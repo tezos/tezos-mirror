@@ -33,7 +33,7 @@ let fetching_locator =
   declare_2
     ~section
     ~name:"fetching_locator"
-    ~msg:"fetching branch of about {locator_length} blocks from peer {peer_id}"
+    ~msg:"fetching branch of {locator_length} blocks from peer {peer_id}"
     ~level:Notice
     ("locator_length", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
@@ -45,7 +45,7 @@ let still_fetching_large_step_from_peer =
     ~msg:
       "still fetching headers from peer {peer_id}: \
        {block_fetched}/{step_length}"
-    ~level:Notice
+    ~level:Info
     ("peer_id", P2p_peer.Id.encoding)
     ("block_fetched", Data_encoding.int31)
     ("step_length", Data_encoding.int31)

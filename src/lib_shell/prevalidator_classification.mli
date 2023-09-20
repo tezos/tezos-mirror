@@ -33,7 +33,7 @@ type error_classification =
   | `Outdated of tztrace ]
 
 (** Classification of an operation in the mempool *)
-type classification = [`Applied | `Prechecked | error_classification]
+type classification = [`Validated | error_classification]
 
 type 'protocol_data bounded_map
 
@@ -59,12 +59,11 @@ module Sized_map :
     not {!add} an operation which is already present in [t]:
 
     - The field [in_mempool] is the set of all operation hashes
-   present in fields: [refused; branch_refused; branch_delayed;
-   prechecked; applied].
+   present in fields:
+   [refused; outdated; branch_refused; branch_delayed; validated].
 
-    - An operation cannot be at the same time in two of the following
-   fields: [refused; branch_refused; branch_delayed; prechecked;
-   applied].
+    - An operation cannot be at the same time in two of the fields:
+   [refused; outdated; branch_refused; branch_delayed; validated].
 
     Note: unparsable operations are handled in a different way because
    they cannot be handled as a [operation] since this
@@ -83,8 +82,7 @@ type 'protocol_data t = private {
   outdated : 'protocol_data bounded_map;
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
-  mutable applied_rev : 'protocol_data operation list;
-  mutable prechecked : 'protocol_data operation Sized_map.t;
+  mutable validated : 'protocol_data operation Sized_map.t;
   mutable unparsable : Operation_hash.Set.t;
   mutable in_mempool :
     ('protocol_data operation * classification) Operation_hash.Map.t;
@@ -116,18 +114,12 @@ val is_in_mempool :
 val is_known_unparsable : Operation_hash.t -> 'protocol_data t -> bool
 
 (** [remove oph classes] removes operation of hash [oph] from all
-    fields of [classes]. If the [oph] was classified as [Applied], the
-    function is in [O(n)] with [n] being the length of
-    [classes.applied]. Otherwise, the function is [O(log n)] with [n]
-    the number of operations in the corresponding class.
+    fields of [classes]. The function is [O(log n)] with [n] the number
+    of operations in the corresponding class.
 
     If [oph] was found, its classification as well as the operation it
     was bound to are returned. If [oph] was not found, [None]
-    is returned.
-
-    {b Warning:} If an operation is removed from the [applied] field,
-    this may invalidate the classification of all the other operations.
-    It is left to the caller to restore a consistent state. *)
+    is returned. *)
 val remove :
   Operation_hash.t ->
   'protocol_data t ->
@@ -151,7 +143,7 @@ val remove :
 
     As a summary:
 
-    - [Applied] and [Prechecked] are never discarded
+    - [Validated] operations are never discarded
 
     - [Branch_refused] and [Branch_delayed] are discarded 0 or 1 time
    (if the corresponding bounded_map is full)
@@ -248,13 +240,11 @@ module Internal_for_tests : sig
       in the ring of [bounded_map] / length of list / cardinal of set). *)
   val pp_t_sizes : Format.formatter -> 'protocol_data t -> unit
 
-  (** [map applied branch_delayed branch_refused refused t]
-    returns the pairs [(operation_hash, operation)] contained in [t].
-    Fields of [t] are included according to the value of the corresponding
-    named argument. *)
+  (** Returns the pairs [(operation_hash, operation)] contained in [t].
+      Fields of [t] are included according to the value of the corresponding
+      named argument. *)
   val to_map :
-    applied:bool ->
-    prechecked:bool ->
+    validated:bool ->
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->
@@ -263,7 +253,7 @@ module Internal_for_tests : sig
     'protocol_data operation Operation_hash.Map.t
 
   (** [flush classes ~handle_branch_refused] partially resets [classes]:
-      - fields [applied_rev], [branch_delayed] and [unparsable] are emptied;
+      - fields [validated], [branch_delayed] and [unparsable] are emptied;
       - field [branch_refused] is emptied iff [handle_branch_refused] is [true];
       - field [refused] is left unchanged, to avoid revalidating operations that
         will never be valid;

@@ -101,7 +101,7 @@ transfers is the following:
 
 The complete schema can be inspected via ``octez-codec describe
 <protocol_name>.fa1.2.token_transfer json schema`` (where ``<protocol_name>``
-can be replaced with e.g. ``alpha`` or ``016-PtMumbai``).
+can be replaced with e.g. ``alpha`` or ``017-PtNairob``).
 
 
 View information

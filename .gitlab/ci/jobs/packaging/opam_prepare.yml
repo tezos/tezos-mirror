@@ -25,12 +25,21 @@
     when: always
   variables:
     RUNTEZTALIAS: "true"
+    # We store caches in _build for two reasons: (1) the _build
+    # folder is excluded from opam's rsync. (2) gitlab ci cache
+    # requires that cached files are in a sub-folder of the checkout.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: "sccache"
+  cache:
+    key: opam-sccache
+    paths:
+      - _build/_sccache
 
 opam:prepare:
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_exec_opam_batch_1
   stage: packaging
   needs: [trigger]
   script:

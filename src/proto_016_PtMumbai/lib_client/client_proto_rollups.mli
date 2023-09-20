@@ -30,6 +30,6 @@ type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
 
 module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
 
-module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t
+module Epoxy_alias : Client_aliases.Alias with type t = Zk_rollup.t
 
-module SoruAlias : Client_aliases.Alias with type t = Sc_rollup.t
+module Soru_alias : Client_aliases.Alias with type t = Sc_rollup.t

@@ -393,7 +393,7 @@ let old_mempool_gen (tree : Block.t Tree.tree) :
     List.map
       (fun (op : Operation.t) ->
         let hash = Operation.hash op in
-        Internal_for_tests.make_operation op hash ())
+        Internal_for_tests.make_operation hash op ())
       pairs
   in
   if elements = [] then QCheck2.Gen.return Operation_hash.Map.empty

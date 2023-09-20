@@ -448,12 +448,18 @@ let main (module C : M) ~select_commands =
           in
           let require_auth = parsed.Client_config.require_auth in
           let*! () =
-            Tezos_base_unix.Internal_event_unix.init_with_defaults
-              ?enable_default_daily_logs_at:daily_logs_path
-              ?internal_events:
-                (Option.bind parsed_config_file (fun cf ->
-                     cf.Client_config.Cfg_file.internal_events))
-              ()
+            let open Tezos_base_unix.Internal_event_unix in
+            let config =
+              make_with_defaults
+                ?enable_default_daily_logs_at:daily_logs_path
+                ()
+            in
+            match parsed_config_file with
+            | None -> init ~config ()
+            | Some cf -> (
+                match cf.Client_config.Cfg_file.internal_events with
+                | None -> init ~config ()
+                | Some config -> init ~config ())
           in
           let rpc_config =
             let rpc_config : RPC_client_unix.config =
@@ -542,7 +548,7 @@ let main (module C : M) ~select_commands =
         match r with
         | Ok () -> Lwt.return 0
         | Error [Tezos_clic.Version] ->
-            let version = Tezos_version.Bin_version.version_string in
+            let version = Tezos_version_value.Bin_version.version_string in
             Format.printf "%s\n" version ;
             Lwt.return 0
         | Error [Tezos_clic.Help command] ->

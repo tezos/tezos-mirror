@@ -63,7 +63,7 @@ let check_validate_1m_restriction_node =
     in
     let* (`OpHash _s) = Operation.Manager.inject [op1] client in
 
-    let error = Operation.conflict_error in
+    let error = Operation.conflict_error_with_needed_fee in
     Log.info
       "Inject a second transfer with the same manager and check that the \
        injection fails with the following message:\n\

@@ -49,11 +49,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       user_activated_upgrades = [];
       user_activated_protocol_overrides = [];
       operation_metadata_size_limit = Unlimited;
-      external_validator_log_config =
-        {
-          lwt_log_sink_unix = Lwt_log_sink_unix.default_cfg;
-          internal_events = Tezos_base.Internal_event_config.lwt_log;
-        };
+      internal_events = Tezos_base.Internal_event_config.stdout;
       data_dir = test_dir;
       store_root = test_dir // "store";
       context_root = test_dir // "context";
@@ -63,7 +59,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       target = None;
       disable_mempool = false;
       enable_testchain = true;
-      dal = Tezos_crypto_dal.Cryptobox.Config.default;
+      dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
     }
   in
   f sandbox_parameters config switch ()
@@ -115,11 +111,23 @@ let ( let*?? ) m f =
 (** Node creation in sandbox. Expects one event with status
     [p2p_layer_disabled]. *)
 let node_sandbox_initialization_events sandbox_parameters config _switch () =
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   let*?? n =
     Node.create
       ~sandboxed:true
       ~sandbox_parameters
       ~singleprocess:true
+      ~version
+      ~commit_info
       (* Tezos_shell.Node.config *)
       config
       (* Tezos_shell.Node.peer_validator_limits *)
@@ -150,10 +158,22 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
 (** Node creation. Expects two events with statuses
     [bootstrapping] and [p2p_maintain_started]. *)
 let node_initialization_events _sandbox_parameters config _switch () =
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   let*?? n =
     Node.create
       ~sandboxed:false
       ~singleprocess:true
+      ~version
+      ~commit_info
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)
@@ -190,10 +210,22 @@ let node_initialization_events _sandbox_parameters config _switch () =
   Node.shutdown n
 
 let node_store_known_protocol_events _sandbox_parameters config _switch () =
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   let*?? n =
     Node.create
       ~sandboxed:false
       ~singleprocess:true
+      ~version
+      ~commit_info
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)

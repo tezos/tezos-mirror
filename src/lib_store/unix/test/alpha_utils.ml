@@ -262,7 +262,8 @@ module Forge = struct
 
   let make_contents ~payload_hash ~payload_round
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
+      ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
       ~seed_nonce_hash () =
     Block_header.
       {
@@ -270,7 +271,11 @@ module Forge = struct
         payload_round;
         proof_of_work_nonce;
         seed_nonce_hash;
-        liquidity_baking_toggle_vote;
+        per_block_votes =
+          {
+            liquidity_baking_vote = liquidity_baking_toggle_vote;
+            adaptive_issuance_vote;
+          };
       }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash
@@ -600,7 +605,7 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
   in
   let block_header_metadata =
     Data_encoding.Binary.to_bytes_exn
-      Main.block_header_metadata_encoding
+      Main.block_header_metadata_encoding_with_legacy_attestation_name
       block_header_metadata
   in
   let payload_hash =

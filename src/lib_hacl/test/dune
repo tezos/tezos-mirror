@@ -8,16 +8,16 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-stdlib
-  tezos-error-monad
-  tezos-lwt-result-stdlib
+  octez-libs.stdlib
+  octez-libs.error-monad
+  octez-libs.lwt-result-stdlib
   zarith
   zarith_stubs_js
   data-encoding
-  tezos-hacl
+  octez-libs.hacl
   qcheck-alcotest
   octez-alcotezt
-  tezos-test-helpers)
+  octez-libs.test-helpers)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
@@ -50,7 +50,7 @@
 
 (rule
  (alias runtest)
- (package tezos-hacl)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
@@ -70,7 +70,7 @@
 
 (rule
  (alias runtest_js)
- (package tezos-hacl)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run node %{dep:./main_js.bc.js})))
 

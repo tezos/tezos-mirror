@@ -6,14 +6,15 @@
  (package octez-smart-rollup-client-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-017-PtNairob
-  tezos-client-commands
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-client-017-PtNairob
-  tezos-smart-rollup-017-PtNairob
-  tezos-smart-rollup-layer2-017-PtNairob)
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol
+  octez-shell-libs.client-commands
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-protocol-017-PtNairob-libs.client
+  octez-l2-libs.smart-rollup
+  octez-protocol-017-PtNairob-libs.smart-rollup
+  octez-protocol-017-PtNairob-libs.smart-rollup-layer2)
  (flags
   (:standard)
   -open Tezos_base
@@ -24,5 +25,6 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_017_PtNairob
+  -open Octez_smart_rollup
   -open Tezos_smart_rollup_017_PtNairob
   -open Tezos_smart_rollup_layer2_017_PtNairob))

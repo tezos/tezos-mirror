@@ -1,8 +1,8 @@
 (executable
  (name error_doc)
  (libraries data-encoding
-            tezos-shell
-            tezos-client-alpha)
+            octez-shell-libs.shell
+            octez-protocol-alpha-libs.client)
  (flags (:standard -open Tezos_base
                    -open Tezos_error_monad
                    -open Data_encoding

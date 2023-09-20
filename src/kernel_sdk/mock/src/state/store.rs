@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -148,6 +149,13 @@ impl Store {
         }
     }
 
+    pub fn delete_value(&mut self, path: &str) {
+        if let Some(mut node) = self.node_from_path_mut(path) {
+            node.value = None;
+            node.inner.remove(VALUE_NAME);
+        };
+    }
+
     pub fn has_entry(&self, path: &str) -> bool {
         self.node_from_path(path)
             .map(|n| n.value.is_some())
@@ -156,7 +164,8 @@ impl Store {
 
     pub fn add_preimage(&mut self, preimage: Vec<u8>) -> [u8; PREIMAGE_HASH_SIZE] {
         let hash_with_prefix =
-            tezos_smart_rollup_encoding::dac::make_preimage_hash(&preimage).unwrap();
+            tezos_smart_rollup_encoding::dac::pages::make_preimage_hash(&preimage)
+                .unwrap();
 
         self.preimages.insert(hash_with_prefix, preimage);
         hash_with_prefix

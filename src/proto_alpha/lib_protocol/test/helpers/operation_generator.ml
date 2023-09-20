@@ -47,14 +47,16 @@ let manager_pass = `PManager
 
 let all_passes = [`PConsensus; `PAnonymous; `PVote; `PManager]
 
-let consensus_kinds = [`KPreendorsement; `KEndorsement; `KDal_attestation]
+let all_non_manager_passes = [`PConsensus; `PAnonymous; `PVote]
+
+let consensus_kinds = [`KPreattestation; `KAttestation; `KDal_attestation]
 
 let anonymous_kinds =
   [
     `KSeed_nonce_revelation;
     `KVdf_revelation;
-    `KDouble_endorsement;
-    `KDouble_preendorsement;
+    `KDouble_attestation;
+    `KDouble_preattestation;
     `KDouble_baking;
     `KActivate_account;
   ]
@@ -68,7 +70,6 @@ let manager_kinds =
     `KTransaction;
     `KOrigination;
     `KDelegation;
-    `KSet_deposits_limit;
     `KIncrease_paid_storage;
     `KRegister_global_constant;
     `KTransfer_ticket;
@@ -94,13 +95,13 @@ let pp_kind fmt k =
     fmt
     "%s"
     (match k with
-    | `KPreendorsement -> "KPreendorsement"
-    | `KEndorsement -> "KEndorsement"
+    | `KPreattestation -> "KPreattestation"
+    | `KAttestation -> "KAttestation"
     | `KDal_attestation -> "KDal_attestation"
     | `KSeed_nonce_revelation -> "KSeed_nonce_revelation"
     | `KVdf_revelation -> "KVdf_revelation"
-    | `KDouble_endorsement -> "KDouble_endorsement"
-    | `KDouble_preendorsement -> "KDouble_preendorsement"
+    | `KDouble_attestation -> "KDouble_attestation"
+    | `KDouble_preattestation -> "KDouble_preattestation"
     | `KDouble_baking -> "KDouble_baking"
     | `KActivate_account -> "KActivate_account"
     | `KProposals -> "KProposals"
@@ -223,13 +224,13 @@ let random_contract_hash =
 
 let block_headers =
   let bh1 =
-    {json|{ "level": 2, "proto": 1, "predecessor": "BLbcVY1kYiKQy2MJJfoHJMN2xRk5QPG1PEKWMDSyW2JMxBsMmiL", "timestamp": "2022-08-08T11:16:30Z", "validation_pass": 4, "operations_hash": "LLoa7bxRTKaQN2bLYoitYB6bU2DvLnBAqrVjZcvJ364cTcX2PZYKU", "fitness": [ "02", "00000002", "", "ffffffff", "00000001" ], "context": "CoUvpF8XBUfz3w9CJumt4ZKGZkrcdcfs1Qdrrd1ZeFij64E1QCud", "payload_hash": "vh2TyrWeZ2dydEy9ZjmvrjQvyCs5sdHZPypcZrXDUSM1tNuPermf", "payload_round": 1, "proof_of_work_nonce": "62de1e0d00000000", "liquidity_baking_toggle_vote": "pass", "signature": "sigaXGo4DWsZwo1SvbKCp2hLgE5jcwd61Ufkc3iMt3sXy3NBj9jticuJKJnRhyH2ZPJQMwEuDqQTgZgoK5xRH6HeF7YxLb4u" }|json}
+    {json|{ "level": 2, "proto": 1, "predecessor": "BLbcVY1kYiKQy2MJJfoHJMN2xRk5QPG1PEKWMDSyW2JMxBsMmiL", "timestamp": "2022-08-08T11:16:30Z", "validation_pass": 4, "operations_hash": "LLoa7bxRTKaQN2bLYoitYB6bU2DvLnBAqrVjZcvJ364cTcX2PZYKU", "fitness": [ "02", "00000002", "", "ffffffff", "00000001" ], "context": "CoUvpF8XBUfz3w9CJumt4ZKGZkrcdcfs1Qdrrd1ZeFij64E1QCud", "payload_hash": "vh2TyrWeZ2dydEy9ZjmvrjQvyCs5sdHZPypcZrXDUSM1tNuPermf", "payload_round": 1, "proof_of_work_nonce": "62de1e0d00000000", "liquidity_baking_toggle_vote": "pass", "adaptive_issuance_vote": "pass", "signature": "sigaXGo4DWsZwo1SvbKCp2hLgE5jcwd61Ufkc3iMt3sXy3NBj9jticuJKJnRhyH2ZPJQMwEuDqQTgZgoK5xRH6HeF7YxLb4u" }|json}
   in
   let bh2 =
-    {json|{ "level": 3, "proto": 1, "predecessor": "BLAUNUbzKHgA4DYQEXCbxY73wdE2roGAzvJJbFp8dQe62Ekpada", "timestamp": "2022-08-08T11:16:32Z", "validation_pass": 4, "operations_hash": "LLoaWjBX8Cm8DVpoLNtm7FPNnxUdL6Dakq122pVfNHYaf2rE9GQXi", "fitness": [ "02", "00000003", "", "fffffffe", "00000000" ], "context": "CoUtWowJUqXwMm4pbR1jjyFfVRHqRHGs6bYVDaaByvbmULoAND2x", "payload_hash": "vh1p1VzeYjZLEW6WDqdTwVy354KEmGCDgPmagEKcLN4NT4X58mNk", "payload_round": 0, "proof_of_work_nonce": "62de1e0d00000000", "liquidity_baking_toggle_vote": "pass", "signature": "sigVqWWE7BPuxHqPWiVRmzQ1eMZZAPAxGJ94ytY2sjV8Y1Z4QH1F2bPGZS1ZeWDbqmcppPPFobRpi7wNasQ17Mm9CFGKag2t" }|json}
+    {json|{ "level": 3, "proto": 1, "predecessor": "BLAUNUbzKHgA4DYQEXCbxY73wdE2roGAzvJJbFp8dQe62Ekpada", "timestamp": "2022-08-08T11:16:32Z", "validation_pass": 4, "operations_hash": "LLoaWjBX8Cm8DVpoLNtm7FPNnxUdL6Dakq122pVfNHYaf2rE9GQXi", "fitness": [ "02", "00000003", "", "fffffffe", "00000000" ], "context": "CoUtWowJUqXwMm4pbR1jjyFfVRHqRHGs6bYVDaaByvbmULoAND2x", "payload_hash": "vh1p1VzeYjZLEW6WDqdTwVy354KEmGCDgPmagEKcLN4NT4X58mNk", "payload_round": 0, "proof_of_work_nonce": "62de1e0d00000000", "liquidity_baking_toggle_vote": "pass", "adaptive_issuance_vote": "pass", "signature": "sigVqWWE7BPuxHqPWiVRmzQ1eMZZAPAxGJ94ytY2sjV8Y1Z4QH1F2bPGZS1ZeWDbqmcppPPFobRpi7wNasQ17Mm9CFGKag2t" }|json}
   in
   let bh3 =
-    {json|{ "level": 4, "proto": 1, "predecessor": "BLuurCvGmNPTzXSnGCpcFPy5h8A49PwH2LnfAWBnp5R1qv5czwe", "timestamp": "2022-08-08T11:16:33Z", "validation_pass": 4, "operations_hash": "LLoaf8AANzyNxhk715zykDrwG5Bpqw6FsZLWWNp2Dcm3ewFrcc3Wc", "fitness": [ "02", "00000004", "", "ffffffff", "00000000" ], "context": "CoVzxEBMDhxpGVxrguik6r5qVogJBFyhuvwm2KZBcsmvqhekPiwL", "payload_hash": "vh2gWcSUUhJBwvjx4vS7JN5ioMVWpHCSK6W2MKNPr5dn6NUdfFDQ", "payload_round": 0, "proof_of_work_nonce": "62de1e0d00000000", "seed_nonce_hash": "nceV3VjdHp1yk6uqcQicQBxLJY1AfWvLSabQpqnpiqkC1q2tS35EN", "liquidity_baking_toggle_vote": "pass", "signature": "sigijumaDLSQwjh2AKK7af1VcEDsZsRwbweL8hF176puhHy3ySVocNCbrwPqJLiQP8EbqY5YL6z6b1vDaw12h8MQU2Rh4SW1" }|json}
+    {json|{ "level": 4, "proto": 1, "predecessor": "BLuurCvGmNPTzXSnGCpcFPy5h8A49PwH2LnfAWBnp5R1qv5czwe", "timestamp": "2022-08-08T11:16:33Z", "validation_pass": 4, "operations_hash": "LLoaf8AANzyNxhk715zykDrwG5Bpqw6FsZLWWNp2Dcm3ewFrcc3Wc", "fitness": [ "02", "00000004", "", "ffffffff", "00000000" ], "context": "CoVzxEBMDhxpGVxrguik6r5qVogJBFyhuvwm2KZBcsmvqhekPiwL", "payload_hash": "vh2gWcSUUhJBwvjx4vS7JN5ioMVWpHCSK6W2MKNPr5dn6NUdfFDQ", "payload_round": 0, "proof_of_work_nonce": "62de1e0d00000000", "seed_nonce_hash": "nceV3VjdHp1yk6uqcQicQBxLJY1AfWvLSabQpqnpiqkC1q2tS35EN", "liquidity_baking_toggle_vote": "pass", "adaptive_issuance_vote": "pass", "signature": "sigijumaDLSQwjh2AKK7af1VcEDsZsRwbweL8hF176puhHy3ySVocNCbrwPqJLiQP8EbqY5YL6z6b1vDaw12h8MQU2Rh4SW1" }|json}
   in
   List.map
     (fun s ->
@@ -376,15 +377,15 @@ let generate_operation gen_op =
   let+ op = generate_op gen_op in
   Operation.pack op
 
-let generate_preendorsement =
+let generate_preattestation =
   let open QCheck2.Gen in
   let+ cc = generate_consensus_content in
-  Preendorsement cc
+  Preattestation cc
 
-let generate_endorsement =
+let generate_attestation =
   let open QCheck2.Gen in
   let+ cc = generate_consensus_content in
-  Endorsement cc
+  Attestation cc
 
 let generate_dal_attestation =
   let open QCheck2.Gen in
@@ -404,17 +405,17 @@ let generate_seed_nonce_revelation =
   let+ nonce = random_nonce in
   Seed_nonce_revelation {level; nonce}
 
-let generate_double_preendorsement =
+let generate_double_preattestation =
   let open QCheck2.Gen in
-  let* op1 = generate_op generate_preendorsement in
-  let+ op2 = generate_op generate_preendorsement in
-  Double_preendorsement_evidence {op1; op2}
+  let* op1 = generate_op generate_preattestation in
+  let+ op2 = generate_op generate_preattestation in
+  Double_preattestation_evidence {op1; op2}
 
-let generate_double_endorsement =
+let generate_double_attestation =
   let open QCheck2.Gen in
-  let* op1 = generate_op generate_endorsement in
-  let+ op2 = generate_op generate_endorsement in
-  Double_endorsement_evidence {op1; op2}
+  let* op1 = generate_op generate_attestation in
+  let+ op2 = generate_op generate_attestation in
+  Double_attestation_evidence {op1; op2}
 
 let generate_double_baking =
   let open QCheck2.Gen in
@@ -500,11 +501,6 @@ let generate_increase_paid_storage =
   let+ destination = random_contract_hash in
   Increase_paid_storage {amount_in_bytes; destination}
 
-let generate_set_deposits_limit =
-  let open QCheck2.Gen in
-  let+ amount_opt = option gen_amount in
-  Set_deposits_limit amount_opt
-
 let generate_register_global_constant =
   let value = Script_repr.lazy_expr (Expr.from_string "Pair 1 2") in
   QCheck2.Gen.pure (Register_global_constant {value})
@@ -520,13 +516,12 @@ let generate_transfer_ticket =
   Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
 
 let generate_dal_publish_slot_header =
-  let published_level = Alpha_context.Raw_level.of_int32_exn Int32.zero in
   let slot_index = Alpha_context.Dal.Slot_index.zero in
   let commitment = Alpha_context.Dal.Slot.Commitment.zero in
   let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
   let slot_header =
     Alpha_context.Dal.Operations.Publish_slot_header.
-      {published_level; slot_index; commitment; commitment_proof}
+      {slot_index; commitment; commitment_proof}
   in
   QCheck2.Gen.pure (Dal_publish_slot_header slot_header)
 
@@ -534,11 +529,9 @@ let generate_sc_rollup_originate =
   let kind = Sc_rollup.Kind.Example_arith in
   let boot_sector = "" in
   let parameters_ty = Script.lazy_expr (Expr.from_string "1") in
-  let origination_proof =
-    Lwt_main.run (Sc_rollup_helpers.compute_origination_proof ~boot_sector kind)
-  in
+  let whitelist = None in
   QCheck2.Gen.pure
-    (Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty})
+    (Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist})
 
 let generate_sc_rollup_add_messages =
   let open QCheck2.Gen in
@@ -561,8 +554,7 @@ let sc_dummy_commitment =
 let generate_sc_rollup_cement =
   let open QCheck2.Gen in
   let+ rollup = random_sc_rollup in
-  let commitment = Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment in
-  Sc_rollup_cement {rollup; commitment}
+  Sc_rollup_cement {rollup}
 
 let generate_sc_rollup_publish =
   let open QCheck2.Gen in
@@ -608,8 +600,6 @@ let generator_of ?source = function
   | `KReveal -> generate_manager_operation ?source generate_reveal
   | `KTransaction -> generate_manager_operation ?source generate_transaction
   | `KOrigination -> generate_manager_operation ?source generate_origination
-  | `KSet_deposits_limit ->
-      generate_manager_operation ?source generate_set_deposits_limit
   | `KIncrease_paid_storage ->
       generate_manager_operation ?source generate_increase_paid_storage
   | `KDelegation -> generate_manager_operation ?source generate_delegation
@@ -637,6 +627,24 @@ let generator_of ?source = function
         generate_sc_rollup_execute_outbox_message
   | `KSc_rollup_recover_bond ->
       generate_manager_operation ?source generate_sc_rollup_recover_bond
+
+let generate_non_manager_operation =
+  let open QCheck2.Gen in
+  let* pass = oneofl all_non_manager_passes in
+  let* kind = oneofl (pass_to_operation_kinds pass) in
+  match kind with
+  | `KPreattestation -> generate_operation generate_preattestation
+  | `KAttestation -> generate_operation generate_attestation
+  | `KDal_attestation -> generate_operation generate_dal_attestation
+  | `KSeed_nonce_revelation -> generate_operation generate_seed_nonce_revelation
+  | `KVdf_revelation -> generate_operation generate_vdf_revelation
+  | `KDouble_attestation -> generate_operation generate_double_attestation
+  | `KDouble_preattestation -> generate_operation generate_double_preattestation
+  | `KDouble_baking -> generate_operation generate_double_baking
+  | `KActivate_account -> generate_operation generate_activate_account
+  | `KProposals -> generate_operation generate_proposals
+  | `KBallot -> generate_operation generate_ballot
+  | `KManager -> assert false
 
 let generate_manager_operation batch_size =
   let open QCheck2.Gen in
@@ -699,15 +707,15 @@ let generate_operation =
   let* kind = oneofl (pass_to_operation_kinds pass) in
   let+ packed_operation =
     match kind with
-    | `KPreendorsement -> generate_operation generate_preendorsement
-    | `KEndorsement -> generate_operation generate_endorsement
+    | `KPreattestation -> generate_operation generate_preattestation
+    | `KAttestation -> generate_operation generate_attestation
     | `KDal_attestation -> generate_operation generate_dal_attestation
     | `KSeed_nonce_revelation ->
         generate_operation generate_seed_nonce_revelation
     | `KVdf_revelation -> generate_operation generate_vdf_revelation
-    | `KDouble_endorsement -> generate_operation generate_double_endorsement
-    | `KDouble_preendorsement ->
-        generate_operation generate_double_preendorsement
+    | `KDouble_attestation -> generate_operation generate_double_attestation
+    | `KDouble_preattestation ->
+        generate_operation generate_double_preattestation
     | `KDouble_baking -> generate_operation generate_double_baking
     | `KActivate_account -> generate_operation generate_activate_account
     | `KProposals -> generate_operation generate_proposals

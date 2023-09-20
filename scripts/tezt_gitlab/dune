@@ -1,0 +1,3 @@
+(library
+ (name tezt_gitlab)
+ (libraries tezt uri))

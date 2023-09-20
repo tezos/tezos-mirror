@@ -11,8 +11,6 @@
     GIT_VERSION: "dev"
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci  build-full-unreleased
-    - chmod +w ${CI_PROJECT_DIR}/octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - strip -s ${CI_PROJECT_DIR}/octez-* _build/default/tezt/tests/main.exe _build/default/src/lib_protocol_compiler/bin/main_native.exe
   artifacts:
     name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
@@ -45,6 +43,8 @@
     - .default_settings_template
     - .image_template__docker
   variables:
+    DOCKER_BUILD_TARGET: "without-evm-artifacts"
+    RUST_TOOLCHAIN_IMAGE: "${PROD_AWS_ECR}/rust-toolchain"
     IMAGE_ARCH_PREFIX: ""
   before_script:
     - ./scripts/ci/docker_registry_auth.sh

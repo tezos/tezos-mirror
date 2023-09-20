@@ -1,0 +1,7 @@
+{0 Octez-protocol-006-PsCARTHA-libs: octez protocol 006-PsCARTHA libraries}
+
+This is a package containing some libraries related to the Tezos 006-PsCARTHA protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_006_PsCARTHA}Tezos_client_006_PsCARTHA}: Protocol specific library for `tezos-client`

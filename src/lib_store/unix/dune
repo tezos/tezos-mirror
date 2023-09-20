@@ -3,24 +3,24 @@
 
 (library
  (name tezos_store_unix)
- (public_name tezos-store.unix)
+ (public_name octez-shell-libs.store.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-shell-services
-  tezos-base
-  tezos-version
+  octez-shell-libs.shell-services
+  octez-libs.base
+  octez-libs.version
   index
   irmin-pack
-  tezos-store.shared
-  tezos-protocol-environment
-  tezos-context
-  tezos-context-ops
-  tezos-shell-context
-  tezos-validation
-  tezos-protocol-updater
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos-crypto
+  octez-shell-libs.store.shared
+  octez-proto-libs.protocol-environment
+  octez-libs.tezos-context
+  octez-shell-libs.context-ops
+  octez-shell-libs.shell-context
+  octez-shell-libs.validation
+  octez-shell-libs.protocol-updater
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
+  octez-libs.crypto
   lwt-watcher
   aches
   aches-lwt
@@ -55,18 +55,18 @@
 
 (library
  (name tezos_store_unix_reconstruction)
- (public_name tezos-store.unix-reconstruction)
+ (public_name octez-shell-libs.store.unix-reconstruction)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
-  tezos-crypto
-  tezos-shell-services
-  tezos-protocol-updater
-  tezos-validation
-  tezos-context-ops
-  tezos-store.shared
-  tezos-store.unix)
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-libs.crypto
+  octez-shell-libs.shell-services
+  octez-shell-libs.protocol-updater
+  octez-shell-libs.validation
+  octez-shell-libs.context-ops
+  octez-shell-libs.store.shared
+  octez-shell-libs.store.unix)
  (flags
   (:standard)
   -open Tezos_base
@@ -83,17 +83,17 @@
 
 (library
  (name tezos_store_unix_snapshots)
- (public_name tezos-store.unix-snapshots)
+ (public_name octez-shell-libs.store.unix-snapshots)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
-  tezos-crypto
-  tezos-shell-services
-  tezos-context
-  tezos-validation
-  tezos-store.shared
-  tezos-store.unix)
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-libs.crypto
+  octez-shell-libs.shell-services
+  octez-libs.tezos-context
+  octez-shell-libs.validation
+  octez-shell-libs.store.shared
+  octez-shell-libs.store.unix)
  (flags
   (:standard)
   -open Tezos_base

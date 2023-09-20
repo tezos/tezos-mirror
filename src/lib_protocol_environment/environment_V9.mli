@@ -98,9 +98,10 @@ module type T = sig
         ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and type Timelock.chest = Tezos_crypto.Timelock.chest
-       and type Timelock.chest_key = Tezos_crypto.Timelock.chest_key
-       and type Timelock.opening_result = Tezos_crypto.Timelock.opening_result
+       and type Timelock.chest = Tezos_crypto.Timelock_legacy.chest
+       and type Timelock.chest_key = Tezos_crypto.Timelock_legacy.chest_key
+       and type Timelock.opening_result =
+        Tezos_crypto.Timelock_legacy.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls.Primitive.Fr.t = Bls12_381.Fr.t
@@ -114,15 +115,13 @@ module type T = sig
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
+       and type Wasm_2_0_0.reveal =
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal
        and type Wasm_2_0_0.version = Tezos_scoru_wasm.Wasm_pvm_state.version
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
        and type Wasm_2_0_0.reveal_hash =
-        Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
-       and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal
-       and type Wasm_2_0_0.input_request =
-        Tezos_scoru_wasm.Wasm_pvm_state.input_request
-       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal_hash
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 

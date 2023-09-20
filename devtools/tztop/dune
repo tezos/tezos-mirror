@@ -8,6 +8,6 @@
  (modes byte)
  (libraries
   octez-protocol-compiler
-  tezos-base
+  octez-libs.base
   compiler-libs.toplevel
   (select tztop.ml from (utop -> tztop.utop.ml) (-> tztop.vanilla.ml))))

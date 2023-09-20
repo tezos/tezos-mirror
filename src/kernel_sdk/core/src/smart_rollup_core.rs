@@ -68,6 +68,9 @@ extern "C" {
     /// Delete the value and/or subkeys of `path` from storage.
     pub fn store_delete(path: *const u8, path_len: usize) -> i32;
 
+    /// Delete the value of `path` from storage.
+    pub fn store_delete_value(path: *const u8, path_len: usize) -> i32;
+
     /// Get the number of subkeys of the prefix given by `path`.
     pub fn store_list_size(path: *const u8, path_len: usize) -> i64;
 
@@ -122,6 +125,22 @@ extern "C" {
     ///
     /// Returns the size of data read (will always be 24).
     pub fn reveal_metadata(destination_addr: *mut u8, max_bytes: usize) -> i32;
+
+    /// Loads the result of a raw reveal request to memory.
+    ///
+    /// If the result is larger than `max_bytes`, its contents is trimmed.
+    ///
+    /// The encoding of the request as stored in the buffer described by `payload_addr` and
+    /// `payload_len` is the same as the one used by the Tezos protocol.
+    ///
+    /// Returns the size of the data loaded in memory.
+    #[cfg(feature = "proto-alpha")]
+    pub fn reveal(
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
 }
 
 /// Wrapper trait for `smart_rollup_core` host functions.
@@ -223,6 +242,13 @@ pub unsafe trait SmartRollupCore {
     /// - `len` must be the length of that slice.
     unsafe fn store_delete(&self, path: *const u8, len: usize) -> i32;
 
+    /// See [store_delete_value].
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `len` must be the length of that slice.
+    unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32;
+
     /// See [store_list_size].
     ///
     /// # Safety
@@ -288,6 +314,23 @@ pub unsafe trait SmartRollupCore {
     /// - `destination_addr` must point to a mutable slice of bytes with
     ///   `capacity >= max_bytes`
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32;
+
+    /// Loads the result of a raw reveal request to memory.
+    /// If the preimage is larger than `max_bytes`, its contents is trimmed.
+    ///
+    /// # Safety
+    /// - `payload_addr` must be a ptr to a slice containing a hash.
+    /// - `payload_len` must be the length of the slice.
+    /// - `destination_addr `must point to a mutable slice of bytes with
+    ///   `capacity >= max_bytes`.
+    #[cfg(feature = "proto-alpha")]
+    unsafe fn reveal(
+        &self,
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
 }
 
 /// Information about message level & id.

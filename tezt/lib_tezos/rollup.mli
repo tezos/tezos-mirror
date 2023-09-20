@@ -39,11 +39,9 @@ module Dal : sig
 
     val parameter_file : Protocol.t -> string Lwt.t
 
-    val from_client : Client.t -> t Lwt.t
+    val from_protocol_parameters : JSON.t -> t
 
-    (** [cryptobox_config_to_json config] returns the Json encoding of
-     the record {!type:Cryptobox.Config.t}. *)
-    val cryptobox_config_to_json : Cryptobox.Config.t -> JSON.t
+    val from_client : Client.t -> t Lwt.t
   end
 
   val endpoint : Dal_node.t -> string
@@ -82,7 +80,14 @@ module Dal : sig
 
     type commitment = string
 
-    type profile = Attestor of string
+    (** Profiles that operate on shards/slots. *)
+    type operator_profile = Attestor of string | Producer of int
+
+    (** List of operator profiles.  *)
+    type operator_profiles = operator_profile list
+
+    (* Profiles tracked by the DAL node. *)
+    type profiles = Bootstrap | Operator of operator_profiles
 
     (** Information contained in a slot header fetched from the DAL node. *)
     type slot_header = {
@@ -138,11 +143,11 @@ module Dal : sig
 
     (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
          the DAL node. *)
-    val patch_profile : profile -> (Dal_node.t, unit) RPC_core.t
+    val patch_profiles : operator_profiles -> (Dal_node.t, unit) RPC_core.t
 
     (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)
-    val get_profiles : unit -> (Dal_node.t, profile list) RPC_core.t
+    val get_profiles : unit -> (Dal_node.t, profiles) RPC_core.t
 
     (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
         statuses know about the given commitment. The resulting list can be filtered by a
@@ -211,8 +216,6 @@ module Dal : sig
   end
 
   module Check : sig
-    type profiles = RPC.profile list
-
-    val profiles_typ : profiles Check.typ
+    val profiles_typ : RPC.profiles Check.typ
   end
 end

@@ -185,26 +185,15 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       verifier_inputs ;
     finish st
 
-  type gate_randomness = {
-    beta_perm : scalar;
-    gamma_perm : scalar;
-    beta_plook : scalar;
-    gamma_plook : scalar;
-    beta_rc : scalar;
-    gamma_rc : scalar;
-    delta : scalar;
-  }
+  type gate_randomness = {beta : scalar; gamma : scalar; delta : scalar}
 
   let build_gates_randomness transcript =
-    let betas_gammas, transcript = Fr_generation.random_fr_list transcript 7 in
-    let beta_perm = List.hd betas_gammas in
-    let gamma_perm = List.nth betas_gammas 1 in
-    let beta_plook = List.nth betas_gammas 2 in
-    let gamma_plook = List.nth betas_gammas 3 in
-    let beta_rc = List.nth betas_gammas 4 in
-    let gamma_rc = List.nth betas_gammas 5 in
-    let delta = List.nth betas_gammas 6 in
-    ( {beta_perm; gamma_perm; beta_plook; gamma_plook; beta_rc; gamma_rc; delta},
+    let betas_gammas, transcript = Fr_generation.random_fr_list transcript 3 in
+    ( {
+        beta = List.hd betas_gammas;
+        gamma = List.nth betas_gammas 1;
+        delta = List.nth betas_gammas 2;
+      },
       transcript )
 
   module Prover = struct
@@ -284,11 +273,11 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       tables : Scalar.t array list;
       wires : int array array;
       permutation : int array;
-      rc_permutation : int array;
+      rc_permutations : int array SMap.t;
       evaluations : Evaluations.t SMap.t;
       alpha : Scalar.t option;
       ultra : bool;
-      range_checks : int list * int;
+      range_checks : (int * int) list SMap.t;
     }
     [@@deriving repr]
 
@@ -298,6 +287,51 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       transcript : PP.transcript;
     }
     [@@deriving repr]
+
+    (* [build_all_wire_keys nb_proofs nb_wires] returns a list of prefixed wires name *)
+    let build_all_wires_keys pp nb_proofs_map nb_wires =
+      let names = wire_names nb_wires in
+      List.concat_map (fun (circuit_name, n) ->
+          let wires_keys =
+            List.concat_map
+              (SMap.Aggregation.build_all_names circuit_name n)
+              names
+          in
+          let c = SMap.find circuit_name pp.circuits_map in
+          let rc_keys =
+            SMap.mapi
+              (fun wire _ ->
+                let n = SMap.find circuit_name nb_proofs_map in
+                List.concat_map
+                  (SMap.Aggregation.build_all_names circuit_name n)
+                  (RangeCheck.z_names wire))
+              c.range_checks
+            |> SMap.values |> List.concat
+          in
+          wires_keys @ rc_keys)
+      @@ SMap.bindings nb_proofs_map
+
+    (* TODO #5551
+       Handle Plookup
+    *)
+    (* For the distributed_prover *)
+    let build_all_keys_z pp =
+      List.concat_map
+        (fun (c_name, c) ->
+          let perm =
+            List.map (SMap.Aggregation.add_prefix c_name) Perm.shared_z_names
+          in
+          if SMap.is_empty c.range_checks then perm
+          else
+            perm
+            @ (SMap.mapi
+                 (fun wire _ ->
+                   List.map
+                     (SMap.Aggregation.add_prefix c_name)
+                     (RangeCheck.shared_z_names wire))
+                 c.range_checks
+              |> SMap.values |> List.concat))
+        (SMap.bindings pp.circuits_map)
 
     let enforce_wire_values wire_indices wire_values =
       try
@@ -312,22 +346,73 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
            Either your witness is too short, or some indexes are greater than \
            the witness size."
 
-    let compute_wire_polynomials ~zero_knowledge ~gates n domain wires =
-      let unblinded_res =
-        SMap.map (fun w -> Evaluations.interpolation_fft domain w) wires
+    let blind ~pp f_map =
+      let nb_extra_blinds =
+        List.fold_left
+          (fun acc e -> max acc (List.length e))
+          0
+          pp.common_pp.eval_points
       in
-      if zero_knowledge then
-        let nb_blinds_map = Gates.aggregate_blinds ~gates in
-        let nb_extra_blinds = SMap.fold (fun _ -> Int.max) nb_blinds_map 0 in
-        let polys, blinds =
-          SMap.map
-            (* 1 more blind is added for the commitment evaluation *)
-              (fun f -> Poly.blind ~nb_blinds:(1 + nb_extra_blinds) n f)
-            unblinded_res
-          |> SMap.two_maps_of_pair_map
-        in
-        (polys, Some blinds)
-      else (unblinded_res, None)
+      let blind_list_map l =
+        List.map
+          (fun unblinded ->
+            if pp.common_pp.zk then
+              let blinded =
+                SMap.map
+                  (Poly.blind ~nb_blinds:(1 + nb_extra_blinds) pp.common_pp.n)
+                  unblinded
+                |> SMap.to_pair
+              in
+              (fst blinded, Some (snd blinded))
+            else (unblinded, None))
+          l
+        |> List.split
+      in
+      SMap.map blind_list_map f_map |> SMap.to_pair
+
+    let update_wires_with_rc_1 ?shifts_map pp
+        (all_f_wires, f_wires, f_blinds, wires_list_map) =
+      let rc_z_evals, rc_map =
+        SMap.mapi
+          (fun name w_list ->
+            let circuit_pp = SMap.find name pp.circuits_map in
+            if SMap.is_empty circuit_pp.range_checks then ([], [])
+            else
+              List.map
+                (fun values ->
+                  RangeCheck.f_map_contribution_1
+                    ~range_checks:circuit_pp.range_checks
+                    ~domain:pp.common_pp.domain
+                    ~values)
+                w_list
+              |> List.split)
+          wires_list_map
+        |> SMap.filter (fun _ x -> x <> ([], []))
+        |> SMap.to_pair
+      in
+      let rc_map, rc_blinds = blind ~pp rc_map in
+      let all_rc_z = SMap.Aggregation.gather_maps ?shifts_map rc_map in
+
+      let wires_list_map =
+        SMap.Aggregation.add_map_list_map wires_list_map rc_z_evals
+      in
+      let f_wires = SMap.Aggregation.add_map_list_map f_wires rc_map in
+      let all_f_wires = SMap.union_disjoint all_f_wires all_rc_z in
+      let f_blinds =
+        SMap.mapi
+          (fun k l1 ->
+            match SMap.find_opt k rc_blinds with
+            | Some l2 ->
+                List.map2
+                  (fun a -> function
+                    | Some b -> Some (SMap.union_disjoint (Option.get a) b)
+                    | None -> None)
+                  l1
+                  l2
+            | None -> l1)
+          f_blinds
+      in
+      (all_f_wires, f_wires, f_blinds, wires_list_map)
 
     (* returns informations about wires, including commitment, blinds &
        different useful representations of wires *)
@@ -346,22 +431,24 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
       (* wire-polynomials array list map & there blinds *)
       let f_wires, f_blinds =
-        SMap.mapi
-          (fun name w_list ->
-            let circuit_pp = SMap.find name pp.circuits_map in
-            List.map
-              (compute_wire_polynomials
-                 ~zero_knowledge:pp.common_pp.zk
-                 ~gates:circuit_pp.gates
-                 pp.common_pp.n
-                 pp.common_pp.domain)
-              w_list
-            |> List.split)
-          wires_list_map
-        |> SMap.two_maps_of_pair_map
+        let f_wires =
+          SMap.map
+            (List.map
+               (SMap.map (Evaluations.interpolation_fft pp.common_pp.domain)))
+            wires_list_map
+        in
+        blind ~pp f_wires
       in
       (* all wire-polynomials gathered in a map *)
       let all_f_wires = SMap.Aggregation.gather_maps ?shifts_map f_wires in
+
+      let all_f_wires, f_wires, f_blinds, wires_list_map =
+        update_wires_with_rc_1
+          ?shifts_map
+          pp
+          (all_f_wires, f_wires, f_blinds, wires_list_map)
+      in
+
       let cm_wires, cm_aux_wires =
         Commitment.commit
           ?all_keys
@@ -371,11 +458,18 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       (wires_list_map, f_wires, f_blinds, all_f_wires, cm_wires, cm_aux_wires)
 
     (* For each circuits, compute the shared Z polynomial *)
-    let build_f_map_perm pp {beta_perm = beta; gamma_perm = gamma; _}
-        batched_wires =
+    let build_f_map_perm pp {beta; gamma; _} batched_wires =
       SMap.mapi
         (fun name values ->
           let circuit_pp = SMap.find name pp.circuits_map in
+          (* Removing everything that is not wires *)
+          let values =
+            let wires_names =
+              wire_names Plompiler.Csir.nb_wires_arch
+              |> List.map String.capitalize_ascii
+            in
+            SMap.filter (fun k _ -> List.mem k wires_names) values
+          in
           let zs =
             Perm.f_map_contribution
               ~permutation:circuit_pp.permutation
@@ -394,8 +488,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       |> SMap.Aggregation.smap_of_smap_smap
 
     (* For each circuit, computes Plookup-specific polynomials *)
-    let build_f_map_plook ?shifts_map pp
-        {beta_plook = beta; gamma_plook = gamma; _} wires_list_map =
+    let build_f_map_plook ?shifts_map pp rd wires_list_map =
       SMap.mapi
         (fun name w_list ->
           let circuit_pp = SMap.find name pp.circuits_map in
@@ -409,8 +502,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                     ~gates:circuit_pp.gates
                     ~tables:circuit_pp.tables
                     ~alpha:circuit_pp.alpha
-                    ~beta
-                    ~gamma
+                    ~beta:rd.beta
+                    ~gamma:rd.gamma
                     ~domain:pp.common_pp.domain
                 in
                 if pp.common_pp.zk then
@@ -422,64 +515,17 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         wires_list_map
       |> SMap.Aggregation.gather_maps ?shifts_map
 
-    let build_f_map_rc_1 ?shifts_map pp {delta; _} wires_list_map batched_wires
-        =
-      let rc_map, rc_z_evals =
-        SMap.mapi
-          (fun name w_list ->
-            let circuit_pp = SMap.find name pp.circuits_map in
-            if fst circuit_pp.range_checks = [] then ([], [])
-            else
-              List.map
-                (fun values ->
-                  let rc_z_eval, rc_map =
-                    RangeCheck.f_map_contribution_1
-                      ~range_checks:circuit_pp.range_checks
-                      ~domain:pp.common_pp.domain
-                      ~values
-                  in
-                  let rc_map =
-                    if pp.common_pp.zk then
-                      SMap.map
-                        (fun f ->
-                          fst (Poly.blind ~nb_blinds:3 pp.common_pp.n f))
-                        rc_map
-                    else rc_map
-                  in
-                  (rc_map, rc_z_eval))
-                w_list
-              |> List.split)
-          wires_list_map
-        |> SMap.to_pair
-      in
-      let batched_z_evals =
-        SMap.mapi
-          (fun name z_evals ->
-            if fst (SMap.find name pp.circuits_map).range_checks = [] then
-              SMap.empty
-            else
-              SMap.singleton
-                RangeCheck.batched_z_name
-                (Evaluations.linear_with_powers z_evals delta))
-          rc_z_evals
-      in
-      let batched_values =
-        Perm.Shared_argument.merge_batched_values batched_z_evals batched_wires
-      in
-      (SMap.Aggregation.gather_maps ?shifts_map rc_map, batched_values)
-
-    let build_f_map_rc_2 pp {beta_rc = beta; gamma_rc = gamma; _} batched_values
-        =
+    let build_f_map_rc_2 pp rd batched_values =
       SMap.mapi
         (fun name values ->
           let circuit_pp = SMap.find name pp.circuits_map in
-          if fst circuit_pp.range_checks = [] then SMap.empty
+          if SMap.is_empty circuit_pp.range_checks then SMap.empty
           else
             let zs =
               RangeCheck.f_map_contribution_2
-                ~permutation:circuit_pp.rc_permutation
-                ~beta
-                ~gamma
+                ~permutations:circuit_pp.rc_permutations
+                ~beta:rd.beta
+                ~gamma:rd.gamma
                 ~domain:pp.common_pp.domain
                 ~values
             in
@@ -540,28 +586,28 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             Perm.prover_identities
               ~circuit_prefix
               ~wires_names
-              ~beta:rd.beta_perm
-              ~gamma:rd.gamma_perm
+              ~beta:rd.beta
+              ~gamma:rd.gamma
               ~n:pp.common_pp.n
               ()
           in
-          if fst circuit_pp.range_checks = [] then perm_id
+          let range_checks = circuit_pp.range_checks in
+          if SMap.is_empty range_checks then perm_id
           else
             let rc2_ids =
               RangeCheck.prover_identities_2
+                ~range_checks
                 ~circuit_prefix
-                ~beta:rd.beta_rc
-                ~gamma:rd.gamma_rc
+                ~beta:rd.beta
+                ~gamma:rd.gamma
                 ~domain_size:pp.common_pp.n
                 ()
             in
-
             merge_prover_identities [perm_id; rc2_ids])
         pp.circuits_map
       |> SMap.values |> merge_prover_identities
 
-    let build_gates_plook_rc1_identities ?shifts_map pp
-        {beta_plook; gamma_plook; _} inputs_map =
+    let build_gates_plook_rc1_identities ?shifts_map pp rd inputs_map =
       let identities_map =
         SMap.mapi
           (fun circuit_name inputs_list ->
@@ -602,29 +648,39 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                     ())
                 inputs_list
             in
+            (* for plookup and rc, we do a mapi on the input_list & ignore the
+               input (instead of doing a List.init nb_proofs) because for the
+               distributed prover, the number of inputs given will differ from
+               nb_proofs *)
             let plookup_identities =
               if not circuit_pp.ultra then []
               else
-                List.init nb_proofs (fun i ->
+                List.mapi
+                  (fun i _ ->
                     Plook.prover_identities
                       ~circuit_prefix
                       ~proof_prefix:(proof_prefix i)
                       ~wires_names
                       ~alpha:circuit_pp.alpha
-                      ~beta:beta_plook
-                      ~gamma:gamma_plook
+                      ~beta:rd.beta
+                      ~gamma:rd.gamma
                       ~n:pp.common_pp.n
                       ())
+                  inputs_list
             in
             let rc1_identities =
-              if fst circuit_pp.range_checks = [] then []
+              let range_checks = circuit_pp.range_checks in
+              if SMap.is_empty range_checks then []
               else
-                List.init nb_proofs (fun i ->
+                List.mapi
+                  (fun i _ ->
                     RangeCheck.prover_identities_1
+                      ~range_checks
                       ~circuit_prefix
                       ~proof_prefix:(proof_prefix i)
                       ~domain_size:pp.common_pp.n
                       ())
+                  inputs_list
             in
             merge_prover_identities
               (rc1_identities @ plookup_identities @ gates_identities))
@@ -645,19 +701,15 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         Perm.Shared_argument.build_batched_wires_values
           ~delta:rd.delta
           ~wires:wires_list_map
+          ()
       in
 
       (* The new batched_wires is used for the RC shared perm argument *)
-      let f_map_contributions, batched_wires =
+      let f_map_contributions =
         let f_map_perm = build_f_map_perm pp rd batched_wires in
         let f_map_plook = build_f_map_plook pp rd wires_list_map in
-        let f_map_rc1, batched_values =
-          build_f_map_rc_1 pp rd wires_list_map batched_wires
-        in
-        let f_map_rc2 = build_f_map_rc_2 pp rd batched_values in
-        ( SMap.union_disjoint_list
-            [f_map_perm; f_map_plook; f_map_rc1; f_map_rc2],
-          batched_values )
+        let f_map_rc2 = build_f_map_rc_2 pp rd batched_wires in
+        SMap.union_disjoint_list [f_map_perm; f_map_plook; f_map_rc2]
       in
 
       let input_com_secrets = format_input_com inputs_map in
@@ -678,7 +730,9 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let batched_wires_polys =
         Perm.Shared_argument.build_batched_witness_polys
           ~use_batched_wires:
-            (SMap.exists (fun _ c -> fst c.range_checks <> []) pp.circuits_map)
+            (SMap.exists
+               (fun _ c -> not (SMap.is_empty c.range_checks))
+               pp.circuits_map)
           ~zero_knowledge:pp.common_pp.zk
           ~domain:pp.common_pp.domain
           ~delta:rd.delta
@@ -757,7 +811,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       alpha : Scalar.t option;
       ultra : bool;
       input_com_sizes : int list;
-      range_checks : bool;
+      range_checks : bool SMap.t;
     }
     [@@deriving repr]
 
@@ -768,7 +822,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         alpha = prover_pp.alpha;
         ultra = prover_pp.ultra;
         input_com_sizes = prover_pp.input_com_sizes;
-        range_checks = fst prover_pp.range_checks <> [];
+        range_checks = SMap.map (fun l -> l <> []) prover_pp.range_checks;
       }
 
     let build_identities circuits_map (n, generator) rd public_inputs_map =
@@ -789,8 +843,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                 ~nb_proofs
                 ~generator
                 ~n
-                ~beta:rd.beta_perm
-                ~gamma:rd.gamma_perm
+                ~beta:rd.beta
+                ~gamma:rd.gamma
                 ~delta:rd.delta
                 ()
             in
@@ -818,28 +872,31 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                       ~generator
                       ~n
                       ~alpha:circuit_pp.alpha
-                      ~beta:rd.beta_plook
-                      ~gamma:rd.gamma_plook
+                      ~beta:rd.beta
+                      ~gamma:rd.gamma
                       ~proof_prefix:(proof_prefix i)
                       ())
             in
-            if not circuit_pp.range_checks then
+            let range_checks = circuit_pp.range_checks in
+            if SMap.is_empty range_checks then
               merge_verifier_identities
                 (perm_identities :: (plookup_identities @ gates_identities))
             else
               let rc1_identities =
                 List.init nb_proofs (fun i ->
                     RangeCheck.verifier_identities_1
+                      ~range_checks
                       ~circuit_prefix
                       ~proof_prefix:(proof_prefix i)
                       ())
               in
               let rc2_identities =
                 RangeCheck.verifier_identities_2
+                  ~range_checks
                   ~circuit_prefix
                   ~nb_proofs
-                  ~beta:rd.beta_rc
-                  ~gamma:rd.gamma_rc
+                  ~beta:rd.beta
+                  ~gamma:rd.gamma
                   ~delta:rd.delta
                   ~domain_size:n
                   ~generator
@@ -918,13 +975,16 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     let eval_points (circuits_map : Prover.circuit_prover_pp SMap.t) =
       let open Prover in
       let used_ultra = SMap.exists (fun _ c -> c.ultra) circuits_map in
-      let used_gx_gate =
+      (* We need gX evaluation for wires if there is a next gate, or if there is a range check gate (RC.Z needs to be evaluated at X & gX and is committed with wires) *)
+      let gx_wires =
         SMap.exists
-          (fun _ c -> Gates.exists_gx_composition ~gates:c.gates)
+          (fun _ c ->
+            Gates.exists_gx_composition ~gates:c.gates
+            || c.range_checks <> SMap.empty)
           circuits_map
       in
       let g_points = if used_ultra then [X; GX] else [X] in
-      let f_points = if used_gx_gate then [X; GX] else [X] in
+      let f_points = if gx_wires then [X; GX] else [X] in
       [g_points; [X; GX]; f_points]
 
     let degree_evaluations ~nb_wires ~gates ~ultra =
@@ -944,16 +1004,14 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           Inputs:
           - n: the number of constraints in the circuits + the number of public inputs
        -   domain: the interpolation domain for polynomials of size n
-       - s elector_polys: the selector polynomials,
-       e.g. [ql, qr, qo, qm, qc] for an arithmetic circuit.
-       We assume ql is the first polynomial in the list.
-       - wire_indices: the list corresponding to the wires indices,
-       e.g. [a, b, c] for an arithmetic circuit
        - l, the number of public inputs + the number of elements committed in input_commitments
        Outputs:
-       - interpolated_polys: selector polynomials, prepended with 0/1s for the public inputs,
+       - interpolated_gates: selector polynomials, prepended with 0/1s for the public inputs,
        interpolated on the domain
+       - extended_gates: gates with "q_pub" selector if there is public_inputs
        - extended_wires: circuits wires prepended with wires corresponding to the public inputs
+       - extended_tables: formatted tables
+       - adapted_range_checks: range check with indexes shifted regarding public_inputs
     *)
     let preprocessing n domain (c : Circuit.t) =
       let l = List.fold_left ( + ) c.public_input_size c.input_com_sizes in
@@ -972,11 +1030,11 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let extended_gates =
         (* Adding 0s/1s for public inputs & input_commitments *)
         SMap.mapi
-          (fun label poly ->
-            let length_poly = Array.length poly in
+          (fun label gate ->
+            let length_poly = Array.length gate in
             Array.init n (fun i ->
                 if i < l && label = ql_name then Scalar.one
-                else if l <= i && i < l + length_poly then poly.(i - l)
+                else if l <= i && i < l + length_poly then gate.(i - l)
                 else Scalar.zero))
           gates
       in
@@ -1000,7 +1058,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
       let extended_gates =
         if c.public_input_size = 0 then extended_gates
-        else SMap.add "qpub" [||] extended_gates
+        else SMap.add_unique "qpub" [||] extended_gates
       in
       let extended_wires =
         let li_array = Array.init l (fun i -> i) in
@@ -1008,7 +1066,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         Array.map (fun w -> Array.pad (Array.append li_array w) n) c.wires
       in
       let adapted_range_checks =
-        (List.map (Int.add l) (fst c.range_checks), snd c.range_checks)
+        SMap.map (List.map (fun (i, n) -> (l + i, n))) c.range_checks
       in
       let extended_tables =
         if not c.ultra then []
@@ -1039,8 +1097,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           (* Generating permutation *)
           let permutation = Perm.build_permutation wires in
 
-          let rc_permutation =
-            RangeCheck.build_permutation ~range_checks ~size_domain:n
+          let rc_permutations =
+            RangeCheck.build_permutations ~range_checks ~size_domain:n
           in
           let g_map_perm =
             Perm.preprocessing
@@ -1055,7 +1113,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           in
           let g_map_range_check =
             RangeCheck.preprocessing
-              ~permutation:rc_permutation
+              ~permutations:rc_permutations
               ~range_checks:circuit.range_checks
               ~domain
           in
@@ -1078,7 +1136,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                 wires;
                 evaluations;
                 permutation;
-                rc_permutation;
+                rc_permutations;
                 alpha;
                 ultra = circuit.ultra;
                 range_checks;
@@ -1092,7 +1150,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
                 alpha;
                 ultra = circuit.ultra;
                 input_com_sizes = circuit.input_com_sizes;
-                range_checks = fst range_checks <> [];
+                range_checks = SMap.map (fun rc -> rc <> []) range_checks;
               }
           in
           ( SMap.add_unique circuit_name prover_pp prv,
@@ -1101,32 +1159,63 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         circuits_map
         SMap.(empty, empty, empty)
 
-    let compute_sizes
-        Circuit.
-          {
-            public_input_size;
-            input_com_sizes;
-            circuit_size;
-            table_size;
-            nb_lookups;
-            ultra;
-            gates;
-            _;
-          } nb_proofs =
+    let compute_sizes circuit_name
+        ( Circuit.
+            {
+              public_input_size;
+              input_com_sizes;
+              circuit_size;
+              table_size;
+              nb_lookups;
+              ultra;
+              gates;
+              range_checks;
+              _;
+            },
+          nb_proofs ) =
       (* Computing domain *)
       (* For TurboPlonk, we want a domain of size a power of two
          higher than or equal to the number of constraints plus public inputs.
          As for UltraPlonk, a domain of size stricly higher than the number of constraints
-         (to be sure we pad the last lookup). *)
-      let nb_cs_pi =
-        circuit_size
-        + List.fold_left ( + ) public_input_size input_com_sizes
-        + if ultra then 1 else 0
+         (to be sure we pad the last lookup).
+         For range-checks, we want to ensure that the domain size is greater than the "size" of the "biggest" range-checks
+      *)
+      let nb_max_constraints =
+        let base_size =
+          circuit_size
+          + List.fold_left ( + ) public_input_size input_com_sizes
+          + if ultra then 1 else 0
+        in
+        let size_with_rc, biggest_rc_wire =
+          SMap.fold
+            (fun wire r (acc, rc_wire) ->
+              let sum_bounds =
+                (List.fold_left (fun sum (_, bound) -> sum + bound)) 0 r
+              in
+              if sum_bounds > acc then (sum_bounds, wire) else (acc, rc_wire))
+            range_checks
+            (base_size, "")
+        in
+        (* if the circuit size has been increased because of the range checks we raise a warning *)
+        let _print_warning =
+          match biggest_rc_wire with
+          | "" -> ()
+          | w ->
+              Printf.printf
+                "\n\
+                 WARNING: Circuit %s's size has been increased to %d (initial \
+                 size was %d) because of the range-checks on the %s wire."
+                circuit_name
+                size_with_rc
+                base_size
+                w
+        in
+        size_with_rc
       in
       (* For UltraPlonk, we want a domain of size a power of two
          higher than the number of records and strictly higher than the number of lookups *)
       let nb_rec_look = if ultra then max (nb_lookups + 1) table_size else 0 in
-      let max_nb = max nb_cs_pi nb_rec_look in
+      let max_nb = max nb_max_constraints nb_rec_look in
       let log = Z.(log2up (of_int max_nb)) in
       let n = Int.shift_left 1 log in
       let pack_size =
@@ -1149,8 +1238,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     let get_sizes ~zero_knowledge circuits_map =
       let log, n, total_pack, some_ultra =
         SMap.fold
-          (fun _ (c, nb_proofs) (acc_log, acc_n, acc_pack_size, acc_ultra) ->
-            let log, n, pack_size = compute_sizes c nb_proofs in
+          (fun k (c, nb_proofs) (acc_log, acc_n, acc_pack_size, acc_ultra) ->
+            let log, n, pack_size = compute_sizes k (c, nb_proofs) in
             ( max acc_log log,
               max acc_n n,
               acc_pack_size + pack_size,
@@ -1210,8 +1299,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let cm_g, g_prover_aux = Commitment.commit pp_prover g_map in
       (* Generating transcript *)
       let transcript =
-        let tmp = PP.PC.Public_parameters.to_bytes n pp_prover in
-        Transcript.expand Commitment.t cm_g tmp
+        PP.PC.Public_parameters.to_bytes n pp_prover
+        |> Transcript.expand Commitment.t cm_g
       in
       let eval_points = eval_points pp_prv in
       let common_prv =

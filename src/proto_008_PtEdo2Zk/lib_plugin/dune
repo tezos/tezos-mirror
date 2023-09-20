@@ -3,11 +3,11 @@
 
 (library
  (name tezos_protocol_plugin_008_PtEdo2Zk)
- (public_name tezos-protocol-plugin-008-PtEdo2Zk)
+ (public_name octez-protocol-008-PtEdo2Zk-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-008-PtEdo2Zk)
+  octez-libs.base
+  tezos-protocol-008-PtEdo2Zk.protocol)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -15,15 +15,17 @@
   -open Tezos_protocol_008_PtEdo2Zk)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-008-PtEdo2Zk-libs))
+
 (library
  (name tezos_protocol_plugin_008_PtEdo2Zk_registerer)
- (public_name tezos-protocol-plugin-008-PtEdo2Zk-registerer)
+ (public_name octez-protocol-008-PtEdo2Zk-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-embedded-protocol-008-PtEdo2Zk
-  tezos-protocol-plugin-008-PtEdo2Zk
-  tezos-validation)
+  octez-libs.base
+  tezos-protocol-008-PtEdo2Zk.embedded-protocol
+  octez-protocol-008-PtEdo2Zk-libs.plugin
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

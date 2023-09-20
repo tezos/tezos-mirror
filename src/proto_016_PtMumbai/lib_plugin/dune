@@ -3,12 +3,12 @@
 
 (library
  (name tezos_protocol_plugin_016_PtMumbai)
- (public_name tezos-protocol-plugin-016-PtMumbai)
+ (public_name octez-protocol-016-PtMumbai-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-016-PtMumbai
-  tezos-smart-rollup-016-PtMumbai)
+  octez-libs.base
+  tezos-protocol-016-PtMumbai.protocol
+  octez-protocol-016-PtMumbai-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -17,15 +17,17 @@
   -open Tezos_smart_rollup_016_PtMumbai)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-016-PtMumbai-libs))
+
 (library
  (name tezos_protocol_plugin_016_PtMumbai_registerer)
- (public_name tezos-protocol-plugin-016-PtMumbai-registerer)
+ (public_name octez-protocol-016-PtMumbai-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-embedded-protocol-016-PtMumbai
-  tezos-protocol-plugin-016-PtMumbai
-  tezos-validation)
+  octez-libs.base
+  tezos-protocol-016-PtMumbai.embedded-protocol
+  octez-protocol-016-PtMumbai-libs.plugin
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

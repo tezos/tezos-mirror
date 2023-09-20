@@ -5,25 +5,25 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-plonk.plonk-test
-  octez-aplonk)
+  octez-libs.plonk.plonk-test
+  octez-libs.aplonk)
  (modules main test_aplonk test_main_protocol))
 
 (rule
  (alias runtest)
- (package octez-aplonk)
+ (package octez-libs)
  (action
   (setenv RANDOM_SEED 42
    (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
 
 (rule
  (alias runtest_slow)
- (package octez-aplonk)
+ (package octez-libs)
  (action (run %{exe:main.exe})))
 
 (rule
  (alias runtest_slow_with_regression)
- (package octez-aplonk)
+ (package octez-libs)
  (action
   (setenv RANDOM_SEED 42
    (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))
@@ -31,6 +31,6 @@
 (executable
  (name bench)
  (libraries
-  octez-plonk.plonk-test
-  octez-aplonk)
+  octez-libs.plonk.plonk-test
+  octez-libs.aplonk)
  (modules bench))

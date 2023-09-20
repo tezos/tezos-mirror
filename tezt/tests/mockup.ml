@@ -234,7 +234,7 @@ let test_typechecking_and_normalization_work_with_constants =
     Michelson_script.(find ["mini_scenarios"; "constant_unit"] protocol |> path)
   in
   let* _ = Client.normalize_script ~script client in
-  let* () = Client.typecheck_script ~script client in
+  let* () = Client.typecheck_script ~scripts:[script] client in
   return ()
 
 let test_simple_baking_event =
@@ -491,7 +491,7 @@ let test_migration_constants ~migrate_from ~migrate_to =
       in
       let* client_to =
         Client.init_mockup
-          ~constants:Protocol.Constants_mainnet
+          ~constants:Protocol.Constants_mainnet_with_chain_id
           ~protocol:migrate_to
           ()
       in
@@ -500,7 +500,7 @@ let test_migration_constants ~migrate_from ~migrate_to =
         perform_migration
           ~protocol:migrate_from
           ~next_protocol:migrate_to
-          ~next_constants:Protocol.Constants_mainnet
+          ~next_constants:Protocol.Constants_mainnet_with_chain_id
           ~pre_migration:(fun _ -> return ())
           ~post_migration:(fun client () ->
             Client.(rpc GET constants_path client))
@@ -1242,17 +1242,27 @@ let test_create_mockup_config_show_init_roundtrip protocols =
         protocol_constants = JSON.parse_file protocol_constants;
       }
   in
-  let compute_expected_amounts bootstrap_accounts protocol_constants =
-    let frozen_deposits_percentage =
-      JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
+  let compute_expected_amounts protocol bootstrap_accounts protocol_constants =
+    let convert =
+      if protocol > Protocol.Nairobi then
+        let limit_of_delegation_over_baking =
+          JSON.(
+            protocol_constants |-> "limit_of_delegation_over_baking" |> as_int)
+        in
+        let limit_of_delegation_over_baking_plus_1 =
+          Int64.of_int (limit_of_delegation_over_baking + 1)
+        in
+        fun amount ->
+          Tez.(amount - (amount /! limit_of_delegation_over_baking_plus_1))
+      else
+        let frozen_deposits_percentage =
+          JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
+        in
+        let pct = 100 - frozen_deposits_percentage in
+        fun amount -> Tez.(of_mutez_int (pct * to_mutez amount / 100))
     in
-    let pct = 100 - frozen_deposits_percentage in
     List.map
-      (fun account ->
-        {
-          account with
-          amount = Tez.(of_mutez_int (pct * to_mutez account.amount / 100));
-        })
+      (fun account -> {account with amount = convert account.amount})
       bootstrap_accounts
   in
   (* Check that two JSON objects are equal by pair-wise comparing
@@ -1389,6 +1399,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
      | Some initial_bootstrap_accounts ->
          let expected_amounts =
            compute_expected_amounts
+             protocol
              initial_bootstrap_accounts
              initial_state.protocol_constants
          in
@@ -1442,6 +1453,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
 
    let expected_amounts =
      compute_expected_amounts
+       protocol
        initial_state.bootstrap_accounts
        initial_state.protocol_constants
    in

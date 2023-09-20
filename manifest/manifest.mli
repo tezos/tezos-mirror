@@ -100,7 +100,7 @@ module Dune : sig
       in the generated dune file. *)
   type foreign_stubs = {
     language : language;
-    flags : string list;
+    flags : s_expr;
     names : string list;
   }
 
@@ -229,7 +229,21 @@ module Dune : sig
       a [(mode promote)] stanza.
   *)
   val targets_rule :
-    ?promote:bool -> ?deps:s_expr list -> string list -> action:s_expr -> s_expr
+    ?promote:bool ->
+    ?deps:s_expr list ->
+    ?enabled_if:s_expr ->
+    string list ->
+    action:s_expr ->
+    s_expr
+
+  (** Same as [targets_rule] but for a single target *)
+  val target_rule :
+    ?promote:bool ->
+    ?deps:s_expr list ->
+    ?enabled_if:s_expr ->
+    string ->
+    action:s_expr ->
+    s_expr
 
   (** Makes an [install] stanza.
 
@@ -451,6 +465,10 @@ module Npm : sig
   (** Npm package description *)
   type t
 
+  (** Version of the package if it comes form an NPM registry, or a path to a
+      local NPM package or JavaScript file. *)
+  type version_or_path = Version of Version.constraints | Path of string
+
   (** Make a npm package.
 
     Usage: [Npm.make package_name version]
@@ -458,7 +476,7 @@ module Npm : sig
   - [package_name] is the name of the npm package.
   - [version]: version constraint used by npm when installing dependencies.
   *)
-  val make : string -> Version.constraints -> t
+  val make : string -> version_or_path -> t
 end
 
 module Flags : sig
@@ -528,9 +546,16 @@ type preprocessor
 
 (** Make a preprocessor.
 
-    [pps ?args target] becomes a [(preprocess (pps target args))] stanza in the [dune] file.
+    [pps target] becomes a [(preprocess (pps target))] stanza in the [dune] file.
     The target's package is also added as a dependency in the [.opam] file. *)
-val pps : ?args:string list -> target -> preprocessor
+val pps : target -> preprocessor
+
+(** Apply multiple preprocessors.
+
+    [pps targets] becomes a [(preprocess (pps targets...))] stanza in the [dune]
+    file. The targets' packages are also added as dependencies in the [.opam]
+    file. *)
+val ppses : target list -> preprocessor
 
 (** Make a staged preprocessor.
 
@@ -637,6 +662,8 @@ type bisect_ppx = No | Yes | With_sigterm
 
     - [flags]: specifies a [(flags ...)] stanza.
       Those flags are passed to the OCaml compiler when compiling and linking OCaml units.
+
+    - [foreign_archives]: specifies a [(foreign_archives)] stanza for the [dune] target.
 
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
@@ -769,6 +796,7 @@ type 'a maker =
   ?deps:target list ->
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
+  ?foreign_archives:string list ->
   ?foreign_stubs:Dune.foreign_stubs ->
   ?ctypes:Ctypes.t ->
   ?implements:target ->
@@ -904,6 +932,15 @@ val private_exes : string list maker
     - [dep_globs_rec]: a list of files to add as dependencies using [(deps (glob_files_rec ...))]
       in the [dune] file.
 
+    - [dune_with_test]: Specifies a condition for the test to be run on the dune file.
+      If set to [Only_on_64_arch], [%{arch_sixtyfour}] is added to the [enabled_if] clause.
+      If set to [Always], nothing is added to the [enabled_if] clause.
+      If set to [Never], [false] is added to the [enabled_if] clause.
+
+    - [enabled_if]: add a custom [enabled_if] clause. If both [dune_with_test] and
+      [enabled_if] are set, then logically, the resulting clause is the conjunction
+      of the two (i.e. [(and <enabled_if> <dune_with_test>)])
+
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
 val test :
@@ -913,6 +950,8 @@ val test :
   ?dep_globs_rec:string list ->
   ?locks:string ->
   ?enabled_if:Dune.s_expr ->
+  ?dune_with_test:with_test ->
+  ?lib_deps:target list ->
   string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
@@ -923,6 +962,7 @@ val tests :
   ?dep_globs_rec:string list ->
   ?locks:string ->
   ?enabled_if:Dune.s_expr ->
+  ?lib_deps:target list ->
   string list maker
 
 (** Register a Tezt test.
@@ -965,7 +1005,9 @@ val tezt :
   ?dep_files:string list ->
   ?synopsis:string ->
   ?opam_with_test:with_test ->
+  ?dune_with_test:with_test ->
   ?with_macos_security_framework:bool ->
+  ?flags:Flags.t ->
   ?dune:Dune.s_expr ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
@@ -1147,6 +1189,44 @@ val open_if : ?m:string -> bool -> target -> target
     [opam/virtual/profile.opam] file without having to add it as a dependency of an
     actual package. *)
 val add_dep_to_profile : string -> target -> unit
+
+(** This module is used to register multiple libraries (sub-libraries)
+    for a single container package. See
+    [https://dune.readthedocs.io/en/stable/concepts/package-spec.html#libraries]
+    for the corresponding dune feature. *)
+module Sub_lib : sig
+  type documentation_entrypoint = Module | Page | Sub_lib
+
+  type sub_lib = {
+    name : string;
+    synopsis : string option;
+    documentation_type : documentation_entrypoint;
+  }
+
+  (** The type of a container for a set of sub-libraries *)
+  type container
+
+  (** Create a container *)
+  val make_container : unit -> container
+
+  (** A sub-lib [maker] is similar to a generic [maker] except that:
+
+      - Passing a value for the [opam] parameter raises [Invalid_argument],
+        as all sub-libraires are necessarily restricted to a single opam
+        package.
+
+      - The [internal_name] parameter can be given to set the internal name of the
+      library. *)
+  type nonrec maker = ?internal_name:string -> string maker
+
+  (** Define a maker for sub-libraries of a given [container]. *)
+  val sub_lib :
+    package_synopsis:string -> container:container -> package:string -> maker
+
+  (** Prints all the registered sub-libraries of a package. *)
+  val pp_documentation_of_container :
+    header:string -> Format.formatter -> container -> unit
+end
 
 (** Get a name for a given target, to display in errors.
 

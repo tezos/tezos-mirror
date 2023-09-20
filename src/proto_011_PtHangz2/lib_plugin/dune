@@ -3,11 +3,11 @@
 
 (library
  (name tezos_protocol_plugin_011_PtHangz2)
- (public_name tezos-protocol-plugin-011-PtHangz2)
+ (public_name octez-protocol-011-PtHangz2-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-011-PtHangz2)
+  octez-libs.base
+  tezos-protocol-011-PtHangz2.protocol)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -15,15 +15,17 @@
   -open Tezos_protocol_011_PtHangz2)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-011-PtHangz2-libs))
+
 (library
  (name tezos_protocol_plugin_011_PtHangz2_registerer)
- (public_name tezos-protocol-plugin-011-PtHangz2-registerer)
+ (public_name octez-protocol-011-PtHangz2-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-embedded-protocol-011-PtHangz2
-  tezos-protocol-plugin-011-PtHangz2
-  tezos-validation)
+  octez-libs.base
+  tezos-protocol-011-PtHangz2.embedded-protocol
+  octez-protocol-011-PtHangz2-libs.plugin
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

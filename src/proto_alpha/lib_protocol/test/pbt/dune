@@ -6,21 +6,21 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-micheline
-  tezos-client-alpha
-  tezos-protocol-alpha
-  tezos-context.merkle_proof_encoding
-  tezos-test-helpers
-  tezos-alpha-test-helpers
+  octez-libs.base
+  octez-libs.micheline
+  octez-protocol-alpha-libs.client
+  tezos-protocol-alpha.protocol
+  octez-libs.tezos-context.merkle_proof_encoding
+  octez-libs.test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-smart-rollup-alpha
-  tezos-crypto-dal
-  tezos-base-test-helpers
+  octez-protocol-alpha-libs.smart-rollup
+  octez-libs.crypto-dal
+  octez-libs.base-test-helpers
   tezos-protocol-alpha.parameters)
  (library_flags (:standard -linkall))
  (flags
@@ -58,6 +58,7 @@
   test_dal_slot_proof
   test_compare_operations
   test_operation_encoding
+  test_balance_updates_encoding
   test_bytes_conversion))
 
 (executable

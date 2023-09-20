@@ -23,24 +23,111 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4443
-   Node profiles should be stored into the memory as well
-   so that we can cache them *)
+module Slot_set = Set.Make (Int)
+module Pkh_set = Signature.Public_key_hash.Set
 
-let add_profile node_store profile =
+(** The set of slots tracked by the slot producer profile and pkh tracked by the attestor.
+    Uses a set to remove duplicates in the profiles provided by the user. *)
+type operator_sets = {producers : Slot_set.t; attestors : Pkh_set.t}
+
+(** A profile context stores profile-specific data used by the daemon.  *)
+type t = Bootstrap | Operator of operator_sets
+
+let empty = Operator {producers = Slot_set.empty; attestors = Pkh_set.empty}
+
+let bootstrap_profile = Bootstrap
+
+let init_attestor operator_sets number_of_slots gs_worker pkh =
+  if Pkh_set.mem pkh operator_sets.attestors then operator_sets
+  else (
+    List.iter
+      (fun slot_index ->
+        Join Gossipsub.{slot_index; pkh}
+        |> Gossipsub.Worker.(app_input gs_worker))
+      Utils.Infix.(0 -- (number_of_slots - 1)) ;
+    {operator_sets with attestors = Pkh_set.add pkh operator_sets.attestors})
+
+let init_producer operator_sets slot_index =
+  {
+    operator_sets with
+    producers = Slot_set.add slot_index operator_sets.producers;
+  }
+
+let add_operator_profiles t proto_parameters gs_worker
+    (operator_profiles : Services.Types.operator_profiles) =
+  match t with
+  | Bootstrap -> None
+  | Operator operator_sets ->
+      let operator_sets =
+        List.fold_left
+          (fun operator_sets operator ->
+            match operator with
+            | Services.Types.Attestor pkh ->
+                init_attestor
+                  operator_sets
+                  proto_parameters.Dal_plugin.number_of_slots
+                  gs_worker
+                  pkh
+            | Producer {slot_index} -> init_producer operator_sets slot_index)
+          operator_sets
+          operator_profiles
+      in
+      Some (Operator operator_sets)
+
+(* TODO https://gitlab.com/tezos/tezos/-/issues/5934
+   We need a mechanism to ease the tracking of newly added/removed topics. *)
+let join_topics_for_producer gs_worker committee producers =
+  Slot_set.iter
+    (fun slot_index ->
+      Signature.Public_key_hash.Map.iter
+        (fun pkh _shards ->
+          let topic = Gossipsub.{slot_index; pkh} in
+          if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
+            Join topic |> Gossipsub.Worker.(app_input gs_worker))
+        committee)
+    producers
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5934
+   We need a mechanism to ease the tracking of newly added/removed topics.
+   Especially important for bootstrap nodes as the cross product can grow quite large. *)
+let join_topics_for_bootstrap proto_parameters gs_worker committee =
+  (* Join topics for all combinations of (all slots) * (all pkh in comittee) *)
+  for slot_index = 0 to proto_parameters.Dal_plugin.number_of_slots do
+    Signature.Public_key_hash.Map.iter
+      (fun pkh _shards ->
+        let topic = Gossipsub.{slot_index; pkh} in
+        if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
+          Join topic |> Gossipsub.Worker.(app_input gs_worker))
+      committee
+  done
+
+let on_new_head t proto_parameters gs_worker committee =
+  match t with
+  | Bootstrap -> join_topics_for_bootstrap proto_parameters gs_worker committee
+  | Operator {producers; attestors = _} ->
+      join_topics_for_producer gs_worker committee producers
+
+let get_profiles t =
+  match t with
+  | Bootstrap -> Services.Types.Bootstrap
+  | Operator {producers; attestors} ->
+      let producer_profiles =
+        Slot_set.fold
+          (fun slot_index acc -> Services.Types.Producer {slot_index} :: acc)
+          producers
+          []
+      in
+      let attestor_profiles =
+        Pkh_set.fold
+          (fun pkh acc -> Services.Types.Attestor pkh :: acc)
+          attestors
+          producer_profiles
+      in
+      Services.Types.Operator (attestor_profiles @ producer_profiles)
+
+let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in
-  let*! () = Store.Legacy.add_profile node_store profile in
-  return_unit
-
-let get_profiles node_store = Store.Legacy.get_profiles node_store
-
-let get_attestable_slots ctxt store proto_parameters pkh ~attested_level =
-  let open Lwt_result_syntax in
-  let* shard_indexes =
-    Node_context.fetch_assigned_shard_indices ctxt ~pkh ~level:attested_level
-    |> Errors.other_lwt_result
-  in
-  let expected_number_of_shards = List.length shard_indexes in
+  let expected_number_of_shards = List.length shard_indices in
   if expected_number_of_shards = 0 then return Services.Types.Not_in_committee
   else
     let published_level =
@@ -65,7 +152,7 @@ let get_attestable_slots ctxt store proto_parameters pkh ~attested_level =
           Store.Shards.are_shards_available
             store.shard_store
             commitment
-            shard_indexes
+            shard_indices
           |> Errors.other_lwt_result
     in
     let all_slot_indexes =

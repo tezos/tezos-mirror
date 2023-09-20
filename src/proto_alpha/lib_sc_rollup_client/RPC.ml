@@ -23,15 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Block_services =
+  Rollup_node_services.Make_services (Sc_rollup_services.Block)
+
 let get_sc_rollup_addresses_command cctxt =
-  Sc_rollup_services.Global.(make_call sc_rollup_address) cctxt () () ()
+  Rollup_node_services.Global.(make_call sc_rollup_address) cctxt () () ()
 
 let get_state_value_command cctxt block key =
-  Sc_rollup_services.Global.Block.(make_call1 state_value) cctxt block {key} ()
+  Block_services.(make_call1 Sc_rollup_services.Block.state_value)
+    cctxt
+    block
+    {key}
+    ()
 
 let get_outbox_proof cctxt serialized_output =
-  Sc_rollup_services.Global.Helpers.(make_call outbox_proof)
+  Block_services.(make_call Sc_rollup_services.Block.Helpers.outbox_proof)
     cctxt
-    ()
+    ((), `Head)
     serialized_output
+    ()
+
+let get_outbox cctxt block level =
+  Block_services.(make_call1 Sc_rollup_services.Block.outbox)
+    cctxt
+    block
+    level
     ()

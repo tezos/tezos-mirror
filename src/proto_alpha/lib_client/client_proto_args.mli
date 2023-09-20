@@ -76,8 +76,6 @@ val successor_level_arg : (bool, full) Tezos_clic.arg
 
 val force_switch : (bool, full) Tezos_clic.arg
 
-val no_endorse_switch : (bool, full) Tezos_clic.arg
-
 val minimal_timestamp_switch : (bool, full) Tezos_clic.arg
 
 val preserved_levels_arg : (int, full) Tezos_clic.arg
@@ -103,15 +101,29 @@ val tez_param :
   ('a, full) Tezos_clic.params ->
   (Tez.t -> 'a, full) Tezos_clic.params
 
-val non_negative_z_parameter : (Z.t, full) Tezos_clic.parameter
+val everything_or_tez_param :
+  name:string ->
+  desc:string ->
+  ('a, full) Tezos_clic.params ->
+  (Tez.t -> 'a, full) Tezos_clic.params
+
+val non_negative_z_parameter :
+  unit -> (Z.t, #Client_context.io) Tezos_clic.parameter
 
 val non_negative_z_param :
   name:string ->
   desc:string ->
-  ('a, full) Tezos_clic.params ->
-  (Z.t -> 'a, full) Tezos_clic.params
+  ('a, (#Client_context.io as 'b)) Tezos_clic.params ->
+  (Z.t -> 'a, 'b) Tezos_clic.params
 
-val non_negative_parameter : (int, full) Tezos_clic.parameter
+val non_negative_parameter :
+  unit -> (int, #Client_context.io) Tezos_clic.parameter
+
+val non_negative_param :
+  name:string ->
+  desc:string ->
+  ('a, (#Client_context.io as 'b)) Tezos_clic.params ->
+  (int -> 'a, 'b) Tezos_clic.params
 
 val global_constant_param :
   name:string ->
@@ -120,14 +132,6 @@ val global_constant_param :
   (string -> 'a, full) Tezos_clic.params
 
 val signature_parameter : (Signature.t, full) Tezos_clic.parameter
-
-module Daemon : sig
-  val baking_switch : (bool, full) Tezos_clic.arg
-
-  val endorsement_switch : (bool, full) Tezos_clic.arg
-
-  val denunciation_switch : (bool, full) Tezos_clic.arg
-end
 
 val int_parameter : (int, full) Tezos_clic.parameter
 
@@ -196,7 +200,14 @@ val json_parameter : (Data_encoding.Json.t, full) Tezos_clic.parameter
 
 val data_parameter : (Michelson_v1_parser.parsed, full) Tezos_clic.parameter
 
-val raw_level_parameter : (Raw_level.t, full) Tezos_clic.parameter
+val raw_level_parameter :
+  unit -> (Raw_level.t, #Client_context.io) Tezos_clic.parameter
+
+val raw_level_param :
+  name:string ->
+  desc:string ->
+  ('a, (#Client_context.io as 'b)) Tezos_clic.params ->
+  (Raw_level.t -> 'a, 'b) Tezos_clic.params
 
 val micheline_parameter :
   (Tezos_micheline.Micheline_parser.node * string, full) Tezos_clic.parameter
@@ -211,6 +222,12 @@ val display_names_flag : (bool, full) Tezos_clic.arg
 val level_arg : (Script_int.n Script_int.num option, full) Tezos_clic.arg
 
 val now_arg : (Script_timestamp.t option, full) Tezos_clic.arg
+
+val limit_of_staking_over_baking_millionth_arg :
+  (int option, full) Tezos_clic.arg
+
+val edge_of_baking_over_staking_billionth_arg :
+  (int option, full) Tezos_clic.arg
 
 module Sc_rollup_params : sig
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter
@@ -231,7 +248,11 @@ module Sc_rollup_params : sig
 
   val number_of_ticks_parameter :
     (Sc_rollup.Number_of_ticks.t, full) Tezos_clic.parameter
+
+  val whitelist : (Sc_rollup.Whitelist.t, full) Tezos_clic.parameter
 end
+
+val whitelist_arg : (Sc_rollup.Whitelist.t option, full) Tezos_clic.arg
 
 module Zk_rollup_params : sig
   val address_parameter : (Zk_rollup.t, full) Tezos_clic.parameter
@@ -252,6 +273,14 @@ module Zk_rollup_params : sig
     ( [`Fee | `Private | `Public] Zk_rollup.Account.SMap.t,
       full )
     Tezos_clic.parameter
+end
+
+module Dal : sig
+  val commitment_parameter :
+    (Dal_slot_repr.Commitment.t, full) Tezos_clic.parameter
+
+  val commitment_proof_parameter :
+    (Dal_slot_repr.Commitment_proof.t, full) Tezos_clic.parameter
 end
 
 val fee_parameter_args : (Injection.fee_parameter, full) Tezos_clic.arg

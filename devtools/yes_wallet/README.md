@@ -39,3 +39,57 @@ The `<commit-or-tag>` refers to some git revision, where the support
 was still maintained (given protocol was active).
 
 After that, the support for the given protocol should be restored.
+
+## Populating an alias file
+
+In order to define aliases, `yes-wallet` supports an optional flag,
+`--aliases` which takes as argument .json file like the following:
+
+```
+[ 
+  {
+    "alias": "Tezos Foundation Baker 1",
+    "address": "tz3cqThj23Feu55KDynm7Vg81mCMpWDgzQZq",
+    "publicKey": "p2pk64qdTFeEGX4QBidPhHX3DadEQVCKpwnaeZg3Mrm6HuM81UAeCq1"
+  },
+  {
+    "alias": "Tezos Foundation Baker 2",
+    "address": "tz3ipHZQpBBFuxv7eKoFgGnTaU3RBhnS93yY",
+    "publicKey": "p2pk65aRfSEqWS1oKrmLCQTaLZULRAEWbmtqouMQhbZC82eirDcUfz4"
+  },
+  {
+    "alias": "Tezos Foundation Baker 3",
+    "address": "tz3UC5hM9uCUiqmAw1pHdxjAdGueQMd8u3wf",
+    "publicKey": "p2pk67A75WnRFWcBgPa9FTLCLAMTohiJXY7TnJiEzX2VuUDK5T3JL6k"
+  },
+  {
+    "alias": "Tezos Foundation Baker 4",
+    "address": "tz3UQN6nBQHofmgQ3pZannhiYE2CT7TEZFim",
+    "publicKey": "p2pk66UPQPLsLejfoss1iwss34icqnZT7UuqdbMaNTzGXQKfGaURMGH"
+  },
+  {
+    "alias": "Tezos Foundation Baker 5",
+    "address": "tz3XPXVG3rmMp7xioPNdj7DyUsFsTFwaG3Ws",
+    "publicKey": "p2pk65rGpQjUzFuQ9zTzCsBgZn9DLhgzw4AyM17kgqc3zUgphXpfpB6"
+  },
+  {
+    "alias": "Tezos Foundation Baker 6",
+    "address": "tz3TXntG3Ncp2Eiv1iGSUquAGio3kpJFQNpY",
+    "publicKey": "p2pk67N1gEB2gYkwcLJQcNmGQvr4R7w2QyKQWJbnGb9MkeGjFVE5JuW"
+  },
+  {
+    "alias": "Tezos Foundation Baker 8",
+    "address": "tz3iY4BXVpKC6JQ3KB7pwHKa1SVpitcfM4p2",
+    "publicKey": "p2pk65dXz5EXTvHskQqmveu5aS9dNLKNajDtcoht4nrmvPYr3F7ecGH"
+  }
+]
+```
+
+Such file can be populated using an indexer's API. For example the
+following script gets all known aliases from active delegates in Tezos
+Mainnet using [tzkt.io](https://tzkt.io)'s API:
+
+```
+curl https://api.tzkt.io/v1/delegates?limit=5000 | jq 'map(select ((.alias?) and .active) |{ "alias" : .alias, "address" : .address , "publicKey" : .publicKey})' > aliases.json
+
+```

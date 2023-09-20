@@ -3,14 +3,14 @@
 
 (library
  (name tenderbrute_017_PtNairob)
- (public_name tezos-baking-017-PtNairob.tenderbrute)
+ (public_name octez-protocol-017-PtNairob-libs.baking.tenderbrute)
  (libraries
   data-encoding
-  tezos-base
-  tezos-base.unix
-  tezos-protocol-017-PtNairob
-  tezos-client-base
-  tezos-client-017-PtNairob)
+  octez-libs.base
+  octez-libs.base.unix
+  tezos-protocol-017-PtNairob.protocol
+  octez-shell-libs.client-base
+  octez-protocol-017-PtNairob-libs.client)
  (flags
   (:standard)
   -open Data_encoding

@@ -3,16 +3,16 @@
 
 (library
  (name tezos_scoru_wasm_helpers)
- (public_name tezos-scoru-wasm-helpers)
+ (public_name octez-l2-libs.scoru-wasm-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-tree-encoding
-  tezos-base.unix
-  tezos-context.disk
-  tezos-scoru-wasm
-  tezos-scoru-wasm-fast
-  tezos-webassembly-interpreter-extra)
+  octez-libs.base
+  octez-libs.tree-encoding
+  octez-libs.base.unix
+  octez-libs.tezos-context.disk
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-fast
+  octez-l2-libs.webassembly-interpreter-extra)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags
   (:standard)

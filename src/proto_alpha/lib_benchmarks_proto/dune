@@ -7,23 +7,23 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   str
-  tezos-stdlib
-  tezos-base
-  tezos-error-monad
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
   tezos-protocol-alpha.parameters
-  tezos-lazy-containers
+  octez-libs.lazy-containers
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha
-  tezos-crypto
-  tezos-shell-benchmarks
-  tezos-micheline
-  tezos-alpha-test-helpers
-  tezos-sapling
-  tezos-client-alpha
-  tezos-protocol-plugin-alpha
-  tezos-protocol-environment)
+  tezos-protocol-alpha.protocol
+  octez-libs.crypto
+  octez-shell-libs.shell-benchmarks
+  octez-libs.micheline
+  octez-protocol-alpha-libs.test-helpers
+  octez-libs.tezos-sapling
+  octez-protocol-alpha-libs.client
+  octez-protocol-alpha-libs.plugin
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

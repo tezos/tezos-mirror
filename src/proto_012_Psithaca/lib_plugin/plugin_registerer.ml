@@ -34,6 +34,6 @@ module Metrics = struct
   let hash = Registerer.Registered.hash
 end
 
-let () = Shell_plugin.register_rpc (module RPC)
+let () = Protocol_plugin.register_rpc (module RPC)
 
-let () = Shell_plugin.register_metrics (module Metrics)
+let () = Protocol_plugin.register_metrics (module Metrics)

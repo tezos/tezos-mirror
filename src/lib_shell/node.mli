@@ -34,7 +34,7 @@ type config = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   data_dir : string;
-  external_validator_log_config : External_validation.log_config;
+  internal_events : Tezos_base.Internal_event_config.t;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -48,21 +48,27 @@ type config = {
       (** If [true], all non-empty mempools will be ignored. *)
   enable_testchain : bool;
       (** If [false], testchain related messages will be ignored. *)
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
+  version:string ->
+  commit_info:Node_version.commit_info ->
   config ->
   Shell_limits.peer_validator_limits ->
   Shell_limits.block_validator_limits ->
   Shell_limits.prevalidator_limits ->
   Shell_limits.chain_validator_limits ->
   History_mode.t option ->
-  t tzresult Lwt.t
+  (t, tztrace) result Lwt.t
 
 val shutdown : t -> unit Lwt.t
 
-val build_rpc_directory : t -> unit Tezos_rpc.Directory.t
+val build_rpc_directory :
+  version:Tezos_version_parser.t ->
+  commit_info:Node_version.commit_info ->
+  t ->
+  unit Tezos_rpc.Directory.t

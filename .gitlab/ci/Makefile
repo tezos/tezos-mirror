@@ -8,6 +8,14 @@ last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^
 new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
 new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
 
+# CI_NODE_INDEX and CI_NODE_TOTAL are only available in jobs whose
+# definition contains 'parallel:'. Give them a default value of 1, so
+# that they can be used as argument to Tezt's '--job' regardless of
+# whether 'parallel:' is used or not (since '--job 1/1' is noop to
+# tezt).
+CI_NODE_INDEX ?= 1
+CI_NODE_TOTAL ?= 1
+
 .PHONY: test-protocol-compiles
 test-protocol-compiles:
 	cd ${CI_PROJECT_DIR} && \
@@ -16,7 +24,7 @@ test-protocol-compiles:
 .PHONY: test-tezt
 test-tezt:
 	cd ${CI_PROJECT_DIR} && \
-		_build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 4 --retry 1 && \
+		_build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 3 --retry 1 && \
 		./scripts/ci/merge_coverage.sh
 
 .PHONY: test-tezt-static-binaries
@@ -25,7 +33,7 @@ ifndef TESTS
 	$(error TESTS is undefined)
 endif
 	cd ${CI_PROJECT_DIR} && \
-		dune exec tezt/tests/main.exe -- ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 4 --retry 1
+		_build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 3 --retry 1
 
 .PHONY: test-tezt-build-long
 test-tezt-build-long:
@@ -40,7 +48,7 @@ test-tezt-self-test:
 .PHONY: test-tezt-fetch-records
 test-tezt-fetch-records:
 	cd ${CI_PROJECT_DIR} && \
-		dune exec tezt/records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info
+		dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info
 
 .PHONY: integration-test-compiler-rejections
 integration-test-compiler-rejections:
@@ -119,7 +127,9 @@ endif
 .PHONY: doc-build-all
 doc-build-all:
 	cd ${CI_PROJECT_DIR} && \
+		./scripts/remove-old-protocols.sh .trash && \
 		make all && \
+		./scripts/restore-old-protocols.sh .trash && \
 		make -C docs -j all
 
 .PHONY: doc-publish

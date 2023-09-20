@@ -50,6 +50,7 @@ module Parameters = struct
     remote_mode : bool;
     operations_pool : string option;
     dal_node : Dal_node.t option;
+    minimal_nanotez_per_gas_unit : int option;
   }
 
   type session_state = {mutable ready : bool}
@@ -93,7 +94,8 @@ let liquidity_baking_votefile ?path vote =
 
 let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
     ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
-    ?(remote_mode = false) ?operations_pool ?dal_node node client =
+    ?(remote_mode = false) ?operations_pool ?dal_node
+    ?minimal_nanotez_per_gas_unit node client =
   let baker =
     create
       ~path:(Protocol.baker protocol)
@@ -114,6 +116,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
         force_apply;
         operations_pool;
         dal_node;
+        minimal_nanotez_per_gas_unit;
       }
   in
   on_stdout baker (handle_raw_stdout baker) ;
@@ -158,6 +161,12 @@ let run ?event_level ?event_sections_levels (baker : t) =
           (Dal_node.rpc_port node))
       baker.persistent_state.dal_node
   in
+  let minimal_nanotez_per_gas_unit =
+    Cli_arg.optional_arg
+      "minimal-nanotez-per-gas-unit"
+      (fun nanotez_per_gas -> string_of_int nanotez_per_gas)
+      baker.persistent_state.minimal_nanotez_per_gas_unit
+  in
   let run_args =
     if baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; Node.data_dir node]
@@ -166,7 +175,9 @@ let run ?event_level ?event_sections_levels (baker : t) =
     ["--endpoint"; node_addr; "--base-dir"; Client.base_dir client; "run"]
     @ run_args @ liquidity_baking_toggle_vote @ votefile @ force_apply
     @ operations_pool @ dal_node_endpoint @ delegates
+    @ minimal_nanotez_per_gas_unit
   in
+
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
     trigger_ready baker None ;
@@ -199,7 +210,8 @@ let wait_for_ready baker =
 
 let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
     ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote ?force_apply
-    ?remote_mode ?operations_pool ?dal_node node client =
+    ?remote_mode ?operations_pool ?dal_node ?minimal_nanotez_per_gas_unit node
+    client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -214,6 +226,7 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
       ?remote_mode
       ?operations_pool
       ?dal_node
+      ?minimal_nanotez_per_gas_unit
       ~delegates
       node
       client

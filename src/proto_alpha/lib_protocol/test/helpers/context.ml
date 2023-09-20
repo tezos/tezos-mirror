@@ -121,34 +121,35 @@ let rpc_ctxt =
         | I bl -> Incremental.rpc_ctxt#call_proto_service3 s bl a b c q i
   end
 
-let get_endorsers ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
+let get_attesters ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
 
-let get_first_different_endorsers ctxt =
-  get_endorsers ctxt >|=? function x :: y :: _ -> (x, y) | _ -> assert false
+let get_first_different_attesters ctxt =
+  get_attesters ctxt >|=? function x :: y :: _ -> (x, y) | _ -> assert false
 
-let get_endorser ctxt =
-  get_endorsers ctxt >|=? fun endorsers ->
-  let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
-  (endorser.consensus_key, endorser.slots)
+let get_attester ctxt =
+  get_attesters ctxt >|=? fun attesters ->
+  let attester = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd attesters in
+  (attester.consensus_key, attester.slots)
 
-let get_endorser_slot ctxt pkh =
-  get_endorsers ctxt >|=? fun endorsers ->
+let get_attester_slot ctxt pkh =
+  get_attesters ctxt >|=? fun attesters ->
   List.find_map
     (function
       | {Plugin.RPC.Validators.consensus_key; slots; _} ->
           if Signature.Public_key_hash.(consensus_key = pkh) then Some slots
           else None)
-    endorsers
+    attesters
 
-let get_endorser_n ctxt n =
-  Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun endorsers ->
-  let endorser =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth endorsers n
+let get_attester_n ctxt n =
+  Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun attesters ->
+  let attester =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth attesters n
   in
-  (endorser.consensus_key, endorser.slots)
+  (attester.consensus_key, attester.slots)
 
-let get_endorsing_power_for_delegate ctxt ?levels pkh =
-  Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun endorsers ->
+let get_attesting_power_for_delegate ctxt ?level pkh =
+  let levels = Option.map (fun level -> [level]) level in
+  Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun attesters ->
   let rec find_slots_for_delegate = function
     | [] -> return 0
     | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
@@ -156,11 +157,24 @@ let get_endorsing_power_for_delegate ctxt ?levels pkh =
           return (List.length slots)
         else find_slots_for_delegate t
   in
-  find_slots_for_delegate endorsers
+  find_slots_for_delegate attesters
+
+let get_cumulated_attesting_power_for_delegate ctxt ~levels pkh =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun accu level ->
+      let+ power = get_attesting_power_for_delegate ctxt ~level pkh in
+      accu + power)
+    0
+    levels
+
+let get_current_voting_power = Delegate_services.current_voting_power rpc_ctxt
 
 let get_voting_power = Delegate_services.voting_power rpc_ctxt
 
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
+
+let get_current_baking_power = Delegate_services.current_baking_power rpc_ctxt
 
 let get_bakers ?filter ?cycle ctxt =
   Plugin.RPC.Baking_rights.get rpc_ctxt ?cycle ctxt >|=? fun bakers ->
@@ -203,34 +217,66 @@ let default_test_constants =
   Tezos_protocol_alpha_parameters.Default_parameters.constants_test
 
 let get_baking_reward_fixed_portion ctxt =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {baking_reward_fixed_portion; _}; _} ->
-  return baking_reward_fixed_portion
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.For_RPC.reward_from_constants
+       csts
+       ~reward_kind:Baking_reward_fixed_portion)
 
-let get_bonus_reward ctxt ~endorsing_power =
+let get_bonus_reward ctxt ~attesting_power =
   get_constants ctxt
-  >>=? fun {
-             Constants.parametric =
-               {baking_reward_bonus_per_slot; consensus_threshold; _};
-             _;
-           } ->
-  let multiplier = max 0 (endorsing_power - consensus_threshold) in
+  >>=? fun {Constants.parametric = {consensus_threshold; _} as csts; _} ->
+  let baking_reward_bonus_per_slot =
+    Delegate.Rewards.For_RPC.reward_from_constants
+      csts
+      ~reward_kind:Baking_reward_bonus_per_slot
+  in
+  let multiplier = max 0 (attesting_power - consensus_threshold) in
   return Test_tez.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
-let get_endorsing_reward ctxt ~expected_endorsing_power =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {endorsing_reward_per_slot; _}; _} ->
+let get_attesting_reward ctxt ~expected_attesting_power =
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  let attesting_reward_per_slot =
+    Delegate.Rewards.For_RPC.reward_from_constants
+      csts
+      ~reward_kind:Attesting_reward_per_slot
+  in
   Lwt.return
     (Environment.wrap_tzresult
-       Tez.(endorsing_reward_per_slot *? Int64.of_int expected_endorsing_power))
+       Tez.(attesting_reward_per_slot *? Int64.of_int expected_attesting_power))
 
 let get_liquidity_baking_subsidy ctxt =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {liquidity_baking_subsidy; _}; _} ->
-  return liquidity_baking_subsidy
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.For_RPC.reward_from_constants
+       csts
+       ~reward_kind:Liquidity_baking_subsidy)
 
 let get_liquidity_baking_cpmm_address ctxt =
   Alpha_services.Liquidity_baking.get_cpmm_address rpc_ctxt ctxt
+
+let get_adaptive_issuance_launch_cycle ctxt =
+  Adaptive_issuance_services.launch_cycle rpc_ctxt ctxt
+
+let get_total_frozen_stake ctxt =
+  Adaptive_issuance_services.total_frozen_stake rpc_ctxt ctxt
+
+let get_total_supply ctxt =
+  Adaptive_issuance_services.total_supply rpc_ctxt ctxt
+
+let get_seed_nonce_revelation_tip ctxt =
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.For_RPC.reward_from_constants
+       csts
+       ~reward_kind:Seed_nonce_revelation_tip)
+
+let get_vdf_revelation_tip ctxt =
+  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  return
+    (Delegate.Rewards.For_RPC.reward_from_constants
+       csts
+       ~reward_kind:Vdf_revelation_tip)
 
 (* Voting *)
 
@@ -296,6 +342,18 @@ module Contract = struct
   let balance_and_frozen_bonds ctxt contract =
     Alpha_services.Contract.balance_and_frozen_bonds rpc_ctxt ctxt contract
 
+  let staked_balance ctxt contract =
+    Alpha_services.Contract.staked_balance rpc_ctxt ctxt contract
+
+  let unstaked_frozen_balance ctxt contract =
+    Alpha_services.Contract.unstaked_frozen_balance rpc_ctxt ctxt contract
+
+  let unstaked_finalizable_balance ctxt contract =
+    Alpha_services.Contract.unstaked_finalizable_balance rpc_ctxt ctxt contract
+
+  let full_balance ctxt contract =
+    Alpha_services.Contract.full_balance rpc_ctxt ctxt contract
+
   let counter ctxt (contract : Contract.t) =
     match contract with
     | Originated _ -> invalid_arg "Helpers.Context.counter"
@@ -341,7 +399,6 @@ module Delegate = struct
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
     staking_balance : Tez.t;
-    frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     deactivated : bool;
@@ -364,9 +421,6 @@ module Delegate = struct
   let staking_balance ctxt pkh =
     Delegate_services.staking_balance rpc_ctxt ctxt pkh
 
-  let frozen_deposits_limit ctxt pkh =
-    Delegate_services.frozen_deposits_limit rpc_ctxt ctxt pkh
-
   let deactivated ctxt pkh = Delegate_services.deactivated rpc_ctxt ctxt pkh
 
   let voting_info ctxt d = Alpha_services.Delegate.voting_info rpc_ctxt ctxt d
@@ -382,6 +436,15 @@ module Sc_rollup = struct
       Plugin.RPC.Sc_rollup.S.inbox
       rpc_ctxt
       ctxt
+      ()
+      ()
+
+  let whitelist ctxt rollup =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.whitelist
+      rpc_ctxt
+      ctxt
+      rollup
       ()
       ()
 
@@ -459,11 +522,10 @@ let tup_get : type a r. (a, r) tup -> a list -> r =
 let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_delegations ?bootstrap_consensus_keys ?consensus_threshold
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
-    ?liquidity_baking_subsidy ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
-    ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
-    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
+    ?issuance_weights ?origination_size ?blocks_per_cycle
+    ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
+    ?sc_rollup_private_enable ?dal_enable ?zk_rollup_enable
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal () =
   let n = tup_n tup in
   Account.generate_accounts ?rng_state n >>?= fun accounts ->
   let contracts =
@@ -483,19 +545,18 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_contracts
     ?level
     ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
+    ?issuance_weights
     ?origination_size
     ?blocks_per_cycle
     ?cycles_per_voting_period
     ?sc_rollup_enable
     ?sc_rollup_arith_pvm_enable
+    ?sc_rollup_private_enable
     ?dal_enable
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
+    ?dal
     bootstrap_accounts
   >|=? fun blk -> (blk, tup_get tup contracts)
 
@@ -574,12 +635,16 @@ let default_raw_context () =
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun context ->
-  let typecheck ctxt script_repr = return ((script_repr, None), ctxt) in
+  let typecheck_smart_contract ctxt script_repr =
+    return ((script_repr, None), ctxt)
+  in
+  let typecheck_smart_rollup ctxt _script_repr = Result_syntax.return ctxt in
   Init_storage.prepare_first_block
     Chain_id.zero
     context
     ~level:0l
     ~timestamp:(Time.Protocol.of_seconds 1643125688L)
     ~predecessor:Block_hash.zero
-    ~typecheck
+    ~typecheck_smart_contract
+    ~typecheck_smart_rollup
   >>= fun e -> Lwt.return @@ Environment.wrap_tzresult e

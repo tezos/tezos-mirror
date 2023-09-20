@@ -30,9 +30,7 @@
 open Alpha_context
 
 type error +=
-  | Not_enough_endorsements of {required : int; provided : int}
   | Faulty_validation_wrong_slot
-  | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
@@ -43,26 +41,15 @@ type error +=
   | Multiple_revelation
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
+  | Invalid_self_transaction_destination
+  | Staking_for_delegator_while_external_staking_disabled
+  | Staking_to_delegate_that_refuses_external_staking
+  | Stake_modification_with_no_delegate_set
+  | Invalid_nonzero_transaction_amount of Tez.t
+  | Invalid_unstake_request_amount of {requested_amount : Z.t}
+  | Invalid_staking_parameters_sender
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"operation.not_enough_endorsements"
-    ~title:"Not enough endorsements"
-    ~description:
-      "The block being validated does not include the required minimum number \
-       of endorsements."
-    ~pp:(fun ppf (required, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong number of endorsements (%i), at least %i are expected"
-        provided
-        required)
-    Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
-    (function
-      | Not_enough_endorsements {required; provided} -> Some (required, provided)
-      | _ -> None)
-    (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
   let description =
     "The consensus operation uses an invalid slot. This error should not \
      happen: the operation validation should have failed earlier."
@@ -76,21 +63,6 @@ let () =
     Data_encoding.empty
     (function Faulty_validation_wrong_slot -> Some () | _ -> None)
     (fun () -> Faulty_validation_wrong_slot) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.set_deposits_limit_on_unregistered_delegate"
-    ~title:"Set deposits limit on an unregistered delegate"
-    ~description:"Cannot set deposits limit on an unregistered delegate."
-    ~pp:(fun ppf c ->
-      Format.fprintf
-        ppf
-        "Cannot set a deposits limit on the unregistered delegate %a."
-        Signature.Public_key_hash.pp
-        c)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function
-      | Set_deposits_limit_on_unregistered_delegate c -> Some c | _ -> None)
-    (fun c -> Set_deposits_limit_on_unregistered_delegate c) ;
 
   let error_while_taking_fees_description =
     "There was an error while taking the fees, which should not happen and \
@@ -217,7 +189,113 @@ let () =
         c)
     Data_encoding.(obj1 (req "contract" Destination.encoding))
     (function Invalid_sender c -> Some c | _ -> None)
-    (fun c -> Invalid_sender c)
+    (fun c -> Invalid_sender c) ;
+  let invalid_self_transaction_destination_description =
+    "A pseudo-transaction destination must equal its sender."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_self_transaction_destination"
+    ~title:"Invalid destination for a pseudo-transaction"
+    ~description:invalid_self_transaction_destination_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        invalid_self_transaction_destination_description)
+    Data_encoding.unit
+    (function Invalid_self_transaction_destination -> Some () | _ -> None)
+    (fun () -> Invalid_self_transaction_destination) ;
+  let staking_for_delegator_while_external_staking_disabled_description =
+    "As long as external staking is not enabled, staking operations are only \
+     allowed from delegates."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.staking_for_delegator_while_external_staking_disabled"
+    ~title:"Staking for a delegator while external staking is disabled"
+    ~description:
+      staking_for_delegator_while_external_staking_disabled_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        staking_for_delegator_while_external_staking_disabled_description)
+    Data_encoding.unit
+    (function
+      | Staking_for_delegator_while_external_staking_disabled -> Some ()
+      | _ -> None)
+    (fun () -> Staking_for_delegator_while_external_staking_disabled) ;
+  let stake_modification_without_delegate_description =
+    "(Un)Stake operations are only allowed when delegate is set."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.stake_modification_with_no_delegate_set"
+    ~title:"(Un)staking without any delegate set"
+    ~description:stake_modification_without_delegate_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf stake_modification_without_delegate_description)
+    Data_encoding.unit
+    (function Stake_modification_with_no_delegate_set -> Some () | _ -> None)
+    (fun () -> Stake_modification_with_no_delegate_set) ;
+  let staking_to_delegate_that_refuses_external_staking_description =
+    "The delegate currently does not accept staking operations from sources \
+     other than itself: its `limit_of_staking_over_baking` parameter is set to \
+     0."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operations.staking_to_delegate_that_refuses_external_staking"
+    ~title:"Staking to delegate that does not accept external staking"
+    ~description:staking_to_delegate_that_refuses_external_staking_description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        staking_to_delegate_that_refuses_external_staking_description)
+    Data_encoding.unit
+    (function
+      | Staking_to_delegate_that_refuses_external_staking -> Some () | _ -> None)
+    (fun () -> Staking_to_delegate_that_refuses_external_staking) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_nonzero_transaction_amount"
+    ~title:"Invalid non-zero transaction amount"
+    ~description:"A transaction expected a zero-amount but got non-zero."
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "A transaction expected a zero-amount but got %a."
+        Tez.pp
+        amount)
+    Data_encoding.(obj1 (req "amount" Tez.encoding))
+    (function
+      | Invalid_nonzero_transaction_amount amount -> Some amount | _ -> None)
+    (fun amount -> Invalid_nonzero_transaction_amount amount) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_unstake_request_amount"
+    ~title:"Invalid unstake request amount"
+    ~description:"The unstake requested amount is negative or too large."
+    ~pp:(fun ppf requested_amount ->
+      Format.fprintf
+        ppf
+        "The unstake requested amount, %a, is negative or too large."
+        Z.pp_print
+        requested_amount)
+    Data_encoding.(obj1 (req "requested_amount" z))
+    (function
+      | Invalid_unstake_request_amount {requested_amount} ->
+          Some requested_amount
+      | _ -> None)
+    (fun requested_amount -> Invalid_unstake_request_amount {requested_amount}) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_staking_parameters_sender"
+    ~title:"Invalid staking parameters sender"
+    ~description:"The staking parameters can only be set by delegates."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid staking parameters sender")
+    Data_encoding.empty
+    (function Invalid_staking_parameters_sender -> Some () | _ -> None)
+    (fun () -> Invalid_staking_parameters_sender)
 
 open Apply_results
 open Apply_operation_result
@@ -237,9 +315,31 @@ let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     ~ticket_diffs
     operations
 
-let apply_delegation ~ctxt ~sender ~delegate ~before_operation =
-  Contract.Delegate.set ctxt sender delegate >|=? fun ctxt ->
-  (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
+let apply_delegation ~ctxt ~(sender : Contract.t) ~delegate ~before_operation =
+  let open Lwt_result_syntax in
+  let* ctxt, balance_updates =
+    match sender with
+    | Originated _ ->
+        (* Originated contracts have no stake (yet). *)
+        return (ctxt, [])
+    | Implicit sender_pkh -> (
+        let* sender_delegate_status =
+          Contract.get_delegate_status ctxt sender_pkh
+        in
+        match sender_delegate_status with
+        | Undelegated | Delegate ->
+            (* No delegate before or re-activation: no unstake request added. *)
+            return (ctxt, [])
+        | Delegated delegate ->
+            (* [request_unstake] bounds to the actual stake. *)
+            Staking.request_unstake
+              ctxt
+              ~sender_contract:sender
+              ~delegate
+              Tez.max_mutez)
+  in
+  let+ ctxt = Contract.Delegate.set ctxt sender delegate in
+  (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, balance_updates, [])
 
 type 'loc execution_arg =
   | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg
@@ -266,6 +366,171 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = not already_allocated;
+      }
+  in
+  return (ctxt, result, [])
+
+let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
+  let open Lwt_result_syntax in
+  let contract = Contract.Implicit destination in
+  (* Staking of zero is forbidden. *)
+  let*? () = error_when Tez.(amount = zero) (Empty_transaction contract) in
+  let*? () =
+    error_unless
+      Signature.Public_key_hash.(sender = destination)
+      Invalid_self_transaction_destination
+  in
+  let*? ctxt = Gas.consume ctxt Adaptive_issuance_costs.stake_cost in
+  let* delegate_opt = Contract.Delegate.find ctxt contract in
+  match delegate_opt with
+  | None -> tzfail Stake_modification_with_no_delegate_set
+  | Some delegate ->
+      let allowed =
+        Signature.Public_key_hash.(delegate = sender)
+        || Constants.adaptive_issuance_enable ctxt
+      in
+      let*? () =
+        error_unless
+          allowed
+          Staking_for_delegator_while_external_staking_disabled
+      in
+      let* {limit_of_staking_over_baking_millionth; _} =
+        Delegate.Staking_parameters.of_delegate ctxt delegate
+      in
+      let forbidden =
+        Signature.Public_key_hash.(delegate <> sender)
+        && Compare.Int32.(limit_of_staking_over_baking_millionth = 0l)
+      in
+      let*? () =
+        error_when forbidden Staking_to_delegate_that_refuses_external_staking
+      in
+      let* ctxt, balance_updates =
+        Staking.stake ctxt ~sender ~delegate amount
+      in
+      (* Since [delegate] is an already existing delegate, it is already allocated. *)
+      let allocated_destination_contract = false in
+      let result =
+        Transaction_to_contract_result
+          {
+            storage = None;
+            lazy_storage_diff = None;
+            balance_updates;
+            ticket_receipt = [];
+            originated_contracts = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size = Z.zero;
+            paid_storage_size_diff = Z.zero;
+            allocated_destination_contract;
+          }
+      in
+      return (ctxt, result, [])
+
+let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
+    ~before_operation =
+  let open Lwt_result_syntax in
+  let*? () =
+    error_when Tez.(amount <> zero) (Invalid_nonzero_transaction_amount amount)
+  in
+  let*? () =
+    error_unless
+      Signature.Public_key_hash.(sender = destination)
+      Invalid_self_transaction_destination
+  in
+  let requested_amount_opt =
+    if Z.fits_int64 requested_amount then
+      Tez.of_mutez (Z.to_int64 requested_amount)
+    else None
+  in
+  let*? requested_amount =
+    match requested_amount_opt with
+    | None -> error (Invalid_unstake_request_amount {requested_amount})
+    | Some requested_amount -> Ok requested_amount
+  in
+  let sender_contract = Contract.Implicit sender in
+  let*? ctxt = Gas.consume ctxt Adaptive_issuance_costs.find_delegate_cost in
+  let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
+  match delegate_opt with
+  | None -> tzfail Stake_modification_with_no_delegate_set
+  | Some delegate ->
+      let* ctxt, balance_updates =
+        Staking.request_unstake ctxt ~sender_contract ~delegate requested_amount
+      in
+      let result =
+        Transaction_to_contract_result
+          {
+            storage = None;
+            lazy_storage_diff = None;
+            balance_updates;
+            ticket_receipt = [];
+            originated_contracts = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size = Z.zero;
+            paid_storage_size_diff = Z.zero;
+            allocated_destination_contract = false;
+          }
+      in
+      return (ctxt, result, [])
+
+let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
+    =
+  error_when Tez.(amount <> zero) (Invalid_nonzero_transaction_amount amount)
+  >>?= fun () ->
+  error_unless
+    Signature.Public_key_hash.(sender = destination)
+    Invalid_self_transaction_destination
+  >>?= fun () ->
+  let contract = Contract.Implicit sender in
+  Gas.consume ctxt Adaptive_issuance_costs.find_delegate_cost >>?= fun ctxt ->
+  Contract.allocated ctxt contract >>= fun already_allocated ->
+  Staking.finalize_unstake ctxt contract >>=? fun (ctxt, balance_updates) ->
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates;
+        ticket_receipt = [];
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract = not already_allocated;
+      }
+  in
+  return (ctxt, result, [])
+
+let apply_set_delegate_parameters ~ctxt ~sender ~destination
+    ~limit_of_staking_over_baking_millionth
+    ~edge_of_baking_over_staking_billionth ~before_operation =
+  let open Lwt_result_syntax in
+  let*? ctxt =
+    Gas.consume ctxt Adaptive_issuance_costs.set_delegate_parameters_cost
+  in
+  let*? () =
+    error_unless
+      Signature.Public_key_hash.(sender = destination)
+      Invalid_self_transaction_destination
+  in
+  let* is_delegate = Contract.is_delegate ctxt sender in
+  let*? () = error_unless is_delegate Invalid_staking_parameters_sender in
+  let*? t =
+    Staking_parameters_repr.make
+      ~limit_of_staking_over_baking_millionth
+      ~edge_of_baking_over_staking_billionth
+  in
+  let* ctxt = Delegate.Staking_parameters.register_update ctxt sender t in
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates = [];
+        ticket_receipt = [];
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract = false;
       }
   in
   return (ctxt, result, [])
@@ -668,8 +933,8 @@ let apply_internal_operation_contents :
   | Delegation delegate ->
       assert_sender_is_contract sender >>?= fun sender ->
       apply_delegation ~ctxt ~sender ~delegate ~before_operation:ctxt_before_op
-      >|=? fun (ctxt, consumed_gas, ops) ->
-      (ctxt, IDelegation_result {consumed_gas}, ops)
+      >|=? fun (ctxt, consumed_gas, balance_updates, ops) ->
+      (ctxt, IDelegation_result {consumed_gas; balance_updates}, ops)
 
 let apply_manager_operation :
     type kind.
@@ -740,20 +1005,76 @@ let apply_manager_operation :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      (* Only allow [Unit] parameter to implicit accounts. *)
-      (match Micheline.root parameters with
-      | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
-      | _ -> error (Script_interpreter.Bad_contract_parameter source_contract))
-      >>?= fun () ->
-      (if Entrypoint.is_default entrypoint then Result.return_unit
-      else error (Script_tc_errors.No_such_entrypoint entrypoint))
-      >>?= fun () ->
-      apply_transaction_to_implicit
-        ~ctxt
-        ~sender:source_contract
-        ~amount
-        ~pkh
-        ~before_operation:ctxt_before_op
+      let elab_conf = Script_ir_translator_config.make ~legacy:false () in
+      (match Entrypoint.to_string entrypoint with
+      | "default" ->
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
+          >>=? fun () ->
+          apply_transaction_to_implicit
+            ~ctxt
+            ~sender:source_contract
+            ~amount
+            ~pkh
+            ~before_operation:ctxt_before_op
+      | "stake" ->
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
+          >>=? fun () ->
+          apply_stake
+            ~ctxt
+            ~sender:source
+            ~amount
+            ~destination:pkh
+            ~before_operation:ctxt_before_op
+      | "unstake" ->
+          Script_ir_translator.parse_data
+            ~elab_conf
+            ctxt
+            ~allow_forged:false
+            Script_typed_ir.int_t
+            (Micheline.root parameters)
+          >>=? fun (requested_amount, ctxt) ->
+          apply_unstake
+            ~ctxt
+            ~sender:source
+            ~amount
+            ~requested_amount:(Script_int.to_zint requested_amount)
+            ~destination:pkh
+            ~before_operation:ctxt_before_op
+      | "finalize_unstake" ->
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
+          >>=? fun () ->
+          apply_finalize_unstake
+            ~ctxt
+            ~sender:source
+            ~amount
+            ~destination:pkh
+            ~before_operation:ctxt_before_op
+      | "set_delegate_parameters" ->
+          Script_ir_translator.parse_data
+            ~elab_conf
+            ctxt
+            ~allow_forged:false
+            Script_typed_ir.pair_int_int_unit_t
+            (Micheline.root parameters)
+          >>=? fun ( ( limit_of_staking_over_baking_millionth,
+                       (edge_of_baking_over_staking_billionth, ()) ),
+                     ctxt ) ->
+          apply_set_delegate_parameters
+            ~ctxt
+            ~sender:source
+            ~destination:pkh
+            ~limit_of_staking_over_baking_millionth:
+              (Script_int.to_zint limit_of_staking_over_baking_millionth)
+            ~edge_of_baking_over_staking_billionth:
+              (Script_int.to_zint edge_of_baking_over_staking_billionth)
+            ~before_operation:ctxt_before_op
+      | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
       {amount; parameters; destination = Originated contract_hash; entrypoint}
@@ -920,8 +1241,8 @@ let apply_manager_operation :
         ~sender:source_contract
         ~delegate
         ~before_operation:ctxt_before_op
-      >|=? fun (ctxt, consumed_gas, ops) ->
-      (ctxt, Delegation_result {consumed_gas}, ops)
+      >|=? fun (ctxt, consumed_gas, balance_updates, ops) ->
+      (ctxt, Delegation_result {consumed_gas; balance_updates}, ops)
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
       Script.force_decode_in_context ~consume_deserialization_gas ctxt value
@@ -954,18 +1275,6 @@ let apply_manager_operation :
           }
       in
       return (ctxt, result, [])
-  | Set_deposits_limit limit ->
-      Delegate.registered ctxt source >>= fun is_registered ->
-      error_unless
-        is_registered
-        (Set_deposits_limit_on_unregistered_delegate source)
-      >>?= fun () ->
-      Delegate.set_frozen_deposits_limit ctxt source limit >>= fun ctxt ->
-      return
-        ( ctxt,
-          Set_deposits_limit_result
-            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
-          [] )
   | Increase_paid_storage {amount_in_bytes; destination} ->
       Contract.increase_paid_storage ctxt destination ~amount_in_bytes
       >>=? fun ctxt ->
@@ -998,13 +1307,13 @@ let apply_manager_operation :
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Dal_publish_slot_header_result {slot_header; consumed_gas} in
       return (ctxt, result, [])
-  | Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty} ->
+  | Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist} ->
       Sc_rollup_operations.originate
         ctxt
         ~kind
         ~boot_sector
-        ~origination_proof
         ~parameters_ty
+        ?whitelist
       >>=? fun ({address; size; genesis_commitment_hash}, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
@@ -1023,12 +1332,7 @@ let apply_manager_operation :
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas} in
       return (ctxt, result, [])
-  | Sc_rollup_cement {rollup; commitment = _commitment_hash} ->
-      (* The field [commitment] is deprecated. It is not used during the
-         application of [Sc_rollup_cement]. The commitment to cement is
-         computed by the protocol.
-
-         It is deprecated starting N, and can be removed in O. *)
+  | Sc_rollup_cement {rollup} ->
       Sc_rollup.Stake_storage.cement_commitment ctxt rollup
       >>=? fun (ctxt, commitment, commitment_hash) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
@@ -1294,8 +1598,7 @@ let burn_manager_storage_fees :
             size_of_constant = payload.size_of_constant;
             global_address = payload.global_address;
           } )
-  | Set_deposits_limit_result _ | Update_consensus_key_result _ ->
-      return (ctxt, storage_limit, smopr)
+  | Update_consensus_key_result _ -> return (ctxt, storage_limit, smopr)
   | Increase_paid_storage_result _ -> return (ctxt, storage_limit, smopr)
   | Transfer_ticket_result payload ->
       let consumed = payload.paid_storage_size_diff in
@@ -1674,7 +1977,9 @@ type application_state = {
   mode : mode;
   op_count : int;
   migration_balance_updates : Receipt.balance_updates;
-  liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
+  liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
+  adaptive_issuance_vote_ema : Per_block_votes.Adaptive_issuance_launch_EMA.t;
+  adaptive_issuance_launch_cycle : Cycle.t option;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
 }
@@ -1682,13 +1987,13 @@ type application_state = {
 let record_operation (type kind) ctxt hash (operation : kind operation) :
     context =
   match operation.protocol_data.contents with
-  | Single (Preendorsement _) -> ctxt
-  | Single (Endorsement _) -> ctxt
+  | Single (Preattestation _) -> ctxt
+  | Single (Attestation _) -> ctxt
   | Single (Dal_attestation _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-      | Vdf_revelation _ | Double_endorsement_evidence _
-      | Double_preendorsement_evidence _ | Double_baking_evidence _
+      | Vdf_revelation _ | Double_attestation_evidence _
+      | Double_preattestation_evidence _ | Double_baking_evidence _
       | Activate_account _ | Drain_delegate _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
@@ -1703,91 +2008,91 @@ let find_in_slot_map consensus_content slot_map =
           error Faulty_validation_wrong_slot
       | Some (consensus_key, power) -> ok (consensus_key, power))
 
-let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
-    (context * Kind.preendorsement contents_result_list) tzresult Lwt.t =
+let record_preattestation ctxt (mode : mode) (content : consensus_content) :
+    (context * Kind.preattestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let ctxt =
     match mode with
     | Full_construction _ -> (
-        match Consensus.get_preendorsements_quorum_round ctxt with
-        | None -> Consensus.set_preendorsements_quorum_round ctxt content.round
+        match Consensus.get_preattestations_quorum_round ctxt with
+        | None -> Consensus.set_preattestations_quorum_round ctxt content.round
         | Some _ -> ctxt)
     | Application _ | Partial_construction _ -> ctxt
   in
-  let mk_preendorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
-      preendorsement_power =
+  let mk_preattestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
+      consensus_power =
     Single_result
-      (Preendorsement_result
+      (Preattestation_result
          {
            balance_updates = [];
            delegate;
            consensus_key = consensus_pkh;
-           preendorsement_power;
+           consensus_power;
          })
   in
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_preendorsements ctxt)
+        find_in_slot_map content (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_preendorsement
+        Consensus.record_preattestation
           ctxt
           ~initial_slot:content.slot
           ~power
           content.round
       in
-      return (ctxt, mk_preendorsement_result consensus_key power)
+      return (ctxt, mk_preattestation_result consensus_key power)
   | Partial_construction _ ->
-      (* In mempool mode, preendorsements are allowed for various levels
-         and rounds. We do not record preendorsements because we could get
-         false-positive conflicts for preendorsements with the same slot
-         but different levels/rounds. We could record just preendorsements
+      (* In mempool mode, preattestations are allowed for various levels
+         and rounds. We do not record preattestations because we could get
+         false-positive conflicts for preattestations with the same slot
+         but different levels/rounds. We could record just preattestations
          for the mempool head's level and round (the most usual
-         preendorsements), but we don't need to, because there is no block
+         preattestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
         let level = Level.from_raw ctxt content.level in
         Stake_distribution.slot_owner ctxt level content.slot
       in
-      return (ctxt, mk_preendorsement_result consensus_key 0 (* Fake power. *))
+      return (ctxt, mk_preattestation_result consensus_key 0 (* Fake power. *))
 
-let record_endorsement ctxt (mode : mode) (content : consensus_content) :
-    (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
+let record_attestation ctxt (mode : mode) (content : consensus_content) :
+    (context * Kind.attestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let mk_endorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
-      endorsement_power =
+  let mk_attestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
+      consensus_power =
     Single_result
-      (Endorsement_result
+      (Attestation_result
          {
            balance_updates = [];
            delegate;
            consensus_key = consensus_pkh;
-           endorsement_power;
+           consensus_power;
          })
   in
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_endorsements ctxt)
+        find_in_slot_map content (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
+        Consensus.record_attestation ctxt ~initial_slot:content.slot ~power
       in
-      return (ctxt, mk_endorsement_result consensus_key power)
+      return (ctxt, mk_attestation_result consensus_key power)
   | Partial_construction _ ->
-      (* In mempool mode, endorsements are allowed for various levels
-         and rounds. We do not record endorsements because we could get
-         false-positive conflicts for endorsements with the same slot
-         but different levels/rounds. We could record just endorsements
+      (* In mempool mode, attestations are allowed for various levels
+         and rounds. We do not record attestations because we could get
+         false-positive conflicts for attestations with the same slot
+         but different levels/rounds. We could record just attestations
          for the predecessor's level and round (the most usual
-         endorsements), but we don't need to, because there is no block
+         attestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
         let level = Level.from_raw ctxt content.level in
         Stake_distribution.slot_owner ctxt level content.slot
       in
-      return (ctxt, mk_endorsement_result consensus_key 0 (* Fake power. *))
+      return (ctxt, mk_attestation_result consensus_key 0 (* Fake power. *))
 
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     ~gas_cost_for_sig_check fees_updated_contents_list =
@@ -1825,25 +2130,12 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   return (ctxt, contents_result_list)
 
 let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
-  let punish =
-    match mistake with
-    | `Double_baking -> Delegate.punish_double_baking
-    | `Double_endorsing -> Delegate.punish_double_endorsing
-  in
-  punish ctxt delegate level >>=? fun (ctxt, burned, punish_balance_updates) ->
-  (match Tez.(burned /? 2L) with
-  | Ok reward ->
-      Token.transfer
-        ctxt
-        `Double_signing_evidence_rewards
-        (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
-        reward
-  | Error _ -> (* reward is Tez.zero *) return (ctxt, []))
-  >|=? fun (ctxt, reward_balance_updates) ->
-  let balance_updates = reward_balance_updates @ punish_balance_updates in
+  let rewarded = Contract.Implicit payload_producer.Consensus_key.delegate in
+  Staking.punish_delegate ctxt delegate level mistake ~rewarded
+  >|=? fun (ctxt, balance_updates) ->
   (ctxt, Single_result (mk_result balance_updates))
 
-let punish_double_endorsement_or_preendorsement (type kind) ctxt
+let punish_double_attestation_or_preattestation (type kind) ctxt
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
     (context
     * kind Kind.double_consensus_operation_evidence contents_result_list)
@@ -1852,13 +2144,13 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt
   let mk_result (balance_updates : Receipt.balance_updates) :
       kind Kind.double_consensus_operation_evidence contents_result =
     match op1.protocol_data.contents with
-    | Single (Preendorsement _) ->
-        Double_preendorsement_evidence_result balance_updates
-    | Single (Endorsement _) ->
-        Double_endorsement_evidence_result balance_updates
+    | Single (Preattestation _) ->
+        Double_preattestation_evidence_result balance_updates
+    | Single (Attestation _) ->
+        Double_attestation_evidence_result balance_updates
   in
   match op1.protocol_data.contents with
-  | Single (Preendorsement e1) | Single (Endorsement e1) ->
+  | Single (Preattestation e1) | Single (Attestation e1) ->
       let level = Level.from_raw ctxt e1.level in
       Stake_distribution.slot_owner ctxt level e1.slot
       >>=? fun (ctxt, consensus_pk1) ->
@@ -1866,7 +2158,7 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt
         ctxt
         consensus_pk1.delegate
         level
-        `Double_endorsing
+        `Double_attesting
         mk_result
         ~payload_producer
 
@@ -1896,10 +2188,10 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
     | Full_construction _ | Application _ -> false
   in
   match contents_list with
-  | Single (Preendorsement consensus_content) ->
-      record_preendorsement ctxt mode consensus_content
-  | Single (Endorsement consensus_content) ->
-      record_endorsement ctxt mode consensus_content
+  | Single (Preattestation consensus_content) ->
+      record_preattestation ctxt mode consensus_content
+  | Single (Attestation consensus_content) ->
+      record_attestation ctxt mode consensus_content
   | Single (Dal_attestation op) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
@@ -1908,8 +2200,8 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
          signature. Consequently, it is really important to ensure this
          operation cannot be included into a block when the feature flag
          is not set. This is done in order to avoid modifying the
-         endorsement encoding. However, once the DAL will be ready, this
-         operation should be merged with an endorsement or at least
+         attestation encoding. However, once the DAL will be ready, this
+         operation should be merged with an attestation or at least
          refined. *)
       Dal_apply.apply_attestation ctxt op >>?= fun ctxt ->
       return
@@ -1917,26 +2209,30 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
-      let tip = Constants.seed_nonce_revelation_tip ctxt in
-      let contract =
-        Contract.Implicit payload_producer.Consensus_key.delegate
-      in
-      Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
+      let tip = Delegate.Rewards.seed_nonce_revelation_tip ctxt in
+      let delegate = payload_producer.Consensus_key.delegate in
+      Delegate.Staking_parameters.pay_rewards
+        ctxt
+        ~source:`Revelation_rewards
+        ~delegate
+        tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
   | Single (Vdf_revelation {solution}) ->
       Seed.update_seed ctxt solution >>=? fun ctxt ->
-      let tip = Constants.seed_nonce_revelation_tip ctxt in
-      let contract =
-        Contract.Implicit payload_producer.Consensus_key.delegate
-      in
-      Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
+      let tip = Delegate.Rewards.vdf_revelation_tip ctxt in
+      let delegate = payload_producer.Consensus_key.delegate in
+      Delegate.Staking_parameters.pay_rewards
+        ctxt
+        ~source:`Revelation_rewards
+        ~delegate
+        tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
-  | Single (Double_preendorsement_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
-  | Single (Double_endorsement_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
+  | Single (Double_preattestation_evidence {op1; op2 = _}) ->
+      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
+  | Single (Double_attestation_evidence {op1; op2 = _}) ->
+      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt bh1 ~payload_producer
   | Single (Activate_account {id = pkh; activation_code}) ->
@@ -2040,10 +2336,10 @@ let may_start_new_cycle ctxt =
       Bootstrap.cycle_end ctxt last_cycle >|=? fun ctxt ->
       (ctxt, balance_updates, deactivated)
 
-let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
+let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
   Liquidity_baking.on_subsidy_allowed
     ctxt
-    ~toggle_vote
+    ~per_block_vote
     (fun ctxt liquidity_baking_cpmm_contract_hash ->
       let liquidity_baking_cpmm_contract =
         Contract.Originated liquidity_baking_cpmm_contract_hash
@@ -2063,7 +2359,9 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                 (Z.of_int 20)))
       in
       let backtracking_ctxt = ctxt in
-      (let liquidity_baking_subsidy = Constants.liquidity_baking_subsidy ctxt in
+      (let liquidity_baking_subsidy =
+         Delegate.Rewards.liquidity_baking_subsidy ctxt
+       in
        (* credit liquidity baking subsidy to CPMM contract *)
        Token.transfer
          ~origin:Subsidy
@@ -2196,33 +2494,33 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
           let ctxt = Gas.set_unlimited backtracking_ctxt in
           Ok (ctxt, []))
 
-let are_endorsements_required ctxt ~level =
+let are_attestations_required ctxt ~level =
   First_level_of_protocol.get ctxt >|=? fun first_level ->
   (* NB: the first level is the level of the migration block. There
-     are no endorsements for this block. Therefore the block at the
-     next level cannot contain endorsements. *)
+     are no attestations for this block. Therefore the block at the
+     next level cannot contain attestations. *)
   let level_position_in_protocol = Raw_level.diff level first_level in
   Compare.Int32.(level_position_in_protocol > 1l)
 
-let record_endorsing_participation ctxt =
+let record_attesting_participation ctxt =
   let open Lwt_result_syntax in
   let*? validators =
-    match Consensus.allowed_endorsements ctxt with
+    match Consensus.allowed_attestations ctxt with
     | Some x -> ok x
     | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
   in
   Slot.Map.fold_es
     (fun initial_slot ((consensus_pk : Consensus_key.pk), power) ctxt ->
       let participation =
-        if Slot.Set.mem initial_slot (Consensus.endorsements_seen ctxt) then
+        if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
           Delegate.Participated
         else Delegate.Didn't_participate
       in
-      Delegate.record_endorsing_participation
+      Delegate.record_attesting_participation
         ctxt
         ~delegate:consensus_pk.delegate
         ~participation
-        ~endorsing_power:power)
+        ~attesting_power:power)
     validators
     ctxt
 
@@ -2246,12 +2544,19 @@ let begin_application ctxt chain_id ~migration_balance_updates
       current_level
       ~round:block_header.protocol_data.contents.payload_round
   in
-  let toggle_vote =
-    block_header.Block_header.protocol_data.contents
-      .liquidity_baking_toggle_vote
+  let per_block_vote =
+    block_header.Block_header.protocol_data.contents.per_block_votes
+      .liquidity_baking_vote
   in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
-    apply_liquidity_baking_subsidy ctxt ~toggle_vote
+    apply_liquidity_baking_subsidy ctxt ~per_block_vote
+  in
+  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
+    let adaptive_issuance_vote =
+      block_header.Block_header.protocol_data.contents.per_block_votes
+        .adaptive_issuance_vote
+    in
+    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info
@@ -2277,6 +2582,8 @@ let begin_application ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
+      adaptive_issuance_vote_ema;
+      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2296,7 +2603,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       ~predecessor_round
       ~timestamp
   in
-  (* The endorsement/preendorsement validation rules for construction are the
+  (* The attestation/preattestation validation rules for construction are the
      same as for application. *)
   let current_level = Level.current ctxt in
   let* ctxt, _slot, block_producer =
@@ -2308,9 +2615,17 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       current_level
       ~round:block_data_contents.payload_round
   in
-  let toggle_vote = block_data_contents.liquidity_baking_toggle_vote in
+  let per_block_vote =
+    block_data_contents.per_block_votes.liquidity_baking_vote
+  in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
-    apply_liquidity_baking_subsidy ctxt ~toggle_vote
+    apply_liquidity_baking_subsidy ctxt ~per_block_vote
+  in
+  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
+    let adaptive_issuance_vote =
+      block_data_contents.per_block_votes.adaptive_issuance_vote
+    in
+    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info ~predecessor:predecessor_hash ctxt
@@ -2335,6 +2650,8 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
+      adaptive_issuance_vote_ema;
+      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2345,9 +2662,13 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_hash
     ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let toggle_vote = Liquidity_baking.LB_pass in
+  let per_block_vote = Per_block_votes.Per_block_vote_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
-    apply_liquidity_baking_subsidy ctxt ~toggle_vote
+    apply_liquidity_baking_subsidy ctxt ~per_block_vote
+  in
+  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
+    let adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass in
+    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     (* The mode [Partial_construction] is used in simulation. We try to
@@ -2367,6 +2688,8 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
+      adaptive_issuance_vote_ema;
+      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2374,14 +2697,15 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
     }
 
 let finalize_application ctxt block_data_contents ~round ~predecessor_hash
-    ~liquidity_baking_toggle_ema ~implicit_operations_results
+    ~liquidity_baking_toggle_ema ~adaptive_issuance_vote_ema
+    ~adaptive_issuance_launch_cycle ~implicit_operations_results
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
   let level = Level.current ctxt in
-  let endorsing_power = Consensus.current_endorsement_power ctxt in
-  let* required_endorsements =
-    are_endorsements_required ctxt ~level:level.level
+  let attestation_power = Consensus.current_attestation_power ctxt in
+  let* required_attestations =
+    are_attestations_required ctxt ~level:level.level
   in
   let block_payload_hash =
     Block_payload.hash
@@ -2390,14 +2714,14 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       (non_consensus_operations ctxt)
   in
   (* from this point nothing should fail *)
-  (* We mark the endorsement branch as the grand parent branch when
+  (* We mark the attestation branch as the grand parent branch when
      accessible. This will not be present before the first two blocks
      of tenderbake. *)
   let level = Level.current ctxt in
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
   let*! ctxt =
-    Consensus.store_endorsement_branch
+    Consensus.store_attestation_branch
       ctxt
       (predecessor_hash, block_payload_hash)
   in
@@ -2410,13 +2734,15 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
   let* ctxt, reward_bonus =
-    if required_endorsements then
-      let* ctxt = record_endorsing_participation ctxt in
-      let*? rewards_bonus = Baking.bonus_baking_reward ctxt ~endorsing_power in
+    if required_attestations then
+      let* ctxt = record_attesting_participation ctxt in
+      let*? rewards_bonus =
+        Baking.bonus_baking_reward ctxt ~attestation_power
+      in
       return (ctxt, Some rewards_bonus)
     else return (ctxt, None)
   in
-  let baking_reward = Constants.baking_reward_fixed_portion ctxt in
+  let baking_reward = Delegate.Rewards.baking_reward_fixed_portion ctxt in
   let* ctxt, baking_receipts =
     Delegate.record_baking_activity_and_pay_rewards_and_fees
       ctxt
@@ -2462,6 +2788,8 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         deactivated;
         balance_updates;
         liquidity_baking_toggle_ema;
+        adaptive_issuance_vote_ema;
+        adaptive_issuance_launch_cycle;
         implicit_operations_results;
         dal_attestation;
       }
@@ -2511,6 +2839,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
   let {
     ctxt;
     liquidity_baking_toggle_ema;
+    adaptive_issuance_vote_ema;
+    adaptive_issuance_launch_cycle;
     implicit_operations_results;
     migration_balance_updates;
     op_count;
@@ -2551,6 +2881,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~round
           ~predecessor_hash
           ~liquidity_baking_toggle_ema
+          ~adaptive_issuance_vote_ema
+          ~adaptive_issuance_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer
@@ -2564,7 +2896,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
       (* Fake finalization to return a correct type, because there is no
          block to finalize in mempool mode. If this changes in the
          future, beware that consensus operations are not recorded by
-         {!record_preendorsement} and {!record_endorsement} in this mode. *)
+         {!record_preattestation} and {!record_attestation} in this mode. *)
       let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
       let level_info = Level.current ctxt in
       let result = finalize ctxt predecessor_fitness in
@@ -2581,6 +2913,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
               deactivated = [];
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
+              adaptive_issuance_vote_ema;
+              adaptive_issuance_launch_cycle;
               implicit_operations_results;
               dal_attestation = None;
             } )
@@ -2603,6 +2937,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~round
           ~predecessor_hash:shell.predecessor
           ~liquidity_baking_toggle_ema
+          ~adaptive_issuance_vote_ema
+          ~adaptive_issuance_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer

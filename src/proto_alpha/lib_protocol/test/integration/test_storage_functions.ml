@@ -98,6 +98,14 @@ module Table =
        end))
        (Int32.Index)
 
+module Indexed_table =
+  Make_carbonated_data_set_storage
+    (Make_subcontext (Registered) (Indexed_context.Raw_context)
+       (struct
+         let name = ["table2"]
+       end))
+       (Int32.Index)
+
 (** Test:
      This test checks that it is possible to add values to a
      Carbonated_data_set_storage and iterate over them. *)
@@ -166,6 +174,50 @@ let test_length () =
   (* The length of a non-existing path also returns 0. *)
   assert_length ctxt ~loc:__LOC__ ["root"; "right"; "non_existing"] 0
 
+let test_is_empty_carbonated_data_set () =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Context.default_raw_context () in
+  let*@ ctxt, is_empty = Table.is_empty ctxt in
+  (* Test is_empty on uninitialized Table. *)
+  let* () = Assert.equal_bool ~loc:__LOC__ is_empty true in
+
+  let*@ ctxt, _ = Table.init ctxt 1 in
+  let*@ ctxt, is_empty = Table.is_empty ctxt in
+  (* Test empty after adding an element to the Table. *)
+  let* () = Assert.equal_bool ~loc:__LOC__ is_empty false in
+
+  let*@ ctxt, _, _ = Table.remove ctxt 1 in
+  let*@ _ctxt, is_empty = Table.is_empty ctxt in
+  (* Test empty after removing the element from the Table. *)
+  Assert.equal_bool ~loc:__LOC__ is_empty true
+
+let test_clear_carbonated_data_set () =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Context.default_raw_context () in
+  (* Test clear on uninitialized Table. *)
+  let*@ ctxt = Table.clear ctxt in
+  let*@ ctxt, is_empty = Table.is_empty ctxt in
+  let* () = Assert.equal_bool ~loc:__LOC__ is_empty true in
+
+  let*@ ctxt, _ = Table.init ctxt 1 in
+  let*@ ctxt, is_empty = Table.is_empty ctxt in
+  let* () = Assert.equal_bool ~loc:__LOC__ is_empty false in
+
+  (* Test clear on non-empty Table. *)
+  let*@ ctxt = Table.clear ctxt in
+  let*@ _ctxt, is_empty = Table.is_empty ctxt in
+  let* () = Assert.equal_bool ~loc:__LOC__ is_empty true in
+
+  (* Test clear on indexed table. Check that only the cleared indexed
+     table is cleared. *)
+  let*@ ctxt, _ = Indexed_table.init (ctxt, 0) 0 in
+  let*@ ctxt, _ = Indexed_table.init (ctxt, 1) 1 in
+  let*@ ctxt = Indexed_table.clear (ctxt, 0) in
+  let*@ ctxt, is_empty0 = Indexed_table.is_empty (ctxt, 0) in
+  let*@ _ctxt, is_empty1 = Indexed_table.is_empty (ctxt, 1) in
+  let* () = Assert.equal_bool ~loc:__LOC__ is_empty0 true in
+  Assert.equal_bool ~loc:__LOC__ is_empty1 false
+
 let tests =
   [
     Tztest.tztest
@@ -173,6 +225,14 @@ let tests =
       `Quick
       test_fold_keys_unaccounted;
     Tztest.tztest "length test" `Quick test_length;
+    Tztest.tztest
+      "test empty carbonated data set"
+      `Quick
+      test_is_empty_carbonated_data_set;
+    Tztest.tztest
+      "test clear carbonated data set"
+      `Quick
+      test_clear_carbonated_data_set;
   ]
 
 let () =

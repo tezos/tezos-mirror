@@ -69,8 +69,8 @@ module Types : sig
   (** The status of a header a DAL node is aware of: *)
   type header_status =
     [ `Waiting_attestation
-      (** The slot header was included and applied in an L1 block but remains to
-          be attested. *)
+      (** The slot header was included and applied in a finalized L1 block
+          but remains to be attested. *)
     | `Attested
       (** The slot header was included in an L1 block and attested. *)
     | `Unattested
@@ -78,16 +78,36 @@ module Types : sig
     | `Not_selected
       (** The slot header was included in an L1 block but was not selected as
           the slot header for that slot index. *)
-    | `Unseen ]
-  (** The slot header was never seen in an L1 block. For instance, this could
-      happen if the RPC `PATCH /commitments/<commitment>` was called but the
-      corresponding slot header was never included into a block. This means that
-      the publish operation was not sent (yet) to L1, or sent but not included
-      (yet) in a block). *)
+    | `Unseen_or_not_finalized
+      (** The slot header was not seen in a *final* L1 block. For instance, this
+          could happen if the RPC `PATCH /commitments/<commitment>` was called
+          but the corresponding slot header was never included into a block; or
+          the slot header was included in a non-final (ie not agreed upon)
+          block. This means that the publish operation was not sent (yet) to L1,
+          or sent but not included (yet) in a block, or included in a not (yet)
+          final block. *)
+    ]
+
+  (** Profiles that operate on shards/slots. *)
+  type operator_profile =
+    | Attestor of Tezos_crypto.Signature.public_key_hash
+        (** [Attestor pkh] downloads all shards assigned to [pkh].
+            Used by bakers to attest availability of their assigned shards. *)
+    | Producer of {slot_index : int}
+        (** [Producer {slot_index}] produces/publishes slot for slot index [slot_index]. *)
+
+  (** List of operator profiles. It may contain dupicates as it represents profiles
+      provided by the user in unprocessed form. *)
+  type operator_profiles = operator_profile list
 
   (** DAL node can track one or many profiles that correspond to various modes
-      that the DAL node would operate in *)
-  type profile = Attestor of Tezos_crypto.Signature.public_key_hash
+      that the DAL node would operate in. *)
+  type profiles =
+    | Bootstrap
+        (** The bootstrap profile facilitates peer discovery in the DAL network.
+            Note that bootstrap nodes are incompatible with attestor/producer profiles
+            as bootstrap nodes are expected to connect to all the meshes with degree 0. *)
+    | Operator of operator_profiles
 
   (** Information associated to a slot header in the RPC services of the DAL
       node. *)
@@ -105,11 +125,9 @@ module Types : sig
 
   val header_status_encoding : header_status Data_encoding.t
 
-  val profile_encoding : profile Data_encoding.t
+  val profiles_encoding : profiles Data_encoding.t
 
   val with_proof_encoding : with_proof Data_encoding.t
-
-  val equal_profile : profile -> profile -> bool
 end
 
 (** Add the given slot in the node if not already present. The corresponding
@@ -156,8 +174,8 @@ val get_commitment_proof :
   service
 
 (** Compute and save the shards of the slot associated to the given
-    commitment. If the input's flag is true, the proofs associated with each
-    given shards are also computed. *)
+    commitment. If the input's flag is true, the proofs associated with the
+    computed shards are also computed and stored in memory. *)
 val put_commitment_shards :
   < meth : [`PUT]
   ; input : Types.with_proof
@@ -198,10 +216,12 @@ val get_published_level_headers :
   ; query : Types.header_status option >
   service
 
-(** Update the list of profiles tracked by the DAL node *)
-val patch_profile :
+(** Update the list of profiles tracked by the DAL node.
+    Note that it does not take the bootstrap profile as it
+    is incompatible with other profiles. *)
+val patch_profiles :
   < meth : [`PATCH]
-  ; input : Types.profile
+  ; input : Types.operator_profiles
   ; output : unit
   ; prefix : unit
   ; params : unit
@@ -212,7 +232,7 @@ val patch_profile :
 val get_profiles :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.profile list
+  ; output : Types.profiles
   ; prefix : unit
   ; params : unit
   ; query : unit >

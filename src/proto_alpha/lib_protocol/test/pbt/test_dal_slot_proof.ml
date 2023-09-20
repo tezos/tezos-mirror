@@ -85,7 +85,9 @@ struct
     let add_slot level sindex (cell, cache, slots_info) skip_slot =
       let index =
         Option.value_f
-          (Dal_slot_index_repr.of_int_opt sindex)
+          (Dal_slot_index_repr.of_int_opt
+             ~number_of_slots:Parameters.(dal_parameters.number_of_slots)
+             sindex)
           ~default:(fun () -> assert false)
       in
       let slot =
@@ -251,7 +253,7 @@ let () =
 
     let count = 5
 
-    let dal_parameters = constants_test.dal
+    let dal_parameters = {constants_test.dal with number_of_slots = 24}
   end) in
   Alcotest_lwt.run
     ~__FILE__

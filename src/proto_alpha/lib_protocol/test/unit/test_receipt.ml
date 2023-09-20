@@ -54,10 +54,14 @@ let test_encodings balance =
   let r8 = Receipt.(balance, Credited am, Block_application) in
   let coded =
     Json.construct
-      Receipt.balance_updates_encoding
+      Receipt.balance_updates_encoding_with_legacy_attestation_name
       [r1; r2; r3; r4; r5; r6; r7; r8]
   in
-  let decoded = Json.destruct Receipt.balance_updates_encoding coded in
+  let decoded =
+    Json.destruct
+      Receipt.balance_updates_encoding_with_legacy_attestation_name
+      coded
+  in
   match decoded with
   | [r1'; r2'; r3'; r4'; r5'; r6'; r7'; r8'] ->
       assert (
@@ -69,17 +73,22 @@ let test_encodings balance =
 let test_encodings () =
   let open Receipt in
   let pkh = Signature.Public_key_hash.zero in
+  let pkh2, _pk, _sk = Signature.generate_key () in
+  let staker1 = Receipt.Shared pkh in
+  let staker2 = Receipt.Single (Contract.Implicit pkh, pkh) in
+  let staker3 = Receipt.Single (Contract.Implicit pkh2, pkh) in
   test_encodings (Contract (Contract.Implicit pkh)) >>=? fun () ->
   test_encodings Block_fees >>=? fun () ->
-  test_encodings (Deposits pkh) >>=? fun () ->
+  test_encodings (Deposits staker1) >>=? fun () ->
+  test_encodings (Deposits staker2) >>=? fun () ->
+  test_encodings (Deposits staker3) >>=? fun () ->
   test_encodings Nonce_revelation_rewards >>=? fun () ->
-  test_encodings Double_signing_evidence_rewards >>=? fun () ->
-  test_encodings Endorsing_rewards >>=? fun () ->
+  test_encodings Attesting_rewards >>=? fun () ->
   test_encodings Baking_rewards >>=? fun () ->
   test_encodings Baking_bonuses >>=? fun () ->
   test_encodings Storage_fees >>=? fun () ->
   test_encodings Double_signing_punishments >>=? fun () ->
-  test_encodings (Lost_endorsing_rewards (pkh, Random.bool (), Random.bool ()))
+  test_encodings (Lost_attesting_rewards (pkh, Random.bool (), Random.bool ()))
   >>=? fun () ->
   test_encodings Liquidity_baking_subsidies >>=? fun () ->
   test_encodings Burned >>=? fun () ->

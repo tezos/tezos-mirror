@@ -1,10 +1,6 @@
 .template__coverage_report:
   extends: .template__coverage
   stage: test_coverage
-  before_script:
-    # Load the environment poetry previously created in the docker image
-    # Give access to the Python dependencies/executables
-    - . "$HOME/.venv/bin/activate"
   coverage: '/Coverage: ([^%]+%)/'
   artifacts:
     expose_as: 'Coverage report'

@@ -64,13 +64,13 @@ module type T = sig
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
     metadata:[`Always | `Never] ->
-    Client_context.full ->
+    Tezos_rpc.Context.generic ->
     block_info tzresult Lwt.t
 
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
+    Tezos_rpc.Context.generic ->
     proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
@@ -82,11 +82,11 @@ module type T = sig
       the committee an interval [(s,n)], meaning that the slots [s;s+1;...;s+n-1]
       belong to [pkh] *)
   val get_committee :
-    Client_context.full ->
+    Tezos_rpc.Context.generic ->
     level:int32 ->
     (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  (** [attested_slot_headers hash block_info number_of_slots] reads the metadata
+  (** [attested_slot_headers block_info number_of_slots] reads the metadata
       of the given [block_info] and constructs the list of attested slots
       headers.
 
@@ -96,10 +96,7 @@ module type T = sig
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
   val attested_slot_headers :
-    Block_hash.t ->
-    block_info ->
-    number_of_slots:int ->
-    slot_index list tzresult
+    block_info -> number_of_slots:int -> slot_index list tzresult
 end
 
 val register : (module T) -> unit

@@ -34,16 +34,18 @@ type t
 
 (** {2 Monitoring the Layer 1 chain} *)
 
-(** [start ~name ~reconnection_delay cctxt] connects to a Tezos node and starts
-    monitoring new heads. One can iterate on the heads by calling {!iter_heads}
-    on its result. [reconnection_delay] gives an initial delay for the
-    reconnection which is used in an exponential backoff. The [name] is used to
-    differentiate events. *)
+(** [start ~name ~reconnection_delay ?protocols cctxt] connects to a Tezos node
+    and starts monitoring new heads. One can iterate on the heads by calling
+    {!iter_heads} on its result. [reconnection_delay] gives an initial delay for
+    the reconnection which is used in an exponential backoff. The [name] is used
+    to differentiate events. If [protocols] is provided, only heads of these
+    protocols will be monitored. *)
 val start :
   name:string ->
   reconnection_delay:float ->
+  ?protocols:Protocol_hash.t list ->
   #Client_context.full ->
-  t tzresult Lwt.t
+  t Lwt.t
 
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
@@ -57,16 +59,28 @@ val iter_heads :
   (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
   unit tzresult Lwt.t
 
+(** [wait_first t] waits for the first head to appear in the stream and
+    returns it. *)
+val wait_first : t -> (Block_hash.t * Block_header.t) Lwt.t
+
 (** {2 Helper functions for the Layer 1 chain} *)
 
-(** [get_predecessor_opt state head] returns the predecessor of block [head],
-    when [head] is not the genesis block. *)
+(** [get_predecessor_opt ?max_read state head] returns the predecessor of block
+    [head], when [head] is not the genesis block. [max_read] (by default [8]) is
+    used to cache a number of predecessors (including [head]) to avoid some RPC
+    calls when one need to access multiple predecessors. *)
 val get_predecessor_opt :
-  t -> Block_hash.t * int32 -> (Block_hash.t * int32) option tzresult Lwt.t
+  ?max_read:int ->
+  t ->
+  Block_hash.t * int32 ->
+  (Block_hash.t * int32) option tzresult Lwt.t
 
-(** [get_predecessor state head] returns the predecessor block of [head]. *)
+(** [get_predecessor ?max_read state head] returns the predecessor block of [head]. *)
 val get_predecessor :
-  t -> Block_hash.t * int32 -> (Block_hash.t * int32) tzresult Lwt.t
+  ?max_read:int ->
+  t ->
+  Block_hash.t * int32 ->
+  (Block_hash.t * int32) tzresult Lwt.t
 
 (** [nth_predecessor ~get_predecessor n head] returns [block, history] where
     [block] is the nth predecessor of [head] and [history] is the list of blocks

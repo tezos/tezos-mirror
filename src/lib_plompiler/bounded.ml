@@ -174,8 +174,7 @@ struct
   module Encoding (L : LIB) = struct
     open L
     module VL = V (L)
-
-    open Encoding.Encodings (L)
+    open L.Encodings
 
     type bound_check_safety = Safe | Unsafe | NoCheck
 

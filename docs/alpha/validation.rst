@@ -30,7 +30,7 @@ From a higher-level, *abstract* perspective, the validation system in
 the Tezos protocol implements this business logic in a functional,
 state-passing machine where:
 
-- Its state is given by the :ref:`context<Context>`, the internal
+- Its state is given by the :ref:`context<def_context_alpha>`, the internal
   representation of the state of the Tezos ledger at a given blockchain
   level. For instance, the context contains the information of all
   activated accounts and contracts, and their balances. More
@@ -67,9 +67,9 @@ operations included in newly received blocks, whose validation is
 triggered by the :ref:`block validator<block_validator>`, in order to
 localize validation rules as needed. The resulting concrete API is
 specified by the :package-api:`Protocol
-<tezos-protocol-environment/Tezos_protocol_environment/V8/module-type-T/Updater/module-type-PROTOCOL/index.html>`
+<octez-proto-libs/Tezos_protocol_environment/V10/module-type-T/Updater/module-type-PROTOCOL/index.html>`
 module in the :doc:`protocol
-environment<../shell/protocol_environment>` ``V8``, and it is
+environment<../shell/protocol_environment>` ``V10``, and it is
 implemented by this protocol in the
 :package-api:`Main<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Main/index.html>`
 module.
@@ -163,7 +163,7 @@ protocol environment:
   any possible context from its future successors, but it might still
   be valid in an alternative branch. For example: a manager operation
   with a smaller counter than the one expected (a
-  *"counter-in-the-past"* error), an unexpected endorsement for the
+  *"counter-in-the-past"* error), an unexpected attestation for the
   current level, etc.
 
 - ``Permanent``: the operation is invalid in the current context, and
@@ -173,7 +173,7 @@ protocol environment:
 - ``Outdated``: the operation is *too old* to be included in a
   block. Furthermore, there might be still some value in the
   information provided by an ``Outdated`` operation. An example is the
-  case of an endorsement which was received *too late*, but that could
+  case of an attestation which was received *too late*, but that could
   still be used to form a consensus quorum.
 
 .. _partial_application_alpha:
@@ -198,7 +198,7 @@ proceeds to "partially apply" each block of this branch using the
 common ancestor's context.
 
 Indeed, by relying on the ancestor context, this mode can *only*
-assert the validity of consensus-related preconditions (endorsing
+assert the validity of consensus-related preconditions (attesting
 power, block fitness, etc.), as future consensus slots are known in
 advance -- how much in advance being specified by the
 ``<PRESERVED_CYCLES>`` protocol constant. Thus, the ``Partial
@@ -223,8 +223,8 @@ The first step in the process is to decide whether a candidate block
 is *well-formed*, that is, that it has the expected "shape" of a valid
 block under the current Tezos economic protocol. Given a block
 candidate, the block validation process will then verify that the
-candidate block declares consistent :ref:`level<Level>`,
-:ref:`round<Round>`, and timestamp values; that it carries a valid
+candidate block declares consistent :ref:`level<def_level_alpha>`,
+:ref:`round<def_round_alpha>`, and timestamp values; that it carries a valid
 signature, etc. At this step, the block validation process will also
 initialize the data-structures required for subsequent steps.
 
@@ -237,7 +237,7 @@ considered as invalid.
 The last step in the block validation process, known as "block
 finalization", aims to verify that the collected consensus operations
 constitute a sufficiently large :ref:`quorum<quorum_alpha>`. That is,
-it will verify that the total endorsing power present in the block is
+it will verify that the total attesting power present in the block is
 greater than the ``CONSENSUS_THRESHOLD`` constant.
 
 This sequence of three steps also yields a new context -- the

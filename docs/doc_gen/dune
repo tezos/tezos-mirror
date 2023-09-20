@@ -1,17 +1,18 @@
 (executables
  (names rpc_doc
         p2p_doc)
- (libraries tezos-base
-            tezos-rpc
-            tezos-stdlib-unix
-            tezos-shell
-            tezos-rpc-http-server
-            tezos-protocol-updater
+ (libraries octez-libs.base
+            octez-libs.rpc
+            octez-libs.stdlib-unix
+            octez-shell-libs.shell
+            octez-libs.rpc-http-server
+            octez-shell-libs.protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
-            tezos-embedded-protocol-genesis
-            tezos-embedded-protocol-016-PtMumbai
-            tezos-embedded-protocol-017-PtNairob
-            tezos-embedded-protocol-alpha
+            tezos-protocol-genesis.embedded-protocol
+            tezos-protocol-016-PtMumbai.embedded-protocol
+            tezos-protocol-017-PtNairob.embedded-protocol
+            tezos-protocol-018-Proxford.embedded-protocol
+            tezos-protocol-alpha.embedded-protocol
             data-encoding
             re)
  (flags (:standard -open Tezos_base__TzPervasives

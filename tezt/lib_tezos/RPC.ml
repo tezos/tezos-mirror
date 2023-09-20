@@ -52,6 +52,8 @@ end
 
 let get_config = make GET ["config"] Fun.id
 
+let get_config_network_dal = make GET ["config"; "network"; "dal"] Fun.id
+
 let get_network_connections =
   make GET ["network"; "connections"] @@ fun json ->
   let decode_connection json =
@@ -263,19 +265,37 @@ let post_private_injection_operation ?(async = false) data =
     Fun.id
 
 let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
-    ?(block = "head") ?(async = false) data =
+    ?(block = "head") ?version ?(async = false) data =
+  let query_string =
+    Query_arg.opt "version" Fun.id version @ Query_arg.switch "async" async
+  in
   make
     POST
     ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "run_operation"]
-    ~query_string:(Query_arg.switch "async" async)
+    ~query_string
     ~data
     Fun.id
 
 let get_chain_chain_id ?(chain = "main") () =
   make GET ["chains"; chain; "chain_id"] JSON.as_string
 
-let get_chain_block ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block] Fun.id
+let get_chain_block ?(chain = "main") ?(block = "head") ?version
+    ?(force_metadata = false) ?metadata () =
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @
+    if force_metadata then [("force_metadata", "")]
+    else
+      []
+      @
+      match metadata with
+      | Some `Never -> [("metadata", "never")]
+      | Some `Always -> [("metadata", "always")]
+      | None -> []
+  in
+  make ~query_string GET ["chains"; chain; "blocks"; block] Fun.id
+
+type balance_update = {kind : string; category : string option}
 
 type block_metadata = {
   protocol : string;
@@ -283,10 +303,13 @@ type block_metadata = {
   proposer : string;
   max_operations_ttl : int;
   dal_attestation : bool Array.t option;
+  balance_updates : balance_update list;
 }
 
-let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "metadata"] @@ fun json ->
+let get_chain_block_metadata ?(chain = "main") ?(block = "head") ?version () =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  make ~query_string GET ["chains"; chain; "blocks"; block; "metadata"]
+  @@ fun json ->
   let dal_attestation =
     match JSON.(json |-> "dal_attestation" |> as_string_opt) with
     | None -> None
@@ -307,13 +330,35 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
     | Some proposer -> proposer
   in
   let max_operations_ttl = JSON.(json |-> "max_operations_ttl" |> as_int) in
-  {dal_attestation; protocol; next_protocol; proposer; max_operations_ttl}
+  let balance_updates = JSON.(json |-> "balance_updates" |> as_list) in
+  let balance_updates =
+    List.map
+      (fun json ->
+        let kind = JSON.(json |-> "kind" |> as_string) in
+        let category = JSON.(json |-> "category" |> as_string_opt) in
+        {kind; category})
+      balance_updates
+  in
+  {
+    dal_attestation;
+    protocol;
+    next_protocol;
+    proposer;
+    max_operations_ttl;
+    balance_updates;
+  }
+
+let get_chain_block_protocols ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "protocols"] Fun.id
 
 let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string
 
 let get_chain_block_header ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
+
+let get_chain_block_header_shell ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "header"; "shell"] Fun.id
 
 let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
   make
@@ -415,11 +460,16 @@ let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "header"; "protocol_data"]
     Fun.id
 
-let get_chain_block_operations ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
+let get_chain_block_operations ?(chain = "main") ?(block = "head") ?version
+    ?(force_metadata = false) () =
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @ if force_metadata then [("force_metadata", "")] else []
+  in
+  make ~query_string GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
 
 let get_chain_block_operations_validation_pass ?(chain = "main")
-    ?(block = "head") ?(force_metadata = false) ?operation_offset
+    ?(block = "head") ?version ?(force_metadata = false) ?operation_offset
     ~validation_pass () =
   let path =
     [
@@ -432,14 +482,17 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
     ]
     @ match operation_offset with None -> [] | Some m -> [string_of_int m]
   in
-  let query_string = if force_metadata then [("force_metadata", "")] else [] in
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @ if force_metadata then [("force_metadata", "")] else []
+  in
   make ~query_string GET path Fun.id
 
-let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
+let get_chain_mempool_pending_operations ?(chain = "main") ?version ?validated
     ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
   let query_string =
     Query_arg.opt "version" Fun.id version
-    @ Query_arg.opt_bool "applied" applied
+    @ Query_arg.opt_bool "validated" validated
     @ Query_arg.opt_bool "refused" refused
     @ Query_arg.opt_bool "outdated" outdated
     @ Query_arg.opt_bool "branch_delayed" branch_delayed
@@ -453,6 +506,26 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
     ~query_string
     GET
     ["chains"; chain; "mempool"; "pending_operations"]
+    Fun.id
+
+let get_chain_mempool_monitor_operations ?(chain = "main") ?version ?validated
+    ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @ Query_arg.opt_bool "validated" validated
+    @ Query_arg.opt_bool "refused" refused
+    @ Query_arg.opt_bool "outdated" outdated
+    @ Query_arg.opt_bool "branch_delayed" branch_delayed
+    @ Query_arg.opt_bool "branch_refused" branch_refused
+    @ Query_arg.opt_list
+        "validation_pass"
+        (fun name vp -> (name, string_of_int vp))
+        validation_passes
+  in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "mempool"; "monitor_operations"]
     Fun.id
 
 let post_chain_mempool_request_operations ?(chain = "main") ?peer () =
@@ -490,6 +563,16 @@ let post_chain_block_helpers_preapply_block ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
     Fun.id
 
+let post_chain_block_helpers_preapply_operations ?(chain = "main")
+    ?(block = "head") ?version ~data () =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  make
+    ~query_string
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "operations"]
+    Fun.id
+
 let post_chain_block_helpers_forge_operations ?(chain = "main")
     ?(block = "head") ~data () =
   make
@@ -506,9 +589,24 @@ let post_chain_block_helpers_forge_block_header ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "forge_block_header"]
     Fun.id
 
-let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
-    ?(block = "head") ~data () =
+let post_chain_block_helpers_parse_operations ?(chain = "main")
+    ?(block = "head") ?(check_signature = true) ?version ops =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  let data : RPC_core.data =
+    Data (`O [("operations", ops); ("check_signature", `Bool check_signature)])
+  in
   make
+    ~query_string
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "parse"; "operations"]
+    Fun.id
+
+let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
+    ?(block = "head") ?version ~data () =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  make
+    ~query_string
     ~data
     POST
     [
@@ -653,6 +751,18 @@ let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
     ~query_string
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
+    Fun.id
+
+let get_chain_block_helper_validators ?(chain = "main") ?(block = "head")
+    ?delegate ?level () =
+  let query_string =
+    Query_arg.opt "delegate" Fun.id delegate
+    @ Query_arg.opt "level" Int.to_string level
+  in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "validators"]
     Fun.id
 
 let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
@@ -821,7 +931,7 @@ let get_chain_block_context_smart_rollups_all ?(chain = "main")
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "smart_rollups"; "all"]
-    Fun.id
+    (fun rollups -> JSON.as_list rollups |> List.map JSON.as_string)
 
 let get_chain_block_context_smart_rollups_smart_rollup_staker_games
     ?(chain = "main") ?(block = "head") ~staker sc_rollup () =
@@ -855,26 +965,6 @@ let get_chain_block_context_smart_rollups_all_inbox ?(chain = "main")
       "smart_rollups";
       "all";
       "inbox";
-    ]
-    Fun.id
-
-let post_chain_block_context_smart_rollups_all_origination_proof
-    ?(chain = "main") ?(block = "head") ~kind ~boot_sector () =
-  let data : RPC_core.data =
-    Data (`O [("kind", `String kind); ("kernel", `String boot_sector)])
-  in
-  make
-    ~data
-    POST
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "smart_rollups";
-      "all";
-      "origination_proof";
     ]
     Fun.id
 
@@ -948,6 +1038,44 @@ let get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitme
       "staked_on_commitment";
     ]
     Fun.id
+
+let post_chain_block_context_smart_rollups_smart_rollup_ticket_balance
+    ?(chain = "main") ?(block = "head") ~sc_rollup ~data () =
+  make
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
+      sc_rollup;
+      "ticket_balance";
+    ]
+    ~data
+    JSON.as_int
+
+let get_chain_block_context_smart_rollups_smart_rollup_whitelist
+    ?(chain = "main") ?(block = "head") sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
+      sc_rollup;
+      "whitelist";
+    ]
+    (fun whitelist ->
+      match JSON.(as_list_opt whitelist) with
+      | Some l -> Some (List.map JSON.as_string l)
+      | None -> None)
 
 let get_chain_block_context_delegates ?(chain = "main") ?(block = "head") () =
   make
@@ -1189,6 +1317,91 @@ let get_chain_block_context_delegate_voting_power ?(chain = "main")
       "delegates";
       pkh;
       "voting_power";
+    ]
+    Fun.id
+
+let get_chain_block_context_total_supply ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "context"; "total_supply"] Fun.id
+
+let get_chain_block_context_total_frozen_stake ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "total_frozen_stake"]
+    Fun.id
+
+let get_chain_block_context_issuance_current_yearly_rate ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "issuance";
+      "current_yearly_rate";
+    ]
+    Fun.id
+
+let get_chain_block_context_issuance_current_yearly_rate_exact ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "issuance";
+      "current_yearly_rate_exact";
+    ]
+    Fun.id
+
+let get_chain_block_context_issuance_issuance_per_minute ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "issuance";
+      "issuance_per_minute";
+    ]
+    Fun.id
+
+let get_chain_block_context_adaptive_issuance_launch_cycle ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "adaptive_issuance_launch_cycle";
+    ]
+    Fun.id
+
+let get_chain_block_context_issuance_expected_issuance ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "issuance";
+      "expected_issuance";
     ]
     Fun.id
 

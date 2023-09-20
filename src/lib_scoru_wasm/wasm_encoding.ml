@@ -986,14 +986,50 @@ let reveal_encoding =
       case
         "Reveal_raw_data"
         reveal_hash_encoding
-        (function Host_funcs.Reveal_raw_data hash -> Some hash | _ -> None)
+        (fun reveal ->
+          match Wasm_pvm_state.Compatibility.of_current_opt reveal with
+          | Some (Reveal_raw_data hash) -> Some hash
+          | Some Reveal_metadata | None -> None)
+        (fun hash -> Wasm_pvm_state.reveal_raw_data hash);
+      case
+        "Reveal_metadata"
+        (value [] Data_encoding.unit)
+        (fun reveal ->
+          match Wasm_pvm_state.Compatibility.of_current_opt reveal with
+          | Some Reveal_metadata -> Some ()
+          | Some (Reveal_raw_data _) | None -> None)
+        (fun () -> Wasm_pvm_state.reveal_metadata);
+      case
+        "Reveal_raw"
+        (value [] Data_encoding.string)
+        (function Wasm_pvm_state.Reveal_raw payload -> Some payload)
+        (fun payload -> Reveal_raw payload);
+    ]
+
+let compatibility_reveal_encoding =
+  tagged_union
+    string_tag
+    [
+      case
+        "Reveal_raw_data"
+        reveal_hash_encoding
+        (function
+          | Wasm_pvm_state.Compatibility.Reveal_raw_data hash -> Some hash
+          | _ -> None)
         (fun hash -> Reveal_raw_data hash);
       case
         "Reveal_metadata"
         (value [] Data_encoding.unit)
-        (function Host_funcs.Reveal_metadata -> Some () | _ -> None)
+        (function
+          | Wasm_pvm_state.Compatibility.Reveal_metadata -> Some () | _ -> None)
         (fun () -> Reveal_metadata);
     ]
+
+module Internal_for_tests = struct
+  let reveal_encoding = reveal_encoding
+
+  let compatibility_reveal_encoding = compatibility_reveal_encoding
+end
 
 let invoke_step_kont_encoding =
   tagged_union

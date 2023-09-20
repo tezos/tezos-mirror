@@ -29,13 +29,15 @@
 
 let () =
   let print_usage_and_fail s =
-    Printf.eprintf "Usage: %s [ --sandbox | --test | --mainnet ]" Sys.argv.(0) ;
+    Printf.eprintf
+      "Usage: %s [ --sandbox | --test | --mainnet | --mainnet-with-chain-id ]"
+      Sys.argv.(0) ;
     raise (Invalid_argument s)
   in
-  let dump parameters file =
+  let dump ?chain_id parameters file =
     let str =
       Data_encoding.Json.to_string
-        (Default_parameters.json_of_parameters parameters)
+        (Default_parameters.json_of_parameters ?chain_id parameters)
     in
     let fd = open_out file in
     output_string fd str ;
@@ -59,4 +61,9 @@ let () =
         dump
           Default_parameters.(parameters_of_constants constants_mainnet)
           "mainnet-parameters.json"
+    | "--mainnet-with-chain-id" ->
+        dump
+          ~chain_id:Protocol.Alpha_context.Constants.mainnet_id
+          Default_parameters.(parameters_of_constants constants_mainnet)
+          "mainnet-with-chain-id-parameters.json"
     | s -> print_usage_and_fail s

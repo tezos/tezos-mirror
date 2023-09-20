@@ -145,4 +145,4 @@ let plot_histograms pdf_file {degrees; depths; sizes; _} =
       [Histogram.hist ~bins:50 ~points ()]
   in
   let plots = [|[|Some degree; Some depth; Some size|]|] in
-  run_matrix ~target:(pdf ~cm_size:(30.0, 20.0) ~pdf_file ()) exec plots
+  run_matrix ~target:(pdf ~cm_size:(30.0, 20.0) ~pdf_file ()) plots

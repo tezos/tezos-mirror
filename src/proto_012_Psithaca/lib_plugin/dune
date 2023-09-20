@@ -3,11 +3,11 @@
 
 (library
  (name tezos_protocol_plugin_012_Psithaca)
- (public_name tezos-protocol-plugin-012-Psithaca)
+ (public_name octez-protocol-012-Psithaca-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-012-Psithaca)
+  octez-libs.base
+  tezos-protocol-012-Psithaca.protocol)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -15,15 +15,17 @@
   -open Tezos_protocol_012_Psithaca)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-012-Psithaca-libs))
+
 (library
  (name tezos_protocol_plugin_012_Psithaca_registerer)
- (public_name tezos-protocol-plugin-012-Psithaca-registerer)
+ (public_name octez-protocol-012-Psithaca-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-embedded-protocol-012-Psithaca
-  tezos-protocol-plugin-012-Psithaca
-  tezos-validation)
+  octez-libs.base
+  tezos-protocol-012-Psithaca.embedded-protocol
+  octez-protocol-012-Psithaca-libs.plugin
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

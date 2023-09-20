@@ -104,6 +104,3 @@ if [ -n "$dev" ]; then
     # utop is constrained to avoid reinstalling in all the times.
     opam install --yes opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam --deps-only --criteria="-changed,-removed"
 fi
-
-"$script_dir"/install_sapling_parameters.sh
-

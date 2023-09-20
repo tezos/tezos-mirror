@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let build_rpc_directory ~user_activated_upgrades
-    ~user_activated_protocol_overrides ~mainchain_validator store =
+    ~user_activated_protocol_overrides ~dal_config ~mainchain_validator store =
   let open Lwt_result_syntax in
   let register endpoint f directory =
     Tezos_rpc.Directory.register directory endpoint f
@@ -35,6 +35,8 @@ let build_rpc_directory ~user_activated_upgrades
   |> register
        Config_services.Network.user_activated_protocol_overrides
        (fun () () () -> return user_activated_protocol_overrides)
+  |> register Config_services.Network.dal_config (fun () () () ->
+         return dal_config)
   |> register Config_services.history_mode (fun () () () ->
          let chain_store = Store.main_chain_store store in
          return (Store.Chain.history_mode chain_store))

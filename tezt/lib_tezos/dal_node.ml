@@ -30,8 +30,8 @@ module Parameters = struct
     rpc_port : int;
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
+    metrics_addr : string;
     node : Node.t;
-    client : Client.t;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -64,43 +64,49 @@ let rpc_host dal_node = dal_node.persistent_state.rpc_host
 
 let rpc_port dal_node = dal_node.persistent_state.rpc_port
 
+let rpc_endpoint dal_node =
+  Printf.sprintf "http://%s:%d" (rpc_host dal_node) (rpc_port dal_node)
+
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
+
+let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 
 let layer1_addr dal_node = Node.rpc_host dal_node.persistent_state.node
 
 let layer1_port dal_node = Node.rpc_port dal_node.persistent_state.node
-
-let endpoint dal_node =
-  Printf.sprintf "http://%s:%d" (rpc_host dal_node) (rpc_port dal_node)
 
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
 let spawn_command dal_node =
   Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
 
-let spawn_config_init ?(use_unsafe_srs = true) dal_node =
+let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
+    ?(attestor_profiles = []) ?(producer_profiles = [])
+    ?(bootstrap_profile = false) dal_node =
   spawn_command dal_node
   @@ List.filter_map
        Fun.id
        [
-         Some "init-config";
+         Some "config";
+         Some "init";
          Some "--data-dir";
          Some (data_dir dal_node);
-         Some "--rpc-port";
-         Some (string_of_int (rpc_port dal_node));
          Some "--rpc-addr";
-         Some (rpc_host dal_node);
+         Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
          Some "--net-addr";
          Some (listen_addr dal_node);
-         (if use_unsafe_srs then Some "--use-unsafe-srs-for-tests" else None);
+         Some "--metrics-addr";
+         Some (metrics_addr dal_node);
+         Some "--expected-pow";
+         Some (string_of_float expected_pow);
+         Some "--peers";
+         Some (String.concat "," peers);
+         Some "--attestor-profiles";
+         Some (String.concat "," attestor_profiles);
+         Some "--producer-profiles";
+         Some (String.concat "," (List.map string_of_int producer_profiles));
+         (if bootstrap_profile then Some "--bootstrap-profile" else None);
        ]
-
-let init_config ?use_unsafe_srs dal_node =
-  let process = spawn_config_init ?use_unsafe_srs dal_node in
-  let* output = Process.check_and_read_stdout process in
-  match output =~* rex "DAL node configuration written in ([^\n]*)" with
-  | None -> failwith "DAL node configuration initialization failed"
-  | Some filename -> return filename
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
@@ -111,6 +117,23 @@ module Config_file = struct
 
   let update dal_node update = read dal_node |> update |> write dal_node
 end
+
+let init_config ?expected_pow ?peers ?attestor_profiles ?producer_profiles
+    ?bootstrap_profile dal_node =
+  let process =
+    spawn_config_init
+      ?expected_pow
+      ?peers
+      ?attestor_profiles
+      ?producer_profiles
+      ?bootstrap_profile
+      dal_node
+  in
+  Process.check process
+
+let read_identity dal_node =
+  let filename = sf "%s/identity.json" @@ data_dir dal_node in
+  JSON.parse_file filename
 
 let check_event ?timeout ?where dal_node name promise =
   let* result =
@@ -154,7 +177,7 @@ let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ~node ~client () =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr ~node () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -164,6 +187,11 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
   in
   let listen_addr =
     match listen_addr with
+    | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
+    | Some addr -> addr
+  in
+  let metrics_addr =
+    match metrics_addr with
     | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
     | Some addr -> addr
   in
@@ -178,25 +206,25 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
         rpc_host;
         rpc_port;
         listen_addr;
+        metrics_addr;
         pending_ready = [];
         node;
-        client;
       }
   in
   on_event dal_node (handle_event dal_node) ;
   dal_node
 
 let make_arguments node =
-  let base_dir_args =
-    ["--base-dir"; Client.base_dir node.persistent_state.client]
-  in
-  let endpoint_args =
-    [
-      "--endpoint";
-      Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
-    ]
-  in
-  base_dir_args @ endpoint_args
+  [
+    "--endpoint";
+    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    "--rpc-addr";
+    Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
+    "--net-addr";
+    listen_addr node;
+    "--metrics-addr";
+    metrics_addr node;
+  ]
 
 let do_runlike_command ?env node arguments =
   if node.status <> Not_running then
@@ -205,7 +233,12 @@ let do_runlike_command ?env node arguments =
     trigger_ready node None ;
     unit
   in
-  let arguments = make_arguments node @ arguments in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6164
+     Improve handling of arguments:
+     * unclear what should happen when two values for the same argument are given
+     * [make_arguments] seems incomplete
+     * refactoring possible in [spawn_config_init] *)
+  let arguments = arguments @ make_arguments node in
   run ?env node {ready = false} arguments ~on_terminate
 
 let run ?env node =

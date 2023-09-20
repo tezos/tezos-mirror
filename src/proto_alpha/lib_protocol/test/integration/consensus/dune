@@ -7,12 +7,12 @@
  (libraries
   tezt.core
   octez-alcotezt
-  tezos-base
-  tezos-protocol-alpha
-  tezos-alpha-test-helpers
-  tezos-base-test-helpers
+  octez-libs.base
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.test-helpers
+  octez-libs.base-test-helpers
   tezos-protocol-alpha.parameters
-  tezos-protocol-plugin-alpha)
+  octez-protocol-alpha-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -32,14 +32,14 @@
   test_deactivation
   test_delegation
   test_double_baking
-  test_double_endorsement
-  test_double_preendorsement
-  test_endorsement
+  test_double_attestation
+  test_double_preattestation
+  test_attestation
   test_frozen_deposits
   test_helpers_rpcs
   test_participation
-  test_preendorsement_functor
-  test_preendorsement
+  test_preattestation_functor
+  test_preattestation
   test_seed))
 
 (executable

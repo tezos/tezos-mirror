@@ -136,7 +136,7 @@ module Inner = struct
   (* Scalars are elements of the prime field Fr from BLS. *)
   module Scalar = Bls12_381.Fr
   module Polynomials = Octez_bls12_381_polynomial.Polynomial
-  module G1_array = Octez_bls12_381_polynomial.Ec_carray.G1_carray
+  module G1_array = Octez_bls12_381_polynomial.G1_carray
 
   (* Operations on vector of scalars *)
   module Evaluations = Octez_bls12_381_polynomial.Evaluations
@@ -189,6 +189,8 @@ module Inner = struct
     let page_proof_encoding = g1_encoding
 
     let share_encoding = array fr_encoding
+
+    let shard_proof_encoding = g1_encoding
 
     let shard_encoding =
       conv
@@ -256,6 +258,19 @@ module Inner = struct
         (Fixed.bytes commitment_size)
       [@@coverage off]
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5593
+
+       We could have a smarter compare eg. using lazy Data_encoding.compare that
+       encodes the two values to bytes lazily and stops as soon as the values
+       are detected to be not equal. *)
+    let compare_commitments a b =
+      (* We are obliged to compare commitments by casting to bytes because
+         {!Bls12_381.G1} doesn't provide a compare function. *)
+      if Bls12_381.G1.eq a b then 0
+      else Bytes.compare (Bls12_381.G1.to_bytes a) (Bls12_381.G1.to_bytes b)
+
+    let compare = compare_commitments
+
     include Tezos_crypto.Helpers.Make (struct
       type t = commitment
 
@@ -267,9 +282,7 @@ module Inner = struct
 
       let raw_encoding = raw_encoding
 
-      let compare a b =
-        if Bls12_381.G1.eq a b then 0
-        else Bytes.compare (Bls12_381.G1.to_bytes a) (Bls12_381.G1.to_bytes b)
+      let compare = compare_commitments
 
       let equal = Bls12_381.G1.eq
 
@@ -610,26 +623,14 @@ module Inner = struct
           max_polynomial_length
           srs_g2_length)
 
-  type parameters = {
+  type parameters = Dal_config.parameters = {
     redundancy_factor : int;
     page_size : int;
     slot_size : int;
     number_of_shards : int;
   }
 
-  let parameters_encoding =
-    let open Data_encoding in
-    conv
-      (fun {redundancy_factor; page_size; slot_size; number_of_shards} ->
-        (redundancy_factor, page_size, slot_size, number_of_shards))
-      (fun (redundancy_factor, page_size, slot_size, number_of_shards) ->
-        {redundancy_factor; page_size; slot_size; number_of_shards})
-      (obj4
-         (req "redundancy_factor" uint8)
-         (req "page_size" uint16)
-         (req "slot_size" int31)
-         (req "number_of_shards" uint16))
-    [@@coverage off]
+  let parameters_encoding = Dal_config.parameters_encoding
 
   let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
 
@@ -648,7 +649,7 @@ module Inner = struct
     let shard_length = erasure_encoded_polynomial_length / number_of_shards in
     let* raw =
       match !initialisation_parameters with
-      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
+      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialised.")
       | Some srs -> return srs
     in
     let* () =
@@ -849,7 +850,7 @@ module Inner = struct
   let shards_from_polynomial t p =
     let codeword = encode t p in
     let rec loop index seq =
-      if index = t.number_of_shards then seq
+      if index < 0 then seq
       else
         (* For each shard index [index], a [share] consists of the
            elements from [codeword] of indices w^index W_0.
@@ -858,9 +859,9 @@ module Inner = struct
         for j = 0 to t.shard_length - 1 do
           share.(j) <- codeword.((t.number_of_shards * j) + index)
         done ;
-        loop (index + 1) (Seq.cons {index; share} seq)
+        loop (index - 1) (Seq.cons {index; share} seq)
     in
-    loop 0 Seq.empty
+    loop (t.number_of_shards - 1) Seq.empty
 
   module ShardSet = Set.Make (struct
     type t = shard
@@ -1585,13 +1586,12 @@ module Inner = struct
   let precompute_shards_proofs t =
     (* Precomputes step. 1 of multiple multi-reveals. *)
     let domain, precomputation = preprocess_multiple_multi_reveals t in
-    ( Domains.Domain_unsafe.to_array domain,
+    ( Octez_bls12_381_polynomial.Domain.to_array domain,
       Array.map G1_array.to_array precomputation )
 
   let prove_shards t ~precomputation:(domain, precomp) ~polynomial =
     let setup =
-      ( Domains.Domain_unsafe.of_array domain,
-        Array.map G1_array.of_array precomp )
+      (Domains.of_array domain, Array.map G1_array.of_array precomp)
     in
     (* Resizing input polynomial [p] to obtain an array of length [t.max_polynomial_length + 1]. *)
     let coefficients =
@@ -1614,17 +1614,22 @@ module Inner = struct
              0
              (t.number_of_shards - 1)))
     else
-      let root =
-        Domains.get t.domain_erasure_encoded_polynomial_length shard_index
-      in
-      let domain = Domains.build t.shard_length in
-      let srs_point = t.srs.kate_amortized_srs_g2_shards in
-      match
-        verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof
-      with
-      | Ok true -> Ok ()
-      | Ok false -> Error `Invalid_shard
-      | Error e -> Error e
+      let expected_shard_length = t.shard_length in
+      let got_shard_length = Array.length evaluations in
+      if expected_shard_length <> got_shard_length then
+        Error `Shard_length_mismatch
+      else
+        let root =
+          Domains.get t.domain_erasure_encoded_polynomial_length shard_index
+        in
+        let domain = Domains.build t.shard_length in
+        let srs_point = t.srs.kate_amortized_srs_g2_shards in
+        match
+          verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof
+        with
+        | Ok true -> Ok ()
+        | Ok false -> Error `Invalid_shard
+        | Error e -> Error e
 
   let prove_page t p page_index =
     if page_index < 0 || page_index >= t.pages_per_slot then
@@ -1817,35 +1822,15 @@ module Internal_for_tests = struct
 end
 
 module Config = struct
-  type t = {activated : bool; use_mock_srs_for_testing : parameters option}
+  type t = Dal_config.t = {
+    activated : bool;
+    use_mock_srs_for_testing : parameters option;
+    bootstrap_peers : string list;
+  }
 
-  let parameters_encoding : parameters Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {slot_size; page_size; redundancy_factor; number_of_shards} ->
-        (slot_size, page_size, redundancy_factor, number_of_shards))
-      (fun (slot_size, page_size, redundancy_factor, number_of_shards) ->
-        {slot_size; page_size; redundancy_factor; number_of_shards})
-      (obj4
-         (req "slot_size" int31)
-         (req "page_size" int31)
-         (req "redundancy_factor" int31)
-         (req "number_of_shards" int31))
-    [@@coverage off]
+  let encoding : t Data_encoding.t = Dal_config.encoding
 
-  let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {activated; use_mock_srs_for_testing} ->
-        (activated, use_mock_srs_for_testing))
-      (fun (activated, use_mock_srs_for_testing) ->
-        {activated; use_mock_srs_for_testing})
-      (obj2
-         (req "activated" bool)
-         (req "use_mock_srs_for_testing" (option parameters_encoding)))
-    [@@coverage off]
-
-  let default = {activated = false; use_mock_srs_for_testing = None}
+  let default = Dal_config.default
 
   let init_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
     let open Lwt_result_syntax in

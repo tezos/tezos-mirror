@@ -3,13 +3,13 @@
 
 (library
  (name tezos_mockup_registration)
- (public_name tezos-mockup-registration)
+ (public_name octez-shell-libs.mockup-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-client-base
-  tezos-shell-services
-  tezos-protocol-environment
+  octez-libs.base
+  octez-shell-libs.client-base
+  octez-shell-libs.shell-services
+  octez-proto-libs.protocol-environment
   uri)
  (flags
   (:standard)
@@ -18,22 +18,22 @@
 
 (library
  (name tezos_mockup)
- (public_name tezos-mockup)
+ (public_name octez-shell-libs.mockup)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-client-base
-  tezos-mockup-proxy
+  octez-libs.base
+  octez-libs.base.unix
+  octez-shell-libs.client-base
+  octez-shell-libs.mockup-proxy
   resto-cohttp-self-serving-client
-  tezos-rpc
-  tezos-p2p-services
-  tezos-p2p
-  tezos-protocol-environment
-  tezos-stdlib-unix
-  tezos-rpc-http
-  tezos-rpc-http-client
-  tezos-mockup-registration)
+  octez-libs.rpc
+  octez-libs.tezos-p2p-services
+  octez-shell-libs.p2p
+  octez-proto-libs.protocol-environment
+  octez-libs.stdlib-unix
+  octez-libs.rpc-http
+  octez-libs.rpc-http-client
+  octez-shell-libs.mockup-registration)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -48,15 +48,15 @@
 
 (library
  (name tezos_mockup_commands)
- (public_name tezos-mockup-commands)
+ (public_name octez-shell-libs.mockup-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-client-commands
-  tezos-client-base
-  tezos-mockup
-  tezos-mockup-registration)
+  octez-libs.base
+  octez-libs.clic
+  octez-shell-libs.client-commands
+  octez-shell-libs.client-base
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-registration)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

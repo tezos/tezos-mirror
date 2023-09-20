@@ -20,6 +20,12 @@ computing the gas costs in the Tezos protocol.
    :maxdepth: 2
    :caption: Using octez-snoop by example
 
+   snoop_tutorial
+
+.. toctree::
+   :maxdepth: 2
+   :caption: octez-snoop: going further for more control
+
    snoop_example
 
 .. toctree::

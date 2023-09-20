@@ -19,6 +19,7 @@ module V0 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
   module RPC_directory = V0_RPC_directory
+  module Legacy_logging = V0_legacy_logging
 end
 
 module V1 = struct
@@ -44,6 +45,7 @@ module V1 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
   module RPC_directory = V0_RPC_directory
+  module Legacy_logging = V0_legacy_logging
 end
 
 module V2 = struct
@@ -68,6 +70,7 @@ module V2 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
   module RPC_directory = V0_RPC_directory
+  module Legacy_logging = V0_legacy_logging
 end
 
 module V3 = struct
@@ -133,3 +136,4 @@ module V9 = struct
 end
 
 module V10 = V9
+module V11 = V10

@@ -7,14 +7,14 @@
  (libraries
   tezt.core
   tezt
-  tezos-context
+  octez-libs.tezos-context
   octez-alcotezt
-  tezos-base
-  tezos-client-alpha
-  tezos-protocol-alpha
+  octez-libs.base
+  octez-protocol-alpha-libs.client
+  tezos-protocol-alpha.protocol
   tezos-protocol-alpha.parameters
-  tezos-alpha-test-helpers
-  tezos-base-test-helpers)
+  octez-protocol-alpha-libs.test-helpers
+  octez-libs.base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -31,6 +31,8 @@
  (modules
   test_constants
   test_frozen_bonds
+  test_adaptive_issuance_launch
+  test_adaptive_issuance_roundtrip
   test_liquidity_baking
   test_storage_functions
   test_storage

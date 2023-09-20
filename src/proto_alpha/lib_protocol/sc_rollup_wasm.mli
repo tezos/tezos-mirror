@@ -52,8 +52,11 @@ module V2_0_0 : sig
       | Waiting_for_input_message
       | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
-    (** [get_status state] gives you the current execution status for the PVM. *)
-    val get_status : state -> status Lwt.t
+    (** [get_status ~is_reveal_enabled state] gives you the current execution status for the PVM. *)
+    val get_status :
+      is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+      state ->
+      status Lwt.t
 
     (** [get_outbox outbox_level state] returns the outbox in [state]
        for a given [outbox_level]. *)
@@ -61,31 +64,12 @@ module V2_0_0 : sig
       Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  module type P = sig
-    module Tree :
-      Context.TREE with type key = string list and type value = bytes
-
-    type tree = Tree.tree
-
-    type proof
-
-    val proof_encoding : proof Data_encoding.t
-
-    val proof_before : proof -> Sc_rollup_repr.State_hash.t
-
-    val proof_after : proof -> Sc_rollup_repr.State_hash.t
-
-    val verify_proof :
-      proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-
-    val produce_proof :
-      Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
-  end
-
   module type Make_wasm = module type of Wasm_2_0_0.Make
 
   (** Build a WebAssembly PVM using the given proof-supporting context. *)
-  module Make (Lib_scoru_Wasm : Make_wasm) (Context : P) :
+  module Make
+      (Lib_scoru_Wasm : Make_wasm)
+      (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
@@ -136,4 +120,11 @@ module V2_0_0 : sig
 
   (** The preimage of {!well_known_reveal_hash}. *)
   val well_known_reveal_preimage : string
+
+  (** Convert a raw reveal request of the WASM PVM into a typed reveal as
+      defined by the protocol.
+
+      If the decoding fails, fallback to requesting the preimage of the
+      {!well_known_reveal_hash}. *)
+  val decode_reveal : Wasm_2_0_0.reveal -> Sc_rollup_PVM_sig.reveal
 end

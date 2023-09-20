@@ -140,6 +140,7 @@ type 'a known = Unknown | Known of 'a
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
+    net_addr : string option;
     mutable net_port : int;
     advertised_net_port : int option;
     rpc_host : string;
@@ -371,27 +372,35 @@ module Config_file = struct
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
+  let put_user_activated_upgrades upgrade_points =
+    JSON.put
+      ( "user_activated_upgrades",
+        JSON.annotate ~origin:"user_activated_upgrades"
+        @@ `A
+             (List.map
+                (fun (level, protocol) ->
+                  `O
+                    [
+                      ("level", `Float (float level));
+                      ("replacement_protocol", `String (Protocol.hash protocol));
+                    ])
+                upgrade_points) )
+
   let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
       =
     let network =
       sandbox_network_config
       |> JSON.annotate
-           ~origin:"set_sandbox_network_with_user_activated_upgrades"
-      |> JSON.put
-           ( "user_activated_upgrades",
-             JSON.annotate ~origin:"user_activated_upgrades"
-             @@ `A
-                  (List.map
-                     (fun (level, protocol) ->
-                       `O
-                         [
-                           ("level", `Float (float level));
-                           ( "replacement_protocol",
-                             `String (Protocol.hash protocol) );
-                         ])
-                     upgrade_points) )
+           ~origin:"set_sandbox_network_config_with_user_activated_upgrades"
+      |> put_user_activated_upgrades upgrade_points
     in
     JSON.put ("network", network) old_config
+
+  let update_network_with_user_activated_upgrades upgrade_points old_config =
+    JSON.update
+      "network"
+      (fun config -> (put_user_activated_upgrades upgrade_points) config)
+      old_config
 
   let set_sandbox_network_with_user_activated_overrides overrides old_config =
     let network =
@@ -413,26 +422,48 @@ module Config_file = struct
     in
     JSON.put ("network", network) old_config
 
+  let set_sandbox_network_with_dal_config
+      (dal_config : Tezos_crypto_dal.Cryptobox.Config.t) old_config =
+    let dal_config_json =
+      let parameters =
+        match dal_config.use_mock_srs_for_testing with
+        | Some parameters ->
+            `O
+              [
+                ("slot_size", `Float (float_of_int parameters.slot_size));
+                ("page_size", `Float (float_of_int parameters.page_size));
+                ( "redundancy_factor",
+                  `Float (float_of_int parameters.redundancy_factor) );
+                ( "number_of_shards",
+                  `Float (float_of_int parameters.number_of_shards) );
+              ]
+        | None -> `Null
+      in
+      JSON.annotate
+        ~origin:"dal_initialisation"
+        (`O
+          [
+            ("activated", `Bool dal_config.activated);
+            ("use_mock_srs_for_testing", parameters);
+            ( "bootstrap_peers",
+              `A
+                (List.map (fun peer -> `String peer) dal_config.bootstrap_peers)
+            );
+          ])
+    in
+    let network =
+      sandbox_network_config
+      |> JSON.annotate ~origin:"set_sandbox_network_with_dal_config"
+      |> JSON.put ("dal_config", dal_config_json)
+    in
+    JSON.put ("network", network) old_config
+
   let set_ghostnet_sandbox_network ?user_activated_upgrades () old_config =
     let may_patch_user_activated_upgrades =
       match user_activated_upgrades with
       | None -> Fun.id
-      | Some upgrade_points ->
-          JSON.put
-            ( "user_activated_upgrades",
-              JSON.annotate ~origin:"user_activated_upgrades"
-              @@ `A
-                   (List.map
-                      (fun (level, protocol) ->
-                        `O
-                          [
-                            ("level", `Float (float level));
-                            ( "replacement_protocol",
-                              `String (Protocol.hash protocol) );
-                          ])
-                      upgrade_points) )
+      | Some upgrade_points -> put_user_activated_upgrades upgrade_points
     in
-
     JSON.put
       ( "network",
         JSON.annotate
@@ -471,15 +502,16 @@ let spawn_snapshot_info ?(json = false) node file =
 let snapshot_info ?json node file =
   spawn_snapshot_info ?json node file |> Process.check
 
-let spawn_snapshot_import ?(reconstruct = false) node file =
+let spawn_snapshot_import ?(no_check = false) ?(reconstruct = false) node file =
   spawn_command
     node
     (["snapshot"; "import"; "--data-dir"; node.persistent_state.data_dir]
     @ (if reconstruct then ["--reconstruct"] else [])
+    @ (if no_check then ["--no-check"] else [])
     @ [file])
 
-let snapshot_import ?reconstruct node file =
-  spawn_snapshot_import ?reconstruct node file |> Process.check
+let snapshot_import ?no_check ?reconstruct node file =
+  spawn_snapshot_import ?no_check ?reconstruct node file |> Process.check
 
 let spawn_reconstruct node =
   spawn_command
@@ -654,8 +686,9 @@ let wait_for_disconnections node disconnections =
   waiter
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
-    ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
-    ?rpc_port ?rpc_tls ?(allow_all_rpc = true) arguments =
+    ?event_pipe ?net_addr ?net_port ?advertised_net_port
+    ?(rpc_host = "localhost") ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
+    arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -680,6 +713,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
       ?event_pipe
       {
         data_dir;
+        net_addr;
         net_port;
         advertised_net_port;
         rpc_host;
@@ -748,7 +782,9 @@ let remove_peers_json_file node =
 let runlike_command_arguments node command arguments =
   let net_addr, rpc_addr =
     match node.persistent_state.runner with
-    | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
+    | None ->
+        ( Option.value ~default:"127.0.0.1" node.persistent_state.net_addr ^ ":",
+          node.persistent_state.rpc_host ^ ":" )
     | Some _ ->
         (* FIXME spawn an ssh tunnel in case of remote host *)
         ("0.0.0.0:", "0.0.0.0:")

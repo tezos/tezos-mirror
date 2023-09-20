@@ -10,7 +10,7 @@ Indeed, by default:
 
 - Private keys are stored unencrypted in file ``$OCTEZ_CLIENT_DIR/secret_keys``.
 - The client uses these keys to sign user operations (e.g. transfers) by itself.
-- The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)endorsements).
+- The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)attestations).
 
 The solutions provided to strengthen the security of the default key management and signing are the following:
 
@@ -18,7 +18,7 @@ The solutions provided to strengthen the security of the default key management 
 
   + store your private keys securely
   + sign user operations (e.g. transfers) interactively on the wallet
-  + automatically sign baking operations, such as (pre-)endorsements, more securely.
+  + automatically sign baking operations, such as (pre-)attestations, more securely.
 
 - If you don't have a hardware wallet, the option ``--encrypted`` of the client offers a first protection for storing your keys.
 
@@ -85,7 +85,7 @@ Tezos Baking app
 
 In Ledger Live (with Developer Mode enabled), there is also a ``Tezos Baking``
 app which allows a delegate to sign automatically (i.e., there is no need
-to manually sign every block or (pre-)endorsement).
+to manually sign every block or (pre-)attestation).
 Of course, the application is restricted to only sign baking operations; it never signs a transfer, for example.
 Furthermore, the application keeps track of the last level baked and only
 allows baking for subsequent levels.
@@ -130,7 +130,7 @@ In the case of blocks or consensus operations for example, this format is instan
 
     <magic_byte><chain_id><block|consensus_operation>
 
-Starting with Octez v12 (supporting the Ithaca protocol), consensus operations also include :ref:`preendorsements <quorum>`. The magic byte distinguishes pre-Ithaca messages from (post-)Ithaca messages, as follows:
+Starting with Octez v12 (supporting the Ithaca protocol), consensus operations also include :ref:`preattestations <quorum>`. The magic byte distinguishes pre-Ithaca messages from (post-)Ithaca messages, as follows:
 
 .. list-table::
    :widths: 55 25
@@ -150,9 +150,9 @@ Starting with Octez v12 (supporting the Ithaca protocol), consensus operations a
      - 0x05
    * - Block
      - 0x11
-   * - Pre-endorsement
+   * - Pre-attestation
      - 0x12
-   * - Endorsement
+   * - Attestation
      - 0x13
 
 The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes``, as explained in the :ref:`signer's manual <signer_manual>`.
@@ -270,7 +270,7 @@ Consensus Key
    The "consensus key" feature is available starting with the Tezos :doc:`Lima<../protocols/015_lima>` protocol.
 
 By default, the baker's key, also called manager key, is used to sign in the consensus protocol, i.e. signing blocks while baking,
-and signing consensus operations (preendorsements and endorsements).
+and signing consensus operations (preattestations and attestations).
 
 A delegate may elect instead to choose a dedicated key: the *consensus key*. It can then be changed without redelegation.
 

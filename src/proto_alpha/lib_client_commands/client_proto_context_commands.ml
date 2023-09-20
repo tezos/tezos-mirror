@@ -57,7 +57,7 @@ let read_encoding ?(buffer_size = 32768) path enc =
 
 let save_zk_rollup ~force (cctxt : #Client_context.full) alias_name rollup =
   let open Lwt_result_syntax in
-  let* () = EpoxyAlias.add ~force cctxt alias_name rollup in
+  let* () = Epoxy_alias.add ~force cctxt alias_name rollup in
   let*! () = cctxt#message "Epoxy rollup memorized as %s" alias_name in
   return_unit
 
@@ -190,7 +190,9 @@ let commands_ro () =
       ~desc:"Get the key rank of a cache key."
       no_options
       (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
-      @@ OriginatedContractAlias.destination_param ~name:"src" ~desc:"contract"
+      @@ Originated_contract_alias.destination_param
+           ~name:"src"
+           ~desc:"contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
@@ -229,10 +231,10 @@ let commands_ro () =
         return_unit);
     command
       ~group
-      ~desc:"Get the balance of a contract."
+      ~desc:"Get the liquid balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
@@ -245,10 +247,47 @@ let commands_ro () =
         return_unit);
     command
       ~group
+      ~desc:"Get the staked balance of a contract."
+      no_options
+      (prefixes ["get"; "staked"; "balance"; "for"]
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* amount =
+          get_staked_balance
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+        in
+        let amount = Option.value ~default:Tez.zero amount in
+        let*! () =
+          cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Get the full balance of a contract."
+      no_options
+      (prefixes ["get"; "full"; "balance"; "for"]
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* amount =
+          get_full_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+        in
+        let*! () =
+          cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
+        in
+        return_unit);
+    command
+      ~group
       ~desc:"Get the storage of a contract."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "contract"; "storage"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -272,7 +311,7 @@ let commands_ro () =
       ~desc:"Get the used storage space of a contract."
       no_options
       (prefixes ["get"; "contract"; "used"; "storage"; "space"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -293,7 +332,7 @@ let commands_ro () =
       ~desc:"Get the paid storage space of a contract."
       no_options
       (prefixes ["get"; "contract"; "paid"; "storage"; "space"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -320,7 +359,7 @@ let commands_ro () =
       @@ prefixes ["of"; "type"]
       @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -377,7 +416,7 @@ let commands_ro () =
       ~desc:"Get the code of a contract."
       (args2 (unparsing_mode_arg ~default:"Readable") normalize_types_switch)
       (prefixes ["get"; "contract"; "code"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -408,7 +447,7 @@ let commands_ro () =
       ~desc:"Get the `BLAKE2B` script hash of a contract."
       no_options
       (prefixes ["get"; "contract"; "script"; "hash"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -433,7 +472,7 @@ let commands_ro () =
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
       @@ prefixes ["for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -462,7 +501,7 @@ let commands_ro () =
       ~desc:"Get the entrypoint list of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -486,7 +525,7 @@ let commands_ro () =
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       (prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"source contract"
       @@ stop)
@@ -509,7 +548,7 @@ let commands_ro () =
       ~desc:"Get the delegate of a contract."
       no_options
       (prefixes ["get"; "delegate"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
@@ -541,9 +580,9 @@ let commands_ro () =
          type, and content."
       no_options
       (prefixes ["get"; "ticket"; "balance"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"Source contract."
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"Source contract."
       @@ prefixes ["with"; "ticketer"]
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"ticketer"
            ~desc:"Ticketer contract of the ticket."
       @@ prefixes ["and"; "type"]
@@ -579,7 +618,7 @@ let commands_ro () =
       ~desc:"Get the complete list of tickets owned by a given contract."
       no_options
       (prefixes ["get"; "all"; "ticket"; "balances"; "for"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"src"
            ~desc:"Source contract."
       @@ stop)
@@ -623,7 +662,7 @@ let commands_ro () =
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_parameter))
+            (non_negative_parameter ())))
       (prefixes ["get"; "receipt"; "for"]
       @@ param
            ~name:"operation"
@@ -782,37 +821,6 @@ let commands_ro () =
                .unsigned_encoding_with_legacy_attestation_name)
         in
         return_unit);
-    command
-      ~group
-      ~desc:"Get the frozen deposits limit of a delegate."
-      no_options
-      (prefixes ["get"; "deposits"; "limit"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source delegate"
-      @@ stop)
-      (fun () contract (cctxt : Protocol_client_context.full) ->
-        let open Lwt_result_syntax in
-        match contract with
-        | Originated _ ->
-            cctxt#error
-              "Cannot change deposits limit on contract %a. This operation is \
-               invalid on originated contracts."
-              Contract.pp
-              contract
-        | Implicit delegate ->
-            let* o =
-              get_frozen_deposits_limit
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                delegate
-            in
-            let*! () =
-              match o with
-              | None -> cctxt#answer "unlimited"
-              | Some limit ->
-                  cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
-            in
-            return_unit);
   ]
 
 (* ----------------------------------------------------------------------------*)
@@ -973,7 +981,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
     ?entrypoint (source : Contract.t) index batch =
   let open Lwt_result_syntax in
   let* destination =
-    Client_proto_contracts.ContractAlias.find_destination
+    Client_proto_contracts.Contract_alias.find_destination
       cctxt
       batch.destination
   in
@@ -1096,7 +1104,7 @@ let commands_rw () =
          simulate_switch
          fee_parameter_args)
       (prefixes ["set"; "delegate"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ prefix "to"
       @@ Public_key_hash.source_param
            ~name:"dlgt"
@@ -1166,7 +1174,7 @@ let commands_rw () =
       ~desc:"Withdraw the delegate from a contract."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["withdraw"; "delegate"; "from"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter)
            contract
@@ -1235,7 +1243,7 @@ let commands_rw () =
          no_print_source_flag
          fee_parameter_args)
       (prefixes ["originate"; "contract"]
-      @@ RawContractAlias.fresh_alias_param
+      @@ Raw_contract_alias.fresh_alias_param
            ~name:"new"
            ~desc:"name of the new contract"
       @@ prefix "transferring"
@@ -1267,7 +1275,7 @@ let commands_rw () =
            program
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* alias_name = RawContractAlias.of_fresh cctxt force alias_name in
+        let* alias_name = Raw_contract_alias.of_fresh cctxt force alias_name in
         let* {expanded = code; _} =
           Lwt.return (Micheline_parser.no_parsing_error program)
         in
@@ -1325,7 +1333,7 @@ let commands_rw () =
          default_entrypoint_arg
          replace_by_fees_arg)
       (prefixes ["multiple"; "transfers"; "from"]
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "using"
@@ -1474,7 +1482,7 @@ let commands_rw () =
          default_entrypoint_arg
          replace_by_fees_arg)
       (prefixes ["originate"; "epoxy"]
-      @@ EpoxyAlias.fresh_alias_param
+      @@ Epoxy_alias.fresh_alias_param
            ~name:"epoxy"
            ~desc:"Fresh name for an Epoxy rollup"
       @@ prefix "from"
@@ -1557,7 +1565,7 @@ let commands_rw () =
               Ok originated_zk_rollup
           | _ -> error_with "Epoxy rollup was not correctly originated"
         in
-        let* alias_name = EpoxyAlias.of_fresh cctxt force alias in
+        let* alias_name = Epoxy_alias.of_fresh cctxt force alias in
         save_zk_rollup ~force cctxt alias_name res);
     command
       ~group
@@ -1710,11 +1718,11 @@ let commands_rw () =
       (prefixes ["transfer"]
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "to"
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"dst"
            ~desc:"name/literal of the destination contract"
       @@ stop)
@@ -1835,11 +1843,11 @@ let commands_rw () =
          replace_by_fees_arg
          successor_level_arg)
       (prefixes ["call"]
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"dst"
            ~desc:"name/literal of the destination contract"
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop)
@@ -1865,6 +1873,303 @@ let commands_rw () =
           amount
           source
           destination
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:
+        "Stake the given amount for the source. The source must be a delegator \
+         to be allowed to stake."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefix "stake"
+      @@ tez_param ~name:"qty" ~desc:"amount staked from source"
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           amount
+           source
+           cctxt ->
+        let contract = Contract.Implicit source in
+        let arg = None in
+        let entrypoint = Some Entrypoint.stake in
+        (* TODO #6162
+           (unless --force)
+              - check contract is delegated
+              - check amount is positive
+              - check contract is a baker if AI is not enabled *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:
+        "Unstake the given amount. If \"everything\" is given as amount, \
+         unstakes everything from the staking balance. Unstaked tez remains \
+         frozen for a set amount of cycles (the slashing period) after the \
+         operation. Once this period is over, the operation \"finalize \
+         unstake\" must be called for the funds to appear in the liquid \
+         balance."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefix "unstake"
+      @@ everything_or_tez_param
+           ~name:"qty"
+           ~desc:"amount to unstake from source"
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           amount
+           source
+           cctxt ->
+        let contract = Contract.Implicit source in
+        let arg =
+          (* Is there a better printer? *)
+          Some (Int64.to_string (Tez.to_mutez amount))
+        in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.unstake in
+        (* TODO #6162
+           (unless --force)
+              - check contract is delegated
+              - check contract has stake
+              - check amount is positive
+              - check contract is a baker if AI is not enabled
+              - print a warning if effective stake is lower *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:
+        "Transfer all the finalizable unstaked funds of the source to their \
+         liquid balance."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["finalize"; "unstake"]
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           source
+           cctxt ->
+        let contract = Contract.Implicit source in
+        let arg = None in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.finalize_unstake in
+        (* TODO #6162
+           (unless --force)
+              - check contract has finalizable unstake requests
+        *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:"Set delegate parameters"
+      (args14
+         limit_of_staking_over_baking_millionth_arg
+         edge_of_baking_over_staking_billionth_arg
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["set"; "delegate"; "parameters"; "for"]
+      @@ Public_key_hash.source_param ~name:"src" ~desc:"name of the delegate"
+      @@ stop)
+      (fun ( limit_of_staking_over_baking_millionth_opt,
+             edge_of_baking_over_staking_billionth_opt,
+             fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           source
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* limit_of_staking_over_baking_millionth =
+          match limit_of_staking_over_baking_millionth_opt with
+          | None ->
+              cctxt#error
+                "The --limit-of-staking-over-baking argument is mandatory"
+          | Some x -> return x
+        in
+        let* edge_of_baking_over_staking_billionth =
+          match edge_of_baking_over_staking_billionth_opt with
+          | None ->
+              cctxt#error
+                "The --edge-of-baking-over-staking argument is mandatory"
+          | Some x -> return x
+        in
+        let contract = Contract.Implicit source in
+        let arg =
+          (* Is there a better way? *)
+          Some
+            (Format.sprintf
+               "Pair %d %d Unit"
+               limit_of_staking_over_baking_millionth
+               edge_of_baking_over_staking_billionth)
+        in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.set_delegate_parameters in
+        (* TODO #6162
+           (unless --force)
+              - check contract is a baker
+        *)
+        transfer_command
+          amount
+          contract
+          contract
           cctxt
           ( fee,
             dry_run,
@@ -2098,13 +2403,13 @@ let commands_rw () =
               "wait until 'N' additional blocks after the operation appears in \
                the considered chain"
             ~default:"0"
-            non_negative_parameter)
+            (non_negative_parameter ()))
          (default_arg
             ~long:"check-previous"
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_parameter)
+            (non_negative_parameter ()))
          (arg
             ~long:"branch"
             ~placeholder:"block_hash"
@@ -2428,97 +2733,6 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Set the deposits limit of a registered delegate."
-      (args5
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args)
-      (prefixes ["set"; "deposits"; "limit"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ prefix "to"
-      @@ tez_param
-           ~name:"deposits limit"
-           ~desc:"the maximum amount of frozen deposits"
-      @@ stop)
-      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           contract
-           limit
-           (cctxt : Protocol_client_context.full) ->
-        let open Lwt_result_syntax in
-        match contract with
-        | Originated _ ->
-            cctxt#error
-              "Cannot change deposits limit on contract %a. This operation is \
-               invalid on originated contracts or unregistered delegate \
-               contracts."
-              Contract.pp
-              contract
-        | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* (_ : _ Injection.result) =
-              set_deposits_limit
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ?confirmations:cctxt#confirmations
-                ~dry_run
-                ~verbose_signing
-                ~simulation
-                ~fee_parameter
-                ?fee
-                mgr
-                ~src_pk
-                ~manager_sk
-                (Some limit)
-            in
-            return_unit);
-    command
-      ~group
-      ~desc:"Remove the deposits limit of a registered delegate."
-      (args5
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         simulate_switch
-         fee_parameter_args)
-      (prefixes ["unset"; "deposits"; "limit"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop)
-      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           contract
-           (cctxt : Protocol_client_context.full) ->
-        let open Lwt_result_syntax in
-        match contract with
-        | Originated _ ->
-            cctxt#error
-              "Cannot change deposits limit on contract %a. This operation is \
-               invalid on originated contracts or unregistered delegate \
-               contracts."
-              Contract.pp
-              contract
-        | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* (_ : _ Injection.result) =
-              set_deposits_limit
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ?confirmations:cctxt#confirmations
-                ~dry_run
-                ~verbose_signing
-                ~simulation
-                ~fee_parameter
-                ?fee
-                mgr
-                ~src_pk
-                ~manager_sk
-                None
-            in
-            return_unit);
-    command
-      ~group
       ~desc:"Increase the paid storage of a smart contract."
       (args6
          force_switch
@@ -2528,7 +2742,7 @@ let commands_rw () =
          simulate_switch
          fee_parameter_args)
       (prefixes ["increase"; "the"; "paid"; "storage"; "of"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"contract"
            ~desc:"name of the smart contract"
       @@ prefix "by"
@@ -2585,7 +2799,7 @@ let commands_rw () =
            ~name:"tickets owner"
            ~desc:"Implicit account owning the tickets."
       @@ prefix "to"
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"recipient contract"
            ~desc:"Contract receiving the tickets."
       @@ prefixes ["with"; "entrypoint"]
@@ -2606,7 +2820,7 @@ let commands_rw () =
            ~desc:"Type of the tickets."
            Client_proto_args.string_parameter
       @@ prefixes ["and"; "ticketer"]
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"tickets ticketer"
            ~desc:"Ticketer contract of the tickets."
       @@ stop)
@@ -2658,7 +2872,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Originate a new smart rollup."
-      (args8
+      (args9
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -2666,7 +2880,8 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg
-         (Client_keys.force_switch ()))
+         (Client_keys.force_switch ())
+         whitelist_arg)
       (prefixes ["originate"; "smart"; "rollup"]
       @@ Smart_rollup_alias.Address.fresh_alias_param
            ~name:"alias"
@@ -2700,7 +2915,8 @@ let commands_rw () =
              fee_parameter,
              storage_limit,
              counter,
-             force )
+             force,
+             whitelist )
            alias
            source
            kind
@@ -2732,6 +2948,7 @@ let commands_rw () =
             ~kind
             ~boot_sector
             ~parameters_ty
+            ?whitelist
             ()
         in
         match res with
@@ -2743,20 +2960,22 @@ let commands_rw () =
                     {address = rollup_address; _});
               _;
             } ->
-            let* alias =
-              Smart_rollup_alias.Address.of_fresh cctxt force alias
-            in
-            let* () =
-              Smart_rollup_alias.Address.add ~force cctxt alias rollup_address
-            in
-            let*! () =
-              cctxt#message
-                {|Smart rollup %a memorized as "%s"|}
-                Sc_rollup.Address.pp
-                rollup_address
-                alias
-            in
-            return_unit
+            if dry_run then return_unit
+            else
+              let* alias =
+                Smart_rollup_alias.Address.of_fresh cctxt force alias
+              in
+              let* () =
+                Smart_rollup_alias.Address.add ~force cctxt alias rollup_address
+              in
+              let*! () =
+                cctxt#message
+                  {|Smart rollup %a memorized as "%s"|}
+                  Sc_rollup.Address.pp
+                  rollup_address
+                  alias
+              in
+              return_unit
         | _ -> return_unit);
     command
       ~group
@@ -2872,7 +3091,7 @@ let commands_rw () =
       @@ param
            ~name:"inbox_level"
            ~desc:"The inbox level for the commitment."
-           raw_level_parameter
+           (raw_level_parameter ())
       @@ prefixes ["and"; "predecessor"]
       @@ param
            ~name:"predecessor"
@@ -2936,10 +3155,6 @@ let commands_rw () =
          counter_arg
          fee_parameter_args)
       (prefixes ["cement"; "commitment"]
-      @@ param
-           ~name:"commitment"
-           ~desc:"The hash of the commitment to be cemented for a smart rollup."
-           Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
@@ -2957,7 +3172,6 @@ let commands_rw () =
              storage_limit,
              counter,
              fee_parameter )
-           commitment
            source
            rollup
            cctxt ->
@@ -2977,7 +3191,6 @@ let commands_rw () =
             ~simulation
             ~source
             ~rollup
-            ~commitment
             ~src_pk
             ~src_sk
             ~fee_parameter
@@ -3343,7 +3556,101 @@ let commands_rw () =
               cctxt#message "Timelock chest verified, message is: %s" m
           | Bogus_opening ->
               cctxt#error "Error opening: incorrect proof or unlocked value."
-          | Bogus_cipher -> cctxt#error "Error deciphering."
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Publish a DAL commitment on L1 for the given level and slot index"
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         storage_limit_arg
+         counter_arg
+         fee_parameter_args)
+      (prefixes ["publish"; "dal"; "commitment"]
+      @@ param
+           ~name:"commitment"
+           ~desc:"The DAL commitment to publish."
+           Dal.commitment_parameter
+      @@ prefixes ["from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"Name of the source contract."
+      @@ prefixes ["for"; "slot"]
+      @@ param
+           ~name:"DAL slot index"
+           ~desc:"The index of the DAL slot."
+           int_parameter
+      @@ prefixes ["at"; "level"]
+      @@ param
+           ~name:"publication level"
+           ~desc:
+             "The publication level is the level at which the commitment is \
+              expected to be included in an L1 block."
+           (raw_level_parameter ())
+      @@ prefixes ["with"; "proof"]
+      @@ param
+           ~name:"commitment proof"
+           ~desc:"The proof of the DAL commitment to publish."
+           Dal.commitment_proof_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             storage_limit,
+             counter,
+             fee_parameter )
+           commitment
+           source
+           slot_index
+           published_level
+           commitment_proof
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* {parametric = {dal = {number_of_slots; _}; _}; _} =
+          Alpha_services.Constants.all
+            cctxt
+            (cctxt#chain, `Level (Raw_level.to_int32 published_level))
+        in
+        let* slot_index =
+          match
+            Alpha_context.Dal.Slot_index.of_int ~number_of_slots slot_index
+          with
+          | Ok i -> return i
+          | Error err ->
+              cctxt#error
+                "Bad slot index: %a. A slot index should be in the interval \
+                 [0;%d]."
+                Environment.Error_monad.pp_trace
+                err
+                (number_of_slots - 1)
+        in
+        let slot_header =
+          Alpha_context.Dal.Operations.Publish_slot_header.
+            {slot_index; commitment; commitment_proof}
+        in
+        let* _res =
+          dal_publish
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~slot_header
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ()
         in
         return_unit);
   ]

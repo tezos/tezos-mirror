@@ -39,8 +39,8 @@ val create :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?listen_addr:string ->
+  ?metrics_addr:string ->
   node:Node.t ->
-  client:Client.t ->
   unit ->
   t
 
@@ -53,8 +53,15 @@ val rpc_host : t -> string
 (** Get the RPC port given as [--rpc-addr] to an dal node. *)
 val rpc_port : t -> int
 
-(** Return the endpoint of the dal node, i.e., http://rpc_host:rpc_port. *)
-val endpoint : t -> string
+(** Return the endpoint of the DAL node's RPC server, i.e.,
+    http://rpc_host:rpc_port. *)
+val rpc_endpoint : t -> string
+
+(** Get the node's point pair "address:port" given as [--net-addr] to a dal node. *)
+val listen_addr : t -> string
+
+(** Get the node's metrics server point pair "address:port" given as [--metrics-addr] to a dal node. *)
+val metrics_addr : t -> string
 
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
@@ -89,14 +96,18 @@ val is_running_not_ready : t -> bool
     running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Run [octez-dal-node init-config]. Returns the name of the resulting
-    configuration file.
+(** Run [octez-dal-node config init].
 
-    If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS
-    allowing tests to run faster, without the need of large file. Default is
-    [true] in tezt.
+    [expected_pow] allows to change the PoW difficulty. Default value is 0.
 *)
-val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
+val init_config :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attestor_profiles:string list ->
+  ?producer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  t ->
+  unit Lwt.t
 
 module Config_file : sig
   (** DAL node configuration files. *)
@@ -111,6 +122,9 @@ module Config_file : sig
       running, it needs to be restarted manually.
 
       Example:
-        [Node.Config_file.update node (JSON.put ("use_unsafe_srs", "true"))] *)
+      [Node.Config_file.update node (JSON.put ("expected_pow", "0.0"))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
+
+(** Read the content of the node's identity file. *)
+val read_identity : t -> JSON.t

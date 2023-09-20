@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type transactions =
+  | Hash of string list
+  | Full of Transaction.transaction_object list
+  | Empty
+
 type t = {
   number : int32;
   hash : string option;
@@ -41,22 +46,44 @@ type t = {
   gasLimit : int32;
   gasUsed : int32;
   timestamp : int32;
-  transactions : string list;
+  transactions : transactions;
   uncles : string list;
 }
 
+let parse_transactions json =
+  match JSON.as_list json with
+  | [] -> Empty
+  | tx :: txs -> (
+      match JSON.as_string_opt tx with
+      | Some h ->
+          let hs = List.map JSON.as_string txs in
+          Hash (h :: hs)
+      | None ->
+          let objs =
+            List.map Transaction.transaction_object_of_json (tx :: txs)
+          in
+          Full objs)
+
 let of_json json =
   let open JSON in
+  (* JSON-RPC Ethereum API and `eth-cli` doesn't use the exact same field names
+     for blocks. As such, this operator accepts an alternative field name to try
+     before failing. *)
+  let ( |?-> ) json (field, alternative) =
+    let res = json |-> field in
+    if JSON.is_null res then json |-> alternative else res
+  in
   {
     number = json |-> "number" |> as_int32;
     hash = json |-> "hash" |> as_string_opt;
-    parent = json |-> "parent" |> as_string;
+    parent = json |?-> ("parent", "parentHash") |> as_string;
     nonce = json |-> "nonce" |> as_string;
     sha3Uncles = json |-> "sha3Uncles" |> as_string;
     logsBloom = json |-> "logsBloom" |> as_string_opt;
-    transactionRoot = json |-> "transactionRoot" |> as_string;
+    transactionRoot =
+      json |?-> ("transactionRoot", "transactionsRoot") |> as_string;
     stateRoot = json |-> "stateRoot" |> as_string;
-    receiptRoot = json |-> "receiptRoot" |> as_string;
+    receiptRoot = json |?-> ("receiptRoot", "receiptsRoot") |> as_string;
     miner = json |-> "miner" |> as_string;
     difficulty = json |-> "difficulty" |> as_int64;
     totalDifficulty = json |-> "totalDifficulty" |> as_int64;
@@ -65,6 +92,6 @@ let of_json json =
     gasLimit = json |-> "gasLimit" |> as_int32;
     gasUsed = json |-> "gasUsed" |> as_int32;
     timestamp = json |-> "timestamp" |> as_int32;
-    transactions = json |-> "transactions" |> as_list |> List.map as_string;
+    transactions = json |-> "transactions" |> parse_transactions;
     uncles = json |-> "uncles" |> as_list |> List.map as_string;
   }

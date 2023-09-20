@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022, 2023 DaiLambda, Incs. <contact@dailambad.jp>          *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -140,34 +141,66 @@ let detach_funcs =
   in
   aux []
 
-let rec restore_funcs (acc, expr) =
+let rec restore_funcs ~used_vars (acc, expr) =
   let open Ast_helper in
   match acc with
   | arg :: acc ->
+      let arg =
+        if List.mem ~equal:String.equal arg used_vars then arg else "_" ^ arg
+      in
       let expr = Exp.fun_ Nolabel None (Codegen_helpers.pvar arg) expr in
-      restore_funcs (acc, expr)
+      restore_funcs ~used_vars (acc, expr)
   | [] -> expr
 
+let open_m =
+  let open Ast_helper in
+  let open Codegen_helpers in
+  Str.open_ (Opn.mk (Mod.ident (loc_ident "S.Syntax")))
+
+(* [let name size1 size2 ... =
+      let open S.Syntax in
+      let size1 = S.safe_int size1 in
+      let size2 = S.safe_int size2 in
+      ...
+      expr
+   ]
+
+   If [takes_saturation_reprs=true], skips [let sizeN = S.safe_int sizeN in]
+*)
 let generate_let_binding =
   let open Ast_helper in
   let open Codegen_helpers in
-  let let_open_in x expr = Exp.open_ (Opn.mk (Mod.ident (loc_ident x))) expr in
-  fun name expr ->
+  fun ~takes_saturation_reprs name expr ->
     let args, expr = detach_funcs expr in
-    let expr =
-      List.fold_left
-        (fun e arg ->
-          let var = ident arg in
-          let patt = pvar arg in
-          Exp.let_
-            Nonrecursive
-            [Vb.mk patt (call (saturated "safe_int") [var])]
-            e)
-        expr
-        args
+    let used_vars =
+      let vs = ref [] in
+      let super = Ast_iterator.default_iterator in
+      let f_expr (i : Ast_iterator.iterator) e =
+        match e.Parsetree.pexp_desc with
+        | Pexp_ident {txt = Longident.Lident v; _} -> vs := v :: !vs
+        | _ -> super.expr i e
+      in
+      let i = {super with expr = f_expr} in
+      i.expr i expr ;
+      !vs
     in
-    let expr = let_open_in "S.Syntax" expr in
-    let expr = restore_funcs (args, expr) in
+    let expr =
+      if takes_saturation_reprs then expr
+      else
+        List.fold_left
+          (fun e arg ->
+            if List.mem ~equal:String.equal arg used_vars then
+              let var = ident arg in
+              let patt = pvar arg in
+              Exp.let_
+                Nonrecursive
+                [Vb.mk patt (call (saturated "safe_int") [var])]
+                e
+            else e)
+          expr
+          args
+    in
+    let expr = restore_funcs ~used_vars (args, expr) in
     Str.value Asttypes.Nonrecursive [Vb.mk (pvar name) expr]
 
 (* ------------------------------------------------------------------------- *)
@@ -177,7 +210,6 @@ module Lift_then_print = Costlang.Let_lift (Codegen)
 
 (* ------------------------------------------------------------------------- *)
 type solution = {
-  inference_model_name : string;
   (* The data required to perform code generation is a map from variables to
      (floating point) coefficients. *)
   map : float Free_variable.Map.t;
@@ -185,32 +217,85 @@ type solution = {
   scores_list : ((string * Namespace.t) * Inference.scores) list;
 }
 
+let solution_encoding =
+  let open Data_encoding in
+  conv
+    (fun {map; scores_list} -> (map, scores_list))
+    (fun (map, scores_list) -> {map; scores_list})
+  @@ obj2
+       (req "map" (Free_variable.Map.encoding float))
+       (req
+          "scores_list"
+          (list
+             (tup2 (tup2 string Namespace.encoding) Inference.scores_encoding)))
+
 let pp_solution ppf solution =
   let open Format in
-  fprintf ppf "inference_model_name: %s@;" solution.inference_model_name ;
   let alist =
     List.sort (fun (fv1, _) (fv2, _) -> Free_variable.compare fv1 fv2)
     @@ List.of_seq
     @@ Free_variable.Map.to_seq solution.map
   in
+  fprintf ppf "@[" ;
   fprintf
     ppf
-    "@[<2>free_variables:@ @[%a@]@]@;"
+    "@[<2>free_variables:@ @[<v>%a@]@]@;"
     (pp_print_list (fun ppf (fv, float) ->
          fprintf ppf "%a = %.12g" Free_variable.pp fv float))
     alist ;
   fprintf
     ppf
-    "@[<2>scores:@ @[%a@]@]@;"
-    (pp_print_list (fun ppf ((s, ns), scores) ->
-         fprintf ppf "%s %a : %a" s Namespace.pp ns Inference.pp_scores scores))
-    (List.sort (fun (k1, _) (k2, _) -> compare k1 k2) solution.scores_list)
+    "@[<2>scores:@ @[<v>%a@]@]"
+    (pp_print_list (fun ppf ((_s, ns), scores) ->
+         fprintf ppf "%a : %a" Namespace.pp ns Inference.pp_scores scores))
+    (List.sort (fun (k1, _) (k2, _) -> compare k1 k2) solution.scores_list) ;
+  fprintf ppf "@]"
 
-let load_solution (fn : string) : solution =
+let load_solution_in_binary (fn : string) : solution =
   In_channel.with_open_bin fn Marshal.from_channel
 
-let save_solution (s : solution) (fn : string) =
+let save_solution_in_binary (s : solution) (fn : string) =
   Out_channel.with_open_bin fn @@ fun outfile -> Marshal.to_channel outfile s []
+
+let solution_to_csv {map; scores_list} =
+  let csv_mapping =
+    Inference.mapping_to_csv (map |> Free_variable.Map.to_seq |> List.of_seq)
+  in
+  let csv_scores_list =
+    List.fold_left
+      (fun csv (name, score) ->
+        Csv.concat csv (Inference.scores_to_csv_column name score))
+      [[]; []]
+      scores_list
+  in
+  Csv.concat csv_mapping csv_scores_list
+
+let load_solution_in_json (fn : string) : solution =
+  In_channel.with_open_text fn @@ fun ic ->
+  let s = In_channel.input_all ic in
+  let open Data_encoding.Json in
+  Result.fold
+    ~error:Stdlib.failwith
+    ~ok:(destruct solution_encoding)
+    (from_string s)
+
+let save_solution_in_json (s : solution) (fn : string) =
+  let open Data_encoding.Json in
+  let json = construct solution_encoding s in
+  Out_channel.with_open_text fn @@ fun oc ->
+  (* We cannot use [Data_encoding.Json.to_string] since it prints out
+     floats in less precision *)
+  let json : Ezjsonm.t =
+    match json with `O kvs -> `O kvs | _ -> assert false
+  in
+  Ezjsonm.(to_channel ~minify:false oc json)
+
+let load_solution (fn : string) : solution =
+  try load_solution_in_json fn with _ -> load_solution_in_binary fn
+
+let save_solution s fn =
+  save_solution_in_binary s fn ;
+  save_solution_in_json s (fn ^ ".json")
 
 let load_exclusions exclude_fn =
   (* one model name like N_IXxx_yyy__alpha per line *)
@@ -244,19 +329,25 @@ let pp_code fmtr =
            pp_print_string)
         lines
   | Item {comments; code} ->
-      List.iter
-        (fun comment -> Format.fprintf fmtr "(* %s *)@;" comment)
-        comments ;
+      List.iter (fprintf fmtr "(* %s *)@;") comments ;
       Pprintast.structure_item fmtr code
 
-let pp_module fmtr codes =
-  Format.fprintf fmtr "@[<hv 0>" ;
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr "@;@;")
-    pp_code
-    fmtr
-    codes ;
-  Format.fprintf fmtr "@]@;"
+let pp_module fmtr items =
+  let open Format in
+  fprintf fmtr "@[<hv 0>" ;
+  pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr "@;@;") pp_code fmtr items ;
+  fprintf fmtr "@]@;"
+
+let pp_module fmtr items =
+  let s = Format.asprintf "%a" pp_module items in
+  let s =
+    match Ocamlformat.impl s with
+    | Ok s -> s
+    | Error e ->
+        Format.eprintf "ocamlformat failed: %s@." (Printexc.to_string e) ;
+        s
+  in
+  Format.pp_print_string fmtr s
 
 let make_toplevel_module structure_items =
   let open Ast_helper in
@@ -265,12 +356,10 @@ let make_toplevel_module structure_items =
     Comment
       [
         "Do not edit this file manually.";
-        "This file was automatically generated from the models registered at";
-        "src/<protocol>/lib_benchmarks_proto/interpreter_model.ml.";
+        "This file was automatically generated from benchmark models";
         "If you wish to update a function in this file,";
         "a. update the corresponding model, or";
-        "b. define a new function in michelson_v1_gas_costs.ml, potentially \
-         referencing this one.";
+        "b. move the function to another module and edit it there.";
       ]
   in
   let suppress_unused_open_warning =
@@ -293,16 +382,20 @@ let make_toplevel_module structure_items =
             (Mb.mk (loc (Some "S")) (Mod.ident (loc_ident "Saturation_repr")));
       }
   in
+  let open_syntax = Item {comments = []; code = open_m} in
   [
     this_file_was_autogenerated;
     suppress_unused_open_warning;
     rename_saturation_repr;
+    open_syntax;
   ]
   @ structure_items
 
 let comment ss = Comment ss
 
-let function_name model_name = "cost_" ^ Namespace.basename model_name
+let function_name model_name =
+  "cost_"
+  ^ String.map (function '.' -> '_' | c -> c) (Namespace.basename model_name)
 
 let codegen (Model.Model model) (sol : solution)
     (transform : Costlang.transform) model_name =
@@ -321,6 +414,7 @@ let codegen (Model.Model model) (sol : solution)
       (Impl)
   in
   let module M = (val model) in
+  let takes_saturation_reprs = M.takes_saturation_reprs in
   let comments =
     let module Sub =
       Costlang.Subst
@@ -336,19 +430,45 @@ let codegen (Model.Model model) (sol : solution)
   let module M = M.Def (Subst_impl) in
   let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
   let fun_name = function_name model_name in
-  Item {comments; code = generate_let_binding fun_name expr}
+  Item
+    {
+      comments;
+      code = generate_let_binding ~takes_saturation_reprs fun_name expr;
+    }
+
+let get_codegen_destinations
+    Registration.{model = Model.Model (module M); from = local_models_info} =
+  if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then []
+  else
+    List.filter_map
+      (fun Registration.{bench_name; _} ->
+        let open Option_syntax in
+        let* (module B : Benchmark.S) =
+          Registration.find_benchmark bench_name
+        in
+        let destination =
+          match B.purpose with Generate_code d -> Some d | _ -> None
+        in
+        destination)
+      local_models_info
+    |> List.sort_uniq String.compare
 
 let codegen_models models sol transform ~exclusions =
-  let codes =
-    List.filter_map
-      (fun (model_name, {Registration.model; _}) ->
-        (* Exclusion is done by the function name *)
-        let fun_name = function_name model_name in
-        if String.Set.mem fun_name exclusions then None
-        else Some (codegen model sol transform model_name))
-      models
-  in
-  comment ["Inference model name: " ^ sol.inference_model_name] :: codes
+  List.filter_map
+    (fun (model_name, ({Registration.model; from = _} as info)) ->
+      let benchmark_destinations = get_codegen_destinations info in
+      if
+        String.Set.mem (Namespace.to_string model_name) exclusions
+        || List.is_empty benchmark_destinations
+      then None
+      else
+        let code = codegen model sol transform model_name in
+        Some
+          (List.map
+             (fun destination -> (destination, code))
+             benchmark_destinations))
+    models
+  |> List.flatten
 
 let%expect_test "basic_printing" =
   let open Codegen in
@@ -358,16 +478,15 @@ let%expect_test "basic_printing" =
     let_ ~name:"tmp1" (int 42) @@ fun tmp1 ->
     let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
-      let open S.Syntax in
-        let x = S.safe_int x in
-        let y = S.safe_int y in
-        let tmp1 = S.safe_int 42 in
-        let tmp2 = S.safe_int 43 in ((x + y) + tmp1) + tmp2 |}]
+      let x = S.safe_int x in
+      let y = S.safe_int y in
+      let tmp1 = S.safe_int 42 in
+      let tmp2 = S.safe_int 43 in ((x + y) + tmp1) + tmp2 |}]
 
 let%expect_test "anonymous_int_literals" =
   let open Codegen in
@@ -375,14 +494,13 @@ let%expect_test "anonymous_int_literals" =
     lam ~name:"x" @@ fun x ->
     lam ~name:"y" @@ fun y -> x + y + int 42 + int 43
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
-      let open S.Syntax in
-        let x = S.safe_int x in
-        let y = S.safe_int y in ((x + y) + (S.safe_int 42)) + (S.safe_int 43) |}]
+      let x = S.safe_int x in
+      let y = S.safe_int y in ((x + y) + (S.safe_int 42)) + (S.safe_int 43) |}]
 
 let%expect_test "let_bound_lambda" =
   let open Codegen in
@@ -392,15 +510,14 @@ let%expect_test "let_bound_lambda" =
     let_ ~name:"incr" (lam ~name:"x" (fun x -> x + int 1)) @@ fun incr ->
     app incr x + app incr y
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
-      let open S.Syntax in
-        let x = S.safe_int x in
-        let y = S.safe_int y in
-        let incr x = x + (S.safe_int 1) in (incr x) + (incr y) |}]
+      let x = S.safe_int x in
+      let y = S.safe_int y in
+      let incr x = x + (S.safe_int 1) in (incr x) + (incr y) |}]
 
 let%expect_test "ill_typed_higher_order" =
   let open Codegen in
@@ -409,14 +526,13 @@ let%expect_test "ill_typed_higher_order" =
     lam ~name:"x" @@ fun x ->
     lam ~name:"y" @@ fun y -> app incr x + app incr y
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name incr x y =
-      let open S.Syntax in
-        let incr = S.safe_int incr in
-        let x = S.safe_int x in let y = S.safe_int y in (incr x) + (incr y) |}]
+      let incr = S.safe_int incr in
+      let x = S.safe_int x in let y = S.safe_int y in (incr x) + (incr y) |}]
 
 let%expect_test "if_conditional_operator" =
   let open Codegen in
@@ -424,13 +540,12 @@ let%expect_test "if_conditional_operator" =
     lam ~name:"x" @@ fun x ->
     lam ~name:"y" @@ fun y -> if_ (lt x y) y x
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
-      let open S.Syntax in
-        let x = S.safe_int x in let y = S.safe_int y in if x < y then y else x |}]
+      let x = S.safe_int x in let y = S.safe_int y in if x < y then y else x |}]
 
 let%expect_test "module_generation" =
   let open Codegen in
@@ -439,25 +554,51 @@ let%expect_test "module_generation" =
     make_toplevel_module
       [
         Item
-          {comments = ["comment"]; code = generate_let_binding "func_name" term};
+          {
+            comments = ["comment"];
+            code =
+              generate_let_binding
+                ~takes_saturation_reprs:false
+                "func_name"
+                term;
+          };
       ]
   in
   Format.printf "%a" pp_module module_ ;
   [%expect
     {|
     (* Do not edit this file manually.
-       This file was automatically generated from the models registered at
-       src/<protocol>/lib_benchmarks_proto/interpreter_model.ml.
+       This file was automatically generated from benchmark models
        If you wish to update a function in this file,
        a. update the corresponding model, or
-       b. define a new function in michelson_v1_gas_costs.ml, potentially referencing this one. *)
+       b. move the function to another module and edit it there. *)
 
     [@@@warning "-33"]
 
     module S = Saturation_repr
+    open S.Syntax
 
     (* comment *)
-    let func_name x = let open S.Syntax in let x = S.safe_int x in x |}]
+    let func_name x =
+      let x = S.safe_int x in
+      x |}]
+
+(* Same as "basic_printing", but no [S.safe_int] conversions for [x] and [y] *)
+let%expect_test "takes_saturation_reprs" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y ->
+    let_ ~name:"tmp1" (int 42) @@ fun tmp1 ->
+    let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
+  in
+  let item = generate_let_binding ~takes_saturation_reprs:true "name" term in
+  Format.printf "%a" Pprintast.structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let tmp1 = S.safe_int 42 in
+      let tmp2 = S.safe_int 43 in ((x + y) + tmp1) + tmp2 |}]
 
 (* Module to get the name of cost functions manually/automatically defined
    in a source file *)

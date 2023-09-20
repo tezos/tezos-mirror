@@ -23,65 +23,110 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Benchmark parameters. *)
+type group = Standalone | Group of string | Generic
+
 type 'config parameters = {bench_number : int; config : 'config}
 
-(* The module type of benchmarks *)
-module type S = sig
-  (** Name of the benchmark *)
+type purpose = Other_purpose of string | Generate_code of string
+
+let pp_purpose ppf t =
+  match t with
+  | Other_purpose s -> Format.fprintf ppf "Other purpose: %s" s
+  | Generate_code s -> Format.fprintf ppf "Generate code: %s" s
+
+module type Benchmark_base = sig
   val name : Namespace.t
 
-  (** Description of the benchmark *)
   val info : string
 
-  (** File where the benchmark module is defined *)
   val module_filename : string
 
-  (** Destination of generated code *)
-  val generated_code_destination : string option
+  val purpose : purpose
 
-  (** Tags of the benchmark *)
   val tags : string list
 
-  (** Configuration of the benchmark (eg sampling parameters, paths, etc) *)
   type config
 
-  (** Default configuration of the benchmark *)
   val default_config : config
 
-  (** Configuration encoding *)
   val config_encoding : config Data_encoding.t
 
-  (** Benchmark workload *)
   type workload
 
-  (** Workload encoding *)
   val workload_encoding : workload Data_encoding.t
 
-  (** Optional conversion to vector, for report generation purposes *)
   val workload_to_vector : workload -> Sparse_vec.String.t
+end
 
-  (** Cost models, with a given local name (string) for reference *)
+module type S = sig
+  include Benchmark_base
+
   val models : (string * workload Model.t) list
 
-  (** Benchmark generator *)
   include Generator.S with type config := config and type workload := workload
 end
 
+module type Simple = sig
+  include Benchmark_base
+
+  val group : group
+
+  val model : workload Model.t
+
+  val create_benchmark :
+    rng_state:Random.State.t -> config -> workload Generator.benchmark
+end
+
+module type Simple_with_num = sig
+  include Benchmark_base
+
+  val group : group
+
+  val model : workload Model.t
+
+  include Generator.S with type workload := workload and type config := config
+end
+
 type t = (module S)
+
+type simple = (module Simple)
+
+type simple_with_num = (module Simple_with_num)
+
+let pp ppf (module Bench : S) =
+  let open Bench in
+  let open Format in
+  let f fmt = fprintf ppf fmt in
+  let pp_config fmt config =
+    Data_encoding.Json.pp fmt
+    @@ Data_encoding.Json.construct config_encoding config
+  in
+  f "@[<v>" ;
+  f "name: %a@;" Namespace.pp name ;
+  f "info: %s@;" info ;
+  f "module_filename: %s@;" module_filename ;
+  f "purpose: %a@;" pp_purpose purpose ;
+  f
+    "tags: [%a]@;"
+    (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf "; ") pp_print_string)
+    tags ;
+  f "@[<v2>default_config:@ @[%a@]@]@;" pp_config default_config ;
+  f
+    "@[<v2>local models for inference:@ @[<v>%a@]@]@;"
+    (pp_print_list (fun ppf (local_model_name, model) ->
+         fprintf ppf "@[<v2>%s:@ @[%a@]@]" local_model_name Model.pp model))
+    models ;
+  f "@]"
 
 type ('cfg, 'workload) poly =
   (module S with type config = 'cfg and type workload = 'workload)
 
 type packed = Ex : ('cfg, 'workload) poly -> packed
 
-(** Get the name of a benchmark *)
 let name ((module B) : t) = B.name
 
-(** Get the description of a benchmark *)
 let info ((module B) : t) = B.info
 
-(** Get the tags of a benchmark *)
 let tags ((module B) : t) = B.tags
 
 let ex_unpack : t -> packed = fun (module Bench) -> Ex ((module Bench) : _ poly)

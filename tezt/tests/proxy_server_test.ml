@@ -226,10 +226,10 @@ let test_wrong_data_dir =
       re_str
   else Lwt.return_unit
 
-let test_proxy_server_redirect_unsupported =
+let test_proxy_server_serve_unsupported =
   Protocol.register_test
     ~__FILE__
-    ~title:"proxy_server redirect curl"
+    ~title:"proxy_server serve unsupported curl"
     ~tags:["redirect"]
   @@ fun protocol ->
   let* node, _client = Client.init_with_protocol `Client ~protocol () in
@@ -240,11 +240,10 @@ let test_proxy_server_redirect_unsupported =
       "localhost"
       (Proxy_server.rpc_port _ps)
   in
-  let r = Process.spawn "curl" ["-vL"; p] in
+  let r = Process.spawn "curl" ["-v"; p] in
   let* err = Process.check_and_read_stderr r in
-  let re_str = "301 Moved Permanently" in
-  let re_str' = "200 OK" in
-  let good_match = err =~ rex re_str && err =~ rex re_str' in
+  let re_str = "200 OK" in
+  let good_match = err =~ rex re_str in
   if not good_match then
     Test.fail
       "Unexpected error message: %s. It doesn't match the regexp %S"
@@ -340,7 +339,7 @@ let register ~protocols =
   register `Node ;
   register `Proxy_server_data_dir ;
   register `Proxy_server_rpc ;
-  test_proxy_server_redirect_unsupported protocols ;
+  test_proxy_server_serve_unsupported protocols ;
   test_equivalence protocols ;
   test_wrong_data_dir protocols ;
   test_multi_protocols protocols

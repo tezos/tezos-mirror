@@ -3,5 +3,5 @@
 
 (library
  (name tezos_expect_helper)
- (public_name tezos-expect-helper)
+ (public_name octez-libs.expect-helper)
  (instrumentation (backend bisect_ppx)))

@@ -3,6 +3,7 @@ include: .gitlab/ci/jobs/build/common.yml
 # See comments in static_x86_64_experimental.yml.
 build:static-x86_64-linux-binaries:
   extends:
+    - .tags_template__build
     - .build_static_binaries_template
   needs: [trigger]
   variables:

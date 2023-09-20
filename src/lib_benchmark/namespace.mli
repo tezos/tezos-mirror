@@ -84,6 +84,11 @@ val basename : t -> string
    Never returns the empty list. *)
 val to_list : t -> string list
 
+(** Returns a path represented by the given list.
+    If the first element is ["."], removes it.
+    Checks that all elements don't contain ['/']. *)
+val of_list : string list -> t
+
 (** [name_match pattern name] returns [true] if and only if [pattern] is a prefix of [name].*)
 val name_match : t -> t -> bool
 

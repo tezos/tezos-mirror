@@ -66,9 +66,14 @@ mv /tmp/tezos_proto_doc_snapshot/docs/alpha docs/${label}
 rm -rf /tmp/tezos_proto_doc_snapshot
 
 # set current version
+# Starting from 018 the version value moved to `constants_repr`. To be
+# able to snapshot older protocol the `raw_context` file is kept even
+# if it is not strictly needed anymore.
 echo "Setting current version in raw_context and proxy"
 sed -i.old.old -e 's/let version_value = "alpha_current"/let version_value = "'${current}'"/' \
-    src/proto_${version}/lib_protocol/raw_context.ml src/proto_${version}/lib_client/proxy.ml
+    src/proto_${version}/lib_protocol/constants_repr.ml\
+    src/proto_${version}/lib_protocol/raw_context.ml\
+    src/proto_${version}/lib_client/proxy.ml
 
 long_hash=$(./octez-protocol-compiler -hash-only src/proto_${version}/lib_protocol)
 short_hash=$(echo $long_hash | head -c 8)

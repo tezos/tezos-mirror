@@ -90,13 +90,14 @@ let endpoint_of_test_mode_tag node = function
    - [sub_group] is a short identifier for your test, used in the test title and as a tag.
    Additionally, since this uses [Protocol.register_regression_test], this has an
    implicit argument to specify the list of protocols to test. *)
-let check_rpc_regression ~test_mode_tag ~test_function ?parameter_overrides
-    ?nodes_args sub_group =
+let check_rpc_regression ~test_mode_tag ~test_function ?supports
+    ?parameter_overrides ?nodes_args sub_group =
   let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
     ~tags:["rpc"; title_tag; sub_group]
+    ?supports
   @@ fun protocol ->
   let* parameter_file =
     patch_protocol_parameters protocol parameter_overrides
@@ -403,6 +404,39 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
 
   unit
 
+let test_adaptive_issuance_on_alpha ?endpoint client =
+  Log.info "Test adaptive issuance parameters retrieval" ;
+
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_total_supply ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_total_frozen_stake ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_issuance_current_yearly_rate ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_issuance_current_yearly_rate_exact ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_issuance_issuance_per_minute ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_issuance_expected_issuance ()
+  in
+  unit
+
 let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
@@ -581,6 +615,10 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
   let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
 
+(* Test the adaptive issuance RPC. *)
+let test_adaptive_issuance _test_mode_tag _protocol ?endpoint client =
+  test_adaptive_issuance_on_alpha ?endpoint client
+
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
   (* initialize data *)
@@ -736,8 +774,8 @@ let bake_empty_block ?endpoint client =
 
    Testing RPCs monitor_operations and pending_operations:
 
-   We create an applied operation and three operations that fail
-   to be applied. Each one of these failed operations has a different
+   We create a validated operation and three operations that fail
+   to be validated. Each one of these failed operations has a different
    classification to test every possibility of the monitor_operations and
    pending_operations RPCs. The error classifications are the following :
    - Branch_refused (Branch error classification in protocol)
@@ -776,7 +814,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let* _ = bake_empty_block ?endpoint client in
 
   (* Outdated operation after the second empty baking. *)
-  let* () = Client.endorse_for ~protocol ~force:true client in
+  let* () = Client.attest_for ~protocol ~force:true client in
   let* _ = bake_empty_block ?endpoint client in
 
   let monitor_path =
@@ -827,7 +865,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
         ]
         client)
   in
-  (* Applied op *)
+  (* Validated op *)
   let* _ =
     Operation.Manager.(
       inject
@@ -873,7 +911,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let expected_manager_mempool =
     {
       Mempool.empty with
-      applied = complete_mempool.applied;
+      validated = complete_mempool.validated;
       refused = complete_mempool.refused;
       branch_refused = complete_mempool.branch_refused;
       branch_delayed = complete_mempool.branch_delayed;
@@ -915,7 +953,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
           Mempool.get_mempool
             ?endpoint
             ~hooks:mempool_hooks
-            ~applied:(i = `Applied)
+            ~validated:(i = `Validated)
             ~refused:(i = `Refused)
             ~branch_delayed:(i = `Branch_delayed)
             ~branch_refused:(i = `Branch_refused)
@@ -926,7 +964,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
         let expected_mempool =
           Mempool.
             {
-              applied = may_get_field `Applied complete_mempool.applied;
+              validated = may_get_field `Validated complete_mempool.validated;
               refused = may_get_field `Refused complete_mempool.refused;
               outdated = may_get_field `Outdated complete_mempool.outdated;
               branch_refused =
@@ -941,7 +979,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
             Mempool.classified_typ
             ~error_msg:"Expected mempool %L, got %R") ;
         unit)
-      [`Applied; `Refused; `Branch_delayed; `Branch_refused; `Outdated]
+      [`Validated; `Refused; `Branch_delayed; `Branch_refused; `Outdated]
   in
   (* We spawn a second monitor_operation RPC that monitor operations
      reclassified with errors. *)
@@ -972,16 +1010,28 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     in
     get_filter_variations ()
   in
-  let* _ = get_filter_variations () in
-  let* _ =
+  let* () = get_filter_variations () in
+  let* () =
+    (* valid configuration *)
     post_and_get_filter
-      {|{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ], "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }|}
+      {|{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
+          "minimal_nanotez_per_byte": [ "56", "3" ],
+          "replace_by_fee_factor": ["21", "20"], "max_operations": 0,
+          "max_total_bytes": 100_000_000 }|}
   in
-  let* _ =
+  let* () =
+    (* valid configuration with omitted fields *)
     post_and_get_filter
-      {|{ "minimal_fees": "200", "allow_script_failure": true }|}
+      {|{ "minimal_fees": "200", "replace_by_fee_factor": ["1", "1"] }|}
   in
-  let* _ = post_and_get_filter "{}" in
+  let* () =
+    (* invalid field name *)
+    post_and_get_filter {|{ "max_operations": 100, "invalid_field_name": 100 }|}
+  in
+  let* () =
+    (* ill-typed data *) post_and_get_filter {|{ "minimal_fees": "toto" }|}
+  in
+  let* () = (* back to default config *) post_and_get_filter "{}" in
   unit
 
 let start_with_acl address acl =
@@ -1439,14 +1489,15 @@ let register protocols =
     ~tags:["rpc"; "regression"; "binary"]
     binary_regression_test ;
   let register protocols test_mode_tag =
-    let check_rpc_regression ?parameter_overrides ?nodes_args ~test_function
-        sub_group =
+    let check_rpc_regression ?parameter_overrides ?supports ?nodes_args
+        ~test_function sub_group =
       check_rpc_regression
         ~test_mode_tag
         ?parameter_overrides
         ?nodes_args
         ~test_function
         sub_group
+        ?supports
         protocols
     in
     let check_rpc ?parameter_overrides ?nodes_args ~test_function sub_group =
@@ -1467,6 +1518,10 @@ let register protocols =
       "delegates"
       ~test_function:test_delegates
       ~parameter_overrides:consensus_threshold ;
+    check_rpc_regression
+      "adaptive_issuance"
+      ~supports:Protocol.(From_protocol (number Nairobi + 1))
+      ~test_function:test_adaptive_issuance ;
     check_rpc_regression
       "votes"
       ~test_function:test_votes

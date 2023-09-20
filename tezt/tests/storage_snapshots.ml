@@ -56,7 +56,12 @@ let get_constants client =
 
 let export_snapshot node ~export_level ~snapshot_dir ~history_mode
     ~export_format =
-  Log.info "Exporting snapshot for %s" (Node.name node) ;
+  Log.info
+    "Exporting %a snapshot for %s at level %d"
+    pp_snapshot_history_mode
+    history_mode
+    (Node.name node)
+    export_level ;
   let filename =
     Format.asprintf
       "%s.%a.%a"
@@ -275,9 +280,11 @@ let test_export_import_snapshots =
   let blocks_to_bake = (preserved_cycles + 1) * blocks_per_cycle in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
   let archive_level = Node.get_level archive_node in
-  let* () =
-    sync_all_nodes [archive_node; full_node; rolling_node] archive_level
-  in
+  let* () = sync_all_nodes cluster archive_level in
+  (* Terminate all nodes to save resources. Note: we may consider
+     that exporting a snapshot from a node that is running is an
+     actual usecase (such exports are already done in other tests). *)
+  let* () = Lwt_list.iter_p Node.terminate cluster in
   let export_import_and_check =
     export_import_and_check ~max_op_ttl ~export_level:archive_level
   in
@@ -286,7 +293,7 @@ let test_export_import_snapshots =
       (fun export_format ->
         Lwt_list.iter_s
           (fun (history_mode, nodes) ->
-            Lwt_list.iter_p
+            Lwt_list.iter_s
               (fun node ->
                 export_import_and_check node ~history_mode ~export_format)
               nodes)
@@ -444,7 +451,7 @@ let test_info_command =
   in
   let expected_hash = JSON.(head |-> "hash" |> as_string) in
   let expected_level = head_level in
-  let expected_version = 5 in
+  let expected_version = 6 in
   Log.info "Checks the human formatted output" ;
   (* Get the info line, which is the second line. *)
   let* () =

@@ -6,23 +6,23 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base-test-helpers
-  tezos-micheline
-  tezos-client-alpha
-  tezos-client-base
+  octez-libs.base
+  octez-libs.base-test-helpers
+  octez-libs.micheline
+  octez-protocol-alpha-libs.client
+  octez-shell-libs.client-base
   tezos-protocol-alpha.parameters
-  tezos-protocol-environment
-  tezos-stdlib-unix
-  tezos-protocol-alpha
-  tezos-test-helpers
-  tezos-alpha-test-helpers
+  octez-proto-libs.protocol-environment
+  octez-libs.stdlib-unix
+  tezos-protocol-alpha.protocol
+  octez-libs.test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-alcotezt
-  tezos-scoru-wasm-helpers
-  tezos-stdlib
-  tezos-crypto-dal
-  tezos-scoru-wasm
-  tezos-webassembly-interpreter-extra)
+  octez-l2-libs.scoru-wasm-helpers
+  octez-libs.stdlib
+  octez-libs.crypto-dal
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.webassembly-interpreter-extra)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -71,7 +71,9 @@
   test_sc_rollup_inbox_legacy
   test_sc_rollup_wasm
   test_local_contexts
-  test_dal_slot_proof))
+  test_dal_slot_proof
+  test_adaptive_issuance
+  test_adaptive_issuance_ema))
 
 (executable
  (name main)

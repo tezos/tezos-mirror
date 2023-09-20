@@ -79,13 +79,13 @@ let commands () =
       ~default:"0.05"
   in
   let source_arg =
-    ContractAlias.destination_arg
+    Contract_alias.destination_arg
       ~name:"source"
       ~doc:"name of the source (i.e. SENDER) contract for the transaction"
       ()
   in
   let payer_arg =
-    ContractAlias.destination_arg
+    Contract_alias.destination_arg
       ~name:"payer"
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()

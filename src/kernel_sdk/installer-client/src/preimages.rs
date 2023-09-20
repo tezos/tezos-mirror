@@ -4,7 +4,7 @@
 
 use std::fs;
 use std::path::Path;
-use tezos_smart_rollup_encoding::dac::prepare_preimages;
+use tezos_smart_rollup_encoding::dac::pages::prepare_preimages;
 use tezos_smart_rollup_encoding::dac::PreimageHash;
 use thiserror::Error;
 

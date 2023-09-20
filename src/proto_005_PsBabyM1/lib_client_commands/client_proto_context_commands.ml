@@ -105,7 +105,7 @@ let commands () =
       ~desc:"Get the balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
@@ -117,7 +117,7 @@ let commands () =
       ~desc:"Get the storage of a contract."
       no_options
       (prefixes ["get"; "contract"; "storage"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_storage cctxt ~chain:cctxt#chain ~block:cctxt#block contract
@@ -137,7 +137,7 @@ let commands () =
       @@ prefixes ["of"; "type"]
       @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
         get_contract_big_map_value
@@ -182,7 +182,7 @@ let commands () =
       ~desc:"Get the code of a contract."
       no_options
       (prefixes ["get"; "contract"; "code"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_script cctxt ~chain:cctxt#chain ~block:cctxt#block contract
@@ -209,7 +209,7 @@ let commands () =
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
       @@ Tezos_clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () entrypoint (_, contract) (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.contract_entrypoint_type
@@ -228,7 +228,7 @@ let commands () =
       ~desc:"Get the entrypoint list of a contract."
       no_options
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_entrypoints
@@ -245,7 +245,7 @@ let commands () =
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       (prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_unreachables
@@ -262,7 +262,7 @@ let commands () =
       ~desc:"Get the delegate of a contract."
       no_options
       (prefixes ["get"; "delegate"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Client_proto_contracts.get_delegate

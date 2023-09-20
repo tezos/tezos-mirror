@@ -25,17 +25,44 @@
 
 module Array = Ctypes.CArray
 
+exception Out_of_bounds
+
 type t = {
   raw : Unsigned.uint8 Array.t;
   min : Unsigned.uint32;
   max : Unsigned.uint32 option;
 }
 
-let get mem = Array.get mem.raw
-
-let set mem = Array.set mem.raw
-
 let length mem = Array.length mem.raw
+
+let bad_bounds mem addr len = addr < 0 || len > length mem - addr
+
+let check_bounds mem addr len =
+  if bad_bounds mem addr len then raise Out_of_bounds
+
+let get mem addr =
+  check_bounds mem addr 1 ;
+  Array.unsafe_get mem.raw addr
+
+let get_string mem ~address ~length =
+  check_bounds mem address length ;
+  String.init length @@ fun i ->
+  Array.unsafe_get mem.raw (i + address) |> Unsigned.UInt8.to_int |> Char.chr
+
+let set mem addr value =
+  check_bounds mem addr 1 ;
+  Array.unsafe_set mem.raw addr value
+
+let set_string mem ~address ~data =
+  let len = String.length data in
+  if len > 0 then (
+    (* For compatibility we only check bounds when something shall be written. *)
+    check_bounds mem address len ;
+    for offset = 0 to len - 1 do
+      String.get_uint8 data offset
+      |> Unsigned.UInt8.of_int
+      |> Array.unsafe_set mem.raw (offset + address)
+    done)
 
 module Internal_for_tests = struct
   let of_list (content : Unsigned.uint8 list) =

@@ -263,6 +263,9 @@ let replay_one_block strict main_chain_store validator_process block =
       Event.(emit block_validation_start)
         (block_alias, Store.Block.hash block, Store.Block.level block)
     in
+    let bv_operations =
+      List.map (List.map Block_validation.mk_operation) operations
+    in
     let* result =
       Block_validator_process.apply_block
         ~simulate:true
@@ -270,7 +273,7 @@ let replay_one_block strict main_chain_store validator_process block =
         main_chain_store
         ~predecessor
         header
-        operations
+        bv_operations
     in
     let now = Time.System.now () in
     let*! () = Event.(emit block_validation_end) (Ptime.diff now start_time) in
@@ -296,9 +299,11 @@ let replay_one_block strict main_chain_store validator_process block =
         (not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes))
         (fun () ->
           let to_json block =
-            Data_encoding.Json.construct Proto.block_header_metadata_encoding
+            Data_encoding.Json.construct
+              Proto.block_header_metadata_encoding_with_legacy_attestation_name
             @@ Data_encoding.Binary.of_bytes_exn
-                 Proto.block_header_metadata_encoding
+                 Proto
+                 .block_header_metadata_encoding_with_legacy_attestation_name
                  block
           in
           let exp = to_json expected_block_receipt_bytes in
@@ -336,11 +341,16 @@ let replay_one_block strict main_chain_store validator_process block =
           in
           let to_json metadata_bytes =
             Data_encoding.Json.construct
-              Proto.operation_data_and_receipt_encoding
+              Proto
+              .operation_data_and_receipt_encoding_with_legacy_attestation_name
               Data_encoding.Binary.
-                ( of_bytes_exn Proto.operation_data_encoding op,
-                  of_bytes_exn Proto.operation_receipt_encoding metadata_bytes
-                )
+                ( of_bytes_exn
+                    Proto.operation_data_encoding_with_legacy_attestation_name
+                    op,
+                  of_bytes_exn
+                    Proto
+                    .operation_receipt_encoding_with_legacy_attestation_name
+                    metadata_bytes )
           in
           let exp_json_opt, got_json_opt =
             match (exp_m, got_m) with
@@ -416,8 +426,8 @@ let replay ~internal_events ~singleprocess ~strict
                protocol_root;
                process_path = Sys.executable_name;
                sandbox_parameters = None;
-               dal_config = Tezos_crypto_dal.Cryptobox.Config.default;
-               log_config = {lwt_log_sink_unix = config.log; internal_events};
+               dal_config = config.blockchain_network.dal_config;
+               internal_events;
              })
       in
       let commit_genesis =
@@ -475,17 +485,14 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
     ~filename:(Data_version.lock_file config.data_dir)
   @@ fun () ->
   (* Main loop *)
-  let log_cfg =
-    {
-      config.log with
-      default_level = Option.value verbosity ~default:config.log.default_level;
-    }
-  in
   let internal_events =
-    Tezos_base_unix.Internal_event_unix.make_with_defaults ()
+    Tezos_base_unix.Internal_event_unix.make_with_defaults
+      ?verbosity
+      ~log_cfg:config.log
+      ()
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
+    Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(

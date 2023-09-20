@@ -24,14 +24,22 @@ It requires protocol environment V8, compared to V7 for Lima. (MR :gl:`!6439`)
 
 - Remove Plonk from Environment V6. (MR :gl:`!6952`)
 
-Michelson opcodes for logical operations on bytes
--------------------------------------------------
+Michelson
+---------
 
-Michelson opcodes ``AND``, ``OR``, ``XOR``, ``NOT``, ``LSL`` and ``LSR``
-now support ``bytes``. (MR :gl:`!6055`)
+- The ``AND``, ``OR``, ``XOR``, and ``NOT`` bitwise instructions have
+  been extended to support ``bytes``. (MR :gl:`!6055`)
 
-- Michelson opcodes ``NAT``, ``INT`` and ``BYTES`` for bytes-int and bytes-nat
-  conversions. (MR :gl:`!6681`)
+- The ``LSL`` and ``LSR`` logical shift instructions have been
+  extended to support ``bytes``. (MR :gl:`!6055`)
+
+- The ``INT`` conversion instruction has been extended to support conversion from ``bytes`` to ``int``. (MR :gl:`!6681`)
+
+- The new ``NAT`` conversion instruction has been added to convert
+  ``bytes`` to ``nat``. (MR :gl:`!6681`)
+
+- The new ``BYTES`` conversion instruction has been added to convert
+  ``nat`` and ``int`` to ``bytes``. (MR :gl:`!6681`)
 
 Smart Rollups
 -------------

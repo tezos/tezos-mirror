@@ -59,7 +59,6 @@
 /013/sapling.html /active/sapling.html 301
 /013/timelock.html /active/timelock.html 301
 /013/token_management.html /active/token_management.html 301
-/013/transaction_rollups.html /active/transaction_rollups.html 301
 /013/voting.html /active/voting.html 301
 /kathmandu/cli-commands.html /active/cli-commands.html 301
 /kathmandu/consensus.html /active/consensus.html 301
@@ -75,7 +74,6 @@
 /kathmandu/sapling.html /active/sapling.html 301
 /kathmandu/timelock.html /active/timelock.html 301
 /kathmandu/token_management.html /active/token_management.html 301
-/kathmandu/transaction_rollups.html /active/transaction_rollups.html 301
 /kathmandu/voting.html /active/voting.html 301
 /api/cli-commands.html /shell/cli-commands.html 301
 /api/rpc.html /shell/rpc.html 301

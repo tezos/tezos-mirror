@@ -427,7 +427,7 @@ let test_contract_noop client ~protocol =
   let burn_cap = Tez.one in
   let prg = Michelson_script.(find ["opcodes"; "noop"] protocol |> path) in
   let* () = Client.remember_script client ~alias:"noop" ~src:("file:" ^ prg) in
-  let* () = Client.typecheck_script client ~script:prg in
+  let* () = Client.typecheck_script client ~scripts:[prg] in
   let* _contract =
     Client.originate_contract
       ~alias:"noop"

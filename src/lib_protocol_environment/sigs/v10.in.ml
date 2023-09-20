@@ -129,11 +129,15 @@ module type T = sig
 
   module RPC_context : [%sig "v10/RPC_context.mli"]
 
+  module Context_binary : [%sig "v10/context_binary.mli"]
+
   module Wasm_2_0_0 : [%sig "v10/wasm_2_0_0.mli"]
 
   module Plonk : [%sig "v10/plonk.mli"]
 
   module Dal : [%sig "v10/dal.mli"]
 
-  module Smart_rollup_address : [%sig "v10/smart_rollup_address.mli"]
+  module Skip_list : [%sig "v10/skip_list.mli"]
+
+  module Smart_rollup : [%sig "v10/smart_rollup.mli"]
 end

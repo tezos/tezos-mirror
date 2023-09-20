@@ -91,7 +91,7 @@ let metrics_serve metrics_addr =
         List.iter_p
           (fun (addr, port) ->
             let host = Ipaddr.V6.to_string addr in
-            let*! () = Node_events.starting_metrics_server ~host ~port in
+            let*! () = Event.starting_metrics_server ~host ~port in
             let*! ctx = Conduit_lwt_unix.init ~src:host () in
             let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
             let mode = `TCP (`Port port) in
@@ -191,6 +191,17 @@ module Inbox = struct
           r := !r +. 1.)
         l
   end
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5897
+     Use a Prometheus histogram instead of a Gauge to report the processing
+     time of each inbox level. *)
+  let head_process_time =
+    v_gauge
+      ~help:"The time the rollup node spent processing the head"
+      "head_inbox_process_time"
+
+  let set_process_time pt =
+    Prometheus.Gauge.set head_process_time (Ptime.Span.to_float_s pt)
 
   let metrics =
     let head_inbox_level =

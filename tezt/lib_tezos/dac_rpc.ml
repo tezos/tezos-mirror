@@ -35,37 +35,15 @@ let make ?data ?query_string =
 let encode_bytes_to_hex_string raw =
   "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
 
-let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
+module V0 = struct
+  let api_prefix = "v0"
 
-let get_bytes_from_json_string_node json =
-  JSON.as_string json |> decode_hex_string_to_bytes
+  let get_preimage page_hash =
+    make GET [api_prefix; "preimage"; page_hash] JSON.as_string
 
-let get_preimage page_hash = make GET ["preimage"; page_hash] JSON.as_string
-
-let post_store_preimage ~payload ~pagination_scheme =
-  let preimage =
-    JSON.parse
-      ~origin:"dal_node_dac_store_preimage_rpc"
-      (Format.sprintf
-         {|{"payload":%s,"pagination_scheme":"%s"}|}
-         (encode_bytes_to_hex_string payload)
-         pagination_scheme)
-  in
-  let data : RPC_core.data = Data (JSON.unannotate preimage) in
-  make ~data POST ["store_preimage"] @@ fun json ->
-  JSON.
-    ( json |-> "root_hash" |> as_string,
-      json |-> "external_message" |> get_bytes_from_json_string_node )
-
-let get_verify_signature external_msg =
-  let query_string =
-    [("external_message", match Hex.of_string external_msg with `Hex s -> s)]
-  in
-  make ~query_string GET ["verify_signature"] JSON.as_bool
-
-let put_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature =
-  let (`Hex root_hash) = hex_root_hash in
-  let payload =
+  let make_put_dac_member_signature_request_body ~dac_member_pkh ~root_hash
+      signature =
+    let (`Hex root_hash) = root_hash in
     `O
       [
         ("root_hash", `String root_hash);
@@ -73,28 +51,52 @@ let put_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature =
         ( "signature",
           `String (Tezos_crypto.Aggregate_signature.to_b58check signature) );
       ]
-  in
-  let data : RPC_core.data = Data payload in
-  make ~data PUT ["dac_member_signature"] @@ fun _resp -> ()
 
-let get_certificate ~hex_root_hash =
-  let (`Hex page_hash) = hex_root_hash in
-  make GET ["certificates"; page_hash] @@ fun json ->
-  JSON.
-    ( json |-> "witnesses" |> as_int,
-      json |-> "aggregate_signature" |> as_string,
-      json |-> "root_hash" |> as_string )
-
-let get_missing_page ~hex_root_hash =
-  make GET ["missing_page"; Hex.show hex_root_hash] JSON.as_string
-
-module Coordinator = struct
-  let post_preimage ~payload =
-    let preimage =
-      JSON.parse
-        ~origin:"Rollup.DAC.RPC.coordinator_post_preimage"
-        (encode_bytes_to_hex_string payload)
+  let put_dac_member_signature ~hex_root_hash ~dac_member_pkh ~signature =
+    let payload =
+      make_put_dac_member_signature_request_body
+        ~dac_member_pkh
+        ~root_hash:hex_root_hash
+        signature
     in
-    let data : RPC_core.data = Data (JSON.unannotate preimage) in
-    make ~data POST ["preimage"] JSON.as_string
+    let data : RPC_core.data = Data payload in
+    make ~data PUT [api_prefix; "dac_member_signature"] @@ fun _resp -> ()
+
+  let get_missing_page ~hex_root_hash =
+    make GET [api_prefix; "missing_page"; Hex.show hex_root_hash] JSON.as_string
+
+  let get_certificate ~hex_root_hash =
+    let (`Hex page_hash) = hex_root_hash in
+    make GET [api_prefix; "certificates"; page_hash] @@ fun json ->
+    JSON.
+      ( json |-> "witnesses" |> as_int,
+        json |-> "aggregate_signature" |> as_string,
+        json |-> "root_hash" |> as_string,
+        json |-> "version" |> as_int )
+
+  let get_serialized_certificate ~hex_root_hash =
+    let (`Hex page_hash) = hex_root_hash in
+    make GET [api_prefix; "serialized_certificates"; page_hash] JSON.as_string
+
+  module Coordinator = struct
+    let post_preimage ~payload =
+      let preimage =
+        JSON.parse
+          ~origin:"Rollup.DAC.RPC.coordinator_post_preimage"
+          (encode_bytes_to_hex_string payload)
+      in
+      let data : RPC_core.data = Data (JSON.unannotate preimage) in
+      make ~data POST [api_prefix; "preimage"] JSON.as_string
+  end
+end
+
+let get_health_live = make GET ["health"; "live"] JSON.as_bool
+
+let get_health_ready = make GET ["health"; "ready"] JSON.as_bool
+
+module V1 = struct
+  let api_prefix = "v1"
+
+  let get_pages page_hash =
+    make GET [api_prefix; "pages"; page_hash] JSON.as_string
 end

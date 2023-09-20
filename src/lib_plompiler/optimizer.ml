@@ -101,6 +101,7 @@ open Optimizer_helpers
     4. Transform pseudo blocks to actual blocks (also considering the non-linear
     computations that were left aside) and join blocks that operate on
     independent wires together. *)
+let list_map f l = (* avoid stack overflows *) List.rev_map f l |> List.rev
 
 let nb_wires_arch = Csir.nb_wires_arch
 
@@ -112,7 +113,7 @@ type scalar = Csir.Scalar.t [@@deriving repr]
    depend on each other, e.g. those using next selectors. *)
 type block = constr array
 
-(* coeff * wire *)
+(* Corresponds to linear term : coeff * wire *)
 type term = scalar * int [@@deriving repr]
 
 (** Type to store the trace_updater information.
@@ -136,7 +137,7 @@ type pseudo_constr = {
 }
 
 (** A pseudo block is a list of pseudo constraints that have been groupped
-    in order to apply the {!shared_wires} heuristic.Alcotest
+    in order to apply the {!shared_wires} heuristic.
     The constraints in a pseudo block satisfy (by construction) the invariant
     the pc_head of a constraint starts with the pc_tail of the previous one
     (when considering the term variables, coefficients may be different).
@@ -268,9 +269,10 @@ let pseudo_block_of_terms terms =
     gates. The wires selected for inlining must:
     - appear in exactly two linear gates of size one
     - not be inputs
+    - not be range-checked
     The inlined linear gates are returned as pseudo blocks because they may need
     to be split again to fit 3 wires. *)
-let inline_linear ~nb_inputs gates =
+let inline_linear ~nb_inputs ~range_checked gates =
   let linear, non_linear =
     List.partition_map
       (fun gate ->
@@ -288,7 +290,8 @@ let inline_linear ~nb_inputs gates =
   (* Associate each wire to the indices (of array [linear]) of the constraints
      where the wire appears. The only wires considered must not:
      - be a circuit input
-     - appear in a non-linear gate. *)
+     - appear in a non-linear gate
+     - be range-checked. *)
   let wire_occurrences =
     Array.fold_left
       (fun (map, i) gate -> (increase_occurrences map i gate, succ i))
@@ -296,7 +299,9 @@ let inline_linear ~nb_inputs gates =
       linear
     |> fst
     |> IMap.filter (fun w _ ->
-           w > nb_inputs && (not @@ ISet.mem w non_linear_wires))
+           w >= nb_inputs
+           && (not (ISet.mem w non_linear_wires))
+           && not (Range_checks.mem w range_checked))
   in
 
   (* During the process of inlining, some wire occurrences will point to
@@ -404,17 +409,22 @@ let combine_pseudo_blocks ~scope ~perfectly pseudo_blocks =
   combine_quadratic ~scope ~join:try_both_ways pseudo_blocks
 
 let linear_combination ~this ~next qc =
-  let pad = List.init (nb_wires_arch - List.length this) (fun _ -> 0) in
-  let wires = List.map snd this @ pad in
-
   let combine l1 l2 = List.combine (list_sub (List.length l2) l1) l2 in
-  let this_sels = combine CS.this_constr_linear_selectors (List.map fst this) in
-  let next_sels = combine CS.next_constr_linear_selectors (List.map fst next) in
+  let pad = List.init (nb_wires_arch - List.length this) (fun _ -> 0) in
+  (* Combining with reversed linear-selectors will leave the a-wire (w0) free
+     when possible. This allows for future combinations with e.g. boolean
+     constraints, that only use the a-wire. In general, it is beneficial to
+     leave the first wires free, as they are the most used by custom gates. *)
+  let wires = List.map snd this @ pad |> List.rev in
+  let this_constr_sels = List.rev CS.this_constr_linear_selectors in
+  let next_constr_sels = List.rev CS.next_constr_linear_selectors in
+  let this_sels = combine this_constr_sels (List.map fst this) in
+  let next_sels = combine next_constr_sels (List.map fst next) in
   CS.mk_linear_constr (wires, (("qc", qc) :: this_sels) @ next_sels)
 
 let dummy_linear_combination terms =
   let pad = List.init (nb_wires_arch - List.length terms) (fun _ -> 0) in
-  CS.mk_linear_constr (List.map snd terms @ pad, [])
+  CS.mk_linear_constr (List.map snd terms @ pad |> List.rev, [])
 
 (** Given a pseudo block, i.e., a list of pseudo constraints, transform it into
     a block. Thanks to the invariant that the pc_head of a pseudo constraint
@@ -639,12 +649,12 @@ let add_boolean_checks ~boolean_vars gates =
     else constr
   in
   (* First try to add them on existing constraints, through the qbool selector *)
-  let gates = List.map (fun gate -> Array.map shared_a gate) gates in
+  let gates = list_map (fun gate -> Array.map shared_a gate) gates in
   (* Then, try to use constraints that do not use the a wire *)
-  let gates = List.map (fun gate -> Array.mapi (unused_a ~gate) gate) gates in
+  let gates = list_map (fun gate -> Array.mapi (unused_a ~gate) gate) gates in
   (* Finally, add manual constraints for the remaining boolean variables *)
   let new_bool_gates =
-    List.map CS.mk_bool_constr (ISet.to_seq !bool_vars_map |> List.of_seq)
+    list_map CS.mk_bool_constr (ISet.to_seq !bool_vars_map |> List.of_seq)
     |> Array.of_list
   in
   List.rev (new_bool_gates :: gates)
@@ -655,7 +665,7 @@ let add_boolean_checks ~boolean_vars gates =
    replace [x -> y] everywhere and remove the constraint.
    Alternatively, we could replace [y -> x].
    This is not possible if both [x] and [y] are inputs to the circuit. *)
-let inline_renamings ~nb_inputs gates =
+let inline_renamings ~nb_inputs ~range_checked gates =
   let renaming_pairs =
     List.filter_map
       (fun gate ->
@@ -669,49 +679,64 @@ let inline_renamings ~nb_inputs gates =
       gates
   in
   (* Create a map from wires to all the wires they are bound to be equal to *)
-  let renaming_partitions =
-    List.fold_left
-      (fun partitions (i, j) ->
-        let rec find_all_equal ~seen i =
-          let i_set =
-            Option.value ~default:ISet.empty @@ IMap.find_opt i partitions
+  let rec build_partitions ?(partitions = IMap.empty) () =
+    (* In just one iteration we may not be able to find all relations.
+       For example, if the list of renamings is [(i, j); (j, k)], we will not
+       realize that i and k are the same in the first iteration.
+       We can do this in two iterations, the first will result in the map:
+            i -> {i, j}   j -> {i, j, k}   k -> {j, k}
+       in the second iteration j has already been linked to i and k, so we will
+       realize the relationship between i and k and get:
+            i -> {i, j, k}   j -> {i, j, k}   k -> {i, j, k}
+       We iterate the function again and again until no new information is
+       obtained, i.e. until nothing is "changed".
+       The total number of iterations can be upper-bounded by the cardinality
+       of the largest partition of wires, but it will be much better than that
+       in most cases. *)
+    let partitions, changed =
+      List.fold_left
+        (fun (partitions, changed) (i, j) ->
+          let default = ISet.empty in
+          let i_set = Option.value ~default @@ IMap.find_opt i partitions in
+          let j_set = Option.value ~default @@ IMap.find_opt j partitions in
+          let ij_set =
+            ISet.union i_set j_set |> ISet.union (ISet.of_list [i; j])
           in
-          ISet.fold
-            (fun j (acc, seen) ->
-              if ISet.mem j seen then (acc, seen)
-              else
-                let j_set = find_all_equal ~seen j in
-                (ISet.union acc j_set, ISet.add j seen))
-            i_set
-            (i_set, ISet.add i seen)
-          |> fst
-        in
-        let ij_partition =
-          let ij = ISet.add i @@ ISet.singleton j in
-          let i_set = find_all_equal ~seen:ij i in
-          let j_set = find_all_equal ~seen:ij j in
-          ISet.union i_set j_set |> ISet.union ij
-        in
-        ISet.fold
-          (fun k partitions -> IMap.add k ij_partition partitions)
-          ij_partition
-          partitions)
-      IMap.empty
-      renaming_pairs
+          let i_or_j_changed =
+            not (ISet.equal i_set ij_set && ISet.equal j_set ij_set)
+          in
+          let partitions = IMap.add i ij_set partitions in
+          let partitions = IMap.add j ij_set partitions in
+          (partitions, changed || i_or_j_changed))
+        (partitions, false)
+        renaming_pairs
+    in
+    if changed then build_partitions ~partitions () else partitions
   in
+  let renaming_partitions = build_partitions () in
   (* Each wire will be renamed (if it is not an input wire) to the
      minimal wire of their partition. This makes sure that all the wire
      in the same partition get renamed to the same wire (when renamed) *)
   let renaming =
     IMap.mapi
-      (fun i i_set -> if i <= nb_inputs then i else ISet.min_elt i_set)
+      (fun i i_set ->
+        (* For simplicity, range-checked variables are ignored and will not be inlined.
+           However, we could inline them as follows. Assume we have two range-checked
+           variables x and y, bound in [0, bx) and [0, by) respectively. And assume
+           there exists a constraint x - y = 0. We could apply the replacement x -> y
+           everywhere in the system and let the new range-check interval for x be
+           [0, min(bx, by)).
+           This could be a nice feature to have, but it is not clear that it will have
+           an impact in our current circuits, since the above situation does not ocur. *)
+        if i < nb_inputs || Range_checks.mem i range_checked then i
+        else ISet.min_elt i_set)
       renaming_partitions
   in
   let free_wires =
     IMap.filter ( <> ) renaming |> IMap.bindings |> List.map fst
   in
   let rename i = Option.value ~default:i @@ IMap.find_opt i renaming in
-  (List.map (CS.rename_wires ~rename) gates, free_wires)
+  (list_map (CS.rename_wires ~rename) gates, free_wires)
 
 (* We remove all constraints of the form [a * x - a * x = 0], which may
    be the result of having renamed some variables *)
@@ -731,12 +756,18 @@ let remove_trivial gates =
     with potentially fewer constraints.
     As a second output, it returns the necessary information to build a function
     that updates the trace to make it compatible with the new constraints *)
-let optimize : nb_inputs:int -> CS.gate list -> CS.gate list * trace_info =
- fun ~nb_inputs gates ->
-  let gates, free_wires_inlining = inline_renamings ~nb_inputs gates in
+let optimize :
+    nb_inputs:int ->
+    range_checks:Range_checks.t ->
+    CS.gate list ->
+    CS.gate list * trace_info =
+ fun ~nb_inputs ~range_checks:range_checked gates ->
+  let gates, free_wires_inlining =
+    inline_renamings ~nb_inputs ~range_checked gates
+  in
   let gates = remove_trivial gates in
   let linear_pseudo_blocks, non_linear, free_wires =
-    inline_linear ~nb_inputs gates
+    inline_linear ~nb_inputs ~range_checked gates
   in
   let free_wires = List.sort Int.compare @@ free_wires_inlining @ free_wires in
   let non_linear, boolean_vars = remove_boolean_gates non_linear in

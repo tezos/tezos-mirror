@@ -55,6 +55,8 @@ module type T = sig
        and type Context_hash.Version.t = Context_hash.Version.t
        and type Context.config = Tezos_context_sigs.Config.t
        and module Context.Proof = Environment_context.Context.Proof
+       and type Context_binary.t = Tezos_context_memory.Context_binary.t
+       and type Context_binary.tree = Tezos_context_memory.Context_binary.tree
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
@@ -114,17 +116,24 @@ module type T = sig
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
+       and type Wasm_2_0_0.reveal =
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal
        and type Wasm_2_0_0.version = Tezos_scoru_wasm.Wasm_pvm_state.version
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
        and type Wasm_2_0_0.reveal_hash =
-        Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
-       and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal
-       and type Wasm_2_0_0.input_request =
-        Tezos_scoru_wasm.Wasm_pvm_state.input_request
-       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
-       and type Smart_rollup_address.t =
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal_hash
+       and module Skip_list = Tezos_base.Skip_list
+       and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t
+       and type Smart_rollup.Commitment_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_commitment_hash.t
+       and type Smart_rollup.State_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+       and type Smart_rollup.Inbox_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_inbox_hash.t
+       and type Smart_rollup.Merkelized_payload_hashes_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -1064,7 +1073,7 @@ struct
     let activate = Context.set_protocol
 
     module type PROTOCOL =
-      Environment_protocol_T_V7.T
+      Environment_protocol_T_V10.T
         with type context := Context.t
          and type cache_value := Environment_context.Context.cache_value
          and type cache_key := Environment_context.Context.cache_key
@@ -1101,6 +1110,22 @@ struct
     let complete ctxt s = Base58.complete ctxt s
   end
 
+  module Context_binary = struct
+    include Tezos_context_memory.Context_binary
+
+    module Tree = struct
+      type nonrec tree = tree
+
+      type nonrec t = t
+
+      type key = string list
+
+      type value = bytes
+
+      include Tezos_context_memory.Context_binary.Tree
+    end
+  end
+
   module Wasm_2_0_0 = struct
     type input = Tezos_scoru_wasm.Wasm_pvm_state.input_info = {
       inbox_level : Bounded.Non_negative_int32.t;
@@ -1112,18 +1137,18 @@ struct
       message_index : Z.t;
     }
 
-    type reveal_hash = Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
+    type reveal_hash = Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal_hash
 
-    type reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal =
+    type reveal = Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal =
       | Reveal_raw_data of reveal_hash
       | Reveal_metadata
 
-    type input_request = Tezos_scoru_wasm.Wasm_pvm_state.input_request =
+    type input_request =
       | No_input_required
       | Input_required
       | Reveal_required of reveal
 
-    type info = Tezos_scoru_wasm.Wasm_pvm_state.info = {
+    type info = {
       current_tick : Z.t;
       last_input_read : input option;
       input_request : input_request;
@@ -1131,7 +1156,7 @@ struct
 
     type version = Tezos_scoru_wasm.Wasm_pvm_state.version
 
-    let v1 = Tezos_scoru_wasm.Wasm_pvm_state.V1
+    let v2 = Tezos_scoru_wasm.Wasm_pvm_state.V2
 
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
@@ -1147,6 +1172,40 @@ struct
 
         let wrap t = PVM_tree t
       end)
+
+      let reveal_compat reveal =
+        match
+          Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.of_current_opt reveal
+        with
+        | Some r -> r
+        | None ->
+            (* The WASM PVM before environment V11 will not request a value
+               outside of the [Compatibility.reveal] domain. As a consequence,
+               the only execution path leading to executing this branch is
+               by having two dishonest nodes playing against each other.
+
+               As a consequence, it is safe to return an arbitrary value here,
+               and we do so to avoid raising an exception. *)
+            Reveal_raw_data "this line costs 10k XTZ to execute"
+
+      let input_request_compat = function
+        | Tezos_scoru_wasm.Wasm_pvm_state.No_input_required -> No_input_required
+        | Input_required -> Input_required
+        | Reveal_required req -> Reveal_required (reveal_compat req)
+
+      let info_compat
+          Tezos_scoru_wasm.Wasm_pvm_state.
+            {current_tick; last_input_read; input_request} =
+        {
+          current_tick;
+          last_input_read;
+          input_request = input_request_compat input_request;
+        }
+
+      let get_info tree =
+        let open Lwt_syntax in
+        let+ info = get_info tree in
+        info_compat info
     end
   end
 
@@ -1466,5 +1525,15 @@ struct
       | Ok () -> Ok true
   end
 
-  module Smart_rollup_address = Tezos_crypto.Hashed.Smart_rollup_address
+  module Skip_list = Skip_list
+
+  module Smart_rollup = struct
+    module Address = Tezos_crypto.Hashed.Smart_rollup_address
+    module Commitment_hash = Tezos_crypto.Hashed.Smart_rollup_commitment_hash
+    module State_hash = Tezos_crypto.Hashed.Smart_rollup_state_hash
+    module Inbox_hash = Tezos_crypto.Hashed.Smart_rollup_inbox_hash
+
+    module Merkelized_payload_hashes_hash =
+      Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash
+  end
 end

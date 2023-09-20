@@ -812,367 +812,84 @@ A detailed description of the following instructions can be found in the `intera
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
 
-Bytes are used for serializing data, in order to check signatures and
-compute hashes on them. They can also be used to incorporate data from
-the wild and untyped outside world.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
 -  ``PACK``: Serializes a piece of data to its optimized
-   binary representation.
-
-::
-
-     :: 'a : 'S   ->   bytes : 'S
-
--  ``UNPACK 'a``: Deserializes a piece of data, if valid.
-
-::
-
-     :: bytes : 'S   ->   option 'a : 'S
-
--  ``CONCAT``: Byte sequence concatenation.
-
-::
-
-    :: bytes : bytes : 'S   -> bytes : 'S
-
-    > CONCAT / s : t : S  =>  (s ^ t) : S
-
-    :: bytes list : 'S   -> bytes : 'S
-
-    > CONCAT / {} : S  =>  0x : S
-    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
-       where CONCAT / { <ss> } : S  =>  r : S
-
--  ``SIZE``: size of a sequence of bytes.
-
-::
-
-     :: bytes : 'S   ->   nat : 'S
-
--  ``SLICE``: Bytes access.
-
-::
-
-    :: nat : nat : bytes : 'S   -> option bytes : 'S
-
-    > SLICE / offset : length : s : S  =>  Some ss : S
-       where ss is the substring of s at the given offset and of the given length
-         iff offset and (offset + length) are in bounds
-    > SLICE / offset : length : s : S  =>  None : S
-         iff offset or (offset + length) are out of bounds
-
--  ``COMPARE``: Lexicographic comparison.
-
-::
-
-    :: bytes : bytes : 'S   ->   int : 'S
-
-    > COMPARE / s : t : S  =>  -1 : S
-        iff s < t
-    > COMPARE / s : t : S  =>  0 : S
-        iff s = t
-    > COMPARE / s : t : S  =>  1 : S
-        iff s > t
-
-Bitwise logical operators are also available on bytes.
-
--  ``OR``
-
-::
-
-    :: bytes : bytes : 'S   ->   bytes : 'S
-
-    > OR / x : y : S  =>  (x | y) : S
-
--  ``AND``
-
-::
-
-    :: bytes : bytes : 'S   ->   bytes : 'S
-
-    > AND / x : y : S  =>  (x & y) : S
-
--  ``XOR``
-
-::
-
-    :: bytes : bytes : 'S   ->   bytes : 'S
-
-    > XOR / x : y : S  =>  (x ^ y) : S
-
--  ``NOT``
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
-    > NOT / x : S  =>  ~x : S
-
-Logical shifts are also available on bytes.
-
--  ``LSL``
-
-::
-
-    :: bytes : nat : 'S   ->   bytes : 'S
-
-    > LSL / x : s : S  =>  (x << s) : S
-        iff   s <= 64000
-    > LSL / x : s : S  =>  [FAILED]
-        iff   s > 64000
-
--  ``LSR``
-
-::
-
-    :: bytes : nat : 'S   ->   bytes : 'S
-
-    > LSR / x : s : S  =>  (x >> s) : S
-        iff   s <= 256
-    > LSR / x : s : S  =>  [FAILED]
-        iff   s > 256
-
-Bytes can be converted to natural numbers and integers.
-
-- ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding.
-  The ``bytes`` are allowed to have leading zeros.
-
-::
-
-    :: bytes : 'S   ->   nat : 'S
-
-    > NAT / s : S  =>  n : S
-        iff s is a big-endian encoding of natural number n
-
-- ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding.
-  The ``bytes`` are allowed to have leading zeros for non-negative numbers and leading ones for negative numbers.
-
-::
-
-    :: bytes : 'S   ->   int : 'S
-
-    > INT / s : S  =>  z : S
-        iff s is a big-endian encoding of integer z
-
-- ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``).
-
-::
-
-    :: int : 'S -> bytes : 'S
-    :: nat : 'S -> bytes : 'S
-
-    > BYTES / n : S => s : S
-       iff s is the shortest big-endian encoding of natural number or integer n
+   binary representation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PACK>`__).
+-  ``UNPACK 'a``: Deserializes a piece of data, if valid (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNPACK>`__).
+-  ``CONCAT``: Concatenate two byte sequences or a list of byte sequences (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONCAT>`__).
+-  ``SIZE``: Size of a sequence of bytes (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
+-  ``SLICE``: Access a subsequence of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SLICE>`__).
+-  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
+-  ``OR``: Bitwise ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
+-  ``AND``: Bitwise ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
+-  ``XOR``: Bitwise ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
+-  ``NOT``: Bitwise ``NOT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
+-  ``LSL``: Logically left shift of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSL>`__).
+-  ``LSR``: Logically right shift of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSR>`__).
+- ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NAT>`__).
+- ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
+- ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BYTES>`__).
 
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``HASH_KEY``: Compute the b58check of a public key.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: key : 'S   ->   key_hash : 'S
-
+-  ``HASH_KEY``: Compute the b58check of a public key (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-HASH_KEY>`__).
 -  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
-   Blake2b-256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Blake2b-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BLAKE2B>`__).
 -  ``KECCAK``: Compute a cryptographic hash of the value contents using the
-   Keccak-256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Keccak-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-KECCAK>`__).
 -  ``SHA256``: Compute a cryptographic hash of the value contents using the
-   Sha256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Sha256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA256>`__).
 -  ``SHA512``: Compute a cryptographic hash of the value contents using the
-   Sha512 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   Sha512 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA512>`__).
 -  ``SHA3``: Compute a cryptographic hash of the value contents using the
-   SHA3-256 cryptographic hash function.
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
+   SHA3-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA3>`__).
 -  ``CHECK_SIGNATURE``: Check that a sequence of bytes has been signed
-   with a given key.
-
-::
-
-    :: key : signature : bytes : 'S   ->   bool : 'S
-
--  ``COMPARE``: Key hash, key and signature comparison
-
-::
-
-    :: key_hash : key_hash : 'S   ->   int : 'S
-    :: key : key : 'S   ->   int : 'S
-    :: signature : signature : 'S   ->   int : 'S
-
-    > COMPARE / x : y : S  =>  -1 : S
-        iff x < y
-    > COMPARE / x : y : S  =>  0 : S
-        iff x = y
-    > COMPARE / x : y : S  =>  1 : S
-        iff x > y
+   with a given key (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CHECK_SIGNATURE>`__).
+-  ``COMPARE``: Key hash, key and signature comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 BLS12-381 primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``NEG``: Negate a curve point or field element.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: bls12_381_g1 : 'S -> bls12_381_g1 : 'S
-    :: bls12_381_g2 : 'S -> bls12_381_g2 : 'S
-    :: bls12_381_fr : 'S -> bls12_381_fr : 'S
-
--  ``ADD``: Add two curve points or field elements.
-
-::
-
-    :: bls12_381_g1 : bls12_381_g1 : 'S -> bls12_381_g1 : 'S
-    :: bls12_381_g2 : bls12_381_g2 : 'S -> bls12_381_g2 : 'S
-    :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
-
--  ``MUL``: Multiply a curve point or field element by a scalar field element. Fr
-   elements can be built from naturals by multiplying by the unit of Fr using ``PUSH bls12_381_fr 1; MUL``. Note
-   that the multiplication will be computed using the natural modulo the order
-   of Fr.
-
-::
-
-    :: bls12_381_g1 : bls12_381_fr : 'S -> bls12_381_g1 : 'S
-    :: bls12_381_g2 : bls12_381_fr : 'S -> bls12_381_g2 : 'S
-    :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
-    :: nat : bls12_381_fr : 'S -> bls12_381_fr : 'S
-    :: int : bls12_381_fr : 'S -> bls12_381_fr : 'S
-    :: bls12_381_fr : nat : 'S -> bls12_381_fr : 'S
-    :: bls12_381_fr : int : 'S -> bls12_381_fr : 'S
-
-- ``INT``: Convert a field element to type ``int``. The returned value is always between ``0`` (inclusive) and the order of Fr (exclusive).
-
-::
-
-    :: bls12_381_fr : 'S   ->   int : 'S
-
--  ``PAIRING_CHECK``:
-   Verify that the product of pairings of the given list of points is equal to 1 in Fq12. Returns ``true`` if the list is empty.
-   Can be used to verify if two pairings P1 and P2 are equal by verifying P1 * P2^(-1) = 1.
-
-::
-
-    :: list (pair bls12_381_g1 bls12_381_g2) : 'S -> bool : 'S
+-  ``NEG``: Negate a curve point or field element (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEG>`__).
+-  ``ADD``: Add two curve points or field elements (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
+-  ``MUL``: Multiply a curve point or scalar field element by an integer or a scalar field element (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
+- ``INT``: Convert a field element to type ``int`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
+-  ``PAIRING_CHECK``: Verify that the product of pairings of the given list of points is equal to 1 in Fq12 (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PAIRING_CHECK>`__).
 
 
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
-Please see the :doc:`Sapling integration<sapling>` page for a more
-comprehensive description of the Sapling protocol.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
--  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
-
-::
-
-    :: sapling_transaction ms : sapling_state ms : 'S   ->   option (pair bytes (pair int (sapling_state ms))): 'S
-
-    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair bound_data (Pair balance s')) : S
-        iff the transaction t successfully applied on state s resulting
-        in the bound_data and the balance of the transaction and an updated state s'
-    > SAPLING_VERIFY_UPDATE / t : s : S  =>  None : S
-        iff the transaction t is invalid with respect to the state
-
--  ``SAPLING_EMPTY_STATE ms``: Pushes an empty state on the stack.
-
-   ::
-
-    ::  'S   ->   sapling_state ms: 'S
-
-    > SAPLING_EMPTY_STATE ms /  S  =>  sapling_state ms : S
-        with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
-        with memo_size `ms`
+-  ``SAPLING_VERIFY_UPDATE``: Verify and apply a transaction on a Sapling state (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SAPLING_VERIFY_UPDATE>`__).
+-  ``SAPLING_EMPTY_STATE ms``: Push an empty state on the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SAPLING_EMPTY_STATE>`__).
 
 .. _MichelsonTickets_alpha:
 
 Operations on tickets
 ~~~~~~~~~~~~~~~~~~~~~
 
-The following operations deal with tickets. Tickets are a way for smart-contracts
-to authenticate data with respect to a Tezos address. This authentication can
-then be used to build composable permission systems. For a high-level explanation of
-tickets in Tezos, see :doc:`Tickets <tickets>`.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-A contract can create a ticket from a value and an amount. The ticket, when
-inspected reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
-impossible for a contract to “forge” a ticket that appears to have been created
-by another ticketer.
-
-The amount is a meta-data that can be used to implement UTXOs.
-
-Tickets cannot be duplicated using the ``DUP`` instruction.
-
-For example, a ticket could represent a Non Fungible Token (NFT) or a Unspent
-Transaction Output (UTXO) which can then be passed around and behave like a value.
-This process can happen without the need to interact with a centralized NFT contract,
-simplifying the code.
-
-- ``TICKET``: Create a ticket with the given content and amount. The ticketer is the address
-  of ``SELF``. The resulting value is ``NONE`` if the amount is zero.
-
-::
-
-   :: 'a : nat : 'S -> option ticket 'a : 'S
-
-Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over it).
-
-- ``READ_TICKET``: Retrieve the information stored in a ticket. Also return the ticket.
-
-::
-
-   :: ticket 'a : 'S -> pair address 'a nat : ticket 'a : 'S
-
+- ``TICKET``: Create a ticket with the given content and amount (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TICKET>`__).
+- ``READ_TICKET``: Retrieve the information stored in a ticket (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-READ_TICKET>`__).
 - ``SPLIT_TICKET``: Delete the given ticket and create two tickets with the
-  same content and ticketer as the original, but with the new provided amounts.
-  (This can be used to easily implement UTXOs.)
-  Return None iff the ticket's original amount is not equal to the sum of the
-  provided amounts, or one of the provided amounts is zero.
-
-::
-
-   :: ticket 'a : (pair nat nat) : 'S ->
-   option (pair (ticket 'a) (ticket 'a)) : 'S
-
-- ``JOIN_TICKETS``: The inverse of ``SPLIT_TICKET``. Delete the given tickets and create a ticket with an amount equal to the
-  sum of the amounts of the input tickets.
-  (This can be used to consolidate UTXOs.)
-  Return None iff the input tickets have a different ticketer or content.
-
-::
-
-   :: (pair (ticket 'a) (ticket 'a)) : 'S ->
-   option (ticket 'a) : 'S
+  same content and ticketer as the original, but with the new provided amounts (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SPLIT_TICKET>`__).
+- ``JOIN_TICKETS``: The inverse of ``SPLIT_TICKET`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-JOIN_TICKETS>`__).
 
 Operations on timelock
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The results can be bytes
-  if the opening is correct, or a boolean indicating whether the chest was incorrect,
-  or its opening was. See :doc:`Timelock <timelock>` for more information.
+- ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The
+  result is a byte option depending if the opening is correct or not. See
+  :doc:`Timelock <timelock>` for more information.
 
 ::
 
@@ -1182,16 +899,10 @@ Operations on timelock
 Events
 ~~~~~~
 
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
 - ``EMIT %tag 'ty``: constructs an operation that will write an event into
-  the transaction receipt after the successful execution of this contract.
-  It accepts as arguments an annotation as a tag to the emitted event and
-  the type of data attachment.
-
-  See :doc:`Event <event>` for more information.
-
-::
-
-    :: 'ty : 'S -> operation : 'S
+  the transaction receipt (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMIT>`__).
 
 
 Removed instructions and types
@@ -1242,6 +953,8 @@ reject any contract using it.
    a transaction rollup ledger. It is the hash of a BLS public key,
    used to authenticate layer-2 operations to transfer tickets from
    this account.
+
+.. _MichelsonViews_alpha:
 
 Operations on views
 ~~~~~~~~~~~~~~~~~~~~

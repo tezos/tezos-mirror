@@ -221,11 +221,11 @@ let list_contract_labels cctxt ~chain ~block =
           Public_key_hash.rev_find cctxt m >>=? function
           | None -> return ""
           | Some nm -> (
-              RawContractAlias.find_opt cctxt nm >>=? function
+              Raw_contract_alias.find_opt cctxt nm >>=? function
               | None -> return (" (known as " ^ nm ^ ")")
               | Some _ -> return (" (known as key:" ^ nm ^ ")")))
       | None -> (
-          RawContractAlias.rev_find cctxt h >>=? function
+          Raw_contract_alias.rev_find cctxt h >>=? function
           | None -> return ""
           | Some nm -> return (" (known as " ^ nm ^ ")")))
       >>=? fun nm ->
@@ -275,7 +275,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     (Some source)
 
 let save_contract ~force cctxt alias_name contract =
-  RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
+  Raw_contract_alias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () -> return_unit
 
 let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage

@@ -1,7 +1,7 @@
 The ``clic`` library
 ====================
 
-:package:`tezos-clic` is an OCaml combinator library for writing
+:package-api:`tezos-clic <octez-libs/Tezos_clic/index.html>` is an OCaml combinator library for writing
 self-documenting command-line argument parsers. Clic is similar to
 `cmdliner <https://erratique.ch/software/cmdliner>`__, but (unlike cmdliner)
 ``tezos-clic`` allows to define a domain-specific
@@ -49,7 +49,7 @@ defining commands that execute over a
 context of type ``unit``.
 
 In the running example, we define a context whose job is to contain
-the actual implementation of the commands. 
+the actual implementation of the commands.
 
 
 We first declare ``CONTEXT`` as the signature of modules that contain a
@@ -244,7 +244,7 @@ with one simple command. This is far from a complete demonstration of
 interactive, searchable documentation, with both command-line and HTML
 outputs. ``clic`` also gives facilities for implementing shell
 auto-completion. For more information, refer to ``clic``\'s
-:package:`API documentation<tezos-clic>`.
+:package-api:`API documentation <octez-libs/Tezos_clic/index.html>`.
 
 ..  LocalWords:  OCaml combinator parsers cmdliner clic Octez tezos
 ..  LocalWords:  literalinclude ocaml desc ctx params json param Lwt

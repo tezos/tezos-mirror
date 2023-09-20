@@ -1,0 +1,9 @@
+{0 Octez-protocol-014-PtKathma-libs: octez protocol 014-PtKathma libraries}
+
+This is a package containing some libraries related to the Tezos 014-PtKathma protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_014_PtKathma}Tezos_client_014_PtKathma}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_protocol_plugin_014_PtKathma}Tezos_protocol_plugin_014_PtKathma}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_014_PtKathma_registerer}Tezos_protocol_plugin_014_PtKathma_registerer}: Protocol plugin registerer

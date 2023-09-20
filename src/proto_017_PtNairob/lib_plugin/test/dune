@@ -6,18 +6,18 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base-test-helpers
-  tezos-base.unix
+  octez-libs.base
+  octez-libs.base-test-helpers
+  octez-libs.base.unix
   octez-alcotezt
-  tezos-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest
-  tezos-stdlib-unix
-  tezos-micheline
-  tezos-protocol-plugin-017-PtNairob
-  tezos-protocol-017-PtNairob
+  octez-libs.stdlib-unix
+  octez-libs.micheline
+  octez-protocol-017-PtNairob-libs.plugin
+  tezos-protocol-017-PtNairob.protocol
   tezos-protocol-017-PtNairob.parameters
-  tezos-017-PtNairob-test-helpers)
+  octez-protocol-017-PtNairob-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -35,12 +35,11 @@
   -open Tezos_protocol_017_PtNairob_parameters
   -open Tezos_017_PtNairob_test_helpers)
  (modules
-  test_consensus_filter
-  test_filter_state
-  test_plugin
+  helpers
   test_conflict_handler
-  test_utils
-  generators))
+  test_consensus_filter
+  test_fee_needed_to_overtake
+  test_fee_needed_to_replace_by_fee))
 
 (executable
  (name main)
@@ -55,7 +54,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-plugin-017-PtNairob-tests)
+ (package octez-protocol-017-PtNairob-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_dal_node_lib_gossipsub)
+ (public_name tezos-dal-node-lib.gossipsub)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.crypto-dal
+  octez-libs.tezos-gossipsub
+  octez-shell-libs.p2p
+  octez-libs.tezos-p2p-services
+  octez-libs.crypto)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_crypto_dal
+  -open Tezos_gossipsub
+  -open Tezos_p2p
+  -open Tezos_p2p_services
+  -open Tezos_crypto))

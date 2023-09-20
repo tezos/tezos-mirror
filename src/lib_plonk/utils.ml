@@ -115,6 +115,23 @@ module Array = struct
         i)
 end
 
+(* This function converts answers to a list of scalars. If [nb_proofs] < [nb_max_proofs], the missing answers will be added as zero, in an order that is suitable for aPlonK’s switches *)
+let pad_answers nb_max_proofs nb_rc_wires nb_proofs
+    (answers : S.t SMap.t SMap.t list) =
+  let answers = List.map (SMap.map SMap.values) answers in
+  (* We want to work on the 'a map list because it’s the only way to find the wires in the answers without knowing if there is ultra or next wire *)
+  let answers_padded =
+    List.map_end
+      (SMap.map (fun w_list ->
+           w_list
+           @ List.init
+               ((nb_max_proofs - nb_proofs)
+               * (Plompiler.Csir.nb_wires_arch + nb_rc_wires))
+               (Fun.const S.zero)))
+      answers
+  in
+  answers_padded |> List.concat_map SMap.values |> List.flatten
+
 module Fr_generation : sig
   (* computes [| 1; x; x²; x³; ...; xᵈ⁻¹ |] *)
   val powers : int -> Bls.Scalar.t -> Bls.Scalar.t array
@@ -208,3 +225,34 @@ end = struct
     let l0_den = Scalar.(of_z n * sub x one) in
     Scalar.div_exn l0_num l0_den
 end
+
+exception SRS_too_short of string
+
+open Bls
+
+(* This function is used to raise a more helpful error message *)
+let pippenger pippenger ps ss =
+  try pippenger ?start:None ?len:None ps ss
+  with Invalid_argument s ->
+    raise (Invalid_argument ("Utils.pippenger : " ^ s))
+
+let pippenger1_with_affine_array g =
+  pippenger G1.pippenger_with_affine_array (G1.to_affine_array g)
+
+let commit_single pippenger zero srs_size srs p =
+  let p_size = 1 + Poly.degree p in
+  if p_size = 0 then zero
+  else if p_size > srs_size then
+    raise
+      (SRS_too_short
+         (Printf.sprintf
+            "commit : Polynomial degree, %i, exceeds srs length, %i."
+            p_size
+            srs_size))
+  else pippenger srs p
+
+let commit1 srs p =
+  commit_single Srs_g1.pippenger G1.zero (Srs_g1.size srs) srs p
+
+let commit2 srs p =
+  commit_single Srs_g2.pippenger G2.zero (Srs_g2.size srs) srs p

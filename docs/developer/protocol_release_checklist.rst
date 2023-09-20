@@ -111,8 +111,13 @@ not reviewed thoroughly enough), they should be dropped.
 
 -  **Release Artifacts are Created**: an MR on ``master`` is made with the result
    of the protocol snapshot (mostly automated by script :src:`scripts/snapshot_alpha_and_link.sh`) linked into the
-   node and client. The delegates must also be built in this branch. CI must be
+   node and client.
+   The few additional manual steps to be done on the documentation part are listed in meta-issue :gl:`#2170` (Section "Protocol snapshot").
+   The delegates must also be built in this branch. CI must be
    run on this branch and pass.
+
+   **NB: Make sure NOT to merge this MR about the same day when a previous protocol gets activated.** It is recommended to avoid merging a snapshot for a new protocol within 1-2 days of another protocol's activation, due to significant interactions and interferences between the snapshotting process and that for upgrading the documentation site to reflect a protocol activation.
+   Note that the activation date cannot be modified, but is known at least two weeks in advance.
 
 -  **Test Network Preparation**: everything before the Spawn Test
    Network section of:
@@ -168,6 +173,8 @@ the point of no return.**
    successful activation; it will be posted around the same time that
    news releases go out.
 
+-  **Doc Update Approved**: A documentation update reflecting the new active protocol and droping the documentation of the previous protocol has to be ready. Technically, an MR instantiating meta-issue :gl:`#2170` (Section "Protocol activation") for the new protocol has to be ready and must have sufficient approvals to be triggered right after activation.
+
 **After Activation**
 
 A few hours after activation, when it is certain that everything has
@@ -180,9 +187,7 @@ master branch, the ``proto_alpha`` directory is reset to the newly activated
 protocol and its associated daemons, with the exception of vanity nonce and
 migration that should be reverted.
 
-Soon after the injection (the same or next day), the documentation has to
-be shifted to reflect the new active protocol and to drop the documentation of
-the previous protocol, see meta-issue :gl:`#2170`. Also, part
+Soon after the activation (preferably on the same or next day), the MR updating the documentation to reflect the new active protocol (see above) has to be merged. Also, part
 of the code related to the old protocol can now be dropped, see
 :doc:`../developer/howto-freeze-protocols`.
 

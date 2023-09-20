@@ -50,6 +50,7 @@ type simulation_result = {
   output : JSON.t;
   inbox_level : int;
   num_ticks : int;
+  insights : string option list;
 }
 
 (** [create ~protocol ?runner ?name ?base_dir node] returns a fresh client
@@ -169,6 +170,15 @@ type transaction = {
   parameters_ty : string option;
 }
 
+(** Same as [outbox_proof_single] without providing the outbox message *)
+val outbox_proof :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  t ->
+  message_index:int ->
+  outbox_level:int ->
+  outbox_proof option Lwt.t
+
 (** Same as [outbox_proof_single] except that the claim is about a batch
     of output transactions. *)
 val outbox_proof_batch :
@@ -179,6 +189,11 @@ val outbox_proof_batch :
   outbox_level:int ->
   transaction list ->
   outbox_proof option Lwt.t
+
+(** [encode_json_outbox_msg outbox_msg_json] returns the encoding of
+    an outbox message. *)
+val encode_json_outbox_msg :
+  ?hooks:Process.hooks -> t -> JSON.u -> string Runnable.process
 
 (** [encode_batch batch] returns the encoding of a [batch] of output
    transactions. *)
@@ -225,15 +240,18 @@ val get_dal_processed_slots :
   t ->
   (int * string) list Runnable.process
 
-(** [simulate ?block client ?reveal_pages messages] simulates the evaluation of
-    input [messages] for the rollup PVM at [block] (default
+(** [simulate ?block client ?reveal_pages ?insight_request messages] simulates
+    the evaluation of input [messages] for the rollup PVM at [block] (default
     ["head"]). [reveal_pages] can be used to provide data to be used for the
-    revelation ticks. *)
+    revelation ticks. [insight_request] can be used to look at a list of keys in
+    the PVM state after the simulation. *)
 val simulate :
   ?hooks:Process_hooks.t ->
   ?block:string ->
   t ->
   ?reveal_pages:string list ->
+  ?insight_requests:
+    [`Pvm_state_key of string list | `Durable_storage_key of string list] list ->
   string list ->
   simulation_result Runnable.process
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,25 +33,17 @@ type cast_mode = Ceil | Floor | Round
 (* Parameters for conversion to fixed point *)
 type options = {
   precision : int;
-      (** Number of bits to consider when decomposing the
-                          mantissa *)
   max_relative_error : float;
-      (** Percentage of admissible relative error when casting floats to ints  *)
   cast_mode : cast_mode;
   inverse_scaling : int;
-      (** The constant prettification will consider 1/inverse_scaling digits to
-          be not significant. *)
   resolution : int;
-      (** Resolution of the grid using when prettifying constants.  *)
 }
 
 (* Handling bad floating point values.  *)
 type fp_error = Bad_fpclass of Float.fpclass | Negative_or_zero_fp
 
 (* Handling codegen errors. *)
-type fixed_point_transform_error =
-  | Imprecise_integer_cast of float * float
-  | Term_is_not_closed of Free_variable.t
+type fixed_point_transform_error = Term_is_not_closed of Free_variable.t
 
 exception Bad_floating_point_number of fp_error
 
@@ -60,7 +53,7 @@ exception Fixed_point_transform_error of fixed_point_transform_error
 
 let default_options =
   {
-    precision = 3;
+    precision = 4;
     max_relative_error = 0.1;
     cast_mode = Round;
     inverse_scaling = 3;
@@ -72,13 +65,6 @@ let default_options =
 
 let pp_fixed_point_transform_error fmtr (err : fixed_point_transform_error) =
   match err with
-  | Imprecise_integer_cast (f, p) ->
-      Format.fprintf
-        fmtr
-        "Fixed_point_transform: Imprecise integer cast of %f: %f %% relative \
-         error"
-        f
-        (p *. 100.)
   | Term_is_not_closed s ->
       Format.fprintf
         fmtr
@@ -170,7 +156,7 @@ let snap_to_grid ~inverse_scaling ~resolution x =
   else
     let not_significant = log10 x / inverse_scaling in
     let grid = resolution * pow 10 not_significant in
-    grid * (1 + (x / grid))
+    (x + grid - 1) / grid * grid
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
@@ -189,15 +175,20 @@ let assert_fp_is_correct (x : float) =
       raise (Bad_floating_point_number (Bad_fpclass fpcl))
   | FP_normal when x <= 0.0 ->
       raise (Bad_floating_point_number Negative_or_zero_fp)
-  | _ -> ()
+  | _ -> fpcl
 
-let cast_safely_to_int max_relative_error mode f : int =
+let cast_to_int max_relative_error mode f : int =
   let i = int_of_float mode f in
   let fi = float_of_int i in
   let re = abs_float (f -. fi) /. abs_float f in
   if re > max_relative_error then
-    raise (Fixed_point_transform_error (Imprecise_integer_cast (f, re)))
-  else i
+    Format.eprintf
+      "Warning: Fixed_point_transform: Imprecise integer cast of %f to %d: %f \
+       %% relative error@."
+      f
+      i
+      (re *. 100.) ;
+  i
 
 (* ------------------------------------------------------------------------- *)
 
@@ -210,12 +201,21 @@ module type Fixed_point_lang_sig = sig
 
   val shift_right : size repr -> int -> size repr
 
-  val shift_left : size repr -> int -> size repr
-
   val ( + ) : size repr -> size repr -> size repr
+
+  val ( * ) : size repr -> size repr -> size repr
+
+  val int : int -> size repr
 end
 
-module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
+module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) : sig
+  (** [approx_mult precision i f] generates fixed-precision multiplication
+      of [i * f] by positive constants. [precision] is a paramter to control
+      how many bit shifts are used.
+  *)
+  val approx_mult :
+    cast_mode -> int -> Lang.size Lang.repr -> float -> Lang.size Lang.repr
+end = struct
   (* IEEE754 redux
      -------------
      Format of a (full-precision, ie 64 bit) floating point number:
@@ -271,63 +271,83 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
   (* Decompose a float into sign/exponent/mantissa *)
   let decompose (x : float) = split (all_bits x)
 
+  let increment_bits exp bits =
+    let rec f = function
+      | [] -> (true, [])
+      | 0L :: rest ->
+          let up, rest = f rest in
+          (false, (if up then 1L else 0L) :: rest)
+      | 1L :: rest ->
+          let up, rest = f rest in
+          if up then (true, 0L :: rest) else (false, 1L :: rest)
+      | _ -> assert false
+    in
+    let up, bits = f bits in
+    if up then (exp + 1, 1L :: bits) else (exp, bits)
+
   (* Generate fixed-precision multiplication by positive constants. *)
-  let approx_mult (precision : int) (i : Lang.size Lang.repr) (x : float) :
+  let approx_mult mode (precision : int) (i : Lang.size Lang.repr) (x : float) :
       Lang.size Lang.repr =
     assert (precision > 0) ;
-    assert_fp_is_correct x ;
-    let _sign, exp, mant = decompose x in
-    let exp = Int64.to_int @@ exponent_bits_to_int exp in
-    let bits, _ = take precision mant in
-    (* the mantissa is always implicitly prefixed by one (except for
-       denormalized numbers, excluded here) *)
-    let bits = 1L :: bits in
-    (* convert mantissa to sum of powers of 2 computed with shifts *)
-    let _, result_opt =
-      List.fold_left
-        (fun (k, term_opt) bit ->
-          if bit = 1L then
-            let new_term =
-              if exp - k < 0 then Lang.shift_right i (k - exp)
-              else if exp - k > 0 then Lang.shift_left i (exp - k)
-              else i
-            in
-            match term_opt with
-            | None -> (k + 1, Some new_term)
-            | Some term -> (k + 1, Some Lang.(term + new_term))
-          else (k + 1, term_opt))
-        (0, None)
-        bits
-    in
-    WithExceptions.Option.get ~loc:__LOC__ result_opt
+    let fpcl = assert_fp_is_correct x in
+    match fpcl with
+    | FP_zero -> Lang.int 0
+    | _ ->
+        let _sign, exp, mant = decompose x in
+        let exp = Int64.to_int @@ exponent_bits_to_int exp in
+        (* The mantissa is always implicitly prefixed by one (except for
+           denormalized numbers, excluded here). *)
+        let bits = 1L :: mant in
+        (* Get the top [precision] bits *)
+        let bits, rest = take precision bits in
+        (* Rounding. [bits_rounded] has [precision+1] bits at most.
+           The number of ones in it is at most [precision] *)
+        let exp, bits_rounded =
+          match mode with
+          | Ceil ->
+              if List.for_all (fun x -> x = 0L) rest then (exp, bits)
+              else increment_bits exp bits
+          | Floor -> (exp, bits)
+          | Round -> (
+              match rest with
+              | 1L :: _ -> increment_bits exp bits
+              | [] | 0L :: _ -> (exp, bits)
+              | _ -> assert false)
+        in
+        (* convert bits for < 1.0 to sum of powers of 2 computed with shifts *)
+        let _, integer, fracs =
+          List.fold_left
+            (fun (k, integer, fracs) bit ->
+              let integer, fracs =
+                if bit = 1L then
+                  if exp - k < 0 then
+                    (integer, Lang.shift_right i (k - exp) :: fracs)
+                  else (integer + (1 lsl (exp - k)), fracs)
+                else (integer, fracs)
+              in
+              (k + 1, integer, fracs))
+            (0, 0, [])
+            bits_rounded
+        in
+        if integer = 0 then
+          match List.rev fracs with
+          | [] -> assert false
+          | f :: fracs -> List.fold_left (fun sum t -> Lang.(sum + t)) f fracs
+        else
+          List.fold_left
+            (fun t sum -> Lang.(sum + t))
+            (if integer = 1 then i else Lang.(i * int integer))
+            (List.rev fracs)
 end
 
-(* ------------------------------------------------------------------------- *)
-(* [Prettify_constants] map float and int constants to an integer grid. *)
+(* [Convert_mult] approximates [float] values to integers:
 
-module Prettify_constants (P : sig
-  val options : options
-end)
-(X : Costlang.S) :
-  Costlang.S with type 'a repr = 'a X.repr and type size = X.size = struct
-  let {max_relative_error; cast_mode; inverse_scaling; resolution; _} =
-    P.options
+   - The multiplications of the form [float * term] or [term * float]
+     to integer-only expressions.
+   - [float] constants to its nearest grid point
 
-  include X
-
-  let int i = X.int (snap_to_grid ~inverse_scaling ~resolution i)
-
-  let float f =
-    let int = cast_safely_to_int max_relative_error cast_mode f in
-    let pretty_int = snap_to_grid ~inverse_scaling ~resolution int in
-    X.int pretty_int
-end
-
-(* [Convert_mult] approximates multiplications of the form [float * term] or
-   [term * float] to integer-only expressions. It is assumed that the term
-   is _closed_, ie contains no free variables.
-
-   Note that this does _not_ convert fp constants to int. *)
+   It is assumed that the term is _closed_, i.e. contains no free variables.
+*)
 module Convert_mult (P : sig
   val options : options
 end)
@@ -338,30 +358,36 @@ end)
 end = struct
   type size = X.size
 
-  type 'a repr = Term : 'a X.repr -> 'a repr | Const : float -> X.size repr
+  type 'a repr = Term : 'a X.repr -> 'a repr | Float : float -> X.size repr
 
-  let prj (type a) (term : a repr) : a X.repr =
-    match term with Term t -> t | Const f -> X.float f
+  let {precision; max_relative_error; cast_mode; inverse_scaling; resolution} =
+    P.options
 
   module FPA = Fixed_point_arithmetic (X)
 
-  let {precision; max_relative_error; cast_mode; _} = P.options
+  (* Cast to int then snap to the nearest grid point *)
+  let cast_and_snap f =
+    X.int
+    @@ snap_to_grid ~inverse_scaling ~resolution
+    @@ cast_to_int max_relative_error cast_mode f
 
-  let cast_safely_to_int = cast_safely_to_int max_relative_error
+  (* Any float left is converted to the nearest grid point *)
+  let prj (type a) (term : a repr) : a X.repr =
+    match term with Term t -> t | Float f -> cast_and_snap f
 
-  (* Cast float to int verifying that the relative error is
-     not too high. *)
-  let cast_safe (type a) (x : a repr) : a repr =
+  (* By default, any float is converted to the nearest grid point *)
+  let lift_unop op x =
     match x with
-    | Term _ -> x
-    | Const f -> Term (X.int (cast_safely_to_int cast_mode f))
+    | Term x -> Term (op x)
+    | Float x -> Term (op @@ cast_and_snap x)
 
-  let lift_unop op x = match x with Term x -> Term (op x) | _ -> cast_safe x
-
-  let rec lift_binop op x y =
+  (* By default, any float is converted to the nearest grid point *)
+  let lift_binop op x y =
     match (x, y) with
     | Term x, Term y -> Term (op x y)
-    | _ -> lift_binop op (cast_safe x) (cast_safe y)
+    | Term x, Float y -> Term (op x (cast_and_snap y))
+    | Float x, Term y -> Term (op (cast_and_snap x) y)
+    | Float x, Float y -> Term (op (cast_and_snap x) (cast_and_snap y))
 
   let gensym : unit -> string =
     let x = ref 0 in
@@ -370,12 +396,13 @@ end = struct
       incr x ;
       "v" ^ string_of_int v
 
-  let false_ = Term X.true_
+  let false_ = Term X.false_
 
   let true_ = Term X.true_
 
-  let float f = Const f
+  let float f = Float f
 
+  (* Integers are kept as they are *)
   let int i = Term (X.int i)
 
   let ( + ) = lift_binop X.( + )
@@ -385,11 +412,12 @@ end = struct
   let ( * ) x y =
     match (x, y) with
     | Term x, Term y -> Term X.(x * y)
-    | Term x, Const y | Const y, Term x ->
-        (* let-bind the non-constant term to avoid copying it. *)
+    | Term x, Float y | Float y, Term x ->
+        (* let-bind the non-constant term [x] to avoid copying it. *)
         Term
-          (X.let_ ~name:(gensym ()) x (fun x -> FPA.approx_mult precision x y))
-    | Const x, Const y -> Const (x *. y)
+          (X.let_ ~name:(gensym ()) x (fun x ->
+               FPA.approx_mult Ceil precision x y))
+    | Float x, Float y -> Float (x *. y)
 
   let ( / ) = lift_binop X.( / )
 
@@ -414,24 +442,24 @@ end = struct
   let lam (type a b) ~name (f : a repr -> b repr) : (a -> b) repr =
     Term
       (X.lam ~name (fun x ->
-           match f (Term x) with Term y -> y | Const f -> X.float f))
+           match f (Term x) with Term y -> y | Float f -> X.float f))
 
   let app (type a b) (fn : (a -> b) repr) (arg : a repr) : b repr =
     match (fn, arg) with
     | Term fn, Term arg -> Term (X.app fn arg)
-    | Term fn, Const f -> Term (X.app fn (X.float f))
-    | Const _, _ -> assert false
+    | Term fn, Float f -> Term (X.app fn (X.float f))
+    | Float _, _ -> assert false
 
   let let_ (type a b) ~name (m : a repr) (fn : a repr -> b repr) : b repr =
     match m with
     | Term m ->
         Term
           (X.let_ ~name m (fun x ->
-               match fn (Term x) with Term y -> y | Const f -> X.float f))
-    | Const f ->
+               match fn (Term x) with Term y -> y | Float f -> X.float f))
+    | Float f ->
         Term
           (X.let_ ~name (X.float f) (fun x ->
-               match fn (Term x) with Term y -> y | Const f -> X.float f))
+               match fn (Term x) with Term y -> y | Float f -> X.float f))
 
   let if_ cond ift iff = Term (X.if_ (prj cond) (prj ift) (prj iff))
 end
@@ -439,4 +467,4 @@ end
 module Apply (P : sig
   val options : options
 end) : Costlang.Transform =
-functor (X : Costlang.S) -> Convert_mult (P) (Prettify_constants (P) (X))
+functor (X : Costlang.S) -> Convert_mult (P) (X)

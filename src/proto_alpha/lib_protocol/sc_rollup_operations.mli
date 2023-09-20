@@ -45,30 +45,14 @@ type origination_result = {
   genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
 }
 
-(** [originate context ~kind ~boot_sector ~origination_proof
-    ~parameters_ty] adds a new rollup running in a given [kind]
-    initialized with a [boot_sector] and to accept smart contract
-    calls of type [parameters_ty].
-
-    [origination_proof], which covers the specialization of the PVM
-    initial state with the [boot_sector], is used by the protocol to
-    compute the genesis commitment, after its correctness has been
-    checked.
-
-    {b Note:} The need to provide an [origination_proof] is motivated
-    by technical limitations of Irmin (as of June, 2022), that
-    requires a context to get an empty tree. As soon as this
-    limitation is lifted, then we can drop the [origination_proof]
-    argument.
-
-    Returns an error if [origination_proof] is invalid ({i e.g.}, it
-    does not target the expected PVM).
-*)
+(** [originate ?whitelist context ~kind ~boot_sector ~parameters_ty] adds a new rollup
+    running in a given [kind] initialized with a [boot_sector] and to accept
+    smart contract calls of type [parameters_ty]. *)
 val originate :
+  ?whitelist:Sc_rollup.Whitelist.t ->
   context ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
-  origination_proof:Sc_rollup.Proof.serialized ->
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
 
@@ -81,6 +65,10 @@ val execute_outbox_message :
   cemented_commitment:Sc_rollup.Commitment.Hash.t ->
   output_proof:string ->
   (execute_outbox_message_result * context) tzresult Lwt.t
+
+(** [validate_untyped_parameters_ty ctxt script] parses the type and check
+    that the entrypoints are well-formed. *)
+val validate_untyped_parameters_ty : context -> Script.expr -> context tzresult
 
 (** A module used for testing purposes only. *)
 module Internal_for_tests : sig

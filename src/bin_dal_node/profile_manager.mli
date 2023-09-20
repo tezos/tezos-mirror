@@ -25,22 +25,43 @@
 
 (** This module provides different handlers related to DAL profiles. *)
 
-(** Adds a profile to the dal [node_store]. If already present,
-    the store does not change. *)
-val add_profile :
-  Store.node_store -> Services.Types.profile -> unit tzresult Lwt.t
+(** A profile manager context stores profile-specific data used by the daemon.  *)
+type t
+
+(** The empty profile manager context. *)
+val empty : t
+
+(** The bootstrap profile. *)
+val bootstrap_profile : t
+
+(** [add_operator_profiles t proto_parameters gs_worker operator_profiles]
+    registers operator profiles (attestor or producer).
+    If the current profile is a bootstrap profile, it will return [None] as bootstrap
+    profiles are incompatible with operator profiles. *)
+val add_operator_profiles :
+  t ->
+  Dal_plugin.proto_parameters ->
+  Gossipsub.Worker.t ->
+  Services.Types.operator_profiles ->
+  t option
+
+(** [on_new_head t proto_parameters gs_worker committee] performs profile-related
+    actions that depend on the current head, more precisely on the current committee. *)
+val on_new_head :
+  t ->
+  Dal_plugin.proto_parameters ->
+  Gossipsub.Worker.t ->
+  Committee_cache.committee ->
+  unit
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
-val get_profiles :
-  Store.node_store ->
-  (Services.Types.profile list, Errors.decoding) result Lwt.t
+val get_profiles : t -> Services.Types.profiles
 
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :
-  Node_context.t ->
+  shard_indices:int list ->
   Store.node_store ->
   Dal_plugin.proto_parameters ->
-  Tezos_crypto.Signature.public_key_hash ->
   attested_level:int32 ->
   (Services.Types.attestable_slots, [Errors.decoding | Errors.other]) result
   Lwt.t

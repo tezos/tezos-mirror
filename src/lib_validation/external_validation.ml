@@ -24,11 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type log_config = {
-  lwt_log_sink_unix : Lwt_log_sink_unix.cfg;
-  internal_events : Tezos_base.Internal_event_config.t;
-}
-
 type parameters = {
   context_root : string;
   protocol_root : string;
@@ -38,7 +33,7 @@ type parameters = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-  log_config : log_config;
+  internal_events : Tezos_base.Internal_event_config.t;
 }
 
 type request =
@@ -50,7 +45,7 @@ type request =
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
       predecessor_resulting_context_hash : Context_hash.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
       max_operations_ttl : int;
       should_precheck : bool;
       simulate : bool;
@@ -68,7 +63,7 @@ type request =
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
       predecessor_resulting_context_hash : Context_hash.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
     }
   | Precheck of {
       chain_id : Chain_id.t;
@@ -76,7 +71,7 @@ type request =
       predecessor_block_hash : Block_hash.t;
       predecessor_resulting_context_hash : Context_hash.t;
       header : Block_header.t;
-      operations : Operation.t list list;
+      operations : Block_validation.operation list list;
       hash : Block_hash.t;
     }
   | Commit_genesis of {chain_id : Chain_id.t}
@@ -138,17 +133,6 @@ let request_pp ppf = function
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
-let log_config_encoding =
-  let open Data_encoding in
-  conv
-    (fun {internal_events; lwt_log_sink_unix} ->
-      (internal_events, lwt_log_sink_unix))
-    (fun (internal_events, lwt_log_sink_unix) ->
-      {internal_events; lwt_log_sink_unix})
-    (obj2
-       (req "internal_events" Tezos_base.Internal_event_config.encoding)
-       (req "lwt_log_sink_unix" Lwt_log_sink_unix.cfg_encoding))
-
 let parameters_encoding =
   let open Data_encoding in
   conv
@@ -161,7 +145,7 @@ let parameters_encoding =
            operation_metadata_size_limit;
            sandbox_parameters;
            dal_config;
-           log_config;
+           internal_events;
          } ->
       ( context_root,
         protocol_root,
@@ -171,7 +155,7 @@ let parameters_encoding =
         operation_metadata_size_limit,
         sandbox_parameters,
         dal_config,
-        log_config ))
+        internal_events ))
     (fun ( context_root,
            protocol_root,
            genesis,
@@ -180,7 +164,7 @@ let parameters_encoding =
            operation_metadata_size_limit,
            sandbox_parameters,
            dal_config,
-           log_config ) ->
+           internal_events ) ->
       {
         context_root;
         protocol_root;
@@ -190,7 +174,7 @@ let parameters_encoding =
         operation_metadata_size_limit;
         sandbox_parameters;
         dal_config;
-        log_config;
+        internal_events;
       })
     (obj9
        (req "context_root" string)
@@ -205,7 +189,7 @@ let parameters_encoding =
           Shell_limits.operation_metadata_size_limit_encoding)
        (opt "sandbox_parameters" json)
        (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
-       (req "log_config" log_config_encoding))
+       (req "internal_events" Tezos_base.Internal_event_config.encoding))
 
 let case_validate tag =
   let open Data_encoding in
@@ -220,7 +204,9 @@ let case_validate tag =
        (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
        (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "max_operations_ttl" int31)
-       (req "operations" (list (list (dynamic_size Operation.encoding))))
+       (req
+          "operations"
+          (list (list (dynamic_size Block_validation.operation_encoding))))
        (req "should_precheck" bool)
        (req "simulate" bool))
     (function
@@ -294,7 +280,9 @@ let case_preapply tag =
              Operation_metadata_list_list_hash.encoding))
        (obj2
           (req "predecessor_resulting_context_hash" Context_hash.encoding)
-          (req "operations" (list (list (dynamic_size Operation.encoding))))))
+          (req
+             "operations"
+             (list (list (dynamic_size Block_validation.operation_encoding))))))
     (function
       | Preapply
           {
@@ -363,7 +351,9 @@ let case_precheck tag =
        (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "header" (dynamic_size Block_header.encoding))
        (req "hash" Block_hash.encoding)
-       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+       (req
+          "operations"
+          (list (list (dynamic_size Block_validation.operation_encoding)))))
     (function
       | Precheck
           {

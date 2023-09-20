@@ -69,6 +69,17 @@ let make ~version ~reveal_builtins ~write_debug state =
           ~src
           ~num_bytes)
   in
+  let store_exists =
+    fn
+      (i32 @-> i32 @-> returning1 i32)
+      (fun key_offset key_length ->
+        with_mem @@ fun memory ->
+        Host_funcs.Aux.store_exists
+          ~durable:state.durable
+          ~memory
+          ~key_offset
+          ~key_length)
+  in
   let store_has =
     fn
       (i32 @-> i32 @-> returning1 i32)
@@ -240,8 +251,6 @@ let make ~version ~reveal_builtins ~write_debug state =
           ~key_offset
           ~key_length)
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4369
-     Align failure mode of reveal_* functions in Fast Execution. *)
   let reveal_preimage =
     fn
       (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
@@ -253,7 +262,7 @@ let make ~version ~reveal_builtins ~write_debug state =
         let* hash =
           Host_funcs.Aux.load_bytes ~memory ~addr:hash_addr ~size:hash_size
         in
-        let*! payload = reveal_builtins.Builtins.reveal_preimage hash in
+        let*! payload = reveal_builtins (Wasm_pvm_state.reveal_raw_data hash) in
         let*! result =
           Host_funcs.Aux.reveal
             ~memory
@@ -268,12 +277,36 @@ let make ~version ~reveal_builtins ~write_debug state =
       (i32 @-> i32 @-> returning1 i32)
       (fun dst max_bytes ->
         let mem = state.retrieve_mem () in
-        let* payload = reveal_builtins.reveal_metadata () in
+        let* payload = reveal_builtins Wasm_pvm_state.reveal_metadata in
         Host_funcs.Aux.reveal
           ~memory:mem
           ~dst
           ~max_bytes
           ~payload:(Bytes.of_string payload))
+  in
+  let reveal_raw =
+    fn
+      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun payload_addr payload_size destination_addr max_bytes ->
+        Lwt.map (Result.fold ~ok:Fun.id ~error:Fun.id)
+        @@ with_mem
+        @@ fun memory ->
+        let open Lwt_result_syntax in
+        let* reveal =
+          Host_funcs.Aux.load_bytes
+            ~memory
+            ~addr:payload_addr
+            ~size:payload_size
+        in
+        let*! payload = reveal_builtins (Reveal_raw reveal) in
+        let*! result =
+          Host_funcs.Aux.reveal
+            ~memory
+            ~dst:destination_addr
+            ~max_bytes
+            ~payload:(Bytes.of_string payload)
+        in
+        return result)
   in
 
   let base =
@@ -294,15 +327,21 @@ let make ~version ~reveal_builtins ~write_debug state =
       ("reveal_metadata", reveal_metadata);
     ]
   in
+  let v1 =
+    [
+      ("__internal_store_get_hash", store_get_hash);
+      ("store_delete_value", store_delete_value);
+      ("store_create", store_create);
+    ]
+  in
+  let v2 = v1 @ [("store_exists", store_exists)] in
+  let v3 = v2 @ [("reveal", reveal_raw)] in
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []
-    | V1 ->
-        [
-          ("__internal_store_get_hash", store_get_hash);
-          ("store_delete_value", store_delete_value);
-          ("store_create", store_create);
-        ]
+    | V1 -> v1
+    | V2 -> v2
+    | V3 -> v3
   in
   List.map
     (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))

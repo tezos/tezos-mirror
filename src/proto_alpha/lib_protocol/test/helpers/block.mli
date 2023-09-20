@@ -33,6 +33,7 @@ type t = {
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;  (** Resulting context *)
+  constants : Constants.Parametric.t;
 }
 
 type block = t
@@ -59,6 +60,8 @@ type baker_policy =
 *)
 type baking_mode = Application | Baking
 
+type error += No_slots_found_for of Signature.Public_key_hash.t
+
 (** Returns (account, round, timestamp) of the next baker given
     a policy, defaults to By_round 0. *)
 val get_next_baker :
@@ -72,7 +75,8 @@ module Forge : sig
   val contents :
     ?proof_of_work_threshold:Int64.t ->
     ?seed_nonce_hash:Nonce_hash.t ->
-    ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+    ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+    ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
     payload_hash:Block_payload_hash.t ->
     payload_round:Round.t ->
     Block_header.shell_header ->
@@ -90,7 +94,8 @@ module Forge : sig
     ?policy:baker_policy ->
     ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
-    ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+    ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+    ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
     t ->
     header tzresult Lwt.t
 
@@ -126,19 +131,18 @@ val genesis :
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?liquidity_baking_subsidy:Tez.t ->
-  ?endorsing_reward_per_slot:Tez.t ->
-  ?baking_reward_bonus_per_slot:Tez.t ->
-  ?baking_reward_fixed_portion:Tez.t ->
+  ?issuance_weights:Constants.Parametric.issuance_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
   ?sc_rollup_enable:bool ->
   ?sc_rollup_arith_pvm_enable:bool ->
+  ?sc_rollup_private_enable:bool ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
+  ?dal:Constants.Parametric.dal ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
@@ -210,7 +214,8 @@ val bake :
   ?timestamp:Timestamp.time ->
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
-  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   ?check_size:bool ->
   t ->
   t tzresult Lwt.t
@@ -219,7 +224,8 @@ val bake :
 val bake_n :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   block tzresult Lwt.t
@@ -228,7 +234,8 @@ val bake_n :
 val bake_until_level :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   Raw_level.t ->
   t ->
   block tzresult Lwt.t
@@ -238,7 +245,8 @@ val bake_until_level :
 val bake_n_with_all_balance_updates :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
@@ -261,12 +269,59 @@ val bake_n_with_origination_results :
 val bake_n_with_liquidity_baking_toggle_ema :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
-  (block * Alpha_context.Liquidity_baking.Toggle_EMA.t) tzresult Lwt.t
+  (block * Alpha_context.Per_block_votes.Liquidity_baking_toggle_EMA.t) tzresult
+  Lwt.t
 
-val current_cycle : t -> Cycle.t tzresult Lwt.t
+(** Variant of [bake_n] that returns the block metadata of the last
+    baked block. [n] must be positive, otherwise a single block is baked. **)
+val bake_n_with_metadata :
+  ?locked_round:Round.t option ->
+  ?policy:baker_policy ->
+  ?timestamp:Timestamp.time ->
+  ?payload_round:Round.t option ->
+  ?check_size:bool ->
+  ?baking_mode:baking_mode ->
+  ?allow_manager_failures:bool ->
+  ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
+  int ->
+  block ->
+  (block * block_header_metadata, Error_monad.tztrace) result Lwt.t
+
+(** Bake blocks while a predicate over the block holds. The returned
+    block is the last one for which the predicate holds; in case the
+    predicate never holds, the input block is returned. When the
+    optional [invariant] argument is provided, it is checked on the
+    input block and on each baked block, including the returned one
+    (the last one satisfy the predicate); it is however not checked
+    on the next block (the first one to invalidate the predicate). *)
+val bake_while :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
+  ?invariant:(block -> unit tzresult Lwt.t) ->
+  (block -> bool) ->
+  block ->
+  block tzresult Lwt.t
+
+(* Same as [bake_while] but the predicate also has access to the
+   metadata resulting from the application of the block. *)
+val bake_while_with_metadata :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
+  ?invariant:(block -> unit tzresult Lwt.t) ->
+  (block -> block_header_metadata -> bool) ->
+  block ->
+  block tzresult Lwt.t
+
+val current_cycle : block -> Cycle.t
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
     that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
@@ -285,19 +340,18 @@ val prepare_initial_context_params :
   ?min_proposal_quorum:int32 ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?liquidity_baking_subsidy:Tez.t ->
-  ?endorsing_reward_per_slot:Tez.t ->
-  ?baking_reward_bonus_per_slot:Tez.t ->
-  ?baking_reward_fixed_portion:Tez.t ->
+  ?issuance_weights:Constants.Parametric.issuance_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
   ?sc_rollup_enable:bool ->
   ?sc_rollup_arith_pvm_enable:bool ->
+  ?sc_rollup_private_enable:bool ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
+  ?dal:Constants.Parametric.dal ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )

@@ -68,7 +68,8 @@ let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
-    ~migration_level ~migrate_from ~migrate_to () =
+    ~migration_level ~migrate_from ~migrate_to ~baked_blocks_after_migration ()
+    =
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, node =
@@ -118,13 +119,17 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* Test that we can still bake after migration *)
-  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+  let* () =
+    repeat baked_blocks_after_migration (fun () ->
+        Client.bake_for_and_wait client)
+  in
   return (client, node)
 
 (** Test all levels for one cycle, after the first cycle. *)
 let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let preserved_cycles = JSON.(get "preserved_cycles" parameters |> as_int) in
   for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
     Test.register
       ~__FILE__
@@ -137,6 +142,7 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
         ~migration_level
         ~migrate_from
         ~migrate_to
+        ~baked_blocks_after_migration:(2 * preserved_cycles * blocks_per_cycle)
         ()
     in
     unit
@@ -174,6 +180,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
       ~migration_level
       ~migrate_from
       ~migrate_to
+      ~baked_blocks_after_migration:5
       ()
   in
   let rolling_available = 60 in
@@ -198,9 +205,19 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
     let level_before = Node.get_level node0 in
     let* () = Client.propose_for ~key:[baker.alias] client0 in
     let* () =
-      Client.preendorse_for ~key:all_bootstrap_keys ~force:true client0
+      Client.preattest_for
+        ~protocol:migrate_to
+        ~key:all_bootstrap_keys
+        ~force:true
+        client0
     in
-    let* () = Client.endorse_for ~key:all_bootstrap_keys ~force:true client0 in
+    let* () =
+      Client.attest_for
+        ~protocol:migrate_to
+        ~key:all_bootstrap_keys
+        ~force:true
+        client0
+    in
     let* level_after = Node.wait_for_level node0 (level_before + 1) in
     Log.debug "Manually baked to level %d" level_after ;
     unit
@@ -315,19 +332,23 @@ let list_count_p p l =
   in
   aux 0 l
 
-let is_endorsement op =
+let is_attestation ~protocol op =
   let kind = JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string) in
-  String.equal kind "endorsement"
+  String.equal
+    kind
+    (if Protocol.(number protocol >= 18) then "attestation" else "endorsement")
 
 (** Check that the given json list of operations contains
-    [expected_count] endorsements. *)
-let check_endorsements ~expected_count consensus_ops =
-  let actual_count = list_count_p is_endorsement (JSON.as_list consensus_ops) in
+    [expected_count] attestations. *)
+let check_attestations ~protocol ~expected_count consensus_ops =
+  let actual_count =
+    list_count_p (is_attestation ~protocol) (JSON.as_list consensus_ops)
+  in
   Check.((expected_count = actual_count) int)
-    ~error_msg:"Expected %L endorsements but got %R."
+    ~error_msg:"Expected %L attestations but got %R."
 
-(** Check that the block at [level] contains [expected_count] endorsements. *)
-let check_endorsements_in_block ~level ~expected_count client =
+(** Check that the block at [level] contains [expected_count] attestations. *)
+let check_attestations_in_block ~protocol ~level ~expected_count client =
   let* consensus_operations =
     RPC.Client.call client
     @@ RPC.get_chain_block_operations_validation_pass
@@ -335,7 +356,7 @@ let check_endorsements_in_block ~level ~expected_count client =
          ~validation_pass:0 (* consensus operations pass *)
          ()
   in
-  Lwt.return (check_endorsements ~expected_count consensus_operations)
+  Lwt.return (check_attestations ~protocol ~expected_count consensus_operations)
 
 (** [start_protocol ~expected_bake_for_blocks ~protocol client] sets up a
    protocol with some specific easily tunable parameters (consensus threshold,
@@ -364,7 +385,7 @@ let start_protocol ?consensus_threshold ?round_duration
   in
   let* parameter_file =
     (* Default value of consensus_threshold is 0, means we do not need
-       endorsements, let's set it up as in mainnet. *)
+       attestations, let's set it up as in mainnet. *)
     let consensus_committee_size =
       JSON.(get "consensus_committee_size" parameters |> as_int)
     in
@@ -394,11 +415,11 @@ let start_protocol ?consensus_threshold ?round_duration
 (** Test that migration occuring through baker daemons
 
    - does not halt the chain;
-   - and that the migration block is not endorsed by the newer
+   - and that the migration block is not attested by the newer
      protocol's baker.
 
    This has become an issue of sort after updating the consensus protocol to
-   Tenderbake.  For one, endorsements have become mandatory, and not only a sign
+   Tenderbake.  For one, attestations have become mandatory, and not only a sign
    of healthiness. Then, a special case for the migration block was built-in as
    a way to deal with first ever migration, in terms of consensus protocol, was
    from Emmy* to Tenderbake.
@@ -411,7 +432,7 @@ let test_migration_with_bakers ?(migration_level = 4)
     ~__FILE__
     ~title:
       (Printf.sprintf
-         "chain progress/endorsement of migration block from %s to %s with \
+         "chain progress/attestation of migration block from %s to %s with \
           baker daemons"
          (Protocol.tag migrate_from)
          (Protocol.tag migrate_to))
@@ -420,7 +441,7 @@ let test_migration_with_bakers ?(migration_level = 4)
         "protocol";
         "migration";
         "baker";
-        "endorsing";
+        "attesting";
         "metadata";
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
@@ -460,9 +481,10 @@ let test_migration_with_bakers ?(migration_level = 4)
   let* _ret = Node.wait_for_level node last_interesting_level in
 
   Log.info
-    "Checking migration block has not been endorsed -- this is a special case" ;
+    "Checking migration block has not been attested -- this is a special case" ;
   let* () =
-    check_endorsements_in_block
+    check_attestations_in_block
+      ~protocol:migrate_from
       ~level:(migration_level + 1)
       ~expected_count:0
       client
@@ -516,7 +538,7 @@ let test_forked_migration_manual ?(migration_level = 4)
         "protocol";
         "migration";
         "baker";
-        "endorsing";
+        "attesting";
         "fork";
         "manual";
         "from_" ^ Protocol.tag migrate_from;
@@ -562,14 +584,14 @@ let test_forked_migration_manual ?(migration_level = 4)
             ~force:true
         in
         let* () =
-          Client.preendorse_for
+          Client.preattest_for
             ~protocol:migrate_from
             ~key:all_bootstrap_keys
             client_2
             ~force:true
         in
         let* () =
-          Client.endorse_for
+          Client.attest_for
             ~key:all_bootstrap_keys
             client_2
             ~protocol:migrate_from
@@ -715,7 +737,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
         "protocol";
         "migration";
         "baker";
-        "endorsing";
+        "attesting";
         "fork";
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
@@ -813,7 +835,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   let pre_migration_level = migration_level - 1 in
   Log.info
     "Wait for a quorum event on a proposal at pre-migration level %d. At this \
-     point, we know that endorsements on this proposal have been propagated, \
+     point, we know that attestations on this proposal have been propagated, \
      so everyone will be able to progress to the next level even if the \
      network gets split."
     pre_migration_level ;
@@ -826,7 +848,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
 
   let post_migration_level = migration_level + 1 in
   Log.info
-    "Migration blocks are not endorsed, so each cluster should be able to \
+    "Migration blocks are not attested, so each cluster should be able to \
      propose blocks for the post-migration level %d. However, since none of \
      the clusters has enough voting power to reach the consensus_threshold, \
      they should not be able to propose blocks for higher levels.\n\
@@ -899,7 +921,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
       let expected_count =
         if level_from = post_migration_level then 0 else n_delegates
       in
-      check_endorsements ~expected_count consensus_ops ;
+      check_attestations ~protocol:migrate_from ~expected_count consensus_ops ;
       check_blocks ~level_from:(level_from + 1) ~level_to)
   in
   check_blocks ~level_from ~level_to

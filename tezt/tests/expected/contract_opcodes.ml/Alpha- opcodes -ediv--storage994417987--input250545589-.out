@@ -32,7 +32,7 @@ trace
     [ 8
       2
       (Pair -8 2) ]
-  - location: 32 (just consumed gas: 0.105)
+  - location: 32 (just consumed gas: 0.151)
     [ (Some (Pair 4 0))
       (Pair -8 2) ]
   - location: 33 (just consumed gas: 0.010)
@@ -52,7 +52,7 @@ trace
       2
       (Pair -8 2)
       (Some (Pair 4 0)) ]
-  - location: 37 (just consumed gas: 0.105)
+  - location: 37 (just consumed gas: 0.151)
     [ (Some (Pair 4 0))
       (Pair -8 2)
       (Some (Pair 4 0)) ]
@@ -87,7 +87,7 @@ trace
       (Pair -8 2)
       (Some (Pair 4 0))
       (Some (Pair 4 0)) ]
-  - location: 44 (just consumed gas: 0.105)
+  - location: 44 (just consumed gas: 0.151)
     [ (Some (Pair -4 0))
       (Pair -8 2)
       (Some (Pair 4 0))
@@ -103,7 +103,7 @@ trace
       (Some (Pair -4 0))
       (Some (Pair 4 0))
       (Some (Pair 4 0)) ]
-  - location: 47 (just consumed gas: 0.105)
+  - location: 47 (just consumed gas: 0.151)
     [ (Some (Pair -4 0))
       (Some (Pair -4 0))
       (Some (Pair 4 0))

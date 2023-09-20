@@ -8,10 +8,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-error-monad
+  octez-libs.base
+  octez-libs.error-monad
   data-encoding
-  tezos-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest
   octez-alcotezt)
  (js_of_ocaml)
@@ -24,7 +24,13 @@
   -open Tezos_error_monad
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_bounded test_time test_protocol test_p2p_addr test_sized))
+ (modules
+  test_bounded
+  test_time
+  test_protocol
+  test_p2p_addr
+  test_sized
+  test_skip_list))
 
 (executable
  (name main)
@@ -37,7 +43,7 @@
 
 (rule
  (alias runtest)
- (package tezos-base)
+ (package octez-libs)
  (deps points.ok points.ko)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
@@ -58,7 +64,7 @@
 
 (rule
  (alias runtest_js)
- (package tezos-base)
+ (package octez-libs)
  (deps points.ok points.ko)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run node %{dep:./main_js.bc.js})))

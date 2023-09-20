@@ -37,3 +37,6 @@ let make_progress_printer fmtr total message =
 let int_encoding : int Data_encoding.encoding =
   let open Data_encoding in
   conv (fun i -> Int64.of_int i) (fun l -> Int64.to_int l) int64
+
+let filename_of_local_model_name local_model_name =
+  String.(concat "__" @@ split_on_char '/' local_model_name)

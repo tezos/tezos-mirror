@@ -10,17 +10,15 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezt" { >= "3.1.0" }
-  "tezt-performance-regression"
+  "tezt" { >= "3.1.1" }
   "uri" { >= "3.1.0" }
+  "cohttp-lwt-unix" { >= "5.2.0" }
   "hex" { >= "1.3.0" }
-  "tezos-crypto-dal"
-  "tezos-base"
-  "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
+  "octez-libs"
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos test framework based on Tezt"
+synopsis: "Octez test framework based on Tezt"

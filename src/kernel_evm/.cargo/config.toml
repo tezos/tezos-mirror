@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[env]
+CI_COMMIT_SHA = "dev"

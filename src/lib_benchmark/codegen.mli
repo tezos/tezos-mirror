@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 type solution = {
-  inference_model_name : string;
   (* The data required to perform code generation is a map from variables to
      (floating point) coefficients. *)
   map : float Free_variable.Map.t;
@@ -33,11 +32,22 @@ type solution = {
   scores_list : ((string * Namespace.t) * Inference.scores) list;
 }
 
+(** [get_codegen_destinations model_info] will return 
+    all the generated code destinations in which given model is used 
+  *)
+val get_codegen_destinations : Registration.model_info -> string trace
+
+val solution_encoding : solution Data_encoding.t
+
 val pp_solution : Format.formatter -> solution -> unit
 
+(** Load a solution form a binary or JSON file *)
 val load_solution : string -> solution
 
+(** Save the given solution to binary and JSON files *)
 val save_solution : solution -> string -> unit
+
+val solution_to_csv : solution -> Csv.csv
 
 (** Load a text file of lines of function names *)
 val load_exclusions : string -> String.Set.t
@@ -60,7 +70,7 @@ val codegen_models :
   solution ->
   Costlang.transform ->
   exclusions:String.Set.t ->
-  code list
+  (string * code) list
 
 (** Make a comment *)
 val comment : string list -> code

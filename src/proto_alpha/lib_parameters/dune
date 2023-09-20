@@ -6,9 +6,9 @@
  (public_name tezos-protocol-alpha.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-environment
-  tezos-protocol-alpha)
+  octez-libs.base
+  octez-proto-libs.protocol-environment
+  tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -19,9 +19,9 @@
 (executable
  (name gen)
  (libraries
-  tezos-base
+  octez-libs.base
   tezos-protocol-alpha.parameters
-  tezos-protocol-alpha)
+  tezos-protocol-alpha.protocol)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -48,7 +48,14 @@
  (deps gen.exe)
  (action (run %{deps} --mainnet)))
 
+(rule
+ (targets mainnet-with-chain-id-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet-with-chain-id)))
+
 (install
  (package tezos-protocol-alpha)
  (section lib)
- (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
+ (files
+  sandbox-parameters.json test-parameters.json mainnet-parameters.json
+  mainnet-with-chain-id-parameters.json))

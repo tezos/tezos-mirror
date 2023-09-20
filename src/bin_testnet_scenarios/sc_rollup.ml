@@ -40,15 +40,13 @@ let originate_new_rollup ?(alias = "rollup")
   Log.info "Rollup %s originated" rollup ;
   return rollup
 
-let setup_l2_node ~(testnet : Testnet.t) ?runner ?name ?loser_mode ~operator
-    client node rollup =
+let setup_l2_node ?runner ?name ?loser_mode ~operator client node rollup =
   let rollup_node =
     Sc_rollup_node.create
       ?runner
       ?name
       ~base_dir:(Client.base_dir client)
       ~default_operator:operator
-      ~protocol:testnet.protocol
       Operator
       node
   in
@@ -86,11 +84,12 @@ let rec wait_for_end_of_game ~staker rollup_address client node =
     wait_for_end_of_game ~staker rollup_address client node)
   else unit
 
-let rejection_with_proof ~(testnet : Testnet.t) () =
+let rejection_with_proof ~(testnet : unit -> Testnet.t) () =
   (* We expect each player to have at least 11,000 xtz. This is enough
      to originate a rollup (1.68 xtz for one of the player), commit
      (10,000 xtz for both player), and play the game (each
      [Smart_rollup_refute] operation should be relatively cheap). *)
+  let testnet = testnet () in
   let min_balance = Tez.(of_mutez_int 11_000_000_000) in
   let* client, node = Helpers.setup_octez_node ~testnet () in
   let* honest_operator = Client.gen_and_show_keys client in
@@ -114,14 +113,12 @@ let rejection_with_proof ~(testnet : Testnet.t) () =
     Lwt.all
       [
         setup_l2_node
-          ~testnet
           ~name:"honest-node"
           ~operator:honest_operator.alias
           client
           node
           rollup_address;
         setup_l2_node
-          ~testnet
           ~name:"dishonest-node"
           ~loser_mode:Format.(sprintf "%d 0 0" fault_level)
           ~operator:dishonest_operator.alias

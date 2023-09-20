@@ -28,8 +28,8 @@ module Demo_block_services = Block_services.Make (Protocol) (Protocol)
 
 let bake (cctxt : Protocol_client_context.full) message : unit tzresult Lwt.t =
   Demo_block_services.Mempool.pending_operations cctxt ()
-  >>=? fun {applied; _} ->
-  let operations = List.map snd applied in
+  >>=? fun {validated; _} ->
+  let operations = List.map snd validated in
   let block_header_data = Header.create message in
   Demo_block_services.Helpers.Preapply.block
     cctxt

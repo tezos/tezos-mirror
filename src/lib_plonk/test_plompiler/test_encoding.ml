@@ -79,7 +79,7 @@ functor
       We'll start by defining encodings for points and lines.
     *)
 
-    open Encodings (L)
+    open Encodings
 
     (** [point] is type of the high-level OCaml representation *)
     type point = {x : int; y : int; z : int}
@@ -168,7 +168,7 @@ functor
       let p = point_encoding.decode p in
       (* We want the intermediate variable here, to test the
          behaviour of input_flag *)
-      let* z = constant_scalar S.zero in
+      let* z = Num.zero in
       assert_equal p.x z
 
     let test_assertion a b () =

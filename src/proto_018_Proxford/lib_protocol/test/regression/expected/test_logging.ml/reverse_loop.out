@@ -1,0 +1,261 @@
+
+trace
+  - CAR (interp) @ location: 9
+    [ (Pair { "abc" ; "def" ; "ghi" } {}) ]
+  - CAR (entry) @ location: 9
+    [ (Pair { "abc" ; "def" ; "ghi" } {}) ]
+    - log/NIL (exit) @ location: 9
+      [ { "abc" ; "def" ; "ghi" } ]
+  - NIL (entry) @ location: 10
+    [ { "abc" ; "def" ; "ghi" } ]
+    - log/SWAP (exit) @ location: 10
+      [ {}
+        { "abc" ; "def" ; "ghi" } ]
+  - SWAP (entry) @ location: 12
+    [ {}
+      { "abc" ; "def" ; "ghi" } ]
+    - log/PUSH (exit) @ location: 12
+      [ { "abc" ; "def" ; "ghi" }
+        {} ]
+  - PUSH (entry) @ location: 13
+    [ { "abc" ; "def" ; "ghi" }
+      {} ]
+    - log/LOOP (exit) @ location: 13
+      [ True
+        { "abc" ; "def" ; "ghi" }
+        {} ]
+  - LOOP (entry) @ location: 33
+    [ True
+      { "abc" ; "def" ; "ghi" }
+      {} ]
+    - control: KLoop_in
+    - log/IF_CONS (exit) @ location: 33
+      [ { "abc" ; "def" ; "ghi" }
+        {} ]
+  - IF_CONS (entry) @ location: 18
+    [ { "abc" ; "def" ; "ghi" }
+      {} ]
+    - log/SWAP (exit) @ location: 18
+      [ "abc"
+        { "def" ; "ghi" }
+        {} ]
+  - SWAP (entry) @ location: 20
+    [ "abc"
+      { "def" ; "ghi" }
+      {} ]
+    - log/DIP (exit) @ location: 20
+      [ { "def" ; "ghi" }
+        "abc"
+        {} ]
+  - DIP (entry) @ location: 21
+    [ { "def" ; "ghi" }
+      "abc"
+      {} ]
+    - log/CONS (exit) @ location: 21
+      [ "abc"
+        {} ]
+  - CONS (entry) @ location: 23
+    [ "abc"
+      {} ]
+    - log/[halt] (exit) @ location: 23
+      [ { "abc" } ]
+  - [halt] (entry) @ location: 23
+    [ { "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - log/PUSH (exit) @ location: 21
+      [ { "def" ; "ghi" }
+        { "abc" } ]
+  - PUSH (entry) @ location: 24
+    [ { "def" ; "ghi" }
+      { "abc" } ]
+    - log/[halt] (exit) @ location: 24
+      [ True
+        { "def" ; "ghi" }
+        { "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ True
+      { "def" ; "ghi" }
+      { "abc" } ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 18
+      [ True
+        { "def" ; "ghi" }
+        { "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ True
+      { "def" ; "ghi" }
+      { "abc" } ]
+    - control: KLoop_in
+    - log/IF_CONS (exit) @ location: 33
+      [ { "def" ; "ghi" }
+        { "abc" } ]
+  - IF_CONS (entry) @ location: 18
+    [ { "def" ; "ghi" }
+      { "abc" } ]
+    - log/SWAP (exit) @ location: 18
+      [ "def"
+        { "ghi" }
+        { "abc" } ]
+  - SWAP (entry) @ location: 20
+    [ "def"
+      { "ghi" }
+      { "abc" } ]
+    - log/DIP (exit) @ location: 20
+      [ { "ghi" }
+        "def"
+        { "abc" } ]
+  - DIP (entry) @ location: 21
+    [ { "ghi" }
+      "def"
+      { "abc" } ]
+    - log/CONS (exit) @ location: 21
+      [ "def"
+        { "abc" } ]
+  - CONS (entry) @ location: 23
+    [ "def"
+      { "abc" } ]
+    - log/[halt] (exit) @ location: 23
+      [ { "def" ; "abc" } ]
+  - [halt] (entry) @ location: 23
+    [ { "def" ; "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - log/PUSH (exit) @ location: 21
+      [ { "ghi" }
+        { "def" ; "abc" } ]
+  - PUSH (entry) @ location: 24
+    [ { "ghi" }
+      { "def" ; "abc" } ]
+    - log/[halt] (exit) @ location: 24
+      [ True
+        { "ghi" }
+        { "def" ; "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ True
+      { "ghi" }
+      { "def" ; "abc" } ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 18
+      [ True
+        { "ghi" }
+        { "def" ; "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ True
+      { "ghi" }
+      { "def" ; "abc" } ]
+    - control: KLoop_in
+    - log/IF_CONS (exit) @ location: 33
+      [ { "ghi" }
+        { "def" ; "abc" } ]
+  - IF_CONS (entry) @ location: 18
+    [ { "ghi" }
+      { "def" ; "abc" } ]
+    - log/SWAP (exit) @ location: 18
+      [ "ghi"
+        {}
+        { "def" ; "abc" } ]
+  - SWAP (entry) @ location: 20
+    [ "ghi"
+      {}
+      { "def" ; "abc" } ]
+    - log/DIP (exit) @ location: 20
+      [ {}
+        "ghi"
+        { "def" ; "abc" } ]
+  - DIP (entry) @ location: 21
+    [ {}
+      "ghi"
+      { "def" ; "abc" } ]
+    - log/CONS (exit) @ location: 21
+      [ "ghi"
+        { "def" ; "abc" } ]
+  - CONS (entry) @ location: 23
+    [ "ghi"
+      { "def" ; "abc" } ]
+    - log/[halt] (exit) @ location: 23
+      [ { "ghi" ; "def" ; "abc" } ]
+  - [halt] (entry) @ location: 23
+    [ { "ghi" ; "def" ; "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - log/PUSH (exit) @ location: 21
+      [ {}
+        { "ghi" ; "def" ; "abc" } ]
+  - PUSH (entry) @ location: 24
+    [ {}
+      { "ghi" ; "def" ; "abc" } ]
+    - log/[halt] (exit) @ location: 24
+      [ True
+        {}
+        { "ghi" ; "def" ; "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ True
+      {}
+      { "ghi" ; "def" ; "abc" } ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 18
+      [ True
+        {}
+        { "ghi" ; "def" ; "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ True
+      {}
+      { "ghi" ; "def" ; "abc" } ]
+    - control: KLoop_in
+    - log/IF_CONS (exit) @ location: 33
+      [ {}
+        { "ghi" ; "def" ; "abc" } ]
+  - IF_CONS (entry) @ location: 18
+    [ {}
+      { "ghi" ; "def" ; "abc" } ]
+    - log/NIL (exit) @ location: 18
+      [ { "ghi" ; "def" ; "abc" } ]
+  - NIL (entry) @ location: 28
+    [ { "ghi" ; "def" ; "abc" } ]
+    - log/PUSH (exit) @ location: 28
+      [ {}
+        { "ghi" ; "def" ; "abc" } ]
+  - PUSH (entry) @ location: 30
+    [ {}
+      { "ghi" ; "def" ; "abc" } ]
+    - log/[halt] (exit) @ location: 30
+      [ False
+        {}
+        { "ghi" ; "def" ; "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ False
+      {}
+      { "ghi" ; "def" ; "abc" } ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 18
+      [ False
+        {}
+        { "ghi" ; "def" ; "abc" } ]
+  - [halt] (entry) @ location: 33
+    [ False
+      {}
+      { "ghi" ; "def" ; "abc" } ]
+    - control: KLoop_in
+    - control: KCons
+    - log/DROP (exit) @ location: 33
+      [ {}
+        { "ghi" ; "def" ; "abc" } ]
+  - DROP (entry) @ location: 33
+    [ {}
+      { "ghi" ; "def" ; "abc" } ]
+    - log/NIL (exit) @ location: 33
+      [ { "ghi" ; "def" ; "abc" } ]
+  - NIL (entry) @ location: 34
+    [ { "ghi" ; "def" ; "abc" } ]
+    - log/PAIR (exit) @ location: 34
+      [ {}
+        { "ghi" ; "def" ; "abc" } ]
+  - PAIR (entry) @ location: 36
+    [ {}
+      { "ghi" ; "def" ; "abc" } ]
+    - log/[halt] (exit) @ location: 36
+      [ (Pair {} { "ghi" ; "def" ; "abc" }) ]
+  - [halt] (entry) @ location: 8
+    [ (Pair {} { "ghi" ; "def" ; "abc" }) ]
+    - control: KNil

@@ -66,8 +66,15 @@ module Node_id_seeded_hash_type = struct
     (Node_id.get_ip n1, Node_id.get_port n1)
     = (Node_id.get_ip n2, Node_id.get_port n2)
 
+  (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+  [@@@ocaml.warning "-32"]
+
   let hash (seed : int) (n : t) : int =
     Hashtbl.seeded_hash seed (Node_id.get_ip n, Node_id.get_port n)
+
+  let seeded_hash = hash
+
+  [@@@ocaml.warning "+32"]
 end
 
 module Node_id_hashtbl = Hashtbl.MakeSeeded (Node_id_seeded_hash_type)
@@ -115,11 +122,18 @@ module Process_id_seeed_hash_type = struct
 
     (p1_ip, p1_port, p1_id) = (p2_ip, p2_port, p2_id)
 
+  (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+  [@@@ocaml.warning "-32"]
+
   let hash (seed : int) (p : t) : int =
     let p_ip = Node_id.get_ip @@ Process_id.get_node p in
     let p_port = Node_id.get_port @@ Process_id.get_node p in
     let p_id = Process_id.get_id p in
     Hashtbl.seeded_hash seed (p_ip, p_port, p_id)
+
+  let seeded_hash = hash
+
+  [@@@ocaml.warning "+32"]
 end
 
 module Process_id_hashtbl = Hashtbl.MakeSeeded (Process_id_seeed_hash_type)

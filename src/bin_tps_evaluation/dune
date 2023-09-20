@@ -7,19 +7,19 @@
  (package tezos-tps-evaluation)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.base
   caqti
   caqti-dynload
   caqti-lwt
   data-encoding
   lwt
-  tezos-baking-alpha
-  tezos-client-alpha.commands
-  tezos-client-base-unix
-  tezos-protocol-alpha
+  octez-protocol-alpha-libs.baking
+  octez-protocol-alpha-libs.client.commands
+  octez-shell-libs.client-base-unix
+  tezos-protocol-alpha.protocol
   tezt
   tezt-tezos
-  tezt-performance-regression
+  tezt-tezos.tezt-performance-regression
   uri)
  (link_flags
   (:standard)
@@ -30,7 +30,7 @@
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos
-  -open Tezt_performance_regression))
+  -open Tezt_tezos_tezt_performance_regression))
 
 (rule
  (targets sql.ml)

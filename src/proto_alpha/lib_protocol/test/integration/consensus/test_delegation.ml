@@ -287,7 +287,13 @@ let undelegated_originated_bootstrap_contract () =
   Context.init1
     ~bootstrap_contracts:
       [
-        Parameters.{delegate = None; amount = Tez.zero; script = Op.dummy_script};
+        Parameters.
+          {
+            delegate = None;
+            amount = Tez.zero;
+            script = Op.dummy_script;
+            hash = None;
+          };
       ]
     ()
   >>=? fun (b, _contract) ->
@@ -322,7 +328,7 @@ let delegated_implicit_bootstrap_contract () =
   (* Test delegation amount *)
   Incremental.begin_construction b >>=? fun i ->
   let ctxt = Incremental.alpha_ctxt i in
-  Delegate.delegated_balance ctxt to_pkh >|= Environment.wrap_tzresult
+  Delegate.For_RPC.delegated_balance ctxt to_pkh >|= Environment.wrap_tzresult
   >>=? fun amount ->
   Assert.equal_tez ~loc:__LOC__ amount (Tez.of_mutez_exn 4_000_000_000_000L)
 

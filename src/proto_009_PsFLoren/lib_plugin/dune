@@ -3,11 +3,11 @@
 
 (library
  (name tezos_protocol_plugin_009_PsFLoren)
- (public_name tezos-protocol-plugin-009-PsFLoren)
+ (public_name octez-protocol-009-PsFLoren-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-009-PsFLoren)
+  octez-libs.base
+  tezos-protocol-009-PsFLoren.protocol)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -15,15 +15,17 @@
   -open Tezos_protocol_009_PsFLoren)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-009-PsFLoren-libs))
+
 (library
  (name tezos_protocol_plugin_009_PsFLoren_registerer)
- (public_name tezos-protocol-plugin-009-PsFLoren-registerer)
+ (public_name octez-protocol-009-PsFLoren-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-embedded-protocol-009-PsFLoren
-  tezos-protocol-plugin-009-PsFLoren
-  tezos-validation)
+  octez-libs.base
+  tezos-protocol-009-PsFLoren.embedded-protocol
+  octez-protocol-009-PsFLoren-libs.plugin
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

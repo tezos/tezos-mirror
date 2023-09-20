@@ -117,3 +117,5 @@ module Empty = struct
 
   let absurd : t -> 'a = function _ -> .
 end
+
+module Skip_list = Skip_list

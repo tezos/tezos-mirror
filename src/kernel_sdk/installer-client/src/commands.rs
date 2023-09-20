@@ -23,5 +23,11 @@ pub enum Commands {
 
         #[arg(short = 'P', long, value_name = "PREIMAGES_OUTPUT_DIR")]
         preimages_dir: OsString,
+
+        #[arg(short = 'S', long, value_name = "INSTALLER_SETUP_CONFIG")]
+        setup_file: Option<OsString>,
+
+        #[arg(short, long, value_name = "DISPLAY_ROOT_HASH")]
+        display_root_hash: bool,
     },
 }

@@ -3,16 +3,16 @@
 
 (library
  (name tezos_protocol_environment_structs)
- (public_name tezos-protocol-environment.structs)
+ (public_name octez-proto-libs.protocol-environment.structs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-stdlib
-  tezos-crypto
-  tezos-lwt-result-stdlib
-  tezos-scoru-wasm
+  octez-libs.stdlib
+  octez-libs.crypto
+  octez-libs.lwt-result-stdlib
+  octez-l2-libs.scoru-wasm
   data-encoding
   bls12-381
-  octez-plonk)
+  octez-libs.plonk)
  (flags
   (:standard)
   -open Plonk))

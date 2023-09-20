@@ -33,11 +33,6 @@
 
 module Digestif = Mec.Digestif
 
-let rec repeat n f () =
-  if n > 0 then (
-    f () ;
-    repeat (n - 1) f ())
-
 module Blake2b = Digestif.Make_BLAKE2B (struct
   let digest_size = 64
 end)
@@ -123,6 +118,8 @@ let () =
             "Feed twice and finalize gives the same result than feeding with \
              the concatenation and finalize"
             `Quick
-            (repeat 100 test_blake2b_feed_twice_and_concat_is_the_same);
+            (Mec.Curve.Utils.PBT.repeat
+               100
+               test_blake2b_feed_twice_and_concat_is_the_same);
         ] );
     ]

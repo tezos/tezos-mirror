@@ -24,4 +24,7 @@
 (*****************************************************************************)
 
 val build_rpc_directory :
-  Validator.t -> Chain_validator.t -> unit Tezos_rpc.Directory.t
+  commit_info:Node_version.commit_info ->
+  Validator.t ->
+  Chain_validator.t ->
+  unit Tezos_rpc.Directory.t

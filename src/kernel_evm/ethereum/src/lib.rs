@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub mod address;
 pub mod block;
 pub mod eth_gen;
-pub mod signatures;
+pub mod rlp_helpers;
 pub mod transaction;
+pub mod tx_common;
+pub mod tx_signature;
 pub mod wei;

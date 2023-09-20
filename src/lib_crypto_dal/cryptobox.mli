@@ -25,7 +25,7 @@
 
 open Cryptobox_intf
 
-(** {0 Cryptography for the Data Availability Layer}
+(** {1 Cryptography for the Data Availability Layer}
 
     The Data Availability Layer (DAL) reduces the storage strain on the
     blockchain by only storing on-chain constant-size cryptographic
@@ -35,12 +35,12 @@ open Cryptobox_intf
     A slot is encoded with some redundancy using a so-called MDS (Maximum
     Distance Separable) code. The resulting encoded slot is partitioned into
     {!type:shard}s, allowing retrieval of the slot with any subset of
-    [{!recfield:parameters.number_of_shards}/{!recfield:parameters.redundancy_factor}]
-    out of [{!recfield:parameters.number_of_shards}] shards. By doing so,
+    [{!field:parameters.number_of_shards}/{!field:parameters.redundancy_factor}]
+    out of [{!field:parameters.number_of_shards}] shards. By doing so,
     we can guarantee high data availability provided a certain fraction of
     the DAL nodes is storing and supplying the data. This fraction can be
     made as small as desired at the expense of a higher data redundancy
-    {!recfield:parameters.redundancy_factor}. MDS codes have no unnecessary
+    {!field:parameters.redundancy_factor}. MDS codes have no unnecessary
     redundancy.
 
     One can verify in constant time that the correct shard was retrieved
@@ -50,8 +50,8 @@ open Cryptobox_intf
     slot commitment.
 
     A {!type:slot} is partioned into
-    [{!recfield:parameters.slot_size}/{!recfield:parameters.page_size}] segments
-    called {!type:Verifier.page}s of size {!recfield:parameters.page_size}.
+    [{!field:parameters.slot_size}/{!field:parameters.page_size}] segments
+    called {!type:Verifier.page}s of size {!field:parameters.page_size}.
     One can also verify in constant time that the correct page
     was retrieved using a KZG proof {!type:page_proof} and the slot commitment.
 
@@ -63,7 +63,7 @@ open Cryptobox_intf
 
 (** Initial values for the parameters of the DAL cryptographic primitives.
     It used to build a value of type [t]. *)
-type parameters = {
+type parameters = Dal_config.parameters = {
   redundancy_factor : int;
   page_size : int;
   slot_size : int;
@@ -117,7 +117,6 @@ type error += Invalid_precomputation_hash of (string, string) error_container
 module Verifier :
   VERIFIER
     with type t = t
-     and type parameters = parameters
      and type commitment = commitment
      and type commitment_proof = commitment_proof
      and type page_proof = page_proof
@@ -126,7 +125,7 @@ module Verifier :
 include
   VERIFIER
     with type t := t
-     and type parameters := parameters
+     and type parameters := Dal_config.parameters
      and type commitment := commitment
      and type commitment_proof := commitment_proof
      and type page_proof := page_proof
@@ -270,11 +269,15 @@ val polynomial_from_shards :
     - For any [p], let [shards = shards_from_polynomial p],
     for any subset S of shards of [polynomial_length / shard_length] elements,
     [polynomial_from_shards S = p].
-    Here, [polynomial_length] and [shard_length] are parameters declared in [t]. *)
+    Here, [polynomial_length] and [shard_length] are parameters declared in [t].
+    The shards in the returned sequence have increasing indexes. *)
 val shards_from_polynomial : t -> polynomial -> shard Seq.t
 
 (** A proof that a shard belongs to some commitment. *)
 type shard_proof
+
+(** An encoding of a shard proof. *)
+val shard_proof_encoding : shard_proof Data_encoding.t
 
 (** [verify_shard t commitment shard proof] returns [Ok ()]
     if [shard] is an element of [shards_from_polynomial p] where
@@ -291,6 +294,8 @@ type shard_proof
     - [Error `Invalid_shard] if the verification fails
     - [Error `Invalid_degree_strictly_less_than_expected _] if the
     SRS contained in [t] is too small to proceed with the verification
+    - [Error `Shard_length_mismatch] if the shard is not of the expected
+    length [shard_length] given for the initialisation of [t]
     - [Error (`Shard_index_out_of_range msg)] if the shard index
     is not within the range [0, number_of_shards - 1]
     (where [number_of_shards] is found in [t]).
@@ -310,6 +315,7 @@ val verify_shard :
   ( unit,
     [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
     | `Invalid_shard
+    | `Shard_length_mismatch
     | `Shard_index_out_of_range of string ] )
   Result.t
 
@@ -392,7 +398,7 @@ val load_precompute_shards_proofs :
 val hash_precomputation : shards_proofs_precomputation -> Tezos_crypto.Blake2B.t
 
 (** [prove_shards t ~precomputation ~polynomial] produces
-   [number_of_shards] proofs (π_0, ..., π_{number_of_shards - 1}) for the elements
+   [number_of_shards] proofs [(π_0, ..., π_{number_of_shards - 1})] for the elements
    of [polynomial_from_shards polynomial] (where [number_of_shards]
    is declared in [t]) using the [precomputation].
 
@@ -481,7 +487,10 @@ module Internal_for_tests : sig
      Return [(size, power_of_two, remainder)] such that:
      * If [domain_size > 1], then [size] is the smallest integer greater or
      equal to [domain_size] and is of the form 2^a * 3^b * 11^c * 19^d,
-     where a ∈ ⟦0, 32⟧, b ∈ {0, 1}, c ∈ {0, 1}, d ∈ {0, 1}.
+     where:
+     {v
+     a ∈ ⟦0, 32⟧, b ∈ {0, 1}, c ∈ {0, 1}, d ∈ {0, 1}
+     v}
      * If [domain_size = 1], then [size = 2].
      * [size = power_of_two * remainder], [power_of_two] is a power of two,
      and [remainder] is not divisible by 2. *)
@@ -508,23 +517,14 @@ end
 
 (** node parameters for the DAL. *)
 module Config : sig
-  type t = {
+  type t = Dal_config.t = {
     activated : bool;
-        (** [true] if the DAL is activated. This may have
-        an impact on the loading time of the node. *)
     use_mock_srs_for_testing : parameters option;
-        (** If [None], the srs is read from the srs files.
-        This is the value expected for production. For testing
-        purposes, we may want to compute the srs instead but this is
-        not secure. In this case, the size of a slot, page, the
-        erasure code redundancy factor and number of shards must be
-        specified. *)
+    bootstrap_peers : string list;
   }
 
   val encoding : t Data_encoding.t
 
-  (** The default configuration is
-      [{activated = false; use_mock_srs_for_testing = None}]. *)
   val default : t
 
   (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the

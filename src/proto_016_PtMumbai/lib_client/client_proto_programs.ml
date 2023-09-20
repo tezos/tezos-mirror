@@ -300,8 +300,8 @@ let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~script:program.expanded
     ~storage:storage.expanded
 
-let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
-    (cctxt : #Client_context.printer) =
+let print_typecheck_result ~emacs ~show_types ~print_source_on_error
+    ~display_names ~name program res (cctxt : #Client_context.printer) =
   if emacs then
     let type_map, errs, _gas =
       match res with
@@ -324,7 +324,11 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
     match res with
     | Ok (type_map, gas) ->
         let program = Michelson_v1_printer.inject_types type_map program in
-        cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]" Gas.pp gas
+        cctxt#message
+          "@[Well typed (Gas remaining: %a)\t%t@]"
+          Gas.pp
+          gas
+          (fun fmt -> if display_names then Format.pp_print_string fmt name)
         >>= fun () ->
         if show_types then
           cctxt#message "%a" Micheline_printer.print_expr program >>= fun () ->
@@ -338,7 +342,7 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
              ~show_source:print_source_on_error
              ~parsed:program)
           errs
-        >>= fun () -> cctxt#error "ill-typed script"
+        >>= fun () -> cctxt#error "script %S is ill-typed" name
 
 let entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (program : Michelson_v1_parser.parsed) ~entrypoint =

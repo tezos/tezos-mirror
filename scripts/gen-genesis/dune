@@ -2,6 +2,6 @@
  (name gen_genesis)
  (libraries
    lwt.unix
-   tezos-base
-   tezos-base.unix
-   tezos-crypto))
+   octez-libs.base
+   octez-libs.base.unix
+   octez-libs.crypto))

@@ -1,0 +1,4 @@
+instructions:
+- set:
+    value: 556e20666573746976616c2064652047414454
+    to: /tmp/foo

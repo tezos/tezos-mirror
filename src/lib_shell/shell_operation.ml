@@ -30,6 +30,7 @@ type 'protocol_operation operation = {
   raw : Operation.t;
   protocol : 'protocol_operation;
   signature_checked : bool;
+  size : int;
 }
 
 let record_successful_signature_check op = {op with signature_checked = true}
@@ -54,7 +55,9 @@ module MakeParser (Proto : Tezos_protocol_environment.PROTOCOL) :
   type protocol_operation = Proto.operation
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
-    safe_binary_of_bytes Proto.operation_data_encoding proto
+    safe_binary_of_bytes
+      Proto.operation_data_encoding_with_legacy_attestation_name
+      proto
 
   let parse hash (raw : Operation.t) =
     let open Result_syntax in
@@ -70,16 +73,14 @@ module MakeParser (Proto : Tezos_protocol_environment.PROTOCOL) :
         raw;
         protocol = {Proto.shell = raw.Operation.shell; protocol_data};
         signature_checked = false;
+        size;
       }
 end
 
 module Internal_for_tests = struct
-  let to_raw {raw; _} = raw
-
-  let hash_of {hash; _} = hash
-
-  let make_operation op oph data =
-    {hash = oph; raw = op; protocol = data; signature_checked = false}
+  let make_operation ?(signature_checked = false) ?(size = 0) hash raw protocol
+      =
+    {hash; raw; protocol; signature_checked; size}
 
   let safe_binary_of_bytes = safe_binary_of_bytes
 end

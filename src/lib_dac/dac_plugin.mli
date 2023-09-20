@@ -46,27 +46,32 @@ val raw_compare : hash -> hash -> int
     the RPC APIs. *)
 type raw_hash
 
+(** [raw_hash_to_hex raw_hash] returns the Hex representation of 
+    the provided [raw_hash]. *)
+val raw_hash_to_hex : raw_hash -> Hex.t
+
 (** Protocol independent encoding of Dac_plugin.hash values.
     Only use in situations where the plugin is not available,
     and for reporting purposes (e.g. when emitting an event or registering
     an error). *)
 val raw_hash_encoding : raw_hash Data_encoding.t
 
-(** This conversion is safe. *)
+(** [raw_hash_to_bytes] converts a [raw_hash] value to a [bytes] one. This
+    conversion is safe. *)
 val raw_hash_to_bytes : raw_hash -> bytes
 
-(** Thanks to [hash] and [raw_hash] internal representation,
-    this conversion is safe. *)
+(** [hash_to_raw] converts a [hash] value to a [raw_hash] one. This conversion
+    is safe. *)
 val hash_to_raw : hash -> raw_hash
 
-(** [raw_hash_to_hex] encodes a [raw_hash] into hex. *)
-val raw_hash_to_hex : raw_hash -> string
-
-(** [raw_hash_of_hex] decodes a hex string representation into [raw_hash]. *)
-val raw_hash_of_hex : string -> raw_hash option
+(** This conversion is safe. *)
+val raw_hash_of_bytes : bytes -> raw_hash
 
 (** [raw_hash] argument definition for RPC. *)
 val raw_hash_rpc_arg : raw_hash Tezos_rpc.Arg.arg
+
+(** [pp_raw_hash] is a pretty printer for [raw_hash] values. *)
+val pp_raw_hash : Format.formatter -> raw_hash -> unit
 
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/4856
     Fix static supported_hashes type. *)

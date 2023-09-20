@@ -23,6 +23,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Benchmarks_shell
 
 let ns = Namespace.make Shell_namespace.ns "misc"
 
@@ -30,12 +31,12 @@ let fv s = Free_variable.of_namespace (ns s)
 
 let lwt_variable = fv "lwt_main_run"
 
-let lwt_model =
+let lwt_model ~name =
   Model.make
     ~conv:(fun () -> ())
-    ~model:(Model.unknown_const1 ~name:(ns "lwt_model") ~const:lwt_variable)
+    ~model:(Model.unknown_const1 ~name ~const:lwt_variable)
 
-module Lwt_main_run_bench : Benchmark.S = struct
+module Lwt_main_run_bench : Benchmark.Simple = struct
   type config = unit
 
   let default_config = ()
@@ -48,11 +49,18 @@ module Lwt_main_run_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose =
+    Benchmark.Other_purpose
+      "Measuring the time spent to trigger a Lwt process. Indeed, several \
+       benchmarks rely on Lwt to run the benchmarked function. The cost of \
+       calling Lwt_main.run needs to be deducted from the total benchmark time \
+       of the function."
 
   let tags = ["misc"]
 
-  let models = [("*", lwt_model)]
+  let group = Benchmark.Generic
+
+  let model = lwt_model ~name
 
   let workload_to_vector () = Sparse_vec.String.of_list [("lwt_main", 1.)]
 
@@ -60,14 +68,10 @@ module Lwt_main_run_bench : Benchmark.S = struct
 
   let workload_encoding = Data_encoding.unit
 
-  let bench () =
+  let create_benchmark ~rng_state:_ () =
     let closure () = Lwt_main.run Lwt.return_unit in
     let workload = () in
     Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num () =
-    ignore rng_state ;
-    List.repeat bench_num bench
 end
 
-let () = Registration.register (module Lwt_main_run_bench)
+let () = Registration.register_simple (module Lwt_main_run_bench)

@@ -86,7 +86,7 @@ in more detail.
    "-- -- Michelson interpreter",":ref:`AT <alcotezt_section>`","","",":ref:`TZ <tezt_section>`",":ref:`TZ <tezt_section>`"
    "Client",":ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`","",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
    "Networked nodes","--","",":ref:`TZ <tezt_section>`","", ""
-   "Endorser","","","",""
+   "Attester","","","",""
    "Baker","","","",""
 
 
@@ -162,14 +162,14 @@ Typical use cases:
 
 Example tests:
  - Testing baking (in :src:`tezt/tests/basic.ml`)
- - Testing double baking and double endorsement scenarios (in
+ - Testing double baking and double attestation scenarios (in
    :src:`tezt/tests/double_bake.ml`).
  - Testing absence of regressions in encodings (in :src:`tezt/tests/encoding.ml`)
 
 References:
  - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
  - `General API documentation <https://nomadic-labs.gitlab.io/tezt/dev/tezt/Tezt/index.html>`__
- - :package-api:`Octez-specific API documentation <tezt-tezos/index.html>`
+ - :package-api:`Octez-specific API documentation <tezt-tezos/Tezt_tezos/index.html>`
 
 .. _long_tezt_section:
 
@@ -198,8 +198,8 @@ Typical use cases:
  - Conversion of pre-existing Alcotests to Tezt
 
 Example tests:
- - Unit tests for :package:`tezos-clic`. To execute them locally, run ``dune build @src/lib_clic/runtest``.
- - Unit tests for :package:`tezos-version`. To execute them locally, run ``dune build @src/lib_version/runtest``.
+ - Unit tests for :package-api:`tezos-clic <octez-libs/Tezos_clic/index.html>`. To execute them locally, run ``dune build @src/lib_clic/runtest``.
+ - Unit tests for :package:`octez-version`. To execute them locally, run ``dune build @src/lib_version/runtest``.
 
 See :doc:`alcotezt` for more information on how to convert tests to
 Alcotezt, and how to execute them.

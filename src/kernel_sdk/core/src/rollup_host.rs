@@ -82,6 +82,10 @@ unsafe impl SmartRollupCore for RollupHost {
         core::store_delete(path, len)
     }
 
+    unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32 {
+        core::store_delete_value(path, len)
+    }
+
     unsafe fn store_list_size(&self, path: *const u8, path_len: usize) -> i64 {
         core::store_list_size(path, path_len)
     }
@@ -114,6 +118,17 @@ unsafe impl SmartRollupCore for RollupHost {
         max_bytes: usize,
     ) -> i32 {
         core::reveal_preimage(hash_addr, hash_len, destination_addr, max_bytes)
+    }
+
+    #[cfg(feature = "proto-alpha")]
+    unsafe fn reveal(
+        &self,
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32 {
+        core::reveal(payload_addr, payload_len, destination_addr, max_bytes)
     }
 
     unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32 {

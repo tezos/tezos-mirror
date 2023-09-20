@@ -135,7 +135,7 @@ module Cache_update_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   (** It is expected that cache keys are non-adversarial,
       ie do not share a long common prefix. This is the case for [Script_cache],
@@ -151,6 +151,8 @@ module Cache_update_benchmark : Benchmark.S = struct
         let name = name
 
         type arg_type = int * unit
+
+        let takes_saturation_reprs = false
 
         module Def (X : Costlang.S) = struct
           open X

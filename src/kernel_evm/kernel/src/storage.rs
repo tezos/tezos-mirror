@@ -1,52 +1,108 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
+use crate::indexable_storage::IndexableStorage;
+use anyhow::Context;
+use evm_execution::account_storage::EthereumAccount;
+use libsecp256k1::PublicKey;
+use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
-use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
+use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
 
-use std::str::from_utf8;
-
+use crate::block_in_progress::BlockInProgress;
 use crate::error::{Error, StorageError};
+use crate::parsing::UPGRADE_NONCE_SIZE;
+use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::block::L2Block;
-use tezos_ethereum::eth_gen::Hash;
 use tezos_ethereum::transaction::{
-    TransactionHash, TransactionReceipt, TransactionStatus, TRANSACTION_HASH_SIZE,
+    TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
+    TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
+pub const STORAGE_VERSION: u64 = 0;
+pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
+
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
 
-const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/evm/blocks/current");
-const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/blocks");
-const EVM_BLOCKS_NUMBER: RefPath = RefPath::assert_from(b"/number");
-const EVM_BLOCKS_HASH: RefPath = RefPath::assert_from(b"/hash");
-const EVM_BLOCKS_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
+const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
-const TRANSACTIONS_RECEIPTS: RefPath = RefPath::assert_from(b"/transactions_receipts");
-const TRANSACTION_RECEIPT_HASH: RefPath = RefPath::assert_from(b"/hash");
-const TRANSACTION_RECEIPT_INDEX: RefPath = RefPath::assert_from(b"/index");
-const TRANSACTION_RECEIPT_BLOCK_HASH: RefPath = RefPath::assert_from(b"/block_hash");
-const TRANSACTION_RECEIPT_BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/block_number");
-const TRANSACTION_RECEIPT_FROM: RefPath = RefPath::assert_from(b"/from");
-const TRANSACTION_RECEIPT_TO: RefPath = RefPath::assert_from(b"/to");
-const TRANSACTION_CUMULATIVE_GAS_USED: RefPath =
-    RefPath::assert_from(b"/cumulative_gas_used");
-const TRANSACTION_RECEIPT_TYPE: RefPath = RefPath::assert_from(b"/type");
-const TRANSACTION_RECEIPT_STATUS: RefPath = RefPath::assert_from(b"/status");
+const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
+// Size of the ticketer contract, it is encoded in base58.
+const TICKETER_SIZE: usize = 36;
 
+const DICTATOR_KEY: RefPath = RefPath::assert_from(b"/dictator_key");
+// Size of the dictator public key in full length.
+const DICTATOR_KEY_SIZE: usize = 65;
+
+// Path to the block in progress, used between reboots
+const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
+
+// flag denoting reboot
+const REBOOTED: RefPath = RefPath::assert_from(b"/reboot");
+
+const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
+const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
+const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
+const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
+const BLOCK_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
+const BLOCK_TIMESTAMP: RefPath = RefPath::assert_from(b"/timestamp");
+
+const EVM_TRANSACTIONS_RECEIPTS: RefPath =
+    RefPath::assert_from(b"/transactions_receipts");
+
+const EVM_TRANSACTIONS_OBJECTS: RefPath = RefPath::assert_from(b"/transactions_objects");
+
+const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
+
+/// Path to the last info per level timestamp seen.
+const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
+    RefPath::assert_from(b"/info_per_level/timestamp");
+/// Path to the number of timestamps read, use to compute the average block time.
+const EVM_INFO_PER_LEVEL_STATS_NUMBERS: RefPath =
+    RefPath::assert_from(b"/info_per_level/stats/numbers");
+/// Path to the sum of distance between blocks, used to compute the average block time.
+const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
+    RefPath::assert_from(b"/info_per_level/stats/total");
+
+pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
+pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
+pub const SIMULATION_GAS: RefPath = RefPath::assert_from(b"/simulation_gas");
+
+pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
+pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
+
+/// Path where all indexes are stored.
+const EVM_INDEXES: RefPath = RefPath::assert_from(b"/indexes");
+
+/// Path where Ethereum accounts are stored.
+const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
+
+/// Subpath where blocks are indexed.
+const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
+
+/// Subpath where transactions are indexed
+const TRANSACTIONS_INDEX: RefPath = BLOCK_TRANSACTIONS;
+
+/// The size of an address. Size in bytes.
+const ADDRESS_SIZE: usize = 20;
+/// The size of a 256 bit hash. Size in bytes.
 const HASH_MAX_SIZE: usize = 32;
+/// The size of status. Size in bytes.
 const TRANSACTION_RECEIPT_STATUS_SIZE: usize = 1;
-
-// We can read/store at most [128] transaction hashes per block.
-// TRANSACTION_HASH_SIZE * 128 = 4096.
-const MAX_TRANSACTION_HASHES: usize = TRANSACTION_HASH_SIZE * 128;
+/// The size of type of the transaction. Size in bytes.
+const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
+/// The size of one 256 bit word. Size in bytes
+pub const WORD_SIZE: usize = 32usize;
 
 // This function should be used when it makes sense that the value
 // stored under [path] can be empty.
@@ -99,13 +155,16 @@ pub fn store_smart_rollup_address<Host: Runtime>(
         .map_err(Error::from)
 }
 
-/// The size of one 256 bit word. Size in bytes
-pub const WORD_SIZE: usize = 32usize;
-
 /// Read a single unsigned 256 bit value from storage at the path given.
 fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
     let bytes = host.store_read(path, 0, WORD_SIZE)?;
     Ok(Wei::from_little_endian(&bytes))
+}
+
+/// Read a single address value from storage at the path given.
+fn read_address(host: &impl Runtime, path: &OwnedPath) -> Result<H160, Error> {
+    let bytes = host.store_read(path, 0, ADDRESS_SIZE)?;
+    Ok(H160::from_slice(&bytes))
 }
 
 fn write_u256(
@@ -118,28 +177,29 @@ fn write_u256(
     host.store_write(path, &bytes, 0).map_err(Error::from)
 }
 
-fn address_path(address: Hash) -> Result<OwnedPath, Error> {
-    let address: &str =
-        from_utf8(address).map_err(crate::error::TransferError::InvalidAddressFormat)?;
-    let address_path: Vec<u8> = format!("/{}", &address.to_ascii_lowercase()).into();
-    OwnedPath::try_from(address_path).map_err(Error::from)
-}
-
 pub fn block_path(number: U256) -> Result<OwnedPath, Error> {
     let number: &str = &number.to_string();
     let raw_number_path: Vec<u8> = format!("/{}", &number).into();
     let number_path = OwnedPath::try_from(raw_number_path)?;
     concat(&EVM_BLOCKS, &number_path).map_err(Error::from)
 }
+
 pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(receipt_hash);
     let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
     let receipt_path = OwnedPath::try_from(raw_receipt_path)?;
-    concat(&TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
+    concat(&EVM_TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
+}
+
+pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
+    let hash = hex::encode(object_hash);
+    let raw_object_path: Vec<u8> = format!("/{}", &hash).into();
+    let object_path = OwnedPath::try_from(raw_object_path)?;
+    concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
 }
 
 pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    let path = concat(&EVM_CURRENT_BLOCK, &EVM_BLOCKS_NUMBER)?;
+    let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_NUMBER)?;
     let mut buffer = [0_u8; 8];
     store_read_slice(host, &path, &mut buffer, 8)?;
     Ok(U256::from_little_endian(&buffer))
@@ -149,10 +209,9 @@ fn read_nth_block_transactions<Host: Runtime>(
     host: &mut Host,
     block_path: &OwnedPath,
 ) -> Result<Vec<TransactionHash>, Error> {
-    let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
+    let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
 
-    let transactions_bytes =
-        store_read_empty_safe(host, &path, 0, MAX_TRANSACTION_HASHES)?;
+    let transactions_bytes = host.store_read_all(&path)?;
 
     Ok(transactions_bytes
         .chunks(TRANSACTION_HASH_SIZE)
@@ -162,31 +221,20 @@ fn read_nth_block_transactions<Host: Runtime>(
         .collect::<Vec<TransactionHash>>())
 }
 
-fn read_current_block_nodebug<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
-    let number = read_current_block_number(host)?;
-    let block_path = block_path(number)?;
-    let transactions = read_nth_block_transactions(host, &block_path)?;
-
-    Ok(L2Block::new(number, transactions))
+fn read_nth_block_timestamp<Host: Runtime>(
+    host: &mut Host,
+    block_path: &OwnedPath,
+) -> Result<Timestamp, Error> {
+    let path = concat(block_path, &BLOCK_TIMESTAMP)?;
+    read_timestamp_path(host, &path)
 }
 
 pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
-    match read_current_block_nodebug(host) {
-        Ok(block) => {
-            debug_msg!(
-                host,
-                "Reading block {} at number {} containing {} transaction(s).\n",
-                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
-                block.number,
-                block.transactions.len()
-            );
-            Ok(block)
-        }
-        Err(e) => {
-            debug_msg!(host, "Block reading failed: {:?}\n", e);
-            Err(e)
-        }
-    }
+    let number = read_current_block_number(host)?;
+    let block_path = block_path(number)?;
+    let transactions = read_nth_block_transactions(host, &block_path)?;
+    let timestamp = read_nth_block_timestamp(host, &block_path)?;
+    Ok(L2Block::new(number, transactions, timestamp))
 }
 
 fn store_block_number<Host: Runtime>(
@@ -194,7 +242,7 @@ fn store_block_number<Host: Runtime>(
     block_path: &OwnedPath,
     block_number: U256,
 ) -> Result<(), Error> {
-    let path = concat(block_path, &EVM_BLOCKS_NUMBER)?;
+    let path = concat(block_path, &BLOCK_NUMBER)?;
     let mut le_block_number: [u8; 32] = [0; 32];
     block_number.to_little_endian(&mut le_block_number);
     host.store_write(&path, &le_block_number, 0)
@@ -206,7 +254,7 @@ fn store_block_hash<Host: Runtime>(
     block_path: &OwnedPath,
     block_hash: &H256,
 ) -> Result<(), Error> {
-    let path = concat(block_path, &EVM_BLOCKS_HASH)?;
+    let path = concat(block_path, &BLOCK_HASH)?;
     host.store_write(&path, block_hash.as_bytes(), 0)
         .map_err(Error::from)
 }
@@ -216,10 +264,19 @@ fn store_block_transactions<Host: Runtime>(
     block_path: &OwnedPath,
     block_transactions: &[TransactionHash],
 ) -> Result<(), Error> {
-    let path = concat(block_path, &EVM_BLOCKS_TRANSACTIONS)?;
+    let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
     let block_transactions = &block_transactions.concat()[..];
-    host.store_write(&path, block_transactions, 0)
+    host.store_write_all(&path, block_transactions)
         .map_err(Error::from)
+}
+
+fn store_block_timestamp<Host: Runtime>(
+    host: &mut Host,
+    block_path: &OwnedPath,
+    timestamp: &Timestamp,
+) -> Result<(), Error> {
+    let path = concat(block_path, &BLOCK_TIMESTAMP)?;
+    store_timestamp_path(host, &path, timestamp)
 }
 
 fn store_block<Host: Runtime>(
@@ -227,9 +284,13 @@ fn store_block<Host: Runtime>(
     block: &L2Block,
     block_path: &OwnedPath,
 ) -> Result<(), Error> {
+    let mut index = init_blocks_index()?;
+    index_block(host, &block.hash, &mut index)?;
+
     store_block_number(host, block_path, block.number)?;
     store_block_hash(host, block_path, &block.hash)?;
-    store_block_transactions(host, block_path, &block.transactions)
+    store_block_transactions(host, block_path, &block.transactions)?;
+    store_block_timestamp(host, block_path, &block.timestamp)
 }
 
 pub fn store_block_by_number<Host: Runtime>(
@@ -257,120 +318,76 @@ pub fn store_current_block<Host: Runtime>(
 ) -> Result<(), Error> {
     match store_current_block_nodebug(host, block) {
         Ok(()) => {
-            debug_msg!(
+            log!(
                 host,
-                "Storing block {} at number {} containing {} transaction(s).\n",
-                String::from_utf8(block.hash.as_bytes().to_vec()).expect("INVALID HASH"),
+                Debug,
+                "Storing block {} containing {} transaction(s).",
                 block.number,
                 block.transactions.len()
             );
             Ok(())
         }
         Err(e) => {
-            debug_msg!(host, "Block storing failed: {:?}\n", e);
+            log!(host, Error, "Block storing failed: {:?}", e);
             Err(e)
         }
     }
 }
 
-// TODO: This store a transaction receipt with multiple subkeys, it could
-// be stored in a single encoded value. However, this is for now easier
-// for the (OCaml) proxy server to do as is.
-pub fn store_transaction_receipt<Host: Runtime>(
-    receipt_path: &OwnedPath,
+pub fn store_simulation_result<Host: Runtime>(
     host: &mut Host,
-    receipt: &TransactionReceipt,
+    result: Option<Vec<u8>>,
 ) -> Result<(), Error> {
-    // Transaction hash
-    let hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_HASH)?;
-    host.store_write(&hash_path, &receipt.hash, 0)?;
-    // Index
-    let index_path = concat(receipt_path, &TRANSACTION_RECEIPT_INDEX)?;
-    host.store_write(&index_path, &receipt.index.to_le_bytes(), 0)?;
-    // Block hash
-    let block_hash_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_HASH)?;
-    host.store_write(&block_hash_path, receipt.block_hash.as_bytes(), 0)?;
-    // Block number
-    let block_number_path = concat(receipt_path, &TRANSACTION_RECEIPT_BLOCK_NUMBER)?;
-    let mut le_receipt_block_number: [u8; 32] = [0; 32];
-    receipt
-        .block_number
-        .to_little_endian(&mut le_receipt_block_number);
-    host.store_write(&block_number_path, &le_receipt_block_number, 0)?;
-    // From
-    let from_path = concat(receipt_path, &TRANSACTION_RECEIPT_FROM)?;
-    let from: H160 = receipt.from.into();
-    host.store_write(&from_path, from.as_bytes(), 0)?;
-    // Type
-    let type_path = concat(receipt_path, &TRANSACTION_RECEIPT_TYPE)?;
-    host.store_write(&type_path, (&receipt.type_).into(), 0)?;
-    // Status
-    let status_path = concat(receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
-    host.store_write(&status_path, (&receipt.status).into(), 0)?;
-    // To
-    if let Some(to) = receipt.to {
-        let to: H160 = to.into();
-        let to_path = concat(receipt_path, &TRANSACTION_RECEIPT_TO)?;
-        host.store_write(&to_path, to.as_bytes(), 0)?;
-    };
-    // Cumulative gas used
-    let cumulative_gas_used_path =
-        concat(receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
-    let mut le_receipt_cumulative_gas_used: [u8; 32] = [0; 32];
-    receipt
-        .cumulative_gas_used
-        .to_little_endian(&mut le_receipt_cumulative_gas_used);
-    host.store_write(
-        &cumulative_gas_used_path,
-        &le_receipt_cumulative_gas_used,
-        0,
-    )?;
-
-    Ok(())
-}
-
-pub fn store_transaction_receipts<Host: Runtime>(
-    host: &mut Host,
-    receipts: &[TransactionReceipt],
-) -> Result<(), Error> {
-    for receipt in receipts {
-        let receipt_path = receipt_path(&receipt.hash)?;
-        store_transaction_receipt(&receipt_path, host, receipt)?;
+    if let Some(result) = result {
+        host.store_write(&SIMULATION_RESULT, &result, 0)
+            .map_err(Error::from)?;
     }
     Ok(())
 }
 
-pub fn read_transaction_receipt_status<Host: Runtime>(
+pub fn store_simulation_gas<Host: Runtime>(
     host: &mut Host,
-    tx_hash: &TransactionHash,
-) -> Result<TransactionStatus, Error> {
-    let receipt_path = receipt_path(tx_hash)?;
-    let status_path = concat(&receipt_path, &TRANSACTION_RECEIPT_STATUS)?;
-    let raw_status = host
-        .store_read(&status_path, 0, TRANSACTION_RECEIPT_STATUS_SIZE)
-        .map_err(Error::from)?;
-    TransactionStatus::try_from(&raw_status).map_err(|_| {
-        Error::Storage(StorageError::InvalidEncoding {
-            path: status_path,
-            value: raw_status,
-        })
-    })
+    result: u64,
+) -> Result<(), Error> {
+    write_u256(host, &SIMULATION_GAS.into(), U256::from(result))
 }
 
-pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
+pub fn store_simulation_status<Host: Runtime>(
     host: &mut Host,
-    tx_hash: &TransactionHash,
-) -> Result<U256, Error> {
-    let receipt_path = receipt_path(tx_hash)?;
-    let cumulative_gas_used_path =
-        concat(&receipt_path, &TRANSACTION_CUMULATIVE_GAS_USED)?;
-    read_u256(host, &cumulative_gas_used_path)
+    result: bool,
+) -> Result<(), Error> {
+    host.store_write(&SIMULATION_STATUS, &[result.into()], 0)
+        .map_err(Error::from)
+}
+
+pub fn store_transaction_receipt<Host: Runtime>(
+    host: &mut Host,
+    receipt: &TransactionReceipt,
+) -> Result<(), Error> {
+    // For each transaction hash there exists a receipt and an object. As
+    // such the indexing must be done either with the objects or the
+    // receipts otherwise they would be indexed twice. We chose to index
+    // hashes using the receipts.
+    let mut transaction_hashes_index = init_transaction_hashes_index()?;
+    index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
+    let receipt_path = receipt_path(&receipt.hash)?;
+    host.store_write_all(&receipt_path, &receipt.rlp_bytes())?;
+    Ok(())
+}
+
+pub fn store_transaction_object<Host: Runtime>(
+    host: &mut Host,
+    object: &TransactionObject,
+) -> Result<(), Error> {
+    let object_path = object_path(&object.hash)?;
+    host.store_write_all(&object_path, &object.rlp_bytes())?;
+    Ok(())
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
 const CHUNKED_TRANSACTION_NUM_CHUNKS: RefPath = RefPath::assert_from(b"/num_chunks");
 
-fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
+pub fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(tx_hash);
     let raw_chunked_transaction_path: Vec<u8> = format!("/{}", hash).into();
     let chunked_transaction_path = OwnedPath::try_from(raw_chunked_transaction_path)?;
@@ -383,7 +400,7 @@ fn chunked_transaction_num_chunks_path(
     concat(chunked_transaction_path, &CHUNKED_TRANSACTION_NUM_CHUNKS).map_err(Error::from)
 }
 
-fn transaction_chunk_path(
+pub fn transaction_chunk_path(
     chunked_transaction_path: &OwnedPath,
     i: u16,
 ) -> Result<OwnedPath, Error> {
@@ -398,10 +415,8 @@ fn is_transaction_complete<Host: Runtime>(
     num_chunks: u16,
 ) -> Result<bool, Error> {
     let n_subkeys = host.store_count_subkeys(chunked_transaction_path)? as u16;
-    // `n_subkeys` includes the key `num_chunks`. The transaction is complete if
-    // number of chunks = num_chunks - 1, the last chunk is not written on disk
-    // and is kept in memory instead.
-    Ok(n_subkeys >= num_chunks)
+    // `n_subkeys` includes the key `num_chunks`
+    Ok(n_subkeys > num_chunks)
 }
 
 fn chunked_transaction_num_chunks_by_path<Host: Runtime>(
@@ -444,7 +459,7 @@ fn store_transaction_chunk_data<Host: Runtime>(
     }
 }
 
-fn read_transaction_chunk_data<Host: Runtime>(
+pub fn read_transaction_chunk_data<Host: Runtime>(
     host: &mut Host,
     transaction_chunk_path: &OwnedPath,
 ) -> Result<Vec<u8>, Error> {
@@ -469,21 +484,12 @@ fn get_full_transaction<Host: Runtime>(
     host: &mut Host,
     chunked_transaction_path: &OwnedPath,
     num_chunks: u16,
-    missing_data: &[u8],
 ) -> Result<Vec<u8>, Error> {
     let mut buffer = Vec::new();
     for i in 0..num_chunks {
         let transaction_chunk_path = transaction_chunk_path(chunked_transaction_path, i)?;
-        // If the transaction is complete and a chunk doesn't exist, it means that it is
-        // the last missing chunk, that was not stored in the storage.
-        match host.store_has(&transaction_chunk_path)? {
-            None => buffer.extend_from_slice(missing_data),
-            Some(_) => {
-                let mut data =
-                    read_transaction_chunk_data(host, &transaction_chunk_path)?;
-                let _ = &mut buffer.append(&mut data);
-            }
-        }
+        let mut data = read_transaction_chunk_data(host, &transaction_chunk_path)?;
+        let _ = &mut buffer.append(&mut data);
     }
     Ok(buffer)
 }
@@ -515,16 +521,17 @@ pub fn store_transaction_chunk<Host: Runtime>(
     let num_chunks =
         chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)?;
 
+    // Store the new transaction chunk.
+    let transaction_chunk_path = transaction_chunk_path(&chunked_transaction_path, i)?;
+    store_transaction_chunk_data(host, &transaction_chunk_path, data)?;
+
+    // If the chunk was the last one, we gather all the chunks and remove the
+    // sub elements.
     if is_transaction_complete(host, &chunked_transaction_path, num_chunks)? {
-        let data =
-            get_full_transaction(host, &chunked_transaction_path, num_chunks, &data)?;
+        let data = get_full_transaction(host, &chunked_transaction_path, num_chunks)?;
         host.store_delete(&chunked_transaction_path)?;
         Ok(Some(data))
     } else {
-        let transaction_chunk_path =
-            transaction_chunk_path(&chunked_transaction_path, i)?;
-        store_transaction_chunk_data(host, &transaction_chunk_path, data)?;
-
         Ok(None)
     }
 }
@@ -537,10 +544,357 @@ pub fn create_chunked_transaction<Host: Runtime>(
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
     let chunked_transaction_num_chunks_path =
         chunked_transaction_num_chunks_path(&chunked_transaction_path)?;
+
+    // A new chunked transaction creates the `../<tx_hash>/num_chunks`, if there
+    // is at least one key, it was already created.
+    if host
+        .store_count_subkeys(&chunked_transaction_path)
+        .unwrap_or(0)
+        > 0
+    {
+        log!(
+            host,
+            Info,
+            "The chunked transaction {} already exist, ignoring the message.\n",
+            hex::encode(tx_hash)
+        );
+        return Ok(());
+    }
+
     host.store_write(
         &chunked_transaction_num_chunks_path,
         &u16::to_le_bytes(num_chunks),
         0,
     )
     .map_err(Error::from)
+}
+
+pub fn store_chain_id<Host: Runtime>(
+    host: &mut Host,
+    chain_id: U256,
+) -> Result<(), Error> {
+    write_u256(host, &EVM_CHAIN_ID.into(), chain_id)
+}
+
+pub fn read_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+    read_u256(host, &EVM_CHAIN_ID.into())
+}
+
+pub fn store_timestamp_path<Host: Runtime>(
+    host: &mut Host,
+    path: &OwnedPath,
+    timestamp: &Timestamp,
+) -> Result<(), Error> {
+    host.store_write(path, &timestamp.i64().to_le_bytes(), 0)?;
+    Ok(())
+}
+
+pub fn read_last_info_per_level_timestamp_stats<Host: Runtime>(
+    host: &mut Host,
+) -> Result<(i64, i64), Error> {
+    let mut buffer = [0u8; 8];
+    store_read_slice(host, &EVM_INFO_PER_LEVEL_STATS_NUMBERS, &mut buffer, 8)?;
+    let numbers = i64::from_le_bytes(buffer);
+
+    let mut buffer = [0u8; 8];
+    store_read_slice(host, &EVM_INFO_PER_LEVEL_STATS_TOTAL, &mut buffer, 8)?;
+    let total = i64::from_le_bytes(buffer);
+
+    Ok((numbers, total))
+}
+
+fn store_info_per_level_stats<Host: Runtime>(
+    host: &mut Host,
+    new_timestamp: Timestamp,
+) -> Result<(), Error> {
+    let old_timestamp =
+        read_last_info_per_level_timestamp(host).unwrap_or_else(|_| Timestamp::from(0));
+    let diff = new_timestamp.i64() - old_timestamp.i64();
+    let (numbers, total) =
+        read_last_info_per_level_timestamp_stats(host).unwrap_or((0i64, 0i64));
+    let total = total + diff;
+    let numbers = numbers + 1;
+
+    host.store_write(&EVM_INFO_PER_LEVEL_STATS_TOTAL, &total.to_le_bytes(), 0)?;
+    host.store_write(&EVM_INFO_PER_LEVEL_STATS_NUMBERS, &numbers.to_le_bytes(), 0)?;
+
+    Ok(())
+}
+
+pub fn store_last_info_per_level_timestamp<Host: Runtime>(
+    host: &mut Host,
+    timestamp: Timestamp,
+) -> Result<(), Error> {
+    store_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into(), &timestamp)?;
+    store_info_per_level_stats(host, timestamp)
+}
+
+pub fn read_timestamp_path<Host: Runtime>(
+    host: &mut Host,
+    path: &OwnedPath,
+) -> Result<Timestamp, Error> {
+    let mut buffer = [0u8; 8];
+    store_read_slice(host, path, &mut buffer, 8)?;
+    let timestamp_as_i64 = i64::from_le_bytes(buffer);
+    Ok(timestamp_as_i64.into())
+}
+
+pub fn read_last_info_per_level_timestamp<Host: Runtime>(
+    host: &mut Host,
+) -> Result<Timestamp, Error> {
+    read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
+}
+
+pub fn store_kernel_upgrade_nonce<Host: Runtime>(
+    host: &mut Host,
+    upgrade_nonce: u16,
+) -> Result<(), Error> {
+    host.store_write_all(&KERNEL_UPGRADE_NONCE, &upgrade_nonce.to_le_bytes())
+        .map_err(Error::from)
+}
+
+pub fn read_kernel_upgrade_nonce<Host: Runtime>(host: &mut Host) -> Result<u16, Error> {
+    match host.store_read_all(&KERNEL_UPGRADE_NONCE) {
+        Ok(bytes) => {
+            let slice_of_bytes: [u8; UPGRADE_NONCE_SIZE] =
+                bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+            Ok(u16::from_le_bytes(slice_of_bytes))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(1_u16),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Get the index of accounts.
+pub fn init_account_index() -> Result<IndexableStorage, StorageError> {
+    let path = concat(&EVM_INDEXES, &ACCOUNTS_INDEX)?;
+    IndexableStorage::new(&RefPath::from(&path))
+}
+
+/// Get the index of blocks.
+pub fn init_blocks_index() -> Result<IndexableStorage, StorageError> {
+    let path = concat(&EVM_INDEXES, &BLOCKS_INDEX)?;
+    IndexableStorage::new(&RefPath::from(&path))
+}
+
+/// Get the index of transactions
+pub fn init_transaction_hashes_index() -> Result<IndexableStorage, StorageError> {
+    let path = concat(&EVM_INDEXES, &TRANSACTIONS_INDEX)?;
+    IndexableStorage::new(&RefPath::from(&path))
+}
+
+pub fn index_account(
+    host: &mut impl Runtime,
+    address: &H160,
+    index: &mut IndexableStorage,
+) -> Result<(), Error> {
+    let account = EthereumAccount::from_address(address)?;
+    // A new account is created whether when it receives assets for the
+    // first time, or when it is created through a contract deployment, by
+    // construction it should be indexed at this specific times.
+    if account.indexed(host)? {
+        Ok(())
+    } else {
+        index.push_value(host, address.as_bytes())?;
+        account.set_indexed(host).map_err(Error::from)
+    }
+}
+
+/// Reads the ticketer address set by the installer, if any, encoded in b58.
+pub fn read_ticketer<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    let mut buffer = [0; 36];
+    store_read_slice(host, &TICKETER, &mut buffer, 36).ok()?;
+    let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
+    ContractKt1Hash::from_b58check(&kt1_b58).ok()
+}
+
+pub fn get_and_increment_deposit_nonce<Host: Runtime>(
+    host: &mut Host,
+) -> Result<u32, Error> {
+    let current_nonce = || -> Option<u32> {
+        let bytes = host.store_read_all(&DEPOSIT_NONCE).ok()?;
+        let slice_of_bytes: [u8; 4] = bytes[..]
+            .try_into()
+            .map_err(|_| Error::InvalidConversion)
+            .ok()?;
+        Some(u32::from_le_bytes(slice_of_bytes))
+    };
+
+    let nonce = current_nonce().unwrap_or(0u32);
+    let new_nonce = nonce + 1;
+    host.store_write_all(&DEPOSIT_NONCE, &new_nonce.to_le_bytes())?;
+    Ok(nonce)
+}
+
+pub fn index_block(
+    host: &mut impl Runtime,
+    block_hash: &H256,
+    blocks_index: &mut IndexableStorage,
+) -> Result<(), Error> {
+    blocks_index
+        .push_value(host, block_hash.as_bytes())
+        .map_err(Error::from)
+}
+
+pub fn index_transaction_hash(
+    host: &mut impl Runtime,
+    transaction_hash: &[u8],
+    transaction_hashes_index: &mut IndexableStorage,
+) -> Result<(), Error> {
+    transaction_hashes_index
+        .push_value(host, transaction_hash)
+        .map_err(Error::from)
+}
+
+pub fn read_dictator_key<Host: Runtime>(host: &mut Host) -> Option<PublicKey> {
+    let mut buffer = [0; DICTATOR_KEY_SIZE];
+    store_read_slice(host, &DICTATOR_KEY, &mut buffer, DICTATOR_KEY_SIZE).ok()?;
+    PublicKey::parse_slice(&buffer, None).ok()
+}
+
+pub fn store_storage_version<Host: Runtime>(
+    host: &mut Host,
+    storage_version: u64,
+) -> Result<(), Error> {
+    host.store_write_all(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes())
+        .map_err(Error::from)
+}
+
+pub fn read_storage_version<Host: Runtime>(host: &mut Host) -> Result<u64, Error> {
+    match host.store_read_all(&STORAGE_VERSION_PATH) {
+        Ok(bytes) => {
+            let slice_of_bytes: [u8; 8] =
+                bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+            Ok(u64::from_le_bytes(slice_of_bytes))
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn read_kernel_version<Host: Runtime>(host: &mut Host) -> Result<String, Error> {
+    match host.store_read_all(&KERNEL_VERSION_PATH) {
+        Ok(bytes) => {
+            let kernel_version =
+                std::str::from_utf8(&bytes).map_err(|_| Error::InvalidConversion)?;
+            Ok(kernel_version.to_owned())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn store_kernel_version<Host: Runtime>(
+    host: &mut Host,
+    kernel_version: &str,
+) -> Result<(), Error> {
+    let kernel_version = kernel_version.as_bytes();
+    host.store_write_all(&KERNEL_VERSION_PATH, kernel_version)
+        .map_err(Error::from)
+}
+
+pub fn store_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+    block: &BlockInProgress,
+) -> Result<(), anyhow::Error> {
+    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, &block.rlp_bytes())
+        .context("Failed to store BlockInProgress")
+}
+
+pub fn read_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+) -> Result<BlockInProgress, anyhow::Error> {
+    let bytes = host
+        .store_read_all(&EVM_BLOCK_IN_PROGRESS)
+        .context("Failed to read stored BlockInProgress")?;
+    let decoder = Rlp::new(bytes.as_slice());
+    BlockInProgress::decode(&decoder).context("Failed to decode stored BlockInProgress")
+}
+
+pub fn delete_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+) -> Result<(), anyhow::Error> {
+    if host.store_read(&REBOOTED, 0, 0).is_ok() {
+        host.store_delete(&EVM_BLOCK_IN_PROGRESS)
+            .context("Failed to delete Block in progress")?
+    }
+    Ok(())
+}
+
+pub fn add_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    host.store_write(&REBOOTED, &[1], 0)
+        .context("Failed to set reboot flag")
+}
+
+pub fn delete_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    host.store_delete(&REBOOTED)
+        .context("Failed to delete reboot flag")
+}
+
+pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
+    Ok(host.store_read(&REBOOTED, 0, 0).is_ok())
+}
+
+pub(crate) mod internal_for_tests {
+    use super::*;
+
+    pub fn store_dictator_key<Host: Runtime>(
+        host: &mut Host,
+        dictator: PublicKey,
+    ) -> Result<(), Error> {
+        host.store_write(&DICTATOR_KEY, &dictator.serialize(), 0)
+            .map_err(Error::from)
+    }
+
+    /// Reads status from the receipt in storage.
+    pub fn read_transaction_receipt_status<Host: Runtime>(
+        host: &mut Host,
+        tx_hash: &TransactionHash,
+    ) -> Result<TransactionStatus, Error> {
+        let receipt = read_transaction_receipt(host, tx_hash)?;
+        Ok(receipt.status)
+    }
+
+    /// Reads cumulative gas used from the receipt in storage.
+    pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
+        host: &mut Host,
+        tx_hash: &TransactionHash,
+    ) -> Result<U256, Error> {
+        let receipt = read_transaction_receipt(host, tx_hash)?;
+        Ok(receipt.cumulative_gas_used)
+    }
+
+    /// Reads a transaction receipt from storage.
+    pub fn read_transaction_receipt<Host: Runtime>(
+        host: &mut Host,
+        tx_hash: &TransactionHash,
+    ) -> Result<TransactionReceipt, Error> {
+        let receipt_path = receipt_path(tx_hash)?;
+        let bytes = host.store_read_all(&receipt_path)?;
+        let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
+        Ok(receipt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tezos_smart_rollup_mock::MockHost;
+
+    use super::*;
+    #[test]
+    fn test_reboot_flag() {
+        let mut host = MockHost::default();
+
+        add_reboot_flag(&mut host).expect("Should have been able to set flag");
+
+        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
+
+        delete_reboot_flag(&mut host).expect("Should have been able to delete flag");
+
+        assert!(
+            !was_rebooted(&mut host).expect("should not have failed without reboot flag")
+        );
+
+        add_reboot_flag(&mut host).expect("Should have been able to set flag");
+
+        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
+    }
 }

@@ -142,7 +142,7 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
   | None | Some _ -> return_unit
 
 let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
-    operations =
+    operations bv_operations =
   let open Lwt_result_syntax in
   let*! () = Events.(emit prechecking_block) block_hash in
   let* () =
@@ -152,7 +152,7 @@ let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
       ~predecessor
       block_header
       block_hash
-      operations
+      bv_operations
   in
   let*! () = Events.(emit prechecked_block) block_hash in
   (* Add the block and operations to the cache of the ddb to make them
@@ -162,6 +162,25 @@ let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
     block_hash
     block_header
     operations
+
+let check_operations_merkle_root hash header operations =
+  let open Result_syntax in
+  let fail_unless b e = if b then return_unit else tzfail e in
+  let computed_hash =
+    let hashes = List.map (List.map Operation.hash) operations in
+    Operation_list_list_hash.compute
+      (List.map Operation_list_hash.compute hashes)
+  in
+  fail_unless
+    (Operation_list_list_hash.equal
+       computed_hash
+       header.Block_header.shell.operations_hash)
+    (Inconsistent_operations_hash
+       {
+         block = hash;
+         expected = header.shell.operations_hash;
+         found = computed_hash;
+       })
 
 let on_validation_request w
     {
@@ -181,6 +200,11 @@ let on_validation_request w
   match b with
   | true -> return Already_committed
   | false -> (
+      (* This check might be redundant as operation paths are already
+         checked when each pass is received from the network. However,
+         removing it would prevent checking locally
+         injected/reconstructed blocks which might be problematic. *)
+      let*? () = check_operations_merkle_root hash header operations in
       let*! r =
         match
           Block_hash_ring.find_opt bv.invalid_blocks_after_precheck hash
@@ -219,6 +243,14 @@ let on_validation_request w
                         f ()
                     | _ -> Lwt.return r
                   in
+                  let*! mempool = Store.Chain.mempool chain_store in
+                  let bv_operations =
+                    List.map
+                      (List.map
+                         (Block_validation.mk_operation
+                            ~known_valid_operation_set:mempool.known_valid))
+                      operations
+                  in
                   let*! r =
                     protect ~canceler:(Worker.canceler w) (fun () ->
                         protect ?canceler (fun () ->
@@ -230,7 +262,8 @@ let on_validation_request w
                                   ~predecessor:pred
                                   header
                                   hash
-                                  operations)))
+                                  operations
+                                  bv_operations)))
                   in
                   match r with
                   | Error errs -> return (Precheck_failed errs)
@@ -252,7 +285,7 @@ let on_validation_request w
                                       chain_store
                                       ~predecessor:pred
                                       header
-                                      operations)))
+                                      bv_operations)))
                       in
                       Shell_metrics.Block_validator
                       .set_operation_per_pass_collector
@@ -312,6 +345,14 @@ let on_preapplication_request w
   let* r =
     protect ~canceler:(Worker.canceler w) (fun () ->
         protect ?canceler (fun () ->
+            let* mempool = Store.Chain.mempool chain_store in
+            let operations =
+              List.map
+                (List.map
+                   (Block_validation.mk_operation
+                      ~known_valid_operation_set:mempool.known_valid))
+                operations
+            in
             Block_validator_process.preapply_block
               bv.validation_process
               chain_store
@@ -488,25 +529,6 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
   | false -> (
       let* r =
         let open Lwt_result_syntax in
-        let hashes = List.map (List.map Operation.hash) operations in
-        let computed_hash =
-          Operation_list_list_hash.compute
-            (List.map Operation_list_hash.compute hashes)
-        in
-        let* () =
-          fail_when
-            (Operation_list_list_hash.compare
-               computed_hash
-               header.shell.operations_hash
-            <> 0)
-            (Inconsistent_operations_hash
-               {
-                 block = hash;
-                 expected = header.shell.operations_hash;
-                 found = computed_hash;
-               })
-          |> Lwt_result.map_error (fun e -> Worker.Request_error e)
-        in
         let* () =
           check_chain_liveness chain_db hash header
           |> Lwt_result.map_error (fun e -> Worker.Request_error e)

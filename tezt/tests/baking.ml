@@ -357,11 +357,11 @@ let check_ordering ops =
 
 let assert_block_is_well_baked block expected_number_manager_op =
   match JSON.(as_list (block |-> "operations")) with
-  | [endorsement_ops; vote_ops; anonymous_ops; manager_ops] ->
-      (* There very well might be endorsement operations *)
+  | [consensus_ops; vote_ops; anonymous_ops; manager_ops] ->
+      (* There very well might be attestation operations *)
       Log.debug
-        "%d endorsement operations"
-        (List.length (JSON.as_list endorsement_ops)) ;
+        "%d consensus operations"
+        (List.length (JSON.as_list consensus_ops)) ;
       List.iter
         (fun l -> assert (JSON.as_list l = []))
         [vote_ops; anonymous_ops] ;
@@ -716,7 +716,7 @@ let test_operation_pool_ordering
     block with the given [minimal_timestamp] flag. *)
 let baking_with_given_minimal_timestamp ~minimal_timestamp =
   Protocol.register_test
-    ~supports:Protocol.(From_protocol (number Mumbai + 1))
+    ~supports:Protocol.(From_protocol (number Nairobi))
     ~__FILE__
     ~title:(sf "Baking minimal timestamp (%b)" minimal_timestamp)
     ~tags:["baking"; "timestamp"]

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2022 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -45,6 +46,7 @@ pub mod contract;
 pub mod entrypoint;
 pub mod micheline;
 pub mod michelson;
+pub mod public_key;
 pub mod public_key_hash;
 pub mod smart_rollup;
 pub mod ticket;

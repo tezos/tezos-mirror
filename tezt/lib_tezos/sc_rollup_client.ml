@@ -58,6 +58,7 @@ type simulation_result = {
   output : JSON.t;
   inbox_level : int;
   num_ticks : int;
+  insights : string option list;
 }
 
 let commitment_from_json json =
@@ -97,19 +98,22 @@ let commitment_info_from_json json =
 
 let next_name = ref 1
 
-let fresh_name () =
-  let index = !next_name in
-  incr next_name ;
-  "client" ^ string_of_int index
-
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ~protocol ?runner ?name ?base_dir ?(color = Log.Color.FG.green)
-    sc_node =
-  let name = match name with None -> fresh_name () | Some name -> name in
+let create ~protocol ?runner ?name ?base_dir ?color sc_node =
+  let name =
+    match name with
+    | Some name -> name
+    | None -> Sc_rollup_node.name sc_node ^ "_client"
+  in
   let path = Protocol.sc_rollup_client protocol in
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
+  in
+  let color =
+    match color with
+    | Some c -> c
+    | None -> Log.Color.(bold ++ Sc_rollup_node.color sc_node)
   in
   {name; path; sc_node; base_dir; color; runner}
 
@@ -165,26 +169,30 @@ let json_of_batch ts =
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
-let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
-    ~outbox_level batch =
+let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level
+    transactions =
   let*? process =
     spawn_command
       ?hooks
       sc_client
-      [
-        "get";
-        "proof";
-        "for";
-        "message";
-        string_of_int message_index;
-        "of";
-        "outbox";
-        "at";
-        "level";
-        string_of_int outbox_level;
-        "transferring";
-        JSON.encode_u (json_of_batch batch);
-      ]
+      (List.concat
+         [
+           [
+             "get";
+             "proof";
+             "for";
+             "message";
+             string_of_int message_index;
+             "of";
+             "outbox";
+             "at";
+             "level";
+             string_of_int outbox_level;
+           ];
+           (match transactions with
+           | Some batch -> ["transferring"; JSON.encode_u (json_of_batch batch)]
+           | None -> []);
+         ])
   in
   match expected_error with
   | None ->
@@ -198,6 +206,16 @@ let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
       let* () = Process.check_error ~msg process in
       return None
 
+let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
+    ~outbox_level batch =
+  outbox_proof
+    ?hooks
+    ?expected_error
+    sc_client
+    (Some batch)
+    ~message_index
+    ~outbox_level
+
 let outbox_proof_single ?hooks ?expected_error ?entrypoint ?parameters_ty
     sc_client ~message_index ~outbox_level ~destination ~parameters =
   outbox_proof_batch
@@ -208,12 +226,25 @@ let outbox_proof_single ?hooks ?expected_error ?entrypoint ?parameters_ty
     ~outbox_level
     [{destination; entrypoint; parameters; parameters_ty}]
 
+let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level =
+  outbox_proof
+    ?hooks
+    ?expected_error
+    sc_client
+    None
+    ~message_index
+    ~outbox_level
+
+let encode_json_outbox_msg ?hooks sc_client outbox_msg =
+  spawn_command
+    ?hooks
+    sc_client
+    ["encode"; "outbox"; "message"; JSON.encode_u outbox_msg]
+  |> Runnable.map String.trim
+
 let encode_batch ?hooks ?expected_error sc_client batch =
   let runnable =
-    spawn_command
-      ?hooks
-      sc_client
-      ["encode"; "outbox"; "message"; JSON.encode_u (json_of_batch batch)]
+    encode_json_outbox_msg ?hooks sc_client (json_of_batch batch)
   in
   match expected_error with
   | None ->
@@ -281,17 +312,6 @@ let inspect_durable_state_value :
       rpc_req ()
       |> Runnable.map (fun json -> List.map JSON.as_string (JSON.as_list json))
 
-(* match expected with
-   | Expected_success -> (
-       let*! json = rpc_req () in
-       match operation with
-       | Value -> return (JSON.as_string json : a)
-       | Length -> return (JSON.as_int64 json : a)
-       | Subkeys -> return (List.map JSON.as_string (JSON.as_list json)))
-   | Expected_error msg ->
-       let*? process = rpc_req () in
-       Process.check_error ~msg process *)
-
 let ticks ?hooks ?(block = "head") sc_client =
   let res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
   Runnable.map JSON.as_int res
@@ -347,7 +367,8 @@ let get_dal_processed_slots ?hooks ?(block = "head") sc_client =
                 let status = obj |> JSON.get "status" |> JSON.as_string in
                 (index, status)))
 
-let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
+let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = [])
+    ?(insight_requests = []) messages =
   let messages_json =
     `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
   in
@@ -360,8 +381,20 @@ let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
             `A (List.map (fun s -> `String Hex.(of_string s |> show)) pages) );
         ]
   in
+  let insight_requests_json =
+    let insight_request_json insight_request =
+      let insight_request_kind, key =
+        match insight_request with
+        | `Pvm_state_key key -> ("pvm_state", key)
+        | `Durable_storage_key key -> ("durable_storage", key)
+      in
+      let x = `A (List.map (fun s -> `String s) key) in
+      `O [("kind", `String insight_request_kind); ("key", x)]
+    in
+    [("insight_requests", `A (List.map insight_request_json insight_requests))]
+  in
   let data =
-    `O (("messages", messages_json) :: reveal_json)
+    `O ((("messages", messages_json) :: reveal_json) @ insight_requests_json)
     |> JSON.annotate ~origin:"simulation data"
   in
   rpc_post ?hooks sc_client ["global"; "block"; block; "simulate"] data
@@ -373,6 +406,8 @@ let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
              output = obj |> get "output";
              inbox_level = obj |> get "inbox_level" |> as_int;
              num_ticks = obj |> get "num_ticks" |> as_string |> int_of_string;
+             insights =
+               obj |> get "insights" |> as_list |> List.map as_string_opt;
            })
 
 let inject ?hooks sc_client messages =

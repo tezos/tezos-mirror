@@ -113,6 +113,12 @@ let assert_max_bytes max_bytes =
 
 let key_contents = function Readonly k | Writeable k -> k
 
+let exists tree key =
+  let open Lwt.Syntax in
+  let key = key_contents key in
+  let+ opt = T.find_tree tree key in
+  Option.is_some opt
+
 let find_value tree key =
   let open Lwt.Syntax in
   let key = key_contents key in

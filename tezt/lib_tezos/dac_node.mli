@@ -29,27 +29,8 @@
 (** DAC Node state. *)
 type t
 
-(** Creates a DAC node to run in legacy mode, using the specified threshold
-    and list of dac members. *)
-val create_legacy :
-  ?path:string ->
-  ?name:string ->
-  ?color:Log.Color.t ->
-  ?data_dir:string ->
-  ?event_pipe:string ->
-  ?rpc_host:string ->
-  ?rpc_port:int ->
-  ?reveal_data_dir:string ->
-  threshold:int ->
-  committee_members:string list ->
-  ?committee_member_address:string ->
-  node:Node.t ->
-  client:Client.t ->
-  unit ->
-  t
-
-(** Creates a DAC node to run in coordinator mode, using the specified
-    threshold, list of dac members and operator. *)
+(** Creates a DAC node to run in coordinator mode registered with
+    the specified committee members. *)
 val create_coordinator :
   ?path:string ->
   ?name:string ->
@@ -59,9 +40,26 @@ val create_coordinator :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?reveal_data_dir:string ->
-  threshold:int ->
+  ?allow_v1_api:bool ->
   committee_members:string list ->
   node:Node.t ->
+  client:Client.t ->
+  unit ->
+  t
+
+(** Same as {!create_coordinator}, but do not assume the endpoint is a node. *)
+val create_coordinator_with_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?allow_v1_api:bool ->
+  committee_members:string list ->
+  endpoint:Client.endpoint ->
   client:Client.t ->
   unit ->
   t
@@ -79,14 +77,36 @@ val create_committee_member :
   ?reveal_data_dir:string ->
   ?coordinator_rpc_host:string ->
   ?coordinator_rpc_port:int ->
+  ?allow_v1_api:bool ->
   address:string ->
   node:Node.t ->
   client:Client.t ->
   unit ->
   t
 
+(** Same as {!create_committee_member}, but do not assume the endpoint is a
+    node. *)
+val create_committee_member_with_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?coordinator_rpc_host:string ->
+  ?coordinator_rpc_port:int ->
+  ?allow_v1_api:bool ->
+  address:string ->
+  endpoint:Client.endpoint ->
+  client:Client.t ->
+  unit ->
+  t
+
 (** Creates a DAC node to run in observer mode, using the specified coordinator
-    rpc host and port. *)
+    rpc host and port and set the committee member endpoints to 
+    [committee_member_rpcs]. *)
 val create_observer :
   ?path:string ->
   ?name:string ->
@@ -98,7 +118,31 @@ val create_observer :
   ?reveal_data_dir:string ->
   ?coordinator_rpc_host:string ->
   ?coordinator_rpc_port:int ->
+  ?timeout:int ->
+  ?allow_v1_api:bool ->
+  committee_member_rpcs:(string * int) list ->
   node:Node.t ->
+  client:Client.t ->
+  unit ->
+  t
+
+(** Same as {!create_obsever}, but do not assume the endpoint is a
+    node. *)
+val create_observer_with_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?reveal_data_dir:string ->
+  ?coordinator_rpc_host:string ->
+  ?coordinator_rpc_port:int ->
+  ?timeout:int ->
+  ?allow_v1_api:bool ->
+  committee_member_rpcs:(string * int) list ->
+  endpoint:Client.endpoint ->
   client:Client.t ->
   unit ->
   t
@@ -107,7 +151,7 @@ val create_observer :
 val name : t -> string
 
 (** Get the mode in which a dac node is configured to run. Returned values can
-    be either "Legacy", "Coordinator", "Commitee_member" or "Observer". *)
+    be either "Coordinator", "Commitee_member" or "Observer". *)
 val mode : t -> string
 
 (** Get the RPC host given as [--rpc-addr] to an dac node. *)
@@ -124,6 +168,12 @@ val data_dir : t -> string
 
 (** Get the reveal-data-dir of an dac node. *)
 val reveal_data_dir : t -> string
+
+(** [allow_v1_api dac_node] is [true] if current node allows running [V1] API. *)
+val allow_v1_api : t -> bool
+
+(** Calls [ls] on reveal data dir. *)
+val ls_reveal_data_dir : t -> string list Lwt.t
 
 (** [run ?wait_ready ?env node] launches the given dac
     node where env is a map of environment variable.
@@ -173,3 +223,13 @@ module Config_file : sig
       running, it needs to be restarted manually. *)
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
+
+(** [with_sleeping_node] creates and runs an embedded node that sleeps for [timeout] 
+    seconds upon receiving any request then returns "ok". It is used to test 
+    timeout capabilities of clients. *)
+val with_sleeping_node :
+  ?rpc_port:int ->
+  ?rpc_address:string ->
+  timeout:float ->
+  (string * int -> unit Lwt.t) ->
+  unit Lwt.t

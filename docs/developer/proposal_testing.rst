@@ -401,7 +401,7 @@ system's temp directory (in our example, ``/tmp``) as given by the path argument
 yes-wallet folder in the default path ``./yes-wallet``.
 
 The command above will generate a wallet containing approximately 400
-keys. If you wish to restrict to a given percentage of the endorsing
+keys. If you wish to restrict to a given percentage of the attesting
 power by retrieving the first bakers (with the biggest staking
 power), you can also use the ``--staking-share`` option to provide a
 limit. For instance, the first largest bakers with an accumulated
@@ -413,14 +413,14 @@ stake of at least 75 percent can be kept with::
    Prior to switching to the Tenderbake consensus algorithm it was
    sufficient to create a minimal yes-wallet with 8 Foundation
    keys. Starting from Protocol I this is no longer the case, because
-   a number of bakers holding at least 2/3rds of the total endorsing
-   power have to endorse a block for it to be considered valid.
+   a number of bakers holding at least 2/3rds of the total attesting
+   power have to attest a block for it to be considered valid.
 
 By restricting the accumulated stake to 75% as in the command above,
 the wallet is both "lighter" (it may contain around 30-40 keys and
 therefore some commands like ``octez-client bake for`` will execute
 faster) and its keys will represent more than the 2/3rds of the
-endorsing power for any given level.
+attesting power for any given level.
 
 Batch Steps 1--7 Above
 ~~~~~~~~~~~~~~~~~~~~~~

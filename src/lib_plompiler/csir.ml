@@ -23,11 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let nb_wires_arch = 5
+let nb_wires_arch = 6
+
+let wire_prefix = "w"
 
 let string_key_of_int ~nb_digits i =
   let s = string_of_int i in
-  Format.sprintf "w%s" @@ String.make (nb_digits - String.length s) '0' ^ s
+  wire_prefix ^ String.make (nb_digits - String.length s) '0' ^ s
 
 let wire_name i =
   if i < 0 || i >= nb_wires_arch then
@@ -35,6 +37,14 @@ let wire_name i =
   string_key_of_int
     ~nb_digits:(String.length @@ string_of_int (nb_wires_arch - 1))
     i
+
+let int_of_wire_name s =
+  let n = String.length wire_prefix in
+  try
+    if String.sub s 0 n <> wire_prefix then
+      failwith "int_of_wire_name : invalid wire name." ;
+    int_of_string (String.sub s n (String.length s - n))
+  with _ -> failwith "int_of_wire_name : invalid wire name."
 
 let linear_selector_name i = "q_" ^ wire_name i
 
@@ -137,15 +147,12 @@ end = struct
     | Some _ -> true
     | None -> false
 
-  let to_list table =
-    Format.printf "\n%i %i\n" (Array.length table) (Array.length table.(0)) ;
-    Array.to_list table
+  let to_list table = Array.to_list table
 
   let of_list table = Array.of_list table
 end
 
 let table_or =
-  assert (nb_wires_arch >= 3) ;
   Table.of_list
   @@ Scalar.
        [
@@ -153,16 +160,103 @@ let table_or =
          [|zero; one; zero; one|];
          [|zero; one; one; one|];
        ]
-  @ List.init (nb_wires_arch - 3) (Fun.const Scalar.[|zero; zero; zero; zero|])
+
+let table_xor =
+  Table.of_list
+  @@ Scalar.
+       [
+         [|zero; zero; one; one|];
+         [|zero; one; zero; one|];
+         [|zero; one; one; zero|];
+       ]
+
+let table_band =
+  Table.of_list
+  @@ Scalar.
+       [
+         [|zero; zero; one; one|];
+         [|zero; one; zero; one|];
+         [|zero; zero; zero; one|];
+       ]
+
+(* There are three ways to define a lookup table for a unary operation
+   when nb_wires_arch = 3. Let z := f x, then:
+    1. x 0 z
+    2. x x z
+    3. x z 0
+   In this module, we choose option 1. *)
+let table_bnot =
+  Table.of_list @@ Scalar.[[|zero; one|]; [|zero; zero|]; [|one; zero|]]
+
+let generate_lookup_table_op1 ~nb_bits (f : int -> int) =
+  let n = 1 lsl nb_bits in
+  let x = Array.init n (fun i -> i) in
+  let y = Array.init n (fun _i -> 0) in
+  let z = Array.map f x in
+  List.map (Array.map Scalar.of_int) [x; y; z]
+
+let generate_lookup_table_op2 ~nb_bits (f : int -> int -> int) =
+  let n = 1 lsl nb_bits in
+  let x = List.init n (fun i -> Array.init n (fun _j -> i)) |> Array.concat in
+  let y = List.init n (fun _i -> Array.init n (fun j -> j)) |> Array.concat in
+  let z = Array.map2 f x y in
+  List.map (Array.map Scalar.of_int) [x; y; z]
+
+let table_bnot4 =
+  let nb_bits = 4 in
+  let mask4 = (1 lsl nb_bits) - 1 in
+  Table.of_list
+  @@ generate_lookup_table_op1 ~nb_bits (fun x -> Int.(logand (lognot x) mask4))
+
+let table_xor4 =
+  Table.of_list @@ generate_lookup_table_op2 ~nb_bits:4 Int.logxor
+
+let table_band4 =
+  Table.of_list @@ generate_lookup_table_op2 ~nb_bits:4 Int.logand
+
+let rotate_right ~nb_bits x y b =
+  let a = x + (y lsl nb_bits) in
+  let r = Int.logor (a lsr b) (a lsl ((2 * nb_bits) - b)) in
+  let mask = (1 lsl nb_bits) - 1 in
+  Int.logand r mask
+
+let table_rotate_right4_1 =
+  (* x0x1x2x3 y0y1y2y3 -> x1x2x3y0 *)
+  let nb_bits = 4 in
+  Table.of_list
+  @@ generate_lookup_table_op2 ~nb_bits (fun x y -> rotate_right ~nb_bits x y 1)
+
+let table_rotate_right4_2 =
+  (* x0x1x2x3 y0y1y2y3 -> x2x3y0y1 *)
+  let nb_bits = 4 in
+  Table.of_list
+  @@ generate_lookup_table_op2 ~nb_bits (fun x y -> rotate_right ~nb_bits x y 2)
+
+let table_rotate_right4_3 =
+  (* x0x1x2x3 y0y1y2y3 -> x3y0y1y2 *)
+  let nb_bits = 4 in
+  Table.of_list
+  @@ generate_lookup_table_op2 ~nb_bits (fun x y -> rotate_right ~nb_bits x y 3)
 
 module Tables = Map.Make (String)
 
-let table_registry = Tables.add "or" table_or Tables.empty
+let table_registry =
+  let t = Tables.add "or" table_or Tables.empty in
+  let t = Tables.add "xor" table_xor t in
+  let t = Tables.add "band" table_band t in
+  let t = Tables.add "bnot" table_bnot t in
+  let t = Tables.add "bnot4" table_bnot4 t in
+  let t = Tables.add "xor4" table_xor4 t in
+  let t = Tables.add "band4" table_band4 t in
+  let t = Tables.add "rotate_right4_1" table_rotate_right4_1 t in
+  let t = Tables.add "rotate_right4_2" table_rotate_right4_2 t in
+  let t = Tables.add "rotate_right4_3" table_rotate_right4_3 t in
+  t
 
 module CS = struct
   let q_list ?q_table ~qc ~linear ~linear_g ~qm ~qx2b ~qx5a ~qx5c ~qecc_ws_add
-      ~qecc_ed_add ~qecc_ed_cond_add ~qbool ~qcond_swap ~q_anemoi ~q_plookup ()
-      =
+      ~qecc_ed_add ~qecc_ed_cond_add ~qbool ~qcond_swap ~q_anemoi ~q_mod_add
+      ~q_mod_mul ~q_plookup () =
     let base =
       [
         ("qc", qc);
@@ -178,6 +272,8 @@ module CS = struct
         ("q_anemoi", q_anemoi);
         ("q_plookup", q_plookup);
       ]
+      @ List.map (fun (label, q) -> ("q_mod_add_" ^ label, q)) q_mod_add
+      @ List.map (fun (label, q) -> ("q_mod_mul_" ^ label, q)) q_mod_mul
       @ List.map (fun (i, q) -> (linear_selector_name i, q)) linear
       @ List.map
           (fun (i, q) -> (linear_selector_name i |> add_next_wire_suffix, q))
@@ -217,6 +313,22 @@ module CS = struct
       ~qbool:[ThisConstr; Wire 0]
       ~qcond_swap:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ~q_anemoi:[ThisConstr; NextConstr; Wire 1; Wire 2; Wire 3; Wire 4]
+      ~q_mod_add:
+        (List.map
+           (fun label ->
+             (label, [ThisConstr; NextConstr] @ List.init 6 (fun i -> Wire i)))
+             (* We list all the labels defined in the MOD_ARITH instantiations
+                at the end of [lib_plompiler/gadget_mod_arith.ml] for which we
+                want to enable addition. *)
+           ["25519"; "64"])
+      ~q_mod_mul:
+        (List.map
+           (fun label ->
+             (label, [ThisConstr; NextConstr] @ List.init 6 (fun i -> Wire i)))
+             (* We list all the labels defined in the MOD_ARITH instantiations
+                at the end of [lib_plompiler/gadget_mod_arith.ml] for which we
+                want to enable multiplication. *)
+           ["25519"; "64"])
       ~q_plookup:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ~q_table:[ThisConstr; Wire 0; Wire 1; Wire 2; Wire 3; Wire 4]
       ()
@@ -251,8 +363,8 @@ module CS = struct
 
   let new_constraint ~wires ?qc ?(linear = []) ?(linear_g = []) ?qm ?qx2b ?qx5a
       ?qx5c ?qecc_ws_add ?qecc_ed_add ?qecc_ed_cond_add ?qbool ?qcond_swap
-      ?q_anemoi ?q_plookup ?q_table ?(precomputed_advice = []) ?(labels = [])
-      label =
+      ?q_anemoi ?(q_mod_add = []) ?(q_mod_mul = []) ?q_plookup ?q_table
+      ?(precomputed_advice = []) ?(labels = []) label =
     let sels =
       List.filter_map
         (fun (l, x) -> Option.bind x (fun c -> Some (l, c)))
@@ -270,6 +382,8 @@ module CS = struct
            ~qbool
            ~qcond_swap
            ~q_anemoi
+           ~q_mod_add:(List.map (fun (i, x) -> (i, Some x)) q_mod_add)
+           ~q_mod_mul:(List.map (fun (i, x) -> (i, Some x)) q_mod_mul)
            ~q_plookup
            ~q_table
            ())

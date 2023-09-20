@@ -3,10 +3,10 @@
 
 (library
  (name tezos_protocol_environment_010_PtGRANAD)
- (public_name tezos-protocol-010-PtGRANAD.environment)
+ (public_name tezos-protocol-010-PtGRANAD.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_010_PtGRANAD))
 
@@ -19,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_010_PtGRANAD)
- (public_name tezos-protocol-010-PtGRANAD.raw)
+ (public_name tezos-protocol-010-PtGRANAD.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-010-PtGRANAD.environment)
+  tezos-protocol-010-PtGRANAD.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -120,12 +120,12 @@
 
 (library
  (name tezos_protocol_010_PtGRANAD)
- (public_name tezos-protocol-010-PtGRANAD)
+ (public_name tezos-protocol-010-PtGRANAD.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-010-PtGRANAD.raw)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
+  tezos-protocol-010-PtGRANAD.protocol.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -135,7 +135,7 @@
 (install
  (package tezos-protocol-010-PtGRANAD)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -248,12 +248,12 @@
 
 (library
  (name tezos_protocol_010_PtGRANAD_lifted)
- (public_name tezos-protocol-010-PtGRANAD.lifted)
+ (public_name tezos-protocol-010-PtGRANAD.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-010-PtGRANAD)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
+  tezos-protocol-010-PtGRANAD.protocol)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -271,8 +271,8 @@
 (library
  (name tezos_protocol_010_PtGRANAD_functor)
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -375,12 +375,12 @@
 
 (library
  (name tezos_embedded_protocol_010_PtGRANAD)
- (public_name tezos-embedded-protocol-010-PtGRANAD)
+ (public_name tezos-protocol-010-PtGRANAD.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-010-PtGRANAD
-  tezos-protocol-updater
-  tezos-protocol-environment)
+  tezos-protocol-010-PtGRANAD.protocol
+  octez-shell-libs.protocol-updater
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

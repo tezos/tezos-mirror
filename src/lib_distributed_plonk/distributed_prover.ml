@@ -48,7 +48,7 @@ module type S = sig
     MP.proof D.t
 end
 
-module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
+module Make_common (MP : Distribution.Main_protocol.S) = struct
   module MP = MP
   module Msg = Message.Make (MP)
   module D = Distributed_wrapper.Make (Msg)
@@ -59,6 +59,10 @@ module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
     let transcript =
       PC.distributed_expand_transcript transcript query_list answers_list
     in
+    (* The main thread simulates a worker, since it is the only one who knows
+       the information about t_map, g_map, plook_map. We need to pad a dummy
+       secret and a dummy prover_aux at the end, corresponding to f_map, which
+       the main thread does not have information about. *)
     let worker_message, state =
       PC.distributed_prove_main1
         pp
@@ -235,7 +239,7 @@ module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
     let randomness, transcript = build_gates_randomness transcript in
 
     let f_map_perm, evaluated_perm_ids, (cmt_perm, perm_prover_aux) =
-      shared_perm_argument pp nb_workers randomness inputs replies
+      shared_perm_rc_argument pp nb_workers randomness inputs replies
     in
 
     let cmt_plook =
@@ -277,8 +281,8 @@ module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
         transcript,
         ( cmt_perm_and_plook,
           commitment_wires,
-          randomness.beta_perm,
-          randomness.gamma_perm,
+          randomness.beta,
+          randomness.gamma,
           randomness.delta ) )
 
   let distributed_prover_main ~workers ~inputs
@@ -298,15 +302,15 @@ module Make_common (MP : Plonk_for_distribution.Main_protocol.S) = struct
     return {perm_and_plook; wires_cm; pp_proof}
 end
 
-module PC_Kzg = Plonk_for_distribution.Kzg_pack.Kzg_pack_impl
-module PP_Kzg = Plonk_for_distribution.Polynomial_protocol.Make (PC_Kzg)
-module Main_Kzg = Plonk_for_distribution.Main_protocol.Make (PP_Kzg)
-module PC_Pack = Plonk_for_distribution.Kzg_pack.Kzg_pack_impl
+module PC_Kzg = Distribution.Kzg.Kzg_impl
+module PP_Kzg = Distribution.Polynomial_protocol.Make (PC_Kzg)
+module Main_Kzg = Distribution.Main_protocol.Make (PP_Kzg)
+module PC_Pack = Distribution.Kzg_pack.Kzg_pack_impl
 module PP_Pack =
-  Plonk_for_distribution.Polynomial_protocol.MakeSuper
+  Distribution.Polynomial_protocol.MakeSuper
     (PC_Pack)
     (Main_Kzg.Input_commitment)
-module Main_Pack = Plonk_for_distribution.Main_protocol.MakeSuper (PP_Pack)
+module Main_Pack = Distribution.Main_protocol.MakeSuper (PP_Pack)
 module Make_aPlonk = Aplonk.Main_protocol.Make_impl (Main_Kzg) (Main_Pack)
 
 module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
@@ -402,38 +406,28 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
         transcript )
 
   let distributed_prove_super_aggregation ~workers
-      (pp : Main_Pack.prover_public_parameters) ~input_commit_infos ~inputs =
+      (pp : Main_Pack.prover_public_parameters) ~input_commit_funcs ~inputs =
     let open Common in
     let open Main_Pack in
     let open D in
     (* TODO: can we commit only to the hidden pi?*)
-    let public_inputs_map, cms_pi = hash_pi pp input_commit_infos inputs in
+    let public_inputs_map, cms_pi = hash_pi pp input_commit_funcs inputs in
     (* add the PI in the transcript *)
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
-    let commit_to_answers_map = commit_to_answers_map input_commit_infos in
     let* ( (pp_proof, PP.{answers; batch; alpha; x; r; cms_answers; t_answers}),
            _transcript,
            (perm_and_plook, wires_cm, beta, gamma, delta) ) =
       distributed_prover
         ~workers
         ~pp_prove:
-          (pp_distributed_prove_super_aggregation_main ~commit_to_answers_map)
+          (pp_distributed_prove_super_aggregation_main
+             ~commit_to_answers_map:
+               (SMap.map (fun f -> f.answers) input_commit_funcs))
         pp
         ~inputs
     in
     let ids_batch =
-      (* FIXME: generalize to plookup & RC *)
-      let rd =
-        {
-          beta_perm = beta;
-          gamma_perm = gamma;
-          beta_plook = Scalar.one;
-          gamma_plook = Scalar.one;
-          beta_rc = Scalar.one;
-          gamma_rc = Scalar.one;
-          delta;
-        }
-      in
+      let rd = {beta; gamma; delta} in
       compute_ids_batch pp rd alpha x public_inputs_map answers cms_answers
     in
     return
@@ -461,12 +455,12 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
       distributed_prove_super_aggregation
         ~workers
         pp.main_pp
-        ~input_commit_infos:(input_commit_infos pp)
+        ~input_commit_funcs:(input_commit_funcs pp inputs)
         ~inputs
     in
     return (meta_proof pp inputs distributed_proof)
 end
 
-module Make (MP : Plonk_for_distribution.Main_protocol.S) : S = Make_common (MP)
+module Make (MP : Distribution.Main_protocol.S) : S = Make_common (MP)
 
 module Super (PI : Aplonk.Pi_parameters.S) : S = Super_impl (PI)

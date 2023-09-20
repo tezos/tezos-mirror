@@ -7,6 +7,7 @@ docker:amd64:
   needs: []
   when: manual
   variables:
+    DOCKER_BUILD_TARGET: "with-evm-artifacts"
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "false"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"

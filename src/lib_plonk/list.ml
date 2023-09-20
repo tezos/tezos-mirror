@@ -158,11 +158,13 @@ let shuffle ?seed l =
   |> List.sort (fun (i, _) (j, _) -> Int.compare i j)
   |> List.rev_map snd
 
-(* transpose [[a1; b1; c1]; [a2; b2; c2]]
-   returns [[a1; a2]; [b1; b2]; [c1; c2]] *)
-let transpose l =
-  let rec aux transposed = function
-    | [] -> List.(map rev transposed)
-    | xs :: ls -> aux (List.map2 (fun x l -> x :: l) xs transposed) ls
+let sub l start len = List.filteri (fun i _ -> start <= i && i < start + len) l
+
+(* Applies the function [f] to the last element of the list [l] ; if [l] is empty, it returns the empty list. *)
+let map_end f l =
+  let rec aux acc = function
+    | [] -> []
+    | [x] -> rev (f x :: acc)
+    | x :: tl -> aux (x :: acc) tl
   in
-  aux (List.map (Fun.const []) (List.hd l)) l
+  aux [] l

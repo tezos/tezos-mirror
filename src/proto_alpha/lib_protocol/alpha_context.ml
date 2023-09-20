@@ -56,6 +56,12 @@ module Sc_rollup_repr = Sc_rollup_repr
 module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
+
+  module Whitelist = struct
+    include Sc_rollup_whitelist_storage
+    include Sc_rollup_whitelist_repr
+  end
+
   module Metadata = Sc_rollup_metadata_repr
   module Dissection_chunk = Sc_rollup_dissection_chunk_repr
   include Sc_rollup_PVM_sig
@@ -363,6 +369,15 @@ module Contract = struct
 
   let get_manager_key = Contract_manager_storage.get_manager_key
 
+  let is_delegate = Contract_delegate_storage.is_delegate
+
+  type delegate_status = Contract_delegate_storage.delegate_status =
+    | Delegate
+    | Delegated of public_key_hash
+    | Undelegated
+
+  let get_delegate_status = Contract_delegate_storage.get_delegate_status
+
   module Delegate = struct
     let find = Contract_delegate_storage.find
 
@@ -375,60 +390,6 @@ module Contract = struct
   end
 end
 
-module Tx_rollup_level = Tx_rollup_level_repr
-module Tx_rollup_commitment_hash = Tx_rollup_commitment_repr.Hash
-module Tx_rollup_message_result_hash = Tx_rollup_message_result_hash_repr
-
-module Tx_rollup = struct
-  include Tx_rollup_repr
-  include Tx_rollup_storage
-  module Internal_for_tests = Tx_rollup_repr
-end
-
-module Tx_rollup_state = struct
-  include Tx_rollup_state_repr
-  include Tx_rollup_state_storage
-
-  module Internal_for_tests = struct
-    include Tx_rollup_state_repr
-    include Tx_rollup_state_repr.Internal_for_tests
-  end
-end
-
-module Tx_rollup_withdraw = Tx_rollup_withdraw_repr
-module Tx_rollup_withdraw_list_hash = Tx_rollup_withdraw_list_hash_repr
-module Tx_rollup_message_result = Tx_rollup_message_result_repr
-
-module Tx_rollup_reveal = struct
-  include Tx_rollup_reveal_repr
-  include Tx_rollup_reveal_storage
-end
-
-module Tx_rollup_message = struct
-  include Tx_rollup_message_repr
-
-  let make_message msg = (msg, size msg)
-
-  let make_batch string = make_message @@ Batch string
-
-  let make_deposit sender destination ticket_hash amount =
-    make_message @@ Deposit {sender; destination; ticket_hash; amount}
-end
-
-module Tx_rollup_message_hash = Tx_rollup_message_hash_repr
-
-module Tx_rollup_inbox = struct
-  include Tx_rollup_inbox_repr
-  include Tx_rollup_inbox_storage
-end
-
-module Tx_rollup_commitment = struct
-  include Tx_rollup_commitment_repr
-  include Tx_rollup_commitment_storage
-end
-
-module Tx_rollup_hash = Tx_rollup_hash_builder
-module Tx_rollup_errors = Tx_rollup_errors_repr
 module Global_constants_storage = Global_constants_storage
 
 module Big_map = struct
@@ -530,11 +491,11 @@ module Consensus_key = Delegate_consensus_key
 
 module Delegate = struct
   include Delegate_storage
-  include Delegate_missed_endorsements_storage
+  include Delegate_missed_attestations_storage
   include Delegate_slashed_deposits_storage
   include Delegate_cycles
 
-  type deposits = Storage.deposits = {
+  type deposits = Deposits_repr.t = {
     initial_amount : Tez.t;
     current_amount : Tez.t;
   }
@@ -551,6 +512,17 @@ module Delegate = struct
   let deactivated = Delegate_activation_storage.is_inactive
 
   module Consensus_key = Delegate_consensus_key
+
+  module Rewards = struct
+    include Delegate_rewards
+
+    module For_RPC = struct
+      include Delegate_rewards.For_RPC
+      include Adaptive_issuance_storage.For_RPC
+    end
+  end
+
+  module Staking_parameters = Delegate_staking_parameters
 end
 
 module Stake_distribution = struct
@@ -563,6 +535,13 @@ module Stake_distribution = struct
   let slot_owner = Delegate_sampler.slot_owner
 
   let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
+
+  let get_total_frozen_stake ctxt cycle =
+    let open Lwt_result_syntax in
+    let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
+    return (Stake_repr.get_frozen total_stake)
+
+  module For_RPC = Delegate_sampler.For_RPC
 end
 
 module Nonce = Nonce_storage
@@ -590,16 +569,16 @@ module Migration = Migration_repr
 module Consensus = struct
   include Raw_context.Consensus
 
-  let load_endorsement_branch ctxt =
-    Storage.Tenderbake.Endorsement_branch.find ctxt >>=? function
-    | Some endorsement_branch ->
-        Raw_context.Consensus.set_endorsement_branch ctxt endorsement_branch
+  let load_attestation_branch ctxt =
+    Storage.Tenderbake.Attestation_branch.find ctxt >>=? function
+    | Some attestation_branch ->
+        Raw_context.Consensus.set_attestation_branch ctxt attestation_branch
         |> return
     | None -> return ctxt
 
-  let store_endorsement_branch ctxt branch =
-    let ctxt = set_endorsement_branch ctxt branch in
-    Storage.Tenderbake.Endorsement_branch.add ctxt branch
+  let store_attestation_branch ctxt branch =
+    let ctxt = set_attestation_branch ctxt branch in
+    Storage.Tenderbake.Attestation_branch.add ctxt branch
 end
 
 let prepare_first_block = Init_storage.prepare_first_block
@@ -607,7 +586,9 @@ let prepare_first_block = Init_storage.prepare_first_block
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, balance_updates, origination_results) ->
-  Consensus.load_endorsement_branch ctxt >>=? fun ctxt ->
+  Consensus.load_attestation_branch ctxt >>=? fun ctxt ->
+  Delegate.load_forbidden_delegates ctxt >>=? fun ctxt ->
+  Adaptive_issuance_storage.load_reward_coeff ctxt >>=? fun ctxt ->
   return (ctxt, balance_updates, origination_results)
 
 let finalize ?commit_message:message c fitness =
@@ -646,10 +627,15 @@ let internal_nonce_already_recorded =
 let description = Raw_context.description
 
 module Parameters = Parameters_repr
+module Votes_EMA = Votes_EMA_repr
+module Per_block_votes = Per_block_votes_repr
 
 module Liquidity_baking = struct
-  include Liquidity_baking_repr
   include Liquidity_baking_storage
+end
+
+module Adaptive_issuance = struct
+  include Adaptive_issuance_storage
 end
 
 module Ticket_hash = struct
@@ -663,6 +649,34 @@ end
 
 module Token = Token
 module Cache = Cache_repr
+
+module Unstake_requests = struct
+  include Unstake_requests_storage
+
+  module For_RPC = struct
+    let apply_slash_to_unstaked_unfinalizable ctxt ~delegate ~requests =
+      Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
+        ctxt
+        {delegate; requests}
+
+    let apply_slash_to_unstaked_unfinalizable_stored_requests ctxt
+        {delegate; requests} =
+      let open Lwt_result_syntax in
+      let* requests =
+        Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
+          ctxt
+          {delegate; requests}
+      in
+      return {delegate; requests}
+  end
+end
+
+module Unstaked_frozen_deposits = Unstaked_frozen_deposits_storage
+
+module Staking_pseudotokens = struct
+  include Staking_pseudotoken_repr
+  include Staking_pseudotokens_storage
+end
 
 module Internal_for_tests = struct
   let to_raw x = x

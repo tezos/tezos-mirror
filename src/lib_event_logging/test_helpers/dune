@@ -3,14 +3,14 @@
 
 (library
  (name tezos_event_logging_test_helpers)
- (public_name tezos-event-logging-test-helpers)
+ (public_name octez-libs.event-logging-test-helpers)
  (libraries
-  tezos-stdlib
-  tezos-lwt-result-stdlib
+  octez-libs.stdlib
+  octez-libs.lwt-result-stdlib
   data-encoding
-  tezos-error-monad
-  tezos-event-logging
-  tezos-test-helpers
+  octez-libs.error-monad
+  octez-libs.event-logging
+  octez-libs.test-helpers
   octez-alcotezt)
  (js_of_ocaml)
  (library_flags (:standard -linkall))

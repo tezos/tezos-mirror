@@ -35,6 +35,7 @@ type t = {
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;
+  constants : Constants.Parametric.t;
 }
 
 type block = t
@@ -79,12 +80,30 @@ let get_next_baker_by_round round block =
     round,
     WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
+type error += No_slots_found_for of Signature.Public_key_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:(Protocol.name ^ "_Block.No_slots_found_for")
+    ~title:"No slots found for given pkh"
+    ~description:"No slots found for given public key hash"
+    ~pp:(fun ppf pkh ->
+      Format.fprintf
+        ppf
+        "No slots found for %a"
+        Signature.Public_key_hash.pp
+        pkh)
+    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+    (function No_slots_found_for pkh -> Some pkh | _ -> None)
+    (fun pkh -> No_slots_found_for pkh)
+
 let get_next_baker_by_account pkh block =
   Plugin.RPC.Baking_rights.get rpc_ctxt ~delegates:[pkh] block
   >>=? fun bakers ->
   (match List.hd bakers with
   | Some b -> return b
-  | None -> failwith "No slots found for %a" Signature.Public_key_hash.pp pkh)
+  | None -> fail (No_slots_found_for pkh))
   >>=? fun {
              Plugin.RPC.Baking_rights.delegate = pkh;
              consensus_key;
@@ -168,7 +187,8 @@ module Forge = struct
       ?(proof_of_work_threshold =
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ~payload_hash ~payload_round
-      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
+      ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
       ~seed_nonce_hash shell =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -179,7 +199,11 @@ module Forge = struct
           payload_round;
           proof_of_work_nonce = default_proof_of_work_nonce;
           seed_nonce_hash;
-          liquidity_baking_toggle_vote;
+          per_block_votes =
+            {
+              liquidity_baking_vote = liquidity_baking_toggle_vote;
+              adaptive_issuance_vote;
+            };
         }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
@@ -239,7 +263,7 @@ module Forge = struct
 
   let forge_header ?(locked_round = None) ?(payload_round = None)
       ?(policy = By_round 0) ?timestamp ?(operations = [])
-      ?liquidity_baking_toggle_vote pred =
+      ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
       | Ok pred_fitness -> pred_fitness
@@ -288,6 +312,7 @@ module Forge = struct
     make_contents
       ~seed_nonce_hash
       ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote
       ~payload_hash
       ~payload_round
       shell
@@ -298,15 +323,20 @@ module Forge = struct
       ?(proof_of_work_threshold =
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ?seed_nonce_hash
-      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass) ~payload_hash
-      ~payload_round shell_header =
+      ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
+      ~payload_hash ~payload_round shell_header =
     naive_pow_miner
       ~proof_of_work_threshold
       shell_header
       {
         Block_header.proof_of_work_nonce = default_proof_of_work_nonce;
         seed_nonce_hash;
-        liquidity_baking_toggle_vote;
+        per_block_votes =
+          {
+            liquidity_baking_vote = liquidity_baking_toggle_vote;
+            adaptive_issuance_vote;
+          };
         payload_hash;
         payload_round;
       }
@@ -380,8 +410,8 @@ let initial_alpha_context ?(commitments = []) constants
   let level = block_header.level in
   let timestamp = block_header.timestamp in
   let predecessor = block_header.predecessor in
-  let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
-      =
+  let typecheck_smart_contract (ctxt : Alpha_context.context)
+      (script : Alpha_context.Script.t) =
     let allow_forged_in_storage =
       false
       (* There should be no forged value in bootstrap contracts. *)
@@ -411,7 +441,8 @@ let initial_alpha_context ?(commitments = []) constants
     (({script with storage}, lazy_storage_diff), ctxt)
   in
   Alpha_context.prepare_first_block
-    ~typecheck
+    ~typecheck_smart_contract
+    ~typecheck_smart_rollup:Sc_rollup_operations.validate_untyped_parameters_ty
     ~level
     ~timestamp
     ~predecessor
@@ -463,6 +494,7 @@ let genesis_with_parameters parameters =
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
+    constants = parameters.constants;
   }
 
 let validate_bootstrap_accounts
@@ -485,11 +517,10 @@ let validate_bootstrap_accounts
     (function Exit -> return_unit | exc -> raise exc)
 
 let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
-    ?level ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
-    ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
-    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
+    ?level ?cost_per_byte ?issuance_weights ?origination_size ?blocks_per_cycle
+    ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
+    ?sc_rollup_private_enable ?dal_enable ?zk_rollup_enable
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal () =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -498,25 +529,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let cost_per_byte =
     Option.value ~default:constants.cost_per_byte cost_per_byte
   in
-  let liquidity_baking_subsidy =
-    Option.value
-      ~default:constants.liquidity_baking_subsidy
-      liquidity_baking_subsidy
-  in
-  let endorsing_reward_per_slot =
-    Option.value
-      ~default:constants.endorsing_reward_per_slot
-      endorsing_reward_per_slot
-  in
-  let baking_reward_bonus_per_slot =
-    Option.value
-      ~default:constants.baking_reward_bonus_per_slot
-      baking_reward_bonus_per_slot
-  in
-  let baking_reward_fixed_portion =
-    Option.value
-      ~default:constants.baking_reward_fixed_portion
-      baking_reward_fixed_portion
+  let issuance_weights =
+    Option.value ~default:constants.issuance_weights issuance_weights
   in
   let origination_size =
     Option.value ~default:constants.origination_size origination_size
@@ -538,6 +552,11 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let sc_rollup_arith_pvm_enable =
     Option.value ~default:constants.sc_rollup.enable sc_rollup_arith_pvm_enable
   in
+  let sc_rollup_private_enable =
+    Option.value
+      ~default:constants.sc_rollup.private_enable
+      sc_rollup_private_enable
+  in
   let dal_enable =
     Option.value ~default:constants.dal.feature_enable dal_enable
   in
@@ -554,28 +573,28 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~default:constants.nonce_revelation_threshold
       nonce_revelation_threshold
   in
+  let dal = Option.value ~default:constants.dal dal in
+
   let constants =
     {
       constants with
-      endorsing_reward_per_slot;
-      baking_reward_bonus_per_slot;
-      baking_reward_fixed_portion;
+      issuance_weights;
       origination_size;
       blocks_per_cycle;
       cycles_per_voting_period;
       min_proposal_quorum;
       cost_per_byte;
-      liquidity_baking_subsidy;
       consensus_threshold;
-      tx_rollup = constants.tx_rollup;
       sc_rollup =
         {
           constants.sc_rollup with
           enable = sc_rollup_enable;
           arith_pvm_enable = sc_rollup_arith_pvm_enable;
+          private_enable = sc_rollup_private_enable;
         };
-      dal = {constants.dal with feature_enable = dal_enable};
+      dal = {dal with feature_enable = dal_enable};
       zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
+      adaptive_issuance = constants.adaptive_issuance;
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
     }
@@ -606,31 +625,29 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
 let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
-    ?bootstrap_contracts ?level ?cost_per_byte ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
+    ?bootstrap_contracts ?level ?cost_per_byte ?issuance_weights
+    ?origination_size ?blocks_per_cycle ?cycles_per_voting_period
+    ?sc_rollup_enable ?sc_rollup_arith_pvm_enable ?sc_rollup_private_enable
     ?dal_enable ?zk_rollup_enable ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold
+    ?nonce_revelation_threshold ?dal
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
     ?level
     ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
+    ?issuance_weights
     ?origination_size
     ?blocks_per_cycle
     ?cycles_per_voting_period
     ?sc_rollup_enable
     ?sc_rollup_arith_pvm_enable
+    ?sc_rollup_private_enable
     ?dal_enable
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
+    ?dal
     ()
   >>=? fun (constants, shell, hash) ->
   validate_bootstrap_accounts bootstrap_accounts constants.minimal_stake
@@ -654,6 +671,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
+    constants;
   }
 
 let alpha_context ?commitments ?min_proposal_quorum
@@ -802,9 +820,10 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     finalize_validation_and_application vstate (Some header.shell)
     >|= Environment.wrap_tzresult
     >|=? fun (validation, result) -> (validation.context, result) )
-  >|=? fun (context, result) ->
+  >>=? fun (context, result) ->
   let hash = Block_header.hash header in
-  ({hash; header; operations; context}, result)
+  Alpha_services.Constants.parametric rpc_ctxt pred >|=? fun constants ->
+  ({hash; header; operations; context; constants}, result)
 
 let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
   apply_with_metadata
@@ -817,7 +836,7 @@ let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?payload_round ?check_size ~baking_mode ?(allow_manager_failures = false)
-    ?liquidity_baking_toggle_vote pred =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
   let operations =
     match (operation, operations) with
     | Some op, Some ops -> Some (op :: ops)
@@ -832,6 +851,7 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?policy
     ?operations
     ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
@@ -844,9 +864,28 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?operations
     pred
 
+let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
+    ?check_size ?(baking_mode = Application) ?(allow_manager_failures = false)
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n pred =
+  let get_next b =
+    bake_with_metadata
+      ?locked_round
+      ?policy
+      ?timestamp
+      ?payload_round
+      ?check_size
+      ~baking_mode
+      ~allow_manager_failures
+      ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote
+      b
+  in
+  get_next pred >>=? fun b ->
+  List.fold_left_es (fun (b, _metadata) _ -> get_next b) b (2 -- n)
+
 let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
     ?payload_round ?locked_round ?policy ?timestamp ?operation ?operations
-    ?liquidity_baking_toggle_vote ?check_size pred =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote ?check_size pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
@@ -857,49 +896,81 @@ let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
     ?operation
     ?operations
     ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote
     ?check_size
     pred
   >>=? fun (t, (_metadata : block_header_metadata)) -> return t
 
 (********** Cycles ****************)
 
-(* This function is duplicated from Context to avoid a cyclic dependency *)
-let get_constants b = Alpha_services.Constants.all rpc_ctxt b
-
-let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote n
-    b =
+let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote n b =
   List.fold_left_es
-    (fun b _ -> bake ~baking_mode ?policy ?liquidity_baking_toggle_vote b)
+    (fun b _ ->
+      bake
+        ~baking_mode
+        ?policy
+        ?liquidity_baking_toggle_vote
+        ?adaptive_issuance_vote
+        b)
     b
     (1 -- n)
 
-let rec bake_while ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote predicate b =
+let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote
+    ?(invariant = fun _ -> return_unit) predicate b =
   let open Lwt_result_syntax in
-  let* new_block = bake ~baking_mode ?policy ?liquidity_baking_toggle_vote b in
-  if predicate new_block then
-    (bake_while [@ocaml.tailcall])
+  let* () = invariant b in
+  let* new_block, metadata =
+    bake_with_metadata
       ~baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote
+      b
+  in
+  if predicate new_block metadata then
+    (bake_while_with_metadata [@ocaml.tailcall])
+      ~baking_mode
+      ?policy
+      ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote
+      ~invariant
       predicate
       new_block
   else return b
 
+let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote ?invariant predicate b =
+  bake_while_with_metadata
+    ?baking_mode
+    ?policy
+    ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote
+    ?invariant
+    (fun block _metadata -> predicate block)
+    b
+
 let bake_until_level ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote level b =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote level b =
   bake_while
     ~baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote
     (fun b -> b.header.shell.level <= Raw_level.to_int32 level)
     b
 
 let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote n b =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
   List.fold_left_es
     (fun (b, balance_updates_rev) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
+      bake_with_metadata
+        ~baking_mode
+        ?policy
+        ?liquidity_baking_toggle_vote
+        ?adaptive_issuance_vote
+        b
       >>=? fun (b, metadata) ->
       let balance_updates_rev =
         List.rev_append metadata.balance_updates balance_updates_rev
@@ -911,8 +982,7 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
             fun (Successful_manager_result r) ->
               match r with
               | Transaction_result (Transaction_to_sc_rollup_result _)
-              | Reveal_result _ | Delegation_result _
-              | Update_consensus_key_result _ | Set_deposits_limit_result _
+              | Reveal_result _ | Update_consensus_key_result _
               | Transfer_ticket_result _ | Dal_publish_slot_header_result _
               | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
               | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
@@ -921,6 +991,7 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
               | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
                   balance_updates_rev
+              | Delegation_result {balance_updates; _}
               | Transaction_result
                   ( Transaction_to_contract_result {balance_updates; _}
                   | Transaction_to_zk_rollup_result {balance_updates; _} )
@@ -950,7 +1021,6 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Update_consensus_key_result _)
             | Successful_manager_result (Transaction_result _)
             | Successful_manager_result (Register_global_constant_result _)
-            | Successful_manager_result (Set_deposits_limit_result _)
             | Successful_manager_result (Increase_paid_storage_result _)
             | Successful_manager_result (Transfer_ticket_result _)
             | Successful_manager_result (Dal_publish_slot_header_result _)
@@ -977,37 +1047,38 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
     (1 -- n)
   >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
 
-let bake_n_with_liquidity_baking_toggle_ema ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote n b =
-  let initial_ema = Liquidity_baking.Toggle_EMA.zero in
-  List.fold_left_es
-    (fun (b, _toggle_ema) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
-      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_toggle_ema))
-    (b, initial_ema)
-    (1 -- n)
-
-let bake_until_cycle_end ?policy b =
-  get_constants b >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
-  let current_level = b.header.shell.level in
-  let current_level = Int32.rem current_level blocks_per_cycle in
-  let delta = Int32.sub blocks_per_cycle current_level in
-  bake_n ?policy (Int32.to_int delta) b
-
-let bake_until_n_cycle_end ?policy n b =
-  List.fold_left_es (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
+let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
+  let open Lwt_result_syntax in
+  let+ b, metadata =
+    bake_n_with_metadata
+      ?baking_mode
+      ?policy
+      ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote
+      n
+      b
+  in
+  (b, metadata.liquidity_baking_toggle_ema)
 
 let current_cycle b =
-  get_constants b >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
   let current_level = b.header.shell.level in
   let current_cycle = Int32.div current_level blocks_per_cycle in
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
-  return current_cycle
+  current_cycle
 
 let bake_until_cycle ?policy cycle (b : t) =
-  let rec loop (b : t) =
-    current_cycle b >>=? fun current_cycle ->
-    if Cycle.equal cycle current_cycle then return b
-    else bake_until_cycle_end ?policy b >>=? fun b -> loop b
+  let open Lwt_result_syntax in
+  let* final_block_of_previous_cycle =
+    bake_while ?policy (fun block -> Cycle.(current_cycle block < cycle)) b
   in
-  loop b
+  bake ?policy final_block_of_previous_cycle
+
+let bake_until_cycle_end ?policy b =
+  let cycle = current_cycle b in
+  bake_until_cycle ?policy (Cycle.succ cycle) b
+
+let bake_until_n_cycle_end ?policy n b =
+  let cycle = current_cycle b in
+  bake_until_cycle ?policy (Cycle.add cycle n) b

@@ -7,19 +7,19 @@
  (package octez-signer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-clic
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-client-commands
-  tezos-signer-services
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-rpc-http-client-unix
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos-signer-backends.unix)
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-shell-libs.client-commands
+  octez-shell-libs.signer-services
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-libs.rpc-http-client-unix
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
+  octez-shell-libs.signer-backends.unix)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

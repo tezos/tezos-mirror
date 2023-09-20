@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-protocol-017-PtNairob
-  tezos-test-helpers
-  tezos-smart-rollup-layer2-017-PtNairob
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol
+  octez-libs.test-helpers
+  octez-protocol-017-PtNairob-libs.smart-rollup-layer2
   octez_smart_rollup_node_PtNairob
   octez-alcotezt
   octez_smart_rollup_node_PtNairob_test_helpers)
@@ -26,7 +26,7 @@
   -open Octez_smart_rollup_node_PtNairob
   -open Octez_alcotezt
   -open Octez_smart_rollup_node_PtNairob_test_helpers)
- (modules canary))
+ (modules canary test_octez_conversions))
 
 (executable
  (name main)

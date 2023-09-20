@@ -1,0 +1,3 @@
+(executable
+ (name update)
+ (libraries tezt tezt_gitlab uri))

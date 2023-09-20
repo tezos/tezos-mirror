@@ -65,7 +65,7 @@ let rc_circuit n nb_range_checks nb_bits =
      [rc] is true, it adds a range check on every input *)
   let circuit rc inputs =
     let* inputs = mapM input inputs in
-    let* i1 = constant_scalar S.zero in
+    let* i1 = Num.zero in
     let l = List.init (1 lsl n) (Fun.const i1) in
     let i = ref 0 in
     let* foo =
@@ -77,7 +77,12 @@ let rc_circuit n nb_range_checks nb_bits =
         i1
         l
     in
-    let* rc = if rc then range_checks inputs else equal foo foo in
+    let* rc =
+      if rc then range_checks inputs
+      else
+        let* _ = mapM (Num.range_check ~nb_bits) inputs in
+        equal foo foo
+    in
     Bool.assert_true rc
   in
   (circuit true inputs, circuit false inputs)
@@ -94,24 +99,11 @@ let () =
   Printf.printf "\n\n------------------\n" ;
   let cs_with_rc = Plompiler.LibCircuit.get_cs with_rc in
   let witness_with_rc = Plompiler.Solver.solve cs_with_rc.solver base_witness in
-  let circuit_with_rc =
-    Plonk.Circuit.to_plonk ~public_input_size:0 cs_with_rc.cs
-  in
+  let circuit_with_rc = Plonk.Circuit.to_plonk cs_with_rc in
   Printf.printf "\n\n------------------\n" ;
-  (* Note that range checks are not the same as the ones in the previous
-     circuit ; it is just indexes I took to make it work *)
-  let range_checks =
-    List.(
-      rev (init nb_range_checks (fun i -> (1 lsl (nb_constraints + 1)) - i - 1)))
-  in
   let cs_no_rc = Plompiler.LibCircuit.get_cs no_rc in
   let witness_no_rc = Plompiler.Solver.solve cs_no_rc.solver base_witness in
-  let circuit_no_rc =
-    Plonk.Circuit.to_plonk
-      ~range_checks:(range_checks, nb_bits)
-      ~public_input_size:0
-      cs_no_rc.cs
-  in
+  let circuit_no_rc = Plonk.Circuit.to_plonk cs_no_rc in
   let end_build_circuit = Unix.gettimeofday () in
   Printf.printf
     "Dummy circuit built in %f ms.\n"

@@ -80,7 +80,6 @@ type manager_operation_kind =
   | K_Delegation
   | K_Undelegation
   | K_Self_delegation
-  | K_Set_deposits_limit
   | K_Update_consensus_key
   | K_Increase_paid_storage
   | K_Reveal
@@ -171,7 +170,6 @@ let kind_to_string = function
   | K_Delegation -> "Delegation"
   | K_Undelegation -> "Undelegation"
   | K_Self_delegation -> "Self-delegation"
-  | K_Set_deposits_limit -> "Set deposits limit"
   | K_Update_consensus_key -> "Update consensus key"
   | K_Origination -> "Origination"
   | K_Register_global_constant -> "Register global constant"
@@ -409,13 +407,6 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
     | None -> Gas.Arith.(integral_of_int_exn 5_200_000)
   in
   let dal = {params.constants.dal with feature_enable = flags.dal} in
-  let tx_rollup =
-    {
-      params.constants.tx_rollup with
-      sunset_level = Int32.max_int;
-      enable = flags.toru;
-    }
-  in
   let sc_rollup =
     {
       params.constants.sc_rollup with
@@ -425,14 +416,7 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
   in
   let zk_rollup = {params.constants.zk_rollup with enable = flags.zkru} in
   let constants =
-    {
-      params.constants with
-      hard_gas_limit_per_block;
-      dal;
-      tx_rollup;
-      zk_rollup;
-      sc_rollup;
-    }
+    {params.constants with hard_gas_limit_per_block; dal; zk_rollup; sc_rollup}
   in
   {params with constants}
 
@@ -689,17 +673,6 @@ let mk_register_global_constant (oinfos : operation_req) (infos : infos) =
     ~source:(contract_of (get_source infos))
     ~value:(Script_repr.lazy_expr (Expr.from_string "Pair 1 2"))
 
-let mk_set_deposits_limit (oinfos : operation_req) (infos : infos) =
-  Op.set_deposits_limit
-    ?force_reveal:oinfos.force_reveal
-    ?fee:oinfos.fee
-    ?gas_limit:oinfos.gas_limit
-    ?storage_limit:oinfos.storage_limit
-    ?counter:oinfos.counter
-    (B infos.ctxt.block)
-    (contract_of (get_source infos))
-    None
-
 let mk_update_consensus_key (oinfos : operation_req) (infos : infos) =
   Op.update_consensus_key
     ?force_reveal:oinfos.force_reveal
@@ -833,7 +806,6 @@ let mk_sc_rollup_cement (oinfos : operation_req) (infos : infos) =
     (B infos.ctxt.block)
     (contract_of (get_source infos))
     sc_rollup
-    (Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment)
 
 let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
@@ -920,16 +892,12 @@ let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =
     staker
 
 let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
-  let published_level =
-    Alpha_context.Raw_level.succ
-    @@ Alpha_context.Raw_level.of_int32_exn infos.ctxt.block.header.shell.level
-  in
   let slot_index = Alpha_context.Dal.Slot_index.zero in
   let commitment = Alpha_context.Dal.Slot.Commitment.zero in
   let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
   let slot =
     Dal.Operations.Publish_slot_header.
-      {published_level; slot_index; commitment; commitment_proof}
+      {slot_index; commitment; commitment_proof}
   in
   Op.dal_publish_slot_header
     ?fee:oinfos.fee
@@ -1013,7 +981,6 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Delegation -> mk_delegation
     | K_Undelegation -> mk_undelegation
     | K_Self_delegation -> mk_self_delegation
-    | K_Set_deposits_limit -> mk_set_deposits_limit
     | K_Update_consensus_key -> mk_update_consensus_key
     | K_Increase_paid_storage -> mk_increase_paid_storage
     | K_Reveal -> mk_reveal
@@ -1379,7 +1346,6 @@ let subjects =
     K_Delegation;
     K_Undelegation;
     K_Self_delegation;
-    K_Set_deposits_limit;
     K_Update_consensus_key;
     K_Increase_paid_storage;
     K_Reveal;
@@ -1399,10 +1365,10 @@ let subjects =
   ]
 
 let is_consumer = function
-  | K_Set_deposits_limit | K_Update_consensus_key | K_Increase_paid_storage
-  | K_Reveal | K_Self_delegation | K_Delegation | K_Undelegation
-  | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
-  | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
+  | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal
+  | K_Self_delegation | K_Delegation | K_Undelegation | K_Sc_rollup_add_messages
+  | K_Sc_rollup_origination | K_Sc_rollup_refute | K_Sc_rollup_timeout
+  | K_Sc_rollup_cement | K_Sc_rollup_publish
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
   | K_Dal_publish_slot_header | K_Zk_rollup_origination | K_Zk_rollup_publish
   | K_Zk_rollup_update ->
@@ -1419,9 +1385,8 @@ let revealed_subjects =
 
 let is_disabled flags = function
   | K_Transaction | K_Origination | K_Register_global_constant | K_Delegation
-  | K_Undelegation | K_Self_delegation | K_Set_deposits_limit
-  | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal
-  | K_Transfer_ticket ->
+  | K_Undelegation | K_Self_delegation | K_Update_consensus_key
+  | K_Increase_paid_storage | K_Reveal | K_Transfer_ticket ->
       false
   | K_Sc_rollup_origination | K_Sc_rollup_publish | K_Sc_rollup_cement
   | K_Sc_rollup_add_messages | K_Sc_rollup_refute | K_Sc_rollup_timeout

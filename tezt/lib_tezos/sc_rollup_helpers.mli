@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,10 +39,30 @@ val hex_encode : string -> string
 *)
 val read_kernel : ?base:string -> string -> string
 
-(** [prepare_installer_kernel ~base_installee ~preimages_dir installee] feeds the
-    [smart-rollup-installer] with a kernel ([installee]), and returns the boot
-    sector corresponding to the installer for this specific kernel. [installee] is read
-    from [base_installee] on the disk.
+module Installer_kernel_config : sig
+  (** Moves path [from] at path [to_]. *)
+  type move_args = {from : string; to_ : string}
+
+  (** Reveals hash [hash] at path [to_]. *)
+  type reveal_args = {hash : string; to_ : string}
+
+  (** Sets value [value] at path [to_]. *)
+  type set_args = {value : string; to_ : string}
+
+  type instr = Move of move_args | Reveal of reveal_args | Set of set_args
+
+  (** Set of instructions used by the installer-client. *)
+  type t = instr list
+end
+
+(** [prepare_installer_kernel ~base_installee ~preimages_dir ?config
+    installee] feeds the [smart-rollup-installer] with a kernel
+    ([installee]), and returns the boot sector corresponding to the
+    installer for this specific kernel. [installee] is read from
+    [base_installee] on the disk.
+
+    A {!Installer_kernel_config.t} can optionally be provided to the installer
+    via [config].
 
     The preimages of the [installee] are saved to [preimages_dir]. This should be the
     reveal data directory of the rollup node.
@@ -53,23 +74,40 @@ val prepare_installer_kernel :
   ?runner:Runner.t ->
   ?base_installee:string ->
   preimages_dir:string ->
+  ?config:Installer_kernel_config.t ->
   string ->
   string Lwt.t
+
+(** [prepare_installer_kernel ?runner ?base_installee ~preimages_dir 
+    ?display_root_hash ?config installee] will behave just as
+    {!Sc_rollup_helpers.prepare_installer_kernel} but will also output
+    the preimage root hash if [display_root_hash] is set to [true]. *)
+val prepare_installer_kernel_gen :
+  ?runner:Runner.t ->
+  ?base_installee:string ->
+  preimages_dir:string ->
+  ?display_root_hash:bool ->
+  ?config:Installer_kernel_config.t ->
+  string ->
+  (string * string option) Lwt.t
 
 (** [setup_l1 protocol] initializes a protocol with the given parameters, and
     returns the L1 node and client. *)
 val setup_l1 :
+  ?bootstrap_smart_rollups:Protocol.bootstrap_smart_rollup list ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?timeout:int ->
+  ?whitelist_enable:bool ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
-(** [originate_sc_rollup] is a wrapper above {Client.originate_sc_rollup} that
+(** [originate_sc_rollup] is a wrapper above {!Client.originate_sc_rollup} that
     waits for the block to be included. *)
 val originate_sc_rollup :
   ?hooks:Process_hooks.t ->
   ?burn_cap:Tez.t ->
+  ?whitelist:string list ->
   ?alias:string ->
   ?src:string ->
   kind:string ->
@@ -90,3 +128,8 @@ val last_cemented_commitment_hash_with_level :
     context. *)
 val genesis_commitment :
   sc_rollup:string -> Client.t -> Sc_rollup_client.commitment Lwt.t
+
+(** [call_rpc ~smart_rollup_node ~service] call the RPC for [service] on
+    [smart_rollup_node]. *)
+val call_rpc :
+  smart_rollup_node:Sc_rollup_node.t -> service:string -> JSON.t Lwt.t

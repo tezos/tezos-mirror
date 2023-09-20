@@ -183,7 +183,7 @@ module List_key_values_benchmark = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let benchmark rng_state {max_size} () =
     let wrap m = m >|= Environment.wrap_tzresult in
@@ -225,7 +225,7 @@ module List_key_values_benchmark_intercept = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Other_purpose "No longer used to generate code"
 
   let benchmark _rng_state _config () =
     let ctxt =

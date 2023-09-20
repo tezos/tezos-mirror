@@ -36,6 +36,9 @@ type t = {
   protocol : Protocol.t;
       (** The protocol run by the targeted testnet. Used to select
           which binaries to run, e.g., the smart rollup node. *)
+  data_dir : string option;
+      (** Optionally can start a node using an existing data-dir, instead
+          of creating and bootstrapping one. *)
 }
 
 (** [get_testnet_config path] returns the configuration of the network

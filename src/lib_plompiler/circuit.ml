@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** PlonK circuit generating backend for Plompiler. *)
+
 include Lang_core
 module Tables = Csir.Tables
 open Solver
@@ -38,6 +40,8 @@ let wql, wqr, wqo = (0, 1, 2)
 
 type scalar = X of S.t
 
+(* Wire representation.
+   Each atom is represented by an index in the trace. *)
 type _ repr =
   | Unit : unit repr
   | Scalar : int -> scalar repr
@@ -58,36 +62,50 @@ let compare_trace_kind x y =
   in
   Int.compare (to_int x) (to_int y)
 
+module Scalar_map = Map.Make (S)
+
+(* State of the interpreter. *)
 type state = {
   nvars : int;
+  (* Number of variables in the circuit. *)
   cs : CS.t;
+  (* Constraint system. *)
   inputs : S.t array;
+  (* Inputs declared for the circuit. *)
   input_com_sizes : int list;
-  pi_size : int;
+  (* Sizes for input commitments. *)
+  pi_size : int; (* Size of public inputs. *)
+  input_flag : trace_kind;
   (* Flag indicating the type of inputs we are expecting. Inputs must
      come in order: (i) InputCom; (ii) Public; (iii) Private;
      (iv) NoInput (corresponding to intermediary variables).
      If we receive an input with earlier precedence than [input_flag], an
      error should be raised. *)
-  input_flag : trace_kind;
-  (*
-    Boolean wires to be checked.
-    If at the end of the circuit ([get_cs]) this is not empty, their
-    conjunction will be asserted.
-  *)
   check_wires : bool repr list;
-  (* Delayed computation, used to dump the implicit checks at the end.
-     This is necessary because some implicit checks on the inputs might
-     create intermediary variables, which would set to false the [input_flag]
-     before some inputs are processed.
-  *)
+  (* Boolean wires to be checked.
+     If at the end of the circuit ([get_cs]) this is not empty, their
+     conjunction will be asserted. *)
   delayed : state -> state * unit repr;
+      (* Delayed computation, used to dump the implicit checks at the end.
+         This is necessary because some implicit checks on the inputs might
+         create intermediary variables, which would set to false the [input_flag]
+         before some inputs are processed.
+      *)
   tables : string list;
   solver : Solver.t;
+  range_checks : Range_checks.t;
+  (* label trace that creates a range-check and the size of the range-check *)
+  range_checks_labels : (string list * int) list;
   (* label trace *)
   labels : string list;
+  (* one and zero are used so often that it's worth reusing them across the
+     whole circuit. Num.constant uses these two values as cache, which in turn
+     is used by Bool.constant and Bytes.constant and leads to important
+     reduction in circuit size. *)
+  cache : scalar repr Scalar_map.t;
 }
 
+(* A Plompiler program is just a state monad. *)
 type 'a t = state -> state * 'a
 
 let ret : 'a -> 'a t = fun x s -> (s, x)
@@ -97,14 +115,24 @@ let ( let* ) : 'a t -> ('a -> 'b t) -> 'b t =
   let s, o = m s in
   f o s
 
+let unscalar (Scalar s) = s
+
+(* Monadic bind that unwraps a scalar repr. *)
 let ( let*& ) : scalar repr t -> (int -> 'b repr t) -> 'b repr t =
- fun m f s ->
-  let s, Scalar o = m s in
-  f o s
+ fun m f ->
+  let* m in
+  f (unscalar m)
 
 let ( >* ) m f =
   let* Unit = m in
   f
+
+let fmap : ('a -> 'b) -> 'a t -> 'b t =
+ fun f m ->
+  let* m in
+  ret (f m)
+
+let ( <$> ) m f = fmap f m
 
 let rec foldM f e l =
   match l with
@@ -131,7 +159,13 @@ let rec iterM f l =
       let* _ = f x in
       iterM f xs
 
-let iter2M f ls rs = iterM (fun (a, b) -> f a b) (List.combine ls rs)
+let iter2M f ls rs =
+  let lrs =
+    try List.combine ls rs
+    with Invalid_argument _ ->
+      failwith "iter2M: inputs are of different length"
+  in
+  iterM (fun (a, b) -> f a b) lrs
 
 let with_bool_check : bool repr t -> unit repr t =
  fun c s ->
@@ -139,10 +173,12 @@ let with_bool_check : bool repr t -> unit repr t =
   ({s with check_wires = b :: s.check_wires}, Unit)
 
 module Input = struct
+  (* Checks to be performed on an input *)
   type 'a implicit_check = 'a repr -> unit repr t
 
   let default_check : 'a implicit_check = fun _ -> ret Unit
 
+  (* Structured inputs *)
   type 'a t' =
     | U : unit t'
     | S : scalar -> scalar t'
@@ -193,6 +229,8 @@ module Input = struct
 
   let to_list (L l, _) = List.map (fun i -> (i, default_check)) l
 
+  (* Traverse the input structure, replacing the scalars
+     with increasing indices starting from [start]. *)
   let rec make_repr : type a. a t' -> int -> a repr * int =
    fun input start ->
     match input with
@@ -215,6 +253,8 @@ module Input = struct
         (List (List.rev l), e)
 end
 
+(* Dummy inputs, useful for computing a circuit before knowning
+   the actual inputs. *)
 module Dummy = struct
   let scalar = Input.(S (X S.zero))
 
@@ -234,6 +274,8 @@ let rec encode : type a. a Input.t' -> S.t list =
 
 let serialize i = Array.of_list @@ encode i
 
+(* Physical equality: the reprs have the same structure
+   and use the same wires. *)
 let rec eq : type a. a repr -> a repr -> bool =
  fun a b ->
   match (a, b) with
@@ -254,6 +296,8 @@ let with_label ~label m s =
   let s' = {s with labels = label :: s.labels} in
   let s'', a = m s' in
   ({s'' with labels = s.labels}, a)
+
+let debug _ _ = ret Unit
 
 let add_solver : solver:Solver.solver_desc -> unit repr t =
  fun ~solver s -> ({s with solver = Solver.append_solver solver s.solver}, Unit)
@@ -276,6 +320,7 @@ let default_solver ?(to_solve = W 2) g =
       to_solve;
     }
 
+(* Add a gate to the constraint system *)
 let append : CS.gate -> ?solver:Solver.solver_desc -> unit repr t =
  fun gate ?solver s ->
   let solver =
@@ -290,6 +335,7 @@ let append : CS.gate -> ?solver:Solver.solver_desc -> unit repr t =
   let solver = Solver.append_solver solver s.solver in
   ({s with cs; solver}, Unit)
 
+(* Add a lookup to the CS *)
 let append_lookup :
     wires:int tagged list -> table:string -> string -> unit repr t =
  fun ~wires ~table label s ->
@@ -308,10 +354,7 @@ let append_lookup :
         ({s with tables}, i)
   in
   let s, index = use_table s table in
-  let wires =
-    let pad_length = Csir.nb_wires_arch - List.length wires in
-    wires @ List.init pad_length (Fun.const @@ Input 0) |> Array.of_list
-  in
+  let wires = Array.of_list wires in
   let solver = Lookup {wires; table} in
   let wires = Array.map untag wires in
   let cstr =
@@ -481,18 +524,6 @@ let deserialize : type a. S.t array -> a Input.t -> a Input.t =
   in
   fun a (w, check) -> (fst @@ aux a w 0, check)
 
-let constant_scalar s =
-  let*& o = fresh Dummy.scalar in
-  append
-    [|
-      CS.new_constraint
-        ~wires:[0; 0; o]
-        ~qc:s
-        ~linear:[(wqo, mone)]
-        "constant_scalar";
-    |]
-  >* ret (Scalar o)
-
 let scalar_of_bool (Bool b) = Scalar b
 
 let unsafe_bool_of_scalar (Scalar b) = Bool b
@@ -505,6 +536,17 @@ module Num = struct
   type nonrec 'a repr = 'a repr
 
   type nonrec 'a t = 'a t
+
+  (* checks that 0 <= (Scalar l) < 2^nb_bits *)
+  let range_check ~nb_bits (Scalar l) s =
+    assert (nb_bits > 0) ;
+    let range_checks_labels = (s.labels, nb_bits) :: s.range_checks_labels in
+    ( {
+        s with
+        range_checks = Range_checks.add ~nb_bits l s.range_checks;
+        range_checks_labels;
+      },
+      Unit )
 
   (* l ≠ 0  <=>  ∃ r ≠ 0 : l * r - 1 = 0 *)
   let assert_nonzero (Scalar l) =
@@ -655,15 +697,45 @@ module Num = struct
     in
     let solver = Pow5 {a = l; c = o} in
     append gate ~solver >* ret @@ Scalar o
+
+  let constant_aux s =
+    let*& o = fresh Dummy.scalar in
+    append
+      [|
+        CS.new_constraint
+          ~wires:[0; 0; o]
+          ~qc:s
+          ~linear:[(wqo, mone)]
+          "constant_scalar";
+      |]
+    >* ret (Scalar o)
+
+  (* cache zero and one otherwise just add a fresh constraint *)
+  let constant x : scalar repr t =
+   fun st ->
+    match Scalar_map.find_opt x st.cache with
+    | None ->
+        let st, o = constant_aux x st in
+        let cache = Scalar_map.add x o st.cache in
+        ({st with cache}, o)
+    | Some o -> (st, o)
+
+  let zero = constant S.zero
+
+  let one = constant S.one
 end
 
 module Bool = struct
-  include Num
+  type nonrec scalar = scalar
 
-  let constant_bool : bool -> bool repr t =
+  type nonrec 'a repr = 'a repr
+
+  type nonrec 'a t = 'a t
+
+  let constant : bool -> bool repr t =
    fun b ->
     let s = if b then S.one else S.zero in
-    let* (Scalar s) = constant_scalar s in
+    let* (Scalar s) = Num.constant s in
     ret (Bool s)
 
   let assert_true (Bool bit) =
@@ -754,11 +826,6 @@ module Bool = struct
       |]
     >* ret @@ Bool o
 
-  let bor_lookup (Bool l) (Bool r) =
-    let* (Bool o) = fresh Dummy.bool in
-    append_lookup ~wires:[Input l; Input r; Output o] ~table:"or" "bor lookup"
-    >* ret @@ Bool o
-
   let swap : type a. bool repr -> a repr -> a repr -> (a * a) repr t =
     let scalar_swap (Bool b) (Scalar x) (Scalar y) =
       let*& u = fresh Dummy.scalar in
@@ -801,18 +868,91 @@ module Bool = struct
   let is_eq_const l s =
     with_label ~label:"Bool.is_eq_const"
     @@ let* diff = Num.add_constant ~ql:S.mone s l in
-       is_zero diff
+       Num.is_zero diff
 
   let band_list l =
     with_label ~label:"Bool.band_list"
     @@
     match l with
-    | [] -> constant_bool true
+    | [] -> constant true
     | hd :: tl ->
         let* sum =
           foldM Num.add (scalar_of_bool hd) (List.map scalar_of_bool tl)
         in
         is_eq_const sum (S.of_int @@ (List.length tl + 1))
+
+  module Internal = struct
+    let bor_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup ~wires:[Input l; Input r; Output o] ~table:"or" "bor lookup"
+      >* ret @@ Bool o
+
+    let xor_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup
+        ~wires:[Input l; Input r; Output o]
+        ~table:"xor"
+        "xor lookup"
+      >* ret @@ Bool o
+
+    let band_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup
+        ~wires:[Input l; Input r; Output o]
+        ~table:"band"
+        "band lookup"
+      >* ret @@ Bool o
+
+    let bnot_lookup (Bool b) =
+      let* (Bool o) = fresh Dummy.bool in
+      let* (Scalar zero) = fresh Dummy.scalar in
+      append_lookup
+        ~wires:[Input b; Input zero; Output o]
+        ~table:"bnot"
+        "bnot lookup"
+      >* ret @@ Bool o
+  end
+end
+
+module Limb (N : sig
+  val nb_bits : int
+end) =
+struct
+  let nb_bits = N.nb_bits
+
+  let xor_lookup (Scalar l) (Scalar r) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("xor" ^ Int.to_string nb_bits)
+      ("xor lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let band_lookup (Scalar l) (Scalar r) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("band" ^ Int.to_string nb_bits)
+      ("band lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let bnot_lookup (Scalar l) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    let* (Scalar zero) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input zero; Output o]
+      ~table:("bnot" ^ Int.to_string nb_bits)
+      ("bnot lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let rotate_right_lookup (Scalar l) (Scalar r) i =
+    let* (Scalar o) = fresh Dummy.scalar in
+    let nb_bits_i = Int.to_string nb_bits ^ "_" ^ Int.to_string i in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("rotate_right" ^ nb_bits_i)
+      ("rotate_right lookup" ^ nb_bits_i)
+    >* ret @@ Scalar o
 end
 
 let hd (List l) = match l with [] -> assert false | x :: _ -> ret x
@@ -842,7 +982,7 @@ let equal : type a. a repr -> a repr -> bool repr t =
     let open Bool in
     let open Num in
     match (a, b) with
-    | Unit, Unit -> constant_bool true
+    | Unit, Unit -> Bool.constant true
     | Bool a, Bool b ->
         let* s = sub (Scalar a) (Scalar b) in
         is_zero s
@@ -855,7 +995,7 @@ let equal : type a. a repr -> a repr -> bool repr t =
         band le re
     | List ls, List rs ->
         let lrs = List.map2 pair ls rs in
-        let* acc = constant_bool true in
+        let* acc = Bool.constant true in
         foldM
           (fun acc (Pair (l, r)) ->
             let* e = aux l r in
@@ -864,6 +1004,18 @@ let equal : type a. a repr -> a repr -> bool repr t =
           lrs
   in
   fun a b -> with_label ~label:"Core.equal" @@ aux a b
+
+let scalar_of_limbs ~nb_bits b =
+  let sb = of_list b in
+  let powers =
+    let nb_limbs = List.length sb in
+    let base = 1 lsl nb_bits |> Z.of_int in
+    List.init nb_limbs (fun i -> S.of_z @@ Z.pow base i)
+  in
+  foldM
+    (fun acc (qr, w) -> Num.add ~qr acc w)
+    (List.hd sb)
+    List.(tl @@ combine powers sb)
 
 (* If [add_alpha], this function returns the binary decomposition of
    [l + Utils.alpha], instead of the binary decompostion of [l], where
@@ -882,14 +1034,8 @@ let bits_of_scalar ?(shift = Z.zero) ~nb_bits (Scalar l) =
               bits = List.map (fun (Bool x) -> x) @@ of_list bits;
             })
      >* let* sum =
-          let powers =
-            List.init nb_bits (fun i -> S.of_z Z.(pow (of_int 2) i))
-          in
           let sbits = List.map scalar_of_bool (of_list bits) in
-          foldM
-            (fun acc (qr, w) -> Num.add ~qr acc w)
-            (List.hd sbits)
-            List.(tl @@ combine powers sbits)
+          scalar_of_limbs ~nb_bits:1 (to_list sbits)
         in
         let* l =
           if Z.(not @@ equal shift zero) then
@@ -897,6 +1043,30 @@ let bits_of_scalar ?(shift = Z.zero) ~nb_bits (Scalar l) =
           else ret (Scalar l)
         in
         assert_equal l sum >* ret bits
+
+let limbs_of_scalar ?(shift = Z.zero) ~total_nb_bits ~nb_bits (Scalar l) =
+  with_label ~label:"Core.limbs_of_scalar"
+  @@
+  let nb_limbs = total_nb_bits / nb_bits in
+  let* limbs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+  add_solver
+    ~solver:
+      (LimbsOfS
+         {
+           total_nb_bits;
+           nb_bits;
+           shift;
+           l;
+           limbs = List.map (fun (Scalar x) -> x) @@ of_list limbs;
+         })
+  >* let* sum = scalar_of_limbs ~nb_bits limbs in
+     let* l =
+       if Z.(not @@ equal shift zero) then
+         Num.add_constant (S.of_z shift) (Scalar l)
+       else ret (Scalar l)
+     in
+     iterM (Num.range_check ~nb_bits) (of_list limbs)
+     >* assert_equal l sum >* ret limbs
 
 module Ecc = struct
   let weierstrass_add (Pair (Scalar x1, Scalar y1))
@@ -957,6 +1127,234 @@ module Ecc = struct
     append gate ~solver >* ret (Pair (Scalar x3, Scalar y3))
 end
 
+module Mod_arith = struct
+  (* Refer to [lib_plompiler/gadget_mod_arith.ml] for documentation on
+     modular arithmetic and details about all parameters:
+     [modulus], [nb_limbs], [base], [moduli], [qm_bound] and [ts_bounds] *)
+  let add ?(subtraction = false) ~label ~modulus ~nb_limbs ~base ~moduli
+      ~qm_bound ~ts_bounds (List xs) (List ys) =
+    (* This is just a sanity check, inputs are assumed to be well-formed,
+       in particular, their limb values are in the range [0, base) *)
+    assert (List.compare_length_with xs nb_limbs = 0) ;
+    assert (List.compare_length_with ys nb_limbs = 0) ;
+    (* Assert that all bounds are compatible with our range-check protocol,
+       which is designed to check membership in intervals of the form [0, 2^k) *)
+    let qm_ubound = snd qm_bound in
+    let ts_ubounds = List.map snd ts_bounds in
+    assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;
+    let label_suffix = if subtraction then "sub" else "add" in
+    (* Create the corresponding constraints *)
+    with_label ~label:("Mod_arith." ^ label_suffix)
+    @@ let* zs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+       let* qm = fresh Dummy.scalar in
+       let* ts = fresh @@ Dummy.list (List.length moduli) Dummy.scalar in
+       let inp1 = List.map unscalar xs in
+       let inp2 = List.map unscalar ys in
+       let out = List.map unscalar (of_list zs) in
+       let scalar_qm = qm in
+       let scalar_ts = of_list ts in
+       let qm = unscalar qm in
+       let ts = List.map unscalar scalar_ts in
+       let gate =
+         (* Substracions zs = xs - ys are modeled as additions xs = zs + ys.
+            Thus, we swap inp1 (xs) and out (zs) when subtraction = true. *)
+         let left_row1 = if subtraction then out else inp1 in
+         let left_row2 = if subtraction then inp1 else out in
+         [|
+           CS.new_constraint
+             ~wires:(left_row1 @ inp2)
+             ~q_mod_add:[(label, one)]
+             ("mod_arith-" ^ label_suffix ^ ".1");
+           CS.new_constraint
+             ~wires:(left_row2 @ [qm] @ ts)
+             ("mod_arith-" ^ label_suffix ^ ".2");
+         |]
+       in
+       let solver =
+         Mod_Add
+           {
+             modulus;
+             base;
+             nb_limbs;
+             moduli;
+             qm_bound;
+             ts_bounds;
+             inp1;
+             inp2;
+             out;
+             qm;
+             ts;
+             inverse = subtraction;
+           }
+       in
+       (* The output is not assumed to be well-formed, we need to enforce this
+          with constraints. In particular, we need to range-check every limb
+          in the output in the range [0, base). *)
+       iterM (Num.range_check ~nb_bits:(Z.log2 base)) (of_list zs)
+       (* qm needs to be range-checked in the interval [0, qm_ubound) *)
+       >* Num.range_check ~nb_bits:(Z.log2 qm_ubound) scalar_qm
+          (* every tj needs to be range-checked in the interval [0, tj_ubound) *)
+       >* iter2M
+            (fun tj_ubound tj -> Num.range_check ~nb_bits:(Z.log2 tj_ubound) tj)
+            ts_ubounds
+            scalar_ts
+       >* append gate ~solver >* ret zs
+
+  (* This function is also used for division, since we implement division
+     [z = x / y] as a multiplication [x = z * y]. However, one must be careful,
+     as this does not prevent "division by 0", i.e., when [y = 0], constraint
+     [x = z * y] is satisfiable for [x = 0]. Therefore, in the gadget for
+     division we will need to explicitly assert that [y <> 0]. *)
+  let mul ?(division = false) ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound
+      ~ts_bounds (List xs) (List ys) =
+    (* This is just a sanity check, inputs are assumed to be well-formed,
+       in particular, their limb values are in the range [0, base) *)
+    assert (List.compare_length_with xs nb_limbs = 0) ;
+    assert (List.compare_length_with ys nb_limbs = 0) ;
+    (* Assert that all bounds are compatible with our range-check protocol,
+       which is designed to check membership in intervals of the form [0, 2^k) *)
+    let qm_ubound = snd qm_bound in
+    let ts_ubounds = List.map snd ts_bounds in
+    assert (List.for_all Utils.is_power_of_2 (base :: qm_ubound :: ts_ubounds)) ;
+    let label_suffix = if division then "div" else "mul" in
+    (* Create the corresponding constraints *)
+    with_label ~label:("Mod_arith." ^ label_suffix)
+    @@ let* zs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+       let* qm = fresh Dummy.scalar in
+       let* ts = fresh @@ Dummy.list (List.length moduli) Dummy.scalar in
+       let inp1 = List.map unscalar xs in
+       let inp2 = List.map unscalar ys in
+       let out = List.map unscalar (of_list zs) in
+       let scalar_qm = qm in
+       let scalar_ts = of_list ts in
+       let qm = unscalar qm in
+       let ts = List.map unscalar scalar_ts in
+       let gate =
+         (* Divisions zs = xs / ys are modeled as multiplications xs = zs * ys.
+            Thus, we swap inp1 (xs) and out (zs) when division = true. *)
+         let left_row1 = if division then out else inp1 in
+         let left_row2 = if division then inp1 else out in
+         [|
+           CS.new_constraint
+             ~wires:(left_row1 @ inp2)
+             ~q_mod_mul:[(label, one)]
+             ("mod_arith-" ^ label_suffix ^ ".1");
+           CS.new_constraint
+             ~wires:(left_row2 @ [qm] @ ts)
+             ("mod_arith-" ^ label_suffix ^ ".2");
+         |]
+       in
+       let solver =
+         Mod_Mul
+           {
+             modulus;
+             base;
+             nb_limbs;
+             moduli;
+             qm_bound;
+             ts_bounds;
+             inp1;
+             inp2;
+             out;
+             qm;
+             ts;
+             inverse = division;
+           }
+       in
+       (* The output is not assumed to be well-formed, we need to enforce this
+          with constraints. In particular, we need to range-check every limb
+          in the output in the range [0, base). *)
+       iterM (Num.range_check ~nb_bits:(Z.log2 base)) (of_list zs)
+       (* qm needs to be range-checked in the interval [0, qm_ubound) *)
+       >* Num.range_check ~nb_bits:(Z.log2 qm_ubound) scalar_qm
+          (* every tj needs to be range-checked in the interval [0, tj_ubound) *)
+       >* iter2M
+            (fun tj_ubound tj -> Num.range_check ~nb_bits:(Z.log2 tj_ubound) tj)
+            ts_ubounds
+            scalar_ts
+       >* append gate ~solver >* ret zs
+
+  (* In order to show that [x] is non-zero, we exhibit a value [r] such that
+     [x * r = 1]. This is a characterization of non-zero elements when
+     [modulus] is prime. More generally, when modulus is a prime power
+     [modulus = p^k], [x] is non-zero iff there exists [r] such that
+     [x * r = p^(k-1)]. For other moduli, this algorithm could be generalized
+     when the prime factorization of [modulus] is known. *)
+  let assert_non_zero ~label ~modulus ~is_prime ~nb_limbs ~base ~moduli
+      ~qm_bound ~ts_bounds xs =
+    (* For now we focus on the case when the modulus is prime, this allows us
+       to characterize non-zero elements as elements which have an inverse. *)
+    if not is_prime then
+      raise
+      @@ Failure
+           (Format.sprintf
+              "assert_non_zero: this function does not support arbitrary \
+               moduli yet; for now, the modulus is required to be prime; %s is \
+               composite."
+              (Z.to_string modulus)) ;
+    let* o = Num.constant S.one in
+    let* z = Num.constant S.zero in
+    let one =
+      o :: List.init (nb_limbs - 1) (Fun.const z) |> List.rev |> to_list
+    in
+    let* _ =
+      mul
+        ~division:true
+        ~label
+        ~modulus
+        ~nb_limbs
+        ~base
+        ~moduli
+        ~qm_bound
+        ~ts_bounds
+        one
+        xs
+    in
+    ret unit
+
+  let is_zero ~label ~modulus ~is_prime ~nb_limbs ~base ~moduli ~qm_bound
+      ~ts_bounds (List xs) =
+    let mul ?(division = false) =
+      mul ~division ~label ~modulus ~nb_limbs ~base ~moduli ~qm_bound ~ts_bounds
+    in
+    let assert_non_zero =
+      assert_non_zero
+        ~label
+        ~modulus
+        ~is_prime
+        ~nb_limbs
+        ~base
+        ~moduli
+        ~qm_bound
+        ~ts_bounds
+    in
+    with_label ~label:"Mod_arith.is_zero"
+    @@ (* b is the output of [is_zero]: b = 1 if x = 0 and b = 0 otherwise *)
+    let* b = fresh Dummy.bool in
+    let* rs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+    let (Bool out) = b in
+    let inp = List.map unscalar xs in
+    let aux = List.map unscalar (of_list rs) in
+    let solver = Mod_IsZero {modulus; base; nb_limbs; inp; aux; out} in
+    let* (Bool not_b) = add_solver ~solver >* Bool.bnot b in
+    let* z = Num.constant S.zero in
+    (* [zero_or_one] represents the modular integer [0] if [x] is zero
+       (b = 1) or the modular integer [1] if [x] is non-zero (b = 0) *)
+    let zero_or_one =
+      Scalar not_b :: List.init (nb_limbs - 1) (Fun.const z)
+      |> List.rev |> to_list
+    in
+    (* We enforce the constraint [x * r = zero_or_one] for some [r <> 0].
+       Note that if [x] is zero, the only way to satisfy the above equation
+       is to set [zero_or_one] to be [zero], that is, set [b = 1].
+       On the other hand, if [x <> 0], because we will enforce the constraint
+       [r <> 0] and we are over an integral domain, the only way to satisfy
+       the above constraint is to set [zero_or_one] to be [one], i.e. [b = 0],
+       as desired. *)
+    let* x_times_r = mul (List xs) rs in
+    assert_non_zero rs >* assert_equal x_times_r zero_or_one >* ret b
+end
+
 module Poseidon = struct
   module VS = Linear_algebra.Make_VectorSpace (S)
   module Poly = Polynomial.MakeUnivariate (S)
@@ -971,12 +1369,11 @@ module Poseidon = struct
     let mul = Poly.( * )
   end)
 
-  let poseidon128_full_round ~matrix ~k ~variant
-      (Scalar x0, Scalar x1, Scalar x2) =
+  let poseidon128_full_round ~matrix ~k (Scalar x0, Scalar x1, Scalar x2) =
     let*& y0 = fresh Dummy.scalar in
     let*& y1 = fresh Dummy.scalar in
     let*& y2 = fresh Dummy.scalar in
-    let solver = Poseidon128Full {x0; y0; x1; y1; x2; y2; k; variant} in
+    let solver = Poseidon128Full {x0; y0; x1; y1; x2; y2; k; matrix} in
     let minv = VS.inverse matrix in
     let k_vec = VS.(mul minv (transpose [|k|])) in
 
@@ -1022,7 +1419,7 @@ module Poseidon = struct
       ~solver
     >* ret @@ to_list [Scalar y0; Scalar y1; Scalar y2]
 
-  let poseidon128_four_partial_rounds ~matrix ~ks ~variant
+  let poseidon128_four_partial_rounds ~matrix ~ks
       (Scalar x0, Scalar x1, Scalar x2) =
     let*& a = fresh Dummy.scalar in
     let*& a_5 = fresh Dummy.scalar in
@@ -1036,7 +1433,7 @@ module Poseidon = struct
     let k_cols = Array.init 4 (fun i -> VS.filter_cols (Int.equal i) ks) in
     let solver =
       Poseidon128Partial
-        {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; variant}
+        {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; matrix}
     in
 
     (* We represent variables x0, x1, x2_5, a, a_5, b, b_5, c, c_5, y0, y1, y2
@@ -1399,11 +1796,14 @@ module Anemoi = struct
        append gate ~solver >* ret @@ pair (Scalar x2) (Scalar y2)
 end
 
+(* Forces the delayed checks, and computes the conjunction of
+   check wires. *)
 let get_checks_wire s =
   let s, Unit = s.delayed s in
   let s, w = Bool.band_list s.check_wires s in
   ({s with check_wires = []; delayed = ret Unit}, w)
 
+(* Run the monad *)
 let get f =
   let s, res =
     f
@@ -1418,7 +1818,10 @@ let get f =
         solver = Solver.empty_solver;
         delayed = ret Unit;
         check_wires = [];
+        range_checks = Range_checks.empty;
+        range_checks_labels = [];
         labels = [];
+        cache = Scalar_map.empty;
       }
   in
   let s, Unit = s.delayed s in
@@ -1444,21 +1847,73 @@ type cs_result = {
   nvars : int;
   free_wires : int list;
   cs : Csir.CS.t;
+  public_input_size : int;
   input_com_sizes : int list;
   tables : Csir.Table.t list;
+  (* wire index * (plonk index * bound) *)
+  range_checks : (int * (int * int) list) list;
+  range_checks_labels : (string list * int) list;
   solver : Solver.t;
 }
 [@@deriving repr]
 
 let cs_ti_t = Repr.pair Csir.CS.t Optimizer.trace_info_t
 
+(* Converting range-checks (given as a list of (plompiler index * bound)) to
+    something that PlonK can understand : (wire name * (wire index * bound)).
+    We go through each wire & each constraint, we take the plompiler index of
+    this wire at this constraint, and look for it in the plompiler
+    range-checks ; if this index is range-checked, it will be formatted as
+   (wire name * (plonk gate index * bound))
+*)
+let to_plonk_range_checks plomp_range_checks cs =
+  let range_checks =
+    let cs = Array.concat cs in
+    (* This function puts all the range-checks that can be written with the
+       given [wire] in their PlonK form in [all_found_rc], and removes them
+       from [pending_rc] *)
+    let rec format_rc (pending_rc, all_found_rc) wire =
+      (* We went through all wires *)
+      if wire = Csir.nb_wires_arch then
+        (* We assert that all pending range-checks have been processed *)
+        let () = assert (Range_checks.is_empty pending_rc) in
+        all_found_rc
+      else
+        let pending_rc, found_rc =
+          (* Go through all constraints of the CS *)
+          Array.fold_left
+            (fun (pending_rc, found_rc) (i, (constr : CS.raw_constraint)) ->
+              (* idx is the plompiler index corresponding to [wire] in the [i]-th
+                 constraint [constr] *)
+              let idx = constr.wires.(wire) in
+              match Range_checks.find_opt idx pending_rc with
+              | None ->
+                  (* [idx] is not range-checked, everything is returned unchanged *)
+                  (pending_rc, found_rc)
+              | Some bound ->
+                  (* [idx] is range-checked, it’s removed from [pending_rc]
+                     & ([wire] * (index of the gate [idx] * [bound]) is added to
+                     [found_rc] *)
+                  let pending_rc = Range_checks.remove idx pending_rc in
+                  let found_rc = (i, bound) :: found_rc in
+                  (pending_rc, found_rc))
+            (pending_rc, [])
+            (Array.mapi (fun i c -> (i, c)) cs)
+        in
+        format_rc (pending_rc, (wire, found_rc) :: all_found_rc) (wire + 1)
+    in
+    format_rc (plomp_range_checks, []) 0
+  in
+  (* Remove empty lists from range checks, in order to avoid useless iterations
+     in PlonK & make the number of wires range-checked more easily computable *)
+  List.filter (fun (_, r) -> r <> []) range_checks
+
 let get_cs ?(optimize = false) f : cs_result =
   let s, _ = get f in
   let ts = List.map (fun t_id -> Tables.find t_id tables) s.tables in
-  let cs, solver, free_wires, nvars =
+  let cs, solver, free_wires =
     if optimize then
-      let circuit_id = Utils.get_circuit_id s.cs in
-      let path = Utils.circuit_path circuit_id in
+      let path = Utils.circuit_path (Utils.get_circuit_id s.cs) in
       let cs, ti =
         if Sys.file_exists path then (
           (* If defined, load it up *)
@@ -1470,21 +1925,30 @@ let get_cs ?(optimize = false) f : cs_result =
           Utils.of_bytes cs_ti_t buffer)
         else
           let nb_inputs = Array.length s.inputs in
-          let o = Optimizer.optimize ~nb_inputs s.cs in
+          let o =
+            Optimizer.optimize ~nb_inputs ~range_checks:s.range_checks s.cs
+          in
           let serialized = Utils.to_bytes cs_ti_t o in
           let outc = open_out_bin path in
           output_bytes outc serialized ;
           close_out outc ;
           o
       in
-      (cs, Solver.append_solver (Updater ti) s.solver, ti.free_wires, s.nvars)
-    else (s.cs, s.solver, [], s.nvars)
+      (cs, Solver.append_solver (Updater ti) s.solver, ti.free_wires)
+    else (s.cs, s.solver, [])
+  in
+  let range_checks = to_plonk_range_checks s.range_checks cs in
+  let range_checks_labels =
+    List.map (fun (label, nb) -> (List.rev label, nb)) s.range_checks_labels
   in
   {
-    nvars;
+    nvars = s.nvars;
     free_wires;
     cs;
     tables = ts;
+    public_input_size = s.pi_size;
     input_com_sizes = List.rev s.input_com_sizes;
     solver;
+    range_checks;
+    range_checks_labels;
   }

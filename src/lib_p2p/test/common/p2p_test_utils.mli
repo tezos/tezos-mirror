@@ -70,6 +70,10 @@ val connect_all :
     function waits until the connections are effectively closed. *)
 val close_active_conns : ('a, 'b, 'c) Tezos_p2p.P2p_pool.t -> unit Lwt.t
 
+val version : Tezos_base.Network_version.t
+
+val conn_meta_config : unit P2p_params.conn_meta_config
+
 val canceler : Lwt_canceler.t
 
 val proof_of_work_target : Tezos_crypto.Crypto_box.pow_target

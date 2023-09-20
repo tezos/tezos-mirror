@@ -68,6 +68,7 @@ type t = {
   p2p : Distributed_db.p2p;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   (* For P2P RPCs *)
   shutdown : unit -> unit Lwt.t;
@@ -124,7 +125,7 @@ type config = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
   data_dir : string;
-  external_validator_log_config : External_validation.log_config;
+  internal_events : Tezos_base.Internal_event_config.t;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -136,7 +137,7 @@ type config = {
   target : (Block_hash.t * int32) option;
   disable_mempool : bool;
   enable_testchain : bool;
-  dal : Tezos_crypto_dal.Cryptobox.Config.t;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 (* These protocols are linked with the node and
@@ -197,7 +198,8 @@ let check_context_consistency store =
       let*! () = Node_event.(emit storage_corrupted_context_detected ()) in
       tzfail Non_recoverable_context
 
-let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
+let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
+    ~commit_info
     {
       genesis;
       chain_name;
@@ -206,7 +208,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       user_activated_protocol_overrides;
       operation_metadata_size_limit;
       data_dir;
-      external_validator_log_config;
+      internal_events;
       store_root;
       context_root;
       protocol_root;
@@ -215,7 +217,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       target;
       disable_mempool;
       enable_testchain;
-      dal;
+      dal_config;
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
   let open Lwt_result_syntax in
@@ -230,7 +232,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       p2p_params
       disable_mempool
   in
-  Shell_metrics.Version.init p2p ;
+  Shell_metrics.Version.init ~version ~commit_info p2p ;
   let* validator_process, store =
     let open Block_validator_process in
     let validator_environment =
@@ -269,8 +271,8 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
                protocol_root;
                process_path = Sys.executable_name;
                sandbox_parameters;
-               dal_config = dal;
-               log_config = external_validator_log_config;
+               dal_config;
+               internal_events;
              })
       in
       let commit_genesis ~chain_id =
@@ -337,13 +339,14 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       p2p;
       user_activated_upgrades;
       user_activated_protocol_overrides;
+      dal_config;
       operation_metadata_size_limit;
       shutdown;
     }
 
 let shutdown node = node.shutdown ()
 
-let build_rpc_directory node =
+let build_rpc_directory ~version ~commit_info node =
   let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
   let merge d = dir := Tezos_rpc.Directory.merge !dir d in
   let register0 s f =
@@ -355,6 +358,7 @@ let build_rpc_directory node =
        node.store) ;
   merge
     (Monitor_directory.build_rpc_directory
+       ~commit_info
        node.validator
        node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
@@ -366,9 +370,10 @@ let build_rpc_directory node =
     (Config_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
        ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
+       ~dal_config:node.dal_config
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
-  merge (Version_directory.rpc_directory node.p2p) ;
+  merge (Version_directory.rpc_directory ~version ~commit_info node.p2p) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

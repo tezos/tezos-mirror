@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-webassembly-interpreter
+  octez-l2-libs.webassembly-interpreter
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -29,7 +29,7 @@
 
 (rule
  (alias runtest)
- (package tezos-webassembly-interpreter)
+ (package octez-l2-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

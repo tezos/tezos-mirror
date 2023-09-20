@@ -165,6 +165,13 @@ module Aux = struct
       max_bytes:int32 ->
       int32 Lwt.t
 
+    val store_exists :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      int32 Lwt.t
+
     val store_has :
       durable:Durable.t ->
       memory:memory ->
@@ -418,6 +425,15 @@ module Aux = struct
                   (Bytes.of_string payload))
           in
           return 0l
+      in
+      extract_error_code res
+
+    let store_exists ~durable ~memory ~key_offset ~key_length =
+      let open Lwt_result_syntax in
+      let*! res =
+        let* key = load_key_from_memory key_offset key_length memory in
+        let*! res = Durable.exists durable key in
+        return (if res then 1l else 0l)
       in
       extract_error_code res
 
@@ -784,6 +800,37 @@ let write_debug ~implem =
           (* Write_debug is considered a no-op, it shouldn't take more than the
              default ticks. *)
           (durable, [], Tick_model.(to_z nop))
+      | _ -> raise Bad_input)
+
+let store_exists_name = "tezos_store_exists"
+
+let store_exists_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let store_exists_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
+    |> to_z)
+
+let store_exists =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
+          let* memory = retrieve_memory memories in
+          let+ r =
+            Aux.store_exists
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+          in
+          (durable, [value r], store_exists_ticks key_length r)
       | _ -> raise Bad_input)
 
 let store_has_name = "tezos_store_has"
@@ -1220,7 +1267,7 @@ let reveal_preimage_parse_args memories args =
       let*! memory = retrieve_memory memories in
       let* hash = Aux.load_bytes ~memory ~addr:hash_addr ~size:hash_size in
       Lwt_result.return
-        (Host_funcs.(Reveal_raw_data hash), Host_funcs.{base; max_bytes})
+        (Wasm_pvm_state.reveal_raw_data hash, Host_funcs.{base; max_bytes})
   | _ -> raise Bad_input
 
 let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
@@ -1241,10 +1288,42 @@ let metadata_size = Int32.add 20l 4l
 let reveal_metadata_parse_args _memories args =
   match args with
   | Values.[Num (I32 base); Num (I32 max_bytes)] ->
-      Lwt.return (Ok (Host_funcs.Reveal_metadata, Host_funcs.{base; max_bytes}))
+      Lwt.return
+        (Ok (Wasm_pvm_state.reveal_metadata, Host_funcs.{base; max_bytes}))
   | _ -> raise Bad_input
 
 let reveal_metadata = Host_funcs.Reveal_func reveal_metadata_parse_args
+
+let reveal_raw_name = "tezos_reveal"
+
+let reveal_raw_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let reveal_raw_parse_args memories args =
+  match args with
+  | Values.
+      [
+        Num (I32 payload_addr);
+        Num (I32 payload_size);
+        Num (I32 destination_addr);
+        Num (I32 max_bytes);
+      ] ->
+      let open Lwt_result_syntax in
+      let*! memory = retrieve_memory memories in
+      let* payload =
+        Aux.load_bytes ~memory ~addr:payload_addr ~size:payload_size
+      in
+      Lwt_result.return
+        ( Host_funcs.(Reveal_raw payload),
+          Host_funcs.{base = destination_addr; max_bytes} )
+  | _ -> raise Bad_input
+
+let reveal_raw = Host_funcs.Reveal_func reveal_raw_parse_args
 
 let store_write_name = "tezos_write_read"
 
@@ -1304,7 +1383,17 @@ let lookup_opt ~version name =
   let v1_and_above ty name =
     match version with
     | Wasm_pvm_state.V0 -> None
-    | V1 -> Some (ExternFunc (HostFunc (ty, name)))
+    | V1 | V2 | V3 -> Some (ExternFunc (HostFunc (ty, name)))
+  in
+  let v2_and_above ty name =
+    match version with
+    | Wasm_pvm_state.V0 | V1 -> None
+    | V2 | V3 -> Some (ExternFunc (HostFunc (ty, name)))
+  in
+  let v3_and_above ty name =
+    match version with
+    | Wasm_pvm_state.V0 | V1 | V2 -> None
+    | V3 -> Some (ExternFunc (HostFunc (ty, name)))
   in
   match name with
   | "read_input" ->
@@ -1341,6 +1430,8 @@ let lookup_opt ~version name =
   | "__internal_store_get_hash" ->
       v1_and_above store_get_hash_type store_get_hash_name
   | "store_create" -> v1_and_above store_create_type store_create_name
+  | "store_exists" -> v2_and_above store_exists_type store_exists_name
+  | "reveal" -> v3_and_above reveal_raw_type reveal_raw_name
   | _ -> None
 
 let lookup ~version name =
@@ -1378,20 +1469,41 @@ let registry_V0 ~write_debug =
 
 let registry_V0_noop = registry_V0 ~write_debug:Noop
 
-let registry_V1 ~write_debug =
+let base_V1 =
   Host_funcs.(
     base
-    |> with_write_debug ~write_debug
     |> with_host_function
          ~global_name:store_get_hash_name
          ~implem:store_get_hash
     |> with_host_function
          ~global_name:store_delete_value_name
          ~implem:store_delete_value
-    |> with_host_function ~global_name:store_create_name ~implem:store_create
-    |> construct)
+    |> with_host_function ~global_name:store_create_name ~implem:store_create)
+
+let registry_V1 ~write_debug =
+  Host_funcs.(base_V1 |> with_write_debug ~write_debug |> construct)
 
 let registry_V1_noop = registry_V1 ~write_debug:Noop
+
+let base_V2 =
+  Host_funcs.(
+    base_V1
+    |> with_host_function ~global_name:store_exists_name ~implem:store_exists)
+
+let registry_V2 ~write_debug =
+  Host_funcs.(base_V2 |> with_write_debug ~write_debug |> construct)
+
+let registry_V2_noop = registry_V2 ~write_debug:Noop
+
+let base_V3 =
+  Host_funcs.(
+    base_V2
+    |> with_host_function ~global_name:reveal_raw_name ~implem:reveal_raw)
+
+let registry_V3 ~write_debug =
+  Host_funcs.(base_V3 |> with_write_debug ~write_debug |> construct)
+
+let registry_V3_noop = registry_V3 ~write_debug:Noop
 
 let registry ~version ~write_debug =
   (* We need to keep a top-level definition for the [Noop] case to be able to
@@ -1403,6 +1515,10 @@ let registry ~version ~write_debug =
   | Wasm_pvm_state.V0, _ -> registry_V0 ~write_debug
   | Wasm_pvm_state.V1, Noop -> registry_V1_noop
   | Wasm_pvm_state.V1, _ -> registry_V1 ~write_debug
+  | Wasm_pvm_state.V2, Noop -> registry_V2_noop
+  | Wasm_pvm_state.V2, _ -> registry_V2 ~write_debug
+  | Wasm_pvm_state.V3, Noop -> registry_V3_noop
+  | Wasm_pvm_state.V3, _ -> registry_V3 ~write_debug
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size
@@ -1412,6 +1528,8 @@ module Internal_for_tests = struct
   let read_input = Func.HostFunc (read_input_type, read_input_name)
 
   let store_has = Func.HostFunc (store_has_type, store_has_name)
+
+  let store_exists = Func.HostFunc (store_exists_type, store_exists_name)
 
   let store_delete = Func.HostFunc (store_delete_type, store_delete_name)
 

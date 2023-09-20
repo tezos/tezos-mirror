@@ -38,7 +38,10 @@ let encoding block_encoding =
        (req "new_chain" (list block_encoding))
 
 let map f {old_chain; new_chain} =
-  {old_chain = List.map f old_chain; new_chain = List.map f new_chain}
+  {
+    old_chain = List.rev_map f old_chain |> List.rev;
+    new_chain = List.rev_map f new_chain |> List.rev;
+  }
 
 let map_es f {old_chain; new_chain} =
   let open Lwt_result_syntax in

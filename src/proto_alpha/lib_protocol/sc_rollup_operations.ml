@@ -26,11 +26,60 @@
 
 open Alpha_context
 
+type ('a, 'b) error_container = {given : 'a; last_update : 'b}
+
+type last_whitelist_update = {message_index : Z.t; outbox_level : Raw_level.t}
+
+let last_whitelist_update_encoding =
+  Data_encoding.(
+    conv
+      (fun {message_index; outbox_level} -> (message_index, outbox_level))
+      (fun (message_index, outbox_level) -> {message_index; outbox_level})
+      (obj2 (req "message_index" n) (req "outbox_level" Raw_level.encoding)))
+
+type outdated_whitelist_update =
+  | Outdated_message_index of (Z.t, last_whitelist_update) error_container
+  | Outdated_outbox_level of
+      (Raw_level.t, last_whitelist_update) error_container
+
+let outdated_whitelist_update_encoding =
+  Data_encoding.(
+    union
+      [
+        case
+          ~title:"outdated_message_index"
+          (Tag 0)
+          (obj2
+             (req "message_index" n)
+             (req "last_whitelist_update" last_whitelist_update_encoding))
+          (function
+            | Outdated_message_index {given; last_update} ->
+                Some (given, last_update)
+            | _ -> None)
+          (fun (given, last_update) ->
+            Outdated_message_index {given; last_update});
+        case
+          ~title:"outdated_outbox_level"
+          (Tag 1)
+          (obj2
+             (req "outbox_level" Raw_level.encoding)
+             (req "last_whitelist_update" last_whitelist_update_encoding))
+          (function
+            | Outdated_outbox_level {given; last_update} ->
+                Some (given, last_update)
+            | _ -> None)
+          (fun (given, last_update) ->
+            Outdated_outbox_level {given; last_update});
+      ])
+
 type error +=
   | (* Permanent *) Sc_rollup_invalid_parameters_type
   | (* Permanent *) Sc_rollup_invalid_last_cemented_commitment
   | (* Permanent *) Sc_rollup_invalid_output_proof
   | (* Permanent *) Sc_rollup_invalid_outbox_level
+  | (* Permanent *)
+      Sc_rollup_outdated_whitelist_update of
+      outdated_whitelist_update
 
 type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
@@ -79,7 +128,42 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
     (function Sc_rollup_invalid_outbox_level -> Some () | _ -> None)
-    (fun () -> Sc_rollup_invalid_outbox_level)
+    (fun () -> Sc_rollup_invalid_outbox_level) ;
+  let description = "Outdated whitelist update" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_outdated_whitelist_update"
+    ~title:description
+    ~description
+    ~pp:
+      (fun ppf -> function
+        | Outdated_message_index {given; last_update} ->
+            Format.fprintf
+              ppf
+              "%s: got message index %a at outbox level %a, while the lastest \
+               whitelist update occurred with message index %a."
+              description
+              Z.pp_print
+              given
+              Z.pp_print
+              last_update.message_index
+              Raw_level.pp
+              last_update.outbox_level
+        | Outdated_outbox_level {given; last_update} ->
+            Format.fprintf
+              ppf
+              "%s: got outbox level %a, while the current outbox level is %a \
+               with message index %a."
+              description
+              Raw_level.pp
+              given
+              Raw_level.pp
+              last_update.outbox_level
+              Z.pp_print
+              last_update.message_index)
+    outdated_whitelist_update_encoding
+    (function Sc_rollup_outdated_whitelist_update e -> Some e | _ -> None)
+    (fun e -> Sc_rollup_outdated_whitelist_update e)
 
 type origination_result = {
   address : Sc_rollup.Address.t;
@@ -226,22 +310,8 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
      for L1 to L2 messages is not propagated to the rollup. *)
   validate_parameters_ty ctxt arg_type entrypoint
 
-let check_origination_proof (type state proof output)
-    ~(pvm : (state, proof, output) Sc_rollup.PVM.implementation) boot_sector
-    origination_proof =
+let originate ?whitelist ctxt ~kind ~boot_sector ~parameters_ty =
   let open Lwt_result_syntax in
-  let (module PVM) = pvm in
-  let*! is_valid = PVM.verify_origination_proof origination_proof boot_sector in
-  let* () =
-    fail_when
-      (not is_valid)
-      (Sc_rollup_proof_repr.Sc_rollup_proof_check "invalid origination proof")
-  in
-  return PVM.(proof_stop_state origination_proof)
-
-let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
-  let open Lwt_result_syntax in
-  let (Packed ((module PVM) as pvm)) = Sc_rollup.Kind.pvm_of kind in
   let*? ctxt =
     let open Result_syntax in
     let* parameters_ty, ctxt =
@@ -252,19 +322,33 @@ let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
     in
     validate_untyped_parameters_ty ctxt parameters_ty
   in
-  let*? origination_proof =
-    Sc_rollup.Proof.unserialize_pvm_step ~pvm origination_proof
+  let boot_sector_size_in_bytes = String.length boot_sector in
+  let*? ctxt =
+    match kind with
+    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith ->
+        (*
+
+           We do not really care about the precision of the gas model
+           when it comes to the [Example_arith] PVM, so we use the
+           WASM PVM model for both cases.
+
+           As you can convince yourself by code inspection, the cost
+           of [Sc_rollup.genesis_state_hash_of] is dominated by the
+           installation of the boot sector.
+
+        *)
+        Gas.consume ctxt
+        @@ Sc_rollup_costs.cost_install_boot_sector_in_wasm_pvm
+             ~boot_sector_size_in_bytes
   in
-  let* genesis_hash =
-    check_origination_proof ~pvm boot_sector origination_proof
-  in
+  let*! genesis_hash = Sc_rollup.genesis_state_hash_of kind ~boot_sector in
   let genesis_commitment =
     Sc_rollup.Commitment.genesis_commitment
       ~genesis_state_hash:genesis_hash
       ~origination_level:(Level.current ctxt).level
   in
   let+ address, size, genesis_commitment_hash, ctxt =
-    Sc_rollup.originate ctxt ~kind ~parameters_ty ~genesis_commitment
+    Sc_rollup.originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
   in
   ({address; size; genesis_commitment_hash}, ctxt)
 
@@ -344,7 +428,6 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     | Some x -> ok x
     | None -> error Sc_rollup_invalid_output_proof
   in
-  let output = PVM.output_of_output_proof output_proof in
   (* Verify that the states match. *)
   let* {Sc_rollup.Commitment.compressed_state; _}, ctxt =
     Sc_rollup.Commitment.get_commitment ctxt rollup cemented_commitment
@@ -362,10 +445,7 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
       (Sc_rollup_costs.cost_verify_output_proof ~bytes_len:output_proof_length)
   in
   (* Verify that the proof is valid. *)
-  let* () =
-    let*! proof_is_valid = PVM.verify_output_proof output_proof in
-    fail_unless proof_is_valid Sc_rollup_invalid_output_proof
-  in
+  let* output = PVM.verify_output_proof output_proof in
   return (output, ctxt)
 
 let validate_outbox_level ctxt ~outbox_level ~lcc_level =
@@ -390,6 +470,147 @@ let validate_outbox_level ctxt ~outbox_level ~lcc_level =
   fail_unless
     (Raw_level.(outbox_level <= lcc_level) && outbox_level_is_active)
     Sc_rollup_invalid_outbox_level
+
+let execute_outbox_message_transaction ctxt ~transactions ~rollup =
+  let open Lwt_result_syntax in
+  (* Turn the transaction batch into a list of operations. *)
+  let*? ctxt, operations =
+    List.fold_left_map_e
+      (fun ctxt transaction ->
+        let open Result_syntax in
+        let+ op, ctxt = to_transaction_operation ctxt rollup transaction in
+        (ctxt, op))
+      ctxt
+      transactions
+  in
+  (* Extract the ticket-token diffs from the operations. We here make sure that
+     there are no tickets with amount zero. Zero-amount tickets are not allowed
+     as they cannot be tracked by the ticket-balance table.
+  *)
+  let* ticket_token_diffs, ctxt =
+    Ticket_operations_diff.ticket_diffs_of_operations ctxt operations
+  in
+  (* Update the ticket-balance table by transferring ticket-tokens to new
+     destinations for each transaction. This fails in case the rollup does not
+     hold a sufficient amount of any of the ticket-tokens transferred.
+
+     The updates must happen before any of the operations are executed to avoid
+     a case where ticket-transfers are funded as a result of prior operations
+     depositing new tickets to the rollup.
+  *)
+  let* paid_storage_size_diff, ctxt =
+    let source_destination = Destination.Sc_rollup rollup in
+    List.fold_left_es
+      (fun (acc_storage_diff, ctxt) ticket_token_diff ->
+        transfer_ticket_tokens
+          ctxt
+          ~source_destination
+          ~acc_storage_diff
+          ticket_token_diff)
+      (Z.zero, ctxt)
+      ticket_token_diffs
+  in
+  let* ctxt, ticket_receipt =
+    List.fold_left_map_es
+      (fun ctxt
+           Ticket_operations_diff.
+             {ticket_token = ex_token; total_amount; destinations = _} ->
+        let+ ticket_token, ctxt = Ticket_token_unparser.unparse ctxt ex_token in
+        (* Here we only show the outgoing (negative) balance wrt to the rollup
+           address. The positive balances for the receiving contracts are
+           contained in the ticket updates for the internal operations. *)
+        let item =
+          Ticket_receipt.
+            {
+              ticket_token;
+              updates =
+                [
+                  {
+                    account = Destination.Sc_rollup rollup;
+                    amount = Z.neg (Script_int.to_zint total_amount);
+                  };
+                ];
+            }
+        in
+        (ctxt, item))
+      ctxt
+      ticket_token_diffs
+  in
+  return ({paid_storage_size_diff; ticket_receipt; operations}, ctxt)
+
+let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
+    ~outbox_level ~message_index =
+  let open Lwt_result_syntax in
+  let* ctxt, is_private = Sc_rollup.Whitelist.is_private ctxt rollup in
+  if is_private then
+    match whitelist with
+    | Some whitelist ->
+        (* The whitelist update fails with an empty list. *)
+        let*? () =
+          error_when
+            (List.is_empty whitelist)
+            Sc_rollup_errors.Sc_rollup_empty_whitelist
+        in
+        let* ctxt, last_whitelist_update =
+          Sc_rollup.Whitelist.find_last_whitelist_update ctxt rollup
+        in
+        let* () =
+          match last_whitelist_update with
+          | None -> return_unit
+          | Some (latest_outbox_level, latest_message_index) ->
+              let last_update =
+                {
+                  message_index = latest_message_index;
+                  outbox_level = latest_outbox_level;
+                }
+              in
+              (* Do not apply whitelist update if a previous whitelist update
+                 occurred with a greater message index for a given outbox level,
+                 or with a greater outbox level. *)
+              let* () =
+                fail_when
+                  (Raw_level.(latest_outbox_level = outbox_level)
+                  && Compare.Z.(latest_message_index >= message_index))
+                  (Sc_rollup_outdated_whitelist_update
+                     (Outdated_message_index
+                        {given = message_index; last_update}))
+              in
+              fail_when
+                Raw_level.(outbox_level < latest_outbox_level)
+                (Sc_rollup_outdated_whitelist_update
+                   (Outdated_outbox_level {given = outbox_level; last_update}))
+        in
+        let* ctxt, new_storage_size =
+          Sc_rollup.Whitelist.replace ctxt rollup ~whitelist
+        in
+        let* ctxt, size_diff =
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6186
+             Do not consider storage diffs for small updates to the storage. *)
+          Sc_rollup.Whitelist.set_last_whitelist_update
+            ctxt
+            rollup
+            (outbox_level, message_index)
+        in
+        let* ctxt, paid_storage_size_diff =
+          Sc_rollup.Whitelist.adjust_storage_space ctxt rollup ~new_storage_size
+        in
+        return
+          ( {
+              paid_storage_size_diff = Z.add paid_storage_size_diff size_diff;
+              ticket_receipt = [];
+              operations = [];
+            },
+            ctxt )
+    | None ->
+        let* ctxt, _freed_size = Sc_rollup.Whitelist.make_public ctxt rollup in
+        return
+          ( {
+              paid_storage_size_diff = Z.zero;
+              ticket_receipt = [];
+              operations = [];
+            },
+            ctxt )
+  else tzfail Sc_rollup_errors.Sc_rollup_is_public
 
 let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
     ~cemented_commitment ~output_proof =
@@ -425,21 +646,25 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
   in
   (* Validate that the outbox level is within valid bounds. *)
   let* () = validate_outbox_level ctxt ~outbox_level ~lcc_level in
-  let* ( Sc_rollup_management_protocol.Atomic_transaction_batch {transactions},
-         ctxt ) =
+  let* decoded_outbox_msg, ctxt =
     Sc_rollup_management_protocol.outbox_message_of_outbox_message_repr
       ctxt
       message
   in
-  (* Turn the transaction batch into a list of operations. *)
-  let*? ctxt, operations =
-    List.fold_left_map_e
-      (fun ctxt transaction ->
-        let open Result_syntax in
-        let+ op, ctxt = to_transaction_operation ctxt rollup transaction in
-        (ctxt, op))
-      ctxt
-      transactions
+  let* receipt, ctxt =
+    match decoded_outbox_msg with
+    | Sc_rollup_management_protocol.Atomic_transaction_batch {transactions} ->
+        execute_outbox_message_transaction ctxt ~transactions ~rollup
+    | Sc_rollup_management_protocol.Whitelist_update whitelist ->
+        let is_enabled = Constants.sc_rollup_private_enable ctxt in
+        if is_enabled then
+          execute_outbox_message_whitelist_update
+            ctxt
+            ~rollup
+            ~whitelist
+            ~outbox_level
+            ~message_index
+        else tzfail Sc_rollup_errors.Sc_rollup_whitelist_disabled
   in
   (* Record that the message for the given level has been applied. This fails
      in case a message for the rollup, outbox-level and message index has
@@ -452,66 +677,19 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
       outbox_level
       ~message_index:(Z.to_int message_index)
   in
-  (* TODO: #3121
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3121
      Implement a more refined model. For instance a water-mark based one.
      For now we only charge for positive contributions. It means that over time
      we are overcharging for storage space.
   *)
-  let paid_storage_size_diff = Z.max Z.zero applied_msg_size_diff in
-  (* Extract the ticket-token diffs from the operations. We here make sure that
-     there are no tickets with amount zero. Zero-amount tickets are not allowed
-     as they cannot be tracked by the ticket-balance table.
-  *)
-  let* ticket_token_diffs, ctxt =
-    Ticket_operations_diff.ticket_diffs_of_operations ctxt operations
-  in
-  (* Update the ticket-balance table by transferring ticket-tokens to new
-     destinations for each transaction. This fails in case the rollup does not
-     hold a sufficient amount of any of the ticket-tokens transferred.
-
-     The updates must happen before any of the operations are executed to avoid
-     a case where ticket-transfers are funded as a result of prior operations
-     depositing new tickets to the rollup.
-  *)
-  let* paid_storage_size_diff, ctxt =
-    let source_destination = Destination.Sc_rollup rollup in
-    List.fold_left_es
-      (fun (acc_storage_diff, ctxt) ticket_token_diff ->
-        transfer_ticket_tokens
-          ctxt
-          ~source_destination
-          ~acc_storage_diff
-          ticket_token_diff)
-      (paid_storage_size_diff, ctxt)
-      ticket_token_diffs
-  in
-  let* ctxt, ticket_receipt =
-    List.fold_left_map_es
-      (fun ctxt
-           Ticket_operations_diff.
-             {ticket_token = ex_token; total_amount; destinations = _} ->
-        let+ ticket_token, ctxt = Ticket_token_unparser.unparse ctxt ex_token in
-        (* Here we only show the outgoing (negative) balance wrt to the rollup
-           address. The positive balances for the receiving contracts are
-           contained in the ticket updates for the internal operations. *)
-        let item =
-          Ticket_receipt.
-            {
-              ticket_token;
-              updates =
-                [
-                  {
-                    account = Destination.Sc_rollup rollup;
-                    amount = Z.neg (Script_int.to_zint total_amount);
-                  };
-                ];
-            }
-        in
-        (ctxt, item))
-      ctxt
-      ticket_token_diffs
-  in
-  return ({paid_storage_size_diff; ticket_receipt; operations}, ctxt)
+  let applied_msg_size_diff = Z.max Z.zero applied_msg_size_diff in
+  return
+    ( {
+        receipt with
+        paid_storage_size_diff =
+          Z.add receipt.paid_storage_size_diff applied_msg_size_diff;
+      },
+      ctxt )
 
 module Internal_for_tests = struct
   let execute_outbox_message = execute_outbox_message

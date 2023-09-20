@@ -1,0 +1,9 @@
+test_kernels:
+  extends:
+    - .kernels_template
+  stage: test
+  needs: [build_kernels]
+  dependencies: [build_kernels]
+  script:
+    - make -f kernels.mk check
+    - make -f kernels.mk test

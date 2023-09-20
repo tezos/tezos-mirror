@@ -85,53 +85,58 @@ module Raw_consensus = struct
       this delegate. *)
 
   type t = {
-    current_endorsement_power : int;
-        (** Number of endorsement slots recorded for the current block. *)
-    allowed_endorsements : (consensus_pk * int) Slot_repr.Map.t option;
-        (** Endorsements rights for the current block. Only an endorsement
+    current_attestation_power : int;
+        (** Number of attestation slots recorded for the current block. *)
+    allowed_attestations : (consensus_pk * int) Slot_repr.Map.t option;
+        (** Attestations rights for the current block. Only an attestation
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
             slot with its power. This is [None] only in mempool mode. *)
-    allowed_preendorsements : (consensus_pk * int) Slot_repr.Map.t option;
-        (** Preendorsements rights for the current block. Only a preendorsement
+    allowed_preattestations : (consensus_pk * int) Slot_repr.Map.t option;
+        (** Preattestations rights for the current block. Only a preattestation
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
             slot with its power. This is [None] only in mempool mode, or in
             application mode when there is no locked round (so the block
-            cannot contain any preendorsements). *)
-    endorsements_seen : Slot_repr.Set.t;
-        (** Record the endorsements already seen. Only initial slots are indexed. *)
-    preendorsements_seen : Slot_repr.Set.t;
-        (** Record the preendorsements already seen. Only initial slots
+            cannot contain any preattestations). *)
+    forbidden_delegates : Signature.Public_key_hash.Set.t;
+        (** Delegates that are not allowed to bake or attest blocks; i.e.,
+            delegates which have zero frozen deposit due to a previous
+            slashing. *)
+    attestations_seen : Slot_repr.Set.t;
+        (** Record the attestations already seen. Only initial slots are indexed. *)
+    preattestations_seen : Slot_repr.Set.t;
+        (** Record the preattestations already seen. Only initial slots
             are indexed. *)
     locked_round_evidence : (Round_repr.t * int) option;
-        (** Record the preendorsement power for a locked round. *)
-    preendorsements_quorum_round : Round_repr.t option;
-        (** in block construction mode, record the round of preendorsements
+        (** Record the preattestation power for a locked round. *)
+    preattestations_quorum_round : Round_repr.t option;
+        (** in block construction mode, record the round of preattestations
             included in a block. *)
-    endorsement_branch : (Block_hash.t * Block_payload_hash.t) option;
+    attestation_branch : (Block_hash.t * Block_payload_hash.t) option;
   }
 
   (** Invariant:
 
-      - [slot \in endorsements_seen => Int_map.mem slot allowed_endorsements]
+      - [slot \in attestations_seen => Int_map.mem slot allowed_attestations]
 
-      - [slot \in preendorsements_seen => Int_map.mem slot allowed_preendorsements]
+      - [slot \in preattestations_seen => Int_map.mem slot allowed_preattestations]
 
-      - [ |endorsements_seen| > 0 => |included endorsements| > 0]
+      - [ |attestations_seen| > 0 => |included attestations| > 0]
 
   *)
 
   let empty : t =
     {
-      current_endorsement_power = 0;
-      allowed_endorsements = Some Slot_repr.Map.empty;
-      allowed_preendorsements = Some Slot_repr.Map.empty;
-      endorsements_seen = Slot_repr.Set.empty;
-      preendorsements_seen = Slot_repr.Set.empty;
+      current_attestation_power = 0;
+      allowed_attestations = Some Slot_repr.Map.empty;
+      allowed_preattestations = Some Slot_repr.Map.empty;
+      forbidden_delegates = Signature.Public_key_hash.Set.empty;
+      attestations_seen = Slot_repr.Set.empty;
+      preattestations_seen = Slot_repr.Set.empty;
       locked_round_evidence = None;
-      preendorsements_quorum_round = None;
-      endorsement_branch = None;
+      preattestations_quorum_round = None;
+      attestation_branch = None;
     }
 
   type error += Double_inclusion_of_consensus_operation
@@ -149,20 +154,20 @@ module Raw_consensus = struct
         | Double_inclusion_of_consensus_operation -> Some () | _ -> None)
       (fun () -> Double_inclusion_of_consensus_operation)
 
-  let record_endorsement t ~initial_slot ~power =
+  let record_attestation t ~initial_slot ~power =
     error_when
-      (Slot_repr.Set.mem initial_slot t.endorsements_seen)
+      (Slot_repr.Set.mem initial_slot t.attestations_seen)
       Double_inclusion_of_consensus_operation
     >|? fun () ->
     {
       t with
-      current_endorsement_power = t.current_endorsement_power + power;
-      endorsements_seen = Slot_repr.Set.add initial_slot t.endorsements_seen;
+      current_attestation_power = t.current_attestation_power + power;
+      attestations_seen = Slot_repr.Set.add initial_slot t.attestations_seen;
     }
 
-  let record_preendorsement ~initial_slot ~power round t =
+  let record_preattestation ~initial_slot ~power round t =
     error_when
-      (Slot_repr.Set.mem initial_slot t.preendorsements_seen)
+      (Slot_repr.Set.mem initial_slot t.preattestations_seen)
       Double_inclusion_of_consensus_operation
     >|? fun () ->
     let locked_round_evidence =
@@ -178,29 +183,39 @@ module Raw_consensus = struct
     {
       t with
       locked_round_evidence;
-      preendorsements_seen =
-        Slot_repr.Set.add initial_slot t.preendorsements_seen;
+      preattestations_seen =
+        Slot_repr.Set.add initial_slot t.preattestations_seen;
     }
 
-  let set_preendorsements_quorum_round round t =
-    match t.preendorsements_quorum_round with
+  let set_forbidden_delegates delegates t =
+    {t with forbidden_delegates = delegates}
+
+  let forbid_delegate delegate t =
+    {
+      t with
+      forbidden_delegates =
+        Signature.Public_key_hash.Set.add delegate t.forbidden_delegates;
+    }
+
+  let set_preattestations_quorum_round round t =
+    match t.preattestations_quorum_round with
     | Some round' ->
         (* If the rounds are different, an error should have already
            been raised. *)
         assert (Round_repr.equal round round') ;
         t
-    | None -> {t with preendorsements_quorum_round = Some round}
+    | None -> {t with preattestations_quorum_round = Some round}
 
-  let initialize_with_endorsements_and_preendorsements ~allowed_endorsements
-      ~allowed_preendorsements t =
-    {t with allowed_endorsements; allowed_preendorsements}
+  let initialize_with_attestations_and_preattestations ~allowed_attestations
+      ~allowed_preattestations t =
+    {t with allowed_attestations; allowed_preattestations}
 
   let locked_round_evidence t = t.locked_round_evidence
 
-  let endorsement_branch t = t.endorsement_branch
+  let attestation_branch t = t.attestation_branch
 
-  let set_endorsement_branch t endorsement_branch =
-    {t with endorsement_branch = Some endorsement_branch}
+  let set_attestation_branch t attestation_branch =
+    {t with attestation_branch = Some attestation_branch}
 end
 
 type dal_committee = {
@@ -235,9 +250,8 @@ type back = {
   dictator_proposal_seen : bool;
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
-    Tez_repr.t Signature.Public_key_hash.Map.t option;
-  tx_rollup_current_messages :
-    Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
+    Stake_repr.t Signature.Public_key_hash.Map.t option;
+  reward_coeff_for_current_cycle : Q.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
@@ -255,6 +269,7 @@ type back = {
      dummy slot headers. *)
   dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
   dal_committee : dal_committee;
+  adaptive_issuance_enable : bool;
 }
 
 (*
@@ -291,8 +306,6 @@ let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
 let[@inline] constants ctxt = ctxt.back.constants
 
-let[@inline] tx_rollup ctxt = ctxt.back.constants.tx_rollup
-
 let[@inline] sc_rollup ctxt = ctxt.back.constants.sc_rollup
 
 let[@inline] zk_rollup ctxt = ctxt.back.constants.zk_rollup
@@ -322,6 +335,11 @@ let[@inline] non_consensus_operations_rev ctxt =
 let[@inline] dictator_proposal_seen ctxt = ctxt.back.dictator_proposal_seen
 
 let[@inline] sampler_state ctxt = ctxt.back.sampler_state
+
+let[@inline] reward_coeff_for_current_cycle ctxt =
+  ctxt.back.reward_coeff_for_current_cycle
+
+let[@inline] adaptive_issuance_enable ctxt = ctxt.back.adaptive_issuance_enable
 
 let[@inline] update_back ctxt back = {ctxt with back}
 
@@ -363,6 +381,13 @@ let[@inline] update_dictator_proposal_seen ctxt dictator_proposal_seen =
 
 let[@inline] update_sampler_state ctxt sampler_state =
   update_back ctxt {ctxt.back with sampler_state}
+
+let[@inline] update_reward_coeff_for_current_cycle ctxt
+    reward_coeff_for_current_cycle =
+  update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
+
+let[@inline] set_adaptive_issuance_enable ctxt =
+  update_back ctxt {ctxt.back with adaptive_issuance_enable = true}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -643,12 +668,9 @@ let storage_error err = error (Storage_error err)
 let version_key = ["version"]
 
 (* This value is set by the snapshot_alpha.sh script, don't change it. *)
-let version_value = "alpha_current"
-
-let version = "v1"
 
 let protocol_migration_internal_message =
-  Sc_rollup_inbox_message_repr.Protocol_migration version_value
+  Sc_rollup_inbox_message_repr.Protocol_migration Constants_repr.version_value
 
 let protocol_migration_serialized_message =
   match
@@ -664,9 +686,9 @@ let protocol_migration_serialized_message =
         pp_trace
         trace
 
-let cycle_eras_key = [version; "cycle_eras"]
+let cycle_eras_key = [Constants_repr.version; "cycle_eras"]
 
-let constants_key = [version; "constants"]
+let constants_key = [Constants_repr.version; "constants"]
 
 let protocol_param_key = ["protocol_parameters"]
 
@@ -773,7 +795,8 @@ let check_inited ctxt =
   | None -> failwith "Internal error: un-initialized context."
   | Some bytes ->
       let s = Bytes.to_string bytes in
-      if Compare.String.(s = version_value) then Result.return_unit
+      if Compare.String.(s = Constants_repr.version_value) then
+        Result.return_unit
       else storage_error (Incompatible_protocol_version s)
 
 let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
@@ -785,7 +808,8 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
+    ctxt =
   Raw_level_repr.of_int32 level >>?= fun level ->
   check_inited ctxt >>=? fun () ->
   get_constants ctxt >>=? fun constants ->
@@ -824,7 +848,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         dictator_proposal_seen = false;
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
-        tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
+        reward_coeff_for_current_cycle = Q.one;
         sc_rollup_current_messages;
         dal_slot_fee_market =
           Dal_slot_repr.Slot_market.init
@@ -833,6 +857,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
           Dal_attestation_repr.Accountability.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
         dal_committee = empty_dal_committee;
+        adaptive_issuance_enable;
       };
   }
 
@@ -844,15 +869,15 @@ let check_and_update_protocol_version ctxt =
        failwith "Internal error: un-initialized context in check_first_block."
    | Some bytes ->
        let s = Bytes.to_string bytes in
-       if Compare.String.(s = version_value) then
+       if Compare.String.(s = Constants_repr.version_value) then
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
        else if Compare.String.(s = "nairobi_017") then return (Nairobi_017, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
-  Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
-  ok (previous_proto, ctxt)
+  Context.add ctxt version_key (Bytes.of_string Constants_repr.version_value)
+  >|= fun ctxt -> ok (previous_proto, ctxt)
 
 (* only for the migration *)
 let[@warning "-32"] get_previous_protocol_constants ctxt =
@@ -883,7 +908,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp ctxt =
+let prepare_first_block ~level ~timestamp chain_id ctxt =
   check_and_update_protocol_version ctxt >>=? fun (previous_proto, ctxt) ->
   (match previous_proto with
   | Genesis param ->
@@ -901,27 +926,6 @@ let prepare_first_block ~level ~timestamp ctxt =
       add_constants ctxt param.constants >|= ok
   | Nairobi_017 ->
       get_previous_protocol_constants ctxt >>= fun c ->
-      let tx_rollup =
-        Constants_parametric_repr.
-          {
-            enable = c.tx_rollup.enable;
-            origination_size = c.tx_rollup.origination_size;
-            hard_size_limit_per_inbox = c.tx_rollup.hard_size_limit_per_inbox;
-            hard_size_limit_per_message =
-              c.tx_rollup.hard_size_limit_per_message;
-            max_withdrawals_per_batch = c.tx_rollup.max_withdrawals_per_batch;
-            max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
-            commitment_bond = c.tx_rollup.commitment_bond;
-            finality_period = c.tx_rollup.finality_period;
-            withdraw_period = c.tx_rollup.withdraw_period;
-            max_inboxes_count = c.tx_rollup.max_inboxes_count;
-            max_messages_per_inbox = c.tx_rollup.max_messages_per_inbox;
-            max_commitments_count = c.tx_rollup.max_commitments_count;
-            cost_per_byte_ema_factor = c.tx_rollup.cost_per_byte_ema_factor;
-            rejection_max_proof_size = c.tx_rollup.rejection_max_proof_size;
-            sunset_level = c.tx_rollup.sunset_level;
-          }
-      in
       let cryptobox_parameters =
         {
           Dal.page_size = c.dal.cryptobox_parameters.page_size;
@@ -935,11 +939,36 @@ let prepare_first_block ~level ~timestamp ctxt =
           {
             feature_enable = c.dal.feature_enable;
             number_of_slots = c.dal.number_of_slots;
-            attestation_lag = c.dal.attestation_lag;
+            attestation_lag = 4;
             attestation_threshold = c.dal.attestation_threshold;
             blocks_per_epoch = c.dal.blocks_per_epoch;
             cryptobox_parameters;
           }
+      in
+      (* When stitching from Oxford and after, [Raw_level_repr.root]
+         should be replaced by the previous value, that is
+         [c.reveal_activation_level.*]. *)
+      let reveal_activation_level :
+          Constants_parametric_repr.sc_rollup_reveal_activation_level =
+        {
+          raw_data = {blake2B = Raw_level_repr.root};
+          metadata = Raw_level_repr.root;
+          dal_page =
+            (if c.dal.feature_enable then Raw_level_repr.root
+            else if dal.feature_enable then
+              (* First level of the protocol with dal activated. *)
+              Raw_level_repr.of_int32_exn (Int32.succ level)
+            else
+              (* Deactivate the reveal if the dal is not enabled.
+
+                 assert (not (c.dal.feature_enable || dal.feature_enable))
+
+                 We set the activation level to [pred max_int] to deactivate
+                 the feature. The [pred] is needed to not trigger an encoding
+                 exception with the value [Int32.int_min] (see
+                 tezt/tests/mockup.ml). *)
+              Raw_level_repr.of_int32_exn Int32.(pred max_int));
+        }
       in
       let sc_rollup =
         Constants_parametric_repr.
@@ -962,6 +991,8 @@ let prepare_first_block ~level ~timestamp ctxt =
               c.sc_rollup.max_number_of_stored_cemented_commitments;
             max_number_of_parallel_games =
               c.sc_rollup.max_number_of_parallel_games;
+            reveal_activation_level;
+            private_enable = false;
           }
       in
       let zk_rollup =
@@ -970,7 +1001,70 @@ let prepare_first_block ~level ~timestamp ctxt =
             enable = c.zk_rollup.enable;
             origination_size = c.zk_rollup.origination_size;
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
+            max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
           }
+      in
+
+      let adaptive_rewards_params =
+        Constants_parametric_repr.
+          {
+            issuance_ratio_min = Q.(5 // 10000) (* 0.05% *);
+            issuance_ratio_max = Q.(1 // 20) (* 5% *);
+            max_bonus = 50_000_000_000_000L (* 5% *);
+            growth_rate =
+              115_740_740L
+              (* 0.01 * [bonus_unit] / second_per_day
+                 For each % and each day, grows the bonus by 0.01% *);
+            center_dz = Q.(1 // 2) (* 50% *);
+            radius_dz = Q.(1 // 50) (* 2% *);
+          }
+      in
+
+      let adaptive_issuance =
+        Constants_parametric_repr.
+          {
+            global_limit_of_staking_over_baking = 5;
+            edge_of_staking_over_delegation = 2;
+            launch_ema_threshold =
+              (if Chain_id.equal Constants_repr.mainnet_id chain_id then
+               (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l
+              else (* 5% for testnets *) 100_000_000l);
+            adaptive_rewards_params;
+          }
+      in
+
+      let issuance_weights =
+        let c_gen =
+          Constants_repr.Generated.generate
+            ~consensus_committee_size:c.consensus_committee_size
+        in
+        c_gen.issuance_weights
+      in
+
+      let percentage_of_frozen_deposits_slashed_per_double_attestation =
+        100
+        * c.ratio_of_frozen_deposits_slashed_per_double_attestation.numerator
+        / c.ratio_of_frozen_deposits_slashed_per_double_attestation.denominator
+      in
+      let percentage_of_frozen_deposits_slashed_per_double_baking =
+        let double_baking_punishment_times_100 =
+          Int64.mul 100L (Tez_repr.to_mutez c.double_baking_punishment)
+        in
+        let percentage_rounded_down =
+          Int64.div
+            double_baking_punishment_times_100
+            (Tez_repr.to_mutez c.minimal_stake)
+        in
+        Int64.to_int percentage_rounded_down
+      in
+      let limit_of_delegation_over_baking =
+        (100 / c.frozen_deposits_percentage) - 1
+      in
+      let minimal_frozen_stake =
+        Tez_repr.(
+          div_exn
+            (mul_exn c.minimal_stake (limit_of_delegation_over_baking + 1))
+            100)
       in
       let constants =
         Constants_parametric_repr.
@@ -985,20 +1079,17 @@ let prepare_first_block ~level ~timestamp ctxt =
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             minimal_stake = c.minimal_stake;
+            minimal_frozen_stake;
             vdf_difficulty = c.vdf_difficulty;
-            seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
-            baking_reward_fixed_portion = c.baking_reward_fixed_portion;
-            baking_reward_bonus_per_slot = c.baking_reward_bonus_per_slot;
-            endorsing_reward_per_slot = c.endorsing_reward_per_slot;
+            issuance_weights;
             cost_per_byte = c.cost_per_byte;
             hard_storage_limit_per_operation =
               c.hard_storage_limit_per_operation;
             quorum_min = c.quorum_min;
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
-            liquidity_baking_subsidy = c.liquidity_baking_subsidy;
             liquidity_baking_toggle_ema_threshold =
               c.liquidity_baking_toggle_ema_threshold;
             minimal_block_delay = c.minimal_block_delay;
@@ -1007,25 +1098,29 @@ let prepare_first_block ~level ~timestamp ctxt =
             consensus_threshold = c.consensus_threshold;
             minimal_participation_ratio = c.minimal_participation_ratio;
             max_slashing_period = c.max_slashing_period;
-            frozen_deposits_percentage = c.frozen_deposits_percentage;
-            double_baking_punishment = c.double_baking_punishment;
-            ratio_of_frozen_deposits_slashed_per_double_endorsement =
-              c.ratio_of_frozen_deposits_slashed_per_double_endorsement;
+            limit_of_delegation_over_baking;
+            percentage_of_frozen_deposits_slashed_per_double_baking;
+            percentage_of_frozen_deposits_slashed_per_double_attestation;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator = c.testnet_dictator;
             initial_seed = c.initial_seed;
             cache_script_size = c.cache_script_size;
             cache_stake_distribution_cycles = c.cache_stake_distribution_cycles;
             cache_sampler_state_cycles = c.cache_sampler_state_cycles;
-            tx_rollup;
             dal;
             sc_rollup;
             zk_rollup;
+            adaptive_issuance;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
-  prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp
+  prepare
+    ctxt
+    ~level
+    ~predecessor_timestamp:timestamp
+    ~timestamp
+    ~adaptive_issuance_enable:false
   >|=? fun ctxt -> (previous_proto, ctxt)
 
 let activate ctxt h = Updater.activate (context ctxt) h >|= update_context ctxt
@@ -1330,36 +1425,42 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  val allowed_endorsements : t -> (consensus_pk * int) slot_map option
+  val allowed_attestations : t -> (consensus_pk * int) slot_map option
 
-  val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
+  val allowed_preattestations : t -> (consensus_pk * int) slot_map option
+
+  val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
   type error += Slot_map_not_found of {loc : string}
 
-  val current_endorsement_power : t -> int
+  val current_attestation_power : t -> int
 
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:(consensus_pk * int) slot_map option ->
-    allowed_preendorsements:(consensus_pk * int) slot_map option ->
+    allowed_attestations:(consensus_pk * int) slot_map option ->
+    allowed_preattestations:(consensus_pk * int) slot_map option ->
     t
 
-  val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
+  val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
 
-  val record_preendorsement :
+  val record_preattestation :
     t -> initial_slot:slot -> power:int -> round -> t tzresult
 
-  val endorsements_seen : t -> slot_set
+  val forbid_delegate : t -> Signature.Public_key_hash.t -> t
 
-  val get_preendorsements_quorum_round : t -> round option
+  val set_forbidden_delegates : t -> Signature.Public_key_hash.Set.t -> t
 
-  val set_preendorsements_quorum_round : t -> round -> t
+  val attestations_seen : t -> slot_set
+
+  val get_preattestations_quorum_round : t -> round option
+
+  val set_preattestations_quorum_round : t -> round -> t
 
   val locked_round_evidence : t -> (round * int) option
 
-  val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
+  val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
-  val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
+  val attestation_branch : t -> (Block_hash.t * Block_payload_hash.t) option
 end
 
 module Consensus :
@@ -1370,21 +1471,6 @@ module Consensus :
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type consensus_pk := consensus_pk = struct
-  let[@inline] allowed_endorsements ctxt =
-    ctxt.back.consensus.allowed_endorsements
-
-  let[@inline] allowed_preendorsements ctxt =
-    ctxt.back.consensus.allowed_preendorsements
-
-  let[@inline] current_endorsement_power ctxt =
-    ctxt.back.consensus.current_endorsement_power
-
-  let[@inline] get_preendorsements_quorum_round ctxt =
-    ctxt.back.consensus.preendorsements_quorum_round
-
-  let[@inline] locked_round_evidence ctxt =
-    Raw_consensus.locked_round_evidence ctxt.back.consensus
-
   let[@inline] update_consensus_with ctxt f =
     {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}
 
@@ -1392,37 +1478,61 @@ module Consensus :
     f ctxt.back.consensus >|? fun consensus ->
     {ctxt with back = {ctxt.back with consensus}}
 
-  let[@inline] initialize_consensus_operation ctxt ~allowed_endorsements
-      ~allowed_preendorsements =
+  let[@inline] allowed_attestations ctxt =
+    ctxt.back.consensus.allowed_attestations
+
+  let[@inline] allowed_preattestations ctxt =
+    ctxt.back.consensus.allowed_preattestations
+
+  let[@inline] forbidden_delegates ctxt =
+    ctxt.back.consensus.forbidden_delegates
+
+  let[@inline] set_forbidden_delegates ctxt delegates =
+    update_consensus_with ctxt (Raw_consensus.set_forbidden_delegates delegates)
+
+  let[@inline] current_attestation_power ctxt =
+    ctxt.back.consensus.current_attestation_power
+
+  let[@inline] get_preattestations_quorum_round ctxt =
+    ctxt.back.consensus.preattestations_quorum_round
+
+  let[@inline] locked_round_evidence ctxt =
+    Raw_consensus.locked_round_evidence ctxt.back.consensus
+
+  let[@inline] initialize_consensus_operation ctxt ~allowed_attestations
+      ~allowed_preattestations =
     update_consensus_with
       ctxt
-      (Raw_consensus.initialize_with_endorsements_and_preendorsements
-         ~allowed_endorsements
-         ~allowed_preendorsements)
+      (Raw_consensus.initialize_with_attestations_and_preattestations
+         ~allowed_attestations
+         ~allowed_preattestations)
 
-  let[@inline] record_preendorsement ctxt ~initial_slot ~power round =
+  let[@inline] record_preattestation ctxt ~initial_slot ~power round =
     update_consensus_with_tzresult
       ctxt
-      (Raw_consensus.record_preendorsement ~initial_slot ~power round)
+      (Raw_consensus.record_preattestation ~initial_slot ~power round)
 
-  let[@inline] record_endorsement ctxt ~initial_slot ~power =
+  let[@inline] record_attestation ctxt ~initial_slot ~power =
     update_consensus_with_tzresult
       ctxt
-      (Raw_consensus.record_endorsement ~initial_slot ~power)
+      (Raw_consensus.record_attestation ~initial_slot ~power)
 
-  let[@inline] endorsements_seen ctxt = ctxt.back.consensus.endorsements_seen
+  let[@inline] forbid_delegate ctxt delegate =
+    update_consensus_with ctxt (Raw_consensus.forbid_delegate delegate)
 
-  let[@inline] set_preendorsements_quorum_round ctxt round =
+  let[@inline] attestations_seen ctxt = ctxt.back.consensus.attestations_seen
+
+  let[@inline] set_preattestations_quorum_round ctxt round =
     update_consensus_with
       ctxt
-      (Raw_consensus.set_preendorsements_quorum_round round)
+      (Raw_consensus.set_preattestations_quorum_round round)
 
-  let[@inline] endorsement_branch ctxt =
-    Raw_consensus.endorsement_branch ctxt.back.consensus
+  let[@inline] attestation_branch ctxt =
+    Raw_consensus.attestation_branch ctxt.back.consensus
 
-  let[@inline] set_endorsement_branch ctxt branch =
+  let[@inline] set_attestation_branch ctxt branch =
     update_consensus_with ctxt (fun ctxt ->
-        Raw_consensus.set_endorsement_branch ctxt branch)
+        Raw_consensus.set_attestation_branch ctxt branch)
 
   type error += Slot_map_not_found of {loc : string}
 
@@ -1435,27 +1545,6 @@ module Consensus :
       Data_encoding.(obj1 (req "loc" (string Plain)))
       (function Slot_map_not_found {loc} -> Some loc | _ -> None)
       (fun loc -> Slot_map_not_found {loc})
-end
-
-module Tx_rollup = struct
-  let add_message ctxt rollup message =
-    let root = ref Tx_rollup_inbox_repr.Merkle.(root empty) in
-    let updater element =
-      let tree =
-        Option.value element ~default:Tx_rollup_inbox_repr.Merkle.(empty)
-      in
-      let tree = Tx_rollup_inbox_repr.Merkle.add_message tree message in
-      root := Tx_rollup_inbox_repr.Merkle.root tree ;
-      Some tree
-    in
-    let map =
-      Tx_rollup_repr.Map.update
-        rollup
-        updater
-        ctxt.back.tx_rollup_current_messages
-    in
-    let back = {ctxt.back with tx_rollup_current_messages = map} in
-    ({ctxt with back}, !root)
 end
 
 (*

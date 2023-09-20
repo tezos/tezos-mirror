@@ -42,7 +42,7 @@ type validator_kind =
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
       dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-      log_config : External_validation.log_config;
+      internal_events : Tezos_base.Internal_event_config.t;
     }
       -> validator_kind
 
@@ -64,7 +64,7 @@ module type S = sig
     predecessor:Store.Block.t ->
     max_operations_ttl:int ->
     Block_header.t ->
-    Operation.t list list ->
+    Block_validation.operation list list ->
     Block_validation.result tzresult Lwt.t
 
   val preapply_block :
@@ -80,7 +80,7 @@ module type S = sig
     predecessor_block_metadata_hash:Block_metadata_hash.t option ->
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
     predecessor_resulting_context_hash:Context_hash.t ->
-    Operation.t list list ->
+    Block_validation.operation list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
   val precheck_block :
@@ -89,7 +89,7 @@ module type S = sig
     predecessor:Store.Block.t ->
     Block_header.t ->
     Block_hash.t ->
-    Operation.t trace trace ->
+    Block_validation.operation trace trace ->
     unit tzresult Lwt.t
 
   val context_garbage_collection :
@@ -554,6 +554,7 @@ module External_validator_process = struct
 
   type validator_process = {
     process : Lwt_process.process_none;
+    process_socket : Lwt_unix.file_descr;
     input : Lwt_io.output_channel;
     output : Lwt_io.input_channel;
     canceler : Lwt_canceler.t;
@@ -576,7 +577,7 @@ module External_validator_process = struct
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
     dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-    log_config : External_validation.log_config;
+    internal_events : Tezos_base.Internal_event_config.t;
   }
 
   let kind = External_process
@@ -600,10 +601,10 @@ module External_validator_process = struct
      This is expected to be used each time the external validator
      process is (re)started.
      The scenario of the handshake is the following:
-     - the node sends some magic bytes,
-     - the external validator checks the bytes and sends it's magic
-       bytes,
-     - the node checks the received bytes,
+     - simultaneously, the node and the external validator send some magic bytes
+       to each others,
+     - simultaneously, the node and the external validator wait for each others
+       magic bytes and check their validity,
      - handshake is finished. *)
   let process_handshake process_input process_output =
     let open Lwt_result_syntax in
@@ -648,7 +649,7 @@ module External_validator_process = struct
         user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
         operation_metadata_size_limit = vp.operation_metadata_size_limit;
         dal_config = vp.dal_config;
-        log_config = vp.log_config;
+        internal_events = vp.internal_events;
       }
     in
     let*! () =
@@ -726,7 +727,7 @@ module External_validator_process = struct
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           clean_process_fd socket_path)
     in
-    let* process_socket, _ =
+    let* process_socket =
       Lwt.finalize
         (fun () ->
           let* process_socket =
@@ -735,7 +736,8 @@ module External_validator_process = struct
               ~max_requests:1
               ~socket_path
           in
-          let*! v = Lwt_unix.accept process_socket in
+          let*! v, _ = Lwt_unix.accept process_socket in
+          let*! () = Lwt_unix.close process_socket in
           return v)
         (fun () ->
           (* As the external validation process is now started, we can
@@ -761,6 +763,7 @@ module External_validator_process = struct
       Running
         {
           process;
+          process_socket;
           input = process_input;
           output = process_output;
           canceler;
@@ -779,6 +782,7 @@ module External_validator_process = struct
     | Running
         {
           process;
+          process_socket;
           input = process_input;
           output = process_output;
           canceler;
@@ -791,6 +795,11 @@ module External_validator_process = struct
                it automatically. *)
             let*! () = Error_monad.cancel_with_exceptions canceler in
             Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
+            let*! () =
+              Lwt.catch
+                (fun () -> Lwt_unix.close process_socket)
+                (fun _ -> Lwt.return_unit)
+            in
             vp.validator_process <- Uninitialized ;
             let*! () = Events.(emit process_exited_abnormally status) in
             start_process vp)
@@ -863,7 +872,8 @@ module External_validator_process = struct
          _;
        } :
         validator_environment) ~genesis ~data_dir ~readonly ~context_root
-      ~protocol_root ~process_path ~sandbox_parameters ~dal_config ~log_config =
+      ~protocol_root ~process_path ~sandbox_parameters ~dal_config
+      ~internal_events =
     let open Lwt_result_syntax in
     let*! () = Events.(emit init ()) in
     let validator =
@@ -881,7 +891,7 @@ module External_validator_process = struct
         lock = Lwt_mutex.create ();
         sandbox_parameters;
         dal_config;
-        log_config;
+        internal_events;
       }
     in
     let* (_ :
@@ -1071,7 +1081,7 @@ let init validator_environment validator_kind =
         process_path;
         sandbox_parameters;
         dal_config;
-        log_config;
+        internal_events;
       } ->
       let* (validator : 'b) =
         External_validator_process.init
@@ -1084,7 +1094,7 @@ let init validator_environment validator_kind =
           ~process_path
           ~sandbox_parameters
           ~dal_config
-          ~log_config
+          ~internal_events
       in
       let validator_process : (module S with type t = 'b) =
         (module External_validator_process)

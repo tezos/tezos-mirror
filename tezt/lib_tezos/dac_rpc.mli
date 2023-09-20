@@ -23,50 +23,71 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [get_preimage hash] requests the preimage of hash, consisting of a
-    single page, from cctxt. When the request succeeds, the raw page will be
-    returned as a sequence of bytes. *)
-val get_preimage : string -> (Dac_node.t, string) RPC_core.t
+(** [V0] is experimental DAC API. *)
+module V0 : sig
+  (** [api_prefix] is a URL prefix of the [V0] API endpoints. *)
+  val api_prefix : string
 
-(** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a [payload] to dac/store_preimage 
-    using a given [pagination_scheme]. It returns the base58 encoded root page hash 
-    and the raw bytes that can be used as contents of a rollup message to trigger the request of
-    the payload in a WASM rollup. *)
-val post_store_preimage :
-  payload:string ->
-  pagination_scheme:string ->
-  (Dac_node.t, string * string) RPC_core.t
+  (** [get_preimage hash] requests the preimage of hash, consisting of a
+      single page, from cctxt. When the request succeeds, the raw page will be
+      returned as a sequence of bytes. *)
+  val get_preimage : string -> (Dac_node.t, string) RPC_core.t
 
-(** [get_verify_signature cctxt external_message] requests the DAL node to verify
-    the signature of the external message [external_message] via
-    the plugin/dac/verify_signature endpoint. The DAC committee
-    of the DAL node must be the same that was used to produce the
-    [external_message]. *)
-val get_verify_signature : string -> (Dac_node.t, bool) RPC_core.t
+  (** [make_put_dac_member_sigature_request_body ~dac_member_pkh ~root_hash signature]
+      creates a JSON body for "PUT v0/dac_member_signature". *)
+  val make_put_dac_member_signature_request_body :
+    dac_member_pkh:string ->
+    root_hash:Hex.t ->
+    Tezos_crypto.Aggregate_signature.signature ->
+    Ezjsonm.value
 
-(** [put_dac_member_signature hex_root_hash dac_member_pkh signature]
-    stores the [signature] generated from signing [hex_root_hash] by
-    [dac_member_pkh]. *)
-val put_dac_member_signature :
-  hex_root_hash:Hex.t ->
-  dac_member_pkh:string ->
-  signature:Tezos_crypto.Aggregate_signature.t ->
-  (Dac_node.t, unit) RPC_core.t
+  (** [put_dac_member_signature hex_root_hash dac_member_pkh signature]
+      stores the [signature] generated from signing [hex_root_hash] by
+      [dac_member_pkh]. *)
+  val put_dac_member_signature :
+    hex_root_hash:Hex.t ->
+    dac_member_pkh:string ->
+    signature:Tezos_crypto.Aggregate_signature.t ->
+    (Dac_node.t, unit) RPC_core.t
 
-(** [get_certificate ~hex_root_hash] fetches the DAC certificate for the
-    provided [hex_root_hash]. *)
-val get_certificate :
-  hex_root_hash:Hex.t -> (Dac_node.t, int * string * string) RPC_core.t
+  (** [get_missing_page ~hex_root_hash] calls
+      "GET v0/missing_page/[page_hash]" endpoint. *)
+  val get_missing_page : hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
 
-(** [get_missing_page ~hex_root_hash] calls GET missing_page/[page_hash] 
-        endpoint. *)
-val get_missing_page : hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
+  (** [get_certificate ~hex_root_hash] fetches the DAC certificate
+      for the provided [hex_root_hash]. *)
+  val get_certificate :
+    hex_root_hash:Hex.t -> (Dac_node.t, int * string * string * int) RPC_core.t
 
-module Coordinator : sig
-  (** [post_preimage ~payload] sends a [payload] to the DAC
-    [Coordinator] via a POST RPC call to dac/preimage. It returns a hex
-    encoded root page hash, produced by [Merkle_tree_V0] pagination scheme.
-    On the backend side it also pushes root page hash of the preimage to all
-    the subscribed DAC Members and Observers. *)
-  val post_preimage : payload:string -> (Dac_node.t, string) RPC_core.t
+  (** [get_serialized_certificate ~hex_root_hash] fetches the DAC certificate for the 
+      provided [hex_root_hash] with SDK kernel compatible [root_hash] encoding. *)
+  val get_serialized_certificate :
+    hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
+
+  module Coordinator : sig
+    (** [post_preimage ~payload] sends a [payload] to the DAC [Coordinator] via
+        a POST RPC call to v0/preimage. It returns a hex encoded root page hash,
+        produced by [Merkle_tree_V0] pagination scheme. On the backend side it
+        also pushes root page hash of the preimage to all the subscribed
+        DAC Members and Observers. *)
+    val post_preimage : payload:string -> (Dac_node.t, string) RPC_core.t
+  end
+end
+
+(** [get_health_live] returns [true] if 
+    [Node_context.get_status cctxt] is [Starting] or [Ready]. *)
+val get_health_live : (Dac_node.t, bool) RPC_core.t
+
+(** [get_health_ready] returns [true] if 
+    [Node_context.get_status cctxt] is [Ready]
+    and fail with [tzfail Dac_node_not_ready] otherwise. *)
+val get_health_ready : (Dac_node.t, bool) RPC_core.t
+
+(** [V1] is a second major DAC API release which is currently work in progress. *)
+module V1 : sig
+  (** [get_pages hash] requests the preimage of hash, consisting of a
+      single page, from cctxt. When the request succeeds, the raw page will be
+      returned as a sequence of bytes. This is achieved by calling
+      "GET v1/pages". *)
+  val get_pages : string -> (Dac_node.t, string) RPC_core.t
 end

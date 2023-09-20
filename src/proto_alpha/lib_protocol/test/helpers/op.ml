@@ -55,18 +55,18 @@ let mk_block_payload_hash payload_round (b : Block.t) =
     hashes
 
 let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
-    ?block_payload_hash ?branch endorsed_block =
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let branch =
     match branch with
-    | None -> endorsed_block.Block.header.shell.predecessor
+    | None -> attested_block.Block.header.shell.predecessor
     | Some branch -> branch
   in
   let* delegate_pkh, slots =
     match delegate with
-    | None -> Context.get_endorser (B endorsed_block)
+    | None -> Context.get_attester (B attested_block)
     | Some del -> (
-        let* slots = Context.get_endorser_slot (B endorsed_block) del in
+        let* slots = Context.get_attester_slot (B attested_block) del in
         match slots with
         | None -> return (del, [])
         | Some slots -> return (del, slots))
@@ -77,28 +77,28 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
   let* level =
     match level with
     | None ->
-        let*? level = Context.get_level (B endorsed_block) in
+        let*? level = Context.get_level (B attested_block) in
         return level
     | Some level -> return level
   in
   let* round =
     match round with
     | None ->
-        let*? round = Block.get_round endorsed_block in
+        let*? round = Block.get_round attested_block in
         return round
     | Some round -> return round
   in
   let block_payload_hash =
     match block_payload_hash with
-    | None -> mk_block_payload_hash round endorsed_block
+    | None -> mk_block_payload_hash round attested_block
     | Some block_payload_hash -> block_payload_hash
   in
   let consensus_content = {slot; level; round; block_payload_hash} in
   let* signer = Account.find delegate_pkh in
   return (consensus_content, signer.sk, branch)
 
-let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
@@ -108,33 +108,33 @@ let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
-  let op = Single (Endorsement consensus_content) in
+  let op = Single (Attestation consensus_content) in
   return
     (sign
-       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Attestation Chain_id.zero))
        signer
        branch
        op)
 
-let endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* op =
-    raw_endorsement
+    raw_attestation
       ?delegate
       ?slot
       ?level
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
   return (Operation.pack op)
 
-let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
@@ -144,28 +144,28 @@ let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
-  let op = Single (Preendorsement consensus_content) in
+  let op = Single (Preattestation consensus_content) in
   return
     (sign
-       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Preattestation Chain_id.zero))
        signer
        branch
        op)
 
-let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* op =
-    raw_preendorsement
+    raw_preattestation
       ?delegate
       ?slot
       ?level
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
   return (Operation.pack op)
 
@@ -605,22 +605,6 @@ let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk (Context.branch ctxt) sop
 
-let set_deposits_limit ?force_reveal ?fee ?gas_limit ?storage_limit ?counter
-    ctxt source limit =
-  let top = Set_deposits_limit limit in
-  manager_operation
-    ?force_reveal
-    ?fee
-    ?counter
-    ?storage_limit
-    ?gas_limit
-    ~source
-    ctxt
-    top
-  >>=? fun sop ->
-  Context.Contract.manager ctxt source >|=? fun account ->
-  sign account.sk (Context.branch ctxt) sop
-
 let increase_paid_storage ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ctxt ~source ~destination (amount : Z.t) =
   let top = Increase_paid_storage {amount_in_bytes = amount; destination} in
@@ -654,16 +638,16 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_endorsement ctxt op1 op2 =
-  let contents = Single (Double_endorsement_evidence {op1; op2}) in
+let double_attestation ctxt op1 op2 =
+  let contents = Single (Double_attestation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_preendorsement ctxt op1 op2 =
-  let contents = Single (Double_preendorsement_evidence {op1; op2}) in
+let double_preattestation ctxt op1 op2 =
+  let contents = Single (Double_preattestation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};
@@ -786,8 +770,7 @@ let originated_sc_rollup op =
   Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
 
 let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ~origination_proof ctxt (src : Contract.t) kind ~boot_sector ~parameters_ty
-    =
+    ?whitelist ctxt (src : Contract.t) kind ~boot_sector ~parameters_ty =
   let open Lwt_result_syntax in
   let* to_sign_op =
     manager_operation
@@ -798,7 +781,7 @@ let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ?storage_limit
       ~source:src
       ctxt
-      (Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty})
+      (Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist})
   in
   let* account = Context.Contract.manager ctxt src in
   let op = sign account.sk (Context.branch ctxt) to_sign_op in
@@ -821,7 +804,7 @@ let sc_rollup_publish ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
   sign account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_cement ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
-    (src : Contract.t) rollup commitment =
+    (src : Contract.t) rollup =
   manager_operation
     ?force_reveal
     ?counter
@@ -830,7 +813,7 @@ let sc_rollup_cement ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     ?storage_limit
     ~source:src
     ctxt
-    (Sc_rollup_cement {rollup; commitment})
+    (Sc_rollup_cement {rollup})
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk (Context.branch ctxt) to_sign_op

@@ -4,9 +4,10 @@
 
 [package]
 name = "installer-kernel"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["TriliTech <contact@trili.tech>"]
+publish = false
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -22,9 +23,10 @@ features = ["portable"]
 
 [dependencies.tezos-smart-rollup]
 path = "../sdk"
-version = "0.1.0"
+version = "0.2.1"
 default-features = false
 
 [dependencies.tezos-smart-rollup-installer-config]
 path = "../installer-config"
+version = "0.2.1"
 default-features = false

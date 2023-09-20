@@ -106,6 +106,12 @@ add_sandboxed_bootstrap_identities() {
     ${client} import secret key activator ${ACTIVATOR_SECRET}
 }
 
+add_liquidity_baking_default_file() {
+
+    echo '{ "liquidity_baking_toggle_vote": "pass" }' > ${client_dir}/per_block_votes.json
+
+}
+
 activate_alpha() {
 
     # Calling `date` with 'AAA+1' is a small tweak to speed-up
@@ -154,6 +160,8 @@ main () {
     init_sandboxed_client "$1" "$2"
 
     add_sandboxed_bootstrap_identities | sed -e 's/^/## /' 1>&2
+
+    add_liquidity_baking_default_file
 
     mkdir -p $client_dir/bin
 

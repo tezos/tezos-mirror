@@ -29,11 +29,7 @@ open Utils
 open Vectors
 open Api
 
-type t =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-     Ensure that ownership and lifetime of [Types.Module.t] is respected.
-  *)
-  Types.Module.t Ctypes.ptr
+type t = Types.Module.t Ctypes.ptr
 
 let wat2wasm code =
   let source = Byte_vector.from_string code in

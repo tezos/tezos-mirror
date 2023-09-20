@@ -37,6 +37,9 @@ let block_header_data_encoding =
 
 type block_header_metadata = Apply_results.block_metadata
 
+let block_header_metadata_encoding_with_legacy_attestation_name =
+  Apply_results.block_metadata_encoding_with_legacy_attestation_name
+
 let block_header_metadata_encoding = Apply_results.block_metadata_encoding
 
 type operation_data = Alpha_context.packed_protocol_data =
@@ -44,7 +47,9 @@ type operation_data = Alpha_context.packed_protocol_data =
       'kind Alpha_context.Operation.protocol_data
       -> operation_data
 
-let operation_data_encoding =
+let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
+
+let operation_data_encoding_with_legacy_attestation_name =
   Alpha_context.Operation.protocol_data_encoding_with_legacy_attestation_name
 
 type operation_receipt = Apply_results.packed_operation_metadata =
@@ -55,8 +60,15 @@ type operation_receipt = Apply_results.packed_operation_metadata =
 
 let operation_receipt_encoding = Apply_results.operation_metadata_encoding
 
+let operation_receipt_encoding_with_legacy_attestation_name =
+  Apply_results.operation_metadata_encoding_with_legacy_attestation_name
+
 let operation_data_and_receipt_encoding =
   Apply_results.operation_data_and_metadata_encoding
+
+let operation_data_and_receipt_encoding_with_legacy_attestation_name =
+  Apply_results
+  .operation_data_and_metadata_encoding_with_legacy_attestation_name
 
 type operation = Alpha_context.packed_operation = {
   shell : Operation.shell_header;
@@ -74,7 +86,7 @@ let validation_passes =
   let open Alpha_context.Constants in
   Updater.
     [
-      (* 2048 endorsements *)
+      (* 2048 attestations *)
       {max_size = 2048 * 2048; max_op = Some 2048};
       (* 32k of voting operations *)
       {max_size = 32 * 1024; max_op = None};
@@ -114,20 +126,20 @@ type mode =
     about the validation/application of a block: application, partial
     validation, and full construction.
 
-    In these modes, endorsements must point to the predecessor's level
-    and preendorsements, if any, to the block's level. *)
+    In these modes, attestations must point to the predecessor's level
+    and preattestations, if any, to the block's level. *)
 let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
-  let* ctxt, endorsements_map =
-    Baking.endorsing_rights_by_first_slot ctxt predecessor_level
+  let* ctxt, attestations_map =
+    Baking.attesting_rights_by_first_slot ctxt predecessor_level
   in
-  let*? can_contain_preendorsements =
+  let*? can_contain_preattestations =
     match mode with
     | Construction _ | Partial_construction _ -> ok true
     | Application block_header | Partial_validation block_header ->
         (* A preexisting block, which has a complete and correct block
-           header, can only contain preendorsements when the locked
+           header, can only contain preattestations when the locked
            round in the fitness has an actual value. *)
         let open Result_syntax in
         let* locked_round =
@@ -135,19 +147,19 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
         in
         return (Option.is_some locked_round)
   in
-  let* ctxt, allowed_preendorsements =
-    if can_contain_preendorsements then
-      let* ctxt, preendorsements_map =
-        Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
+  let* ctxt, allowed_preattestations =
+    if can_contain_preattestations then
+      let* ctxt, preattestations_map =
+        Baking.attesting_rights_by_first_slot ctxt (Level.current ctxt)
       in
-      return (ctxt, Some preendorsements_map)
+      return (ctxt, Some preattestations_map)
     else return (ctxt, None)
   in
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt
-      ~allowed_endorsements:(Some endorsements_map)
-      ~allowed_preendorsements
+      ~allowed_attestations:(Some attestations_map)
+      ~allowed_preattestations
   in
   return ctxt
 
@@ -155,7 +167,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
     construction mode).
 
     In the mempool, there are three allowed levels for both
-    endorsements and preendorsements: [predecessor_level - 1] (aka the
+    attestations and preattestations: [predecessor_level - 1] (aka the
     grandparent's level), [predecessor_level] (that is, the level of
     the mempool's head), and [predecessor_level + 1] (aka the current
     level in ctxt). *)
@@ -164,12 +176,12 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
   let open Alpha_context in
   (* We don't want to compute the tables by first slot for all three
      possible levels because it is time-consuming. So we don't compute
-     any [allowed_endorsements] or [allowed_preendorsements] tables. *)
+     any [allowed_attestations] or [allowed_preattestations] tables. *)
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt
-      ~allowed_endorsements:None
-      ~allowed_preendorsements:None
+      ~allowed_attestations:None
+      ~allowed_preattestations:None
   in
   (* However, we want to ensure that the cycle rights are loaded in
      the context, so that {!Stake_distribution.slot_owner} doesn't
@@ -351,8 +363,8 @@ let init chain_id ctxt block_header =
   let level = block_header.Block_header.level in
   let timestamp = block_header.timestamp in
   let predecessor = block_header.predecessor in
-  let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
-      =
+  let typecheck_smart_contract (ctxt : Alpha_context.context)
+      (script : Alpha_context.Script.t) =
     let allow_forged_in_storage =
       false
       (* There should be no forged value in bootstrap contracts. *)
@@ -393,7 +405,8 @@ let init chain_id ctxt block_header =
   in
   Alpha_context.prepare_first_block
     chain_id
-    ~typecheck
+    ~typecheck_smart_contract
+    ~typecheck_smart_rollup:Sc_rollup_operations.validate_untyped_parameters_ty
     ~level
     ~timestamp
     ~predecessor
@@ -405,7 +418,13 @@ let init chain_id ctxt block_header =
       ({
          payload_hash = Block_payload_hash.zero;
          payload_round = Alpha_context.Round.zero;
-         liquidity_baking_toggle_vote = Alpha_context.Liquidity_baking.LB_pass;
+         per_block_votes =
+           {
+             liquidity_baking_vote =
+               Alpha_context.Per_block_votes.Per_block_vote_pass;
+             adaptive_issuance_vote =
+               Alpha_context.Per_block_votes.Per_block_vote_pass;
+           };
          seed_nonce_hash = None;
          proof_of_work_nonce =
            Bytes.make Constants_repr.proof_of_work_nonce_size '0';

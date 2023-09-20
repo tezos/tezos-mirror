@@ -38,6 +38,10 @@ type t
 val create :
   ?runner:Runner.t -> ?rpc_addr:string -> ?rpc_port:int -> Sc_rollup_node.t -> t
 
+(** [mockup ?runner ?rpc_addr ?rpc_port ()] is like [create] but doesn't
+    communicate with a [rollup_node] and serves mockup values. *)
+val mockup : ?runner:Runner.t -> ?rpc_addr:string -> ?rpc_port:int -> unit -> t
+
 (** [run proxy_server] launches the EVM proxy server with the arguments
     given during {!create}. *)
 val run : t -> unit Lwt.t
@@ -58,6 +62,28 @@ val spawn_run : t -> Process.t
     [proxy_server]. *)
 val endpoint : t -> string
 
-(** [call_evm_rpc proxy_server ~method_ ~parameters] sends a JSON-RPC request to
-    the [proxy_server], for the given [method_] and [parameters]. *)
-val call_evm_rpc : t -> method_:string -> parameters:JSON.u -> JSON.t Lwt.t
+(** JSON-RPC request. *)
+type request = {method_ : string; parameters : JSON.u}
+
+(** [call_evm_rpc proxy_server ~request] sends a JSON-RPC request to the
+    [proxy_server], for the given [request]. *)
+val call_evm_rpc : t -> request -> JSON.t Lwt.t
+
+(** [batch_evm_rpc proxy_server ~requests] sends multiple JSON-RPC requests to the
+    [proxy_server], for the given [requests]. *)
+val batch_evm_rpc : t -> request list -> JSON.t Lwt.t
+
+(** [extract_result json] expects a JSON-RPC `result` and returns the value. *)
+val extract_result : JSON.t -> JSON.t
+
+(** [fetch_contract_code proxy_server contract] returns the code associated to
+    the given contract in the rollup. *)
+val fetch_contract_code : t -> string -> string Lwt.t
+
+(** A slot in the transaction pool associates an address to a mapping of nonces
+    to transactions. *)
+type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
+
+(** [txpool_content proxy_server] returns the transaction hash and nonce
+    contained in the `pending` and `queued` pools. *)
+val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t

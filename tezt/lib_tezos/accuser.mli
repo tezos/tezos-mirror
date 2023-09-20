@@ -52,7 +52,10 @@ type event = {name : string; value : JSON.t; timestamp : float}
     will communicate with it.
 
     If [runner] is specified, the accuser will be spawned on this
-    runner using SSH. *)
+    runner using SSH.
+
+    [preserved_levels] is the number of effective levels kept in the accuser's
+    memory*)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -60,6 +63,7 @@ val create :
   ?event_pipe:string ->
   ?base_dir:string ->
   ?runner:Runner.t ->
+  ?preserved_levels:int ->
   Node.t ->
   t
 
@@ -83,7 +87,7 @@ val kill : t -> unit Lwt.t
 
     The resulting promise is fulfilled as soon as the accuser has been spawned.
     It continues running in the background. *)
-val run : t -> unit Lwt.t
+val run : ?event_level:Daemon.Level.default_level -> t -> unit Lwt.t
 
 (** {2 Events} *)
 
@@ -137,6 +141,9 @@ val log_events : t -> unit
     from [name]. It will be created as a named pipe so that accuser
     events can be received.
 
+    [event_level] specifies the verbosity of the file descriptor sink.
+    The default value is [`Info].
+
     [base_dir] corresponds to the (useless) "--base-dir" argument of
     the octez-accuser command.
 
@@ -145,14 +152,19 @@ val log_events : t -> unit
     will communicate with it.
 
     If [runner] is specified, the accuser will be spawned on this
-    runner using SSH. *)
+    runner using SSH.
+
+    [preserved_levels] is the number of effective levels kept in the accuser's
+    memory *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
+  ?event_level:Daemon.Level.default_level ->
   ?base_dir:string ->
   ?runner:Runner.t ->
+  ?preserved_levels:int ->
   Node.t ->
   t Lwt.t
 

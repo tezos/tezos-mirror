@@ -123,9 +123,7 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
   let open P2p_limits in
   let open Lwt_syntax in
   match limits.maintenance_idle_time with
-  | None ->
-      let* () = Events.(emit maintenance_disabled) () in
-      return_none
+  | None -> return_none
   | Some maintenance_idle_time ->
       let maintenance_config =
         {
@@ -225,7 +223,7 @@ module Real = struct
       create_maintenance_worker limits pool connect_handler config triggers log
     in
     let* welcome = may_create_welcome_worker config limits connect_handler in
-    P2p_metrics.collect pool ;
+    P2p_metrics_collectors.collect pool ;
     return
       {
         config;
@@ -308,8 +306,13 @@ module Real = struct
   let get_peer_metadata {pool; _} conn =
     P2p_pool.Peers.get_peer_metadata pool conn
 
-  let connect ?timeout net point =
-    P2p_connect_handler.connect ?timeout net.connect_handler point
+  let connect ?trusted ?expected_peer_id ?timeout net point =
+    P2p_connect_handler.connect
+      ?trusted
+      ?expected_peer_id
+      ?timeout
+      net.connect_handler
+      point
 
   let recv _net conn =
     let open Lwt_syntax in
@@ -317,16 +320,8 @@ module Real = struct
     let peer_id = (P2p_conn.info conn).peer_id in
     let* () =
       match msg with
-      | Ok _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
-
-             the counter should be moved to P2p_conn instead *)
-          Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_received ;
-          Events.(emit message_read) peer_id
-      | Error _ ->
-          Prometheus.Counter.inc_one
-            P2p_metrics.Messages.user_message_received_error ;
-          Events.(emit message_read_error) peer_id
+      | Ok _ -> Events.(emit message_read) peer_id
+      | Error _ -> Events.(emit message_read_error) peer_id
     in
     return msg
 
@@ -362,10 +357,6 @@ module Real = struct
       match r with
       | Ok () ->
           let peer_id = (P2p_conn.info conn).peer_id in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
-
-             the counter should be moved to P2p_conn instead *)
-          Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
           Events.(emit message_sent) peer_id
       | Error trace ->
           Events.(emit sending_message_error)
@@ -376,10 +367,6 @@ module Real = struct
   let try_send _net conn v =
     match P2p_conn.write_now conn v with
     | Ok v ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
-
-           the counter should be moved to P2p_conn instead *)
-        Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
         Events.(emit__dont_wait__use_with_care message_trysent)
           (P2p_conn.info conn).peer_id ;
         v
@@ -450,6 +437,9 @@ module Real = struct
   let on_new_connection {connect_handler; _} f =
     P2p_connect_handler.on_new_connection connect_handler f
 
+  let on_disconnection {connect_handler; _} f =
+    P2p_connect_handler.on_disconnection connect_handler f
+
   let negotiated_version _ conn = P2p_conn.negotiated_version conn
 end
 
@@ -502,6 +492,8 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   get_peer_metadata : P2p_peer.Id.t -> 'peer_meta;
   set_peer_metadata : P2p_peer.Id.t -> 'peer_meta -> unit;
   connect :
+    ?trusted:bool ->
+    ?expected_peer_id:P2p_peer.Id.t ->
     ?timeout:Ptime.span ->
     P2p_point.Id.t ->
     ('msg, 'peer_meta, 'conn_meta) connection tzresult Lwt.t;
@@ -521,6 +513,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit;
   on_new_connection :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit;
+  on_disconnection : (P2p_peer.Id.t -> unit) -> unit;
   negotiated_version :
     ('msg, 'peer_meta, 'conn_meta) connection -> Network_version.t;
   activate : unit -> unit;
@@ -594,7 +587,9 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       global_stat = Real.global_stat net;
       get_peer_metadata = Real.get_peer_metadata net;
       set_peer_metadata = Real.set_peer_metadata net;
-      connect = (fun ?timeout -> Real.connect ?timeout net);
+      connect =
+        (fun ?trusted ?expected_peer_id ?timeout ->
+          Real.connect ?trusted ?expected_peer_id ?timeout net);
       recv = Real.recv net;
       recv_any = Real.recv_any net;
       send = Real.send net;
@@ -604,6 +599,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f);
       iter_connections = Real.iter_connections net;
       on_new_connection = Real.on_new_connection net;
+      on_disconnection = Real.on_disconnection net;
       negotiated_version = Real.negotiated_version net;
       activate = Real.activate net;
       watcher = net.Real.watcher;
@@ -640,7 +636,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     get_peer_metadata = (fun _ -> peer_cfg.P2p_params.peer_meta_initial ());
     set_peer_metadata = (fun _ _ -> ());
     connect =
-      (fun ?timeout:_ _ ->
+      (fun ?trusted:_ ?expected_peer_id:_ ?timeout:_ _ ->
         Lwt_result_syntax.tzfail P2p_errors.Connection_refused);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
@@ -649,6 +645,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     fold_connections = (fun ~init ~f:_ -> init);
     iter_connections = (fun _f -> ());
     on_new_connection = (fun _f -> ());
+    on_disconnection = (fun _f -> ());
     negotiated_version = (fun _ -> announced_version);
     pool = None;
     connect_handler = None;
@@ -704,6 +701,8 @@ let fold_connections net = net.fold_connections
 let iter_connections net = net.iter_connections
 
 let on_new_connection net = net.on_new_connection
+
+let on_disconnection net = net.on_disconnection
 
 let greylist_addr net addr =
   Option.iter (fun pool -> P2p_pool.greylist_addr pool addr) net.pool

@@ -1,60 +1,140 @@
 RandomTx.make_rollup:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 RandomTx.make_rollup_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 insufficient balance: amount > bal:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 insufficient balance: amount > bal_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 insufficient balance: amount + fee > bal:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 insufficient balance: amount + fee > bal_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid dst:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 invalid dst_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid src:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 invalid src_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 replay:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 replay_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 balance out of bounds 1:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 balance out of bounds 1_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: bad msg:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 invalid signature: bad msg_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: bad sk:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 invalid signature: bad sk_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: not on curve:
-Constraints: 3760
+Constraints       : 3758 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3758 [11.88]
 
 invalid signature: not on curve_optimized:
-Constraints: 1423
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 

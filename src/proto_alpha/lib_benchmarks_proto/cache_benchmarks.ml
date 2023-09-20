@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +25,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Benchmarks_proto
 
 let ns = Namespace.make Registration_helpers.ns "cache"
 
@@ -46,7 +48,7 @@ module Cache = Script_cache
 (** {2 Constructing a dummy cached value} *)
 
 let make_context ~rng_state =
-  Execution_context.make ~rng_state |> assert_ok_lwt |> fst
+  Execution_context.make ~rng_state () |> assert_ok_lwt |> fst
 
 let throwaway_context =
   let rng_state = Random.State.make [|0x1337; 0x533D|] in
@@ -135,7 +137,9 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let group = Benchmark.Standalone
+
+  let purpose = Benchmark.Generate_code "cache_repr"
 
   (** It is expected that cache keys are non-adversarial,
       ie do not share a long common prefix. This is the case for [Script_cache],
@@ -146,7 +150,7 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
       We therefore do not take into account the length of the key in the model. *)
   let model =
     let affine_logn name =
-      let open Model in
+      let open Tezos_benchmark.Model in
       let param_name param =
         Free_variable.of_namespace (Namespace.cons name param)
       in
@@ -154,6 +158,8 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
       let coeff = param_name "coeff" in
       let module M = struct
         let name = name
+
+        let takes_saturation_reprs = false
 
         type arg_type = int * unit
 

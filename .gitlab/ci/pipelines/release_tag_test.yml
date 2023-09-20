@@ -9,7 +9,7 @@ include:
   - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_test.yml
 
   # Stage: publish_release_gitlab
-  - .gitlab/ci/jobs/publish/gitlab.yml
+  - .gitlab/ci/jobs/publish/gitlab:release.yml
 
   # Stage: publish_release
   # We cannot test this job because it requires CI variables

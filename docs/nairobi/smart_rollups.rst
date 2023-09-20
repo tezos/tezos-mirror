@@ -107,10 +107,10 @@ sequence of bytes following no particular underlying format. The
 interpretation of this sequence of bytes is the responsibility of each
 kernel.
 
-There are two ways for an end-user to push an external message to the
-rollups inbox: first, she can inject the dedicated Layer 1 operation
+There are two ways for end-users to push an external message to the
+rollups inbox: first, they can inject the dedicated Layer 1 operation
 using the Octez client (see command ``send smart rollup message
-<messages> from <src>``); second, she can use the batcher
+<messages> from <src>``); second, they can use the batcher
 of a smart rollup node. More details can be found in :ref:`sending_external_inbox_message_nairobi`.
 
 Internal messages
@@ -139,6 +139,8 @@ the Layer 1 pushes one final internal message “End of
 level”. Similarly to “Start of level“, this internal messages does not
 come with any payload.
 
+.. _reveal_data_channel_smart_rollups:
+.. _reveal_data_channel_smart_rollups_nairobi:
 
 Reveal data channel
 """""""""""""""""""
@@ -203,7 +205,7 @@ Commitments
 ^^^^^^^^^^^
 
 Starting from the rollup origination level, levels are partitioned
-into **commitment periods** of 30 consecutive blocks.
+into **commitment periods** of 60 consecutive blocks.
 
 A **commitment** claims that the interpretation of all inbox messages
 published during a given commitment period and applied on the state of
@@ -224,8 +226,8 @@ must be wrong.
 Notice that, to publish a commitment, an operator must provide a
 deposit of 10,000 tez. For this reason, the operator is said to be a
 **staker**. Several users can stake on the same commitment. When a
-staker publishes a new commitment based on a commitment she is staking
-on, she does not have to provide a new deposit: the deposit also
+staker *S* publishes a new commitment based on a commitment that *S* is staking
+on, *S* does not have to provide a new deposit: the deposit also
 applies to this new commitment.
 
 There is no need to synchronize between operators: if two honest
@@ -282,14 +284,14 @@ provide a proof that they correctly interpreted this conflicting tick.
 
 The Layer 1 PVM then determines whether these proofs are valid. There
 are only two possible outcomes: either one of the staker has provided
-a valid proof, she wins the game, and is rewarded with half of the
-opponent's deposit (the other half being burnt) ; or, both stakers have
+a valid proof, then that staker wins the game, and is rewarded with half of the
+opponent's deposit (the other half being burnt); or, both stakers have
 provided an invalid proof and they both lose their deposit. In the
 end, at most one stake will be kept in the commitment tree. When a
 commitment has no more stake on it (because all stakers have lost the
 related refutation games), it is removed from the tree. An honest
-player must therefore play as many refutation games as there are
-stakes on the commitments in conflict with her own commitment.
+player *H* must therefore play as many refutation games as there are
+stakes on the commitments in conflict with *H*'s own commitment.
 
 Finally, notice that each player is subject to a timer similar to a
 chess clock, allowing each player to play only up to one week: after
@@ -299,7 +301,7 @@ two players can last at most 2 weeks.
 
 There is no timeout for starting a refutation game after having
 published a concurrent commitment. However, assuming the existence of
-an honest participant, she will start the refutation game with all
+an honest participant, that participant will start the refutation game with all
 concurrent stakers to avoid the rollup being stuck.
 
 Workflows
@@ -454,38 +456,23 @@ Now that the rollup is originated, anyone can make it progress by deploying a
 rollup node.
 
 First, we need to decide on a directory where the rollup node stores
-its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path. The
-rollup node is configured with the following command:
+its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path, by default
+``~/.tezos-smart-rollup-node``.
+
+
+The rollup node can then be run with:
 
 .. code:: sh
 
-   octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
-                    init operator config for "${SOR_ALIAS_OR_ADDR}" \
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
+                    run operator for "${SOR_ALIAS_OR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
-This creates a configuration file:
+where ``${OCLIENT_DIR}`` is the data directory of the Octez client, by default  ``~/.tezos-client``.
 
-::
-
-   Smart rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
-
-Here is the content of the file:
-
-::
-
-  {
-    "data-dir": "${ROLLUP_NODE_DIR}",
-    "smart-rollup-address": "${SOR_ADDR}",
-    "smart-rollup-node-operator": {
-      "publish": "${OPERATOR_ADDR}",
-      "add_messages": "${OPERATOR_ADDR}",
-      "cement": "${OPERATOR_ADDR}",
-      "refute": "${OPERATOR_ADDR}"
-    },
-    "fee-parameters": {},
-    "mode": "operator"
-  }
+The log should show that the rollup node follows the Layer 1 chain and
+processes the inbox of each level.
 
 Notice that distinct Layer 1 adresses could be used for the Layer 1
 operations issued by the rollup node simply by editing the
@@ -541,26 +528,61 @@ operations which are injected by the rollup node in each mode.
 .. [*] An accuser node will publish commitments only when it detects
        conflicts; for such cases it must make a deposit of 10,000 tez.
 
-Second, the configured rollup node can be run:
+
+Configuration file
+""""""""""""""""""
+
+The rollup node can also be configured with the following command that
+uses the same arguments as the ``run`` command:
 
 .. code:: sh
 
-   octez-smart-rollup-node-alpha -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
+                    init operator config for "${SOR_ALIAS_OR_ADDR}" \
+                    with operators "${OPERATOR_ADDR}" \
+                    --data-dir "${ROLLUP_NODE_DIR}"
 
-where ``${OCLIENT_DIR}`` is the data directory of the Octez client.
+This creates a configuration file:
 
-The log should show that the rollup node follows the Layer 1 chain and
-processes the inbox of each level.
+::
+
+   Smart rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
+
+Here is the content of the file:
+
+::
+
+  {
+    "data-dir": "${ROLLUP_NODE_DIR}",
+    "smart-rollup-address": "${SOR_ADDR}",
+    "smart-rollup-node-operator": {
+      "publish": "${OPERATOR_ADDR}",
+      "add_messages": "${OPERATOR_ADDR}",
+      "cement": "${OPERATOR_ADDR}",
+      "refute": "${OPERATOR_ADDR}"
+    },
+    "fee-parameters": {},
+    "mode": "operator"
+  }
+
+The rollup node can now be run with just:
+
+.. code:: sh
+
+   octez-smart-rollup-node -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+
+The configuration will be read from ``${ROLLUP_NODE_DIR}/config.json``.
 
 Rollup node in a sandbox
 """"""""""""""""""""""""
 
 The node can also be tested locally with a sandbox environment. (See :doc:`sandbox documentation <../user/sandbox>`.)
 
-Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup-node-alpha run``.
+Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup-node run``.
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 
+.. _sending_external_inbox_message:
 .. _sending_external_inbox_message_nairobi:
 
 Sending an external inbox message
@@ -603,9 +625,10 @@ can encode an outbox transaction using the Octez rollup client as follows:
       "entrypoint" : "%default" } ]'
 
 
-    EMESSAGE=$(octez-smart-rollup-client-alpha encode outbox message "${MESSAGE}")
+    EMESSAGE=$(octez-smart-rollup-client-PtNairob encode outbox message "${MESSAGE}")
 
 
+.. _triggering_execution_outbox_message:
 .. _triggering_execution_outbox_message_nairobi:
 
 Triggering the execution of an outbox message
@@ -622,7 +645,7 @@ populated as follows:
 
 .. code:: sh
 
-   octez-smart-rollup-client-alpha rpc get \
+   octez-smart-rollup-client-PtNairob rpc get \
      /global/block/cemented/outbox/${L}/messages
 
 Here is the output for this command:
@@ -644,7 +667,7 @@ proof is retrieved as follows:
 
 .. code:: sh
 
-   PROOF=$(octez-smart-rollup-client-alpha get proof for message 0 \
+   PROOF=$(octez-smart-rollup-client-PtNairob get proof for message 0 \
      of outbox at level "${L}" \
      transferring "${MESSAGE}")
 
@@ -667,6 +690,7 @@ operation. More complex parameters, typically containing assets
 represented as tickets, can be used as long as they match the type of
 the entrypoint of the destination smart contract.
 
+.. _sending_internal_inbox_message:
 .. _sending_internal_inbox_message_nairobi:
 
 Sending an internal inbox message
@@ -718,6 +742,7 @@ to the rollup.
             PAIR;
           }
 
+.. _populating_the_reveal_channel:
 .. _populating_the_reveal_channel_nairobi:
 
 Populating the reveal channel
@@ -737,6 +762,7 @@ this. For instance, one can classify pages into two categories: index
 pages that are hashes for other pages and leaf pages that contain
 actual payloads.
 
+.. _configure_fast_exec:
 .. _configure_fast_exec_nairobi:
 
 Configure WebAssembly fast execution
@@ -793,11 +819,10 @@ More precisely, determinism is ensured by the following restrictions:
 #. Instructions and types related to floating-point arithmetic are not
    supported. This is because IEEE floats are not deterministic, as
    the standard includes undefined behavior operations.
-#. The length of the call stack of the WASM kernel is bounded (see the WASM PVM
-   versioning section).
+#. The length of the call stack of the WASM kernel is bounded.
 
-Modulo the limitations above, a valid kernel is a WASM module that satisfies
-the following constraints:
+Modulo the limitations above, a valid kernel is a WASM module that
+satisfies the following constraints:
 
 #. It exports a function ``kernel_run`` that takes no argument and
    returns nothing.
@@ -919,8 +944,11 @@ upgrades. The WASM PVM will upgrade itself when it reads the
 | Protocol     | Version        |
 +==============+================+
 | Mumbai       | 2.0.0          |
++--------------+----------------+
 | Nairobi      | 2.0.0-r1       |
 +--------------+----------------+
+
+The changes in each WASM PVM version can be found by searching for string "PVM" in the corresponding protocol's changelog, section ``Smart Rollups`` (e.g. `this section <../protocols/alpha.html#smart-rollups>`__ for protocol Alpha).
 
 Control Flow
 """"""""""""
@@ -1359,9 +1387,9 @@ evaluate the WASM PVM without relying on any node and network:
 
 .. code:: sh
 
-  octez-smart-rollup-wasm-debugger "${WASM_FILE}" --inputs "${JSON_INPUTS}" --rollup "${SOR_ADDR}"
+  octez-smart-rollup-wasm-debugger --kernel "${WASM_FILE}" --inputs "${JSON_INPUTS}" --rollup "${SOR_ADDR}"
 
-``octez-smart-rollup-wasm-debugger`` takes as its argument the WASM kernel to be debugged, either a a ``.wasm`` file (the binary
+``octez-smart-rollup-wasm-debugger`` takes as its argument the WASM kernel to be debugged, either a ``.wasm`` file (the binary
 representation of WebAssembly modules) or as a ``.wast`` file (its textual
 representation), and actually parses and typechecks the kernel before
 giving it to the PVM.
@@ -1613,7 +1641,7 @@ Glossary
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
-#. **Commitment period**: A period of 30 blocks during which all inbox
+#. **Commitment period**: A period of 60 blocks during which all inbox
    messages must be processed by the rollup node state to compute a
    commitment. A commitment must be published for each commitment
    period.

@@ -28,10 +28,10 @@ open Plonk_test
 module HashPV = Poseidon128
 module MerklePV = Gadget.Merkle (HashPV)
 module SchnorrPV = Plompiler.Schnorr (HashPV)
+module Curve = SchnorrPV.Curve
 module Hash = HashPV.P
 module Merkle = MerklePV.P
 module Schnorr = SchnorrPV.P
-module Curve = Mec.Curve.Jubjub.AffineEdwards
 
 let two = Z.of_int 2
 
@@ -249,7 +249,7 @@ module Benchmark (L : LIB) = struct
       (fst @@ List.hd values)
       (List.tl values)
 
-  open Encodings (L)
+  open Encodings
 
   type curve_t_u = (scalar * scalar) repr
 
@@ -412,7 +412,7 @@ module Benchmark (L : LIB) = struct
 
   let make_rollup init_tree tx_list () =
     let* generator =
-      Plompiler_Curve.(input_point @@ affine_to_point Schnorr.g)
+      Plompiler_Curve.(input_point @@ affine_to_point Curve.one)
     in
     let* init_root = Input.scalar init_tree |> input in
     let* inputs_rollup =
@@ -567,34 +567,30 @@ let benchmark () =
         rec_state := end_state ;
         (txs, start_state))
   in
-  let witness_list, cs_opt, public_input_size =
+  let witness_list, cs_opt =
     Time.time "Build witness" @@ fun () ->
     List.fold_left
-      (fun (acc_inputs, _cs, _public_input_size) (txs, state) ->
-        let cs, circuit, solver =
+      (fun (acc_inputs, _cs) (txs, state) ->
+        let cs, circuit =
           match !circuit_info with
           | None ->
               let module E1 = Benchmark (LibCircuit) in
               let circuit = E1.make_rollup (Merkle.root state.tree) txs in
-              let LibCircuit.{cs; solver; _} =
-                LibCircuit.(get_cs ~optimize:true (circuit ()))
-              in
-              circuit_info := Some (cs, circuit, solver) ;
-              (cs, circuit, solver)
+              let cs = LibCircuit.(get_cs ~optimize:true (circuit ())) in
+              circuit_info := Some (cs, circuit) ;
+              (cs, circuit)
           | Some info -> info
         in
-        let witness, public_input_size =
-          let initial, public_input_size =
-            LibCircuit.(get_inputs (circuit ()))
-          in
-          let private_inputs = Solver.solve solver initial in
-          (private_inputs, public_input_size)
+        let witness =
+          let initial, _ = LibCircuit.(get_inputs (circuit ())) in
+          let private_inputs = Solver.solve cs.solver initial in
+          private_inputs
         in
         (* We check satisfiability of CS with the witness in case of a wrong erronerous transaction *)
-        assert (CS.sat cs [] witness) ;
+        assert (CS.sat cs witness) ;
         let inputs = Main.{witness; input_commitments = []} in
-        (inputs :: acc_inputs, Some cs, public_input_size))
-      ([], None, 0)
+        (inputs :: acc_inputs, Some cs))
+      ([], None)
       tx_state_lists
   in
   let cs = Option.get cs_opt in
@@ -604,13 +600,12 @@ let benchmark () =
        Constraints: %i\n"
       nb_txs
       depth_tree
-      Array.(concat cs |> length)
+      Array.(concat cs.cs |> length)
   in
   Printf.fprintf !Helpers.output_buffer "%s" msg ;
   print_endline msg ;
   let circuit =
-    Time.time "PlonK convertion" @@ fun () ->
-    Plonk.Circuit.to_plonk ~public_input_size cs
+    Time.time "PlonK convertion" @@ fun () -> Plonk.Circuit.to_plonk cs
   in
   let circuit_map = Plonk.SMap.singleton "" (circuit, nb_proofs) in
   let inputs = Plonk.SMap.singleton "" witness_list in

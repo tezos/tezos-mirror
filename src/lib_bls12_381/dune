@@ -1,0 +1,102 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name bls12_381)
+ (public_name bls12-381)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  integers
+  integers_stubs_js
+  zarith
+  zarith_stubs_js
+  hex)
+ (js_of_ocaml (javascript_files runtime_helper.js blst_bindings_stubs.js))
+ (library_flags (:standard -linkall))
+ (modules bls12_381 ff_sig fr fq12 g1 g2 gt pairing fq fq2)
+ (private_modules fq fq2)
+ (foreign_archives blst)
+ (foreign_stubs
+  (language c)
+  (flags (-Wall -Wextra :standard (:include c_flags_blst.sexp)))
+  (names blst_wrapper blst_bindings_stubs))
+ (c_library_flags (-Wall -Wextra :standard -lpthread)))
+
+(copy_files libblst/bindings/blst.h)
+
+(copy_files libblst/bindings/blst_extended.h)
+
+(copy_files libblst/bindings/blst_aux.h)
+
+(data_only_dirs libblst)
+
+(rule
+ (deps (source_tree libblst) build_blst.sh blst_extended.c blst_extended.h)
+ (targets libblst.a dllblst.so c_flags_blst.sexp)
+ (action
+  (no-infer
+   (progn
+    (run cp blst_extended.c libblst/src/blst_extended.c)
+    (run cp blst_extended.h libblst/bindings/blst_extended.h)
+    (run sh build_blst.sh)
+    (run cp libblst/libblst.a libblst.a)
+    (ignore-stderr
+     (with-accepted-exit-codes
+      (or 0 1)
+      (run cp libblst/libblst.so dllblst.so)))
+    (ignore-stderr
+     (with-accepted-exit-codes
+      (or 0 1)
+      (run cp libblst/libblst.dylib dllblst.so)))))))
+
+(rule
+ (mode fallback)
+ (deps
+  (source_tree libblst)
+  needed-wasm-names
+  blst_extended.c
+  (glob_files *.h))
+ (targets blst.wasm blst.js)
+ (action
+  (progn
+   (run cp -f blst_extended.c libblst/src/)
+   (run
+    emcc
+    -Os
+    -o blst.js
+    -I libblst/src/
+    libblst/src/server.c
+    %{dep:blst_wrapper.c}
+    -DENABLE_EMSCRIPTEN_STUBS
+    -DENABLE_MODULE_RECOVERY
+    -s ALLOW_MEMORY_GROWTH=1
+    -s WASM=1
+    -s MALLOC=emmalloc
+    -s EXPORT_ES6=0
+    -s FILESYSTEM=0
+    -s MODULARIZE=1
+    -s EXPORT_NAME='_BLS12381'
+    -s EXPORTED_FUNCTIONS=@needed-wasm-names
+    --no-entry))))
+
+(executable
+ (name gen_wasm_needed_names)
+ (modules gen_wasm_needed_names)
+ (libraries re))
+
+(rule
+ (targets needed-wasm-names)
+ (mode promote)
+ (deps (:files blst_bindings_stubs.js))
+ (action
+  (with-outputs-to %{targets} (run ./gen_wasm_needed_names.exe %{files}))))
+
+(install
+ (files
+  libblst/bindings/blst.h
+  libblst/bindings/blst_aux.h
+  blst_extended.h
+  blst_misc.h
+  caml_bls12_381_stubs.h)
+ (section lib)
+ (package bls12-381))

@@ -29,11 +29,19 @@
 type error += Parse_error
 
 type error +=
-  | Operation_conflict of {new_hash : Operation_hash.t}
+  | Operation_conflict of {
+      new_hash : Operation_hash.t;
+      needed_fee_in_mutez : int64 option;
+    }
   | Operation_replacement of {
       old_hash : Operation_hash.t;
       new_hash : Operation_hash.t;
     }
+  | Rejected_by_full_mempool of {
+      hash : Operation_hash.t;
+      needed_fee_in_mutez : int64 option;
+    }
+  | Removed_from_full_mempool of Operation_hash.t
 
 type error += Too_many_operations
 

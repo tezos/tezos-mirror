@@ -57,7 +57,7 @@ module type UNIVARIATE = sig
 
   (** [get_dense_polynomial_coefficients P] returns the list of the
       coefficients of P, including the null coefficients, in decreasing order
-      i.e. if P(X) = a_{0} + a_{1} X + ... + a_{n - 1} X^{n - 1}, the function
+      i.e. if [P(X) = a_{0} + a_{1} X + ... + a_{n - 1} X^{n - 1}], the function
       will return [a_{n - 1}, ..., a_{0}]
   *)
   val get_dense_polynomial_coefficients : t -> scalar list
@@ -65,7 +65,7 @@ module type UNIVARIATE = sig
   (** [get_dense_polynomial_coefficients_with_degree P] returns the list of the
       coefficients of P with the degree as a tuple, including the null
       coefficients, in decreasing order
-      i.e. if P(X) = a_{0} + a_{1} X + ... + a_{n - 1} X^{n - 1}, the function
+      i.e. if [P(X) = a_{0} + a_{1} X + ... + a_{n - 1} X^{n - 1}], the function
       will return [(a_{n - 1}, n -1), ..., (a_{0}, 0)].
   *)
   val get_dense_polynomial_coefficients_with_degree : t -> (scalar * int) list

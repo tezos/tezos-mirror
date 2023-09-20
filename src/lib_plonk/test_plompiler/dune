@@ -4,21 +4,22 @@
 (executable
  (name afl)
  (libraries
-  octez-plompiler
-  octez-plonk
+  octez-libs.plompiler
+  octez-libs.plonk
   bls12-381)
  (modules afl))
 
 (executable
  (name main)
  (libraries
-  octez-plonk.plonk-test)
+  octez-libs.plonk.plonk-test)
  (modules
   bench_poseidon
   benchmark
   main
   test_anemoi
   test_blake
+  test_sha2
   test_core
   test_edwards
   test_encoding
@@ -28,27 +29,32 @@
   test_lookup
   test_merkle
   test_merkle_narity
+  test_mod_arith
   test_optimizer
   test_poseidon
+  test_range_checks
   test_schnorr
+  test_ed25519
+  test_edwards25519
   test_serialization
-  test_weierstrass))
+  test_weierstrass
+  test_utils))
 
 (rule
  (alias runtest)
- (package octez-plonk)
+ (package octez-libs)
  (action
   (setenv RANDOM_SEED 42
    (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
 
 (rule
  (alias runtest_slow)
- (package octez-plonk)
+ (package octez-libs)
  (action (run %{exe:main.exe})))
 
 (rule
  (alias runtest_slow_with_regression)
- (package octez-plonk)
+ (package octez-libs)
  (action
   (setenv RANDOM_SEED 42
    (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))

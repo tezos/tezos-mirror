@@ -3,12 +3,12 @@
 
 (library
  (name tezos_protocol_plugin_017_PtNairob)
- (public_name tezos-protocol-plugin-017-PtNairob)
+ (public_name octez-protocol-017-PtNairob-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-017-PtNairob
-  tezos-smart-rollup-017-PtNairob)
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol
+  octez-protocol-017-PtNairob-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -17,15 +17,17 @@
   -open Tezos_smart_rollup_017_PtNairob)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-017-PtNairob-libs))
+
 (library
  (name tezos_protocol_plugin_017_PtNairob_registerer)
- (public_name tezos-protocol-plugin-017-PtNairob-registerer)
+ (public_name octez-protocol-017-PtNairob-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-embedded-protocol-017-PtNairob
-  tezos-protocol-plugin-017-PtNairob
-  tezos-validation)
+  octez-libs.base
+  tezos-protocol-017-PtNairob.embedded-protocol
+  octez-protocol-017-PtNairob-libs.plugin
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

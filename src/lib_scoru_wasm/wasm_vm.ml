@@ -28,7 +28,9 @@ open Wasm_pvm_state.Internal_state
 
 let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   function
-  | Nairobi | Proto_alpha -> V1
+  | Nairobi -> V1
+  | Oxford -> V2
+  | Proto_alpha -> V2
 
 let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports
@@ -73,7 +75,9 @@ let get_wasm_version {durable; _} =
   let+ bytes = Tezos_lazy_containers.Chunked_byte_vector.to_bytes cbv in
   Data_encoding.Binary.of_bytes_exn Wasm_pvm_state.version_encoding bytes
 
-let stack_size_limit = function Wasm_pvm_state.V0 -> 300 | V1 -> 60_000
+let stack_size_limit = function
+  | Wasm_pvm_state.V0 -> 300
+  | V1 | V2 | V3 -> 60_000
 (* The limit 60_000 has been chosen such that the simplest WASM program
    consisting in trying to recursively call 60,000 times the same function
    results in Wasmer raising a runtime error.
@@ -573,11 +577,8 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_builtins
         fun pvm_state ->
           let info = input_request pvm_state in
           match info with
-          | Reveal_required (Reveal_raw_data req) ->
-              let* res = reveal_builtins.Builtins.reveal_preimage req in
-              reveal_step (Bytes.of_string res) pvm_state
-          | Reveal_required Reveal_metadata ->
-              let* res = reveal_builtins.reveal_metadata () in
+          | Reveal_required req ->
+              let* res = reveal_builtins req in
               reveal_step (Bytes.of_string res) pvm_state
           | _ ->
               compute_step_with_host_functions

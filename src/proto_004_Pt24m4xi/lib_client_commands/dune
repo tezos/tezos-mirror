@@ -3,18 +3,18 @@
 
 (library
  (name tezos_client_004_Pt24m4xi_commands)
- (public_name tezos-client-004-Pt24m4xi.commands)
+ (public_name octez-protocol-004-Pt24m4xi-libs.client.commands)
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-protocol-004-Pt24m4xi
-  tezos-stdlib-unix
-  tezos-protocol-environment
-  tezos-shell-services
-  tezos-client-base
-  tezos-client-004-Pt24m4xi
-  tezos-client-commands
-  tezos-rpc)
+  octez-libs.base
+  octez-libs.clic
+  tezos-protocol-004-Pt24m4xi.protocol
+  octez-libs.stdlib-unix
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-004-Pt24m4xi-libs.client
+  octez-shell-libs.client-commands
+  octez-libs.rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -30,18 +30,18 @@
 
 (library
  (name tezos_client_004_Pt24m4xi_commands_registration)
- (public_name tezos-client-004-Pt24m4xi.commands-registration)
+ (public_name octez-protocol-004-Pt24m4xi-libs.client.commands-registration)
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-protocol-004-Pt24m4xi
-  tezos-protocol-environment
-  tezos-shell-services
-  tezos-client-base
-  tezos-client-004-Pt24m4xi
-  tezos-client-commands
-  tezos-client-004-Pt24m4xi.commands
-  tezos-rpc)
+  octez-libs.base
+  octez-libs.clic
+  tezos-protocol-004-Pt24m4xi.protocol
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-004-Pt24m4xi-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-004-Pt24m4xi-libs.client.commands
+  octez-libs.rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

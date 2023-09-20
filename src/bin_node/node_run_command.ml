@@ -212,9 +212,8 @@ let init_identity_file (config : Config_file.t) =
     ~identity_file
     ~expected_pow:config.p2p.expected_pow
 
-let init_node ?sandbox ?target ~identity ~singleprocess
-    ~external_validator_log_config ~force_history_mode_switch
-    (config : Config_file.t) =
+let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
+    ~force_history_mode_switch (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* TODO "WARN" when pow is below our expectation. *)
   let*! () =
@@ -308,7 +307,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         config.shell.block_validator_limits.operation_metadata_size_limit;
       patch_context;
       data_dir = config.data_dir;
-      external_validator_log_config;
+      internal_events;
       store_root = Data_version.store_dir config.data_dir;
       context_root = Data_version.context_dir config.data_dir;
       protocol_root = Data_version.protocol_dir config.data_dir;
@@ -316,7 +315,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
       target;
       enable_testchain = config.p2p.enable_testchain;
       disable_mempool = config.p2p.disable_mempool;
-      dal = config.dal;
+      dal_config = config.blockchain_network.dal_config;
     }
   in
   let* () =
@@ -329,10 +328,22 @@ let init_node ?sandbox ?target ~identity ~singleprocess
           ~new_history_mode:history_mode
     | _ -> return_unit
   in
+  let version =
+    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+  in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
   Node.create
     ~sandboxed:(sandbox <> None)
     ?sandbox_parameters:(Option.map snd sandbox_param)
     ~singleprocess
+    ~version
+    ~commit_info
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
@@ -362,7 +373,15 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
-  let dir = Node.build_rpc_directory node in
+  let version = Tezos_version_value.Current_git_info.version in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
+  let dir = Node.build_rpc_directory ~version ~commit_info node in
   let dir = Node_directory.build_node_directory config dir in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
@@ -388,7 +407,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
   let cors =
-    RPC_server.
+    Resto_cohttp.Cors.
       {
         allowed_origins = rpc_config.cors_origins;
         allowed_headers = cors_headers;
@@ -402,7 +421,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
       dir
   in
   let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
-    let path = Cohttp_lwt.Request.uri req |> Uri.path in
+    let path = Cohttp.Request.uri req |> Uri.path in
     if path = "/metrics" then
       let*! response = Metrics_server.callback conn req body in
       Lwt.return (`Response response)
@@ -486,24 +505,19 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     (config : Config_file.t) =
   let open Lwt_result_syntax in
   (* Main loop *)
-  let log_cfg =
-    {
-      config.log with
-      default_level = Option.value verbosity ~default:config.log.default_level;
-    }
-  in
   let internal_events =
-    Tezos_base_unix.Internal_event_unix.make_with_defaults
-      ~enable_default_daily_logs_at:
-        Filename.Infix.(config.data_dir // "daily_logs")
-      ?internal_events:config.internal_events
-      ()
+    match config.internal_events with
+    | Some ie -> ie
+    | None ->
+        Tezos_base_unix.Internal_event_unix.make_with_defaults
+          ~enable_default_daily_logs_at:
+            Filename.Infix.(config.data_dir // "daily_logs")
+          ?verbosity
+          ~log_cfg:config.log
+          ()
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init ~log_cfg ~internal_events ()
-  in
-  let external_validator_log_config =
-    External_validation.{internal_events; lwt_log_sink_unix = log_cfg}
+    Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
@@ -520,19 +534,21 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Event.(emit starting_node)
       ( config.blockchain_network.chain_name,
-        Tezos_version.Current_git_info.version,
-        Tezos_version.Current_git_info.abbreviated_commit_hash )
+        Tezos_version_value.Current_git_info.version,
+        Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
   let* () =
     let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-    Tezos_crypto_dal.Cryptobox.Config.init_dal ~find_srs_files config.dal
+    Tezos_crypto_dal.Cryptobox.Config.init_dal
+      ~find_srs_files
+      config.blockchain_network.dal_config
   in
   let*! node =
     init_node
       ?sandbox
       ?target
-      ~external_validator_log_config
+      ~internal_events
       ~identity
       ~singleprocess
       ~force_history_mode_switch
@@ -548,25 +564,30 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
       node
   in
   let*? node in
-  let node_downer =
+  let log_node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-        let*! () = Event.(emit shutting_down_node) () in
-        Node.shutdown node)
+        Event.(emit shutting_down_node) ())
   in
   let* rpc = init_rpc config node in
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      ~after:[node_downer]
+      ~after:[log_node_downer]
       (fun _ ->
         let*! () = Event.(emit shutting_down_rpc_server) () in
         List.iter_p RPC_server.shutdown rpc)
+  in
+  let node_downer =
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      ~after:[rpc_downer]
+      (fun _ -> Node.shutdown node)
   in
   let*! () = Event.(emit node_is_ready) () in
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      ~after:[rpc_downer]
+      ~after:[node_downer]
       (fun exit_status ->
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())

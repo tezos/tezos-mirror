@@ -1,0 +1,9 @@
+{0 Octez-protocol-012-Psithaca-libs: octez protocol 012-Psithaca libraries}
+
+This is a package containing some libraries related to the Tezos 012-Psithaca protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_012_Psithaca}Tezos_client_012_Psithaca}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_protocol_plugin_012_Psithaca}Tezos_protocol_plugin_012_Psithaca}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_012_Psithaca_registerer}Tezos_protocol_plugin_012_Psithaca_registerer}: Protocol plugin registerer

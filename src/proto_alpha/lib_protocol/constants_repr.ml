@@ -24,6 +24,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+let version_value = "alpha_current"
+
+let version = "v1"
 
 let mainnet_id = Chain_id.of_b58check_exn "NetXdQprcVkpaWU"
 
@@ -219,28 +222,30 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The unfreeze delay must be strictly greater than 0.")
   >>? fun () ->
-  (* The [frozen_deposits_percentage] should be a percentage *)
+  (* The [limit_of_delegation_over_baking] should be non-negative. *)
+  error_unless
+    Compare.Int.(constants.limit_of_delegation_over_baking >= 0)
+    (Invalid_protocol_constants
+       "The delegation over baking limit must be greater than or equal to 0.")
+  >>? fun () ->
   error_unless
     Compare.Int.(
-      constants.frozen_deposits_percentage > 0
-      && constants.frozen_deposits_percentage <= 100)
+      constants.percentage_of_frozen_deposits_slashed_per_double_baking >= 0
+      && constants.percentage_of_frozen_deposits_slashed_per_double_baking
+         <= 100)
     (Invalid_protocol_constants
-       "The frozen percentage ratio must be strictly greater than 0 and less \
-        or equal than 100.")
+       "The percentage of frozen deposits slashed per double baking must be \
+        between 0 and 100 included.")
   >>? fun () ->
   error_unless
-    Tez_repr.(constants.double_baking_punishment >= zero)
+    Compare.Int.(
+      constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+      >= 0
+      && constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+         <= 100)
     (Invalid_protocol_constants
-       "The double baking punishment must be non-negative.")
-  >>? fun () ->
-  error_unless
-    (let Ratio_repr.{numerator; denominator} =
-       constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
-     in
-     Compare.Int.(numerator >= 0 && denominator > 0))
-    (Invalid_protocol_constants
-       "The ratio of frozen deposits ratio slashed per double endorsement must \
-        be a non-negative valid ratio.")
+       "The percentage of frozen deposits slashed per double attestation must \
+        be between 0 and 100 included.")
   >>? fun () ->
   error_unless
     (let snapshot_frequence =
@@ -336,6 +341,12 @@ let check_constants constants =
         blocks_per_epoch must divide blocks_per_cycle.")
   >>? fun () ->
   error_unless
+    Compare.Int.(constants.dal.attestation_lag > 1)
+    (Invalid_protocol_constants
+       "The attestation_lag must be strictly greater than 1, because only slot \
+        headers in finalized blocks are attested.")
+  >>? fun () ->
+  error_unless
     Compare.Int.(
       constants.sc_rollup.max_number_of_stored_cemented_commitments > 0)
     (Invalid_protocol_constants
@@ -346,40 +357,45 @@ let check_constants constants =
 module Generated = struct
   type t = {
     consensus_threshold : int;
-    baking_reward_fixed_portion : Tez_repr.t;
-    baking_reward_bonus_per_slot : Tez_repr.t;
-    endorsing_reward_per_slot : Tez_repr.t;
-    liquidity_baking_subsidy : Tez_repr.t;
+    issuance_weights : Constants_parametric_repr.issuance_weights;
   }
 
-  let generate ~consensus_committee_size ~blocks_per_minute =
+  let generate ~consensus_committee_size =
+    (* The weights are expressed in [(256 * 80)]th of the total
+       reward, because it is the smallest proportion used so far*)
     let consensus_threshold = (consensus_committee_size * 2 / 3) + 1 in
-    (* As in previous protocols, we set the maximum total rewards per minute to
-       be 80 tez. *)
-    let rewards_per_minute = Tez_repr.(mul_exn one 80) in
-    let rewards_per_block =
-      Ratio_repr.(
-        Tez_repr.(
-          div_exn
-            (mul_exn rewards_per_minute blocks_per_minute.denominator)
-            blocks_per_minute.numerator))
-    in
-    let rewards_half = Tez_repr.(div_exn rewards_per_block 2) in
-    let rewards_quarter = Tez_repr.(div_exn rewards_per_block 4) in
     let bonus_committee_size = consensus_committee_size - consensus_threshold in
+    let base_total_issued_per_minute = Tez_repr.of_mutez_exn 85_007_812L in
+    let _reward_parts_whole = 20480 (* = 256 * 80 *) in
+    let reward_parts_half = 10240 (* = reward_parts_whole / 2 *) in
+    let reward_parts_quarter = 5120 (* = reward_parts_whole / 4 *) in
+    let reward_parts_16th = 1280 (* = reward_parts_whole / 16 *) in
     {
       consensus_threshold;
-      baking_reward_fixed_portion =
-        (if Compare.Int.(bonus_committee_size <= 0) then
-         (* a fortiori, consensus_committee_size < 4 *)
-         rewards_half
-        else rewards_quarter);
-      baking_reward_bonus_per_slot =
-        (if Compare.Int.(bonus_committee_size <= 0) then Tez_repr.zero
-        else Tez_repr.div_exn rewards_quarter bonus_committee_size);
-      endorsing_reward_per_slot =
-        Tez_repr.div_exn rewards_half consensus_committee_size;
-      liquidity_baking_subsidy = Tez_repr.div_exn rewards_per_block 16;
+      issuance_weights =
+        {
+          base_total_issued_per_minute;
+          (* 85.007812 tez/minute *)
+          baking_reward_fixed_portion_weight =
+            (* 1/4 or 1/2 *)
+            (if Compare.Int.(bonus_committee_size <= 0) then
+             (* a fortiori, consensus_committee_size < 4 *)
+             reward_parts_half
+            else reward_parts_quarter);
+          baking_reward_bonus_weight =
+            (* 1/4 or 0 *)
+            (if Compare.Int.(bonus_committee_size <= 0) then 0
+            else reward_parts_quarter);
+          attesting_reward_weight = reward_parts_half;
+          (* 1/2 *)
+          (* All block (baking + attesting)rewards sum to 1 ( *256*80 ) *)
+          liquidity_baking_subsidy_weight = reward_parts_16th;
+          (* 1/16 *)
+          seed_nonce_revelation_tip_weight = 1;
+          (* 1/20480 *)
+          vdf_revelation_tip_weight = 1;
+          (* 1/20480 *)
+        };
     }
 end
 

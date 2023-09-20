@@ -84,7 +84,7 @@ let bigstring_of_file filename ~hash =
   bs
 
 let load_real_srs prefix =
-  let open Octez_bls12_381_polynomial.Bls12_381_polynomial.Srs in
+  let open Octez_bls12_381_polynomial.Srs in
   let ( // ) s1 s2 = s1 ^ "/" ^ s2 in
   ( ( Srs_g1.of_bigstring
         (bigstring_of_file
@@ -116,19 +116,18 @@ let load_real_srs prefix =
       |> Result.get_ok ) )
 
 let make_fake_srs () =
-  let open Octez_bls12_381_polynomial.Bls12_381_polynomial in
-  (Srs.generate_insecure 14 1, Srs.generate_insecure 1 14)
+  let open Octez_bls12_381_polynomial in
+  (Srs.generate_insecure 14 5, Srs.generate_insecure 1 14)
 
 let srs =
   match Sys.getenv_opt "SRS_DIR" with
   | None -> make_fake_srs ()
   | Some prefix -> load_real_srs prefix
 
-let rec repeat n f =
-  if n <= 0 then ()
-  else (
+let rec repeat n f () =
+  if n > 0 then (
     f () ;
-    repeat (n - 1) f)
+    repeat (n - 1) f ())
 
 let must_fail f =
   let exception Local in
@@ -261,7 +260,7 @@ module Time = struct
 
   let bench_test_circuit ~nb_rep func () =
     reset () ;
-    repeat nb_rep func ;
+    repeat nb_rep func () ;
     assert (nb_rep = !setup.n && nb_rep = !prove.n && nb_rep = !verify.n) ;
     Printf.printf
       "\nTimes over %d repetitions (95%% confidence interval):\n\n"
@@ -445,15 +444,56 @@ module Plompiler_Helpers = struct
       let module E2 = Test (LibResult) in
       E2.tests
     in
-    let run_one_test (circuit, info) (result, _) =
-      let LibCircuit.{cs; tables; solver; _} =
-        LibCircuit.(get_cs (circuit ()))
+
+    let print_regressions info_name (cs : LibCircuit.cs_result) =
+      let nb_constraints = Array.(concat cs.cs |> length) in
+      let max_rc, sum_rc =
+        let w_bounds =
+          List.map
+            (fun (_w, lw) -> List.fold_left (fun acc (_i, b) -> acc + b) 0 lw)
+            cs.range_checks
+        in
+        let max_rc = List.fold_left max 0 w_bounds in
+        let sum_rc = List.fold_left Int.add 0 w_bounds in
+        (max_rc, sum_rc)
       in
-      let initial, public_input_size = LibCircuit.(get_inputs (circuit ())) in
-      if info.flamegraph then
-        Plompiler.Utils.dump_label_traces (info.name ^ "_flamegraph") cs ;
+      let size_of_tables =
+        List.fold_left (fun acc t -> acc + Csir.Table.size t) 0 cs.tables
+      in
+      let circuit_size = max nb_constraints (max max_rc size_of_tables) in
+      let log2 x = if x = 0 then 0. else Float.log2 @@ Int.to_float x in
+
+      Printf.fprintf
+        !output_buffer
+        "%s:\n\
+         Constraints       : %d [%.2f]\n\
+         Range-Checks-Total: %d [%.2f]\n\
+         Range-Checks-Max  : %d [%.2f]\n\
+         Tables            : %d [%.2f]\n\
+         Circuit Size      : %d [%.2f]\n\n"
+        info_name
+        nb_constraints
+        (log2 nb_constraints)
+        sum_rc
+        (log2 sum_rc)
+        max_rc
+        (log2 max_rc)
+        size_of_tables
+        (log2 size_of_tables)
+        circuit_size
+        (log2 circuit_size)
+    in
+
+    let run_one_test (circuit, info) (result, _) =
+      let cs = LibCircuit.(get_cs (circuit ())) in
+      let initial, _ = LibCircuit.(get_inputs (circuit ())) in
+      if info.flamegraph then (
+        Plompiler.Utils.dump_label_traces (info.name ^ "_flamegraph") cs.cs ;
+        Plompiler.Utils.dump_label_range_checks_traces
+          (info.name ^ "_flamegraph_range_checks")
+          cs.range_checks_labels) ;
       let pi =
-        try Solver.solve solver initial |> fun x -> Some x with _ -> None
+        try Solver.solve cs.solver initial |> fun x -> Some x with _ -> None
       in
       match pi with
       | None -> assert (not info.valid)
@@ -467,35 +507,9 @@ module Plompiler_Helpers = struct
                   ","
                   (List.map S.string_of_scalar (Array.to_list private_inputs))) ;
              Printf.printf "CS:\n%s\n" (CS.to_string cs) ; *)
-          if not info.valid then assert (not @@ CS.sat cs tables private_inputs)
+          if not info.valid then assert (not @@ CS.sat cs private_inputs)
           else (
-            Printf.fprintf
-              !output_buffer
-              "%s:\nConstraints: %d\n\n"
-              info.name
-              Array.(concat cs |> length) ;
-
-            assert (CS.sat cs tables private_inputs) ;
-            let cs, private_inputs =
-              if optimize then (
-                let LibCircuit.{cs; solver; _} =
-                  LibCircuit.(get_cs ~optimize (circuit ()))
-                in
-                Printf.fprintf
-                  !output_buffer
-                  "%s_optimized:\nConstraints: %d\n\n"
-                  info.name
-                  Array.(concat cs |> length) ;
-                let private_inputs = Solver.solve solver initial in
-                assert (CS.sat cs tables private_inputs) ;
-
-                (cs, private_inputs))
-              else (cs, private_inputs)
-            in
-            if info.flamegraph then
-              Plompiler.Utils.dump_label_traces
-                (info.name ^ "_opt_flamegraph")
-                cs ;
+            print_regressions info.name cs ;
             let res = LibResult.get_result (result ()) in
             let serialized_res = LibResult.serialize res in
             let out_size = Array.length serialized_res in
@@ -505,6 +519,23 @@ module Plompiler_Helpers = struct
                 (Array.length private_inputs - out_size)
                 out_size
             in
+
+            assert (CS.sat cs private_inputs) ;
+            let cs, private_inputs =
+              if optimize then (
+                let cs = LibCircuit.(get_cs ~optimize (circuit ())) in
+                print_regressions (info.name ^ "_optimized") cs ;
+
+                let private_inputs = Solver.solve cs.solver initial in
+                assert (CS.sat cs private_inputs) ;
+
+                (cs, private_inputs))
+              else (cs, private_inputs)
+            in
+            if info.flamegraph then
+              Plompiler.Utils.dump_label_traces
+                (info.name ^ "_opt_flamegraph")
+                cs.cs ;
             (* Compare values obtained from Result and Circuit interpreters *)
             assert (Array.for_all2 S.( = ) serialized_res trace_out) ;
             match plonk with
@@ -512,7 +543,7 @@ module Plompiler_Helpers = struct
             | Some plonk ->
                 let module Main = (val plonk : Plonk.Main_protocol.S) in
                 let open Make (Main) in
-                let circuit = CS.to_plonk ~public_input_size ~tables cs in
+                let circuit = CS.to_plonk cs in
                 test_circuit
                   ~name:info.name
                   ~zero_knowledge:false

@@ -60,7 +60,7 @@ module type AUTOMATON_SUBCONFIG = sig
     include PRINTABLE
 
     (** [valid] performs an application layer-level validity check on a message. *)
-    val valid : t -> [`Valid | `Unknown | `Invalid]
+    val valid : t -> Message_id.t -> [`Valid | `Unknown | `Invalid]
   end
 end
 
@@ -78,6 +78,9 @@ module type SPAN = sig
   val of_float_s : float -> t
 
   val to_float_s : t -> float
+
+  (** [mul s n] returns [n * s]. *)
+  val mul : t -> int -> t
 end
 
 module type TIME = sig
@@ -93,9 +96,6 @@ module type TIME = sig
 
   val sub : t -> span -> t
 
-  (** [mul_span s n] returns [n * s]. *)
-  val mul_span : span -> int -> span
-
   val to_span : t -> span
 end
 
@@ -107,13 +107,13 @@ module type AUTOMATON_CONFIG = sig
   module Time : TIME with type span = Span.t
 end
 
-type 'span per_topic_score_parameters = {
+type 'span per_topic_score_limits = {
   time_in_mesh_weight : float;
       (** P1: The weight of the score associated to the time spent in the mesh. *)
   time_in_mesh_cap : float;
       (** P1: The maximum value considered for the score associated to the time spent
           by a peer in the mesh. *)
-  time_in_mesh_quantum : float;
+  time_in_mesh_quantum : 'span;
       (** P1: The score associated to the time spent [t] in the mesh is
           [(min t time_in_mesh_cap) / time_in_mesh_quantum]. *)
   first_message_deliveries_weight : float;
@@ -122,7 +122,7 @@ type 'span per_topic_score_parameters = {
       (** P2: The maximum value considered during score computation for the number of
           first message deliveries. *)
   first_message_deliveries_decay : float;
-      (** [P2] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P2: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   mesh_message_deliveries_weight : float;
       (** P3: The weight of the score associated to the number of first/near-first
@@ -139,27 +139,27 @@ type 'span per_topic_score_parameters = {
       (** P3: The number of messages received from a peer in the mesh in the
           associated topic above which the peer won't be penalized  *)
   mesh_message_deliveries_decay : float;
-      (** [P3] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P3: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   mesh_failure_penalty_weight : float;
       (** P3b: Penalty induced when a peer gets pruned with a non-zero mesh message delivery deficit. *)
   mesh_failure_penalty_decay : float;
-      (** [P3b] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P3b: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   invalid_message_deliveries_weight : float;
       (** P4: Penalty induced when a peer sends an invalid message. *)
   invalid_message_deliveries_decay : float;
-      (** [P4] score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
+      (** P4: The score is multiplied by this factor every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
 }
 
-type ('topic, 'span) topic_score_parameters =
-  | Topic_score_parameters_single of 'span per_topic_score_parameters
+type ('topic, 'span) topic_score_limits =
+  | Topic_score_limits_single of 'span per_topic_score_limits
       (** Use this constructor when the topic score parameters do not
           depend on the topic. *)
-  | Topic_score_parameters_family of {
+  | Topic_score_limits_family of {
       all_topics : 'topic Seq.t;
-      parameters : 'topic -> 'span per_topic_score_parameters;
+      parameters : 'topic -> 'span per_topic_score_limits;
       weights : 'topic -> float;
     }
       (** Use this constructor when the topic score parameters may depend
@@ -171,8 +171,8 @@ type ('topic, 'span) topic_score_parameters =
 
    TODO: https://gitlab.com/tezos/tezos/-/issues/5545
    We did not implement P6, aka IP colocation factor *)
-type ('topic, 'span) score_parameters = {
-  topics : ('topic, 'span) topic_score_parameters;
+type ('topic, 'span) score_limits = {
+  topics : ('topic, 'span) topic_score_limits;
       (** Per-topic score parameters. *)
   topic_score_cap : float option;
       (** An optional cap on the total positive contribution of topics to the score of the peer.
@@ -181,10 +181,10 @@ type ('topic, 'span) score_parameters = {
       (** P7: The weight of the score associated to the behaviour penalty. This
           parameter must be negative. *)
   behaviour_penalty_threshold : float;
-      (** The threshold on the behaviour penalty
+      (** P7: The threshold on the behaviour penalty
           counter above which we start penalizing the peer. *)
   behaviour_penalty_decay : float;
-      (** [P7] score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
+      (** P7: The score is multiplied by a factor of [behaviour_penalty_decay] every [score_cleanup_ticks] heartbeat.
           This parameter must be in the unit interval. *)
   app_specific_weight : float;  (** P5: Application-specific peer scoring *)
   decay_zero : float;
@@ -211,7 +211,7 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
       (** The optimal number of full connections per topic. For
           example, if it is 6, each peer will want to have about six peers in
           their mesh for each topic they're subscribed to. It should be set
-          somewhere between {degree_low} and {degree_high}. *)
+          somewhere between {!degree_low} and {!degree_high}. *)
   publish_threshold : float;
       (** The threshold value (as a score) from which we can publish a
           message to our peers. *)
@@ -227,9 +227,9 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           [PrunePeers] in the Go implementation.) *)
   unsubscribe_backoff : 'span;
       (** The duration that prevent reconnections after leaving a topic to our full connections. *)
-  graft_flood_backoff : 'span;
-      (** The duration added when a peer tries to graft our connection
-          too soon. *)
+  graft_flood_threshold : 'span;
+      (** If a graft comes before [graft_flood_threshold] has elapsed since the last prune,
+          then there is an extra score penalty applied to the peer through P7. *)
   prune_backoff : 'span;  (** The duration added when we prune a peer. *)
   retain_duration : 'span;
       (** The duration added to remove metadata about a disconnected peer. *)
@@ -264,8 +264,8 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           the mesh is pruned due to over subscription, we make sure that we have
           outbound connections to at least [degree_out] of the survivor
           peers. This prevents Sybil attackers from overwhelming our mesh with
-          incoming connections. [degree_out] must be set below {degree_low}, and
-          must not exceed [degree_optimal / 2]. *)
+          incoming connections. [degree_out] must be set below {!degree_low},
+          and must not exceed [degree_optimal / 2]. *)
   degree_lazy : int;
       (** [degree_lazy] affects how many peers the local peer will emit gossip
           to at each heartbeat. The local peer will send gossip to at least
@@ -293,14 +293,14 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
       (** The number of heartbeat ticks setting the frequency at which to
           attempt to improve the mesh with opportunistic grafting. Every
           [opportunistic_graft_ticks], if the median score of the mesh peers
-          falls below the {opportunistic_graft_threshold}, then the local peer
+          falls below the {!opportunistic_graft_threshold}, then the local peer
           will select some high-scoring mesh peers to graft.  *)
   opportunistic_graft_peers : int;
       (** The number of peers to opportunistically graft. *)
   opportunistic_graft_threshold : float;
       (** The median mesh score threshold before triggering opportunistic
           grafting; this should have a small positive value. *)
-  score_parameters : ('topic, 'span) score_parameters;
+  score_limits : ('topic, 'span) score_limits;
       (** score-specific parameters. *)
   seen_history_length : int;
       (** [seen_history_length] controls the size of the message cache used for
@@ -347,7 +347,7 @@ module type SCORE = sig
   type topic
 
   (** [newly_connected params] creates a fresh statistics record. *)
-  val newly_connected : (topic, span) score_parameters -> t
+  val newly_connected : (topic, span) score_limits -> t
 
   (** [value ps] evaluates the score of [ps]. *)
   val value : t -> value
@@ -412,9 +412,97 @@ module type SCORE = sig
 
   module Internal_for_tests : sig
     val get_topic_params :
-      ('topic, 'span) score_parameters ->
-      'topic ->
-      'span per_topic_score_parameters
+      ('topic, 'span) score_limits -> 'topic -> 'span per_topic_score_limits
+
+    (** Convert a score value into a float.  *)
+    val to_float : value -> float
+
+    (** [is_active topic t] returns [true] if the peer's score for [topic] is marked as active,
+        and [false] otherwise. *)
+    val is_active : topic -> t -> bool
+  end
+end
+
+module type MESSAGE_CACHE = sig
+  module Peer : ITERABLE
+
+  module Topic : ITERABLE
+
+  module Message_id : ITERABLE
+
+  module Message : PRINTABLE
+
+  module Time : TIME
+
+  (** A sliding window cache that stores published messages and their first seen
+    time. The module also keeps track of the number of accesses to a message by
+    a peer, thus indirectly tracking the number of IWant requests a peer makes
+    for the same message between two heartbeats.
+
+    The module assumes that no two different messages have the same message
+    id. However, the cache stores duplicates; for instance, if [add_message id
+    msg topic] is called exactly twice, then [msg] will appear twice in
+    [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
+    shifts have been executed in the meanwhile). *)
+  type t
+
+  (** [create ~history_slots ~gossip_slots ~seen_message_slots] creates two
+      sliding window caches, one with length [history_slots] for storing message contents
+      and another with length [seen_message] for storing seen messages and their first
+      seen times.
+
+      When queried for messages to advertise, the cache only returns messages in
+      the last [gossip_slots]. The [gossip_slots] must be smaller or equal to
+      [history_slots].
+
+      The slack between [gossip_slots] and [history_slots] accounts for the
+      reaction time between when a message is advertised via IHave gossip, and
+      when the peer pulls it via an IWant command. To see this, if say
+      [gossip_slot = history_slots] then the messages inserted in cache
+      [history_slots] heartbeat ticks ago and advertised now will not be
+      available after the next tick, because they are removed from the
+      cache. This means IWant requests from the remote peer for such messages
+      would be unfulfilled and potentially penalizing.
+
+      @raise Assert_failure when [gossip_slots <= 0 || gossip_slots > history_slots]
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/5129
+      Error handling. *)
+  val create :
+    history_slots:int -> gossip_slots:int -> seen_message_slots:int -> t
+
+  (** Add message to the most recent cache slot. If the message already exists
+      in the cache, the message is not overridden, instead a duplicate message
+      id is stored (the message itself is only stored once). *)
+  val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
+
+  (** Get the message associated to the given message id, increase the access
+      counter for the peer requesting the message, and also returns the updated
+      counter. *)
+  val get_message_for_peer :
+    Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
+
+  (** Get the message ids for the given topic in the last [gossip_slots] slots
+      of the cache. If there were duplicates added in the cache, then there will
+      be duplicates in the output. There is no guarantee about the order of
+      messages in the output. *)
+  val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
+
+  (** [get_first_seen_time message_id t] returns the time the message with [message_id]
+      was first seen. Returns [None] if the message was not seen during the period
+      covered by the sliding window. *)
+  val get_first_seen_time : Message_id.t -> t -> Time.t option
+
+  (** [seen_message message_id t] returns [true] if the message was seen during the
+      period covered by the sliding window and returns [false] if otherwise. *)
+  val seen_message : Message_id.t -> t -> bool
+
+  (** Shift the sliding window by one slot (usually corresponding to one
+      heartbeat tick). *)
+  val shift : t -> t
+
+  module Internal_for_tests : sig
+    val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
   end
 end
 
@@ -440,10 +528,10 @@ module type AUTOMATON = sig
   module Time : PRINTABLE
 
   (** Module for time duration *)
-  module Span : PRINTABLE
+  module Span : SPAN
 
   (** Module for peers scores *)
-  module Score : SCORE with type time = Time.t
+  module Score : SCORE with type time = Time.t and type topic = Topic.t
 
   type message = Message.t
 
@@ -559,7 +647,9 @@ module type AUTOMATON = sig
     | Mesh_full : [`Graft] output
         (** Grafting a peer for a topic whose mesh has already sufficiently many
             peers. *)
-    | No_peer_in_mesh : [`Prune] output
+    | Prune_topic_not_tracked : [`Prune] output
+        (** Attempting to prune a peer for a non-tracked topic. *)
+    | Peer_not_in_mesh : [`Prune] output
         (** Attempting to prune a peer which is not in the mesh. *)
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
         (** The given peer has been pruned for the given topic, but no
@@ -644,10 +734,12 @@ module type AUTOMATON = sig
   (** Initialise a state. *)
   val make : Random.State.t -> limits -> parameters -> state
 
-  (** [add_peer { direct; outbound; peer }] is called to notify a new connection. If
-      [direct] is [true], the gossipsub always forwards messages to those
-      peers. [outbound] is [true] if it is an outbound connection, that is, a
-      connection initiated by the local (not the remote) peer. *)
+  (** [add_peer { direct; outbound; peer }] is called to notify a new
+      connection. If [direct] is [true], the gossipsub always forwards messages
+      to those peers. [outbound] is [true] if it is an outbound connection, that
+      is, a connection initiated by the local (not the remote) peer. Note
+      however that the notion of "outbound" connections can be refined, relaxed
+      or redefined by the application layer to fit its own needs. *)
   val add_peer : add_peer -> [`Add_peer] monad
 
   (** [remove_peer { peer }] notifies gossipsub that we are disconnected
@@ -766,6 +858,9 @@ module type AUTOMATON = sig
 
   val pp_unsubscribe : Format.formatter -> unsubscribe -> unit
 
+  val pp_set_application_score :
+    Format.formatter -> set_application_score -> unit
+
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig
@@ -773,11 +868,46 @@ module type AUTOMATON = sig
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
+    module Connections : sig
+      type t
+
+      val empty : t
+
+      val bindings : t -> (Peer.t * connection) list
+
+      val find : Peer.t -> t -> connection option
+
+      val mem : Peer.t -> t -> bool
+
+      val add_peer :
+        Peer.t ->
+        direct:bool ->
+        outbound:bool ->
+        t ->
+        [`added of t | `already_known]
+
+      val subscribe :
+        Peer.t -> Topic.t -> t -> [`unknown_peer | `subscribed of t]
+
+      val unsubscribe :
+        Peer.t -> Topic.t -> t -> [`unknown_peer | `unsubscribed of t]
+
+      val remove : Peer.t -> t -> t
+
+      val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b
+
+      val iter : (Peer.t -> connection -> unit) -> t -> unit
+
+      val peers_in_topic : Topic.t -> t -> Peer.Set.t
+    end
+
     module Message_cache : sig
       type t
 
       val get_message_for_peer :
         Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
+
+      val seen_message : Message_id.t -> t -> bool
 
       module Internal_for_tests : sig
         val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
@@ -787,7 +917,7 @@ module type AUTOMATON = sig
     type view = {
       limits : limits;
       parameters : parameters;
-      connections : connection Peer.Map.t;
+      connections : Connections.t;
       scores : Score.t Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
@@ -828,6 +958,21 @@ module type AUTOMATON = sig
     (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
     val get_fanout_peers : Topic.t -> view -> Peer.t list
 
+    (** [get_peer_score peer view] returns the score of [peer]. *)
+    val get_peer_score : Peer.t -> view -> Score.value
+
+    (** [get_peer_ihave_per_heartbeat peer view] returns
+        the number of IHaves received from [peer] since the last heartbeat. *)
+    val get_peer_ihave_per_heartbeat : Peer.t -> view -> int
+
+    (** [get_peer_iwant_per_heartbeat peer view] returns
+        the number of IWants sent to [peer] since the last heartbeat. *)
+    val get_peer_iwant_per_heartbeat : Peer.t -> view -> int
+
+    (** [get_peer_backoff topic peer view] returns the backoff time of [peer] for [topic].
+        Returns [None] if the peer is not backoffed for [topic]. *)
+    val get_peer_backoff : Topic.t -> Peer.t -> view -> Time.t option
+
     val limits : view -> limits
 
     (** [has_joined topic view] returns true if and only if the automaton is
@@ -835,9 +980,22 @@ module type AUTOMATON = sig
         and hasn't left the [topic]. *)
     val has_joined : Topic.t -> view -> bool
 
+    (** [in_mesh peer topic view] returns true if and only if [peer] is
+        in the mesh of [topic]. *)
+    val in_mesh : Topic.t -> Peer.t -> view -> bool
+
+    (** [is_direct peer view] returns true if and only if [peer] is a direct peer. *)
+    val is_direct : Peer.t -> view -> bool
+
+    (** [is_outbound peer view] returns true if and only if
+        [peer] has an outbound connection. *)
+    val is_outbound : Peer.t -> view -> bool
+
     val pp_connection : connection Fmt.t
 
-    val pp_connections : connection Peer.Map.t Fmt.t
+    val pp_connections : Connections.t Fmt.t
+
+    val pp_scores : Score.value Peer.Map.t Fmt.t
 
     val pp_peer_map : 'a Fmt.t -> 'a Peer.Map.t Fmt.t
 
@@ -936,17 +1094,34 @@ module type WORKER = sig
       P2P layer. *)
   type p2p_output =
     | Out_message of {to_peer : GS.Peer.t; p2p_message : p2p_message}
+        (** Emit the given [p2p_message] to the remote peer [to_peer]. *)
     | Disconnect of {peer : GS.Peer.t}
+        (** End the connection with the peer [peer]. *)
     | Kick of {peer : GS.Peer.t}
-    | Connect of {peer : GS.Peer.t}
+        (** Kick the peer [peer]: the peer is disconnected and blacklisted.*)
+    | Connect of {px : GS.Peer.t; origin : GS.Peer.t}
+        (** Inform the p2p_output messages processor that we want to connect to
+            the peer [px] advertised by some other peer [origin]. *)
+    | Forget of {px : GS.Peer.t; origin : GS.Peer.t}
+        (** Inform the p2p_output messages processor that we don't want to
+            connect to the peer [px] advertised by some other peer [origin]. *)
 
   (** The application layer will be advertised about full messages it's
       interested in. *)
   type app_output = message_with_header
 
-  (** [make rng limits parameters] initializes a new Gossipsub automaton with
-      the given arguments. Then, it initializes and returns a worker for it. *)
+  (** The different kinds of events the Gossipsub worker handles. *)
+  type event = private
+    | Heartbeat
+    | P2P_input of p2p_input
+    | App_input of app_input
+
+  (** [make ~events_logging rng limits parameters] initializes a new Gossipsub
+      automaton with the given arguments. Then, it initializes and returns a
+      worker for it. The [events_logging] function can be used to define a
+      handler for logging the worker's events. *)
   val make :
+    ?events_logging:(event -> unit Monad.t) ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->
     (GS.Peer.t, GS.Message_id.t) parameters ->
@@ -974,6 +1149,9 @@ module type WORKER = sig
   (** [app_output_stream t] returns the output stream containing data for the
       application layer. *)
   val app_output_stream : t -> app_output Stream.t
+
+  (** [is_subscribed t topic] checks whether [topic] is in the mesh of [t]. *)
+  val is_subscribed : t -> GS.Topic.t -> bool
 
   (** Pretty-printer for values of type {!p2p_output}. *)
   val pp_p2p_output : Format.formatter -> p2p_output -> unit

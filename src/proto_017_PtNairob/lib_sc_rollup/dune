@@ -3,11 +3,11 @@
 
 (library
  (name tezos_smart_rollup_017_PtNairob)
- (public_name tezos-smart-rollup-017-PtNairob)
+ (public_name octez-protocol-017-PtNairob-libs.smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-017-PtNairob)
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

@@ -6,9 +6,9 @@
  (public_name tezos-protocol-011-PtHangz2.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-environment
-  tezos-protocol-011-PtHangz2)
+  octez-libs.base
+  octez-proto-libs.protocol-environment
+  tezos-protocol-011-PtHangz2.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -19,7 +19,7 @@
 (executable
  (name gen)
  (libraries
-  tezos-base
+  octez-libs.base
   tezos-protocol-011-PtHangz2.parameters)
  (link_flags
   (:standard)

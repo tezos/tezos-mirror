@@ -59,12 +59,12 @@ to implement the :doc:`consensus algorithm<consensus>`. There are two
 kinds of consensus operations, each belonging to the different voting
 phases required to agree on the next block.
 
-- A ``Preendorsement`` operation implements a first vote for a
+- A ``Preattestation`` operation implements a first vote for a
   :ref:`candidate block <candidate_block_alpha>` with the aim of
-  building a :ref:`preendorsement quorum <quorum_alpha>`.
+  building a :ref:`preattestation quorum <quorum_alpha>`.
 
-- An ``Endorsement`` operation implements a vote for a candidate block
-  for which a preendorsement quorum certificate (PQC) has been
+- An ``Attestation`` operation implements a vote for a candidate block
+  for which a preattestation quorum certificate (PQC) has been
   observed.
 
 .. _voting_operations_alpha:
@@ -119,19 +119,19 @@ protocol<randomness_generation_alpha>`.
 
 Three operations in this class are used to :ref:`punish participants
 which engage in Byzantine behaviour<slashing_alpha>` -- notably
-delegates which :ref:`"double sign" <Double signing>` blocks, or emit
+delegates which :ref:`"double sign" <def_double_signing_alpha>` blocks, or emit
 conflicting :ref:`consensus operations<consensus_operations_alpha>`:
 
-- The ``Double_preendorsement_evidence`` operation allows for accusing
-  a delegate of having *double-preendorsed* -- i.e., of having
-  preendorsed two different block candidates, at the same level and at
+- The ``Double_preattestation_evidence`` operation allows for accusing
+  a delegate of having *double-preattested* -- i.e., of having
+  preattested two different block candidates, at the same level and at
   the same round. The bulk of the evidence, the two arguments
-  provided, consists of the two offending preendorsements.
+  provided, consists of the two offending preattestations.
 
-- Similarly, the ``Double_endorsement_evidence`` operation allows for
-  accusing a delegate of having *double-endorsed* -- i.e., of having
-  endorsed two different block candidates at the same level and the
-  same round -- by providing the two offending endorsements.
+- Similarly, the ``Double_attestation_evidence`` operation allows for
+  accusing a delegate of having *double-attested* -- i.e., of having
+  attested two different block candidates at the same level and the
+  same round -- by providing the two offending attestations.
 
 - The ``Double_baking_evidence`` allows for accusing a delegate of
   having "double-baked" a block -- i.e., of having signed two
@@ -143,7 +143,7 @@ See :ref:`here<slashing_alpha>` for further detail on the semantics of
 evidence-providing operations.
 
 The ``Activation`` operation allows users which participated in the
-Tezos fundraiser to make their :ref:`accounts <Account>` operational.
+Tezos fundraiser to make their :ref:`accounts <def_account_alpha>` operational.
 
 Finally, the ``Drain_delegate`` operation allows an active
 consensus-key account, i.e., an account to which a baker delegated its
@@ -167,9 +167,9 @@ Manager operations enable end-users to interact with the Tezos
 blockchain -- e.g., transferring funds or calling :doc:`smart
 contracts<michelson>`. A manager operation is issued by a single
 *manager* account which signs the operation and pays the
-:ref:`fees<Fee>` to the baker for its inclusion in a block. Indeed,
+:ref:`fees<def_fee_alpha>` to the baker for its inclusion in a block. Indeed,
 manager operations are the only fee-paying and
-:ref:`gas-consuming<Gas>` operations.
+:ref:`gas-consuming<def_gas_alpha>` operations.
 
 - The ``Reveal`` operation reveals the public key of the sending
   manager. Knowing this public key is indeed necessary to check the signature
@@ -177,13 +177,13 @@ manager operations are the only fee-paying and
 - The ``Transaction`` operation allows users to either transfer tez
   between accounts and/or to invoke a smart contract.
 - The ``Delegation`` operation allows users to :ref:`delegate their
-  stake <delegating_coins>` to a :ref:`delegate<Delegate>` (a
+  stake <delegating_coins>` to a :ref:`delegate<def_delegate_alpha>` (a
   *baker*), or to register themselves as delegates.
 - The ``Update_consensus_key`` operation allows users to delegate the
   responsibility of signing blocks and consensus-related operations to
   another account. Note that consensus keys cannot be BLS public keys.
 - The ``Origination`` operation is used to
-  :ref:`originate<Origination>`, that is to deploy, smart contracts
+  :ref:`originate<def_origination_alpha>`, that is to deploy, smart contracts
   in the Tezos blockchain.
 - The ``Set_deposits_limit`` operation enables delegates to adjust the
   amount of stake a delegate :ref:`has locked in

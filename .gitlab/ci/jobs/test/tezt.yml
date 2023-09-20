@@ -17,6 +17,7 @@ include: .gitlab/ci/jobs/test/common.yml
       junit: $JUNIT
     paths:
       - tezt.log
+      - tezt-*.log
       - tezt-results-$CI_NODE_INDEX.json
       - $BISECT_FILE
       - $JUNIT
@@ -38,20 +39,26 @@ tezt:
     - .template__coverage_files
     - .tezt_template
   variables:
-    # Do not tests with the tag 'ci_disable'. See the registration of
-    # the individual test for the disabling rationale.
-    TESTS: "/ci_disable"
+    # Do not tests with the tag 'ci_disabled' and 'flaky'.
+    # See tezt/lib_tezos/tag.mli for more information.
+    TESTS: "/ci_disabled /flaky"
   dependencies:
-    - "build_x86_64"
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
     - "build_kernels"
     - "tezt:fetch-records"
   needs:
-    - "build_x86_64"
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
     - "build_kernels"
     - "tezt:fetch-records"
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
-  parallel: 40
+  parallel: 60
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/6173
+  # Temporarily allow corrupted coverage files.
+  allow_failure:
+    exit_codes: 64
 
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:
@@ -61,18 +68,16 @@ tezt:static-binaries:
     - .image_template__runtime_build_test_dependencies_template
     - .tezt_template
   dependencies:
-    # Fetch src/proto_*/parameters/*.json from build_x86_64
-    - build_x86_64
+    # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from
+    # build_x86_64-exp-dev-extra
+    - build_x86_64-exp-dev-extra
     # And fetch the static executables from build:static
     - build:static-x86_64-linux-binaries
     - tezt:fetch-records
   needs:
-    - build_x86_64
+    - build_x86_64-exp-dev-extra
     - build:static-x86_64-linux-binaries
     - tezt:fetch-records
-  # WARNING: if you increase the number of parallel jobs, you need to
-  # update test_coverage.yml with the new list of jobs.
-  parallel: 2
   variables:
     TESTS: "cli"
   before_script:

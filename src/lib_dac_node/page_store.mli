@@ -33,6 +33,9 @@ type error +=
       expected : Dac_plugin.raw_hash;
       actual : Dac_plugin.raw_hash;
     }
+  | Cannot_fetch_remote_page_with_flooding_strategy of {
+      hash : Dac_plugin.raw_hash;
+    }
 
 (** [S] is the module type defining the backend required for
     persisting DAC pages data onto the page storage. *)
@@ -95,6 +98,26 @@ type remote_configuration = {
    saved locally. *)
 module Remote : S with type configuration = remote_configuration
 
+type remote_with_flooding_configuration = {
+  timeout : float;
+  cctxts : Dac_node_client.cctxt list;
+  page_store : Filesystem.t;
+}
+
+(** A [Page_store] implementation backed by the local filesystem, which
+   uses connections to a collection of Dac nodes to retrieve pages that are not
+   saved locally. It retrieves pages by sending the same page request to each remote
+   node and saves only 1 copy of the page locally. 
+   
+   It is typically used by the Observer node to retrieve missing pages from the DAC
+   committee members.
+   *)
+
+(** TODO: https://gitlab.com/tezos/tezos/-/issues/5672
+    Merge Remote_with_flooding into Remote *)
+module Remote_with_flooding :
+  S with type configuration = remote_with_flooding_configuration
+
 (**/**)
 
 module Internal_for_tests : sig
@@ -131,10 +154,10 @@ end
       This function may fail with
       {ul
         {li [Reveal_data_path_not_a_directory reveal_data_dir] if the
-          path exists and is not a directory,
+          path exists and is not a directory,}
 
         {li [Cannot_create_reveal_data_dir reveal_data_dir] If the
-            creation of the directory fails.}}
+            creation of the directory fails.}
       }
   *)
 val ensure_reveal_data_dir_exists : string -> unit tzresult Lwt.t

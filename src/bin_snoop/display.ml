@@ -234,10 +234,10 @@ let plot_scatter opts title input_columns outputs =
   let open Result_syntax in
   match input_columns with
   | [] ->
-      Format.kasprintf
-        Result.error
-        "Display.plot_scatter (%s): empty scatter data"
-        (Str.global_replace (Str.regexp {|\\n|}) " " title)
+      let rows = Array.length @@ Stdlib.List.hd outputs in
+      let column = ("constant axis", Array.init rows (fun _ -> 0.)) in
+      let plot = scatterplot_2d opts title column outputs in
+      return [plot]
   | [column] ->
       let plot = scatterplot_2d opts title column outputs in
       return [plot]
@@ -309,7 +309,7 @@ let empirical_data opts
   let samples = convert_workload_data workload_data in
   (* Extract name of variables and check well-formedness *)
   let variables =
-    List.rev_map (fun {workload; _} -> List.rev_map fst workload) samples
+    List.rev_map (fun {workload; _} -> List.map fst workload) samples
   in
   let variables = List.sort_uniq Stdlib.compare variables in
   match variables with
@@ -520,20 +520,37 @@ let raw_workload (workload_data : (Sparse_vec.String.t * float array) list) =
         [Histogram.hist ~binwidth:50.0 ~points ()])
     workload_data
 
-let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
+let perform_plot ~measure ~local_model_name ~problem ~solution ~plot_target
+    ~options =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
-  let filename ?index kind =
+  let filename_prefix ?index kind =
     let dir = options.save_directory in
     let kind =
       match index with None -> kind | Some i -> Format.asprintf "%s-%d" kind i
     in
+    (*
+      Expect the name is one of:
+      <instr_name>
+      <instr_name>/time
+      <instr_name>/alloc
+    *)
+    let rec body = function
+      | [] -> assert false
+      | "alloc" :: tl -> body tl ^ "_alloc"
+      | "time" :: tl -> body tl ^ "_time"
+      | s :: _ -> s
+    in
+    let bench_name =
+      match List.rev (Namespace.to_list Bench.name) with
+      | "intercept" :: tl -> body tl ^ "__intercept"
+      | tl -> body tl
+    in
     Filename.Infix.(
       dir
       // Format.asprintf
-           "%a_%s_%s.pdf"
-           Namespace.pp_short
-           Bench.name
-           model_name
+           "%s_%s_%s"
+           bench_name
+           (Benchmark_helpers.filename_of_local_model_name local_model_name)
            kind)
   in
   let workload_data =
@@ -560,9 +577,10 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
         | Save ->
             List.mapi
               (fun i plot ->
-                let pdf_file = filename ~index:i kind in
+                let prefix = filename_prefix ~index:i kind in
+                let pdf_file = prefix ^ ".pdf" in
                 let target = pdf ?cm_size:(pdf_cm_size options) ~pdf_file () in
-                Plot.run ~target exec_detach plot ;
+                Plot.run ~target ~detach:true plot ;
                 pdf_file)
               plots
         | Show ->
@@ -583,7 +601,8 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
                     x11)
             in
             let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
-            Plot.run_matrix ~target exec_detach plots ;
+            let plot_file = filename_prefix kind ^ ".plot" in
+            Plot.run_matrix ~target ~detach:true plots ~filename:plot_file ;
             [])
     | Error msg ->
         Format.eprintf "Failed performing plot: %s@." msg ;

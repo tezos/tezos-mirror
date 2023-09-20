@@ -4,15 +4,15 @@
 (library
  (name get_contracts_lib)
  (libraries
-  tezos-micheline
-  tezos-base
-  tezos-store
-  tezos-protocol-016-PtMumbai
-  tezos-client-016-PtMumbai
-  tezos-protocol-017-PtNairob
-  tezos-client-017-PtNairob
-  tezos-protocol-alpha
-  tezos-client-alpha)
+  octez-libs.micheline
+  octez-libs.base
+  octez-shell-libs.store
+  tezos-protocol-017-PtNairob.protocol
+  octez-protocol-017-PtNairob-libs.client
+  tezos-protocol-018-Proxford.protocol
+  octez-protocol-018-Proxford-libs.client
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -23,8 +23,8 @@
 (executable
  (name get_contracts)
  (libraries
-  tezos-micheline
-  tezos-base
+  octez-libs.micheline
+  octez-libs.base
   get_contracts_lib)
  (link_flags
   (:standard)

@@ -12,9 +12,10 @@ Specify related merge requests, specifically dependencies. -->
 # Manually testing the MR
 
 You can always manually test merge request by playing with the debugger:
+
 ```
-$ make -f kernels.mk evm_kernel.wasm
-$ rlwrap ./octez-smart-rollup-wasm-debugger evm_kernel.wasm --inputs tezt/tests/evm_kernel_inputs/inputs.json
+make -f kernels.mk evm_kernel.wasm
+rlwrap ./octez-smart-rollup-wasm-debugger --kernel evm_kernel.wasm --inputs tezt/tests/evm_kernel_inputs/inputs.json
 ```
 
 <!--

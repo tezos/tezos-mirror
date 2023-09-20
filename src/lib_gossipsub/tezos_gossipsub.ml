@@ -131,7 +131,8 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_successfully : [`Graft] output
     | Peer_backed_off : [`Graft] output
     | Mesh_full : [`Graft] output
-    | No_peer_in_mesh : [`Prune] output
+    | Prune_topic_not_tracked : [`Prune] output
+    | Peer_not_in_mesh : [`Prune] output
     | Ignore_PX_score_too_low : Score.t -> [`Prune] output
     | No_PX : [`Prune] output
     | PX : Peer.Set.t -> [`Prune] output
@@ -168,21 +169,156 @@ module Make (C : AUTOMATON_CONFIG) :
   type connection = {
     topics : Topic.Set.t;  (** The set of topics the peer subscribed to. *)
     direct : bool;
-        (** A direct (aka explicit) connection is a connection to which we forward all the messages. *)
-    outbound : bool;  (** An outbound connection is a connection we initiated. *)
+        (** A direct (aka explicit) connection is a connection to which we
+            forward all the messages. *)
+    outbound : bool;
+        (** Intuitively, an outbound connection is a connection we
+            initiated. But, the application layer can refine, relax or redefine
+            this notion to fit its needs. *)
   }
+
+  (** [Connections] implements a bidirectional map from peers to connections and from
+      topics to peer.
+
+      Invariant:
+        forall (c : Connections.t),
+        forall (p : Peer.t),
+        forall (t : Topic.t),
+        t \in (Connections.find p c).topics <=> p \in (Connections.peers_in_topic topic c)
+  *)
+  module Connections : sig
+    type t
+
+    val empty : t
+
+    val bindings : t -> (Peer.t * connection) list
+
+    val find : Peer.t -> t -> connection option
+
+    val mem : Peer.t -> t -> bool
+
+    val add_peer :
+      Peer.t ->
+      direct:bool ->
+      outbound:bool ->
+      t ->
+      [`added of t | `already_known]
+
+    val subscribe : Peer.t -> Topic.t -> t -> [`unknown_peer | `subscribed of t]
+
+    val unsubscribe :
+      Peer.t -> Topic.t -> t -> [`unknown_peer | `unsubscribed of t]
+
+    val remove : Peer.t -> t -> t
+
+    val fold : (Peer.t -> connection -> 'b -> 'b) -> t -> 'b -> 'b
+
+    val iter : (Peer.t -> connection -> unit) -> t -> unit
+
+    val peers_in_topic : Topic.t -> t -> Peer.Set.t
+  end = struct
+    type t = {
+      peer_to_conn : connection Peer.Map.t;
+      topic_to_peer : Peer.Set.t Topic.Map.t;
+    }
+
+    let empty = {peer_to_conn = Peer.Map.empty; topic_to_peer = Topic.Map.empty}
+
+    let bindings map = Peer.Map.bindings map.peer_to_conn
+
+    let find peer map = Peer.Map.find peer map.peer_to_conn
+
+    let mem peer map = Peer.Map.mem peer map.peer_to_conn
+
+    let add_peer peer ~direct ~outbound map =
+      if mem peer map then `already_known
+      else
+        let peer_to_conn =
+          Peer.Map.add
+            peer
+            {topics = Topic.Set.empty; direct; outbound}
+            map.peer_to_conn
+        in
+        `added {map with peer_to_conn}
+
+    let subscribe peer topic map =
+      match find peer map with
+      | None -> `unknown_peer
+      | Some connection ->
+          (* We could detect that [peer] is already subscribed to [topic]. *)
+          let connection =
+            {connection with topics = Topic.Set.add topic connection.topics}
+          in
+          let peer_to_conn = Peer.Map.add peer connection map.peer_to_conn in
+          let topic_to_peer =
+            Topic.Map.update
+              topic
+              (function
+                | None -> Some (Peer.Set.singleton peer)
+                | Some peers_in_topic -> Some (Peer.Set.add peer peers_in_topic))
+              map.topic_to_peer
+          in
+          `subscribed {peer_to_conn; topic_to_peer}
+
+    let unsubscribe peer topic map =
+      match find peer map with
+      | None -> `unknown_peer
+      | Some connection ->
+          let connection =
+            {connection with topics = Topic.Set.remove topic connection.topics}
+          in
+          let peer_to_conn = Peer.Map.add peer connection map.peer_to_conn in
+          let topic_to_peer =
+            Topic.Map.update
+              topic
+              (function
+                | None -> None
+                | Some peers_in_topic ->
+                    Some (Peer.Set.remove peer peers_in_topic))
+              map.topic_to_peer
+          in
+          `unsubscribed {peer_to_conn; topic_to_peer}
+
+    let remove peer map =
+      match find peer map with
+      | None -> map
+      | Some conn ->
+          let topics = conn.topics in
+          let peer_to_conn = Peer.Map.remove peer map.peer_to_conn in
+          let topic_to_peer =
+            Topic.Set.fold
+              (fun topic topic_to_peer ->
+                Topic.Map.update
+                  topic
+                  (function
+                    | None ->
+                        (* Should never happen by invariant on type [t]. *)
+                        None
+                    | Some peers_in_topic ->
+                        Some (Peer.Set.remove peer peers_in_topic))
+                  topic_to_peer)
+              topics
+              map.topic_to_peer
+          in
+          {peer_to_conn; topic_to_peer}
+
+    let fold f map acc = Peer.Map.fold f map.peer_to_conn acc
+
+    let iter f map = Peer.Map.iter f map.peer_to_conn
+
+    let peers_in_topic topic map =
+      Topic.Map.find topic map.topic_to_peer
+      |> Option.value ~default:Peer.Set.empty
+  end
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}
 
   module Message_cache = Message_cache.Make (C.Subconfig) (Time)
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4983
-
-      This data-structure should be documented. *)
   type state = {
-    limits : limits;
-    parameters : parameters;
-    connections : connection Peer.Map.t;
+    limits : limits;  (** Statically known parameters of the algorithm. *)
+    parameters : parameters;  (** Other parameters of the algorithm. *)
+    connections : Connections.t;
         (** [connections] is the set of active connections. A connection is added
             through the `Add_peer` message and removed through the `Remove_peer`
             message. *)
@@ -192,7 +328,11 @@ module Make (C : AUTOMATON_CONFIG) :
             can't be stored in {!connections}. Any peer having an active connection
             is associated to a score. *)
     ihave_per_heartbeat : int Peer.Map.t;
+        (** Mapping tracking for each peer the number of IHave messages received from
+            that peer between two heartbeats. *)
     iwant_per_heartbeat : int Peer.Map.t;
+        (** Mapping tracking for each peer the number of messages ids sent in
+            IWant messages to that peer between two heartbeats. *)
     mesh : Peer.Set.t Topic.Map.t;
         (** The mesh for a topic is a random subset of the connected peers
             subscribed to that topic and that have non-negative score, are not
@@ -212,8 +352,11 @@ module Make (C : AUTOMATON_CONFIG) :
              backoff is set for a peer and a topic, this peer is not expected
              to be in the mesh of the given topic.  *)
     message_cache : Message_cache.t;
-    rng : Random.State.t;
+        (** A sliding window cache that stores published messages and their first
+        seen time. *)
+    rng : Random.State.t;  (** The state of the PRNG algorithm. *)
     heartbeat_ticks : int64;
+        (** A counter of the number of elapsed heartbeat ticks.  *)
   }
   (* Invariants:
 
@@ -246,10 +389,10 @@ module Make (C : AUTOMATON_CONFIG) :
 
   let assert_in_unit_interval v = assert (v >= 0.0 && v <= 1.0)
 
-  let check_per_topic_score_parameters tsp =
+  let check_per_topic_score_limits tsp =
     assert (tsp.time_in_mesh_weight >= 0.0) ;
     assert (tsp.time_in_mesh_cap >= 0.0) ;
-    assert (tsp.time_in_mesh_quantum > 0.0) ;
+    assert (Span.(tsp.time_in_mesh_quantum > zero)) ;
     assert (tsp.first_message_deliveries_weight >= 0.0) ;
     assert (tsp.first_message_deliveries_cap >= 0) ;
     assert_in_unit_interval tsp.first_message_deliveries_decay ;
@@ -263,12 +406,11 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (tsp.invalid_message_deliveries_weight <= 0.0) ;
     assert_in_unit_interval tsp.invalid_message_deliveries_decay
 
-  let check_score_parameters (sp : _ score_parameters) =
+  let check_score_limits (sp : _ score_limits) =
     (match sp.topics with
-    | Topic_score_parameters_single tp -> check_per_topic_score_parameters tp
-    | Topic_score_parameters_family {all_topics; parameters; weights = _} ->
-        Seq.map parameters all_topics
-        |> Seq.iter check_per_topic_score_parameters) ;
+    | Topic_score_limits_single tp -> check_per_topic_score_limits tp
+    | Topic_score_limits_family {all_topics; parameters; weights = _} ->
+        Seq.map parameters all_topics |> Seq.iter check_per_topic_score_limits) ;
     Option.iter (fun cap -> assert (cap >= 0.0)) sp.topic_score_cap ;
     assert (sp.behaviour_penalty_weight <= 0.0) ;
     assert (sp.behaviour_penalty_threshold >= 0.0) ;
@@ -278,7 +420,7 @@ module Make (C : AUTOMATON_CONFIG) :
   let check_limits l =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5129
        Replace the asserts by something more informative. *)
-    assert (l.degree_low > 0) ;
+    assert (l.degree_low >= 0) ;
     assert (l.degree_out >= 0) ;
     assert (l.degree_score >= 0) ;
     assert (l.degree_low <= l.degree_optimal) ;
@@ -293,7 +435,7 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (l.degree_out <= l.degree_optimal / 2) ;
     assert (l.history_gossip_length > 0) ;
     assert (l.history_gossip_length <= l.history_length) ;
-    check_score_parameters l.score_parameters
+    check_score_limits l.score_limits
 
   let make : Random.State.t -> limits -> parameters -> state =
    fun rng limits parameters ->
@@ -301,7 +443,7 @@ module Make (C : AUTOMATON_CONFIG) :
     {
       limits;
       parameters;
-      connections = Peer.Map.empty;
+      connections = Connections.empty;
       scores = Peer.Map.empty;
       ihave_per_heartbeat = Peer.Map.empty;
       iwant_per_heartbeat = Peer.Map.empty;
@@ -345,7 +487,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let unsubscribe_backoff state = state.limits.unsubscribe_backoff
 
-    let graft_flood_backoff state = state.limits.graft_flood_backoff
+    let graft_flood_threshold state = state.limits.graft_flood_threshold
 
     let retain_duration state = state.limits.retain_duration
 
@@ -392,7 +534,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let rng state = state.rng
 
-    let score_parameters state = state.limits.score_parameters
+    let score_limits state = state.limits.score_limits
 
     let update ?(delta = 1) key map =
       Peer.Map.update
@@ -464,21 +606,20 @@ module Make (C : AUTOMATON_CONFIG) :
       get_scores_score_or_zero state.scores peer
 
     let peer_has_outbound_connection peers ~default peer =
-      Peer.Map.find_opt peer peers
+      Connections.find peer peers
       |> Option.map (fun connection -> connection.outbound)
       |> Option.value ~default
 
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5391
-       Optimize by having a topic to peers map *)
     let select_connections_peers connections scores rng topic ~filter ~max =
-      Peer.Map.bindings connections
-      |> List.filter_map (fun (peer, connection) ->
-             let score = get_scores_score_or_zero scores peer in
-             let topics = connection.topics in
-             if filter peer connection score && Topic.Set.mem topic topics then
-               Some peer
-             else None)
-      |> List.shuffle ~rng |> List.take_n max
+      Connections.peers_in_topic topic connections
+      |> Peer.Set.to_seq
+      |> Seq.filter_map (fun peer ->
+             match Connections.find peer connections with
+             | None -> assert false
+             | Some connection ->
+                 let score = get_scores_score_or_zero scores peer in
+                 if filter peer connection score then Some peer else None)
+      |> List.of_seq |> List.shuffle ~rng |> List.take_n max
 
     let select_peers topic ~filter ~max =
       let open Monad.Syntax in
@@ -605,19 +746,13 @@ module Make (C : AUTOMATON_CONFIG) :
 
   include Helpers
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5148
-     Consider merging subcribe/unsubscribe with join/leave. *)
   module Subscribe = struct
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
-      match Peer.Map.find peer connections with
-      | None -> return Subscribe_to_unknown_peer
-      | Some connection ->
-          let connection =
-            {connection with topics = Topic.Set.add topic connection.topics}
-          in
-          let connections = Peer.Map.add peer connection connections in
+      match Connections.subscribe peer topic connections with
+      | `unknown_peer -> return Subscribe_to_unknown_peer
+      | `subscribed connections ->
           let* () = set_connections connections in
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
              rust-libp2p adds the peer to the mesh if needed here. *)
@@ -630,6 +765,7 @@ module Make (C : AUTOMATON_CONFIG) :
   module Unsubscribe = struct
     let remove_peer_from_mesh topic peer =
       let open Monad.Syntax in
+      let* () = update_score peer (fun s -> Score.prune s topic) in
       let*! mesh in
       let mesh =
         Topic.Map.update
@@ -657,14 +793,10 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
-      match Peer.Map.find peer connections with
-      | None -> return @@ Unsubscribe_from_unknown_peer
-      | Some connection ->
-          let connection =
-            {connection with topics = Topic.Set.remove topic connection.topics}
-          in
-          let peers = Peer.Map.add peer connection connections in
-          let* () = set_connections peers in
+      match Connections.unsubscribe peer topic connections with
+      | `unknown_peer -> return @@ Unsubscribe_from_unknown_peer
+      | `unsubscribed connections ->
+          let* () = set_connections connections in
           (* Remove the peer from mesh as done in the rust implementation
              but not go implementation. *)
           let* () = remove_peer_from_mesh topic peer in
@@ -721,7 +853,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! rng in
       let iwant_message_ids_len = List.length message_ids in
-      (* Do not send more messages than [max_sent_iwant_per_heartbeat] *)
+      (* Do not send more than [max_sent_iwant_per_heartbeat] message ids. *)
       let iwant_ids_to_send_n = min iwant_message_ids_len limit in
       let shuffle_iwant_ids = List.shuffle ~rng message_ids in
       let requested_message_ids =
@@ -740,8 +872,8 @@ module Make (C : AUTOMATON_CONFIG) :
             Ihave_from_peer_with_low_score {score; threshold = gossip_threshold})
       in
       let* count_ihave_received = update_and_get_ihave_per_heartbeat peer in
-      let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_recv_ihave_message count_ihave_received in
+      let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_sent_iwant_message count_iwant_sent in
       let*? () = check_topic_tracked topic in
       let* iwant_message_ids = filter peer message_ids in
@@ -753,7 +885,7 @@ module Make (C : AUTOMATON_CONFIG) :
         shuffle_and_trunc iwant_message_ids ~limit
       in
       let* () = update_iwant_per_heartbeat ~delta:length peer in
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/4966
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/5532
 
          The go implementation traces some of the messages
          requested. *)
@@ -831,7 +963,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_active peer =
       let open Monad.Syntax in
       let*! connections in
-      match Peer.Map.find peer connections with
+      match Connections.find peer connections with
       | None -> Unexpected_grafting_peer |> fail
       | Some connection -> pass connection
 
@@ -874,13 +1006,16 @@ module Make (C : AUTOMATON_CONFIG) :
           if Time.(current >= backoff_expire) then unit
           else
             let score = Score.penalty score 1 in
-            let*! graft_flood_backoff in
+            let*! graft_flood_threshold in
+            let*! prune_backoff in
+            (* Calculate the last prune time
+               based on the recored backoff expire time and prune backoff. *)
+            let last_prune_time = Time.(sub backoff_expire prune_backoff) in
             let score =
-              if Time.(current < add backoff_expire graft_flood_backoff) then
+              if Time.(current < add last_prune_time graft_flood_threshold) then
                 Score.penalty score 1
               else score
             in
-            let*! prune_backoff in
             let* () = set_backoff_for_peer prune_backoff topic peer in
             let* () = add_score peer score in
             fail Peer_backed_off
@@ -928,34 +1063,40 @@ module Make (C : AUTOMATON_CONFIG) :
       fail_if Score.(value score < of_float accept_px_threshold)
       @@ Ignore_PX_score_too_low score
 
-    let check_topic_known topic =
+    let check_topic_tracked topic =
       let open Monad.Syntax in
       let*! mesh_opt = find_mesh topic in
       match mesh_opt with
-      | None -> No_peer_in_mesh |> fail
+      | None -> Prune_topic_not_tracked |> fail
       | Some mesh -> pass mesh
+
+    let take_threshold_px (px : Peer.t Seq.t) (state : state) =
+      (* [peers_to_px] is not just the max number of peers we send via PX, but
+         also the max number of advertised PXs we accept. *)
+      let peers_to_px = peers_to_px state in
+      List.of_seq px
+      |> List.shuffle ~rng:(rng state)
+      |> List.take_n peers_to_px |> Peer.Set.of_list
 
     let handle peer topic ~px ~backoff =
       let open Monad.Syntax in
-      let*? mesh = check_topic_known topic in
-      let mesh = Peer.Set.remove peer mesh in
-      let* () = set_mesh_topic topic mesh in
+      let*? mesh = check_topic_tracked topic in
+      let*? () = fail_if_not (Peer.Set.mem peer mesh) Peer_not_in_mesh in
+      let* () = Peer.Set.remove peer mesh |> set_mesh_topic topic in
       let* () = set_backoff_for_peer backoff topic peer in
       let* () = update_score peer (fun s -> Score.prune s topic) in
-      let px = Peer.Set.of_seq px in
-      if Peer.Set.is_empty px then No_PX |> return
-      else
-        let*? () = check_px_score peer in
-        return (PX px)
+      let*? () = check_px_score peer in
+      let*! px = take_threshold_px px in
+      return @@ if Peer.Set.is_empty px then No_PX else PX px
   end
 
   let handle_prune : prune -> [`Prune] output Monad.t =
    fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
 
   module Receive_message = struct
-    let check_valid sender topic message =
+    let check_valid sender topic message message_id =
       let open Monad.Syntax in
-      match Message.valid message with
+      match Message.valid message message_id with
       | `Valid -> unit
       | `Unknown ->
           (* FIXME https://gitlab.com/tezos/tezos/-/issues/5486
@@ -970,6 +1111,12 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let handle sender topic message_id message =
       let open Monad.Syntax in
+      let*! mesh_opt = find_mesh topic in
+      let*? peers_in_mesh =
+        match mesh_opt with
+        | Some peers -> pass peers
+        | None -> fail Not_subscribed
+      in
       let*? () =
         let*! message_cache in
         match Message_cache.get_first_seen_time message_id message_cache with
@@ -981,13 +1128,7 @@ module Make (C : AUTOMATON_CONFIG) :
             in
             fail Already_received
       in
-      let*? () = check_valid sender topic message in
-      let*! mesh_opt = find_mesh topic in
-      let*? peers_in_mesh =
-        match mesh_opt with
-        | Some peers -> pass peers
-        | None -> fail Not_subscribed
-      in
+      let*? () = check_valid sender topic message message_id in
       let peers = Peer.Set.remove sender peers_in_mesh in
       let* () = put_message_in_cache message_id message topic in
       let* () =
@@ -1071,7 +1212,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! backoff in
       let*! scores in
       let is_valid peer =
-        match Peer.Map.find peer connections with
+        match Connections.find peer connections with
         | None ->
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/5005
 
@@ -1159,6 +1300,15 @@ module Make (C : AUTOMATON_CONFIG) :
         let get_score = get_scores_score_or_zero scores in
         Peer.Set.filter (fun peer -> Score.(get_score peer < zero)) mesh
       in
+      (* Notify scoring about the prunes. *)
+      let* () =
+        Peer.Set.fold
+          (fun peer scores ->
+            update_scores_score peer (fun s -> Score.prune s topic) scores)
+          mesh
+          scores
+        |> set_scores
+      in
       Leaving_topic {to_prune = mesh; noPX_peers} |> return
 
     let handle topic : [`Leave] output Monad.t =
@@ -1201,7 +1351,7 @@ module Make (C : AUTOMATON_CONFIG) :
           (* Subtract some slack time to the current time to account for
              the message latency; for details, see
              https://github.com/libp2p/go-libp2p-pubsub/issues/368 *)
-          Time.sub current (Time.mul_span heartbeat_interval 2)
+          Time.sub current (Span.mul heartbeat_interval 2)
         in
         let*! backoff in
         Topic.Map.filter_map
@@ -1375,7 +1525,7 @@ module Make (C : AUTOMATON_CONFIG) :
         (to_prune, peers)
       in
 
-      let opportunistic_grafting topic peers =
+      let opportunistic_grafting topic peers to_prune =
         if Int64.rem heartbeat_ticks opportunistic_graft_ticks = 0L then
           let num_peers = List.length peers in
           if num_peers > 1 then
@@ -1404,8 +1554,13 @@ module Make (C : AUTOMATON_CONFIG) :
                 let in_mesh = Peer.Set.mem peer peers_set in
                 let backed_off = exists_backoff topic peer backoff in
                 let above_median = Score.(score > median_score) in
+                let pruned =
+                  match Peer.Map.find peer to_prune with
+                  | None -> false
+                  | Some topics -> Topic.Set.mem topic topics
+                in
                 (not in_mesh) && (not backed_off) && (not connection.direct)
-                && above_median
+                && above_median && not pruned
               in
               select_connections_peers
                 connections
@@ -1571,26 +1726,9 @@ module Make (C : AUTOMATON_CONFIG) :
         in
 
         (* Attempt opportunistic grafting. *)
-        let to_graft, to_prune =
-          let peers_to_graft = opportunistic_grafting topic peers in
-          let to_graft = add_to_peers_topic_set to_graft topic peers_to_graft in
-          (* Do not actually prune the [peers_to_graft]. *)
-          let to_prune =
-            List.fold_left
-              (fun to_prune peer_to_graft ->
-                Peer.Map.update
-                  peer_to_graft
-                  (function
-                    | None -> None
-                    | Some topicset ->
-                        let topicset = Topic.Set.remove topic topicset in
-                        if Topic.Set.is_empty topicset then None
-                        else Some topicset)
-                  to_prune)
-              to_prune
-              peers_to_graft
-          in
-          (to_graft, to_prune)
+        let to_graft =
+          let peers_to_graft = opportunistic_grafting topic peers to_prune in
+          add_to_peers_topic_set to_graft topic peers_to_graft
         in
 
         (`To_prune to_prune, `To_graft to_graft, noPX_peers)
@@ -1706,7 +1844,7 @@ module Make (C : AUTOMATON_CONFIG) :
         let peers_to_keep, peers_to_remove =
           Peer.Set.fold
             (fun peer acc ->
-              match Peer.Map.find peer connections with
+              match Connections.find peer connections with
               | None ->
                   (* impossible, given the global invariants on the state *)
                   assert false
@@ -1758,6 +1896,32 @@ module Make (C : AUTOMATON_CONFIG) :
       (* Update the fanout map. *)
       update_fanout fanout ~to_add ~to_remove
 
+    let prune_scores to_prune =
+      let open Monad.Syntax in
+      let*! scores in
+      Peer.Map.fold
+        (fun peer topics ->
+          Topic.Set.fold
+            (fun topic ->
+              update_scores_score peer (fun score -> Score.prune score topic))
+            topics)
+        to_prune
+        scores
+      |> set_scores
+
+    let graft_scores to_graft =
+      let open Monad.Syntax in
+      let*! scores in
+      Peer.Map.fold
+        (fun peer topics ->
+          Topic.Set.fold
+            (fun topic ->
+              update_scores_score peer (fun score -> Score.graft score topic))
+            topics)
+        to_graft
+        scores
+      |> set_scores
+
     let handle =
       let open Monad.Syntax in
       let*! heartbeat_ticks in
@@ -1780,6 +1944,9 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! message_cache in
       let* () = Message_cache.shift message_cache |> set_message_cache in
 
+      (* Notify scoring about the prunes/grafts. *)
+      let* () = prune_scores to_prune in
+      let* () = graft_scores to_graft in
       Heartbeat {to_graft; to_prune; noPX_peers} |> return
   end
 
@@ -1790,23 +1957,21 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       let*! connections in
       let*! scores in
-      let*! score_parameters in
-      match Peer.Map.find peer connections with
-      | None ->
-          let connection = {direct; topics = Topic.Set.empty; outbound} in
-          let connections = Peer.Map.add peer connection connections in
+      let*! score_limits in
+      match Connections.add_peer peer ~direct ~outbound connections with
+      | `added connections ->
           let scores =
             Peer.Map.update
               peer
               (function
-                | None -> Some (Score.newly_connected score_parameters)
+                | None -> Some (Score.newly_connected score_limits)
                 | Some score -> Some (Score.set_connected score))
               scores
           in
           let* () = set_connections connections in
           let* () = set_scores scores in
           return Peer_added
-      | Some _ -> return Peer_already_known
+      | `already_known -> return Peer_already_known
   end
 
   let add_peer : add_peer -> [`Add_peer] output Monad.t =
@@ -1829,7 +1994,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! retain_duration in
       let*! scores in
       let*! connections in
-      let* () = Peer.Map.remove peer connections |> set_connections in
+      let* () = Connections.remove peer connections |> set_connections in
       let* () =
         Peer.Map.update
           peer
@@ -1846,6 +2011,74 @@ module Make (C : AUTOMATON_CONFIG) :
 
   let remove_peer : remove_peer -> [`Remove_peer] output Monad.t =
    fun {peer} -> Remove_peer.handle peer
+
+  (* On spam protection
+     ==================
+
+     We make the assumption that the bandwidth per peer can be limited. This
+     means that if the automaton allows a peer to send us an unbounded number of
+     messages, this is not a case of concern by itself. There is a case of
+     concern if this results in wasting space or CPU time.
+
+     Another assumption we make is that messages are of bounded size, because
+     the message encoding should ensure this.
+
+     We detail next for each p2p message type what checks are (or are not) in
+     place concerning the receipt of "spam" and what are the concerns.
+
+     IHave messages:
+     - There is a maximum number, given by [max_recv_ihave_per_heartbeat], of
+       IHave messages that a peer accepts from another peer between two
+       heartbeat ticks; receiving more than this limit is not punished, the
+       automaton simply returns [Too_many_recv_ihave_messages].
+     - The number of message ids included is not checked, even though the remote
+       peer should include at most [max_sent_iwant_per_heartbeat] ids.
+
+     IWant messages:
+     - There is a maximum number, given by [max_gossip_retransmission], of times
+       that a peer can request the *same* message (during the time the message is
+       in the message cache).
+     - There is no imposed bound on the number of IWant messages received from a peer.
+     - The number of message ids included is not checked, though the remote peer
+       should include at most [max_sent_iwant_per_heartbeat] ids between two
+       heartbeat ticks.
+
+     Note on IHave/IWant messages: heartbeats of different peers need not be in
+     sync. Therefore we cannot use the limits supposedly used by the sender on
+     the receiver side to punish the sender; we could multiply these limits by 2
+     though.
+
+     Graft messages:
+     - Receiving a Graft message within the backoff period (given by
+       [prune_backoff] or [unsubscribed_backoff]) is punished. Receiving such a
+       Graft very soon (before [last_prune_time + graft_flood_threshold]) is punished
+       further.
+     - Receiving a duplicate of an accepted Graft request is not punished, the
+       automaton simply returns [Peer_already_in_mesh]. In all other failure cases
+       (except for unconnected peers) a backoff is set.
+
+     Prune messages:
+     - In case of a duplicate Prune the automaton simply returns
+       [Peer_not_in_mesh] because the peer has already been removed from the mesh
+       following the first Prune message.
+     - The number of PX peers is not bounded. However, the remote peer should
+       advertise at most [peers_to_px].
+
+     Subscribe/Unsubscribe messages:
+     - Duplicates are not checked for, a duplicate Subscribe/Unsubscribed (for a
+       connected peer) is always successful.
+
+     Full messages:
+     - We check for duplicates with the message cache. A duplicate is not re-routed.
+     - A peer sending duplicates within a small window (given by
+       [mesh_message_deliveries_window] of a few ms) is rewarded because they
+       count as near-first deliveries. Duplicates received outside of this window
+       are not counted.
+     - Potential problems:
+       - receiving a large number of duplicates, as all duplicate message ids
+         are stored in the cache *)
+
+  (* "Getters" *)
 
   let select_px_peers state ~peer_to_prune topic ~noPX_peers =
     let do_px = do_px state in
@@ -2028,6 +2261,10 @@ module Make (C : AUTOMATON_CONFIG) :
     let open Format in
     fprintf fmtr "{ topic=%a; peer=%a }" Topic.pp topic Peer.pp peer
 
+  let pp_set_application_score fmtr ({peer; score} : set_application_score) =
+    let open Format in
+    fprintf fmtr "{ peer=%a; score=%g }" Peer.pp peer score
+
   let pp_peer_map pp_elt =
     Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_elt
 
@@ -2102,7 +2339,8 @@ module Make (C : AUTOMATON_CONFIG) :
     | Grafting_successfully -> fprintf fmtr "Grafting_successfully"
     | Peer_backed_off -> fprintf fmtr "Peer_backed_off"
     | Mesh_full -> fprintf fmtr "Mesh_full"
-    | No_peer_in_mesh -> fprintf fmtr "No_peer_in_mesh"
+    | Prune_topic_not_tracked -> fprintf fmtr "Prune_topic_not_tracked"
+    | Peer_not_in_mesh -> fprintf fmtr "Peer_not_in_mesh"
     | Ignore_PX_score_too_low score ->
         fprintf fmtr "Ignore_PX_score_too_low %a" Score.pp score
     | No_PX -> fprintf fmtr "No_PX"
@@ -2192,11 +2430,12 @@ module Make (C : AUTOMATON_CONFIG) :
     }
 
     module Message_cache = Message_cache
+    module Connections = Connections
 
     type view = state = {
       limits : limits;
       parameters : parameters;
-      connections : connection Peer.Map.t;
+      connections : Connections.t;
       scores : Score.t Peer.Map.t;
       ihave_per_heartbeat : int Peer.Map.t;
       iwant_per_heartbeat : int Peer.Map.t;
@@ -2229,7 +2468,7 @@ module Make (C : AUTOMATON_CONFIG) :
             && filter_rec peer connection score filters
       in
       fun ?(filters = []) view ->
-        Peer.Map.fold
+        Connections.fold
           (fun peer connection acc ->
             let score = get_score_or_zero peer view in
             if filter_rec peer connection score filters then peer :: acc
@@ -2243,7 +2482,7 @@ module Make (C : AUTOMATON_CONFIG) :
       | Some peers -> Peer.Set.elements peers
 
     let get_subscribed_topics peer state =
-      match Peer.Map.find peer state.connections with
+      match Connections.find peer state.connections with
       | None -> []
       | Some connection -> Topic.Set.elements connection.topics
 
@@ -2255,9 +2494,48 @@ module Make (C : AUTOMATON_CONFIG) :
       | None -> []
       | Some fanout_peers -> Peer.Set.elements fanout_peers.peers
 
+    let get_peer_score peer {scores; _} =
+      match Peer.Map.find peer scores with
+      | None -> Score.zero
+      | Some score -> Score.value score
+
+    let get_peer_ihave_per_heartbeat peer {ihave_per_heartbeat; _} =
+      match Peer.Map.find peer ihave_per_heartbeat with
+      | None ->
+          (* Return 0 as this happens when no IHaves have been received from [peer]. *)
+          0
+      | Some count -> count
+
+    let get_peer_iwant_per_heartbeat peer {iwant_per_heartbeat; _} =
+      match Peer.Map.find peer iwant_per_heartbeat with
+      | None ->
+          (* Return 0 as this happens when no IWants have been sent to [peer]. *)
+          0
+      | Some count -> count
+
+    let get_peer_backoff topic peer {backoff; _} =
+      match Topic.Map.find topic backoff with
+      | None -> None
+      | Some backoffs -> Peer.Map.find peer backoffs
+
     let limits state = state.limits
 
     let has_joined topic {mesh; _} = Topic.Map.mem topic mesh
+
+    let in_mesh topic peer {mesh; _} =
+      match Topic.Map.find topic mesh with
+      | None -> false
+      | Some topic_mesh -> Peer.Set.mem peer topic_mesh
+
+    let is_direct peer {connections; _} =
+      match Connections.find peer connections with
+      | None -> false
+      | Some {direct; _} -> direct
+
+    let is_outbound peer {connections; _} =
+      match Connections.find peer connections with
+      | None -> false
+      | Some {outbound; _} -> outbound
 
     let pp_connection fmtr c =
       let fields =
@@ -2272,7 +2550,10 @@ module Make (C : AUTOMATON_CONFIG) :
       Fmt.record fields fmtr c
 
     let pp_connections =
-      Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp pp_connection
+      Fmt.Dump.iter_bindings Connections.iter Fmt.nop Peer.pp pp_connection
+
+    let pp_scores =
+      Fmt.Dump.iter_bindings Peer.Map.iter Fmt.nop Peer.pp Score.pp_value
 
     (* re-export printers *)
     let pp_peer_map = pp_peer_map

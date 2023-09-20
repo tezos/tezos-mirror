@@ -3,18 +3,20 @@
 
 (library
  (name tezos_base_unix)
- (public_name tezos-base.unix)
+ (public_name octez-libs.base.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-error-monad
-  tezos-crypto
-  tezos-base
-  tezos-hacl
-  tezos-stdlib
-  tezos-stdlib-unix
+  octez-libs.error-monad
+  octez-libs.crypto
+  octez-libs.base
+  octez-libs.hacl
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
   data-encoding
   uri
-  tezos-event-logging)
+  octez-libs.event-logging)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect))
  (flags
   (:standard)
   -open Tezos_error_monad

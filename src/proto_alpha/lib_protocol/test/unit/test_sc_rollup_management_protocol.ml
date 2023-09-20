@@ -52,12 +52,12 @@ let check_encode_decode_inbox_message message =
     (Sc_rollup.Inbox_message.unsafe_to_string bytes)
     (Sc_rollup.Inbox_message.unsafe_to_string bytes')
 
-let check_encode_decode_outbox_message_untyped ctxt message =
+let check_encode_decode_outbox_message_untyped ctxt transactions =
   let open Lwt_result_wrap_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult
-    @@ Internal_for_tests.serialize_outbox_message_untyped message
+    @@ Internal_for_tests.serialize_outbox_transactions_untyped transactions
   in
   let* message', _ctxt =
     let*? message_repr =
@@ -66,20 +66,23 @@ let check_encode_decode_outbox_message_untyped ctxt message =
     wrap @@ outbox_message_of_outbox_message_repr ctxt message_repr
   in
   let*? bytes' =
-    Environment.wrap_tzresult
-    @@ Internal_for_tests.serialize_outbox_message_untyped message'
+    match message' with
+    | Whitelist_update _ -> assert false (* its serialized transaction *)
+    | Atomic_transaction_batch {transactions} ->
+        Environment.wrap_tzresult
+        @@ Internal_for_tests.serialize_outbox_transactions_untyped transactions
   in
   Assert.equal_string
     ~loc:__LOC__
     (Sc_rollup.Outbox.Message.unsafe_to_string bytes)
     (Sc_rollup.Outbox.Message.unsafe_to_string bytes')
 
-let check_encode_decode_outbox_message_typed ctxt message =
+let check_encode_decode_outbox_message_typed ctxt transactions =
   let open Lwt_result_wrap_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult
-    @@ Internal_for_tests.serialize_outbox_message_typed message
+    @@ Internal_for_tests.serialize_outbox_transactions_typed transactions
   in
   let* message', _ctxt =
     let*? message_repr =
@@ -88,8 +91,11 @@ let check_encode_decode_outbox_message_typed ctxt message =
     wrap @@ outbox_message_of_outbox_message_repr ctxt message_repr
   in
   let*? bytes' =
-    Environment.wrap_tzresult
-    @@ Internal_for_tests.serialize_outbox_message_typed message'
+    match message' with
+    | Whitelist_update _ -> assert false (* its serialized transaction *)
+    | Atomic_transaction_batch {transactions} ->
+        Environment.wrap_tzresult
+        @@ Internal_for_tests.serialize_outbox_transactions_typed transactions
   in
   Assert.equal_string
     ~loc:__LOC__
@@ -326,10 +332,7 @@ let test_encode_decode_outbox_message () =
       ~destination:add_or_clear_destination
       ~entrypoint:(Entrypoint.of_string_strict_exn "clear")
   in
-  let outbox_message =
-    Sc_rollup_management_protocol.Internal_for_tests.make_atomic_batch
-      [transaction1; transaction2; transaction3]
-  in
+  let outbox_message = [transaction1; transaction2; transaction3] in
   let* () = check_encode_decode_outbox_message_untyped ctxt outbox_message in
   check_encode_decode_outbox_message_typed ctxt outbox_message
 

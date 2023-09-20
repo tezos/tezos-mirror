@@ -36,6 +36,14 @@ let starting_node =
     ~level:Notice
     ()
 
+let rpc_server_started =
+  declare_0
+    ~section
+    ~name:"rpc_server_started"
+    ~msg:"DAC Node RPC server is started"
+    ~level:Notice
+    ()
+
 let shutdown_node =
   declare_1
     ~section
@@ -77,11 +85,11 @@ let node_is_ready =
     ~level:Notice
     ()
 
-let dac_is_ready =
+let committee_keys_imported =
   declare_0
     ~section
-    ~name:"dac_is_ready"
-    ~msg:"The Data Availability Committee is ready"
+    ~name:"committee_keys_imported"
+    ~msg:"The Data Availability Committee keys had been successfully imported"
     ~level:Notice
     ()
 
@@ -273,6 +281,66 @@ let cannot_retrieve_keys_from_address =
     ~level:Notice
     ("address", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
 
+let fetched_missing_page =
+  declare_1
+    ~section
+    ~name:"missing_page_fetched"
+    ~msg:"Successfully fetched missing page for hash: {hash}"
+    ~level:Notice
+    ("hash", Data_encoding.(string' Hex))
+
+(** [layer1_node_tracking_ended] is emitted when client loses connection
+    to Tezos node. *)
+let layer1_node_tracking_ended =
+  declare_0
+    ~section
+    ~name:"new_head_daemon_connection_lost"
+    ~msg:"Daemon for monitoring new L1 heads lost connection to Tezos node"
+    ~level:Warning
+    ()
+
+(** [cannot_connect_to_tezos_node] event is emitted when client tries to
+    track Tezos node L1 heads, but fails. *)
+let cannot_connect_to_tezos_node =
+  declare_3
+    ~section
+    ~name:"new_head_daemon_cannot_connect"
+    ~msg:
+      "Cannot connect to Tezos node. Tried {count}-times already, will retry \
+       in {delay}s. Error: {error}"
+    ~level:Warning
+    ("count", Data_encoding.int31)
+    ("delay", Data_encoding.float)
+    ("error", trace_encoding)
+    ~pp3:pp_print_trace
+
+(** [connection_lost] is emitted when client looses connection to Coordinator's
+    stream of root hashes. *)
+let connection_lost =
+  declare_0
+    ~section
+    ~name:"new_root_hash_daemon_connection_lost"
+    ~msg:
+      "Daemon for monitoring new root hashes has lost connection to \
+       Coordinator node"
+    ~level:Warning
+    ()
+
+(** [cannot_connect] event is emited when client tries to subscribe to the
+    stream of root hashes, but fails. *)
+let cannot_connect =
+  declare_3
+    ~section
+    ~name:"new_root_hash_daemon_cannot_connect"
+    ~msg:
+      "Cannot connect to Coordinator node. Tried {count}-times already, will \
+       retry in {delay}s. Error: {error}"
+    ~level:Warning
+    ("count", Data_encoding.int31)
+    ("delay", Data_encoding.float)
+    ("error", trace_encoding)
+    ~pp3:pp_print_trace
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -308,13 +376,27 @@ let emit_signature_pushed_to_coordinator signature =
 
 let emit_no_committee_member_address = emit no_committee_member_address
 
+let emit_rpc_started = emit rpc_server_started
+
 let emit_cannot_retrieve_keys_from_address address =
   emit cannot_retrieve_keys_from_address address
 
-let fetched_missing_page =
-  declare_1
-    ~section
-    ~name:"missing_page_fetched"
-    ~msg:"Successfully fetched missing page for hash: {hash}"
-    ~level:Notice
-    ("hash", Dac_plugin.raw_hash_encoding)
+let emit_fetched_missing_page root_hash =
+  let (`Hex root_hash) = Dac_plugin.hash_to_hex root_hash in
+  emit fetched_missing_page root_hash
+
+(** [emit_cannot_connect_to_coordinator ()] emits [connection_lost] event. *)
+let emit_coordinators_connection_lost () = emit connection_lost ()
+
+(** [emit_cannot_connect_to_coordinator ~count ~delay error] emits
+    [cannot_connect] event. *)
+let emit_cannot_connect_to_coordinator ~count ~delay error =
+  (emit cannot_connect) (count, delay, error)
+
+(** [emit_l1_tracking_ended ()] emits [layer1_node_tracking_ended] event. *)
+let emit_l1_tracking_ended () = emit layer1_node_tracking_ended ()
+
+(** [emit_cannot_connect_to_tezos_node ~count ~delay error] emits
+    [cannot_connect] event. *)
+let cannot_connect_to_tezos_node ~count ~delay error =
+  (emit cannot_connect_to_tezos_node) (count, delay, error)

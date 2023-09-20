@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold  <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,7 +31,7 @@ module Map = Map.Make (struct
 end)
 
 (* A [Certificate_streamer.t] is a mutable map that associates to root hashes
-   values of type [Certificate_repr.t Data_streamer.t]. Such data streamers are
+   values of type [Certificate_repr.V0.t Data_streamer.t]. Such data streamers are
    used to notify clients of updates of DAC certificates. *)
 type t = Certificate_repr.t Data_streamer.t Map.t ref
 
@@ -46,6 +47,9 @@ let create_if_none certificate_streamers root_hash =
   !certificate_streamers |> Map.find root_hash
   |> Option.value_f ~default:(fun _ -> assert false)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5550
+   Close certificate streamer after timeout to avoid clients hanging
+   indefinitely. *)
 let handle_subscribe dac_plugin certificate_streamers raw_root_hash =
   let open Result_syntax in
   let* root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in

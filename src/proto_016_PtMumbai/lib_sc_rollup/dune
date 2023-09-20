@@ -3,11 +3,11 @@
 
 (library
  (name tezos_smart_rollup_016_PtMumbai)
- (public_name tezos-smart-rollup-016-PtMumbai)
+ (public_name octez-protocol-016-PtMumbai-libs.smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-016-PtMumbai)
+  octez-libs.base
+  tezos-protocol-016-PtMumbai.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

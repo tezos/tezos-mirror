@@ -3,19 +3,19 @@
 
 (library
  (name tezos_client_sapling_013_PtJakart)
- (public_name tezos-client-013-PtJakart.sapling)
+ (public_name octez-protocol-013-PtJakart-libs.client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-crypto
-  tezos-stdlib-unix
-  tezos-client-base
-  tezos-signer-backends
-  tezos-client-013-PtJakart
-  tezos-client-013-PtJakart.commands
-  tezos-protocol-013-PtJakart
-  tezos-protocol-plugin-013-PtJakart)
+  octez-libs.base
+  octez-libs.clic
+  octez-libs.crypto
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base
+  octez-shell-libs.signer-backends
+  octez-protocol-013-PtJakart-libs.client
+  octez-protocol-013-PtJakart-libs.client.commands
+  tezos-protocol-013-PtJakart.protocol
+  octez-protocol-013-PtJakart-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

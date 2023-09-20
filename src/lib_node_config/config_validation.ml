@@ -263,7 +263,7 @@ let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
   let open Lwt_result_syntax in
   let*! r = resolver addr in
   match r with
-  | Error [Config_file.Failed_to_parse_address (addr, why)] ->
+  | Error [P2p_resolve.Failed_to_parse_address (addr, why)] ->
       return_some
         (mk_alert
            ~event:(Option.value e_parse ~default:cannot_parse_addr)
@@ -452,6 +452,22 @@ let validate_connections (config : Config_file.t) =
   in
   Lwt.return_ok validated_connections
 
+let maintenance_disabled =
+  E.declare_0
+    ~name:"maintenance_disabled"
+    ~level:Warning
+    ~msg:
+      "The P2P maintenance is disabled. The P2P maintenance should only be \
+       disabled for testing purposes."
+    ()
+
+let warn_maintenance_deactivated (config : Config_file.t) =
+  when_
+    (config.p2p.limits.maintenance_idle_time = None)
+    ~event:maintenance_disabled
+    ~payload:()
+  |> Lwt_result.return
+
 (* Deprecated argument *)
 
 let testchain_is_deprecated =
@@ -468,7 +484,12 @@ let warn_deprecated_fields (config : Config_file.t) =
 (* Main validation passes. *)
 
 let validation_passes ignore_testchain_warning =
-  [validate_expected_pow; validate_addresses; validate_connections]
+  [
+    validate_expected_pow;
+    validate_addresses;
+    validate_connections;
+    warn_maintenance_deactivated;
+  ]
   @ if ignore_testchain_warning then [] else [warn_deprecated_fields]
 
 let validate_passes ?(ignore_testchain_warning = false) config =

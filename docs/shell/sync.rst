@@ -2,8 +2,8 @@ Synchronisation heuristic
 =========================
 
 When a new node joins the network, it must **bootstrap**: fetch and
-validate the chain before starting to bake or endorse new blocks. A
-bootstrapping node cannot bake or endorse new blocks, so for
+validate the chain before starting to bake or attest new blocks. A
+bootstrapping node cannot bake or attest new blocks, so for
 efficiency it should not bother to track a **mempool**: a pool of
 active operations.
 

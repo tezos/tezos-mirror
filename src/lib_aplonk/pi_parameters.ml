@@ -34,7 +34,7 @@ module No_public_input : CircuitPI = struct
 
   let nb_outer = 0
 
-  let check ~switches:_ ~outer:_ ~inner:_ = L.Bool.constant_bool true
+  let check ~switches:_ ~outer:_ ~inner:_ = L.Bool.constant true
 
   let outer_of_inner _ = []
 end
@@ -44,7 +44,7 @@ module One_public_input : CircuitPI = struct
 
   let nb_outer = 0
 
-  let check ~switches:_ ~outer:_ ~inner:_ = L.Bool.constant_bool true
+  let check ~switches:_ ~outer:_ ~inner:_ = L.Bool.constant true
 
   let outer_of_inner _ = []
 end

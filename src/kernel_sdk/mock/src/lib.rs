@@ -39,10 +39,10 @@ const TOO_MANY_REBOOT_FLAG_KEY: &str = "/readonly/kernel/env/too_many_reboot";
 /// with a given inbox. Written as i32 (little-endian).
 const REBOOT_COUNTER_KEY: &str = "/readonly/kernel/env/reboot_counter";
 
-const MUMBAI_ACTIVATION_LEVEL: u32 = 3_268_609;
-const MUMBAI_BLOCK_TIME: i64 = 15;
-// Mumbai activates approximately at 2:24PM UTC on March 29th 2023.
-const MUMBAI_ACTIVATION_TIMESTAMP: i64 = 1_680_096_240;
+const NAIROBI_ACTIVATION_LEVEL: u32 = 3_760_129;
+const NAIROBI_BLOCK_TIME: i64 = 15;
+// Nairobi activated approximately at 0:07AM UTC on June 24th 2023.
+const NAIROBI_ACTIVATION_TIMESTAMP: i64 = 1_687_561_630;
 
 /// The runtime host when _not_ running in **wasm**.
 #[derive(Debug)]
@@ -105,10 +105,10 @@ impl MockHost {
 
         let mut state = HostState::default_with_metadata(RollupMetadata {
             raw_rollup_address,
-            origination_level: MUMBAI_ACTIVATION_LEVEL,
+            origination_level: NAIROBI_ACTIVATION_LEVEL,
         });
 
-        state.curr_level = MUMBAI_ACTIVATION_LEVEL;
+        state.curr_level = NAIROBI_ACTIVATION_LEVEL;
 
         let info = info_for_level(state.curr_level as i32);
 
@@ -259,9 +259,9 @@ impl MockHost {
 }
 
 fn info_for_level(level: i32) -> inbox::InfoPerLevel {
-    let timestamp = (level as i64 - 1 - (MUMBAI_ACTIVATION_LEVEL as i64))
-        * MUMBAI_BLOCK_TIME
-        + MUMBAI_ACTIVATION_TIMESTAMP;
+    let timestamp = (level as i64 - 1 - (NAIROBI_ACTIVATION_LEVEL as i64))
+        * NAIROBI_BLOCK_TIME
+        + NAIROBI_ACTIVATION_TIMESTAMP;
 
     let hash = crypto::blake2b::digest_256(&timestamp.to_le_bytes()).unwrap();
 

@@ -120,7 +120,15 @@ pub trait Runtime {
         buffer: &mut [u8],
     ) -> Result<usize, RuntimeError>;
 
+    /// Read an entire value from the given path in storage.
+    #[cfg(feature = "alloc")]
+    fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError>;
+
     /// Write the bytes given by `src` to storage at `path`, starting `at_offset`.
+    ///
+    /// Contrary to `store_write_all`, this does not replace the value (if any)
+    /// previously stored under `path`. This allows for splicing/patching values
+    /// directly in storage, without having to read the entire value from disk.
     fn store_write<T: Path>(
         &mut self,
         path: &T,
@@ -128,8 +136,21 @@ pub trait Runtime {
         at_offset: usize,
     ) -> Result<(), RuntimeError>;
 
+    /// Write the bytes given by `src` to storage at `path`.
+    ///
+    /// Contrary to `store_write`, this replaces the value (if any) that
+    /// was previously stored at `path`.
+    fn store_write_all<T: Path>(
+        &mut self,
+        path: &T,
+        src: &[u8],
+    ) -> Result<(), RuntimeError>;
+
     /// Delete `path` from storage.
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError>;
+
+    /// Delete value under `path` from storage.
+    fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError>;
 
     /// Count the number of subkeys under `prefix`.
     ///
@@ -165,6 +186,16 @@ pub trait Runtime {
         destination: &mut [u8],
     ) -> Result<usize, RuntimeError>;
 
+    /// Reveal a DAL page.
+    #[cfg(all(feature = "alloc", feature = "proto-alpha"))]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError>;
+
     /// Return the size of value stored at `path`
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError>;
 
@@ -187,7 +218,7 @@ pub trait Runtime {
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError>;
 
     /// Returns [RollupMetadata]
-    fn reveal_metadata(&self) -> Result<RollupMetadata, RuntimeError>;
+    fn reveal_metadata(&self) -> RollupMetadata;
 
     /// True if the last kernel run was aborted.
     fn last_run_aborted(&self) -> Result<bool, RuntimeError>;
@@ -336,26 +367,113 @@ where
         }
     }
 
+    #[cfg(feature = "alloc")]
+    fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
+        use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+
+        let length = Runtime::store_value_size(self, path)?;
+        let mut buffer: Vec<u8> = Vec::with_capacity(length);
+
+        // SAFETY: the algorithm goes as follows:
+        //
+        // A vector of capacity [length] has been previously allocated, of the exact
+        // size of the value in the storage. Only `MAX_FILE_CHUNK_SIZE` bytes
+        // can be read at once, as such the values must be read as chunks.
+        while buffer.len() < length {
+            let offset = buffer.len();
+            let max_length = usize::min(MAX_FILE_CHUNK_SIZE, length - offset);
+            // At each loop, `store_read` takes a slice starting at the next
+            // offset in the value, which is the current length of the buffer.
+            // The slicing is always valid since it starts at the buffer's
+            // length, and always below the vector capacity by construction of
+            // the looping condition.
+            let slice = &mut buffer[offset..];
+            unsafe {
+                // SAFETY: `store_read` expects a pointer to write the value,
+                // which is given by the slicing in the buffer.
+                let chunk_size = self.store_read(
+                    path.as_ptr(),
+                    path.size(),
+                    offset,
+                    slice.as_mut_ptr(),
+                    max_length,
+                );
+                let chunk_size =
+                    Error::wrap(chunk_size).map_err(RuntimeError::HostErr)?;
+                // SAFETY: at the end of the loop, the buffer's length is
+                // incremented with the size of the value read, since
+                // `store_read` won't update it (as it only deals with
+                // pointers). This makes the slicing at the next loop valid,
+                // since it starts from the buffer length, and is less than the capacity.
+                buffer.set_len(offset + chunk_size)
+            };
+        }
+        Ok(buffer)
+    }
+
     fn store_write<T: Path>(
         &mut self,
         path: &T,
-        src: &[u8],
-        at_offset: usize,
+        mut src: &[u8],
+        mut at_offset: usize,
     ) -> Result<(), RuntimeError> {
-        let result_code = unsafe {
-            SmartRollupCore::store_write(
-                self,
-                path.as_ptr(),
-                path.size(),
-                at_offset,
-                src.as_ptr(),
-                src.len(),
-            )
+        use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+
+        let write = |bytes: &[u8], offset| {
+            let result_code = unsafe {
+                SmartRollupCore::store_write(
+                    self,
+                    path.as_ptr(),
+                    path.size(),
+                    offset,
+                    bytes.as_ptr(),
+                    bytes.len(),
+                )
+            };
+            match Error::wrap(result_code) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(RuntimeError::HostErr(e)),
+            }
         };
-        match Error::wrap(result_code) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(RuntimeError::HostErr(e)),
+
+        if src.len() <= MAX_FILE_CHUNK_SIZE {
+            return write(src, at_offset);
         }
+
+        while src.len() > MAX_FILE_CHUNK_SIZE {
+            write(&src[..MAX_FILE_CHUNK_SIZE], at_offset)?;
+            at_offset += MAX_FILE_CHUNK_SIZE;
+            src = &src[MAX_FILE_CHUNK_SIZE..];
+        }
+
+        // Don't do final extra write of zero bytes
+        if !src.is_empty() {
+            write(src, at_offset)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn store_write_all<T: Path>(
+        &mut self,
+        path: &T,
+        value: &[u8],
+    ) -> Result<(), RuntimeError> {
+        // Removing the value first prevents some cases where a value already
+        // exists in the storage at the given path and is bigger than the one
+        // being written. Keeping the old value would lead to a situation where
+        // ```
+        // let () = host.store_write_all(path, value)?;
+        // let value_read = host.store_read_all(path)?;
+        // value != value_read
+        // ```
+        // due to remaining bytes from the previous value.
+        //
+        // `store_delete_value` always succeeds even if the path does not
+        // exists, hence there is no need to check the value exists beforehand.
+        Runtime::store_delete_value(self, path)?;
+
+        Runtime::store_write(self, path, value, 0)
     }
 
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
@@ -363,6 +481,16 @@ where
 
         let res =
             unsafe { SmartRollupCore::store_delete(self, path.as_ptr(), path.size()) };
+        match Error::wrap(res) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(RuntimeError::HostErr(e)),
+        }
+    }
+
+    fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
+        let res = unsafe {
+            SmartRollupCore::store_delete_value(self, path.as_ptr(), path.size())
+        };
         match Error::wrap(res) {
             Ok(_) => Ok(()),
             Err(e) => Err(RuntimeError::HostErr(e)),
@@ -444,7 +572,7 @@ where
         }
     }
 
-    fn reveal_metadata(&self) -> Result<RollupMetadata, RuntimeError> {
+    fn reveal_metadata(&self) -> RollupMetadata {
         let mut destination = [0u8; METADATA_SIZE];
         let res = unsafe {
             SmartRollupCore::reveal_metadata(
@@ -453,8 +581,44 @@ where
                 destination.len(),
             )
         };
+
+        // Revealing metadata should always succeed
+        debug_assert!(res == METADATA_SIZE as i32, "SDK_ERROR: Revealing metadata always succeeds. \
+                                             If you see this message, please report it to the \
+                                             SDK developers at https://gitlab.com/tezos/tezos");
+
+        RollupMetadata::from(destination)
+    }
+
+    #[cfg(all(feature = "alloc", feature = "proto-alpha"))]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        // This will match the encoding declared for a DAL page in the Tezos protocol.
+        let payload: &[u8] = &[
+            &[2u8], // tag
+            published_level.to_be_bytes().as_ref(),
+            &[slot_index],
+            page_index.to_be_bytes().as_ref(),
+        ]
+        .concat();
+
+        let res = unsafe {
+            SmartRollupCore::reveal(
+                self,
+                payload.as_ptr(),
+                payload.len(),
+                destination.as_mut_ptr(),
+                destination.len(),
+            )
+        };
+
         match Error::wrap(res) {
-            Ok(_) => Ok(RollupMetadata::from(destination)),
+            Ok(size) => Ok(size),
             Err(e) => Err(RuntimeError::HostErr(e)),
         }
     }
@@ -557,7 +721,8 @@ mod tests {
     use std::slice::{from_raw_parts, from_raw_parts_mut};
     use test_helpers::*;
     use tezos_smart_rollup_core::{
-        smart_rollup_core::MockSmartRollupCore, MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE,
+        smart_rollup_core::MockSmartRollupCore, MAX_FILE_CHUNK_SIZE,
+        MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE,
     };
 
     const READ_SIZE: usize = 80;
@@ -773,6 +938,66 @@ mod tests {
     }
 
     #[test]
+    fn store_read_all_above_max_file_chunk_size() {
+        // Arrange
+
+        // The value read is formed of 3 chunks, two of the max chunk value and
+        // the last one being less than the max size.
+        const PATH: RefPath<'static> = RefPath::assert_from("/a/simple/path".as_bytes());
+        const VALUE_FIRST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'a'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_SECOND_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'b'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_LAST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE / 2] =
+            [b'c'; MAX_FILE_CHUNK_SIZE / 2];
+        const VALUE_SIZE: usize =
+            VALUE_FIRST_CHUNK.len() + VALUE_SECOND_CHUNK.len() + VALUE_LAST_CHUNK.len();
+
+        let mut mock = mock_path_exists(PATH.as_bytes());
+        // Check that the path is the one given to `store_read_all` and the
+        // offset is always a multiple of `MAX_FILE_CHUNK_SIZE`.
+        mock.expect_store_read()
+            .withf(|path_ptr, path_size, offset, _, max_bytes| {
+                let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
+                let last_offset = MAX_FILE_CHUNK_SIZE * 2;
+                let expected_max_bytes = if offset == &last_offset {
+                    VALUE_LAST_CHUNK.len()
+                } else {
+                    MAX_FILE_CHUNK_SIZE
+                };
+
+                (offset % MAX_FILE_CHUNK_SIZE) == 0
+                    && &expected_max_bytes == max_bytes
+                    && PATH.as_bytes() == slice
+            })
+            // Returns the expected chunks, as we know the offsets are consistent.
+            .returning(|_, _, offset, buf_ptr, _| {
+                let chunk = if offset == 0 {
+                    VALUE_FIRST_CHUNK.to_vec()
+                } else if offset == MAX_FILE_CHUNK_SIZE {
+                    VALUE_SECOND_CHUNK.to_vec()
+                } else {
+                    VALUE_LAST_CHUNK.to_vec()
+                };
+                let buffer = unsafe { from_raw_parts_mut(buf_ptr, chunk.len()) };
+                buffer.copy_from_slice(&chunk);
+                (chunk.len()).try_into().unwrap()
+            });
+
+        mock.expect_store_value_size()
+            .return_const(i32::try_from(VALUE_SIZE).unwrap());
+
+        // Act
+        let result = Runtime::store_read_all(&mock, &PATH);
+
+        // Assert
+        let mut expected: Vec<u8> = Vec::new();
+        expected.extend_from_slice(&VALUE_FIRST_CHUNK);
+        expected.extend_from_slice(&VALUE_SECOND_CHUNK);
+        expected.extend_from_slice(&VALUE_LAST_CHUNK);
+
+        assert_eq!(Ok(expected), result);
+    }
+
+    #[test]
     fn store_write_ok() {
         // Arrange
         const PATH: RefPath<'static> = RefPath::assert_from("/a/simple/path".as_bytes());
@@ -828,6 +1053,81 @@ mod tests {
     }
 
     #[test]
+    fn store_write_all() {
+        const PATH: RefPath<'static> = RefPath::assert_from("/a/simple/path".as_bytes());
+        const VALUE_FIRST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'a'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_SECOND_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'b'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_LAST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE / 2] =
+            [b'c'; MAX_FILE_CHUNK_SIZE / 2];
+
+        let mut mock = MockSmartRollupCore::new();
+        mock.expect_store_delete_value()
+            .withf(|path_ptr, path_size| {
+                let path = unsafe { from_raw_parts(*path_ptr, *path_size) };
+                path == PATH.as_bytes()
+            })
+            .return_const(0);
+
+        mock.expect_store_write()
+            .withf(|path_ptr, path_size, at_offset, src_ptr, src_size| {
+                let path_slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
+                let output_slice = unsafe { from_raw_parts(*src_ptr, *src_size) };
+                // Store_write_all should always write maximum size of chunk per
+                // maximum size of chunk
+                let correct_value = if *at_offset == 0 {
+                    output_slice == VALUE_FIRST_CHUNK
+                } else if *at_offset == MAX_FILE_CHUNK_SIZE {
+                    output_slice == VALUE_SECOND_CHUNK
+                } else if *at_offset == MAX_FILE_CHUNK_SIZE * 2 {
+                    output_slice == VALUE_LAST_CHUNK
+                } else {
+                    false
+                };
+
+                correct_value && PATH.as_bytes() == path_slice
+            })
+            .return_const(0);
+
+        mock.expect_store_read()
+            .withf(|path_ptr, path_size, _, _, _| {
+                let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
+                PATH.as_bytes() == slice
+            })
+            .returning(|_, _, offset, buf_ptr, _| {
+                let chunk = if offset < MAX_FILE_CHUNK_SIZE {
+                    VALUE_FIRST_CHUNK.to_vec()
+                } else if offset < MAX_FILE_CHUNK_SIZE * 2 {
+                    VALUE_SECOND_CHUNK.to_vec()
+                } else {
+                    VALUE_LAST_CHUNK.to_vec()
+                };
+                let buffer = unsafe { from_raw_parts_mut(buf_ptr, chunk.len()) };
+                buffer.copy_from_slice(&chunk);
+                (chunk.len()).try_into().unwrap()
+            });
+
+        mock.expect_store_value_size().return_const(
+            i32::try_from(MAX_FILE_CHUNK_SIZE * 2 + MAX_FILE_CHUNK_SIZE / 2).unwrap(),
+        );
+
+        mock.expect_store_has().return_const(1_i32);
+
+        // Act
+
+        let mut value: Vec<u8> = Vec::new();
+        value.extend_from_slice(&VALUE_FIRST_CHUNK);
+        value.extend_from_slice(&VALUE_SECOND_CHUNK);
+        value.extend_from_slice(&VALUE_LAST_CHUNK);
+        let result = mock.store_write_all(&PATH, &value);
+        let result_read = Runtime::store_read_all(&mock, &PATH).unwrap();
+
+        // Assert
+        assert_eq!(Ok(()), result);
+        assert_eq!(value.len(), result_read.len());
+        assert_eq!(value, result_read);
+    }
+
+    #[test]
     fn store_delete() {
         // Arrange
         const PATH: RefPath<'static> =
@@ -862,6 +1162,39 @@ mod tests {
 
         // Assert
         assert_eq!(Err(RuntimeError::PathNotFound), result);
+    }
+
+    #[test]
+    fn store_delete_value() {
+        // Arrange
+        const PATH: RefPath<'static> =
+            RefPath::assert_from("/a/PATH.which/does/exist".as_bytes());
+
+        const REMAINING_PATH: RefPath<'static> =
+            RefPath::assert_from("/a/PATH.which/does/exist/and/survived".as_bytes());
+
+        let mut mock = mock_path_exists(PATH.as_bytes());
+        mock.expect_store_delete()
+            .withf(|ptr, size| {
+                let slice = unsafe { from_raw_parts(*ptr, *size) };
+
+                PATH.as_bytes() == slice
+            })
+            .return_const(0);
+        mock.expect_store_has()
+            .withf(move |ptr, size| {
+                let bytes = unsafe { from_raw_parts(*ptr, *size) };
+                REMAINING_PATH.as_bytes() == bytes
+            })
+            .return_const(tezos_smart_rollup_core::VALUE_TYPE_VALUE);
+
+        // Act
+        let result = mock.store_delete(&PATH);
+        let result_remaining = mock.store_has(&REMAINING_PATH);
+
+        // Assert
+        assert_eq!(Ok(()), result);
+        assert!(matches!(result_remaining, Ok(Some(_))));
     }
 
     #[test]
@@ -961,7 +1294,7 @@ mod tests {
             });
 
         // Act
-        let result = mock.reveal_metadata().unwrap();
+        let result = mock.reveal_metadata();
 
         // Assert
         assert_eq!(expected_metadata, result);

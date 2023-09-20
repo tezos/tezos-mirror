@@ -7,16 +7,16 @@
  (libraries
   tezt.core
   octez-alcotezt
-  tezos-base
-  tezos-protocol-alpha
-  tezos-alpha-test-helpers
-  tezos-base-test-helpers
-  tezos-client-alpha
+  octez-libs.base
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.test-helpers
+  octez-libs.base-test-helpers
+  octez-protocol-alpha-libs.client
   tezos-benchmark
-  tezos-micheline
+  octez-libs.micheline
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.plugin
   tezos-protocol-alpha.parameters)
  (library_flags (:standard -linkall))
  (flags

@@ -3,12 +3,12 @@
 
 (library
  (name tezos_layer2_utils_017_PtNairob)
- (public_name tezos-layer2-utils-017-PtNairob)
+ (public_name octez-protocol-017-PtNairob-libs.layer2-utils)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-017-PtNairob
-  tezos-client-017-PtNairob)
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol
+  octez-protocol-017-PtNairob-libs.client)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

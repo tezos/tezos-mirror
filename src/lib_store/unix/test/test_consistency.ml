@@ -39,7 +39,7 @@ let nb_protocols = 5
 let register_protocol ~hash ~sources =
   let module M = struct
     include
-      Registered_protocol.Register_embedded_V9
+      Registered_protocol.Register_embedded_V11
         (Tezos_protocol_environment_demo_noops)
         (Tezos_protocol_demo_noops.Protocol)
         (struct
@@ -288,7 +288,10 @@ let test_protocol_level_consistency_remove_file history_mode
   return_unit
 
 let make_tests =
-  let history_modes = History_mode.[Rolling (Some {offset = 1}); Archive] in
+  let history_modes =
+    History_mode.
+      [Rolling (Some {offset = 1}); Full (Some {offset = 1}); Archive]
+  in
   let tests =
     Stdlib.List.init 5 (fun i history_mode ->
         ( Format.asprintf

@@ -731,7 +731,21 @@ functor
 
     open Utils (L)
 
-    let input_bitlist l = Input.list (List.map Input.bool l)
+    let bytes_of_hex = Plompiler.Utils.bytes_of_hex
+
+    let test_constant ~le b () =
+      let b = bytes_of_hex b in
+      let* o' = input @@ input_bytes ~le (bytes_of_hex "0f") in
+      let* o = Bytes.constant ~le b in
+      assert_equal o o'
+
+    let tests_constant =
+      let name = "Bytes.test_constant" in
+      [
+        test ~valid:true ~name @@ test_constant ~le:false "0f";
+        test ~valid:true ~name @@ test_constant ~le:true "0f";
+        test ~valid:false ~name @@ test_constant ~le:true "00";
+      ]
 
     let test_add a b z () =
       let* a = input ~kind:`Public a in
@@ -741,10 +755,8 @@ functor
       assert_equal z z'
 
     let tests_add =
-      let ex = Plompiler.Utils.(bitlist @@ bytes_of_hex "08") in
-      let input_bitlist l = Input.list (List.map Input.bool l) in
-      let i = input_bitlist ex in
-      let o = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "10") in
+      let i = input_bytes ~le:false @@ Stdlib.Bytes.of_string "\008" in
+      let o = input_bytes ~le:false @@ Stdlib.Bytes.of_string "\016" in
       [
         test ~valid:true ~name:"Bytes.test_add" @@ test_add i i o;
         test ~valid:false ~name:"Bytes.test_add" @@ test_add o o i;
@@ -758,23 +770,29 @@ functor
       assert_equal z z'
 
     let tests_xor =
-      let ex = Plompiler.Utils.(bitlist @@ bytes_of_hex "08") in
-      let i = input_bitlist ex in
-      let o = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "00") in
-      let i1 =
-        input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "510e527f")
-      in
-      let i2 =
-        input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "00000041")
-      in
-      let o1 =
-        input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "510e523e")
-      in
+      let i = input_bytes ~le:false @@ bytes_of_hex "08" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "00" in
+      let i1 = input_bytes ~le:false @@ bytes_of_hex "510e527f" in
+      let i2 = input_bytes ~le:false @@ bytes_of_hex "00000041" in
+      let o1 = input_bytes ~le:false @@ bytes_of_hex "510e523e" in
       [
         test ~valid:true ~name:"Bytes.test_xor" @@ test_xor i i o;
         test ~valid:true ~name:"Bytes.blake" @@ test_xor i1 i2 o1;
         test ~valid:false ~name:"Bytes.test_xor" @@ test_xor o o i;
       ]
+
+    let test_concat a b o () =
+      let* a = input ~kind:`Public a in
+      let* b = input b in
+      let* o = input o in
+      let o' = Bytes.concat [|a; b|] in
+      assert_equal o o'
+
+    let tests_concat =
+      let a = input_bytes ~le:false @@ bytes_of_hex "08" in
+      let b = input_bytes ~le:false @@ bytes_of_hex "01" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "0801" in
+      [test ~valid:true ~name:"Bytes.test_concat" @@ test_concat a b o]
 
     let test_ifthenelse_bytes b l r z () =
       let* b = input ~kind:`Public b in
@@ -785,8 +803,8 @@ functor
       assert_equal z o
 
     let tests_ifthenelse_bytes =
-      let l = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "01") in
-      let r = input_bitlist Plompiler.Utils.(bitlist @@ bytes_of_hex "00") in
+      let l = input_bytes ~le:false @@ bytes_of_hex "01" in
+      let r = input_bytes ~le:false @@ bytes_of_hex "00" in
       [
         test ~valid:true ~name:"Bytes.test_ifthenelse"
         @@ test_ifthenelse_bytes (Input.bool true) l r l;
@@ -796,23 +814,68 @@ functor
         @@ test_ifthenelse_bytes (Input.bool false) l r l;
       ]
 
-    let test_rotate l i z () =
+    let test_rotate_left l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let o = rotate l i in
+      let* o = rotate_left l i in
       assert_equal o z
 
-    let tests_rotate =
+    let tests_rotate_left =
       List.map
         (fun (i, a, b) ->
-          let a =
-            input_bitlist Plompiler.Utils.(bitlist @@ Stdlib.Bytes.of_string a)
-          in
-          let b =
-            input_bitlist Plompiler.Utils.(bitlist @@ Stdlib.Bytes.of_string b)
-          in
-          test ~valid:true ~name:"Bytes.test_rotate" @@ test_rotate a i b)
+          let a = input_bytes ~le:false @@ Stdlib.Bytes.of_string a in
+          let b = input_bytes ~le:false @@ Stdlib.Bytes.of_string b in
+          test ~valid:true ~name:"Bytes.test_rotate_left"
+          @@ test_rotate_left a i b)
         [
+          (0, "\001", "\001");
+          (1, "\001", "\002");
+          (2, "\001", "\004");
+          (3, "\001", "\008");
+          (4, "\001", "\016");
+          (5, "\001", "\032");
+          (6, "\001", "\064");
+          (7, "\001", "\128");
+          (8, "\001", "\001");
+          (0, "\000\001", "\000\001");
+          (1, "\000\001", "\000\002");
+          (2, "\000\001", "\000\004");
+          (3, "\000\001", "\000\008");
+          (4, "\000\001", "\000\016");
+          (5, "\000\001", "\000\032");
+          (6, "\000\001", "\000\064");
+          (7, "\000\001", "\000\128");
+          (8, "\000\001", "\001\000");
+          (1, "\000\128", "\001\000");
+          (1, "\128\000", "\000\001");
+          (0, "\000\000\001", "\000\000\001");
+          (1, "\000\000\001", "\000\000\002");
+          (2, "\000\000\001", "\000\000\004");
+          (3, "\000\000\001", "\000\000\008");
+          (4, "\000\000\001", "\000\000\016");
+          (5, "\000\000\001", "\000\000\032");
+          (6, "\000\000\001", "\000\000\064");
+          (7, "\000\000\001", "\000\000\128");
+          (8, "\000\000\001", "\000\001\000");
+          (1, "\000\000\128", "\000\001\000");
+          (1, "\128\000\000", "\000\000\001");
+        ]
+
+    let test_rotate_right l i z () =
+      let* l = input ~kind:`Public l in
+      let* z = input z in
+      let* o = rotate_right l i in
+      assert_equal o z
+
+    let tests_rotate_right =
+      List.map
+        (fun (i, a, b) ->
+          let a = input_bytes ~le:false @@ Stdlib.Bytes.of_string a in
+          let b = input_bytes ~le:false @@ Stdlib.Bytes.of_string b in
+          test ~valid:true ~name:"Bytes.test_rotate_right"
+          @@ test_rotate_right a i b)
+        [
+          (0, "\001", "\001");
           (1, "\001", "\128");
           (2, "\001", "\064");
           (3, "\001", "\032");
@@ -820,6 +883,8 @@ functor
           (5, "\001", "\008");
           (6, "\001", "\004");
           (7, "\001", "\002");
+          (8, "\001", "\001");
+          (0, "\000\001", "\000\001");
           (1, "\000\001", "\128\000");
           (2, "\000\001", "\064\000");
           (3, "\000\001", "\032\000");
@@ -827,6 +892,10 @@ functor
           (5, "\000\001", "\008\000");
           (6, "\000\001", "\004\000");
           (7, "\000\001", "\002\000");
+          (8, "\000\001", "\001\000");
+          (9, "\000\001", "\000\128");
+          (1, "\001\000", "\000\128");
+          (0, "\000\000\001", "\000\000\001");
           (1, "\000\000\001", "\128\000\000");
           (2, "\000\000\001", "\064\000\000");
           (3, "\000\000\001", "\032\000\000");
@@ -834,9 +903,186 @@ functor
           (5, "\000\000\001", "\008\000\000");
           (6, "\000\000\001", "\004\000\000");
           (7, "\000\000\001", "\002\000\000");
+          (8, "\000\000\001", "\001\000\000");
+          (9, "\000\000\001", "\000\128\000");
         ]
 
-    let tests = tests_add @ tests_xor @ tests_ifthenelse_bytes @ tests_rotate
+    let test_not a z () =
+      let* a = input ~kind:`Public a in
+      let* z = input z in
+      let* z' = not a in
+      assert_equal z z'
+
+    let tests_not =
+      let i = Bytes.input_bytes ~le:false @@ bytes_of_hex "0F" in
+      let o = Bytes.input_bytes ~le:false @@ bytes_of_hex "F0" in
+      [
+        test ~valid:true ~name:"Bytes.test_not" @@ test_not i o;
+        test ~valid:true ~name:"Bytes.test_not" @@ test_not o i;
+      ]
+
+    let test_band a b o () =
+      let* a = input ~kind:`Public a in
+      let* b = input ~kind:`Public b in
+      let* o = input o in
+      let* o' = band a b in
+      assert_equal o o'
+
+    let tests_band =
+      List.map
+        (fun (valid, a, b, o) ->
+          let a = Bytes.input_bytes ~le:false @@ bytes_of_hex a in
+          let b = Bytes.input_bytes ~le:false @@ bytes_of_hex b in
+          let o = Bytes.input_bytes ~le:false @@ bytes_of_hex o in
+          test ~valid ~name:"Bytes.test_band" @@ test_band a b o)
+        [
+          (true, "00", "00", "00");
+          (true, "0F", "00", "00");
+          (true, "00", "0F", "00");
+          (true, "0F", "0F", "0F");
+          (true, "F0", "00", "00");
+          (true, "00", "F0", "00");
+          (true, "F0", "F0", "F0");
+          (false, "0F", "00", "0F");
+        ]
+
+    let test_shift_left l i z () =
+      let* l = input ~kind:`Public l in
+      let* z = input z in
+      let* o = shift_left l i in
+      assert_equal o z
+
+    let tests_shift_left =
+      List.map
+        (fun (i, a, b) ->
+          let a = Bytes.input_bytes ~le:false @@ bytes_of_hex a in
+          let b = Bytes.input_bytes ~le:false @@ bytes_of_hex b in
+          test ~valid:true ~name:"Bytes.test_shift_left"
+          @@ test_shift_left a i b)
+        [
+          (0, "B0", "B0");
+          (1, "B0", "60");
+          (2, "B0", "C0");
+          (3, "B0", "80");
+          (4, "B0", "00");
+          (5, "B0", "00");
+          (6, "B0", "00");
+          (7, "B0", "00");
+          (8, "B0", "00");
+        ]
+
+    let test_shift_right l i z () =
+      let* l = input ~kind:`Public l in
+      let* z = input z in
+      let* o = shift_right l i in
+      assert_equal o z
+
+    let tests_shift_right =
+      List.map
+        (fun (i, a, b) ->
+          let a = Bytes.input_bytes ~le:false @@ bytes_of_hex a in
+          let b = Bytes.input_bytes ~le:false @@ bytes_of_hex b in
+          test ~valid:true ~name:"Bytes.test_shift_right"
+          @@ test_shift_right a i b)
+        [
+          (0, "B0", "B0");
+          (1, "B0", "58");
+          (2, "B0", "2C");
+          (3, "B0", "16");
+          (4, "B0", "0B");
+          (5, "B0", "05");
+          (6, "B0", "02");
+          (7, "B0", "01");
+          (8, "B0", "00");
+        ]
+
+    let tests =
+      tests_constant @ tests_add @ tests_xor @ tests_concat
+      @ tests_ifthenelse_bytes @ tests_rotate_left @ tests_rotate_right
+      @ tests_not @ tests_band @ tests_shift_left @ tests_shift_right
+  end
+
+module Limbs : Test =
+functor
+  (L : LIB)
+  ->
+  struct
+    open L
+
+    open Utils (L)
+
+    let bytes_of_hex = Plompiler.Utils.bytes_of_hex
+
+    module Limbs4 = Limbs (struct
+      let nb_bits = 4
+    end)
+
+    let test_constant4_bytes ~le b c () =
+      let* o' = input @@ Bytes.input_bytes ~le c in
+      let* lo' = Limbs4.of_bytes o' in
+      let* o = Bytes.constant ~le b in
+      let* lo = Limbs4.of_bytes o in
+      assert_equal lo lo'
+
+    let test_constant4_limbs ~le b c () =
+      let* o' = input @@ Bytes.input_bytes ~le c in
+      let* lo' = Limbs4.of_bytes o' in
+      let* o = Limbs4.constant ~le b in
+      assert_equal o lo'
+
+    let tests_constant str f =
+      List.map
+        (fun (valid, le, b, c) ->
+          let name = "Limbs.test_constant" ^ str in
+          let b = bytes_of_hex b in
+          let c = bytes_of_hex c in
+          test ~valid ~name @@ f ~le b c)
+        [
+          (true, false, "0f", "0f");
+          (true, true, "0f", "0f");
+          (true, true, "becd", "becd");
+          (false, true, "00", "0f");
+        ]
+
+    let test_limbs_of_scalar ~total_nb_bits ~nb_bits sx expected () =
+      let* x = input ~kind:`Public sx in
+      let* expected = input expected in
+      let* xlimbs = limbs_of_scalar ~total_nb_bits ~nb_bits x in
+      assert_equal xlimbs expected
+
+    let test_limbs_of_scalar_bytes ~total_nb_bits ~nb_bits sx expected () =
+      let module Limbs_n = Limbs (struct
+        let nb_bits = nb_bits
+      end) in
+      let* x = input ~kind:`Public sx in
+      let* expected = input expected in
+      let* xbits = bits_of_scalar ~nb_bits:total_nb_bits x in
+      let* xlimbs = Limbs_n.of_bytes xbits in
+      assert_equal xlimbs expected
+
+    let tests_limbs_of_scalar str f =
+      List.map
+        (fun (valid, sx, expected, total_nb_bits, nb_bits) ->
+          let sx = si sx in
+          let expected = Input.list @@ List.map si expected in
+          test ~valid ~name:("Limbs.test_limbs_of_scalar" ^ str)
+          @@ f ~total_nb_bits ~nb_bits sx expected)
+        [
+          (true, 9, [1; 0; 0; 1; 0], 5, 1);
+          (true, 30, [0; 1; 1; 1; 1], 5, 1);
+          (false, 3, [1; 1; 1; 0; 0], 5, 1);
+          (true, 128, [0; 0; 0; 0; 0; 0; 0; 1], 8, 1);
+          (true, 128, [0; 0; 0; 2], 8, 2);
+          (true, 128, [0; 8], 8, 4);
+          (true, 255, [15; 15], 8, 4);
+          (true, 3225, [9; 9; 12], 12, 4);
+        ]
+
+    let tests =
+      tests_constant "4_bytes" test_constant4_bytes
+      @ tests_constant "4_limbs" test_constant4_limbs
+      @ tests_limbs_of_scalar "_limbs" test_limbs_of_scalar
+      @ tests_limbs_of_scalar "_bytes" test_limbs_of_scalar_bytes
   end
 
 module ECC : Test =
@@ -1004,14 +1250,16 @@ functor
       let* s' = scalar_of_bytes b in
       assert_equal s s'
 
-    let t s () =
-      let b = Stdlib.Bytes.of_string s in
-      let bs = Plompiler.Utils.bitlist ~le:true b in
-      let bs = Input.list (List.map Input.bool bs) in
-      test_scalar_of_bytes bs (Input.scalar (S.of_bytes_exn b)) ()
-
     let tests_scalar_of_bytes =
-      [test ~valid:true ~name:"Rest.test_scalar_of_bytes" @@ t "\x010101"]
+      List.map
+        (fun s ->
+          let bs = Bytes.input_bytes ~le:true @@ Stdlib.Bytes.of_string s in
+          let scalar =
+            Input.scalar (S.of_bytes_exn @@ Stdlib.Bytes.of_string s)
+          in
+          test ~valid:true ~name:"Rest.test_scalar_of_bytes"
+          @@ test_scalar_of_bytes bs scalar)
+        ["\x010101"]
 
     let tests = tests_full_adder @ tests_scalar_of_bytes
   end
@@ -1026,6 +1274,7 @@ let tests =
       ("Tuple", (module Tuple : Test));
       ("ECC", (module ECC : Test));
       ("Bytes", (module Bytes : Test));
+      ("Limbs", (module Limbs : Test));
     ]
   in
   (* This test uses plonk and it is marked quick so that it

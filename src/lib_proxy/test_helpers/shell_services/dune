@@ -4,11 +4,11 @@
 (library
  (name tezos_proxy_test_helpers_shell_services)
  (libraries
-  tezos-base
-  tezos-shell-services
-  tezos-test-helpers
+  octez-libs.base
+  octez-shell-libs.shell-services
+  octez-libs.test-helpers
   qcheck-core
-  tezos-context.memory
+  octez-libs.tezos-context.memory
   lwt.unix
   octez-alcotezt)
  (library_flags (:standard -linkall))

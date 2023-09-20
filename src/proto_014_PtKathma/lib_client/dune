@@ -3,21 +3,21 @@
 
 (library
  (name tezos_client_014_PtKathma)
- (public_name tezos-client-014-PtKathma)
+ (public_name octez-protocol-014-PtKathma-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-shell-services
-  tezos-client-base
-  tezos-protocol-014-PtKathma
-  tezos-protocol-014-PtKathma.lifted
-  tezos-mockup-registration
-  tezos-proxy
-  tezos-signer-backends
-  tezos-protocol-plugin-014-PtKathma
+  octez-libs.base
+  octez-libs.clic
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  tezos-protocol-014-PtKathma.protocol
+  tezos-protocol-014-PtKathma.protocol.lifted
+  octez-shell-libs.mockup-registration
+  octez-shell-libs.proxy
+  octez-shell-libs.signer-backends
+  octez-protocol-014-PtKathma-libs.plugin
   tezos-protocol-014-PtKathma.parameters
-  tezos-rpc
+  octez-libs.rpc
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

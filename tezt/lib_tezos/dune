@@ -6,15 +6,15 @@
  (public_name tezt-tezos)
  (libraries
   tezt
-  tezt-performance-regression
+  tezt-tezos.tezt-performance-regression
   uri
   hex
-  tezos-crypto-dal
-  tezos-base
-  tezos-base.unix
+  octez-libs.crypto-dal
+  octez-libs.base
+  octez-libs.base.unix
   cohttp-lwt-unix)
  (flags
   (:standard)
   -open Tezt
   -open Tezt.Base
-  -open Tezt_performance_regression))
+  -open Tezt_tezos_tezt_performance_regression))

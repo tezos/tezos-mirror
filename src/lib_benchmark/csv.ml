@@ -41,7 +41,6 @@ let disjoint_headers (csv1 : csv) (csv2 : csv) =
       let header2 = String_set.of_list header2 in
       String_set.disjoint header1 header2
 
-(* Horizontally concat CSVs *)
 let concat ?(check_disjoint_headers = true) (csv1 : csv) (csv2 : csv) : csv =
   (* Check that both CSVs have the same number of lines. *)
   if Compare.List_lengths.(csv1 <> csv2) then

@@ -23,16 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Event_legacy
+type 'a t
 
-(** Storing a slot content event. The given parameter is the slot's commitment
-    hash. *)
+val emit : 'a t -> 'a -> unit Lwt.t
+
+val emit__dont_wait__use_with_care : 'a t -> 'a -> unit
+
+val starting_node : unit t
+
+val shutdown_node : int t
+
+val store_is_ready : unit t
+
+val node_is_ready : unit t
+
+val data_dir_not_found : string t
+
+val failed_to_persist_profiles :
+  (Services.Types.profiles * Error_monad.tztrace) t
+
+val fetched_slot : (int * int) t
+
+val layer1_node_new_head : (Block_hash.t * int32) t
+
+val layer1_node_final_block : int32 t
+
+val layer1_node_tracking_started : unit t
+
+val layer1_node_tracking_started_for_plugin : unit t
+
+val protocol_plugin_resolved : Protocol_hash.t t
+
+val no_protocol_plugin : unit t
+
+val unexpected_protocol_plugin : unit t
+
+val daemon_error : Error_monad.tztrace t
+
+val configuration_loaded : unit t
+
 val stored_slot_content : Cryptobox.Commitment.t t
 
-(** Storing a slot's shards event. The given parameters are the slot's
-    commitment hash and the number of its shards. *)
 val stored_slot_shards : (Cryptobox.Commitment.t * int) t
 
-(** Decoding a value failed. See {!Types.kind} for kind of considered
-    values. *)
 val decoding_data_failed : Types.kind t
+
+val loading_shard_data_failed : string t
+
+val message_validation_error : (Gossipsub.message_id * string) t
+
+val p2p_server_is_ready : P2p_point.Id.t t
+
+val rpc_server_is_ready : P2p_point.Id.t t
+
+val metrics_server_is_ready : (string * int) t

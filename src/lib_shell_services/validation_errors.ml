@@ -29,11 +29,19 @@
 type error += Parse_error
 
 type error +=
-  | Operation_conflict of {new_hash : Operation_hash.t}
+  | Operation_conflict of {
+      new_hash : Operation_hash.t;
+      needed_fee_in_mutez : int64 option;
+    }
   | Operation_replacement of {
       old_hash : Operation_hash.t;
       new_hash : Operation_hash.t;
     }
+  | Rejected_by_full_mempool of {
+      hash : Operation_hash.t;
+      needed_fee_in_mutez : int64 option;
+    }
+  | Removed_from_full_mempool of Operation_hash.t
 
 type error += Too_many_operations
 
@@ -70,17 +78,32 @@ let () =
     ~description:
       "The operation cannot be added because the mempool already contains a \
        conflicting operation."
-    ~pp:(fun ppf new_hash ->
+    ~pp:(fun ppf (new_hash, needed_fee_in_mutez) ->
       Format.fprintf
         ppf
         "The operation %a cannot be added because the mempool already contains \
-         a conflicting operation that should not be replaced (e.g. an \
-         operation from the same manager with better fees)."
+         a conflicting operation. %s"
         Operation_hash.pp
-        new_hash)
-    (Data_encoding.obj1 (Data_encoding.req "new_hash" Operation_hash.encoding))
-    (function Operation_conflict {new_hash} -> Some new_hash | _ -> None)
-    (fun new_hash -> Operation_conflict {new_hash}) ;
+        new_hash
+        (match needed_fee_in_mutez with
+        | None ->
+            "The pre-existing operation cannot be replaced with the new one, \
+             even if fees were increased. Try again after the next block has \
+             been baked."
+        | Some needed_fee_in_mutez ->
+            Format.asprintf
+              "To replace the latter, this particular operation would need a \
+               total fee of at least %Ld mutez."
+              needed_fee_in_mutez))
+    (Data_encoding.obj2
+       (Data_encoding.req "new_hash" Operation_hash.encoding)
+       (Data_encoding.opt "needed_fee_in_mutez" Data_encoding.int64))
+    (function
+      | Operation_conflict {new_hash; needed_fee_in_mutez} ->
+          Some (new_hash, needed_fee_in_mutez)
+      | _ -> None)
+    (fun (new_hash, needed_fee_in_mutez) ->
+      Operation_conflict {new_hash; needed_fee_in_mutez}) ;
   (* Operation replacement *)
   register_error_kind
     `Temporary
@@ -102,6 +125,60 @@ let () =
       | Operation_replacement {old_hash; new_hash} -> Some (old_hash, new_hash)
       | _ -> None)
     (fun (old_hash, new_hash) -> Operation_replacement {old_hash; new_hash}) ;
+  (* Rejected_by_full_mempool *)
+  register_error_kind
+    `Temporary
+    ~id:"node.mempool.rejected_by_full_mempool"
+    ~title:"Operation fees are too low to be considered in full mempool"
+    ~description:"Operation fees are too low to be considered in full mempool"
+    ~pp:(fun ppf (oph, fee_opt) ->
+      Format.fprintf
+        ppf
+        "Operation %a has been rejected because the mempool is full. %s"
+        Operation_hash.pp
+        oph
+        (match fee_opt with
+        | Some fee ->
+            Format.sprintf
+              "This specific operation would need a total fee of at least %Ld \
+               mutez to be considered and propagated by the mempool of this \
+               particular node right now. Note that if the node receives \
+               operations with a better fee over gas limit ratio in the \
+               future, the operation may be rejected even with the indicated \
+               fee, or it may be successfully injected but removed at a later \
+               date."
+              fee
+        | None ->
+            "The operation cannot be accepted by this node at the moment, \
+             regardless of its fee. Try again after the next block has been \
+             baked."))
+    Data_encoding.(
+      obj2
+        (req "operation_hash" Operation_hash.encoding)
+        (opt "needed_fee_in_mutez" int64))
+    (function
+      | Rejected_by_full_mempool {hash; needed_fee_in_mutez} ->
+          Some (hash, needed_fee_in_mutez)
+      | _ -> None)
+    (fun (hash, needed_fee_in_mutez) ->
+      Rejected_by_full_mempool {hash; needed_fee_in_mutez}) ;
+  (* Removed_from_full_mempool *)
+  register_error_kind
+    `Temporary
+    ~id:"node.mempool.removed_from_full_mempool"
+    ~title:"Operation removed from full mempool because its fees are too low"
+    ~description:
+      "Operation removed from full mempool because its fees are too low"
+    ~pp:(fun ppf oph ->
+      Format.fprintf
+        ppf
+        "Operation %a has been removed from a full mempool because it had the \
+         lowest fee/gas ratio."
+        Operation_hash.pp
+        oph)
+    Data_encoding.(obj1 (req "operation_hash" Operation_hash.encoding))
+    (function Removed_from_full_mempool oph -> Some oph | _ -> None)
+    (fun oph -> Removed_from_full_mempool oph) ;
   (* Too many operations *)
   register_error_kind
     `Temporary

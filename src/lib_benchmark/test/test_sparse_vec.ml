@@ -67,11 +67,9 @@ let tests =
     ( Test.tztest_assert "swap" `Quick @@ fun () ->
       V.swap vec0 "saucisse" "fatigue" =:= vec6 );
     ( Test.tztest_assert "eval1" `Quick @@ fun () ->
-      V.eval vec0 "saucisse" = 42.0 );
+      V.get_exn vec0 "saucisse" = 42.0 );
     ( Test.tztest_assert "eval2" `Quick @@ fun () ->
-      V.eval vec0 "fatigue" = 100.0 );
-    ( Test.tztest_assert "eval_absent" `Quick @@ fun () ->
-      V.eval vec0 "lentilles" = 0.0 );
+      V.get_exn vec0 "fatigue" = 100.0 );
   ]
 
 let () =

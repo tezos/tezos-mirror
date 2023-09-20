@@ -10,34 +10,22 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezt" { with-test & >= "3.1.0" }
-  "tezos-context" {with-test}
+  "tezt" { with-test & >= "3.1.1" }
+  "octez-libs" {with-test}
   "octez-alcotezt" {with-test}
-  "tezos-base" {with-test}
-  "tezos-client-017-PtNairob" {with-test}
+  "octez-protocol-017-PtNairob-libs" {with-test}
   "tezos-protocol-017-PtNairob" {with-test}
-  "tezos-017-PtNairob-test-helpers" {with-test}
-  "tezos-base-test-helpers" {with-test}
-  "tezos-protocol-plugin-017-PtNairob" {with-test}
   "tezos-benchmark" {with-test}
-  "tezos-micheline" {with-test}
   "tezos-benchmark-017-PtNairob" {with-test}
   "tezos-benchmark-type-inference-017-PtNairob" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "tezos-test-helpers" {with-test}
-  "tezos-smart-rollup-017-PtNairob" {with-test}
-  "tezos-crypto-dal" {with-test}
   "tezt-tezos" {with-test}
-  "tezos-client-base" {with-test}
-  "tezos-protocol-environment" {with-test}
-  "tezos-stdlib-unix" {with-test}
-  "tezos-scoru-wasm-helpers" {with-test}
-  "tezos-stdlib" {with-test}
-  "tezos-scoru-wasm" {with-test}
-  "tezos-webassembly-interpreter-extra" {with-test}
+  "octez-shell-libs" {with-test}
+  "octez-proto-libs" {with-test}
+  "octez-l2-libs" {with-test}
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

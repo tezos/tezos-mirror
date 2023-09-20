@@ -16,7 +16,7 @@ tezos_node=./octez-node
 tezos_client=./octez-client
 
 # Protocol configuration.
-protocol_hash=PtNairobi9MxcBmKF7avFwkUohUu9KuxHt3w9cBmJ7ULqPD7cY5
+protocol_hash=PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
 protocol_parameters=src/proto_017_PtNairob/parameters/sandbox-parameters.json
 protocol_name=nairobi
 
@@ -35,7 +35,7 @@ proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi-rc.json
+openapi_json=docs/api/rpc-openapi.json
 proto_openapi_json=docs/api/$protocol_name-openapi.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 

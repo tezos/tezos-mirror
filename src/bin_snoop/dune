@@ -7,17 +7,18 @@
  (package octez-snoop)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-clic
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-libs.clic
   tezos-benchmark
   tezos-benchmark-examples
-  tezos-shell-benchmarks
+  octez-shell-libs.shell-benchmarks
   tezos-benchmarks-proto-alpha
   str
   pyml
-  prbnmcn-stats)
+  prbnmcn-stats
+  octez-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

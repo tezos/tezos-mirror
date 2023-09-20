@@ -1,0 +1,9 @@
+{0 Octez-protocol-011-PtHangz2-libs: octez protocol 011-PtHangz2 libraries}
+
+This is a package containing some libraries related to the Tezos 011-PtHangz2 protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_011_PtHangz2}Tezos_client_011_PtHangz2}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_protocol_plugin_011_PtHangz2}Tezos_protocol_plugin_011_PtHangz2}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_011_PtHangz2_registerer}Tezos_protocol_plugin_011_PtHangz2_registerer}: Protocol plugin registerer

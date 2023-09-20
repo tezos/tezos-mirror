@@ -54,17 +54,14 @@ val proof_of_work_threshold : Raw_context.t -> int64
 
 val minimal_stake : Raw_context.t -> Tez_repr.t
 
-val vdf_difficulty : Raw_context.t -> int64
+val minimal_frozen_stake : Raw_context.t -> Tez_repr.t
 
-val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
+val vdf_difficulty : Raw_context.t -> int64
 
 val origination_size : Raw_context.t -> int
 
-val baking_reward_fixed_portion : Raw_context.t -> Tez_repr.t
-
-val baking_reward_bonus_per_slot : Raw_context.t -> Tez_repr.t
-
-val endorsing_reward_per_slot : Raw_context.t -> Tez_repr.t
+val issuance_weights :
+  Raw_context.t -> Constants_parametric_repr.issuance_weights
 
 val quorum_min : Raw_context.t -> int32
 
@@ -72,13 +69,9 @@ val quorum_max : Raw_context.t -> int32
 
 val min_proposal_quorum : Raw_context.t -> int32
 
-val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
-
 val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 
 val parametric : Raw_context.t -> Constants_parametric_repr.t
-
-val tx_rollup : Raw_context.t -> Constants_parametric_repr.tx_rollup
 
 val sc_rollup : Raw_context.t -> Constants_parametric_repr.sc_rollup
 
@@ -90,42 +83,13 @@ val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 
 val max_slashing_period : Raw_context.t -> int
 
-val frozen_deposits_percentage : Raw_context.t -> int
+val limit_of_delegation_over_baking : Raw_context.t -> int
 
-val double_baking_punishment : Raw_context.t -> Tez_repr.t
+val percentage_of_frozen_deposits_slashed_per_double_baking :
+  Raw_context.t -> int
 
-val tx_rollup_enable : Raw_context.t -> bool
-
-val tx_rollup_origination_size : Raw_context.t -> int
-
-val tx_rollup_hard_size_limit_per_inbox : Raw_context.t -> int
-
-val tx_rollup_hard_size_limit_per_message : Raw_context.t -> int
-
-val tx_rollup_max_withdrawals_per_batch : Raw_context.t -> int
-
-val tx_rollup_commitment_bond : Raw_context.t -> Tez_repr.t
-
-val tx_rollup_finality_period : Raw_context.t -> int
-
-val tx_rollup_withdraw_period : Raw_context.t -> int
-
-val tx_rollup_max_inboxes_count : Raw_context.t -> int
-
-val tx_rollup_max_messages_per_inbox : Raw_context.t -> int
-
-val tx_rollup_max_commitments_count : Raw_context.t -> int
-
-val tx_rollup_cost_per_byte_ema_factor : Raw_context.t -> int
-
-val tx_rollup_max_ticket_payload_size : Raw_context.t -> int
-
-val tx_rollup_rejection_max_proof_size : Raw_context.t -> int
-
-val tx_rollup_sunset_level : Raw_context.t -> int32
-
-val ratio_of_frozen_deposits_slashed_per_double_endorsement :
-  Raw_context.t -> Ratio_repr.t
+val percentage_of_frozen_deposits_slashed_per_double_attestation :
+  Raw_context.t -> int
 
 val testnet_dictator : Raw_context.t -> Signature.Public_key_hash.t option
 
@@ -159,6 +123,11 @@ val max_number_of_stored_cemented_commitments : Raw_context.t -> int
 
 val sc_rollup_timeout_period_in_blocks : Raw_context.t -> int
 
+val sc_rollup_reveal_activation_level :
+  Raw_context.t -> Constants_parametric_repr.sc_rollup_reveal_activation_level
+
+val sc_rollup_private_enable : Raw_context.t -> bool
+
 val dal_number_of_slots : Raw_context.t -> int
 
 val dal_enable : Raw_context.t -> bool
@@ -168,3 +137,16 @@ val zk_rollup_enable : Raw_context.t -> bool
 val zk_rollup_min_pending_to_process : Raw_context.t -> int
 
 val zk_rollup_origination_size : Raw_context.t -> int
+
+val zk_rollup_max_ticket_payload_size : Raw_context.t -> int
+
+val adaptive_issuance_enable : Raw_context.t -> bool
+
+val adaptive_issuance_global_limit_of_staking_over_baking : Raw_context.t -> int
+
+val adaptive_issuance_edge_of_staking_over_delegation : Raw_context.t -> int
+
+val adaptive_issuance_launch_ema_threshold : Raw_context.t -> int32
+
+val adaptive_issuance_rewards_params :
+  Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params

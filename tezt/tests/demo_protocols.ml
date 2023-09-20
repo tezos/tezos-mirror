@@ -111,10 +111,10 @@ module Demo_counter = struct
     let* () = Demo_client.increment_a client in
     let* mempool = Mempool.get_mempool client in
     Check.(
-      (List.length mempool.applied = 1)
+      (List.length mempool.validated = 1)
         int
         ~__LOC__
-        ~error_msg:"Expected %R applied operations, got %L") ;
+        ~error_msg:"Expected %R validated operations, got %L") ;
     let* () = Demo_client.bake client in
     let* () = check_a ~__LOC__ client 1 in
     let* () = check_b ~__LOC__ client 0 in

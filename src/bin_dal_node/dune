@@ -2,37 +2,46 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_dal)
+ (name main)
  (public_name octez-dal-node)
  (package octez-dal-node)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-clic
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-client-commands
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-protocol-updater
-  tezos-rpc-http-client-unix
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos_dal_node_lib
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.version
+  cmdliner
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-shell-libs.client-commands
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-shell-libs.protocol-updater
+  octez-libs.rpc-http-client-unix
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
+  tezos-dal-node-lib
   tezos-dal-node-services
-  tezos_layer2_store
-  tezos-crypto-dal
-  tezos-store.unix
-  tezos-store.shared
+  octez-l2-libs.layer2_store
+  octez-libs.crypto-dal
+  octez-shell-libs.store.unix
+  octez-shell-libs.store.shared
+  octez-libs.tezos-gossipsub
+  tezos-dal-node-lib.gossipsub
+  octez-shell-libs.p2p
+  octez-libs.tezos-p2p-services
+  octez-libs.crypto
+  octez-libs.base.p2p-identity-file
+  octez-shell-libs.shell-services
   irmin-pack
   irmin-pack.unix
   irmin
-  tezos-dal-016-PtMumbai
-  tezos-dal-017-PtNairob
-  (select void_for_linking-tezos-dal-alpha from
-   (tezos-dal-alpha -> void_for_linking-tezos-dal-alpha.empty)
-   (-> void_for_linking-tezos-dal-alpha.empty)))
+  prometheus-app
+  octez-protocol-017-PtNairob-libs.dal
+  octez-protocol-018-Proxford-libs.dal
+  (select void_for_linking-octez-protocol-alpha-libs-dal from
+   (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -50,7 +59,15 @@
   -open Tezos_dal_node_services
   -open Tezos_layer2_store
   -open Tezos_crypto_dal
-  -open Tezos_store_unix
-  -open Tezos_store_shared))
+  -open Tezos_store_shared
+  -open Tezos_gossipsub
+  -open Tezos_dal_node_lib_gossipsub
+  -open Tezos_p2p
+  -open Tezos_p2p_services
+  -open Tezos_crypto
+  -open Tezos_base_p2p_identity_file
+  -open Tezos_shell_services))
 
-(rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))
+(rule
+ (action
+  (progn (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** "Pure value" backend for Plompiler.
+    It actually implements a simple state monad to keep track
+    of implicit checks.
+*)
+
 include Lang_core
 
 type scalar = X of S.t
@@ -51,6 +56,10 @@ let ( let* ) m f s =
 let ( >* ) m f =
   let* U = m in
   f
+
+let ( <$> ) m f =
+  let* m in
+  ret (f m)
 
 let rec mapM f ls =
   match ls with
@@ -122,6 +131,8 @@ let rec encode : type a. a Input.t' -> S.t list =
 
 let serialize i = Array.of_list @@ encode (fst i)
 
+(* Note: this doesn't match [Circuit]'s concept of physical equality,
+   as we don't have wires here. *)
 let rec eq : type a. a repr -> a repr -> bool =
  fun a b ->
   match (a, b) with
@@ -161,6 +172,8 @@ let pair l r = P (l, r)
 
 let unit = U
 
+let to_s s = S (X s)
+
 let of_s (S (X s)) = s
 
 let map2 f x y = X (f x y)
@@ -174,8 +187,6 @@ let rec foldM f e l =
 
 let scalar_of_bool (B b) = if b then S (X S.one) else S (X S.zero)
 
-let constant_scalar x = ret @@ Input.s x
-
 let unsafe_bool_of_scalar (S (X s)) = if S.(eq s one) then B true else B false
 
 module Num = struct
@@ -184,6 +195,10 @@ module Num = struct
   type nonrec 'a repr = 'a repr
 
   type nonrec 'a t = 'a t
+
+  let range_check ~nb_bits (S (X x)) s =
+    assert (Z.compare (S.to_z x) Z.(one lsl nb_bits) < 0) ;
+    (s, U)
 
   let assert_nonzero sx =
     let x = of_s sx in
@@ -248,10 +263,20 @@ module Num = struct
   let pow5 sl =
     let l = of_s sl in
     ret @@ S (X S.(pow l (Z.of_int 5)))
+
+  let constant : S.t -> scalar repr t = fun s -> ret (S (X s))
+
+  let zero = constant S.zero
+
+  let one = constant S.one
 end
 
 module Bool = struct
-  include Num
+  type nonrec scalar = scalar
+
+  type nonrec 'a repr = 'a repr
+
+  type nonrec 'a t = 'a t
 
   let s_of_b b = if b then X S.one else X S.zero
 
@@ -263,7 +288,7 @@ module Bool = struct
     assert (not b) ;
     ret U
 
-  let constant_bool : bool -> bool repr t = fun b -> ret (B b)
+  let constant : bool -> bool repr t = fun b -> ret (B b)
 
   let band (B l) (B r) = ret @@ B (l && r)
 
@@ -279,8 +304,6 @@ module Bool = struct
 
   let bor (B l) (B r) = ret @@ B (l || r)
 
-  let bor_lookup (B l) (B r) = bor (B l) (B r)
-
   let bnot (B b) = ret @@ B (not b)
 
   let ifthenelse (B b) l r = if b then ret l else ret r
@@ -289,6 +312,49 @@ module Bool = struct
 
   let band_list l : bool repr t =
     ret @@ List.fold_left (fun (B a) (B b) -> B (a && b)) (B true) l
+
+  module Internal = struct
+    let bor_lookup (B l) (B r) = bor (B l) (B r)
+
+    let xor_lookup (B l) (B r) = xor (B l) (B r)
+
+    let band_lookup (B l) (B r) = band (B l) (B r)
+
+    let bnot_lookup (B b) = bnot (B b)
+  end
+end
+
+module Limb (N : sig
+  val nb_bits : int
+end) =
+struct
+  let nb_bits =
+    (* As we use the Int functions (logxor, logand, etc.) to compute
+       the lookup table, the nb_bits is limited to int_size / 2. *)
+    assert (N.nb_bits <= 8) ;
+    N.nb_bits
+
+  let xor_lookup (S (X l)) (S (X r)) =
+    ret @@ to_s @@ S.of_int
+    @@ Int.logxor (Z.to_int (S.to_z l)) (Z.to_int (S.to_z r))
+
+  let band_lookup (S (X l)) (S (X r)) =
+    ret @@ to_s @@ S.of_int
+    @@ Int.logand (Z.to_int (S.to_z l)) (Z.to_int (S.to_z r))
+
+  let bnot_lookup (S (X l)) =
+    let mask = (1 lsl nb_bits) - 1 in
+    ret @@ to_s @@ S.of_int @@ Int.(logand (lognot (Z.to_int (S.to_z l))) mask)
+
+  let rotate_right_lookup (S (X l)) (S (X r)) i =
+    assert (i < nb_bits) ;
+    ret @@ to_s
+    @@ S.of_int
+         (Csir.rotate_right
+            ~nb_bits
+            (Z.to_int (S.to_z l))
+            (Z.to_int (S.to_z r))
+            i)
 end
 
 let point x y = P (S (X x), S (X y))
@@ -340,10 +406,47 @@ module Ecc = struct
          (s_of_base @@ W.get_v_coordinate out)
 end
 
+module Mod_arith = struct
+  let add ?(subtraction = false) ~label:_ ~modulus ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x y =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let ys = List.map (fun s -> of_s s |> S.to_z) (of_list y) in
+    let zs =
+      if subtraction then Utils.mod_sub_limbs ~modulus ~base xs ys
+      else Utils.mod_add_limbs ~modulus ~base xs ys
+    in
+    let z = List.map (fun z -> S.of_z z |> to_s) zs |> to_list in
+    ret z
+
+  let mul ?(division = false) ~label:_ ~modulus ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x y =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let ys = List.map (fun s -> of_s s |> S.to_z) (of_list y) in
+    let zs =
+      if division then Utils.mod_div_limbs ~modulus ~base xs ys
+      else Utils.mod_mul_limbs ~modulus ~base xs ys
+    in
+    let z = List.map (fun z -> S.of_z z |> to_s) zs |> to_list in
+    ret z
+
+  let assert_non_zero ~label:_ ~modulus ~is_prime:_ ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let x = Utils.z_of_limbs ~base xs in
+    assert (not Z.(rem x modulus = zero)) ;
+    ret unit
+
+  let is_zero ~label:_ ~modulus ~is_prime:_ ~nb_limbs:_ ~base ~moduli:_
+      ~qm_bound:_ ~ts_bounds:_ x =
+    let xs = List.map (fun s -> of_s s |> S.to_z) (of_list x) in
+    let x = Utils.z_of_limbs ~base xs in
+    ret @@ B Z.(rem x modulus = zero)
+end
+
 module Poseidon = struct
   module VS = Linear_algebra.Make_VectorSpace (S)
 
-  let poseidon128_full_round ~matrix ~k ~variant:_ (x0, x1, x2) =
+  let poseidon128_full_round ~matrix ~k (x0, x1, x2) =
     let pow5 x = S.pow (of_s x) (Z.of_int 5) in
     let x_vec = [|Array.map pow5 [|x0; x1; x2|]|] |> VS.transpose in
     let y_vec = VS.mul matrix x_vec in
@@ -352,7 +455,7 @@ module Poseidon = struct
     let y2 = S.add k.(2) @@ y_vec.(2).(0) in
     ret @@ to_list [S (X y0); S (X y1); S (X y2)]
 
-  let poseidon128_four_partial_rounds ~matrix ~ks ~variant:_ (x0, x1, x2) =
+  let poseidon128_four_partial_rounds ~matrix ~ks (x0, x1, x2) =
     let k0 = VS.filter_cols (Int.equal 0) ks in
     let k1 = VS.filter_cols (Int.equal 1) ks in
     let k2 = VS.filter_cols (Int.equal 2) ks in
@@ -413,21 +516,41 @@ let assert_equal l r =
 let equal : type a. a repr -> a repr -> bool repr t =
  fun l r -> ret @@ B (eq l r)
 
+let scalar_of_limbs ~nb_bits b =
+  let sb = of_list b in
+  let powers =
+    let nb_limbs = List.length sb in
+    let base = 1 lsl nb_bits |> Z.of_int in
+    List.init nb_limbs (fun i -> S.of_z @@ Z.pow base i)
+  in
+  foldM
+    (fun acc (qr, w) -> Num.add ~qr acc w)
+    (List.hd sb)
+    List.(tl @@ combine powers sb)
+
 let bits_of_scalar ?(shift = Z.zero) ~nb_bits sx =
   let x = of_s sx |> S.to_z in
   let x = Z.add shift x in
   let sx = S (X (S.of_z x)) in
   let binary_decomposition = Utils.bool_list_of_z ~nb_bits x in
   let bits = L (List.map (fun x -> B x) binary_decomposition) in
-  let powers = List.init nb_bits (fun i -> S.of_z Z.(pow (of_int 2) i)) in
-  let sbits = List.map scalar_of_bool (of_list bits) in
   let* sum =
-    foldM
-      (fun acc (qr, w) -> Num.add ~qr acc w)
-      (List.hd sbits)
-      List.(tl @@ combine powers sbits)
+    let sbits = List.map scalar_of_bool (of_list bits) in
+    scalar_of_limbs ~nb_bits:1 (to_list sbits)
   in
   with_bool_check (equal sx sum) >* ret bits
+
+let limbs_of_scalar ?(shift = Z.zero) ~total_nb_bits ~nb_bits sx =
+  let x = of_s sx |> S.to_z in
+  let x = Z.add shift x in
+  let binary_decomposition = Utils.bool_list_of_z ~nb_bits:total_nb_bits x in
+  let nb_decomposition =
+    Utils.limbs_of_bool_list ~nb_bits binary_decomposition
+  in
+  let limbs = L (List.map (fun x -> to_s @@ S.of_int x) nb_decomposition) in
+  let sx = S (X (S.of_z x)) in
+  let* sum = scalar_of_limbs ~nb_bits limbs in
+  with_bool_check (equal sx sum) >* ret limbs
 
 let of_b (B x) = x
 
@@ -439,6 +562,22 @@ let init_state = []
 let with_label ~label t =
   ignore label ;
   t
+
+let rec repr_to_string : type a. a repr -> string = function
+  | U -> "()"
+  | S (X s) -> S.string_of_scalar s
+  | B b -> if b then "T" else "F"
+  | P (a, b) -> "(" ^ repr_to_string a ^ "," ^ repr_to_string b ^ ")"
+  | L (B _ :: _ as bs) ->
+      (* special case to print bytes in hex *)
+      let bs = List.map (fun (B b) -> if b then true else false) bs in
+      let bs = Utils.of_bitlist ~le:false bs in
+      Utils.hex_of_bytes bs
+  | L l -> String.concat ";" (List.map repr_to_string l)
+
+let debug s x =
+  Format.printf "%s: %s\n%!" s (repr_to_string x) ;
+  ret unit
 
 let get_result : 'a repr t -> 'a Input.t =
  fun m ->

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,7 +32,17 @@
 (** Smart contract rollup node states. *)
 type t
 
-type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
+type mode =
+  | Batcher
+  | Custom
+  | Maintenance
+  | Observer
+  | Operator
+  | Accuser
+  | Bailout
+
+(** Returns the associated {!mode}, fails if the mode is not valid. *)
+val mode_of_string : string -> mode
 
 (** Create a smart contract rollup node.
 
@@ -60,7 +71,6 @@ type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
 
 *)
 val create :
-  protocol:Protocol.t ->
   ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
@@ -77,8 +87,29 @@ val create :
   Node.t ->
   t
 
+(** Do not assume we are running the rollup node against a local octez node. *)
+val create_with_endpoint :
+  ?runner:Runner.t ->
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  base_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?operators:(string * string) list ->
+  ?default_operator:string ->
+  ?dal_node:Dal_node.t ->
+  mode ->
+  Client.endpoint ->
+  t
+
 (** Get the name of an sc node. *)
 val name : t -> string
+
+(** Get the color of the logs of a smart rollup node. *)
+val color : t -> Log.Color.t
 
 (** Get the RPC host given as [--rpc-addr] to an sc node. *)
 val rpc_host : t -> string
@@ -105,18 +136,39 @@ val base_dir : t -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run ?event_level ?event_sections_levels ?loser_mode node rollup_address
-    arguments ] launches the given smart contract rollup node for the rollup at
-    [rollup_address] with the given extra arguments. [event_level] and
-    [event_sections_levels] allow to select which events we want the node to
+(** [run ?event_level ?event_sections_levels ?loser_mode ?wait_ready node
+    rollup_address arguments ] launches the given smart contract rollup node for
+    the rollup at [rollup_address] with the given extra arguments. [event_level]
+    and [event_sections_levels] allow to select which events we want the node to
     emit (see {!Daemon}). [legacy] (by default [false]) must be set if we want
     to use the legacy [run] command of the node (which requires a config file to
-    exist). *)
+    exist). If [wait_ready] is [false], tezt does not wait for the node to be
+    ready. If [restart] is [true], it will stop and restart the node if it is already
+    running. *)
 val run :
   ?legacy:bool ->
+  ?restart:bool ->
+  ?mode:mode ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?loser_mode:string ->
+  ?wait_ready:bool ->
+  t ->
+  string ->
+  string list ->
+  unit Lwt.t
+
+(** [run_sequencer ?event_level ?event_sections_levels ?wait_ready node
+    rollup_address arguments] launches the sequencer node for
+    the rollup at [rollup_address] with the given extra arguments.
+    [event_level] and [event_sections_levels] allow to select which events we
+    want the node to emit (see {!Daemon}).
+    If [wait_ready] is [false], tezt does not wait for the node to be
+    ready. *)
+val run_sequencer :
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?wait_ready:bool ->
   t ->
   string ->
   string list ->
@@ -189,6 +241,17 @@ val wait_for_ready : t -> unit Lwt.t
    If [timeout] is provided, stop waiting if [timeout] seconds have
    passed. *)
 val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
+
+(** Unbounded variant of {!wait_for_sync}. Do not use in a Tezt tests, as it
+    has been proven time and again that it is a source of waste of CI time when
+    a test is buggy or flaky.
+
+    This variant of {!wait_for_sync} should not be used in sandboxes, as it has
+    been witnessed time and time again that these tests are more subject to
+    race conditions when setting up rollup infrastructure. On open testnets
+    like mondaynet and dailynet, this does not happen because of the large
+    block time. *)
+val unsafe_wait_sync : ?timeout:float -> t -> int Lwt.t
 
 (** Wait until the layer 1 of the sc node is synchronized with its
     underlying l1 node. *)

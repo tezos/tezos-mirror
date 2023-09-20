@@ -1,0 +1,7 @@
+{0 Octez-protocol-002-PsYLVpVv-libs: octez protocol 002-PsYLVpVv libraries}
+
+This is a package containing some libraries related to the Tezos 002-PsYLVpVv protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_002_PsYLVpVv}Tezos_client_002_PsYLVpVv}: Protocol specific library for `tezos-client`

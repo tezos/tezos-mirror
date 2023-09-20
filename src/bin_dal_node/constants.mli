@@ -30,3 +30,6 @@ val shards_store_lru_size : int
 
 (** [committee_cache_size] is the size of the DAL committee cache. *)
 val committee_cache_size : int
+
+(** [shards_proofs_cache_size] is the size of the cache for shards proofs per slot. *)
+val shards_proofs_cache_size : int

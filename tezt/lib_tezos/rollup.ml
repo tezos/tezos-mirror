@@ -41,11 +41,8 @@ module Dal = struct
       let args = [(["dal_parametric"; "feature_enable"], `Bool true)] in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
 
-    let from_client client =
-      let* json =
-        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
-        |> Lwt.map (fun json -> JSON.(json |-> "dal_parametric"))
-      in
+    let from_protocol_parameters json =
+      let json = JSON.(json |-> "dal_parametric") in
       let number_of_shards = JSON.(json |-> "number_of_shards" |> as_int) in
       let redundancy_factor = JSON.(json |-> "redundancy_factor" |> as_int) in
       let slot_size = JSON.(json |-> "slot_size" |> as_int) in
@@ -57,40 +54,22 @@ module Dal = struct
       in
       let blocks_per_epoch = JSON.(json |-> "blocks_per_epoch" |> as_int) in
       let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
-      return
-        {
-          feature_enabled;
-          cryptobox =
-            Cryptobox.Verifier.
-              {number_of_shards; redundancy_factor; slot_size; page_size};
-          number_of_slots;
-          attestation_lag;
-          attestation_threshold;
-          blocks_per_epoch;
-        }
+      {
+        feature_enabled;
+        cryptobox =
+          Cryptobox.Verifier.
+            {number_of_shards; redundancy_factor; slot_size; page_size};
+        number_of_slots;
+        attestation_lag;
+        attestation_threshold;
+        blocks_per_epoch;
+      }
 
-    let cryptobox_config_to_json (t : Cryptobox.Config.t) =
-      let parameters =
-        match t.use_mock_srs_for_testing with
-        | Some parameters ->
-            `O
-              [
-                ("slot_size", `Float (float_of_int parameters.slot_size));
-                ("page_size", `Float (float_of_int parameters.page_size));
-                ( "redundancy_factor",
-                  `Float (float_of_int parameters.redundancy_factor) );
-                ( "number_of_shards",
-                  `Float (float_of_int parameters.number_of_shards) );
-              ]
-        | None -> `Null
+    let from_client client =
+      let* json =
+        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
       in
-      JSON.annotate
-        ~origin:"dal_initialisation"
-        (`O
-          [
-            ("activated", `Bool t.activated);
-            ("use_mock_srs_for_testing", parameters);
-          ])
+      from_protocol_parameters json |> return
   end
 
   let endpoint dal_node =
@@ -187,7 +166,11 @@ module Dal = struct
 
     type commitment = string
 
-    type profile = Attestor of string
+    type operator_profile = Attestor of string | Producer of int
+
+    type operator_profiles = operator_profile list
+
+    type profiles = Bootstrap | Operator of operator_profiles
 
     type slot_header = {
       slot_level : int;
@@ -264,21 +247,40 @@ module Dal = struct
         ]
         JSON.as_string
 
-    let json_of_profile = function
+    let json_of_operator_profile = function
       | Attestor pkh ->
           `O [("kind", `String "attestor"); ("public_key_hash", `String pkh)]
+      | Producer slot_index ->
+          `O
+            [
+              ("kind", `String "producer");
+              ("slot_index", `Float (float_of_int slot_index));
+            ]
+
+    let operator_profile_of_json json =
+      let open JSON in
+      match json |-> "kind" |> as_string with
+      | "attestor" -> Attestor (json |-> "public_key_hash" |> as_string)
+      | "producer" -> Producer (json |-> "slot_index" |> as_int)
+      | _ -> failwith "invalid case"
 
     let profiles_of_json json =
-      let json_field_value json ~field = JSON.(get field json |> as_string) in
-      JSON.as_list json
-      |> List.map (fun obj ->
-             match json_field_value ~field:"kind" obj with
-             | "attestor" ->
-                 Attestor (json_field_value ~field:"public_key_hash" obj)
-             | _ -> failwith "invalid case")
+      let open JSON in
+      match json |-> "kind" |> as_string with
+      | "bootstrap" -> Bootstrap
+      | "operator" ->
+          let operator_profiles =
+            List.map
+              operator_profile_of_json
+              (json |-> "operator_profiles" |> as_list)
+          in
+          Operator operator_profiles
+      | _ -> failwith "invalid case"
 
-    let patch_profile profile =
-      let data = Client.Data (json_of_profile profile) in
+    let patch_profiles profiles =
+      let data =
+        Client.Data (`A (List.map json_of_operator_profile profiles))
+      in
       make ~data PATCH ["profiles"] as_empty_object_or_fail
 
     let get_profiles () = make GET ["profiles"] profiles_of_json
@@ -383,16 +385,36 @@ module Dal = struct
   module Check = struct
     open RPC
 
-    type profiles = RPC.profile list
-
-    let profile_typ : profile Check.typ =
-      Check.equalable
-        (fun ppf (Attestor pkh) -> Format.fprintf ppf "(Attestor %s) " pkh)
-        (fun (RPC.Attestor att1) (RPC.Attestor att2) -> String.equal att1 att2)
-
     let profiles_typ : profiles Check.typ =
-      let open Check in
-      let sort = List.sort compare in
-      convert sort (list profile_typ)
+      let pp_operator_profile ppf = function
+        | Attestor pkh -> Format.fprintf ppf "Attestor %s" pkh
+        | Producer slot_index -> Format.fprintf ppf "Producer %d" slot_index
+      in
+      let equal_operator_profile op1 op2 =
+        match (op1, op2) with
+        | Attestor pkh1, Attestor pkh2 -> String.equal pkh1 pkh2
+        | Producer slot_index1, Producer slot_index2 ->
+            Int.equal slot_index1 slot_index2
+        | _, _ -> false
+      in
+      let pp ppf = function
+        | Bootstrap -> Format.fprintf ppf "Bootstrap"
+        | Operator operator_profiles ->
+            Format.fprintf
+              ppf
+              "Operator [%a]"
+              (Format.pp_print_list pp_operator_profile)
+              operator_profiles
+      in
+      let equal p1 p2 =
+        match (p1, p2) with
+        | Bootstrap, Bootstrap -> true
+        | Operator ops1, Operator ops2 ->
+            let ops1 = List.sort compare ops1 in
+            let ops2 = List.sort compare ops2 in
+            List.equal equal_operator_profile ops1 ops2
+        | _, _ -> false
+      in
+      Check.equalable pp equal
   end
 end

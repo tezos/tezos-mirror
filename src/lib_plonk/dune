@@ -3,14 +3,15 @@
 
 (library
  (name plonk)
- (public_name octez-plonk)
+ (public_name octez-libs.plonk)
  (instrumentation (backend bisect_ppx))
  (libraries
   repr
   hacl-star
   data-encoding
-  octez-bls12-381-polynomial
-  octez-plompiler)
+  octez-libs.bls12-381-polynomial
+  octez-libs.plompiler
+  str)
  (preprocess (pps ppx_repr))
  (flags
   (:standard)

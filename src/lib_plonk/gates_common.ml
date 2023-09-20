@@ -57,19 +57,16 @@ let get_buffers ~nb_buffers ~nb_ids =
   tmp_buffers := buffers ;
   (buffers, Array.init nb_ids (fun _ -> Evaluations.create size_eval))
 
-let get_answers ~q_label ~blinds ~prefix ~prefix_common answers : answers =
+let get_answers ?(gx = false) ~q_label ~prefix ~prefix_common answers : answers
+    =
   let dummy = Scalar.zero in
   let answer = get_answer answers in
   let answer_wire w =
     let w = wire_name w in
-    match SMap.find_opt w blinds with
-    | Some array ->
-        assert (Array.length array = 2) ;
-        let w' = prefix w in
-        let x = if array.(0) = 0 then dummy else answer X w' in
-        let gx = if array.(1) = 0 then dummy else answer GX w' in
-        (x, gx)
-    | None -> (dummy, dummy)
+    let w' = prefix w in
+    let x = answer X w' in
+    let gx = if gx then answer GX w' else dummy in
+    (x, gx)
   in
   let q = prefix_common q_label |> answer X in
   let wires, wires_g =
@@ -77,16 +74,9 @@ let get_answers ~q_label ~blinds ~prefix ~prefix_common answers : answers =
   in
   {q; wires; wires_g}
 
-let get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations =
-  let dummy = Evaluations.zero in
+let get_evaluations ~q_label ~prefix ~prefix_common evaluations =
   let find_wire w =
-    let w = wire_name w in
-    match SMap.find_opt w blinds with
-    | Some array ->
-        assert (Array.length array = 2) ;
-        if array.(0) = 0 && array.(1) = 0 then dummy
-        else Evaluations.find_evaluation evaluations (prefix w)
-    | None -> dummy
+    Evaluations.find_evaluation evaluations (prefix @@ wire_name w)
   in
   {
     q = Evaluations.find_evaluation evaluations (prefix_common q_label);
@@ -111,9 +101,6 @@ let map_singleton m =
 
 module type Base_sig = sig
   val q_label : string
-
-  (* array.(i) = 1 <=> f is evaluated at (g^i)X *)
-  val blinds : int array SMap.t
 
   val identity : string * int
 

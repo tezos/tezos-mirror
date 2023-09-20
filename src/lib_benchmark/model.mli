@@ -46,6 +46,12 @@ module type Model_impl = sig
 
   val name : Namespace.t
 
+  (** If [true], the generated function takes
+      [Saturation_repr.may_saturate Saturation_repr.t] as arguments
+      instead of [int]s. Otherwise, the generated function takes [int]s.
+  *)
+  val takes_saturation_reprs : bool
+
   module Def (X : Costlang.S) : sig
     type model_type
 
@@ -134,6 +140,11 @@ val get_free_variable_set_of_t : _ t -> Free_variable.Set.t
 val get_free_variable_set_applied :
   'workload t -> 'workload -> Free_variable.Set.t
 
+(** Set [takes_saturation_reprs] field of the model.
+    Raises [Invalid_arg _] when the model is [Aggregate _].
+*)
+val set_takes_saturation_reprs : bool -> 'a t -> 'a t
+
 (* -------------------------------------------------------------------------- *)
 (** Commonly used abstract models
     Except for [zero], they all require a unique name in {!Namespace.t}, and some
@@ -160,6 +171,14 @@ val affine :
   name:Namespace.t ->
   intercept:Free_variable.t ->
   coeff:Free_variable.t ->
+  (int * unit) model
+
+(** [fun n -> intercept + coeff × (n - offset)] *)
+val affine_offset :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  offset:int ->
   (int * unit) model
 
 (** [fun n -> coeff * n²] *)
@@ -201,6 +220,14 @@ val linear_min :
   name:Namespace.t ->
   intercept:Free_variable.t ->
   coeff:Free_variable.t ->
+  (int * (int * unit)) model
+
+(** fun a b -> intercept + coeff × (min(a,b) - offset) *)
+val linear_min_offset :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  offset:int ->
   (int * (int * unit)) model
 
 (** [fun a b -> intercept + coeff × (a×b)] *)
@@ -280,3 +307,34 @@ val breakdown2_const :
   break1:int ->
   break2:int ->
   (int * unit) model
+
+(** [breakdown2] with a non-zero value at 0 and offset *)
+val breakdown2_const_offset :
+  name:Namespace.t ->
+  coeff1:Free_variable.t ->
+  coeff2:Free_variable.t ->
+  coeff3:Free_variable.t ->
+  const:Free_variable.t ->
+  break1:int ->
+  break2:int ->
+  offset:int ->
+  (int * unit) model
+
+(* -------------------------------------------------------------------------- *)
+
+module type Binary_operation = sig
+  module Def (X : Costlang.S) : sig
+    val op : X.size X.repr -> X.size X.repr -> X.size X.repr
+  end
+end
+
+(** Synthesize two models of the same signature by the specified binary operation.
+*)
+val synthesize :
+  name:Namespace.t ->
+  binop:(module Binary_operation) ->
+  x_label:string ->
+  x_model:'a model ->
+  y_label:string ->
+  y_model:'a model ->
+  'a model

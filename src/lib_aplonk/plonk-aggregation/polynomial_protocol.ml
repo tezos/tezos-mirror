@@ -53,14 +53,15 @@ module type S = sig
 
   val update_transcript_with_formatted_answers :
     transcript ->
-    (Poly.scalar array -> Answers_commitment.t) SMap.t ->
-    Poly.scalar SMap.t SMap.t list ->
-    Poly.scalar list * Answers_commitment.t SMap.t * transcript
+    (Scalar.t SMap.t SMap.t list -> Answers_commitment.t) SMap.t ->
+    Scalar.t SMap.t SMap.t list ->
+    Scalar.t list * Answers_commitment.t SMap.t * transcript
 
   val prove_super_aggregation :
     prover_public_parameters ->
     transcript ->
-    commit_to_answers_map:(Scalar.t array -> Answers_commitment.t) SMap.t ->
+    commit_to_answers_map:
+      (Scalar.t SMap.t SMap.t list -> Answers_commitment.t) SMap.t ->
     n:int ->
     generator:Scalar.t ->
     secrets:(Poly.t SMap.t * PC.Commitment.prover_aux) list ->
@@ -136,18 +137,12 @@ struct
     in
     let t_answers = t_answers |> SMap.values |> List.concat_map SMap.values in
     let cms_answers =
-      let flatten_circuit_answers circuit_answers =
-        circuit_answers
-        |> List.concat_map SMap.values
-        |> List.concat_map SMap.values
-        |> Array.of_list
-      in
       SMap.mapi
         (fun circuit_name commit ->
           List.map
             (SMap.Aggregation.select_answers_by_circuit circuit_name)
             circuit_answers
-          |> flatten_circuit_answers |> commit)
+          |> commit)
         cm_to_answers_map
     in
     (* We treat t answers as Public inputs instead of through the

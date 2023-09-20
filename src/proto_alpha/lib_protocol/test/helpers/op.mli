@@ -51,17 +51,17 @@ val sign :
   packed_contents_list ->
   packed_operation
 
-(** Create an unpacked endorsement that is expected for given [Block.t].
+(** Create an unpacked attestation that is expected for given [Block.t].
 
-    Optional parameters allow to specify the endorsed values: [level],
+    Optional parameters allow to specify the attested values: [level],
     [round] and/or [block_payload_hash].
 
-    They also allow to specify the endorser ([delegate]), and/or the
+    They also allow to specify the attester ([delegate]), and/or the
     [slot]. These default to the first slot and its delegate.
 
     Finally, the operation [branch] can be specified. It defaults to the
-    predecessor of the endorsed block. *)
-val raw_endorsement :
+    predecessor of the attested block. *)
+val raw_attestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -69,13 +69,13 @@ val raw_endorsement :
   ?block_payload_hash:Block_payload_hash.t ->
   ?branch:Block_hash.t ->
   Block.t ->
-  Kind.endorsement Operation.t tzresult Lwt.t
+  Kind.attestation Operation.t tzresult Lwt.t
 
-(** Create an unpacked preendorsement that is expected for a given
+(** Create an unpacked preattestation that is expected for a given
     [Block.t].
 
-    Optional parameters are the same than {!raw_endorsement}. *)
-val raw_preendorsement :
+    Optional parameters are the same than {!raw_attestation}. *)
+val raw_preattestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -83,11 +83,11 @@ val raw_preendorsement :
   ?block_payload_hash:Block_payload_hash.t ->
   ?branch:Block_hash.t ->
   Block.t ->
-  Kind.preendorsement Operation.t tzresult Lwt.t
+  Kind.preattestation Operation.t tzresult Lwt.t
 
-(** Create a packed endorsement that is expected for a given
-    [Block.t] by packing the result of {!raw_endorsement}. *)
-val endorsement :
+(** Create a packed attestation that is expected for a given
+    [Block.t] by packing the result of {!raw_attestation}. *)
+val attestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -97,9 +97,9 @@ val endorsement :
   Block.t ->
   Operation.packed tzresult Lwt.t
 
-(** Create a packed preendorsement that is expected for a given
-    [Block.t] by packing the result of {!raw_preendorsement}. *)
-val preendorsement :
+(** Create a packed preattestation that is expected for a given
+    [Block.t] by packing the result of {!raw_preattestation}. *)
+val preattestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -172,17 +172,6 @@ val delegation :
   Context.t ->
   Contract.t ->
   public_key_hash option ->
-  Operation.packed tzresult Lwt.t
-
-val set_deposits_limit :
-  ?force_reveal:bool ->
-  ?fee:Tez.tez ->
-  ?gas_limit:gas_limit ->
-  ?storage_limit:Z.t ->
-  ?counter:Manager_counter.t ->
-  Context.t ->
-  Contract.t ->
-  Tez.tez option ->
   Operation.packed tzresult Lwt.t
 
 val increase_paid_storage :
@@ -284,16 +273,16 @@ val register_global_constant :
   value:Protocol.Alpha_context.Script.lazy_expr ->
   (Protocol.operation, tztrace) result Lwt.t
 
-val double_endorsement :
+val double_attestation :
   Context.t ->
-  Kind.endorsement Operation.t ->
-  Kind.endorsement Operation.t ->
+  Kind.attestation Operation.t ->
+  Kind.attestation Operation.t ->
   Operation.packed
 
-val double_preendorsement :
+val double_preattestation :
   Context.t ->
-  Kind.preendorsement Operation.t ->
-  Kind.preendorsement Operation.t ->
+  Kind.preattestation Operation.t ->
+  Kind.preattestation Operation.t ->
   Operation.packed
 
 val double_baking :
@@ -447,7 +436,7 @@ val sc_rollup_origination :
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
-  origination_proof:Sc_rollup.Proof.serialized ->
+  ?whitelist:Sc_rollup.Whitelist.t ->
   Context.t ->
   Contract.t ->
   Sc_rollup.Kind.t ->
@@ -476,8 +465,7 @@ val sc_rollup_publish :
   Sc_rollup.Commitment.t ->
   Operation.packed tzresult Lwt.t
 
-(** [sc_rollup_cement ctxt source rollup commitment] tries to cement
-    the specified commitment.
+(** [sc_rollup_cement ctxt source rollup] tries to cement a commitment.
 
     Optional arguments allow to override defaults:
 
@@ -493,7 +481,6 @@ val sc_rollup_cement :
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
-  Sc_rollup.Commitment.Hash.t ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_execute_outbox_message :

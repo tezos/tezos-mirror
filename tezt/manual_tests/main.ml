@@ -28,7 +28,6 @@
    as functions to be called here. *)
 
 let () =
-  Migration.register () ;
   Stresstest_command.register ~protocols:Protocol.all ;
   Dal.register [Alpha] ;
   Baker_test.register ~protocols:Protocol.all ;

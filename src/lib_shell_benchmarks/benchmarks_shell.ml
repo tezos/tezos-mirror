@@ -24,11 +24,30 @@
 (*****************************************************************************)
 
 module Registration = struct
-  let register (module B : Benchmark.S) =
-    let module Bench = struct
-      include B
+  let adjust_tags tags = "shell" :: tags
 
-      let tags = "shell" :: B.tags
+  let register ?add_timer ((module Bench) : Benchmark.t) =
+    let module B : Benchmark.S = struct
+      include Bench
+
+      let tags = adjust_tags tags
     end in
-    Registration.register (module Bench)
+    Registration.register ?add_timer (module B)
+
+  let register_simple ?add_timer (module Bench : Benchmark.Simple) =
+    let module B = struct
+      include Bench
+
+      let tags = adjust_tags tags
+    end in
+    Registration.register_simple ?add_timer (module B)
+
+  let register_simple_with_num ?add_timer
+      (module Bench : Benchmark.Simple_with_num) =
+    let module B = struct
+      include Bench
+
+      let tags = adjust_tags tags
+    end in
+    Registration.register_simple_with_num ?add_timer (module B)
 end

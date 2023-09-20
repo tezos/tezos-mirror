@@ -41,6 +41,18 @@ module Network : sig
       unit,
       User_activated.protocol_overrides )
     Tezos_rpc.Service.t
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5926
+
+     Consider exposing the whole network record via `config/network`
+     instead of exposing each field separately. Note that the
+     [Config_file.blockchain_network] lives in [lib_node_config], which isn't js_combatible,
+     so we can't reference it in [lib_shell_services], which is js_compatible.
+     Hence to do this we would need to extract [Config_file.blockchain_network] into a
+     separate directory, as done for [lib_dal_config]. *)
+
+  val dal_config :
+    ([`GET], unit, unit, unit, unit, Dal_config.t) Tezos_rpc.Service.t
 end
 
 val history_mode :
@@ -66,3 +78,5 @@ end
 
 val user_activated_upgrades :
   #Tezos_rpc.Context.simple -> User_activated.upgrades tzresult Lwt.t
+
+val dal_config : #Tezos_rpc.Context.simple -> Dal_config.t tzresult Lwt.t

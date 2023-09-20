@@ -7,11 +7,11 @@
  (libraries
   tezt.core
   octez-alcotezt
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-micheline
-  tezos-crypto
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-libs.micheline
+  octez-libs.crypto
   tezos-benchmark
   tezos-benchmark-examples)
  (library_flags (:standard -linkall))
@@ -25,6 +25,7 @@
   test
   test_sparse_vec
   test_costlang
+  test_model
   test_probe
   test_measure
   test_benchmark_helpers))

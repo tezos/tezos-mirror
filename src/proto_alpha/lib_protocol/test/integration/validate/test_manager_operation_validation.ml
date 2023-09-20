@@ -501,11 +501,6 @@ let flag_expect_failure flags errs =
   ]
     when flags.scoru = false ->
       return_unit
-  | [
-   Environment.Ecoproto_error Validate_errors.Manager.Tx_rollup_feature_disabled;
-  ]
-    when flags.toru = false ->
-      return_unit
   | [Environment.Ecoproto_error Dal_errors.Dal_feature_disabled]
     when flags.dal = false ->
       return_unit

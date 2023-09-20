@@ -1,0 +1,7 @@
+instructions:
+  - move:
+      from: /move/path/from
+      to: /move/path/to
+
+  - reveal: aea02c32324433
+    to: /path/reveal/to

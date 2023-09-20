@@ -23,18 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines a description format and interpretation of the programs
+    needed to populate the PlonK witness for a Plompiler circuit given the
+    initial inputs. *)
+
 open Lang_core
 module CS = Csir.CS
 open Linear_algebra.Make_VectorSpace(S)
 module Tables = Csir.Tables
 
+(** Index of a wire  *)
 type wire = W of int [@@ocaml.unboxed]
 
+(** Index of a row  *)
 type row = R of int [@@ocaml.unboxed]
 
+(** Input/output tag for generic lookups. *)
 type 'a tagged = Input of 'a | Output of 'a
 
+(** [untag t] unwraps a tagged value. *)
 val untag : 'a tagged -> 'a
+
+(** Descriptors for core gates. *)
 
 type arith_desc = {
   wires : row array;
@@ -81,6 +91,14 @@ type ed_cond_desc = {
 
 type bits_desc = {nb_bits : int; shift : Z.t; l : int; bits : int list}
 
+type limbs_desc = {
+  total_nb_bits : int;
+  nb_bits : int;
+  shift : Z.t;
+  l : int;
+  limbs : int list;
+}
+
 type pos128full_desc = {
   x0 : int;
   y0 : int;
@@ -89,7 +107,7 @@ type pos128full_desc = {
   x2 : int;
   y2 : int;
   k : S.t array;
-  variant : Variants.t;
+  matrix : matrix;
 }
 
 type pos128partial_desc = {
@@ -106,7 +124,7 @@ type pos128partial_desc = {
   x2 : int;
   y2 : int;
   k_cols : matrix array;
-  variant : Variants.t;
+  matrix : matrix;
 }
 
 type anemoi_desc = {
@@ -147,6 +165,40 @@ type anemoi_custom_desc = {
   ky2 : S.t;
 }
 
+(** See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
+type mod_arith_desc = {
+  (* parameters *)
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  moduli : Z.t list;
+  qm_bound : Z.t * Z.t;
+  ts_bounds : (Z.t * Z.t) list;
+  (* specifies if we are doing the inverse operation, i.e. sub instead of add
+     or div instead of mul *)
+  inverse : bool;
+  (* variables *)
+  inp1 : int list;
+  inp2 : int list;
+  out : int list;
+  qm : int;
+  ts : int list;
+}
+
+(** See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
+type mod_arith_is_zero_desc = {
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  inp : int list;
+  aux : int list;
+  out : int;
+}
+[@@deriving repr]
+
+(** Solver description language.
+    Each core gate has a descriptor holding the data needed to compute
+    the part of the trace it determines. *)
 type solver_desc =
   | Arith of arith_desc
   | Pow5 of pow5_desc
@@ -159,20 +211,32 @@ type solver_desc =
   | Swap of swap_desc
   | Skip
   | BitsOfS of bits_desc
+  | LimbsOfS of limbs_desc
   | Poseidon128Full of pos128full_desc
   | Poseidon128Partial of pos128partial_desc
   | AnemoiRound of anemoi_desc
   | AnemoiDoubleRound of anemoi_double_desc
   | AnemoiCustom of anemoi_custom_desc
+  | Mod_Add of mod_arith_desc
+  | Mod_Mul of mod_arith_desc
+  | Mod_IsZero of mod_arith_is_zero_desc
   | Updater of Optimizer.trace_info
 
+(** Collection of solver descriptors for a circuit. *)
 type solvers
 
+(** A solver is formed by solver descriptors together with meta-data
+    about the size of the initial inputs and final size of the witness.
+*)
 type t = {solvers : solvers; initial_size : int; final_size : int}
 [@@deriving repr]
 
+(** Empty solver. *)
 val empty_solver : t
 
+(** [append_solver sd s] sdds a solver descriptor [sd] to a solver [s]. *)
 val append_solver : solver_desc -> t -> t
 
+(** [solve s inital] computes the witness using solver [s] and
+    the [initial] inputs. *)
 val solve : t -> S.t array -> S.t array

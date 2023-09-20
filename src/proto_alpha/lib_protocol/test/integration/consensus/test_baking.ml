@@ -175,13 +175,13 @@ let get_contract_for_pkh contracts pkh =
   find_contract contracts
 
 (** Test that
-    - the block producer gets the bonus for including the endorsements;
+    - the block producer gets the bonus for including the attestations;
     - the payload producer gets the baking reward.
 
     The test checks this in two scenarios, in the first one the payload producer
     and the block producer are the same delegate, in the second one they are
     different. The first scenario is checked by first baking block [b1] and then
-    block [b2] at round 0 containing a number of endorsements for [b1] and the
+    block [b2] at round 0 containing a number of attestations for [b1] and the
     checking the balance of [b2]'s baker. For the second scenario another block
     [b2'] is build on top of [b1] by a different baker, using the same payload as
     [b2].  *)
@@ -190,38 +190,39 @@ let test_rewards_block_and_payload_producer () =
   Context.get_baker (B genesis) ~round:Round.zero >>=? fun baker_b1 ->
   get_contract_for_pkh contracts baker_b1 >>=? fun baker_b1_contract ->
   Block.bake ~policy:(By_round 0) genesis >>=? fun b1 ->
-  Context.get_endorsers (B b1) >>=? fun endorsers ->
+  Context.get_attesters (B b1) >>=? fun attesters ->
   List.map_es
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-    endorsers
-  >>=? fun endorsers ->
-  (* We let just a part of the endorsers vote; we assume here that 5 of 10
-     endorsers will have together at least one slot (to pass the threshold), but
+    attesters
+  >>=? fun attesters ->
+  (* We let just a part of the attesters vote; we assume here that 5 of 10
+     attesters will have together at least one slot (to pass the threshold), but
      not all slots (to make the test more interesting, otherwise we know the
-     total endorsing power). *)
-  let endorsers = List.take_n 5 endorsers in
+     total attesting power). *)
+  let attesters = List.take_n 5 attesters in
   List.map_ep
-    (fun (endorser, _slots) -> Op.endorsement ~delegate:endorser b1)
-    endorsers
-  >>=? fun endos ->
-  let endorsing_power =
+    (fun (attester, _slots) -> Op.attestation ~delegate:attester b1)
+    attesters
+  >>=? fun attestations ->
+  let attesting_power =
     List.fold_left
       (fun acc (_pkh, slots) -> acc + List.length slots)
       0
-      endorsers
+      attesters
   in
   let fee = Tez.one in
   Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.one
   >>=? fun tx ->
-  Block.bake ~policy:(By_round 0) ~operations:(endos @ [tx]) b1 >>=? fun b2 ->
+  Block.bake ~policy:(By_round 0) ~operations:(attestations @ [tx]) b1
+  >>=? fun b2 ->
   Context.get_baker (B b1) ~round:Round.zero >>=? fun baker_b2 ->
   get_contract_for_pkh contracts baker_b2 >>=? fun baker_b2_contract ->
   Context.Contract.balance (B b2) baker_b2_contract >>=? fun bal ->
   Context.Delegate.current_frozen_deposits (B b2) baker_b2
   >>=? fun frozen_deposit ->
   Context.get_baking_reward_fixed_portion (B b2) >>=? fun baking_reward ->
-  Context.get_bonus_reward (B b2) ~endorsing_power >>=? fun bonus_reward ->
+  Context.get_bonus_reward (B b2) ~attesting_power >>=? fun bonus_reward ->
   (if Signature.Public_key_hash.equal baker_b2 baker_b1 then
    Context.get_baking_reward_fixed_portion (B b1)
   else return Tez.zero)
@@ -239,16 +240,16 @@ let test_rewards_block_and_payload_producer () =
      correspond to a slot of [baker_b2] and it includes the PQC for [b2]. We
      check that the fixed baking reward goes to the payload producer [baker_b2],
      while the bonus goes to the the block producer (aka baker) [baker_b2']. *)
-  Context.get_endorsers (B b2) >>=? fun endorsers ->
+  Context.get_attesters (B b2) >>=? fun attesters ->
   List.map_es
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-    endorsers
-  >>=? fun preendorsers ->
+    attesters
+  >>=? fun preattesters ->
   List.map_ep
-    (fun (endorser, _slots) -> Op.preendorsement ~delegate:endorser b2)
-    preendorsers
-  >>=? fun preendos ->
+    (fun (attester, _slots) -> Op.preattestation ~delegate:attester b2)
+    preattesters
+  >>=? fun preattestations ->
   Context.get_baker (B b1) ~round:Round.zero >>=? fun baker_b2 ->
   Context.get_bakers (B b1) >>=? fun bakers ->
   let baker_b2' = Context.get_first_different_baker baker_b2 bakers in
@@ -256,7 +257,7 @@ let test_rewards_block_and_payload_producer () =
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker_b2')
-    ~operations:(preendos @ endos @ [tx])
+    ~operations:(preattestations @ attestations @ [tx])
     b1
   >>=? fun b2' ->
   (* [baker_b2], as payload producer, gets the block reward and the fees *)
@@ -274,7 +275,7 @@ let test_rewards_block_and_payload_producer () =
   in
   Assert.equal_tez ~loc:__LOC__ bal expected_balance >>=? fun () ->
   (* [baker_b2'] gets the bonus because he is the one who included the
-     endorsements *)
+     attestations *)
   get_contract_for_pkh contracts baker_b2' >>=? fun baker_b2'_contract ->
   Context.Contract.balance (B b2') baker_b2'_contract >>=? fun bal' ->
   Context.Delegate.current_frozen_deposits (B b2') baker_b2'
@@ -311,8 +312,8 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
     ()
   >>=? fun (b0, (account1, _account2)) ->
   let pkh1 = Context.Contract.pkh account1 in
-  Context.get_constants (B b0)
-  >>=? fun Constants.{parametric = {baking_reward_fixed_portion; _}; _} ->
+  Context.get_baking_reward_fixed_portion (B b0)
+  >>=? fun baking_reward_fixed_portion ->
   Block.bake ~policy:(By_account pkh1) b0 >>= fun b1 ->
   if has_active_stake then
     b1 >>?= fun b1 ->

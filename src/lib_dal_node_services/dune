@@ -6,9 +6,9 @@
  (public_name tezos-dal-node-services)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-rpc
-  tezos-crypto-dal)
+  octez-libs.base
+  octez-libs.rpc
+  octez-libs.crypto-dal)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

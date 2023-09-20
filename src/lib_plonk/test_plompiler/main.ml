@@ -31,19 +31,25 @@ let () =
           Alcotest.run
             "Plompiler"
             [
+              ("Utils", Test_utils.tests);
               ("Core", Test_core.tests);
               ("Blake", Test_blake.tests);
               ("Poseidon", Test_poseidon.tests);
+              ("Sha2", Test_sha2.tests);
               ("Anemoi", Test_anemoi.tests);
               ("Enum", Test_enum.tests);
               ("Schnorr", Test_schnorr.tests);
+              ("Ed25519", Test_ed25519.tests);
+              ("Edwards25519", Test_edwards25519.tests);
               ("Merkle", Test_merkle.tests);
               ("Merkle N-arity: Plonk integration", Test_merkle_narity.tests);
+              ("ModularArith", Test_mod_arith.tests);
               ("Edwards", Test_edwards.tests);
               ("Weierstrass", Test_weierstrass.tests);
               ("Serialization", Test_serialization.tests);
               ("Lookups", Test_lookup.tests);
               ("InputCom", Test_input_com.tests);
+              ("Range-checks", Test_range_checks.tests);
               ("Linear algebra", Test_linear_algebra.tests);
               ("Bench", Benchmark.bench);
               ("Bench Poseidon", Bench_poseidon.bench);

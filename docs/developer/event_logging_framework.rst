@@ -34,7 +34,7 @@ See for instance
    ``val Simple.emit: 'a Simple.t -> 'a -> (unit, trace) result Lwt.t``.
 
 Please read the guidelines that are documented in
-`the Internal_event.Simple module. <../api/odoc/_html/tezos-event-logging/Tezos_event_logging/Internal_event/Simple/index.html>`__
+`the Internal_event.Simple module. <../api/odoc/_html/octez-libs/Event_logging/Internal_event/Simple/index.html>`__
 
 
 “Heavy” Events
@@ -66,4 +66,4 @@ See for instance:
 -  The (simplest) module ``Lwt_log_sink``:
    :src:`src/lib_event_logging/internal_event.ml`,
 -  or, the much more complex,
-   :src:`src/lib_stdlib_unix/file_descriptor_sink.ml`.
+   :src:`src/lib_base/unix/file_descriptor_sink.ml`.

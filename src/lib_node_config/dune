@@ -6,15 +6,15 @@
  (public_name octez-node-config)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-shell-services
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-context
-  tezos-store
-  tezos-validation)
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-shell-libs.shell-services
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-libs.tezos-context
+  octez-shell-libs.store
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

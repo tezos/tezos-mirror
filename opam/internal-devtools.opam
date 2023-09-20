@@ -13,7 +13,7 @@ depends: [
   "num"
   "re" { >= "1.9.0" }
   "octez-protocol-compiler"
-  "tezos-base"
+  "octez-libs"
 ]
 depopts: [
   "utop"
@@ -22,7 +22,7 @@ conflicts: [
   "utop" { < "2.8" }
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

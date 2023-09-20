@@ -1,0 +1,7 @@
+{0 Octez-protocol-001-PtCJ7pwo-libs: octez protocol 001-PtCJ7pwo libraries}
+
+This is a package containing some libraries related to the Tezos 001-PtCJ7pwo protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_001_PtCJ7pwo}Tezos_client_001_PtCJ7pwo}: Protocol specific library for `tezos-client`

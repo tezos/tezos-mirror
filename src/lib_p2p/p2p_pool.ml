@@ -52,11 +52,14 @@ type config = {
   ip_greylist_cleanup_delay : Time.System.Span.t;
 }
 
+module Point_LRU_set : Aches.Vache.SET with type elt = P2p_point.Id.t =
+  Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (P2p_point.Id)
+
 type ('msg, 'peer, 'conn) t = {
   config : config;
   peer_meta_config : 'peer P2p_params.peer_meta_config;
   (* Set of points corresponding to this peer *)
-  my_id_points : unit P2p_point.Table.t;
+  my_id_points : Point_LRU_set.t;
   known_peer_ids :
     (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t
     P2p_peer.Table.t;
@@ -167,7 +170,7 @@ let register_point ?trusted ?expected_peer_id pool ((addr, port) as point) =
 let unregister_point pool point = P2p_point.Table.remove pool.known_points point
 
 let register_new_point ?trusted t point =
-  if not (P2p_point.Table.mem t.my_id_points point) then
+  if not (Point_LRU_set.mem t.my_id_points point) then
     Some (register_point ?trusted t point)
   else None
 
@@ -513,7 +516,7 @@ let create config peer_meta_config triggers ~log =
     {
       config;
       peer_meta_config;
-      my_id_points = P2p_point.Table.create ~random:true 7;
+      my_id_points = Point_LRU_set.create 7;
       known_peer_ids = P2p_peer.Table.create ~random:true 53;
       connected_peer_ids = P2p_peer.Table.create ~random:true 53;
       known_points = P2p_point.Table.create ~random:true 53;
@@ -590,7 +593,7 @@ let destroy pool =
   tear_down_connections pool
 
 let add_to_id_points t point =
-  P2p_point.Table.add t.my_id_points point () ;
+  Point_LRU_set.add t.my_id_points point ;
   P2p_point.Table.remove t.known_points point
 
 (* [sample best other points] return a list of elements selected in [points].
@@ -714,7 +717,7 @@ module Internal_for_tests = struct
     {
       config;
       peer_meta_config;
-      my_id_points = P2p_point.Table.create ~random:true 7;
+      my_id_points = Point_LRU_set.create 7;
       known_peer_ids = P2p_peer.Table.create ~random:true 53;
       connected_peer_ids = P2p_peer.Table.create ~random:true 53;
       known_points = P2p_point.Table.create ~random:true 53;

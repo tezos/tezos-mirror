@@ -3,14 +3,14 @@
 
 (library
  (name tezos_webassembly_interpreter)
- (public_name tezos-webassembly-interpreter)
+ (public_name octez-l2-libs.webassembly-interpreter)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-lwt-result-stdlib
-  tezos-stdlib
-  tezos-error-monad
+  octez-libs.lwt-result-stdlib
+  octez-libs.stdlib
+  octez-libs.error-monad
   zarith
-  tezos-lazy-containers)
+  octez-libs.lazy-containers)
  (preprocess (pps ppx_deriving.show))
  (flags
   (:standard)

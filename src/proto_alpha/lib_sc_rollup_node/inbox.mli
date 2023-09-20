@@ -44,21 +44,21 @@ val process_head :
   Node_context.rw ->
   predecessor:Layer1.header ->
   Layer1.header ->
-  (Sc_rollup.Inbox.Hash.t
-  * Sc_rollup.Inbox.t
-  * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-  * Sc_rollup.Inbox_message.t list)
+  (Octez_smart_rollup.Inbox.Hash.t
+  * Octez_smart_rollup.Inbox.t
+  * Merkelized_payload_hashes_hash.t
+  * string list)
   tzresult
   Lwt.t
 
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
 
-(** [add_messages ~is_migration_block ~predecessor_timestamp
+(** [add_messages ~is_first_block ~predecessor_timestamp
     ~predecessor inbox messages] adds [messages] to the [inbox] using
-    {!Inbox.add_all_messages}. *)
+    {!Sc_rollup.Inbox.add_all_messages}. *)
 val add_messages :
-  is_migration_block:bool ->
+  is_first_block:bool ->
   predecessor_timestamp:Timestamp.time ->
   predecessor:Block_hash.t ->
   Inbox.t ->
@@ -70,31 +70,43 @@ val add_messages :
   tzresult
   Lwt.t
 
-(** [payloads_history_of_messages ~is_migration_block ~predecessor
+(** [payloads_history_of_messages ~is_first_block ~predecessor
     ~predecessor_timestamp messages] builds the payloads history for
     the list of [messages]. This allows to not store payloads
     histories (which contain merkelized skip lists) but simply
     messages. *)
 val payloads_history_of_messages :
-  is_migration_block:bool ->
+  is_first_block:bool ->
   predecessor:Block_hash.t ->
   predecessor_timestamp:Timestamp.time ->
-  Sc_rollup.Inbox_message.t list ->
+  string list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
+
+(** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
+    node agrees with the L1 node that inbox for [block] is [node_inbox]. *)
+val same_as_layer_1 :
+  _ Node_context.t ->
+  Block_hash.t ->
+  Octez_smart_rollup.Inbox.t ->
+  unit tzresult Lwt.t
+
+(** Serialize an external messages to the protocol representation. NOTE: this
+    adds a tag ['\001'] at the beginning. *)
+val serialize_external_message : string -> string tzresult
 
 (**/**)
 
 module Internal_for_tests : sig
   val process_messages :
     Node_context.rw ->
-    is_migration_block:bool ->
+    is_first_block:bool ->
     predecessor:Layer1.header ->
-    level:int32 ->
-    Sc_rollup.Inbox_message.t list ->
-    (Sc_rollup.Inbox.Hash.t
-    * Sc_rollup.Inbox.t
-    * Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-    * Sc_rollup.Inbox_message.t list)
+    Layer1.header ->
+    string list ->
+    (Octez_smart_rollup.Inbox.Hash.t
+    * Octez_smart_rollup.Inbox.t
+    * Merkelized_payload_hashes_hash.t
+    * string list)
     tzresult
     Lwt.t
 end

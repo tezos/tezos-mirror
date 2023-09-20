@@ -25,7 +25,7 @@
 
 module type S = sig
   (** Plonk Main Protocol *)
-  module MP : Plonk_for_distribution.Main_protocol.S
+  module MP : Distribution.Main_protocol.S
 
   (** Type witness for a protocol step. *)
   type 'a step =
@@ -95,5 +95,5 @@ module type S = sig
   val string_of_message : t -> string
 end
 
-module Make : functor (MP : Plonk_for_distribution.Main_protocol.S) ->
+module Make : functor (MP : Distribution.Main_protocol.S) ->
   S with module MP = MP

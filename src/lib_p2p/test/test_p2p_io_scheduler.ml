@@ -32,28 +32,22 @@
     Subject:      On I/O scheduling of client-server connections.
 *)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "test-p2p-io-scheduler"
-end)
-
 exception Error of error list
 
 let rec listen ?port addr =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let tentative_port = match port with None -> 0 | Some port -> port in
-  let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-  let main_socket = Lwt_unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0) in
-  Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
-  Lwt.catch
-    (fun () ->
-      let* () = Lwt_unix.bind main_socket (ADDR_INET (uaddr, tentative_port)) in
-      Lwt_unix.listen main_socket 50 ;
-      return (main_socket, tentative_port))
-    (function
-      | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
-        when port = None ->
-          listen addr
-      | exn -> Lwt.fail exn)
+  let*! sock =
+    P2p_fd.create_listening_socket ~backlog:50 ~addr tentative_port
+  in
+  match sock with
+  | Ok sock -> return (sock, tentative_port)
+  | Error
+      (P2p_fd.Failed_to_open_listening_socket
+         {reason = Unix.EADDRINUSE | Unix.EADDRNOTAVAIL; _}
+      :: _) ->
+      listen ?port addr
+  | Error err -> Lwt.return_error err
 
 let accept main_socket =
   let open Lwt_syntax in
@@ -73,7 +67,7 @@ let rec accept_n main_socket n =
 
 let connect addr port =
   let open Lwt_syntax in
-  let* fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
+  let* fd = P2p_fd.socket () in
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   let* r = P2p_fd.connect fd uaddr in
   match r with
@@ -122,10 +116,10 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
       ()
   in
   Moving_average.on_update (P2p_io_scheduler.ma_state sched) (fun () ->
-      debug "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      Tezt.Log.debug "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       if display_client_stat then
         P2p_io_scheduler.iter_connection sched (fun conn ->
-            debug
+            Tezt.Log.debug
               " client(%d) %a"
               (P2p_io_scheduler.id conn)
               P2p_stat.pp
@@ -137,7 +131,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   let* r = List.iter_ep P2p_io_scheduler.close conns in
   match r with
   | Ok () ->
-      debug "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      Tezt.Log.debug "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       return_ok ()
   | Error _ -> Lwt.fail Alcotest.Test_error
 
@@ -186,7 +180,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   | Error err -> Lwt.fail (Error err)
   | Ok () ->
       let stat = P2p_io_scheduler.stat conn in
-      let* () = lwt_debug "Client OK %a" P2p_stat.pp stat in
+      Tezt.Log.debug "Client OK %a" P2p_stat.pp stat ;
       return_ok ()
 
 (** Listens to address [addr] on port [port] to open a socket [main_socket].
@@ -195,25 +189,20 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
 *)
 let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
-  let open Lwt_syntax in
-  let* () = Tezos_base_unix.Internal_event_unix.init () in
+  let open Lwt_result_syntax in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let* main_socket, port = listen ?port addr in
   let* server_node =
-    let* r =
-      Process.detach
-        ~prefix:"server: "
-        (fun (_ : (unit, unit) Process.Channel.t) ->
-          server
-            ?display_client_stat
-            ?max_download_speed
-            ~read_buffer_size
-            ?read_queue_size
-            main_socket
-            n)
-    in
-    match r with
-    | Error err -> Lwt.fail (Error err)
-    | Ok node -> Lwt.return node
+    Process.detach
+      ~prefix:"server: "
+      (fun (_ : (unit, unit) Process.Channel.t) ->
+        server
+          ?display_client_stat
+          ?max_download_speed
+          ~read_buffer_size
+          ?read_queue_size
+          main_socket
+          n)
   in
 
   let client n =
@@ -221,7 +210,9 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
     Process.detach ~prefix (fun (_ : (unit, unit) Process.Channel.t) ->
         let* () =
           Lwt.catch
-            (fun () -> Lwt_unix.close main_socket)
+            (fun () ->
+              let*! () = Lwt_unix.close main_socket in
+              return_unit)
             (function
               (* the connection was already closed *)
               | Unix.Unix_error (EBADF, _, _) -> return_unit
@@ -229,10 +220,8 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
         in
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  let* r = List.map_es client (1 -- n) in
-  match r with
-  | Error err -> Lwt.fail (Error err)
-  | Ok client_nodes -> Process.wait_all (server_node :: client_nodes)
+  let* client_nodes = List.map_es client (1 -- n) in
+  Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()
 

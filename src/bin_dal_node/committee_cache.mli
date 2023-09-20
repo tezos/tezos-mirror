@@ -30,22 +30,19 @@ type t
 (** Represents shard indexes from [start_index] to [start_index + offset - 1]. *)
 type shard_indices = {start_index : int; offset : int}
 
+(** Represents the committee for a given level, 
+    as a mapping from an attestor to its assigned shard indexes. *)
+type committee = shard_indices Tezos_crypto.Signature.Public_key_hash.Map.t
+
 (** [create ~max_size] returns an empty cache. If the cache size exceeds [max_size],
     committees of old [level]s are removed in FIFO order. *)
 val create : max_size:int -> t
 
-(** [find t ~level] returns shard indexes that is assigned to the at level [level].
+(** [find t ~level] returns the {!committee} at [level].
     When the committee for block level [level] is not stored in the cache it returns [None]. *)
-val find :
-  t ->
-  level:int32 ->
-  shard_indices Tezos_crypto.Signature.Public_key_hash.Map.t option
+val find : t -> level:int32 -> committee option
 
 (** [add t ~level ~committee] adds the committee [committee] for level [level].
     If the committee for [level] already exists in the cache, it is removed and
     replaced by the given [committee]. *)
-val add :
-  t ->
-  level:int32 ->
-  committee:shard_indices Tezos_crypto.Signature.Public_key_hash.Map.t ->
-  unit
+val add : t -> level:int32 -> committee:committee -> unit

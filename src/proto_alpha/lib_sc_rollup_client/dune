@@ -6,14 +6,15 @@
  (package octez-smart-rollup-client-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-alpha
-  tezos-client-commands
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-client-alpha
-  tezos-smart-rollup-alpha
-  tezos-smart-rollup-layer2-alpha)
+  octez-libs.base
+  tezos-protocol-alpha.protocol
+  octez-shell-libs.client-commands
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-protocol-alpha-libs.client
+  octez-l2-libs.smart-rollup
+  octez-protocol-alpha-libs.smart-rollup
+  octez-protocol-alpha-libs.smart-rollup-layer2)
  (flags
   (:standard)
   -open Tezos_base
@@ -24,5 +25,6 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_alpha
+  -open Octez_smart_rollup
   -open Tezos_smart_rollup_alpha
   -open Tezos_smart_rollup_layer2_alpha))

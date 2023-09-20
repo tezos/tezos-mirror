@@ -27,17 +27,17 @@
 (* Tezos Protocol Implementation - Low level Repr. of Operations *)
 
 module Kind = struct
-  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+  type preattestation_consensus_kind = Preattestation_consensus_kind
 
-  type endorsement_consensus_kind = Endorsement_consensus_kind
+  type attestation_consensus_kind = Attestation_consensus_kind
 
   type 'a consensus =
-    | Preendorsement_kind : preendorsement_consensus_kind consensus
-    | Endorsement_kind : endorsement_consensus_kind consensus
+    | Preattestation_kind : preattestation_consensus_kind consensus
+    | Attestation_kind : attestation_consensus_kind consensus
 
-  type preendorsement = preendorsement_consensus_kind consensus
+  type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = endorsement_consensus_kind consensus
+  type attestation = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -48,11 +48,11 @@ module Kind = struct
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence =
-    endorsement_consensus_kind double_consensus_operation_evidence
+  type double_attestation_evidence =
+    attestation_consensus_kind double_consensus_operation_evidence
 
-  type double_preendorsement_evidence =
-    preendorsement_consensus_kind double_consensus_operation_evidence
+  type double_preattestation_evidence =
+    preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
@@ -71,8 +71,6 @@ module Kind = struct
   type delegation = Delegation_kind
 
   type event = Event_kind
-
-  type set_deposits_limit = Set_deposits_limit_kind
 
   type increase_paid_storage = Increase_paid_storage_kind
 
@@ -118,7 +116,6 @@ module Kind = struct
     | Delegation_manager_kind : delegation manager
     | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
-    | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
@@ -138,20 +135,14 @@ module Kind = struct
 end
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.endorsement consensus_operation_type
-  | Preendorsement : Kind.preendorsement consensus_operation_type
-
-let pp_operation_kind (type kind) ppf
-    (operation_kind : kind consensus_operation_type) =
-  match operation_kind with
-  | Endorsement -> Format.fprintf ppf "Endorsement"
-  | Preendorsement -> Format.fprintf ppf "Preendorsement"
+  | Attestation : Kind.attestation consensus_operation_type
+  | Preattestation : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot_repr.t;
   level : Raw_level_repr.t;
-  (* The level is not required to validate an endorsement when it corresponds
-     to the current payload, but if we want to filter endorsements, we need
+  (* The level is not required to validate an attestation when it corresponds
+     to the current payload, but if we want to filter attestations, we need
      the level. *)
   round : Round_repr.t;
   block_payload_hash : Block_payload_hash.t;
@@ -187,22 +178,22 @@ let pp_consensus_content ppf content =
     content.block_payload_hash
 
 type consensus_watermark =
-  | Endorsement of Chain_id.t
-  | Preendorsement of Chain_id.t
+  | Attestation of Chain_id.t
+  | Preattestation of Chain_id.t
   | Dal_attestation of Chain_id.t
 
 let to_watermark = function
-  | Preendorsement chain_id ->
+  | Preattestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
   | Dal_attestation chain_id
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4479
 
-     We reuse the watermark of an endorsement. This is because this
-     operation is temporary and aims to be merged with an endorsement
+     We reuse the watermark of an attestation. This is because this
+     operation is temporary and aims to be merged with an attestation
      later on. Moreover, there is a leak of abstraction with the shell
      which makes adding a new watermark a bit awkward. *)
-  | Endorsement chain_id ->
+  | Attestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id))
 
@@ -212,11 +203,11 @@ let of_watermark = function
         match Bytes.get b 0 with
         | '\x12' ->
             Option.map
-              (fun chain_id -> Preendorsement chain_id)
+              (fun chain_id -> Preattestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | '\x13' ->
             Option.map
-              (fun chain_id -> Endorsement chain_id)
+              (fun chain_id -> Attestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -243,8 +234,8 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Preendorsement : consensus_content -> Kind.preendorsement contents
-  | Endorsement : consensus_content -> Kind.endorsement contents
+  | Preattestation : consensus_content -> Kind.preattestation contents
+  | Attestation : consensus_content -> Kind.attestation contents
   | Dal_attestation :
       Dal_attestation_repr.operation
       -> Kind.dal_attestation contents
@@ -257,16 +248,16 @@ and _ contents =
       solution : Seed_repr.vdf_solution;
     }
       -> Kind.vdf_revelation contents
-  | Double_preendorsement_evidence : {
-      op1 : Kind.preendorsement operation;
-      op2 : Kind.preendorsement operation;
+  | Double_preattestation_evidence : {
+      op1 : Kind.preattestation operation;
+      op2 : Kind.preattestation operation;
     }
-      -> Kind.double_preendorsement_evidence contents
-  | Double_endorsement_evidence : {
-      op1 : Kind.endorsement operation;
-      op2 : Kind.endorsement operation;
+      -> Kind.double_preattestation_evidence contents
+  | Double_attestation_evidence : {
+      op1 : Kind.attestation operation;
+      op2 : Kind.attestation operation;
     }
-      -> Kind.double_endorsement_evidence contents
+      -> Kind.double_attestation_evidence contents
   | Double_baking_evidence : {
       bh1 : Block_header_repr.t;
       bh2 : Block_header_repr.t;
@@ -329,9 +320,6 @@ and _ manager_operation =
       value : Script_repr.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
-  | Set_deposits_limit :
-      Tez_repr.t option
-      -> Kind.set_deposits_limit manager_operation
   | Increase_paid_storage : {
       amount_in_bytes : Z.t;
       destination : Contract_hash.t;
@@ -355,8 +343,8 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
-      origination_proof : Sc_rollup_proof_repr.serialized;
       parameters_ty : Script_repr.lazy_expr;
+      whitelist : Sc_rollup_whitelist_repr.t option;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
@@ -365,7 +353,6 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_commitment_repr.Hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {
@@ -420,7 +407,6 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
-  | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
@@ -689,18 +675,7 @@ module Encoding = struct
           inj = (fun value -> Register_global_constant {value});
         }
 
-    let set_deposits_limit_case =
-      MCase
-        {
-          tag = 5;
-          name = "set_deposits_limit";
-          encoding = obj1 (opt "limit" Tez_repr.encoding);
-          select =
-            (function
-            | Manager (Set_deposits_limit _ as op) -> Some op | _ -> None);
-          proj = (function Set_deposits_limit key -> key);
-          inj = (fun key -> Set_deposits_limit key);
-        }
+    (* Tag 5 was for Set_deposits_limit. *)
 
     let increase_paid_storage_case =
       MCase
@@ -843,20 +818,19 @@ module Encoding = struct
             obj4
               (req "pvm_kind" Sc_rollups.Kind.encoding)
               (req "kernel" (string Hex))
-              (req "origination_proof" Sc_rollup_proof_repr.serialized_encoding)
-              (req "parameters_ty" Script_repr.lazy_expr_encoding);
+              (req "parameters_ty" Script_repr.lazy_expr_encoding)
+              (opt "whitelist" Sc_rollup_whitelist_repr.encoding);
           select =
             (function
             | Manager (Sc_rollup_originate _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Sc_rollup_originate
-                {kind; boot_sector; origination_proof; parameters_ty} ->
-                (kind, boot_sector, origination_proof, parameters_ty));
+            | Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist}
+              ->
+                (kind, boot_sector, parameters_ty, whitelist));
           inj =
-            (fun (kind, boot_sector, origination_proof, parameters_ty) ->
-              Sc_rollup_originate
-                {kind; boot_sector; origination_proof; parameters_ty});
+            (fun (kind, boot_sector, parameters_ty, whitelist) ->
+              Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist});
         }
 
     let dal_publish_slot_header_case =
@@ -894,23 +868,12 @@ module Encoding = struct
         {
           tag = sc_rollup_operation_cement_tag;
           name = "smart_rollup_cement";
-          encoding =
-            obj2
-              (req "rollup" Sc_rollup_repr.encoding)
-              (req
-                 ~description:
-                   "DEPRECATED: This field is not used anymore by the protocol \
-                    and will be removed in a future proposal."
-                 "commitment"
-                 Sc_rollup_commitment_repr.Hash.encoding);
+          encoding = obj1 (req "rollup" Sc_rollup_repr.encoding);
           select =
             (function
             | Manager (Sc_rollup_cement _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Sc_rollup_cement {rollup; commitment} -> (rollup, commitment));
-          inj =
-            (fun (rollup, commitment) -> Sc_rollup_cement {rollup; commitment});
+          proj = (function Sc_rollup_cement {rollup} -> rollup);
+          inj = (fun rollup -> Sc_rollup_cement {rollup});
         }
 
     let sc_rollup_publish_case =
@@ -1038,9 +1001,9 @@ module Encoding = struct
         name = "preendorsement";
         encoding = consensus_content_encoding;
         select =
-          (function Contents (Preendorsement _ as op) -> Some op | _ -> None);
-        proj = (fun (Preendorsement preendorsement) -> preendorsement);
-        inj = (fun preendorsement -> Preendorsement preendorsement);
+          (function Contents (Preattestation _ as op) -> Some op | _ -> None);
+        proj = (fun (Preattestation preattestation) -> preattestation);
+        inj = (fun preattestation -> Preattestation preattestation);
       }
 
   let preattestation_case =
@@ -1050,19 +1013,19 @@ module Encoding = struct
         name = "preattestation";
         encoding = consensus_content_encoding;
         select =
-          (function Contents (Preendorsement _ as op) -> Some op | _ -> None);
-        proj = (fun (Preendorsement preendorsement) -> preendorsement);
-        inj = (fun preendorsement -> Preendorsement preendorsement);
+          (function Contents (Preattestation _ as op) -> Some op | _ -> None);
+        proj = (fun (Preattestation preattestation) -> preattestation);
+        inj = (fun preattestation -> Preattestation preattestation);
       }
 
   let preendorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.preendorsement contents_list -> _ = function
+    let to_list : Kind.preattestation contents_list -> _ = function
       | Single o -> o
     in
-    let of_list : Kind.preendorsement contents -> _ = function
+    let of_list : Kind.preattestation contents -> _ = function
       | o -> Single o
     in
     def "inlined.preendorsement"
@@ -1085,10 +1048,10 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.preendorsement contents_list -> _ = function
+    let to_list : Kind.preattestation contents_list -> _ = function
       | Single o -> o
     in
-    let of_list : Kind.preendorsement contents -> _ = function
+    let of_list : Kind.preattestation contents -> _ = function
       | o -> Single o
     in
     def "inlined.preattestation"
@@ -1121,16 +1084,16 @@ module Encoding = struct
         name = "endorsement";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Endorsement _ as op) -> Some op | _ -> None);
+          (function Contents (Attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Endorsement consensus_content) ->
+          (fun (Attestation consensus_content) ->
             ( consensus_content.slot,
               consensus_content.level,
               consensus_content.round,
               consensus_content.block_payload_hash ));
         inj =
           (fun (slot, level, round, block_payload_hash) ->
-            Endorsement {slot; level; round; block_payload_hash});
+            Attestation {slot; level; round; block_payload_hash});
       }
 
   let attestation_case =
@@ -1140,24 +1103,24 @@ module Encoding = struct
         name = "attestation";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Endorsement _ as op) -> Some op | _ -> None);
+          (function Contents (Attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Endorsement consensus_content) ->
+          (fun (Attestation consensus_content) ->
             ( consensus_content.slot,
               consensus_content.level,
               consensus_content.round,
               consensus_content.block_payload_hash ));
         inj =
           (fun (slot, level, round, block_payload_hash) ->
-            Endorsement {slot; level; round; block_payload_hash});
+            Attestation {slot; level; round; block_payload_hash});
       }
 
   let endorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
-    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.attestation contents -> _ = fun o -> Single o in
     def "inlined.endorsement"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
@@ -1178,8 +1141,8 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
-    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.attestation contents -> _ = fun o -> Single o in
     def "inlined.attestation"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
@@ -1248,7 +1211,7 @@ module Encoding = struct
       }
 
   let double_preendorsement_evidence_case :
-      Kind.double_preendorsement_evidence case =
+      Kind.double_preattestation_evidence case =
     Case
       {
         tag = 7;
@@ -1259,14 +1222,14 @@ module Encoding = struct
             (req "op2" (dynamic_size preendorsement_encoding));
         select =
           (function
-          | Contents (Double_preendorsement_evidence _ as op) -> Some op
+          | Contents (Double_preattestation_evidence _ as op) -> Some op
           | _ -> None);
-        proj = (fun (Double_preendorsement_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
+        proj = (fun (Double_preattestation_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_preattestation_evidence {op1; op2});
       }
 
   let double_preattestation_evidence_case :
-      Kind.double_preendorsement_evidence case =
+      Kind.double_preattestation_evidence case =
     Case
       {
         tag = 7;
@@ -1277,13 +1240,13 @@ module Encoding = struct
             (req "op2" (dynamic_size preattestation_encoding));
         select =
           (function
-          | Contents (Double_preendorsement_evidence _ as op) -> Some op
+          | Contents (Double_preattestation_evidence _ as op) -> Some op
           | _ -> None);
-        proj = (fun (Double_preendorsement_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
+        proj = (fun (Double_preattestation_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_preattestation_evidence {op1; op2});
       }
 
-  let double_endorsement_evidence_case : Kind.double_endorsement_evidence case =
+  let double_endorsement_evidence_case : Kind.double_attestation_evidence case =
     Case
       {
         tag = 2;
@@ -1294,13 +1257,13 @@ module Encoding = struct
             (req "op2" (dynamic_size endorsement_encoding));
         select =
           (function
-          | Contents (Double_endorsement_evidence _ as op) -> Some op
+          | Contents (Double_attestation_evidence _ as op) -> Some op
           | _ -> None);
-        proj = (fun (Double_endorsement_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
+        proj = (fun (Double_attestation_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_attestation_evidence {op1; op2});
       }
 
-  let double_attestation_evidence_case : Kind.double_endorsement_evidence case =
+  let double_attestation_evidence_case : Kind.double_attestation_evidence case =
     Case
       {
         tag = 2;
@@ -1311,10 +1274,10 @@ module Encoding = struct
             (req "op2" (dynamic_size attestation_encoding));
         select =
           (function
-          | Contents (Double_endorsement_evidence _ as op) -> Some op
+          | Contents (Double_attestation_evidence _ as op) -> Some op
           | _ -> None);
-        proj = (fun (Double_endorsement_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
+        proj = (fun (Double_attestation_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_attestation_evidence {op1; op2});
       }
 
   let double_baking_evidence_case =
@@ -1481,8 +1444,7 @@ module Encoding = struct
   let register_global_constant_case =
     make_manager_case 111 Manager_operations.register_global_constant_case
 
-  let set_deposits_limit_case =
-    make_manager_case 112 Manager_operations.set_deposits_limit_case
+  (* 112 was for Set_deposits_limit. *)
 
   let increase_paid_storage_case =
     make_manager_case 113 Manager_operations.increase_paid_storage_case
@@ -1570,7 +1532,6 @@ module Encoding = struct
       PCase transaction_case;
       PCase origination_case;
       PCase delegation_case;
-      PCase set_deposits_limit_case;
       PCase increase_paid_storage_case;
       PCase update_consensus_key_case;
       PCase drain_delegate_case;
@@ -1888,15 +1849,15 @@ let acceptable_pass (op : packed_operation) =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
   | Single (Failing_noop _) -> None
-  | Single (Preendorsement _) -> Some consensus_pass
-  | Single (Endorsement _) -> Some consensus_pass
+  | Single (Preattestation _) -> Some consensus_pass
+  | Single (Attestation _) -> Some consensus_pass
   | Single (Dal_attestation _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
   | Single (Seed_nonce_revelation _) -> Some anonymous_pass
   | Single (Vdf_revelation _) -> Some anonymous_pass
-  | Single (Double_endorsement_evidence _) -> Some anonymous_pass
-  | Single (Double_preendorsement_evidence _) -> Some anonymous_pass
+  | Single (Double_attestation_evidence _) -> Some anonymous_pass
+  | Single (Double_preattestation_evidence _) -> Some anonymous_pass
   | Single (Double_baking_evidence _) -> Some anonymous_pass
   | Single (Activate_account _) -> Some anonymous_pass
   | Single (Drain_delegate _) -> Some anonymous_pass
@@ -1978,13 +1939,13 @@ let check_signature (type kind) key chain_id (op : kind operation) =
   | Some signature ->
       let watermark =
         match op.protocol_data.contents with
-        | Single (Preendorsement _) -> to_watermark (Preendorsement chain_id)
-        | Single (Endorsement _) -> to_watermark (Endorsement chain_id)
+        | Single (Preattestation _) -> to_watermark (Preattestation chain_id)
+        | Single (Attestation _) -> to_watermark (Attestation chain_id)
         | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
         | Single
             ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-            | Vdf_revelation _ | Double_endorsement_evidence _
-            | Double_preendorsement_evidence _ | Double_baking_evidence _
+            | Vdf_revelation _ | Double_attestation_evidence _
+            | Double_preattestation_evidence _ | Double_baking_evidence _
             | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
             Generic_operation
         | Cons (Manager_operation _, _ops) -> Generic_operation
@@ -2023,8 +1984,6 @@ let equal_manager_operation_kind :
   | Delegation _, _ -> None
   | Register_global_constant _, Register_global_constant _ -> Some Eq
   | Register_global_constant _, _ -> None
-  | Set_deposits_limit _, Set_deposits_limit _ -> Some Eq
-  | Set_deposits_limit _, _ -> None
   | Increase_paid_storage _, Increase_paid_storage _ -> Some Eq
   | Increase_paid_storage _, _ -> None
   | Update_consensus_key _, Update_consensus_key _ -> Some Eq
@@ -2061,21 +2020,21 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
  fun op1 op2 ->
   match (op1, op2) with
-  | Preendorsement _, Preendorsement _ -> Some Eq
-  | Preendorsement _, _ -> None
-  | Endorsement _, Endorsement _ -> Some Eq
-  | Endorsement _, _ -> None
+  | Preattestation _, Preattestation _ -> Some Eq
+  | Preattestation _, _ -> None
+  | Attestation _, Attestation _ -> Some Eq
+  | Attestation _, _ -> None
   | Dal_attestation _, Dal_attestation _ -> Some Eq
   | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation _ -> Some Eq
   | Vdf_revelation _, _ -> None
-  | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq
-  | Double_endorsement_evidence _, _ -> None
-  | Double_preendorsement_evidence _, Double_preendorsement_evidence _ ->
+  | Double_attestation_evidence _, Double_attestation_evidence _ -> Some Eq
+  | Double_attestation_evidence _, _ -> None
+  | Double_preattestation_evidence _, Double_preattestation_evidence _ ->
       Some Eq
-  | Double_preendorsement_evidence _, _ -> None
+  | Double_preattestation_evidence _, _ -> None
   | Double_baking_evidence _, Double_baking_evidence _ -> Some Eq
   | Double_baking_evidence _, _ -> None
   | Activate_account _, Activate_account _ -> Some Eq
@@ -2169,9 +2128,9 @@ let compare_inner_pass : type a b. a pass -> b pass -> int =
    failed to convert in a {!int}, the value of [round] is (-1). *)
 type round_infos = {level : int32; round : int}
 
-(** [endorsement_infos] is the pair of a {!round_infos} and a [slot]
+(** [attestation_infos] is the pair of a {!round_infos} and a [slot]
    convert into an {!int}. *)
-type endorsement_infos = {round : round_infos; slot : int}
+type attestation_infos = {round : round_infos; slot : int}
 
 (** [double_baking_infos] is the pair of a {!round_infos} and a
     {!block_header} hash. *)
@@ -2190,15 +2149,15 @@ let round_infos_from_consensus_content (c : consensus_content) =
   | Ok round -> {level; round}
   | Error _ -> {level; round = -1}
 
-(** Compute a {!endorsement_infos} from a {!consensus_content}. It is
-   used to compute the weight of {!Endorsement} and {!Preendorsement}.
+(** Compute a {!attestation_infos} from a {!consensus_content}. It is
+   used to compute the weight of {!Attestation} and {!Preattestation}.
 
-    Precondition: [c] comes from a valid operation. The {!Endorsement}
-   or {!Preendorsement} is valid, so its [round] must succeed to
+    Precondition: [c] comes from a valid operation. The {!Attestation}
+   or {!Preattestation} is valid, so its [round] must succeed to
    convert into an {!int}. Hence, for the unreachable path where the
    convertion fails, we put (-1) as [round] value (see
    {!round_infos_from_consensus_content}). *)
-let endorsement_infos_from_consensus_content (c : consensus_content) =
+let attestation_infos_from_consensus_content (c : consensus_content) =
   let slot = Slot_repr.to_int c.slot in
   let round = round_infos_from_consensus_content c in
   {round; slot}
@@ -2232,8 +2191,8 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    is used to compare it to an operation of the same pass.
     Operation weight are defined by validation pass.
 
-    The [weight] of an {!Endorsement} or {!Preendorsement} depends on
-   its {!endorsement_infos}.
+    The [weight] of an {!Attestation} or {!Preattestation} depends on
+   its {!attestation_infos}.
 
     The [weight] of a {!Dal_attestation} depends on the pair of
    the size of its bitset, {!Dal_attestation_repr.t}, and the
@@ -2247,8 +2206,8 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    The [weight] of a {!Seed_nonce_revelation} depends on its [level]
    converted in {!int32}.
 
-    The [weight] of a {!Double_preendorsement} or
-   {!Double_endorsement} depends on the [level] and [round] of their
+    The [weight] of a {!Double_preattestation} or
+   {!Double_attestation} depends on the [level] and [round] of their
    first denounciated operations. The [level] and [round] are wrapped
    in a {!round_infos}.
 
@@ -2265,8 +2224,8 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     The [weight] of {!Manager_operation} depends on its [fee] and
    [gas_limit] ratio expressed in {!Q.t}. *)
 type _ weight =
-  | Weight_endorsement : endorsement_infos -> consensus_pass_type weight
-  | Weight_preendorsement : endorsement_infos -> consensus_pass_type weight
+  | Weight_attestation : attestation_infos -> consensus_pass_type weight
+  | Weight_preattestation : attestation_infos -> consensus_pass_type weight
   | Weight_dal_attestation :
       (* attestor * num_attestations * level *)
       (Signature.Public_key_hash.t * int * int32)
@@ -2279,8 +2238,8 @@ type _ weight =
       -> voting_pass_type weight
   | Weight_seed_nonce_revelation : int32 -> anonymous_pass_type weight
   | Weight_vdf_revelation : Seed_repr.vdf_solution -> anonymous_pass_type weight
-  | Weight_double_preendorsement : round_infos -> anonymous_pass_type weight
-  | Weight_double_endorsement : round_infos -> anonymous_pass_type weight
+  | Weight_double_preattestation : round_infos -> anonymous_pass_type weight
+  | Weight_double_attestation : round_infos -> anonymous_pass_type weight
   | Weight_double_baking : double_baking_infos -> anonymous_pass_type weight
   | Weight_activate_account :
       Ed25519.Public_key_hash.t
@@ -2359,16 +2318,16 @@ let weight_of : packed_operation -> operation_weight =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
   | Single (Failing_noop _) -> W (Noop, Weight_noop)
-  | Single (Preendorsement consensus_content) ->
+  | Single (Preattestation consensus_content) ->
       W
         ( Consensus,
-          Weight_preendorsement
-            (endorsement_infos_from_consensus_content consensus_content) )
-  | Single (Endorsement consensus_content) ->
+          Weight_preattestation
+            (attestation_infos_from_consensus_content consensus_content) )
+  | Single (Attestation consensus_content) ->
       W
         ( Consensus,
-          Weight_endorsement
-            (endorsement_infos_from_consensus_content consensus_content) )
+          Weight_attestation
+            (attestation_infos_from_consensus_content consensus_content) )
   | Single (Dal_attestation Dal_attestation_repr.{attestor; attestation; level})
     ->
       W
@@ -2385,19 +2344,19 @@ let weight_of : packed_operation -> operation_weight =
       W (Anonymous, Weight_seed_nonce_revelation (Raw_level_repr.to_int32 level))
   | Single (Vdf_revelation {solution}) ->
       W (Anonymous, Weight_vdf_revelation solution)
-  | Single (Double_endorsement_evidence {op1; _}) -> (
+  | Single (Double_attestation_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
-      | Single (Endorsement consensus_content) ->
+      | Single (Attestation consensus_content) ->
           W
             ( Anonymous,
-              Weight_double_endorsement
+              Weight_double_attestation
                 (round_infos_from_consensus_content consensus_content) ))
-  | Single (Double_preendorsement_evidence {op1; _}) -> (
+  | Single (Double_preattestation_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
-      | Single (Preendorsement consensus_content) ->
+      | Single (Preattestation consensus_content) ->
           W
             ( Anonymous,
-              Weight_double_preendorsement
+              Weight_double_preattestation
                 (round_infos_from_consensus_content consensus_content) ))
   | Single (Double_baking_evidence {bh1; _}) ->
       let double_baking_infos =
@@ -2456,8 +2415,8 @@ let compare_round_infos infos1 infos2 =
     (infos1.level, infos1.round)
     (infos2.level, infos2.round)
 
-(** When comparing {!Endorsement} to {!Preendorsement} or
-   {!Double_endorsement_evidence} to {!Double_preendorsement}, in case
+(** When comparing {!Attestation} to {!Preattestation} or
+   {!Double_attestation_evidence} to {!Double_preattestation}, in case
    of {!round_infos} equality, the position is relevant to compute the
    order. *)
 type prioritized_position = Nopos | Fstpos | Sndpos
@@ -2470,10 +2429,10 @@ let compare_round_infos_with_prioritized_position ~prioritized_position infos1
   if Compare.Int.(cmp <> 0) then cmp
   else match prioritized_position with Fstpos -> 1 | Sndpos -> -1 | Nopos -> 0
 
-(** When comparing consensus operation with {!endorsement_infos}, in
+(** When comparing consensus operation with {!attestation_infos}, in
    case of equality of their {!round_infos}, either they are of the
    same kind and their [slot] have to be compared in the reverse
-   order, otherwise the {!Endorsement} is better and
+   order, otherwise the {!Attestation} is better and
    [prioritized_position] gives its position. *)
 let compare_prioritized_position_or_slot ~prioritized_position =
   match prioritized_position with
@@ -2481,12 +2440,12 @@ let compare_prioritized_position_or_slot ~prioritized_position =
   | Fstpos -> fun _ _ -> 1
   | Sndpos -> fun _ _ -> -1
 
-(** Two {!endorsement_infos} are compared by their {!round_infos}.
+(** Two {!attestation_infos} are compared by their {!round_infos}.
    When their {!round_infos} are equal, they are compared according to
    their priority or their [slot], see
    {!compare_prioritized_position_or_slot} for more details. *)
-let compare_endorsement_infos ~prioritized_position (infos1 : endorsement_infos)
-    (infos2 : endorsement_infos) =
+let compare_attestation_infos ~prioritized_position (infos1 : attestation_infos)
+    (infos2 : attestation_infos) =
   compare_pair_in_lexico_order
     ~cmp_fst:compare_round_infos
     ~cmp_snd:(compare_prioritized_position_or_slot ~prioritized_position)
@@ -2506,45 +2465,45 @@ let compare_baking_infos infos1 infos2 =
 (** Two valid {!Dal_attestation} are compared in the
    lexicographic order of their pairs of bitsets size and attestor
    hash. *)
-let compare_dal_attestation (attestor1, endorsements1, level1)
-    (attestor2, endorsements2, level2) =
+let compare_dal_attestation (attestor1, attestations1, level1)
+    (attestor2, attestations2, level2) =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
          ~cmp_fst:Compare.Int32.compare
          ~cmp_snd:Compare.Int.compare)
     ~cmp_snd:Signature.Public_key_hash.compare
-    ((level1, endorsements1), attestor1)
-    ((level2, endorsements2), attestor2)
+    ((level1, attestations1), attestor1)
+    ((level2, attestations2), attestor2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
 
 (** Comparing consensus operations by their [weight] uses the
-   comparison on {!endorsement_infos} for {!Endorsement} and
-   {!Preendorsement}: see {!endorsement_infos} for more details.
+   comparison on {!attestation_infos} for {!Attestation} and
+   {!Preattestation}: see {!attestation_infos} for more details.
 
     {!Dal_attestation} is smaller than the other kinds of
    consensus operations. Two valid {!Dal_attestation} are
    compared by {!compare_dal_attestation}. *)
 let compare_consensus_weight w1 w2 =
   match (w1, w2) with
-  | Weight_endorsement infos1, Weight_endorsement infos2 ->
-      compare_endorsement_infos ~prioritized_position:Nopos infos1 infos2
-  | Weight_preendorsement infos1, Weight_preendorsement infos2 ->
-      compare_endorsement_infos ~prioritized_position:Nopos infos1 infos2
-  | Weight_endorsement infos1, Weight_preendorsement infos2 ->
-      compare_endorsement_infos ~prioritized_position:Fstpos infos1 infos2
-  | Weight_preendorsement infos1, Weight_endorsement infos2 ->
-      compare_endorsement_infos ~prioritized_position:Sndpos infos1 infos2
+  | Weight_attestation infos1, Weight_attestation infos2 ->
+      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
+  | Weight_preattestation infos1, Weight_preattestation infos2 ->
+      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
+  | Weight_attestation infos1, Weight_preattestation infos2 ->
+      compare_attestation_infos ~prioritized_position:Fstpos infos1 infos2
+  | Weight_preattestation infos1, Weight_attestation infos2 ->
+      compare_attestation_infos ~prioritized_position:Sndpos infos1 infos2
   | ( Weight_dal_attestation (attestor1, size1, lvl1),
       Weight_dal_attestation (attestor2, size2, lvl2) ) ->
       compare_dal_attestation (attestor1, size1, lvl1) (attestor2, size2, lvl2)
-  | Weight_dal_attestation _, (Weight_endorsement _ | Weight_preendorsement _)
+  | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
     ->
       -1
-  | (Weight_endorsement _ | Weight_preendorsement _), Weight_dal_attestation _
+  | (Weight_attestation _ | Weight_preattestation _), Weight_dal_attestation _
     ->
       1
 
@@ -2571,8 +2530,8 @@ let compare_vote_weight w1 w2 =
 
 (** {5 Comparison of valid anonymous operations} *)
 
-(** Comparing two {!Double_endorsement_evidence}, or two
-   {!Double_preendorsement_evidence}, or comparing them to each other
+(** Comparing two {!Double_attestation_evidence}, or two
+   {!Double_preattestation_evidence}, or comparing them to each other
    is comparing their {!round_infos}, see {!compare_round_infos} for
    more details.
 
@@ -2587,32 +2546,32 @@ let compare_vote_weight w1 w2 =
    Two {!Activate_account} are compared as their [id].
 
    When comparing different kind of anonymous operations, the order is
-   as follows: {!Double_preendorsement_evidence} >
-   {!Double_endorsement_evidence} > {!Double_baking_evidence} >
+   as follows: {!Double_preattestation_evidence} >
+   {!Double_attestation_evidence} > {!Double_baking_evidence} >
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}.
    *)
 let compare_anonymous_weight w1 w2 =
   match (w1, w2) with
-  | Weight_double_preendorsement infos1, Weight_double_preendorsement infos2 ->
+  | Weight_double_preattestation infos1, Weight_double_preattestation infos2 ->
       compare_round_infos infos1 infos2
-  | Weight_double_preendorsement infos1, Weight_double_endorsement infos2 ->
+  | Weight_double_preattestation infos1, Weight_double_attestation infos2 ->
       compare_round_infos_with_prioritized_position
         ~prioritized_position:Fstpos
         infos1
         infos2
-  | Weight_double_endorsement infos1, Weight_double_preendorsement infos2 ->
+  | Weight_double_attestation infos1, Weight_double_preattestation infos2 ->
       compare_round_infos_with_prioritized_position
         ~prioritized_position:Sndpos
         infos1
         infos2
-  | Weight_double_endorsement infos1, Weight_double_endorsement infos2 ->
+  | Weight_double_attestation infos1, Weight_double_attestation infos2 ->
       compare_round_infos infos1 infos2
   | ( ( Weight_double_baking _ | Weight_seed_nonce_revelation _
       | Weight_vdf_revelation _ | Weight_activate_account _
       | Weight_drain_delegate _ ),
-      (Weight_double_preendorsement _ | Weight_double_endorsement _) ) ->
+      (Weight_double_preattestation _ | Weight_double_attestation _) ) ->
       -1
-  | ( (Weight_double_preendorsement _ | Weight_double_endorsement _),
+  | ( (Weight_double_preattestation _ | Weight_double_attestation _),
       ( Weight_double_baking _ | Weight_seed_nonce_revelation _
       | Weight_vdf_revelation _ | Weight_activate_account _
       | Weight_drain_delegate _ ) ) ->

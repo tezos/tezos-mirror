@@ -3,20 +3,41 @@
 
 (library
  (name octez_smart_rollup_node)
- (public_name octez-smart-rollup-node)
+ (public_name octez-smart-rollup-node-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-crypto
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-libs.crypto
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
   cohttp-lwt-unix
   octez-node-config
   prometheus-app
-  octez-injector)
+  tezos-dal-node-lib
+  tezos-dac-lib
+  tezos-dac-client-lib
+  octez-injector
+  octez-version.value
+  octez-l2-libs.layer2_store
+  octez-crawler
+  octez-libs.tezos-workers
+  octez-l2-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_base
   -open Tezos_stdlib_unix
   -open Tezos_crypto
-  -open Octez_injector))
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_dal_node_lib
+  -open Tezos_dac_lib
+  -open Tezos_dac_client_lib
+  -open Octez_injector
+  -open Tezos_version_value
+  -open Tezos_layer2_store
+  -open Octez_crawler
+  -open Tezos_workers
+  -open Octez_smart_rollup))

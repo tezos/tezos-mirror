@@ -7,16 +7,17 @@
  (package octez-smart-rollup-wasm-debugger)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-tree-encoding
-  tezos-base.unix
-  tezos-client-alpha
-  tezos-scoru-wasm
-  octez_smart_rollup_wasm_benchmark_lib
-  tezos-scoru-wasm-helpers
-  tezos-webassembly-interpreter
-  tezos-webassembly-interpreter-extra)
+  octez-libs.base
+  octez-libs.clic
+  octez-libs.tree-encoding
+  octez-libs.base.unix
+  yaml
+  octez-protocol-alpha-libs.client
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-helpers
+  octez-l2-libs.webassembly-interpreter
+  octez-l2-libs.webassembly-interpreter-extra
+  octez-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

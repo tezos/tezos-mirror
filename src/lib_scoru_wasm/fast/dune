@@ -3,15 +3,15 @@
 
 (library
  (name tezos_scoru_wasm_fast)
- (public_name tezos-scoru-wasm-fast)
+ (public_name octez-l2-libs.scoru-wasm-fast)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-tree-encoding
-  tezos-webassembly-interpreter
-  tezos-lazy-containers
-  tezos-scoru-wasm
-  tezos-wasmer)
+  octez-libs.base
+  octez-libs.tree-encoding
+  octez-l2-libs.webassembly-interpreter
+  octez-libs.lazy-containers
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.wasmer)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives))

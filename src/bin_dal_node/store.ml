@@ -29,9 +29,6 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4097
    Add an interface to this module *)
 
-(* Relative path to store directory from base-dir *)
-let path = "store"
-
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
@@ -45,10 +42,49 @@ let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
 let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 
+module Value_size_hooks = struct
+  (* The [value_size] required by [Tezos_key_value_store.directory] is known when
+     the daemon loads a protocol, after the store is activated. We use the closure
+     [value_size_fun] to perform delayed protocol-specific parameter passing.
+
+     Note that this mechanism is not sufficient to make the key-value store
+     robust to dynamic changes in [value_size]. For instance, there could be
+     concurrent writes for protocol P-1 and protocol P, if they define
+     distinct [value_size] this will make it so that [P-1] uses the [value_size]
+     of [P].
+
+     A potential solution would have a function [Cryptobox.share_encoding : t -> share encoding]
+     with the property that the produced encodings are of [`Fixed] class.
+     The [Key_value_store.t] type could be parameterized by an extra type parameter
+     corresponding to some dynamic state (corresponding to the cryptobox in our
+     use case), passed explicitly to the [write] and [read] functions.
+
+     Correcting this is left to future work.
+
+     TODO: https://gitlab.com/tezos/tezos/-/issues/6034 *)
+
+  (* We used the [share_size] callback to pass the share size to the store
+     in a delayed fashion, when the protocol becomes known to the daemon. *)
+  let share_size_ref = ref None
+
+  let set_share_size size =
+    match !share_size_ref with
+    | None -> share_size_ref := Some size
+    | Some previous_size ->
+        if Int.equal size previous_size then ()
+        else
+          Stdlib.failwith
+            "Store.set_share_size: new share size incompatible with current \
+             store"
+
+  let share_size () =
+    match !share_size_ref with None -> assert false | Some size -> size
+end
+
 module Shards = struct
   include Key_value_store
 
-  type nonrec t = (Cryptobox.Commitment.t * int, Cryptobox.share) t
+  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) t
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
@@ -56,10 +92,10 @@ module Shards = struct
     let open Lwt_result_syntax in
     List.for_all_es
       (fun index ->
-        let*! value = read_value store (commitment, index) in
+        let*! value = read_value store commitment index in
         match value with
         | Ok _ -> return true
-        | Error [Stored_data.Missing_stored_data _] -> return false
+        | Error [Missing_stored_kvs_data _] -> return false
         | Error e -> fail e)
       shard_indexes
 
@@ -67,7 +103,7 @@ module Shards = struct
     let open Lwt_result_syntax in
     let shards =
       Seq.map
-        (fun {Cryptobox.index; share} -> ((commitment, index), share))
+        (fun {Cryptobox.index; share} -> (commitment, index, share))
         shards
     in
     let* () = write_values shards_store shards |> Errors.other_lwt_result in
@@ -80,21 +116,48 @@ module Shards = struct
     *)
     return @@ Lwt_watcher.notify shards_watcher commitment
 
+  let read_all shards_store commitment ~number_of_shards =
+    Seq.ints 0
+    |> Seq.take_while (fun x -> x < number_of_shards)
+    |> Seq.map (fun shard_index -> (commitment, shard_index))
+    |> read_values shards_store
+
   let init node_store_dir shard_store_dir =
+    let open Lwt_syntax in
     let ( // ) = Filename.concat in
     let dir_path = node_store_dir // shard_store_dir in
-    init ~lru_size:Constants.shards_store_lru_size (fun (commitment, index) ->
+    let+ () =
+      if not (Sys.file_exists dir_path) then Lwt_utils_unix.create_dir dir_path
+      else return_unit
+    in
+    init ~lru_size:Constants.shards_store_lru_size (fun commitment ->
         let commitment_string = Cryptobox.Commitment.to_b58check commitment in
-        let filename = string_of_int index in
-        let filepath = dir_path // commitment_string // filename in
-        Stored_data.make_file ~filepath Cryptobox.share_encoding Stdlib.( = ))
+        let filepath = dir_path // commitment_string in
+        directory
+          ~encoded_value_size:(Value_size_hooks.share_size ())
+          Cryptobox.share_encoding
+          filepath
+          Stdlib.( = )
+          Fun.id)
 end
+
+module Shard_proofs_cache =
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
+    (struct
+      type t = Cryptobox.Commitment.t
+
+      let equal = Cryptobox.Commitment.equal
+
+      let hash = Hashtbl.hash
+    end)
 
 (** Store context *)
 type node_store = {
   store : t;
   shard_store : Shards.t;
   shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
+  in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
+      (* The length of the array is the number of shards per slot *)
 }
 
 (** [open_shards_stream node_store] opens a stream that should be notified when
@@ -102,16 +165,24 @@ type node_store = {
 let open_shards_stream {shards_watcher; _} =
   Lwt_watcher.create_stream shards_watcher
 
-(** [init config] inits the store on the filesystem using the given [config]. *)
+(** [init config] inits the store on the filesystem using the
+    given [config]. *)
 let init config =
   let open Lwt_result_syntax in
-  let base_dir = Configuration.data_dir_path config path in
+  let base_dir = Configuration_file.store_path config in
   let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let shard_store = Shards.init base_dir shard_store_dir in
+  let*! shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; shards_watcher}
+  return
+    {
+      shard_store;
+      store;
+      shards_watcher;
+      in_memory_shard_proofs =
+        Shard_proofs_cache.create Constants.shards_proofs_cache_size;
+    }
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
   let open Result_syntax in
@@ -156,15 +227,6 @@ let decode_slot slot_size v =
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
 
-let encode_profile profile =
-  Data_encoding.Binary.to_string_exn Services.Types.profile_encoding profile
-
-let decode_profile profile =
-  trace_decoding_error
-    ~data_kind:Types.Profile
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Services.Types.profile_encoding profile
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
 
    DAL/Node: Replace Irmin storage for paths
@@ -203,7 +265,7 @@ module Legacy = struct
          that are either [`Waiting_attesattion], [`Attested], or [`Unattested].
 
          "Others" path(s) are used to store information of slots headers when
-         their statuses are [`Not_selected] or [`Unseen]. *)
+         their statuses are [`Not_selected] or [`Unseen_or_not_finalized]. *)
 
       val slots_indices : Services.Types.level -> Path.t
 
@@ -215,12 +277,6 @@ module Legacy = struct
 
       val other_header_status :
         Services.Types.slot_id -> Cryptobox.commitment -> Path.t
-    end
-
-    module Profile : sig
-      val profiles : Path.t
-
-      val profile : Services.Types.profile -> Path.t
     end
   end = struct
     type t = string list
@@ -290,14 +346,6 @@ module Legacy = struct
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
         others index / commitment_repr / "status"
     end
-
-    module Profile = struct
-      let root = ["profiles"]
-
-      let profiles = root
-
-      let profile profile = root / encode_profile profile
-    end
   end
 
   let add_slot_by_commitment node_store cryptobox slot commitment =
@@ -341,7 +389,7 @@ module Legacy = struct
              levels_path)
         store
         levels_path
-        (encode_header_status `Unseen)
+        (encode_header_status `Unseen_or_not_finalized)
 
   let exists_slot_by_commitment node_store cryptobox commitment =
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
@@ -360,15 +408,15 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let add_slot_headers ~block_level ~block_hash:_ slot_headers node_store =
-    let open Lwt_syntax in
+  let add_slot_headers ~block_level slot_headers node_store =
+    let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
        Handle reorgs. *)
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
              https://gitlab.com/tezos/tezos/-/issues/4528
        Handle statuses evolution. *)
-    List.iter_s
+    List.iter_es
       (fun (slot_header, status) ->
         let Dal_plugin.{slot_index; commitment; published_level} =
           slot_header
@@ -377,7 +425,7 @@ module Legacy = struct
         assert (Int32.equal published_level block_level) ;
         let index = Services.Types.{slot_level = published_level; slot_index} in
         let header_path = Path.Commitment.header commitment index in
-        let* () =
+        let*! () =
           set
             ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
             slots_store
@@ -391,14 +439,15 @@ module Legacy = struct
             let status_path = Path.Level.accepted_header_status index in
             let data = encode_commitment commitment in
             (* Before adding the item in accepted path, we should remove it from
-               others path, as it may appear there with an Unseen status. *)
-            let* () =
+               others path, as it may appear there with an
+               Unseen_or_not_finalized status. *)
+            let*! () =
               remove
                 ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
                 slots_store
                 others_path
             in
-            let* () =
+            let*! () =
               set
                 ~msg:
                   (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
@@ -406,17 +455,23 @@ module Legacy = struct
                 commitment_path
                 data
             in
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
-              slots_store
-              status_path
-              (encode_header_status `Waiting_attestation)
+            let*! () =
+              set
+                ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
+                slots_store
+                status_path
+                (encode_header_status `Waiting_attestation)
+            in
+            return_unit
         | Dal_plugin.Failed ->
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-              slots_store
-              others_path
-              (encode_header_status `Not_selected))
+            let*! () =
+              set
+                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                slots_store
+                others_path
+                (encode_header_status `Not_selected)
+            in
+            return_unit)
       slot_headers
 
   let update_slot_headers_attestation ~published_level ~number_of_slots store
@@ -467,20 +522,6 @@ module Legacy = struct
       ~none:(fail `Not_found)
       ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
       commitment_str_opt
-
-  let get_profiles node_store =
-    let open Lwt_syntax in
-    let path = Path.Profile.profiles in
-    let* profiles = list node_store.store path in
-    return @@ List.map_e (fun (p, _) -> decode_profile p) profiles
-
-  let add_profile node_store profile =
-    let path = Path.Profile.profile profile in
-    set
-      ~msg:(Printf.sprintf "New profile added: %s" (Path.to_string path))
-      node_store.store
-      path
-      ""
 
   (** Filter the given list of indices according to the values of the given slot
       level and index. *)
@@ -636,4 +677,13 @@ module Legacy = struct
           (fun header ->
             if header.Services.Types.status = hs then Some header else None)
           accu
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+
+     handle with_proof flag -> store proofs on disk? *)
+  let save_shard_proofs node_store commitment shard_proofs =
+    Shard_proofs_cache.replace
+      node_store.in_memory_shard_proofs
+      commitment
+      shard_proofs
 end

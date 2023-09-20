@@ -3,10 +3,10 @@
 
 (library
  (name tezos_protocol_environment_008_PtEdoTez)
- (public_name tezos-protocol-008-PtEdoTez.environment)
+ (public_name tezos-protocol-008-PtEdoTez.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_008_PtEdoTez))
 
@@ -19,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_008_PtEdoTez)
- (public_name tezos-protocol-008-PtEdoTez.raw)
+ (public_name tezos-protocol-008-PtEdoTez.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-008-PtEdoTez.environment)
+  tezos-protocol-008-PtEdoTez.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -112,12 +112,12 @@
 
 (library
  (name tezos_protocol_008_PtEdoTez)
- (public_name tezos-protocol-008-PtEdoTez)
+ (public_name tezos-protocol-008-PtEdoTez.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-008-PtEdoTez.raw)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
+  tezos-protocol-008-PtEdoTez.protocol.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -127,7 +127,7 @@
 (install
  (package tezos-protocol-008-PtEdoTez)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -232,12 +232,12 @@
 
 (library
  (name tezos_protocol_008_PtEdoTez_lifted)
- (public_name tezos-protocol-008-PtEdoTez.lifted)
+ (public_name tezos-protocol-008-PtEdoTez.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-008-PtEdoTez)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
+  tezos-protocol-008-PtEdoTez.protocol)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -255,8 +255,8 @@
 (library
  (name tezos_protocol_008_PtEdoTez_functor)
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -351,12 +351,12 @@
 
 (library
  (name tezos_embedded_protocol_008_PtEdoTez)
- (public_name tezos-embedded-protocol-008-PtEdoTez)
+ (public_name tezos-protocol-008-PtEdoTez.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-008-PtEdoTez
-  tezos-protocol-updater
-  tezos-protocol-environment)
+  tezos-protocol-008-PtEdoTez.protocol
+  octez-shell-libs.protocol-updater
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

@@ -11,11 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "ppx_expect"
-  "tezos-base"
-  "tezos-stdlib-unix"
-  "tezos-crypto"
-  "tezos-micheline"
-  "tezos-clic"
+  "octez-libs"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "prbnmcn-linalg" { = "0.0.1" }
   "prbnmcn-stats" { = "0.0.6" }
@@ -25,9 +21,5 @@ depends: [
   "ocaml-migrate-parsetree"
   "hashcons"
 ]
-build: [
-  ["rm" "-r" "vendors"]
-  ["dune" "build" "-p" name "-j" jobs]
-  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-]
+build: [["rm" "-r" "vendors" "contrib"] ["dune" "build" "-p" name "-j" jobs]]
 synopsis: "Tezos: library for writing benchmarks and performing simple parameter inference"

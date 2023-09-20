@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type protocol = Nairobi | Proto_alpha
+type protocol = Nairobi | Oxford | Proto_alpha
 
 (* This type mimics [Sc_rollup_inbox_repr.internal_inbox_messages], without
    fully deserializing the `Transfer`, and is produced by reading the first bytes
@@ -58,6 +58,8 @@ let protocol_from_raw payload =
     match Data_encoding.(Binary.of_string_exn string payload) with
     | payload when String.equal payload Constants.proto_alpha_name ->
         Some (Protocol_migration Proto_alpha)
+    | payload when String.equal payload Constants.oxford_name ->
+        Some (Protocol_migration Oxford)
     | payload when String.equal payload Constants.nairobi_name ->
         Some (Protocol_migration Nairobi)
     | _ -> None
@@ -89,6 +91,8 @@ module Internal_for_tests = struct
   let proto_to_binary = function
     | Nairobi ->
         Data_encoding.(Binary.to_string_exn string Constants.nairobi_name)
+    | Oxford ->
+        Data_encoding.(Binary.to_string_exn string Constants.oxford_name)
     | Proto_alpha ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_alpha_name)
 

@@ -302,28 +302,33 @@ let tez_param ~name ~desc next =
     (tez_parameter name)
     next
 
-let non_negative_z_parameter =
-  Tezos_clic.parameter (fun _ s ->
-      try
-        let v = Z.of_string s in
-        error_when Compare.Z.(v < Z.zero) (Forbidden_Negative_int s)
-        >>?= fun () -> return v
-      with _ -> failwith "Invalid number, must be a non negative number.")
+let non_negative_z_parser (cctxt : #Client_context.io) s =
+  match Z.of_string s with
+  | exception Invalid_argument _ -> cctxt#error "Expected number"
+  | v when Compare.Z.(v < Z.zero) ->
+      cctxt#error "Invalid number, must be a non negative number."
+  | v -> Lwt_result_syntax.return v
+
+let non_negative_z_parameter () = Tezos_clic.parameter non_negative_z_parser
 
 let non_negative_z_param ~name ~desc next =
-  Tezos_clic.param ~name ~desc non_negative_z_parameter next
+  Tezos_clic.param ~name ~desc (non_negative_z_parameter ()) next
 
 let counter_parameter =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       match Manager_counter.Internal_for_injection.of_string s with
-      | None -> failwith "Invalid counter, must be a non-negative number."
+      | None -> cctxt#error "Invalid counter, must be a non-negative number."
       | Some c -> return c)
 
-let non_negative_parameter =
-  Tezos_clic.parameter (fun _ s ->
-      match int_of_string_opt s with
-      | Some i when i >= 0 -> return i
-      | _ -> failwith "Parameter should be a non-negative integer literal")
+let non_negative_parser (cctxt : #Client_context.io) s =
+  match int_of_string_opt s with
+  | Some i when i >= 0 -> return i
+  | _ -> cctxt#error "Parameter should be a non-negative integer literal"
+
+let non_negative_parameter () = Tezos_clic.parameter non_negative_parser
+
+let non_negative_param ~name ~desc next =
+  Tezos_clic.param ~name ~desc (non_negative_parameter ()) next
 
 let fee_arg =
   Tezos_clic.arg
@@ -352,15 +357,19 @@ let level_arg =
     ~doc:"Set the level to be returned by the LEVEL instruction"
     level_kind
 
-let raw_level_parameter =
-  Tezos_clic.parameter (fun _ s ->
-      match Int32.of_string_opt s with
-      | Some i when i >= 0l ->
-          Lwt.return @@ Environment.wrap_tzresult (Raw_level.of_int32 i)
-      | _ ->
-          failwith
-            "'%s' is not a valid level (should be a non-negative int32 value)"
-            s)
+let raw_level_parser (cctxt : #Client_context.io) s =
+  match Int32.of_string_opt s with
+  | Some i when i >= 0l ->
+      Lwt.return @@ Environment.wrap_tzresult (Raw_level.of_int32 i)
+  | _ ->
+      cctxt#error
+        "'%s' is not a valid level (should be a non-negative int32 value)"
+        s
+
+let raw_level_parameter () = Tezos_clic.parameter raw_level_parser
+
+let raw_level_param ~name ~desc next =
+  Tezos_clic.param ~name ~desc (raw_level_parameter ()) next
 
 let timestamp_parameter =
   Tezos_clic.parameter (fun _ s ->

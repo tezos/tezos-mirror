@@ -31,7 +31,8 @@ module Make (N : sig
 end) =
 struct
   module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
-  include Maker.Make (Tezos_context_encoding.Context.Schema)
+  module Raw = Maker.Make (Tezos_context_encoding.Context.Schema)
+  include Raw
 
   let make_key_path path key = path @ [key]
 
@@ -109,4 +110,12 @@ struct
     @@ fun () ->
     let*! bytes_opt = find store path in
     return bytes_opt
+
+  module Raw_irmin = struct
+    type rw = [`Read | `Write] t
+
+    include Raw
+
+    let unsafe = Fun.id
+  end
 end

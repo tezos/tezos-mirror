@@ -104,6 +104,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   incoming : Lwt_canceler.t P2p_point.Table.t;
   mutable new_connection_hook :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) P2p_conn.t -> unit) list;
+  mutable disconnection_hook : (P2p_peer.Id.t -> unit) list;
   answerer : 'msg P2p_answerer.t Lazy.t;
   dependencies : ('msg, 'peer_meta, 'conn_meta) dependencies;
 }
@@ -136,6 +137,7 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
     encoding = P2p_message.encoding message_config.P2p_params.encoding;
     triggers;
     new_connection_hook = [];
+    disconnection_hook = [];
     log;
     pool;
     answerer;
@@ -198,6 +200,7 @@ let create_connection t p2p_conn id_point point_info peer_info
         point_info ;
       t.log (Disconnection peer_id) ;
       P2p_peer_state.set_disconnected ~timestamp peer_info ;
+      List.iter (fun f -> f peer_id) t.disconnection_hook ;
       Option.iter
         (fun point_info -> P2p_pool.Points.remove_connected t.pool point_info)
         point_info ;
@@ -622,7 +625,7 @@ let fail_unless_disconnected_point point_info =
   | Requested _ | Accepted _ -> tzfail P2p_errors.Pending_connection
   | Running _ -> tzfail P2p_errors.Connected
 
-let connect ?timeout t point =
+let connect ?trusted ?expected_peer_id ?timeout t point =
   let open Lwt_result_syntax in
   let* () =
     fail_when
@@ -637,7 +640,9 @@ let connect ?timeout t point =
   in
   let canceler = Lwt_canceler.create () in
   with_timeout ~canceler (Systime_os.sleep timeout) (fun canceler ->
-      let point_info = P2p_pool.register_point t.pool point in
+      let point_info =
+        P2p_pool.register_point ?trusted ?expected_peer_id t.pool point
+      in
       let ((addr, port) as point) = P2p_point_state.Info.point point_info in
       let* () =
         fail_unless
@@ -648,7 +653,7 @@ let connect ?timeout t point =
       let* () = fail_unless_disconnected_point point_info in
       let timestamp = Time.System.now () in
       P2p_point_state.set_requested ~timestamp point_info canceler ;
-      let*! fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
+      let*! fd = P2p_fd.socket () in
       let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
       let*! () = Events.(emit connect_status) ("start", point) in
       let* () =
@@ -691,6 +696,8 @@ let connect ?timeout t point =
 let stat t = P2p_io_scheduler.global_stat t.io_sched
 
 let on_new_connection t f = t.new_connection_hook <- f :: t.new_connection_hook
+
+let on_disconnection t f = t.disconnection_hook <- f :: t.disconnection_hook
 
 let destroy t =
   P2p_point.Table.iter_p
@@ -844,7 +851,7 @@ module Internal_for_tests = struct
       ?(custom_p2p_versions = [P2p_version.zero])
       ?(encoding = make_crashing_encoding ())
       ?(incoming = P2p_point.Table.create ~random:true 53)
-      ?(new_connection_hook = [])
+      ?(new_connection_hook = []) ?(disconnection_hook = [])
       ?(answerer = lazy (P2p_protocol.create_private ())) pool dependencies :
       ('msg, 'peer_meta, 'conn_meta) t =
     let pool =
@@ -874,6 +881,7 @@ module Internal_for_tests = struct
       encoding;
       incoming;
       new_connection_hook;
+      disconnection_hook;
       answerer;
       dependencies;
     }

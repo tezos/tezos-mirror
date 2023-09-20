@@ -41,6 +41,35 @@ module Event = struct
       ("hash", Block_hash.encoding)
 end
 
+type operation = {
+  hash : Operation_hash.t;
+  operation : Operation.t;
+  check_signature : bool;
+}
+
+let mk_operation ?known_valid_operation_set operation =
+  let hash = Operation.hash operation in
+  let check_signature =
+    match known_valid_operation_set with
+    | None -> true
+    | Some known_valid -> not (Operation_hash.Set.mem hash known_valid)
+    (* We do not check the signature of the operation
+       if the operation is already known valid *)
+  in
+  {hash; operation; check_signature}
+
+let operation_encoding =
+  let open Data_encoding in
+  conv
+    (fun {hash; operation; check_signature} ->
+      (hash, operation, check_signature))
+    (fun (hash, operation, check_signature) ->
+      {hash; operation; check_signature})
+    (obj3
+       (req "hash" Operation_hash.encoding)
+       (req "operation" Operation.encoding)
+       (req "check_signature" bool))
+
 type validation_store = {
   resulting_context_hash : Context_hash.t;
   timestamp : Time.Protocol.t;
@@ -289,12 +318,11 @@ let may_patch_protocol ~user_activated_upgrades
       in
       return {validation_result with context}
 
-module Make (Filter : Shell_plugin.FILTER) = struct
-  module Proto = Filter.Proto
-
+module Make (Proto : Protocol_plugin.T) = struct
   type 'operation_data preapplied_operation = {
     hash : Operation_hash.t;
     raw : Operation.t;
+    check_signature : bool;
     protocol_data : 'operation_data;
   }
 
@@ -395,18 +423,14 @@ module Make (Filter : Shell_plugin.FILTER) = struct
            (Too_many_operations {pass; found = List.length ops; max}))
     in
     List.iter_ep
-      (fun op ->
-        let size = Data_encoding.Binary.length Operation.encoding op in
+      (fun {hash; operation; _} ->
+        let size = Data_encoding.Binary.length Operation.encoding operation in
         fail_unless
           (size <= Proto.max_operation_data_length)
           (invalid_block
              block_hash
              (Oversized_operation
-                {
-                  operation = Operation.hash op;
-                  size;
-                  max = Proto.max_operation_data_length;
-                })))
+                {operation = hash; size; max = Proto.max_operation_data_length})))
       ops
 
   let check_operation_quota block_hash operations =
@@ -432,18 +456,16 @@ module Make (Filter : Shell_plugin.FILTER) = struct
     List.mapi_es
       (fun pass ->
         let open Lwt_result_syntax in
-        List.map_es (fun op ->
-            let op_hash = Operation.hash op in
+        List.map_es (fun {hash; operation; check_signature} ->
             match
               Data_encoding.Binary.of_bytes_opt
-                Proto.operation_data_encoding
-                op.Operation.proto
+                Proto.operation_data_encoding_with_legacy_attestation_name
+                operation.Operation.proto
             with
             | None ->
-                tzfail
-                  (invalid_block block_hash (Cannot_parse_operation op_hash))
+                tzfail (invalid_block block_hash (Cannot_parse_operation hash))
             | Some protocol_data ->
-                let op = {Proto.shell = op.shell; protocol_data} in
+                let op = {Proto.shell = operation.shell; protocol_data} in
                 let allowed_pass = Proto.acceptable_pass op in
                 let is_pass_consistent =
                   match allowed_pass with
@@ -455,9 +477,9 @@ module Make (Filter : Shell_plugin.FILTER) = struct
                     is_pass_consistent
                     (invalid_block
                        block_hash
-                       (Unallowed_pass {operation = op_hash; pass; allowed_pass}))
+                       (Unallowed_pass {operation = hash; pass; allowed_pass}))
                 in
-                return (op_hash, op)))
+                return (hash, op, check_signature)))
       operations
 
   (* FIXME: This code is used by preapply but emitting time
@@ -472,12 +494,13 @@ module Make (Filter : Shell_plugin.FILTER) = struct
     let should_include_metadata_hashes =
       match proto_env_version with
       | Protocol.V0 -> false
-      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10) -> true
+      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11) ->
+          true
     in
     let block_metadata =
       let metadata =
         Data_encoding.Binary.to_bytes_exn
-          Proto.block_header_metadata_encoding
+          Proto.block_header_metadata_encoding_with_legacy_attestation_name
           block_data
       in
       let metadata_hash_opt =
@@ -496,12 +519,14 @@ module Make (Filter : Shell_plugin.FILTER) = struct
                     serializable/deserializable *)
                  let bytes =
                    Data_encoding.Binary.to_bytes_exn
-                     Proto.operation_receipt_encoding
+                     Proto
+                     .operation_receipt_encoding_with_legacy_attestation_name
                      receipt
                  in
                  let _ =
                    Data_encoding.Binary.of_bytes_exn
-                     Proto.operation_receipt_encoding
+                     Proto
+                     .operation_receipt_encoding_with_legacy_attestation_name
                      bytes
                  in
                  let metadata =
@@ -580,7 +605,7 @@ module Make (Filter : Shell_plugin.FILTER) = struct
             (fun (state, acc) ops ->
               let* state, ops_metadata =
                 List.fold_left_es
-                  (fun (state, acc) (oph, op) ->
+                  (fun (state, acc) (oph, op, _check_signature) ->
                     let* state, op_metadata =
                       Proto.apply_operation state oph op
                     in
@@ -871,12 +896,12 @@ module Make (Filter : Shell_plugin.FILTER) = struct
               {shell = op.raw.shell; protocol_data = op.protocol_data}
             in
             let open Lwt_result_syntax in
-            let*! status = Filter.Mempool.syntactic_check operation in
             let* validation_state =
-              match status with
-              | `Ill_formed -> failwith "Ill-formed operation filtered"
-              | `Well_formed ->
-                  Proto.validate_operation pv.validation_state op.hash operation
+              Proto.validate_operation
+                ~check_signature:op.check_signature
+                pv.validation_state
+                op.hash
+                operation
             in
             let* application_state, receipt =
               Proto.apply_operation pv.application_state op.hash operation
@@ -898,8 +923,10 @@ module Make (Filter : Shell_plugin.FILTER) = struct
           match
             Data_encoding.Binary.(
               of_bytes_exn
-                Proto.operation_receipt_encoding
-                (to_bytes_exn Proto.operation_receipt_encoding receipt))
+                Proto.operation_receipt_encoding_with_legacy_attestation_name
+                (to_bytes_exn
+                   Proto.operation_receipt_encoding_with_legacy_attestation_name
+                   receipt))
           with
           | receipt -> Applied (pv, receipt)
           | exception exn ->
@@ -922,17 +949,18 @@ module Make (Filter : Shell_plugin.FILTER) = struct
     | Some protocol_data -> return protocol_data
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
-    safe_binary_of_bytes Proto.operation_data_encoding proto
+    safe_binary_of_bytes
+      Proto.operation_data_encoding_with_legacy_attestation_name
+      proto
 
-  let parse (raw : Operation.t) =
+  let parse {hash; operation = raw; check_signature} =
     let open Result_syntax in
-    let hash = Operation.hash raw in
     let size = Data_encoding.Binary.length Operation.encoding raw in
     if size > Proto.max_operation_data_length then
       tzfail (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
       let* protocol_data = parse_unsafe raw.proto in
-      return {hash; raw; protocol_data}
+      return {hash; check_signature; raw; protocol_data}
 
   let preapply ~chain_id ~cache ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
@@ -954,7 +982,7 @@ module Make (Filter : Shell_plugin.FILTER) = struct
       Protocol.(
         match Proto.environment_version with
         | V0 -> false
-        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 -> true)
+        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 -> true)
       && not is_from_genesis
     in
     let* context =
@@ -1048,8 +1076,9 @@ module Make (Filter : Shell_plugin.FILTER) = struct
              operations ->
           let*! new_validation_result, new_validation_state, rev_receipts =
             List.fold_left_s
-              (fun (acc_validation_result, acc_validation_state, receipts) op ->
-                match parse op with
+              (fun (acc_validation_result, acc_validation_state, receipts)
+                   operation ->
+                match parse operation with
                 | Error _ ->
                     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1721  *)
                     Lwt.return
@@ -1252,13 +1281,8 @@ module Make (Filter : Shell_plugin.FILTER) = struct
       List.fold_left_es
         (fun state ops ->
           List.fold_left_es
-            (fun state (oph, op) ->
-              let*! status = Filter.Mempool.syntactic_check op in
-              match status with
-              | `Ill_formed -> failwith "Ill-formed operation filtered"
-              | `Well_formed ->
-                  let* state = Proto.validate_operation state oph op in
-                  return state)
+            (fun state (oph, op, check_signature) ->
+              Proto.validate_operation ~check_signature state oph op)
             state
             ops)
         state
@@ -1291,11 +1315,11 @@ let assert_no_duplicate_operations block_hash live_operations operations =
   try
     return
       (List.fold_left
-         (List.fold_left (fun live_operations op ->
-              let oph = Operation.hash op in
-              if Operation_hash.Set.mem oph live_operations then
-                raise (Duplicate (Replayed_operation oph))
-              else Operation_hash.Set.add oph live_operations))
+         (List.fold_left
+            (fun live_operations {hash; operation = _; check_signature = _} ->
+              if Operation_hash.Set.mem hash live_operations then
+                raise (Duplicate (Replayed_operation hash))
+              else Operation_hash.Set.add hash live_operations))
          live_operations
          operations)
   with Duplicate err -> tzfail (invalid_block block_hash err)
@@ -1306,14 +1330,18 @@ let assert_operation_liveness block_hash live_blocks operations =
   try
     return
       (List.iter
-         (List.iter (fun op ->
-              if not (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+         (List.iter (fun {hash; operation; check_signature = _} ->
+              if
+                not
+                  (Block_hash.Set.mem
+                     operation.Operation.shell.branch
+                     live_blocks)
               then
                 let error =
                   Outdated_operation
                     {
-                      operation = Operation.hash op;
-                      originating_block = op.shell.branch;
+                      operation = hash;
+                      originating_block = operation.shell.branch;
                     }
                 in
                 raise (Outdated error)))
@@ -1347,10 +1375,10 @@ let recompute_metadata chain_id ~predecessor_block_header ~predecessor_context
     block_hash block_header operations =
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   Block_validation.recompute_metadata
     chain_id
     ~predecessor_block_header
@@ -1389,10 +1417,10 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
   let open Lwt_result_syntax in
   let block_hash = Block_header.hash block_header in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   Block_validation.precheck
     chain_id
     ~predecessor_block_header
@@ -1418,12 +1446,11 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
     } ~cache block_hash block_header operations =
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
   let* () =
-    if should_precheck && Filter.Proto.(compare environment_version V7 >= 0)
-    then
+    if should_precheck && Proto.(compare environment_version V7 >= 0) then
       precheck
         ~chain_id
         ~predecessor_block_header
@@ -1435,7 +1462,7 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
         operations
     else return_unit
   in
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   Block_validation.apply
     ?simulate
     ?cached_result
@@ -1502,16 +1529,18 @@ let preapply ~chain_id ~user_activated_upgrades
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
   let open Lwt_result_syntax in
   let*! protocol = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash:predecessor_hash protocol
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin
+      ~block_hash:predecessor_hash
+      protocol
   in
   (* The cache might be inconsistent with the context. By forcing the
      reloading of the cache, we restore the consistency. *)
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   let* protocol_data =
     match
       Data_encoding.Binary.of_bytes_opt
-        Filter.Proto.block_header_data_encoding
+        Proto.block_header_data_encoding
         protocol_data
     with
     | None -> failwith "Invalid block header"

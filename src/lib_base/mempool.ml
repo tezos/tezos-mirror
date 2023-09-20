@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type t = {
-  known_valid : Tezos_crypto.Hashed.Operation_hash.t list;
+  known_valid : Tezos_crypto.Hashed.Operation_hash.Set.t;
   pending : Tezos_crypto.Hashed.Operation_hash.Set.t;
 }
 
@@ -41,9 +41,13 @@ let encoding =
        (fun {known_valid; pending} -> (known_valid, pending))
        (fun (known_valid, pending) -> {known_valid; pending})
        (obj2
-          (req "known_valid" (list Tezos_crypto.Hashed.Operation_hash.encoding))
+          (req "known_valid" Tezos_crypto.Hashed.Operation_hash.Set.encoding)
           (req
              "pending"
+             (* This [dynamic_size] is redundant with the [Set]'s
+                internal [dynamic_size]. Removing it would require to
+                handle retro-compatibility as other nodes would
+                use/expect the legacy encoding. *)
              (dynamic_size Tezos_crypto.Hashed.Operation_hash.Set.encoding)))
 
 let bounded_encoding ?max_operations () =
@@ -55,20 +59,25 @@ let bounded_encoding ?max_operations () =
         encoding
 
 let empty =
-  {known_valid = []; pending = Tezos_crypto.Hashed.Operation_hash.Set.empty}
+  {
+    known_valid = Tezos_crypto.Hashed.Operation_hash.Set.empty;
+    pending = Tezos_crypto.Hashed.Operation_hash.Set.empty;
+  }
 
 let is_empty {known_valid; pending} =
-  known_valid = [] && Tezos_crypto.Hashed.Operation_hash.Set.is_empty pending
+  Tezos_crypto.Hashed.Operation_hash.Set.is_empty known_valid
+  && Tezos_crypto.Hashed.Operation_hash.Set.is_empty pending
 
 let remove oph {known_valid; pending} =
   {
-    known_valid =
-      List.filter
-        (fun x -> not (Tezos_crypto.Hashed.Operation_hash.equal x oph))
-        known_valid;
+    known_valid = Tezos_crypto.Hashed.Operation_hash.Set.remove oph known_valid;
     pending = Tezos_crypto.Hashed.Operation_hash.Set.remove oph pending;
   }
 
-let cons_valid oph t = {t with known_valid = oph :: t.known_valid}
+let cons_valid oph t =
+  {
+    known_valid = Tezos_crypto.Hashed.Operation_hash.Set.add oph t.known_valid;
+    pending = t.pending;
+  }
 
 let () = Data_encoding.Registration.register encoding

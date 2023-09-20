@@ -39,3 +39,7 @@ let tztests_with_pvm ~versions l =
     (fun version ->
       List.map (fun (title, sort, k) -> tztest ~version title sort k) l)
     versions
+
+let all_versions = List.map snd Tezos_scoru_wasm.Wasm_pvm_state.versions
+
+let tztests_with_all_pvms = tztests_with_pvm ~versions:all_versions

@@ -82,7 +82,18 @@ let register_protocol_migration_tests () =
     ~from_protocol:migrate_to
     ~to_protocol:Demo
     ~loser_protocols:[migrate_from] ;
-  Sc_rollup.register_migration ~migrate_from:Protocol.Nairobi ~migrate_to
+  Sc_rollup.register_migration ~migrate_from ~migrate_to ;
+  Dal.register_migration ~migrate_from ~migrate_to
+
+let register_old_protocol_migration_tests () =
+  List.iter
+    (fun p ->
+      match (p, Protocol.next_protocol p) with
+      | _, Some Alpha -> () (* Already in register_protocol_migration_tests *)
+      | _, None -> ()
+      | migrate_from, Some migrate_to ->
+          Sc_rollup.register_migration ~migrate_from ~migrate_to)
+    Protocol.all
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
    [?supports] to decide which protocols the tests should run on.
@@ -126,9 +137,11 @@ let register_protocol_tests_that_use_supports_correctly () =
   Contract_typecheck_regression.register ~protocols ;
   Contract_macros.register ~protocols ;
   Contract_mini_scenarios.register ~protocols ;
+  Contract_bootstrap.register ~protocols ;
   Create_contract.register ~protocols ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols ;
+  Double_consensus.register ~protocols ;
   Encoding.register ~protocols ;
   Events.register ~protocols ;
   External_validation.register ~protocols ;
@@ -161,6 +174,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Proxy.register ~protocols ;
   Proxy_server_test.register ~protocols ;
   RPC_test.register protocols ;
+  Rpc_versioning_attestation.register ~protocols ;
   Reject_malformed_micheline.register ~protocols ;
   Replace_by_fees.register ~protocols ;
   Retro.register ~protocols ;
@@ -194,7 +208,10 @@ let register_protocol_tests_that_use_supports_correctly () =
   Used_paid_storage_spaces.register ~protocols ;
   Vdf_test.register ~protocols ;
   Views.register ~protocols ;
-  Zk_rollup.register ~protocols
+  Zk_rollup.register ~protocols ;
+  Tx_sc_rollup.register ~protocols ;
+  Dac.register ~protocols ;
+  Timelock.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as
@@ -202,20 +219,16 @@ let register_protocol_tests_that_use_supports_correctly () =
    Some do not. Those that do not are declared here. *)
 let register_protocol_specific_because_regression_tests () =
   Dal.register ~protocols:[Alpha] ;
-  Dac.register ~protocols:[Alpha] ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
-           re-enable Mumbai when DAC is separated from Dal node. *)
   Evm_rollup.register ~protocols:[Alpha] ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
-         re-enable Mumbai when DAC is separated from Dal node. *)
-  Tx_sc_rollup.register ~protocols:[Alpha] ;
+  Sc_sequencer.register ~protocols:[Alpha] ;
   Snoop_codegen.register ~protocols:[Alpha] ;
-  Timelock.register ~protocols:[Alpha] ;
-  Timelock_disabled.register ~protocols:[Mumbai]
+  (* This can be safely removed after Nairobi is frozen *)
+  Timelock_disabled.register ~protocols:[Nairobi]
 
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
+  register_old_protocol_migration_tests () ;
   register_protocol_tests_that_use_supports_correctly () ;
   register_protocol_specific_because_regression_tests () ;
   Tezos_scoru_wasm_regressions.register () ;

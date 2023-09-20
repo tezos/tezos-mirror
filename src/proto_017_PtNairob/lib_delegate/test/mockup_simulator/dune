@@ -3,20 +3,20 @@
 
 (library
  (name tezos_017_PtNairob_mockup_simulator)
- (public_name tezos-baking-017-PtNairob.mockup-simulator)
+ (public_name octez-protocol-017-PtNairob-libs.bakings.mockup-simulator)
  (libraries
-  tezos-base
-  tezos-protocol-017-PtNairob
-  tezos-client-017-PtNairob
-  tezos-client-commands
-  tezos-baking-017-PtNairob
-  tezos-stdlib-unix
-  tezos-client-base-unix
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol
+  octez-protocol-017-PtNairob-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-017-PtNairob-libs.baking
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base-unix
   tezos-protocol-017-PtNairob.parameters
-  tezos-mockup
-  tezos-mockup-proxy
-  tezos-mockup-commands
-  tezos-baking-017-PtNairob.tenderbrute)
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-proxy
+  octez-shell-libs.mockup-commands
+  octez-protocol-017-PtNairob-libs.baking.tenderbrute)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

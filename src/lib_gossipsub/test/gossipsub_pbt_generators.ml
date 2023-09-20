@@ -68,6 +68,9 @@ struct
     | Leave : GS.leave -> [`Leave] input (* case 10 *)
     | Subscribe : GS.subscribe -> [`Subscribe] input (* case 11 *)
     | Unsubscribe : GS.unsubscribe -> [`Unsubscribe] input (* case 12 *)
+    | Set_application_score :
+        GS.set_application_score
+        -> [`Set_application_score] input (* case 13 *)
 
   type ex_input = I : _ input -> ex_input
 
@@ -112,24 +115,41 @@ struct
         fprintf fmtr "Subscribe %a" GS.pp_subscribe subscribe
     | Unsubscribe unsubscribe ->
         fprintf fmtr "Unsubscribe %a" GS.pp_unsubscribe unsubscribe
+    | Set_application_score set_application_score ->
+        fprintf
+          fmtr
+          "Set_application_score %a"
+          GS.pp_set_application_score
+          set_application_score
 
-  let pp_trace ?pp_state ?pp_state' ?pp_output () fmtr trace =
+  let pp_output fmtr (O o) = GS.pp_output fmtr o
+
+  let pp_trace ?pp_state ?pp_output () fmtr trace =
     let open Format in
-    let pp fmtr (Transition {time; input; state; state'; output}) =
-      fprintf fmtr "[%a] " GS.Time.pp time ;
-      Option.iter (fun pp -> fprintf fmtr "%a => " pp state) pp_state ;
+    let pp fmtr (Transition {time; input; state; state' = _; output}) =
+      Option.iter (fun pp -> fprintf fmtr "%a@," pp state) pp_state ;
+      fprintf fmtr "[%a] => " GS.Time.pp time ;
       pp_input fmtr input ;
-      Option.iter (fun pp -> fprintf fmtr " / %a" pp (O output)) pp_output ;
-      Option.iter (fun pp -> fprintf fmtr " => %a" pp state') pp_state'
+      Option.iter (fun pp -> fprintf fmtr " / %a" pp (O output)) pp_output
+    in
+    let pp_last_state fmtr trace =
+      match List.hd (List.rev trace) with
+      | None -> ()
+      | Some (Transition {state'; _}) ->
+          Option.iter (fun pp -> fprintf fmtr "%a@," pp state') pp_state
     in
     fprintf
       fmtr
-      "%a"
+      "%a@;%a"
       (pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr "@,") pp)
       trace
+      pp_last_state
+      trace
 
-  let add_peer ~gen_peer =
-    let+ direct = bool and+ outbound = bool and+ peer = gen_peer in
+  let add_peer ~gen_peer ~gen_direct ~gen_outbound =
+    let+ direct = gen_direct
+    and+ outbound = gen_outbound
+    and+ peer = gen_peer in
     ({direct; outbound; peer} : GS.add_peer)
 
   let remove_peer ~gen_peer =
@@ -153,13 +173,14 @@ struct
     let+ peer = gen_peer and+ topic = gen_topic in
     ({peer; topic} : GS.graft)
 
-  let prune ~gen_peer ~gen_topic ~gen_span px_count =
+  let prune ~gen_peer ~gen_topic ~gen_backoff ~gen_px_count =
+    let* px_count = gen_px_count in
     let+ peer = gen_peer
     and+ topic = gen_topic
     and+ px =
       let+ l = list_repeat px_count gen_peer in
       List.to_seq l
-    and+ backoff = gen_span in
+    and+ backoff = gen_backoff in
     ({peer; topic; px; backoff} : GS.prune)
 
   let receive_message ~gen_peer ~gen_topic ~gen_message_id ~gen_message =
@@ -191,6 +212,10 @@ struct
     let+ topic = gen_topic and+ peer = gen_peer in
     ({topic; peer} : GS.unsubscribe)
 
+  let set_application_score ~gen_peer ~gen_score =
+    let+ peer = gen_peer and+ score = gen_score in
+    ({peer; score} : GS.set_application_score)
+
   let input (I i) = Input i
 
   module I = struct
@@ -221,6 +246,8 @@ struct
     let unsubscribe x = Unsubscribe x |> i
 
     let heartbeat = i Heartbeat
+
+    let set_application_score x = Set_application_score x |> i
   end
 
   let dispatch : type a. a input -> GS.state -> GS.state * a GS.output =
@@ -239,23 +266,23 @@ struct
     | Leave m -> GS.leave m state
     | Subscribe m -> GS.handle_subscribe m state
     | Unsubscribe m -> GS.handle_unsubscribe m state
+    | Set_application_score m -> GS.set_application_score m state
 
   (** A fragment is a sequence of events encoding a basic interaction with
       the gossipsub automaton. Fragments support sequential and parallel
       composition. *)
   module Fragment = struct
-    type raw = Thread of event SeqM.t | Par of raw list | Seq of raw list
+    type raw = Thread of event Seq.t | Par of raw list | Seq of raw list
 
     type t = raw M.t
 
-    let raw_of_list l = Thread (List.to_seq l |> Seq.map input |> SeqM.of_seq)
+    let raw_of_list l = Thread (List.to_seq l |> Seq.map input)
 
-    let of_list (l : ex_input list) =
-      M.return (Thread (List.to_seq l |> Seq.map input |> SeqM.of_seq))
+    let of_list (l : ex_input list) = raw_of_list l |> M.return
 
     (* Smart [raw] constructors *)
 
-    let empty_raw = Thread SeqM.empty
+    let empty_raw = Thread Seq.empty
 
     let seq rs =
       match rs with
@@ -294,8 +321,7 @@ struct
       let open M in
       match raw with
       | Thread seq -> (
-          let* opt = SeqM.uncons seq in
-          match opt with
+          match Seq.uncons seq with
           | None -> k None
           | Some (hd, tail) -> k (Some (hd, Thread tail)))
       | Seq [] -> k None
@@ -335,8 +361,7 @@ struct
       raw_of_list (f x)
 
     let tick : t =
-      Thread
-        ([Elapse (Milliseconds.Span.of_int_s 1)] |> List.to_seq |> SeqM.of_seq)
+      Thread ([Elapse (Milliseconds.Span.of_int_s 1)] |> List.to_seq)
       |> M.return
 
     let repeat : int -> t -> t =
@@ -469,6 +494,12 @@ struct
       if shrinking_deactivated then fragment
       else M.set_shrink shrink_raw fragment
   end
+
+  let fold fragment f init =
+    let open M in
+    let* raw = Fragment.raw_generator fragment in
+    let seq = SeqM.M.unfold Fragment.next raw in
+    SeqM.fold_left (fun acc event -> f event acc) init seq
 
   let run state fragment : trace t =
     let open M in

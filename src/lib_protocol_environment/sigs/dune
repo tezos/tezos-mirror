@@ -3,10 +3,10 @@
 
 (library
  (name tezos_protocol_environment_sigs)
- (public_name tezos-protocol-environment.sigs)
+ (public_name octez-proto-libs.protocol-environment.sigs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment.sigs-internals)
+  octez-proto-libs.protocol-environment.sigs-internals)
  (flags
   (:standard)
   -nostdlib
@@ -90,3 +90,12 @@
   (with-stdout-to
    %{targets}
    (run %{dep:../ppinclude/ppinclude.exe} v10.in.ml))))
+
+(rule
+ (targets v11.ml)
+ (mode promote)
+ (deps v11.in.ml (glob_files v11/*.mli))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{dep:../ppinclude/ppinclude.exe} v11.in.ml))))

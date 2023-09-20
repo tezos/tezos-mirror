@@ -6,16 +6,16 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-tree-encoding
-  tezos-base.unix
-  tezos-context.disk
-  tezos-base-test-helpers
-  tezos-scoru-wasm-helpers
-  tezos_scoru_wasm_test_helpers
-  tezos-test-helpers
-  tezos-scoru-wasm
-  tezos-scoru-wasm-fast
+  octez-libs.base
+  octez-libs.tree-encoding
+  octez-libs.base.unix
+  octez-libs.tezos-context.disk
+  octez-libs.base-test-helpers
+  octez-l2-libs.scoru-wasm-helpers
+  octez-l2-libs.scoru_wasm_test_helpers
+  octez-libs.test-helpers
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-fast
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -48,7 +48,7 @@
 
 (rule
  (alias runtest)
- (package tezos-scoru-wasm-fast-test)
+ (package octez-l2-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

@@ -3,11 +3,11 @@
 
 (library
  (name tezos_context_dump)
- (public_name tezos-context.dump)
+ (public_name octez-libs.tezos-context.dump)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.stdlib-unix
   fmt)
  (flags
   (:standard)

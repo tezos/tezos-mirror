@@ -1,0 +1,9 @@
+{0 Octez-protocol-013-PtJakart-libs: octez protocol 013-PtJakart libraries}
+
+This is a package containing some libraries related to the Tezos 013-PtJakart protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_013_PtJakart}Tezos_client_013_PtJakart}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_protocol_plugin_013_PtJakart}Tezos_protocol_plugin_013_PtJakart}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_013_PtJakart_registerer}Tezos_protocol_plugin_013_PtJakart_registerer}: Protocol plugin registerer

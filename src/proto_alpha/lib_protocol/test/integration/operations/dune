@@ -7,12 +7,12 @@
  (libraries
   tezt.core
   octez-alcotezt
-  tezos-base
-  tezos-protocol-alpha
-  tezos-client-alpha
-  tezos-alpha-test-helpers
-  tezos-base-test-helpers
-  tezos-protocol-plugin-alpha)
+  octez-libs.base
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.client
+  octez-protocol-alpha-libs.test-helpers
+  octez-libs.base-test-helpers
+  octez-protocol-alpha-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

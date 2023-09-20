@@ -61,15 +61,21 @@ type t
 
 type operation := t
 
+type consensus_kind = Attestation | Preattestation
+
 (** The kind is necessary because it determines the watermark of an
    operation which is necessary for signing an operation. This type
    aims to be extended when other kinds of operations are added into
    this module. *)
-type kind = Consensus of {chain_id : string} | Voting | Manager
+type kind =
+  | Consensus of {kind : consensus_kind; chain_id : string}
+  | Anonymous
+  | Voting
+  | Manager
 
-(** [make ~branch ~signer ~kind json client] builds the representation
+(** [make ~branch ?signer ~kind json client] builds the representation
    of an unsigned operation. *)
-val make : branch:string -> signer:Account.key -> kind:kind -> JSON.u -> t
+val make : branch:string -> ?signer:Account.key -> kind:kind -> JSON.u -> t
 
 (** [json t] gives the json representation of an unsigned operation. *)
 val json : t -> JSON.u
@@ -95,11 +101,15 @@ val hex :
   Client.t ->
   Hex.t Lwt.t
 
-(** [sign t client] signs the raw representation of operation [t] by
-   its signer (see {!val:make}). [client] is used to construct the
-   binary representation of [t]. *)
+(** [sign t client] signs the raw representation of operation [t] by its signer
+    (see {!val:make}). [client] is used to construct the binary representation
+    of [t]. Note that if no signer have been given to [t] the function returns
+    [Tezos_crypto.Signature.zero]. *)
 val sign :
   ?protocol:Protocol.t -> t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
+
+(** [hash t client] returns the hash of the operation  *)
+val hash : t -> Client.t -> [`OpHash of string] Lwt.t
 
 (** [inject ?(request=`Inject) ?(force=false) ?(signature=None)
    ?(error=None) t] injects an operation into the node. The node is
@@ -137,6 +147,25 @@ val inject :
   Client.t ->
   [`OpHash of string] Lwt.t
 
+(** Same as [inject], but do not wait for the process to exit. *)
+val spawn_inject :
+  ?force:bool ->
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  JSON.t Runnable.process Lwt.t
+
+(** Run [spawn_inject] then capture two groups on stderr with [rex]. *)
+val inject_and_capture2_stderr :
+  rex:rex ->
+  ?force:bool ->
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  (string * string) Lwt.t
+
 (** [inject_operations ?protocol ?request ?force ?error ?use_tmp_file ops
     client] is similar as [inject] for a list of operations. This function calls
     the RPC {!val:RPC.post_private_injection_operations} which is faster than
@@ -173,6 +202,15 @@ val inject_operations :
    [chain_id] when it is not provided. *)
 val make_run_operation_input : ?chain_id:string -> t -> Client.t -> JSON.u Lwt.t
 
+(** Craft a json representing the full operation, in a format that is
+   compatible with the [preapply/operations] RPC
+   ({!RPC.post_chain_block_helpers_preapply_operations}).
+
+   This json contains many more fields than the one produced by the
+   {!json} function above. *)
+val make_preapply_operation_input :
+  protocol:Protocol.t -> signature:Tezos_crypto.Signature.t -> t -> JSON.u
+
 module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
@@ -182,6 +220,50 @@ module Consensus : sig
      [level - attestation_lag].  For each slot, the value of the
      booleans indicates whether the data is deemed available. *)
   val dal_attestation : attestation:bool array -> level:int -> t
+
+  (** [consensus ~kind ~use_legacy_name ~level ~round ~slot ~block_payload_hash]
+      crafts a consensus operation with the [kind] at [level] on the [round]
+      with the [slot] and [block_payload_hash]. If [use_legacy_name] is set, the
+      [kind] field in the crafted JSON will be "(pre)endorsement" instead of
+      "(pre)attestation". *)
+  val consensus :
+    use_legacy_name:bool ->
+    kind:consensus_kind ->
+    slot:int ->
+    level:int ->
+    round:int ->
+    block_payload_hash:string ->
+    t
+
+  (** [preattestation ?use_legacy_name ~level ~round ~slot ~block_payload_hash]
+      crafts a preattestation operation at [level] on the [round] with the
+      [slot] and [block_payload_hash]. If [use_legacy_name] is set, the [kind]
+      field in the crafted JSON will be "preendorsement" instead of
+      "preattestation". *)
+  val preattestation :
+    use_legacy_name:bool ->
+    slot:int ->
+    level:int ->
+    round:int ->
+    block_payload_hash:string ->
+    t
+
+  (** [attestation ?use_legacy_name ~level ~round ~slot ~block_payload_hash]
+      crafts an attestation operation at [level] on the [round] with the [slot]
+      and [block_payload_hash]. If [use_legacy_name] is set, the [kind] field in
+      the crafted JSON will be "endorsement" instead of "attestation". *)
+  val attestation :
+    use_legacy_name:bool ->
+    slot:int ->
+    level:int ->
+    round:int ->
+    block_payload_hash:string ->
+    t
+
+  (** [kind_to_string kind use_legacy_name] return the name of the [kind]. If
+      [use_legacy_name] is set, the name corresponding to the [kind] will be
+      "(pre)endorsement" instead of "(pre)attestation". *)
+  val kind_to_string : consensus_kind -> bool -> string
 
   (** [operation] constructs an operation from a consensus
      operation. the [client] is used to fetch the branch and the
@@ -205,6 +287,69 @@ module Consensus : sig
     ?chain_id:string ->
     ?error:rex ->
     signer:Account.key ->
+    t ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
+end
+
+module Anonymous : sig
+  (** A representation of an anonymous operation. *)
+  type t
+
+  type double_consensus_evidence_kind =
+    | Double_attestation_evidence
+    | Double_preattestation_evidence
+
+  (** [double_consensus_evidence ~kind ~use_legacy_name op1 op2] crafts a double
+      consensus evidence operation with the [kind], [op1] and [op2]. Both
+      operations should be of the same kind and the same as the one expected by
+      [kind]. If [use_legacy_name] is set, the [kind] field in the crafted JSON
+      will be "(pre)endorsement" instead of "(pre)attestation". *)
+  val double_consensus_evidence :
+    kind:double_consensus_evidence_kind ->
+    use_legacy_name:bool ->
+    operation * Tezos_crypto.Signature.t ->
+    operation * Tezos_crypto.Signature.t ->
+    t
+
+  (** [double_attestation_evidence ~use_legacy_name op1 op2] crafts a double
+      attestation evidence operation with op1 and op2. Both operations should be
+      attestations. If [use_legacy_name] is set, the [kind] field in the crafted
+      JSON will be "endorsement" instead of "attestation". *)
+  val double_attestation_evidence :
+    use_legacy_name:bool ->
+    operation * Tezos_crypto.Signature.t ->
+    operation * Tezos_crypto.Signature.t ->
+    t
+
+  (** [double_preattestation_evidence ~use_legacy_name op1 op2] crafts a double
+      attestation evidence operation with op1 and op2. Both operations should be
+      preattestations. If [use_legacy_name] is set, the [kind] field in the
+      crafted JSON will be "preendorsement" instead of "preattestation". *)
+  val double_preattestation_evidence :
+    use_legacy_name:bool ->
+    operation * Tezos_crypto.Signature.t ->
+    operation * Tezos_crypto.Signature.t ->
+    t
+
+  (** [kind_to_string kind use_legacy_name] return the name of the [kind]. If
+      [use_legacy_name] is set, the name corresponding to the [kind] will be
+      "double_(pre)endorsement_evidence" instead of
+      "double_(pre)attestation_evidence". *)
+  val kind_to_string : double_consensus_evidence_kind -> bool -> string
+
+  (** [operation] constructs an operation from an anonymous operation. the
+      [client] is used to fetch the branch and the [chain_id]. *)
+  val operation : ?branch:string -> t -> Client.t -> operation Lwt.t
+
+  (** A wrapper for {!val:inject} with anonymous operations. The client is used
+      to get all the data that was not provided if it can be recovered via RPCs.
+      Mainly those are the [branch] and the [chain_id]. *)
+  val inject :
+    ?request:[`Inject | `Notify] ->
+    ?force:bool ->
+    ?branch:string ->
+    ?error:rex ->
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
@@ -306,7 +451,6 @@ module Manager : sig
      operation for the data-availability layer that publishes a
      slot. *)
   val dal_publish_slot_header :
-    level:int ->
     index:int ->
     commitment:Tezos_crypto_dal.Cryptobox.commitment ->
     proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->
@@ -428,8 +572,27 @@ module Manager : sig
   val get_branch : ?chain:string -> ?offset:int -> Client.t -> string Lwt.t
 end
 
-(** Regular expression recognizing the mempool error that arises when
-    the operation conflicts with another previously validated operation.
+(** Regular expressions for specific error messages.
 
-    Intended to be provided as the [error] argument to {!val:inject}. *)
-val conflict_error : rex
+    Can be used as e.g.
+    - the [error] argument of {!val:inject}
+    - the [rex] argument of {!val:inject_and_capture2_stderr}
+    - the [msg] argument of {!val:Process.check_error}. *)
+
+(** Matches the client message for the [Operation_quota_exceeded]
+    protocol error. *)
+val gas_limit_exceeded : rex
+
+(** Matches the message produced by
+    [Operation_conflict {new_hash; needed_fee_in_mutez = Some fee}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [new_hash] and [fee]. *)
+val conflict_error_with_needed_fee : rex
+
+(** Matches the message produced by
+    [Rejected_by_full_mempool {hash; needed_fee_in_mutez = Some fee}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [hash] and [fee]. *)
+val rejected_by_full_mempool_with_needed_fee : rex

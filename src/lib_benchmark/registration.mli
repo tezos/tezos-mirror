@@ -30,6 +30,8 @@ exception Benchmark_not_found of Namespace.t
 
 exception Model_not_found of Namespace.t
 
+exception Local_model_not_found of String.t
+
 exception Parameter_not_found of Free_variable.t
 
 (** Types of the registered informations for each kind of item.
@@ -55,10 +57,27 @@ type parameter_info = Namespace.t list
 (* Registration functions *)
 
 (** Register a benchmark. Recursively registers any relevant model and parameter
-    included in it. *)
-val register : Benchmark.t -> unit
+    included in it. Add timer latency to the model if [add_timer] is [true] (default).
+    It is expected that [add_timer] is set to [false] when registering a benchmark
+    which uses [Calculated].
+*)
+val register : ?add_timer:bool -> Benchmark.t -> unit
 
-(** Register a {!Tezos_clic.command} for the command line *)
+(** Register a [Benchmark.Simple]. Recursively registers any relevant model and parameter
+    included in it. *)
+val register_simple : ?add_timer:bool -> Benchmark.simple -> unit
+
+(** Register a [Benchmark.Simple_with_num]. Recursively registers any relevant model and parameter
+        included in it. *)
+val register_simple_with_num :
+  ?add_timer:bool -> Benchmark.simple_with_num -> unit
+
+(** [register_model_for_code_generation s model] registers a model [model] with
+    a local model name [s] for code generation.
+    Use [register] if a model is associated with a benchmark. *)
+val register_model_for_code_generation : string -> 'a Model.t -> unit
+
+(** Register a {!type:Tezos_clic.command} for the command line *)
 val add_command : unit Tezos_clic.command -> unit
 
 (* -------------------------------------------------------------------------- *)
@@ -127,8 +146,16 @@ val find_benchmarks_in_namespace :
 val find_model : Namespace.t -> model_info option
 
 (** [find_model_exn s] returns [(name,m)] with [name = s] if the model of [m] is
-    named [name] and has been registered, else raises the exception {! Model_not_found s} *)
+    named [name] and has been registered, else raises the exception {! Local_model_not_found s} *)
 val find_model_exn : Namespace.t -> model_info
+
+(** [find_local_model s] returns the list of benchmark names whose local model
+    name is [s], if the latter has been registered, else returns [None] *)
+val find_local_model : String.t -> Namespace.t list option
+
+(** [find_local_model s] returns the list of benchmark names whose local model
+    name is [s], if the latter has been registered, else raises the exception {! Model_not_found s} *)
+val find_local_model_exn : String.t -> Namespace.t list
 
 (** [find_models_in_namespace s] returns all registered models which name
     has [s] as a parent namespace. *)

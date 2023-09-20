@@ -25,32 +25,44 @@
 
 exception Status_already_ready
 
+type head_info = {
+  proto : int; (* the [proto_level] from the head's shell header *)
+  level : int32;
+}
+
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
+  plugin_proto : int; (* the [proto_level] of the plugin *)
+  last_seen_head : head_info option;
 }
 
 type status = Ready of ready_ctxt | Starting
 
 type t = {
   mutable status : status;
-  config : Configuration.t;
+  config : Configuration_file.t;
   store : Store.node_store;
-  tezos_node_cctxt : Client_context.full;
+  tezos_node_cctxt : Tezos_rpc.Context.generic;
   neighbors_cctxts : Dal_node_client.cctxt list;
   committee_cache : Committee_cache.t;
+  gs_worker : Gossipsub.Worker.t;
+  transport_layer : Gossipsub.Transport_layer.t;
+  mutable profile_ctxt : Profile_manager.t;
+  metrics_server : Metrics.t;
 }
 
-let init config store cctxt =
+let init config store gs_worker transport_layer cctxt metrics_server =
   let neighbors_cctxts =
     List.map
-      (fun Configuration.{addr; port} ->
+      (fun Configuration_file.{addr; port} ->
         let endpoint =
           Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port)
         in
         Dal_node_client.make_unix_cctxt endpoint)
-      config.Configuration.neighbors
+      config.Configuration_file.neighbors
   in
   {
     status = Starting;
@@ -60,12 +72,39 @@ let init config store cctxt =
     neighbors_cctxts;
     committee_cache =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
+    gs_worker;
+    transport_layer;
+    profile_ctxt = Profile_manager.empty;
+    metrics_server;
   }
 
-let set_ready ctxt plugin cryptobox proto_parameters =
+let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
   match ctxt.status with
-  | Starting -> ctxt.status <- Ready {plugin; cryptobox; proto_parameters}
+  | Starting ->
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
+
+         Instead of recompute those parameters, they could be stored
+         (for a given cryptobox). *)
+      let shards_proofs_precomputation =
+        Cryptobox.precompute_shards_proofs cryptobox
+      in
+      ctxt.status <-
+        Ready
+          {
+            plugin;
+            cryptobox;
+            proto_parameters;
+            shards_proofs_precomputation;
+            plugin_proto;
+            last_seen_head = None;
+          }
   | Ready _ -> raise Status_already_ready
+
+let update_plugin_in_ready ctxt plugin proto =
+  match ctxt.status with
+  | Starting -> ()
+  | Ready ready_ctxt ->
+      ctxt.status <- Ready {ready_ctxt with plugin; plugin_proto = proto}
 
 type error += Node_not_ready
 
@@ -89,33 +128,49 @@ let get_ready ctxt =
   | Ready ctxt -> Ok ctxt
   | Starting -> fail [Node_not_ready]
 
+let update_last_seen_head ctxt head_info =
+  let open Result_syntax in
+  match ctxt.status with
+  | Ready ready_ctxt ->
+      ctxt.status <- Ready {ready_ctxt with last_seen_head = Some head_info} ;
+      return_unit
+  | Starting -> fail [Node_not_ready]
+
+let get_profile_ctxt ctxt = ctxt.profile_ctxt
+
+let set_profile_ctxt ctxt pctxt = ctxt.profile_ctxt <- pctxt
+
 let get_config ctxt = ctxt.config
 
 let get_status ctxt = ctxt.status
 
 let get_store ctxt = ctxt.store
 
+let get_gs_worker ctxt = ctxt.gs_worker
+
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 
-let fetch_assigned_shard_indices ctxt ~level ~pkh =
+let fetch_committee ctxt ~level =
   let open Lwt_result_syntax in
   let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
-  let+ committee =
-    match Committee_cache.find cache ~level with
-    | Some committee -> return committee
-    | None ->
-        let*? {plugin = (module Plugin); _} = get_ready ctxt in
-        let+ committee = Plugin.get_committee cctxt ~level in
-        let committee =
-          Tezos_crypto.Signature.Public_key_hash.Map.map
-            (fun (start_index, offset) -> Committee_cache.{start_index; offset})
-            committee
-        in
-        Committee_cache.add cache ~level ~committee ;
-        committee
-  in
+  match Committee_cache.find cache ~level with
+  | Some committee -> return committee
+  | None ->
+      let*? {plugin = (module Plugin); _} = get_ready ctxt in
+      let+ committee = Plugin.get_committee cctxt ~level in
+      let committee =
+        Tezos_crypto.Signature.Public_key_hash.Map.map
+          (fun (start_index, offset) -> Committee_cache.{start_index; offset})
+          committee
+      in
+      Committee_cache.add cache ~level ~committee ;
+      committee
+
+let fetch_assigned_shard_indices ctxt ~level ~pkh =
+  let open Lwt_result_syntax in
+  let+ committee = fetch_committee ctxt ~level in
   match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
   | None -> []
   | Some {start_index; offset} ->

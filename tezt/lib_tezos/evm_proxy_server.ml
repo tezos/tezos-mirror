@@ -29,7 +29,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     rpc_addr : string;
     rpc_port : int;
-    rollup_node : Sc_rollup_node.t;
+    rollup_node : Sc_rollup_node.t option;
     runner : Runner.t option;
   }
 
@@ -45,17 +45,12 @@ include Daemon.Make (Parameters)
 
 let path = "./octez-evm-proxy-server"
 
-let connection_arguments ?rpc_addr ?rpc_port rollup_node_endpoint =
+let connection_arguments ?rpc_addr ?rpc_port () =
   let open Cli_arg in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  ( [
-      "--rollup-node-endpoint";
-      rollup_node_endpoint;
-      "--rpc-port";
-      string_of_int rpc_port;
-    ]
+  ( ["--rpc-port"; string_of_int rpc_port]
     @ optional_arg "--rpc-addr" Fun.id rpc_addr,
     Option.value ~default:"127.0.0.1" rpc_addr,
     rpc_port )
@@ -95,9 +90,8 @@ let wait_for_ready proxy_server =
       check_event proxy_server event_ready_name promise
 
 let create ?runner ?rpc_addr ?rpc_port rollup_node =
-  let rollup_node_endpoint = Sc_rollup_node.endpoint rollup_node in
   let arguments, rpc_addr, rpc_port =
-    connection_arguments ?rpc_addr ?rpc_port rollup_node_endpoint
+    connection_arguments ?rpc_addr ?rpc_port ()
   in
   let proxy_server =
     create
@@ -107,12 +101,25 @@ let create ?runner ?rpc_addr ?rpc_port rollup_node =
   on_event proxy_server (handle_event proxy_server) ;
   proxy_server
 
+let mockup ?runner ?rpc_addr ?rpc_port () =
+  create ?runner ?rpc_addr ?rpc_port None
+
+let create ?runner ?rpc_addr ?rpc_port rollup_node =
+  create ?runner ?rpc_addr ?rpc_port (Some rollup_node)
+
+let rollup_node_endpoint proxy_server =
+  match proxy_server.persistent_state.rollup_node with
+  | Some rollup_node -> Sc_rollup_node.endpoint rollup_node
+  | None -> "mockup"
+
 let run proxy_server =
   let* () =
     run
       proxy_server
       {ready = false}
-      (["run"] @ proxy_server.persistent_state.arguments)
+      (["run"; "with"; "endpoint"]
+      @ [rollup_node_endpoint proxy_server]
+      @ proxy_server.persistent_state.arguments)
   in
   let* () = wait_for_ready proxy_server in
   unit
@@ -121,7 +128,11 @@ let spawn_command proxy_server args =
   Process.spawn ?runner:proxy_server.persistent_state.runner path @@ args
 
 let spawn_run proxy_server =
-  spawn_command proxy_server (["run"] @ proxy_server.persistent_state.arguments)
+  spawn_command
+    proxy_server
+    (["run"; "with"; "endpoint"]
+    @ [rollup_node_endpoint proxy_server]
+    @ proxy_server.persistent_state.arguments)
 
 let endpoint (proxy_server : t) =
   Format.sprintf
@@ -134,7 +145,9 @@ let init ?runner ?rpc_addr ?rpc_port rollup_node =
   let* () = run proxy_server in
   return proxy_server
 
-let request method_ parameters : JSON.t =
+type request = {method_ : string; parameters : JSON.u}
+
+let request_to_JSON {method_; parameters} : JSON.u =
   `O
     [
       ("jsonrpc", `String "2.0");
@@ -142,8 +155,61 @@ let request method_ parameters : JSON.t =
       ("params", parameters);
       ("id", `String "0");
     ]
+
+let build_request request =
+  request_to_JSON request |> JSON.annotate ~origin:"evm_proxy_server"
+
+let batch_requests requests =
+  `A (List.map request_to_JSON requests)
   |> JSON.annotate ~origin:"evm_proxy_server"
 
-let call_evm_rpc proxy_server ~method_ ~parameters =
+(* We keep both encoding (with a single object or an array of objects) and both
+   function on purpose, to ensure both encoding are supported by the server. *)
+let call_evm_rpc proxy_server request =
   let endpoint = endpoint proxy_server in
-  RPC.Curl.post endpoint (request method_ parameters) |> Runnable.run
+  RPC.Curl.post endpoint (build_request request) |> Runnable.run
+
+let batch_evm_rpc proxy_server requests =
+  let endpoint = endpoint proxy_server in
+  RPC.Curl.post endpoint (batch_requests requests) |> Runnable.run
+
+let extract_result json = JSON.(json |-> "result")
+
+let fetch_contract_code evm_proxy_server contract_address =
+  let* code =
+    call_evm_rpc
+      evm_proxy_server
+      {
+        method_ = "eth_getCode";
+        parameters = `A [`String contract_address; `String "latest"];
+      }
+  in
+  return (extract_result code |> JSON.as_string)
+
+type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
+
+let txpool_content evm_proxy_server =
+  let* txpool =
+    call_evm_rpc
+      evm_proxy_server
+      {method_ = "txpool_content"; parameters = `A []}
+  in
+  Log.info "Result: %s" (JSON.encode txpool) ;
+  let txpool = extract_result txpool in
+  let parse field =
+    let open JSON in
+    let pool = txpool |-> field in
+    (* `|->` returns `Null if the field does not exists, and `Null is
+       interpreted as the empty list by `as_object`. As such, we must ensure the
+       field exists. *)
+    if is_null pool then Test.fail "%s must exists" field
+    else
+      pool |> as_object
+      |> List.map (fun (address, transactions) ->
+             let transactions =
+               transactions |> as_object
+               |> List.map (fun (nonce, tx) -> (Int64.of_string nonce, tx))
+             in
+             {address; transactions})
+  in
+  return (parse "pending", parse "queued")

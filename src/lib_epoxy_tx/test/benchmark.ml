@@ -64,10 +64,10 @@ let circuit_inputs ~nb_batches ~batch_size =
       in
       let batch, s = List.hd rs in
       let c = H.inner_batch batch init_state s in
-      let initial, public_input_size = LibCircuit.get_inputs c in
+      let initial, _public_input_size = LibCircuit.get_inputs c in
       let r = LibCircuit.get_cs ~optimize:true c in
       let private_inputs = Solver.solve r.solver initial in
-      let circ = Plonk.Circuit.to_plonk ~public_input_size r.cs in
+      let circ = Plonk.Circuit.to_plonk r in
       let solver = Solver.solve r.solver in
       let hd = private_inputs in
       let cs, _ =

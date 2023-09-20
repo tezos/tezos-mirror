@@ -5,11 +5,11 @@
 
 (library
  (name tezos_p2p_services)
- (public_name tezos-p2p-services)
+ (public_name octez-libs.tezos-p2p-services)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-rpc)
+  octez-libs.base
+  octez-libs.rpc)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

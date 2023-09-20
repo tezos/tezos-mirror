@@ -7,10 +7,11 @@
  (package octez-smart-rollup-client-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-protocol-017-PtNairob
-  octez_smart_rollup_client_PtNairob)
+  octez-libs.base
+  octez-libs.clic
+  tezos-protocol-017-PtNairob.protocol
+  octez_smart_rollup_client_PtNairob
+  octez-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

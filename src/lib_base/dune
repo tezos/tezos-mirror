@@ -5,16 +5,16 @@
 
 (library
  (name tezos_base)
- (public_name tezos-base)
+ (public_name octez-libs.base)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-stdlib
-  tezos-crypto
+  octez-libs.stdlib
+  octez-libs.crypto
   data-encoding
-  tezos-error-monad
-  tezos-rpc
-  tezos-micheline
-  tezos-event-logging
+  octez-libs.error-monad
+  octez-libs.rpc
+  octez-libs.micheline
+  octez-libs.event-logging
   ptime
   ptime.clock.os
   ezjsonm
@@ -30,5 +30,7 @@
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_micheline
   -open Tezos_event_logging))
+
+(documentation (package octez-libs))
 
 (ocamllex point_parser)

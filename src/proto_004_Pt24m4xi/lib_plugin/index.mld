@@ -1,0 +1,7 @@
+{0 Octez-protocol-004-Pt24m4xi-libs: octez protocol 004-Pt24m4xi libraries}
+
+This is a package containing some libraries related to the Tezos 004-Pt24m4xi protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_004_Pt24m4xi}Tezos_client_004_Pt24m4xi}: Protocol specific library for `tezos-client`

@@ -2,19 +2,19 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_store_mocked)
- (public_name tezos-store.mocked)
- (implements tezos-store)
+ (name mocked)
+ (public_name octez-shell-libs.mocked)
+ (implements octez-shell-libs.store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-crypto
-  tezos-shell-services
-  tezos-context.memory
-  tezos-context-ops
-  tezos-validation
-  tezos-protocol-environment
-  tezos-store.shared)
+  octez-libs.base
+  octez-libs.crypto
+  octez-shell-libs.shell-services
+  octez-libs.tezos-context.memory
+  octez-shell-libs.context-ops
+  octez-shell-libs.validation
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.store.shared)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

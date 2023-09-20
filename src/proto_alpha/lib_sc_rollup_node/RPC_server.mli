@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,16 +24,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc_http_server
-
-(** Functor to construct an RPC server for a given PVM with simulation. *)
-module Make (Simulation : Simulation.S) (Batcher : Batcher.S) : sig
-  (** [start node_ctxt config] starts an RPC server listening for requests on
-      the port [config.rpc_port] and address [config.rpc_addr]. *)
-  val start :
-    Node_context.rw -> Configuration.t -> RPC_server.server tzresult Lwt.t
-
-  (** Shutdown a running RPC server. When this function is called, the rollup
-      node will stop listening to incoming requests. *)
-  val shutdown : RPC_server.server -> unit Lwt.t
-end
+include Daemon_components.RPC_server_sig

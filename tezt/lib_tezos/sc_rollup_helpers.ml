@@ -61,38 +61,101 @@ let load_kernel_file
 let read_kernel ?base name : string =
   hex_encode (load_kernel_file ?base (name ^ ".wasm"))
 
+module Installer_kernel_config = struct
+  type move_args = {from : string; to_ : string}
+
+  type reveal_args = {hash : string; to_ : string}
+
+  type set_args = {value : string; to_ : string}
+
+  type instr = Move of move_args | Reveal of reveal_args | Set of set_args
+
+  type t = instr list
+
+  let instr_to_yaml = function
+    | Move {from; to_} -> sf {|  - move:
+      from: %s
+      to: %s
+|} from to_
+    | Reveal {hash; to_} -> sf {|  - reveal: %s
+    to: %s
+|} hash to_
+    | Set {value; to_} ->
+        sf {|  - set:
+      value: %s
+      to: %s
+|} value to_
+
+  let to_yaml t =
+    "instructions:\n" ^ String.concat "" (List.map instr_to_yaml t)
+end
+
 (* Testing the installation of a larger kernel, with e2e messages.
 
    When a kernel is too large to be originated directly, we can install
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel ?runner
+let prepare_installer_kernel_gen ?runner
     ?(base_installee =
       "src/proto_alpha/lib_protocol/test/integration/wasm_kernel")
-    ~preimages_dir installee =
+    ~preimages_dir ?(display_root_hash = false) ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
   let installer = installee ^ "-installer.hex" in
   let output = Temp.file installer in
   let installee = (project_root // base_installee // installee) ^ ".wasm" in
+  let setup_file_args =
+    match config with
+    | Some config ->
+        let setup_file = Temp.file "setup-config.yaml" in
+        Base.write_file
+          setup_file
+          ~contents:(Installer_kernel_config.to_yaml config) ;
+        ["--setup-file"; setup_file]
+    | None -> []
+  in
+  let display_root_hash_arg =
+    if display_root_hash then ["--display-root-hash"] else []
+  in
   let process =
     Process.spawn
       ?runner
       ~name:installer
       (project_root // "smart-rollup-installer")
-      [
-        "get-reveal-installer";
-        "--upgrade-to";
-        installee;
-        "--output";
-        output;
-        "--preimages-dir";
-        preimages_dir;
-      ]
+      ([
+         "get-reveal-installer";
+         "--upgrade-to";
+         installee;
+         "--output";
+         output;
+         "--preimages-dir";
+         preimages_dir;
+       ]
+      @ display_root_hash_arg @ setup_file_args)
   in
-  let+ _ = Runnable.run @@ Runnable.{value = process; run = Process.check} in
-  read_file output
+  let+ installer_output =
+    Runnable.run
+    @@ Runnable.{value = process; run = Process.check_and_read_stdout}
+  in
+  let root_hash =
+    if display_root_hash then installer_output =~* rex "ROOT_HASH: ?(\\w*)"
+    else None
+  in
+  (read_file output, root_hash)
+
+let prepare_installer_kernel ?runner ?base_installee ~preimages_dir ?config
+    installee =
+  let open Lwt.Syntax in
+  let+ output, _ =
+    prepare_installer_kernel_gen
+      ?runner
+      ?base_installee
+      ~preimages_dir
+      ?config
+      installee
+  in
+  output
 
 let default_boot_sector_of ~kind =
   match kind with
@@ -104,15 +167,25 @@ let make_parameter name = function
   | None -> []
   | Some value -> [([name], `Int value)]
 
-let setup_l1 ?commitment_period ?challenge_window ?timeout protocol =
+let make_bool_parameter name = function
+  | None -> []
+  | Some value -> [([name], `Bool value)]
+
+let setup_l1 ?bootstrap_smart_rollups ?commitment_period ?challenge_window
+    ?timeout ?whitelist_enable protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
     @ make_parameter "smart_rollup_timeout_period_in_blocks" timeout
+    @ (if Protocol.number protocol >= 19 then
+       make_bool_parameter "smart_rollup_private_enable" whitelist_enable
+      else [])
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base parameters in
+  let* parameter_file =
+    Protocol.write_parameter_file ?bootstrap_smart_rollups ~base parameters
+  in
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
   in
@@ -121,7 +194,7 @@ let setup_l1 ?commitment_period ?challenge_window ?timeout protocol =
 (** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
-let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999))
+let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
     ?(alias = "rollup") ?(src = Constant.bootstrap1.alias) ~kind
     ?(parameters_ty = "string") ?(boot_sector = default_boot_sector_of ~kind)
     client =
@@ -130,6 +203,7 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999))
       originate
         ?hooks
         ~burn_cap
+        ?whitelist
         ~alias
         ~src
         ~kind
@@ -170,3 +244,11 @@ let genesis_commitment ~sc_rollup tezos_client =
   match Sc_rollup_client.commitment_from_json json with
   | None -> failwith "genesis commitment have been removed"
   | Some commitment -> return commitment
+
+let call_rpc ~smart_rollup_node ~service =
+  let open Runnable.Syntax in
+  let url =
+    Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint smart_rollup_node) service
+  in
+  let*! response = RPC.Curl.get url in
+  return response

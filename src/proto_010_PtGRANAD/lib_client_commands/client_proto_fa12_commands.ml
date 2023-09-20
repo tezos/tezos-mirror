@@ -33,7 +33,7 @@ let group =
     title = "Commands for managing FA1.2-compatible smart contracts";
   }
 
-let alias_param = Client_proto_contracts.ContractAlias.destination_param
+let alias_param = Client_proto_contracts.Contract_alias.destination_param
 
 let token_contract_param () =
   alias_param
@@ -73,7 +73,7 @@ let custom_gas_flag =
          with _ -> failwith "invalid gas limit (must be a positive number)"))
 
 let payer_arg =
-  Client_proto_contracts.ContractAlias.destination_arg
+  Client_proto_contracts.Contract_alias.destination_arg
     ~name:"payer"
     ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
     ()

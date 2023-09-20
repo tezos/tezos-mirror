@@ -85,19 +85,19 @@ let commands () =
       ~default:"0.05"
   in
   let source_arg =
-    ContractAlias.destination_arg
+    Contract_alias.destination_arg
       ~name:"source"
       ~doc:"name of the source (i.e. SENDER) contract for the transaction"
       ()
   in
   let payer_arg =
-    ContractAlias.destination_arg
+    Contract_alias.destination_arg
       ~name:"payer"
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()
   in
   let self_arg =
-    OriginatedContractAlias.destination_arg
+    Originated_contract_alias.destination_arg
       ~name:"self-address"
       ~doc:"address of the contract (i.e. SELF_ADDRESS) for the transaction"
       ()
@@ -951,7 +951,7 @@ let commands () =
            ~desc:"the name of the view"
            entrypoint_parameter
       @@ prefixes ["on"; "contract"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"contract"
            ~desc:"viewed contract"
       @@ prefixes ["with"; "input"]
@@ -987,7 +987,7 @@ let commands () =
       (prefixes ["run"; "view"]
       @@ param ~name:"view" ~desc:"the name of the view" string_parameter
       @@ prefixes ["on"; "contract"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ stop)
@@ -1024,7 +1024,7 @@ let commands () =
       (prefixes ["run"; "view"]
       @@ param ~name:"view" ~desc:"the name of the view" string_parameter
       @@ prefixes ["on"; "contract"]
-      @@ OriginatedContractAlias.destination_param
+      @@ Originated_contract_alias.destination_param
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ prefixes ["with"; "input"]

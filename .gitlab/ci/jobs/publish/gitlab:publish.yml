@@ -1,0 +1,10 @@
+gitlab:publish:
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
+  stage: publish_package_gitlab
+  # Publish jobs are uninterruptible to avoid publishing partial results.
+  interruptible: false
+  dependencies:
+    - build:static-x86_64-linux-binaries
+    - build:static-arm64-linux-binaries
+  script:
+    - ${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh

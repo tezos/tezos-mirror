@@ -6,16 +6,16 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos-p2p
-  tezos-p2p-services
-  tezos-test-helpers
-  tezos-base-test-helpers
-  tezos-event-logging-test-helpers
-  tezos_p2p_test_common)
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
+  octez-shell-libs.p2p
+  octez-libs.tezos-p2p-services
+  octez-libs.test-helpers
+  octez-libs.base-test-helpers
+  octez-libs.event-logging-test-helpers
+  octez-shell-libs.p2p_test_common)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -42,7 +42,7 @@
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

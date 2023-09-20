@@ -37,6 +37,39 @@ module Classification = Prevalidator_classification
 
 let is_in_mempool oph t = Classification.is_in_mempool oph t <> None
 
+let classification_pp pp classification =
+  Format.fprintf
+    pp
+    (match (classification :> Classification.classification) with
+    | `Validated -> "Validated"
+    | `Branch_delayed _ -> "Branch_delayed"
+    | `Branch_refused _ -> "Branch_refused"
+    | `Refused _ -> "Refused"
+    | `Outdated _ -> "Outdated")
+
+let eq_classification cl1 cl2 =
+  match
+    ( (cl1 :> Classification.classification),
+      (cl2 :> Classification.classification) )
+  with
+  | `Validated, `Validated
+  | `Branch_delayed _, `Branch_delayed _
+  | `Branch_refused _, `Branch_refused _
+  | `Refused _, `Refused _
+  | `Outdated _, `Outdated _ ->
+      true
+  | ( `Validated,
+      (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) )
+  | ( `Branch_delayed _,
+      (`Validated | `Branch_refused _ | `Refused _ | `Outdated _) )
+  | ( `Branch_refused _,
+      (`Validated | `Branch_delayed _ | `Refused _ | `Outdated _) )
+  | ( `Refused _,
+      (`Validated | `Branch_delayed _ | `Branch_refused _ | `Outdated _) )
+  | ( `Outdated _,
+      (`Validated | `Branch_delayed _ | `Branch_refused _ | `Refused _) ) ->
+      false
+
 module Operation_map = struct
   let pp_with_trace ppf map =
     Format.fprintf
@@ -77,10 +110,21 @@ type classification_event =
   | Remove of Operation_hash.t
   | Flush of bool
 
-let drop oph t =
-  let open Classification in
-  let (_ : (unit operation * classification) option) = remove oph t in
-  ()
+let drop ?expected_classification oph t =
+  match (Classification.remove oph t, expected_classification) with
+  | _, None -> ()
+  | None, Some expected ->
+      Test.fail
+        ~__LOC__
+        "drop: expected to remove an operation classified as %a, but the \
+         operation was not found"
+        classification_pp
+        expected
+  | Some (_op, classification), Some expected ->
+      Check.(
+        (classification = (expected :> Classification.classification))
+          (equalable classification_pp eq_classification)
+          ~error_msg:"drop: expected %R but got %L")
 
 let play_event event t =
   let open Classification in
@@ -160,14 +204,14 @@ let qcheck_bounded_map_is_empty bounded_map =
   qcheck_eq_true ~actual
 
 (** Computes the set of operation hashes present in fields [refused; outdated;
-    branch_refused; branch_delayed; prechecked; applied_rev] of [t]. Also checks
+    branch_refused; branch_delayed; validated] of [t]. Also checks
     that these fields are disjoint. *)
 let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let ( +> ) acc next_set =
     if not (Operation_hash.Set.disjoint acc next_set) then
       QCheck2.Test.fail_reportf
         "Invariant 'The fields: [refused; outdated; branch_refused; \
-         branch_delayed; applied] are disjoint' broken by t =@.%a@.%s"
+         branch_delayed; validated] are disjoint' broken by t =@.%a@.%s"
         Classification.Internal_for_tests.pp
         t
         (match fail_msg with None -> "" | Some msg -> "\n" ^ msg ^ "@.") ;
@@ -176,15 +220,13 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let to_set = Classification.Internal_for_tests.set_of_bounded_map in
   to_set t.refused +> to_set t.outdated +> to_set t.branch_refused
   +> to_set t.branch_delayed
-  +> (Classification.Sized_map.to_seq t.prechecked
+  +> (Classification.Sized_map.to_seq t.validated
      |> Seq.map fst |> Operation_hash.Set.of_seq)
-  +> (Operation_hash.Set.of_list
-     @@ List.rev_map (fun op -> op.hash) t.applied_rev)
 
 (** Checks both invariants of type [Prevalidator_classification.t]:
     - The field [in_mempool] is the set of all operation hashes present
-      in fields: [refused; outdated; branch_refused; branch_delayed; applied].
-    - The fields: [refused; outdated; branch_refused; branch_delayed; applied]
+      in fields: [refused; outdated; branch_refused; branch_delayed; validated].
+    - The fields: [refused; outdated; branch_refused; branch_delayed; validated]
       are disjoint.
     These invariants are enforced by [Prevalidator_classification]
     **as long as the caller does not [add] an operation which is already
@@ -220,7 +262,7 @@ let check_invariants ?fail_msg (t : unit Classification.t) =
     QCheck2.Test.fail_reportf
       "Invariant 'The field [in_mempool] is the set of all operation hashes \
        present in fields: [refused; outdated; branch_refused; branch_delayed; \
-       applied]' broken by t =@.%a\n\
+       validated]' broken by t =@.%a\n\
        @.%s@.%a@.%s"
       Classification.Internal_for_tests.pp
       t
@@ -230,17 +272,6 @@ let check_invariants ?fail_msg (t : unit Classification.t) =
       (match fail_msg with
       | None -> ""
       | Some msg -> Format.sprintf "\n%s@." msg)
-
-let classification_pp pp classification =
-  Format.fprintf
-    pp
-    (match classification with
-    | `Applied -> "Applied"
-    | `Prechecked -> "Prechecked"
-    | `Branch_delayed _ -> "Branch_delayed"
-    | `Branch_refused _ -> "Branch_refused"
-    | `Refused _ -> "Refused"
-    | `Outdated _ -> "Outdated")
 
 let event_pp pp = function
   | Add_if_not_present (classification, op) ->
@@ -270,7 +301,6 @@ let test_flush_empties_all_except_refused_and_outdated =
   let outdated_after = t.outdated |> Classification.map in
   qcheck_bounded_map_is_empty t.branch_refused ;
   qcheck_bounded_map_is_empty t.branch_delayed ;
-  qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq'
     ~pp:Operation_map.pp_with_trace
     ~eq:Operation_map.eq
@@ -308,7 +338,6 @@ let test_flush_empties_all_except_refused_and_branch_refused =
       ()
   in
   qcheck_bounded_map_is_empty t.branch_delayed ;
-  qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq'
     ~pp:Operation_map.pp_with_trace
     ~eq:Operation_map.eq
@@ -331,25 +360,9 @@ let test_is_in_mempool_remove =
   Classification.add unrefused_classification op t ;
   let oph = op.hash in
   qcheck_eq_true ~actual:(is_in_mempool oph t) ;
-  drop oph t ;
+  drop ~expected_classification:unrefused_classification oph t ;
   qcheck_eq_false ~actual:(is_in_mempool oph t) ;
   true
-
-let test_is_applied =
-  let open QCheck2 in
-  Test.make
-    ~name:"[is_applied] is well-behaved"
-    Generators.(Gen.pair t_gen (operation_with_hash_gen ()))
-  @@ fun (t, op) ->
-  Classification.add `Applied op t ;
-  let oph = op.hash in
-  qcheck_eq_true ~actual:(is_in_mempool oph t) ;
-  match Classification.remove oph t with
-  | None -> false
-  | Some (_op, classification) ->
-      qcheck_eq_true ~actual:(classification = `Applied) ;
-      qcheck_eq_false ~actual:(is_in_mempool oph t) ;
-      true
 
 let test_invariants =
   let open QCheck2 in
@@ -530,7 +543,8 @@ module Bounded = struct
     in
     let () =
       Operation_hash.Map.iter
-        (fun oph _op -> drop oph t)
+        (fun oph _op ->
+          drop ~expected_classification:error_classification oph t)
         (Classification.map bounded_map)
     in
     discarded_operations_rev := [] ;
@@ -594,8 +608,7 @@ module To_map = struct
       arguments set to [true] *)
   let to_map_all =
     Classification.Internal_for_tests.to_map
-      ~applied:true
-      ~prechecked:true
+      ~validated:true
       ~branch_delayed:true
       ~branch_refused:true
       ~refused:true
@@ -738,8 +751,7 @@ module To_map = struct
     @@ fun (t, handle_branch_refused) ->
     let initial =
       Classification.Internal_for_tests.to_map
-        ~applied:false
-        ~prechecked:false
+        ~validated:false
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
@@ -782,8 +794,7 @@ module To_map = struct
       ~expected:Operation_hash.Map.empty
       ~actual:
         (Classification.Internal_for_tests.to_map
-           ~applied:false
-           ~prechecked:false
+           ~validated:false
            ~branch_delayed:false
            ~branch_refused:false
            ~refused:false
@@ -824,7 +835,6 @@ let () =
           test_flush_empties_all_except_refused_and_branch_refused;
         ];
       mk_tests "is_in_mempool" [test_is_in_mempool_remove];
-      mk_tests "is_applied" [test_is_applied];
       mk_tests "unparsable" Unparsable.[test_add_is_known; test_flush_is_known];
       mk_tests "invariants" [test_invariants];
       mk_tests "bounded" [Bounded.test_bounded];
@@ -838,7 +848,6 @@ let () =
             test_map_remove_add;
             test_map_add_remove;
             test_flush;
-            test_is_applied;
             test_is_in_mempool;
             test_none;
           ];

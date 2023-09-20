@@ -6,12 +6,12 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-lwt-result-stdlib
-  tezos-lwt-result-stdlib.examples.traces
+  octez-libs.lwt-result-stdlib
+  octez-libs.lwt-result-stdlib.examples.traces
   lwt.unix
   octez-alcotezt
   qcheck-alcotest
-  tezos-test-helpers)
+  octez-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -43,8 +43,8 @@
 
 (rule
  (alias runtest)
- (package tezos-lwt-result-stdlib)
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (package octez-libs)
+ (enabled_if (and %{arch_sixtyfour} (<> false %{env:RUNTEZTALIAS=true})))
  (action (run %{dep:./main.exe})))
 
 (rule

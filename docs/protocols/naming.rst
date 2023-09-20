@@ -57,15 +57,15 @@ in-use and upcoming protocols:
 
   - other terms: "active protocol", "mainnet protocol"
 
-* The protocol currently under voting, that is in any of the possible voting
+* Any protocol currently subject to the governance process, that is, being part of any of the possible voting
   phases: "candidate protocol".
 
-  - other possible terms: "current proposal"
+  - other possible terms: "(new) protocol proposal", "current proposal"
 
 External resources
 ------------------
 
-The current protocol status can be found at election pages such as: tzstats.com_, tzkt.io_, or tezosagora.org_.
+The current status of a protocol in the governance process can be found at election pages such as: tzstats.com_, tzkt.io_, or tezosagora.org_.
 
 An interesting blog post on the history of the initial Tezos economic protocols
 is: `A quick history of past upgrades

@@ -3,7 +3,7 @@
  (public_name tezos-time-measurement)
  (libraries unix
             data-encoding
-            tezos-event-logging
+            octez-libs.event-logging
             lwt)
  (instrumentation.backend (ppx tezos-time-measurement.ppx))
  (flags (:standard

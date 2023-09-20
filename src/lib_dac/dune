@@ -6,8 +6,8 @@
  (public_name tezos-dac-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-updater)
+  octez-libs.base
+  octez-shell-libs.protocol-updater)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

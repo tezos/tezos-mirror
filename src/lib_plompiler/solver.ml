@@ -82,6 +82,15 @@ type ed_cond_desc = {
 type bits_desc = {nb_bits : int; shift : Utils.Z.t; l : int; bits : int list}
 [@@deriving repr]
 
+type limbs_desc = {
+  total_nb_bits : int;
+  nb_bits : int;
+  shift : Utils.Z.t;
+  l : int;
+  limbs : int list;
+}
+[@@deriving repr]
+
 type pos128full_desc = {
   x0 : int;
   y0 : int;
@@ -90,7 +99,7 @@ type pos128full_desc = {
   x2 : int;
   y2 : int;
   k : VS.t array;
-  variant : Variants.t;
+  matrix : VS.matrix;
 }
 
 type swap_desc = {b : int; x : int; y : int; u : int; v : int} [@@deriving repr]
@@ -99,8 +108,8 @@ type swap_desc = {b : int; x : int; y : int; u : int; v : int} [@@deriving repr]
    S.t but for some reason Repr does not see this equality. *)
 let pos128full_desc_t =
   let open Repr in
-  record "pos128full_desc" (fun x0 y0 x1 y1 x2 y2 k variant ->
-      {x0; y0; x1; y1; x2; y2; k; variant})
+  record "pos128full_desc" (fun x0 y0 x1 y1 x2 y2 k matrix ->
+      {x0; y0; x1; y1; x2; y2; k; matrix})
   |+ field "x0" int (fun t -> t.x0)
   |+ field "y0" int (fun t -> t.y0)
   |+ field "x1" int (fun t -> t.x1)
@@ -108,7 +117,7 @@ let pos128full_desc_t =
   |+ field "x2" int (fun t -> t.x2)
   |+ field "y2" int (fun t -> t.y2)
   |+ field "k" (array S.t) (fun t -> t.k)
-  |+ field "variant" Variants.t (fun t -> t.variant)
+  |+ field "matrix" (array (array S.t)) (fun t -> t.matrix)
   |> sealr
 
 type pos128partial_desc = {
@@ -126,15 +135,15 @@ type pos128partial_desc = {
   y2 : int;
   (* Can we share these? *)
   k_cols : VS.matrix array;
-  variant : Variants.t;
+  matrix : VS.matrix;
 }
 
 let pos128partial_desc_t =
   let open Repr in
   record
     "pos128partial_desc"
-    (fun a b c a_5 b_5 c_5 x0 y0 x1 y1 x2 y2 k_cols variant ->
-      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; variant})
+    (fun a b c a_5 b_5 c_5 x0 y0 x1 y1 x2 y2 k_cols matrix ->
+      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; matrix})
   |+ field "a" int (fun t -> t.a)
   |+ field "b" int (fun t -> t.b)
   |+ field "c" int (fun t -> t.c)
@@ -148,7 +157,7 @@ let pos128partial_desc_t =
   |+ field "x2" int (fun t -> t.x2)
   |+ field "y2" int (fun t -> t.y2)
   |+ field "k_cols" (array (array (array S.t))) (fun t -> t.k_cols)
-  |+ field "variant" Variants.t (fun t -> t.variant)
+  |+ field "matrix" (array (array S.t)) (fun t -> t.matrix)
   |> sealr
 
 type anemoi_desc = {
@@ -205,6 +214,40 @@ type anemoi_custom_desc = {
 }
 [@@deriving repr]
 
+let z_repr = Repr.map Repr.string Z.of_string Z.to_string
+
+module Z = struct
+  let t = z_repr
+
+  include Z
+end
+
+type mod_arith_desc = {
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  moduli : Z.t list;
+  qm_bound : Z.t * Z.t;
+  ts_bounds : (Z.t * Z.t) list;
+  inverse : bool;
+  inp1 : int list;
+  inp2 : int list;
+  out : int list;
+  qm : int;
+  ts : int list;
+}
+[@@deriving repr]
+
+type mod_arith_is_zero_desc = {
+  modulus : Z.t;
+  base : Z.t;
+  nb_limbs : int;
+  inp : int list;
+  aux : int list;
+  out : int;
+}
+[@@deriving repr]
+
 type solver_desc =
   | Arith of arith_desc
   | Pow5 of pow5_desc
@@ -217,11 +260,15 @@ type solver_desc =
   | Swap of swap_desc
   | Skip
   | BitsOfS of bits_desc
+  | LimbsOfS of limbs_desc
   | Poseidon128Full of pos128full_desc
   | Poseidon128Partial of pos128partial_desc
   | AnemoiRound of anemoi_desc
   | AnemoiDoubleRound of anemoi_double_desc
   | AnemoiCustom of anemoi_custom_desc
+  | Mod_Add of mod_arith_desc
+  | Mod_Mul of mod_arith_desc
+  | Mod_IsZero of mod_arith_is_zero_desc
   | Updater of Optimizer.trace_info
 [@@deriving repr]
 
@@ -322,17 +369,26 @@ let solve_one trace solver =
         (fun b value -> trace.(b) <- (if value then S.one else S.zero))
         bits
         binary_decomposition
+  | LimbsOfS {total_nb_bits; nb_bits; shift; l; limbs} ->
+      let x = trace.(l) |> S.to_z in
+      let x = Z.(x + shift) in
+      let binary_decomposition =
+        Utils.bool_list_of_z ~nb_bits:total_nb_bits x
+      in
+      let nb_decomposition =
+        Utils.limbs_of_bool_list ~nb_bits binary_decomposition
+      in
+      List.iter2
+        (fun b value -> trace.(b) <- S.of_int value)
+        limbs
+        nb_decomposition
   | Updater ti -> ignore @@ Optimizer.trace_updater ti trace
   | Swap {b; x; y; u; v} ->
       let b, x, y = (trace.(b), trace.(x), trace.(y)) in
       let x_res, y_res = if S.is_zero b then (x, y) else (y, x) in
       trace.(u) <- x_res ;
       trace.(v) <- y_res
-  | Poseidon128Full {x0; y0; x1; y1; x2; y2; k; variant} ->
-      let matrix =
-        Array.map (Array.map S.of_string)
-        @@ if variant = PFull128 then Mds_full.v else Mds_128.v
-      in
+  | Poseidon128Full {x0; y0; x1; y1; x2; y2; k; matrix} ->
       let pow5 x = S.pow trace.(x) (Z.of_int 5) in
       let x_vec = [|Array.map pow5 [|x0; x1; x2|]|] |> VS.transpose in
       let y_vec = VS.mul matrix x_vec in
@@ -340,11 +396,7 @@ let solve_one trace solver =
         (fun i yi -> trace.(yi) <- S.add k.(i) @@ y_vec.(i).(0))
         [y0; y1; y2]
   | Poseidon128Partial
-      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; variant} ->
-      let matrix =
-        Array.map (Array.map S.of_string)
-        @@ if variant = PFull128 then Mds_full.v else Mds_128.v
-      in
+      {a; b; c; a_5; b_5; c_5; x0; y0; x1; y1; x2; y2; k_cols; matrix} ->
       let pow5 x = S.pow x (Z.of_int 5) in
       let ppow5 v = [|v.(0); v.(1); [|pow5 v.(2).(0)|]|] in
       let x_vec = [|[|trace.(x0)|]; [|trace.(x1)|]; [|trace.(x2)|]|] in
@@ -396,7 +448,183 @@ let solve_one trace solver =
         Gadget_anemoi.Anemoi128.compute_one_round x1' y1' kx2 ky2
       in
       trace.(x2) <- x2' ;
-      trace.(y2) <- y2') ;
+      trace.(y2) <- y2'
+  | Mod_Add
+      {
+        modulus;
+        base;
+        nb_limbs;
+        moduli;
+        qm_bound;
+        ts_bounds;
+        inverse;
+        inp1;
+        inp2;
+        out;
+        qm;
+        ts;
+      } ->
+      (* See [lib_plompiler/gadget_mod_arith.ml] for explanations *)
+      (* This is just a sanity check *)
+      assert (List.compare_length_with inp1 nb_limbs = 0) ;
+      assert (List.compare_length_with inp2 nb_limbs = 0) ;
+      assert (List.compare_length_with out nb_limbs = 0) ;
+      let sum = List.fold_left Z.add Z.zero in
+      let ( %! ) = Z.rem in
+      let xs = List.map (fun v -> trace.(v) |> S.to_z) inp1 in
+      let ys = List.map (fun v -> trace.(v) |> S.to_z) inp2 in
+      let zs =
+        if inverse then Utils.mod_sub_limbs ~modulus ~base xs ys
+        else Utils.mod_add_limbs ~modulus ~base xs ys
+      in
+      List.iter2 (fun v zi -> trace.(v) <- S.of_z zi) out zs ;
+      (* The rest of trace values from this point onwards, i.e. qm and tj,
+         are designed to enforce the equality xs + ys = zs.
+         If we are doing a substraction xs - ys = zs (when inverse = true),
+         we implement it as an addition zs + ys = xs. Therefore, we need to
+         rename [xs <-> zs]. *)
+      let xs, zs = if inverse then (zs, xs) else (xs, zs) in
+      let qm_shift, qm_ubound = qm_bound in
+      let bs_mod_m =
+        List.init nb_limbs (fun i -> Z.pow base i %! modulus) |> List.rev
+      in
+      let x_plus_y_minus_z =
+        List.map2 (fun (xi, yi) zi -> Z.(xi + yi - zi)) (List.combine xs ys) zs
+      in
+      (* \sum_i (B^i mod m) * (x_i + y_i - z_i) = (qm + qm_shift) * m *)
+      let qm_value, r =
+        let lhs = sum @@ List.map2 Z.mul bs_mod_m x_plus_y_minus_z in
+        Z.(div_rem (lhs - (qm_shift * modulus)) modulus)
+      in
+      assert (Z.(equal r zero)) ;
+      assert (Z.(compare qm_value zero >= 0)) ;
+      assert (Z.(compare qm_value qm_ubound < 0)) ;
+      trace.(qm) <- S.of_z qm_value ;
+      (* For every modulo mj in moduli,
+         \sum_i ((B^i mod m) mod mj) * (x_i + y_i - z_i)
+         - qm * (m mod mj) - ((qm_shift * m) mod mj) = (tj + tj_shift) * mj *)
+      List.iter2
+        (fun mj (tj, (tj_shift, tj_ubound)) ->
+          let bs_mod_m_mod_mj = List.map (fun v -> v %! mj) bs_mod_m in
+          let terms = List.map2 Z.mul bs_mod_m_mod_mj x_plus_y_minus_z in
+          let lhs =
+            Z.(
+              sum terms
+              - (qm_value * (modulus %! mj))
+              - (qm_shift * modulus %! mj))
+          in
+          let tj_value, r = Z.(div_rem (lhs - (tj_shift * mj)) mj) in
+          assert (Z.(equal r zero)) ;
+          assert (Z.(compare tj_value zero >= 0)) ;
+          assert (Z.(compare tj_value tj_ubound < 0)) ;
+          trace.(tj) <- S.of_z tj_value)
+        moduli
+        (List.combine ts ts_bounds)
+  | Mod_Mul
+      {
+        modulus;
+        base;
+        nb_limbs;
+        moduli;
+        qm_bound;
+        ts_bounds;
+        inverse;
+        inp1;
+        inp2;
+        out;
+        qm;
+        ts;
+      } ->
+      (* See [lib_plompiler/gadget_mod_arith.ml] for explanations *)
+      (* This is just a sanity check *)
+      assert (List.compare_length_with inp1 nb_limbs = 0) ;
+      assert (List.compare_length_with inp2 nb_limbs = 0) ;
+      assert (List.compare_length_with out nb_limbs = 0) ;
+      let sum = List.fold_left Z.add Z.zero in
+      let ( %! ) = Z.rem in
+      let xs = List.map (fun v -> trace.(v) |> S.to_z) inp1 in
+      let ys = List.map (fun v -> trace.(v) |> S.to_z) inp2 in
+      let zs =
+        if inverse then Utils.mod_div_limbs ~modulus ~base xs ys
+        else Utils.mod_mul_limbs ~modulus ~base xs ys
+      in
+      List.iter2 (fun v zi -> trace.(v) <- S.of_z zi) out zs ;
+      (* The rest of trace values from this point onwards, i.e. qm and tj,
+         are designed to enforce the equality xs * ys = zs.
+         If we are doing a division xs / ys = zs (when inverse = true),
+         we implement it as a multiplication zs * ys = xs. Therefore, we need to
+         rename [xs <-> zs]. *)
+      let xs, zs = if inverse then (zs, xs) else (xs, zs) in
+      let qm_shift, qm_ubound = qm_bound in
+      let bs_mod_m =
+        List.init nb_limbs (fun i -> Z.pow base i %! modulus) |> List.rev
+      in
+      let bij_mod_m =
+        List.init nb_limbs (fun i ->
+            List.init nb_limbs (fun j -> Z.pow base (i + j) %! modulus))
+        |> List.concat |> List.rev
+      in
+      let x_times_y =
+        List.concat_map (fun xi -> List.map (fun yj -> Z.(xi * yj)) ys) xs
+      in
+      (* \sum_i (\sum_j (B^{i+j} mod m) * x_i * y_j) - (\sum_i (B^i mod m) * z_i)
+            = (qm + qm_shift) * m *)
+      let qm_value, r =
+        let lhs_xy = sum @@ List.map2 Z.mul bij_mod_m x_times_y in
+        let lhs_z = sum @@ List.map2 Z.mul bs_mod_m zs in
+        Z.(div_rem (lhs_xy - lhs_z - (qm_shift * modulus)) modulus)
+      in
+      assert (Z.(equal r zero)) ;
+      assert (Z.(compare qm_value zero >= 0)) ;
+      assert (Z.(compare qm_value qm_ubound < 0)) ;
+      trace.(qm) <- S.of_z qm_value ;
+
+      (* For every modulo mj in moduli,
+         \sum_i (\sum_j ((B^{i+j} mod m) mod mj) * x_i * y_j)
+            - (\sum_i ((B^i mod m) mod mj) * z_i)
+            - qm * (m mod mj) - ((qm_shift * m) mod mj) = (tj + tj_shift) * mj *)
+      List.iter2
+        (fun mj (tj, (tj_shift, tj_ubound)) ->
+          let bs_mod_m_mod_mj = List.map (fun v -> v %! mj) bs_mod_m in
+          let bij_mod_m_mod_mj = List.map (fun v -> v %! mj) bij_mod_m in
+          let sum_xy = sum @@ List.map2 Z.mul bij_mod_m_mod_mj x_times_y in
+          let sum_z = sum @@ List.map2 Z.mul bs_mod_m_mod_mj zs in
+          let lhs =
+            Z.(
+              sum_xy - sum_z
+              - (qm_value * (modulus %! mj))
+              - (qm_shift * modulus %! mj))
+          in
+          let tj_value, r = Z.(div_rem (lhs - (tj_shift * mj)) mj) in
+          assert (Z.(equal r zero)) ;
+          assert (Z.(compare tj_value zero >= 0)) ;
+          assert (Z.(compare tj_value tj_ubound < 0)) ;
+          trace.(tj) <- S.of_z tj_value)
+        moduli
+        (List.combine ts ts_bounds)
+  | Mod_IsZero {modulus; base; nb_limbs; inp; aux; out} ->
+      (* See [lib_plompiler/gadget_mod_arith.ml] for explanations *)
+      (* This is just a sanity check *)
+      assert (List.compare_length_with inp nb_limbs = 0) ;
+      assert (List.compare_length_with aux nb_limbs = 0) ;
+      let xs = List.map (fun v -> trace.(v) |> S.to_z) inp in
+      let x = Utils.z_of_limbs ~base xs in
+      if Z.(rem x modulus = zero) then (
+        (* The auxiliary variable [r] must satisfy the equation [x * r = 0],
+           because [x = 0], the value of [r] is irrelevant here.
+           Since it must be non-zero, we set it to be 1. *)
+        trace.(out) <- S.one ;
+        List.iteri
+          (fun i v ->
+            if i < nb_limbs - 1 then trace.(v) <- S.zero else trace.(v) <- S.one)
+          aux)
+      else (
+        (* The auxiliary variable [r] must satisfy the equation [x * r = 1],
+           therefore, [r] must be the inverse of [x <> 0]. *)
+        trace.(out) <- S.zero ;
+        let one = Utils.z_to_limbs ~len:nb_limbs ~base Z.one in
+        let x_inv = Utils.mod_div_limbs ~modulus ~base one xs in
+        List.iter2 (fun v r -> trace.(v) <- S.of_z r) aux x_inv)) ;
   trace
 
 let solve : t -> S.t array -> S.t array =

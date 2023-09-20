@@ -90,7 +90,6 @@ type prevalidator_limits = {
   max_refused_operations : int;
   operation_timeout : Time.System.Span.t;
   operations_batch_size : int;
-  disable_precheck : bool;
 }
 
 let default_prevalidator_limits =
@@ -98,32 +97,18 @@ let default_prevalidator_limits =
     operation_timeout = Time.System.Span.of_seconds_exn 10.;
     max_refused_operations = 1000;
     operations_batch_size = 50;
-    disable_precheck = false;
   }
 
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {
-           operation_timeout;
-           max_refused_operations;
-           operations_batch_size;
-           disable_precheck;
-         } ->
-      ( operation_timeout,
-        max_refused_operations,
-        operations_batch_size,
-        disable_precheck ))
+    (fun {operation_timeout; max_refused_operations; operations_batch_size} ->
+      (operation_timeout, max_refused_operations, operations_batch_size, false))
     (fun ( operation_timeout,
            max_refused_operations,
            operations_batch_size,
-           disable_precheck ) ->
-      {
-        operation_timeout;
-        max_refused_operations;
-        operations_batch_size;
-        disable_precheck;
-      })
+           _disable_precheck ) ->
+      {operation_timeout; max_refused_operations; operations_batch_size})
     (obj4
        (dft
           "operations_request_timeout"
@@ -137,10 +122,9 @@ let prevalidator_limits_encoding =
           "operations_batch_size"
           int31
           default_prevalidator_limits.operations_batch_size)
-       (dft
-          "disable_precheck"
-          bool
-          default_prevalidator_limits.disable_precheck))
+       (dft "disable_precheck" bool false))
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5767
+   Remove "disable_precheck" from this encoding in Octez V19. *)
 
 type peer_validator_limits = {
   new_head_request_timeout : Time.System.Span.t;

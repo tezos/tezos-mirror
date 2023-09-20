@@ -6,24 +6,24 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-crypto
-  tezos-context-ops
-  tezos-store.shared
-  tezos-store.unix
-  tezos-store.unix-reconstruction
-  tezos-store.unix-snapshots
-  tezos-shell-services
-  tezos-stdlib-unix
-  tezos-validation
-  tezos-protocol-updater
-  tezos-embedded-protocol-demo-noops
-  tezos-embedded-protocol-genesis
-  tezos-embedded-protocol-alpha
+  octez-libs.base
+  octez-libs.crypto
+  octez-shell-libs.context-ops
+  octez-shell-libs.store.shared
+  octez-shell-libs.store.unix
+  octez-shell-libs.store.unix-reconstruction
+  octez-shell-libs.store.unix-snapshots
+  octez-shell-libs.shell-services
+  octez-libs.stdlib-unix
+  octez-shell-libs.validation
+  octez-shell-libs.protocol-updater
+  tezos-protocol-demo-noops.embedded-protocol
+  tezos-protocol-genesis.embedded-protocol
+  tezos-protocol-alpha.embedded-protocol
   tezos-protocol-alpha.parameters
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.plugin
   octez-alcotezt
-  tezos-test-helpers)
+  octez-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -73,7 +73,7 @@
 
 (rule
  (alias runtest)
- (package tezos-store)
+ (package octez-store-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,3 +29,9 @@
 include S.SIGNATURE with type watermark = Bytes.t
 
 include S.RAW_DATA with type t := t
+
+(** Signs the Keccak256 hash of bytes, instead of BLAKE2b. *)
+val sign_keccak256 : Secret_key.t -> bytes -> t
+
+(** Check the Keccak256 hash of bytes, instead of BLAKE2b. *)
+val check_keccak256 : Public_key.t -> t -> bytes -> bool

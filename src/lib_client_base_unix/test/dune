@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-mockup-commands
-  tezos-client-base-unix
-  tezos-base-test-helpers
+  octez-libs.base
+  octez-shell-libs.mockup-commands
+  octez-shell-libs.client-base-unix
+  octez-libs.base-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -34,7 +34,7 @@
 
 (rule
  (alias runtest)
- (package tezos-client-base-unix)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

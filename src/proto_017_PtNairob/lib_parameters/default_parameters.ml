@@ -456,5 +456,18 @@ let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
       no_reward_cycles = None;
     }
 
-let json_of_parameters parameters =
-  Data_encoding.Json.construct Parameters.encoding parameters
+module Protocol_parameters_overrides = struct
+  type t = {parameters : Parameters.t; chain_id : Chain_id.t option}
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {parameters; chain_id} -> (parameters, chain_id))
+      (fun (parameters, chain_id) -> {parameters; chain_id})
+      (merge_objs Parameters.encoding (obj1 (opt "chain_id" Chain_id.encoding)))
+end
+
+let json_of_parameters ?chain_id parameters =
+  Data_encoding.Json.construct
+    Protocol_parameters_overrides.encoding
+    Protocol_parameters_overrides.{parameters; chain_id}

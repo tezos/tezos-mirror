@@ -43,6 +43,18 @@
 /src/proto_*/lib_protocol/sc_rollup_inbox*         @sribaroud
 /src/proto_*/lib_protocol/sc_rollup_refutation*    @sribaroud
 
+/src/lib_aplonk               @MarcBeunardeau
+/src/lib_bls12_381*           @victor-dumitrescu
+/src/lib_crypto               @victor-dumitrescu
+/src/lib_distributed_internal @alocascio
+/src/lib_distributed_plonk    @alocascio
+/src/lib_epoxy_tx             @alocascio
+/src/lib_hacl                 @victor-dumitrescu
+/src/lib_mec                  @MarcBeunardeau
+/src/lib_plompiler            @alocascio
+/src/lib_plonk                @MarcBeunardeau
+/src/lib_polynomial           @MarcBeunardeau
+
 /src/lib_webassembly         @lthms @ole.kruger @picdc
 /src/lib_scoru_wasm          @lthms @ole.kruger @picdc
 
@@ -59,7 +71,7 @@
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
-# @ACoquerau = Albin Coquereau
+# @ACoquereau = Albin Coquereau
 # @alocascio = Antonio Locascio
 # @andrea.cerone = Andrea Cerone
 # @arvidnl = Arvid Jakobsson
@@ -78,28 +90,34 @@
 # @linoscope = Lin Oshitani
 # @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
+# @MarcBeunardeau = Marc Beunardeau
 # @mbouaziz = Mehdi Bouaziz
+# @MBourgoin = Mathias Bourgoin
 # @mebsout = Alain Mebsout
 # @murbard = Arthur B.
 # @naih = Nicolas Ayache
 # @NicVolanschi = Nic Volanschi
 # @ole.kruger = Ole Krüger
 # @paracetamolo = Marco Stronati
+# @pe.cornilleau = Pierre-Emmanuel Cornilleau
 # @picdc = Pierrick Couderc
 # @pirbo = Pierre Boutillier
 # @rafoo_ = Raphaël Cauderlier
 # @raphael-proust = Raphaël Proust
 # @romain.nl = Romain
+# @ryan.tan3 = Ryan Tan
 # @Saroupille = François Thiré
+# @satos---jp = Sota Sato
 # @smondet = Seb Mondet
 # @sribaroud = Sylvain R.
 # @tomjack = Tom Jack
 # @vbotbol = vbot
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
+# @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
+* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @MarcBeunardeau @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @pe.cornilleau @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @ryan.tan3 @Saroupille @satos---jp @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #

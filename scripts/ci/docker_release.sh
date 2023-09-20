@@ -29,7 +29,9 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   "${build_deps_image_name}" \
   "${build_deps_image_version}" \
   "${OCTEZ_EXECUTABLES}" \
-  "${CI_COMMIT_SHORT_SHA}"
+  "${CI_COMMIT_SHORT_SHA}" \
+  "${DOCKER_BUILD_TARGET}" \
+  "${RUST_TOOLCHAIN_IMAGE}"
 
 # auth gitlab or dockerhub registry
 # notice the different namespace for gitlab and that we remove the `-`

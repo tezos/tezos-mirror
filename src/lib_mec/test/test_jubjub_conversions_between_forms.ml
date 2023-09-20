@@ -33,14 +33,6 @@
 
 open Mec.Curve.Jubjub
 
-let rec repeat n f =
-  if n <= 0 then
-    let f () = () in
-    f
-  else (
-    f () ;
-    repeat (n - 1) f)
-
 let test_generation () =
   let pt_ed1 = AffineEdwards.random () in
   let pt_mt1 = from_affine_edwards_to_affine_montgomery pt_ed1 in
@@ -139,9 +131,15 @@ let get_tests () =
   let open Alcotest in
   ( "Affine Edwards <-> Affine Montgomery ; Affine Edwards -> Affine Weierstrass",
     [
-      test_case "Points are on both curves" `Quick (repeat 100 test_generation);
-      test_case "Addition" `Quick (repeat 100 test_addition);
-      test_case "Scalar multiplication" `Quick (repeat 100 test_multiplication);
+      test_case
+        "Points are on both curves"
+        `Quick
+        (Mec.Curve.Utils.PBT.repeat 100 test_generation);
+      test_case "Addition" `Quick (Mec.Curve.Utils.PBT.repeat 100 test_addition);
+      test_case
+        "Scalar multiplication"
+        `Quick
+        (Mec.Curve.Utils.PBT.repeat 100 test_multiplication);
     ] )
 
 let () =

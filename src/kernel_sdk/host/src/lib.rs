@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2022-2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -19,6 +20,10 @@ pub mod runtime;
 
 /// The size of a metadata in bytes: 20 (rollup address) + 4 (origination level).
 pub use crate::metadata::METADATA_SIZE;
+use path::RefPath;
+
+/// Boot path for kernels
+pub const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
 
 /// Defines the errors possibly returned by an host functions.
 #[repr(i32)]

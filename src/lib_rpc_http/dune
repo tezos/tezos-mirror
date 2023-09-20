@@ -3,11 +3,11 @@
 
 (library
  (name tezos_rpc_http)
- (public_name tezos-rpc-http)
+ (public_name octez-libs.rpc-http)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-rpc
+  octez-libs.base
+  octez-libs.rpc
   resto-cohttp
   uri)
  (flags
@@ -17,13 +17,13 @@
 
 (library
  (name tezos_rpc_http_client)
- (public_name tezos-rpc-http-client)
+ (public_name octez-libs.rpc-http-client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.base
   resto-cohttp-client
-  tezos-rpc
-  tezos-rpc-http)
+  octez-libs.rpc
+  octez-libs.rpc-http)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -32,15 +32,15 @@
 
 (library
  (name tezos_rpc_http_client_unix)
- (public_name tezos-rpc-http-client-unix)
+ (public_name octez-libs.rpc-http-client-unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-stdlib-unix
-  tezos-base
+  octez-libs.stdlib-unix
+  octez-libs.base
   cohttp-lwt-unix
   resto-cohttp-client
-  tezos-rpc
-  tezos-rpc-http-client)
+  octez-libs.rpc
+  octez-libs.rpc-http-client)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -49,16 +49,16 @@
 
 (library
  (name tezos_rpc_http_server)
- (public_name tezos-rpc-http-server)
+ (public_name octez-libs.rpc-http-server)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.stdlib-unix
   cohttp-lwt-unix
   resto-cohttp-server
   resto-acl
-  tezos-rpc
-  tezos-rpc-http)
+  octez-libs.rpc
+  octez-libs.rpc-http)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

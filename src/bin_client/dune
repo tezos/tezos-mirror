@@ -7,18 +7,18 @@
  (package octez-client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-clic
-  tezos-rpc-http-client
-  tezos-stdlib-unix
-  tezos-shell-services
-  tezos-client-base
-  tezos-client-commands
-  tezos-mockup-commands
-  tezos-proxy
-  tezos-client-base-unix
-  tezos-signer-backends.unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
+  octez-libs.rpc-http-client
+  octez-libs.stdlib-unix
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-shell-libs.client-commands
+  octez-shell-libs.mockup-commands
+  octez-shell-libs.proxy
+  octez-shell-libs.client-base-unix
+  octez-shell-libs.signer-backends.unix
   uri
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)
@@ -26,96 +26,102 @@
   (select void_for_linking-tezos-client-demo-counter from
    (tezos-client-demo-counter -> void_for_linking-tezos-client-demo-counter.empty)
    (-> void_for_linking-tezos-client-demo-counter.empty))
-  (select void_for_linking-tezos-client-000-Ps9mPmXa from
-   (tezos-client-000-Ps9mPmXa -> void_for_linking-tezos-client-000-Ps9mPmXa.empty)
-   (-> void_for_linking-tezos-client-000-Ps9mPmXa.empty))
-  (select void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration from
-   (tezos-client-001-PtCJ7pwo.commands-registration -> void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration.empty)
-   (-> void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration.empty))
-  (select void_for_linking-tezos-client-002-PsYLVpVv-commands-registration from
-   (tezos-client-002-PsYLVpVv.commands-registration -> void_for_linking-tezos-client-002-PsYLVpVv-commands-registration.empty)
-   (-> void_for_linking-tezos-client-002-PsYLVpVv-commands-registration.empty))
-  (select void_for_linking-tezos-client-003-PsddFKi3-commands-registration from
-   (tezos-client-003-PsddFKi3.commands-registration -> void_for_linking-tezos-client-003-PsddFKi3-commands-registration.empty)
-   (-> void_for_linking-tezos-client-003-PsddFKi3-commands-registration.empty))
-  (select void_for_linking-tezos-client-004-Pt24m4xi-commands-registration from
-   (tezos-client-004-Pt24m4xi.commands-registration -> void_for_linking-tezos-client-004-Pt24m4xi-commands-registration.empty)
-   (-> void_for_linking-tezos-client-004-Pt24m4xi-commands-registration.empty))
-  (select void_for_linking-tezos-client-005-PsBabyM1-commands-registration from
-   (tezos-client-005-PsBabyM1.commands-registration -> void_for_linking-tezos-client-005-PsBabyM1-commands-registration.empty)
-   (-> void_for_linking-tezos-client-005-PsBabyM1-commands-registration.empty))
-  (select void_for_linking-tezos-client-006-PsCARTHA-commands-registration from
-   (tezos-client-006-PsCARTHA.commands-registration -> void_for_linking-tezos-client-006-PsCARTHA-commands-registration.empty)
-   (-> void_for_linking-tezos-client-006-PsCARTHA-commands-registration.empty))
-  (select void_for_linking-tezos-client-007-PsDELPH1-commands-registration from
-   (tezos-client-007-PsDELPH1.commands-registration -> void_for_linking-tezos-client-007-PsDELPH1-commands-registration.empty)
-   (-> void_for_linking-tezos-client-007-PsDELPH1-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-007-PsDELPH1 from
-   (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty)
-   (-> void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty))
-  (select void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration from
-   (tezos-client-008-PtEdo2Zk.commands-registration -> void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration.empty)
-   (-> void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk from
-   (tezos-protocol-plugin-008-PtEdo2Zk -> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty)
-   (-> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty))
-  (select void_for_linking-tezos-client-009-PsFLoren-commands-registration from
-   (tezos-client-009-PsFLoren.commands-registration -> void_for_linking-tezos-client-009-PsFLoren-commands-registration.empty)
-   (-> void_for_linking-tezos-client-009-PsFLoren-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-009-PsFLoren from
-   (tezos-protocol-plugin-009-PsFLoren -> void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty)
-   (-> void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty))
-  (select void_for_linking-tezos-client-010-PtGRANAD-commands-registration from
-   (tezos-client-010-PtGRANAD.commands-registration -> void_for_linking-tezos-client-010-PtGRANAD-commands-registration.empty)
-   (-> void_for_linking-tezos-client-010-PtGRANAD-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-010-PtGRANAD from
-   (tezos-protocol-plugin-010-PtGRANAD -> void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty)
-   (-> void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty))
-  (select void_for_linking-tezos-client-011-PtHangz2-commands-registration from
-   (tezos-client-011-PtHangz2.commands-registration -> void_for_linking-tezos-client-011-PtHangz2-commands-registration.empty)
-   (-> void_for_linking-tezos-client-011-PtHangz2-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-011-PtHangz2 from
-   (tezos-protocol-plugin-011-PtHangz2 -> void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty)
-   (-> void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty))
-  (select void_for_linking-tezos-client-012-Psithaca-commands-registration from
-   (tezos-client-012-Psithaca.commands-registration -> void_for_linking-tezos-client-012-Psithaca-commands-registration.empty)
-   (-> void_for_linking-tezos-client-012-Psithaca-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-012-Psithaca from
-   (tezos-protocol-plugin-012-Psithaca -> void_for_linking-tezos-protocol-plugin-012-Psithaca.empty)
-   (-> void_for_linking-tezos-protocol-plugin-012-Psithaca.empty))
-  (select void_for_linking-tezos-client-013-PtJakart-commands-registration from
-   (tezos-client-013-PtJakart.commands-registration -> void_for_linking-tezos-client-013-PtJakart-commands-registration.empty)
-   (-> void_for_linking-tezos-client-013-PtJakart-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-013-PtJakart from
-   (tezos-protocol-plugin-013-PtJakart -> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty)
-   (-> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty))
-  (select void_for_linking-tezos-client-014-PtKathma-commands-registration from
-   (tezos-client-014-PtKathma.commands-registration -> void_for_linking-tezos-client-014-PtKathma-commands-registration.empty)
-   (-> void_for_linking-tezos-client-014-PtKathma-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-014-PtKathma from
-   (tezos-protocol-plugin-014-PtKathma -> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty)
-   (-> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty))
-  (select void_for_linking-tezos-client-015-PtLimaPt-commands-registration from
-   (tezos-client-015-PtLimaPt.commands-registration -> void_for_linking-tezos-client-015-PtLimaPt-commands-registration.empty)
-   (-> void_for_linking-tezos-client-015-PtLimaPt-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-015-PtLimaPt from
-   (tezos-protocol-plugin-015-PtLimaPt -> void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty)
-   (-> void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty))
-  tezos-client-016-PtMumbai.commands-registration
-  tezos-baking-016-PtMumbai-commands.registration
-  tezos-protocol-plugin-016-PtMumbai
-  tezos-client-017-PtNairob.commands-registration
-  tezos-baking-017-PtNairob-commands.registration
-  tezos-protocol-plugin-017-PtNairob
-  (select void_for_linking-tezos-client-alpha-commands-registration from
-   (tezos-client-alpha.commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
-   (-> void_for_linking-tezos-client-alpha-commands-registration.empty))
-  (select void_for_linking-tezos-baking-alpha-commands-registration from
-   (tezos-baking-alpha-commands.registration -> void_for_linking-tezos-baking-alpha-commands-registration.empty)
-   (-> void_for_linking-tezos-baking-alpha-commands-registration.empty))
-  (select void_for_linking-tezos-protocol-plugin-alpha from
-   (tezos-protocol-plugin-alpha -> void_for_linking-tezos-protocol-plugin-alpha.empty)
-   (-> void_for_linking-tezos-protocol-plugin-alpha.empty)))
+  (select void_for_linking-octez-protocol-000-Ps9mPmXa-libs-client from
+   (octez-protocol-000-Ps9mPmXa-libs.client -> void_for_linking-octez-protocol-000-Ps9mPmXa-libs-client.empty)
+   (-> void_for_linking-octez-protocol-000-Ps9mPmXa-libs-client.empty))
+  (select void_for_linking-octez-protocol-001-PtCJ7pwo-libs-client-commands-registration from
+   (octez-protocol-001-PtCJ7pwo-libs.client.commands-registration -> void_for_linking-octez-protocol-001-PtCJ7pwo-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-001-PtCJ7pwo-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-002-PsYLVpVv-libs-client-commands-registration from
+   (octez-protocol-002-PsYLVpVv-libs.client.commands-registration -> void_for_linking-octez-protocol-002-PsYLVpVv-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-002-PsYLVpVv-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-003-PsddFKi3-libs-client-commands-registration from
+   (octez-protocol-003-PsddFKi3-libs.client.commands-registration -> void_for_linking-octez-protocol-003-PsddFKi3-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-003-PsddFKi3-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-004-Pt24m4xi-libs-client-commands-registration from
+   (octez-protocol-004-Pt24m4xi-libs.client.commands-registration -> void_for_linking-octez-protocol-004-Pt24m4xi-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-004-Pt24m4xi-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-005-PsBabyM1-libs-client-commands-registration from
+   (octez-protocol-005-PsBabyM1-libs.client.commands-registration -> void_for_linking-octez-protocol-005-PsBabyM1-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-005-PsBabyM1-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-006-PsCARTHA-libs-client-commands-registration from
+   (octez-protocol-006-PsCARTHA-libs.client.commands-registration -> void_for_linking-octez-protocol-006-PsCARTHA-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-006-PsCARTHA-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-007-PsDELPH1-libs-client-commands-registration from
+   (octez-protocol-007-PsDELPH1-libs.client.commands-registration -> void_for_linking-octez-protocol-007-PsDELPH1-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-007-PsDELPH1-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin from
+   (octez-protocol-007-PsDELPH1-libs.plugin -> void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-008-PtEdo2Zk-libs-client-commands-registration from
+   (octez-protocol-008-PtEdo2Zk-libs.client.commands-registration -> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin from
+   (octez-protocol-008-PtEdo2Zk-libs.plugin -> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-009-PsFLoren-libs-client-commands-registration from
+   (octez-protocol-009-PsFLoren-libs.client.commands-registration -> void_for_linking-octez-protocol-009-PsFLoren-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-009-PsFLoren-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-009-PsFLoren-libs-plugin from
+   (octez-protocol-009-PsFLoren-libs.plugin -> void_for_linking-octez-protocol-009-PsFLoren-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-009-PsFLoren-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-010-PtGRANAD-libs-client-commands-registration from
+   (octez-protocol-010-PtGRANAD-libs.client.commands-registration -> void_for_linking-octez-protocol-010-PtGRANAD-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-010-PtGRANAD-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin from
+   (octez-protocol-010-PtGRANAD-libs.plugin -> void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-011-PtHangz2-libs-client-commands-registration from
+   (octez-protocol-011-PtHangz2-libs.client.commands-registration -> void_for_linking-octez-protocol-011-PtHangz2-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-011-PtHangz2-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-011-PtHangz2-libs-plugin from
+   (octez-protocol-011-PtHangz2-libs.plugin -> void_for_linking-octez-protocol-011-PtHangz2-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-011-PtHangz2-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-012-Psithaca-libs-client-commands-registration from
+   (octez-protocol-012-Psithaca-libs.client.commands-registration -> void_for_linking-octez-protocol-012-Psithaca-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-012-Psithaca-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-012-Psithaca-libs-plugin from
+   (octez-protocol-012-Psithaca-libs.plugin -> void_for_linking-octez-protocol-012-Psithaca-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-012-Psithaca-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-013-PtJakart-libs-client-commands-registration from
+   (octez-protocol-013-PtJakart-libs.client.commands-registration -> void_for_linking-octez-protocol-013-PtJakart-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-013-PtJakart-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-013-PtJakart-libs-plugin from
+   (octez-protocol-013-PtJakart-libs.plugin -> void_for_linking-octez-protocol-013-PtJakart-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-013-PtJakart-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-014-PtKathma-libs-client-commands-registration from
+   (octez-protocol-014-PtKathma-libs.client.commands-registration -> void_for_linking-octez-protocol-014-PtKathma-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-014-PtKathma-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-014-PtKathma-libs-plugin from
+   (octez-protocol-014-PtKathma-libs.plugin -> void_for_linking-octez-protocol-014-PtKathma-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-014-PtKathma-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-015-PtLimaPt-libs-client-commands-registration from
+   (octez-protocol-015-PtLimaPt-libs.client.commands-registration -> void_for_linking-octez-protocol-015-PtLimaPt-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-015-PtLimaPt-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin from
+   (octez-protocol-015-PtLimaPt-libs.plugin -> void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-016-PtMumbai-libs-client-commands-registration from
+   (octez-protocol-016-PtMumbai-libs.client.commands-registration -> void_for_linking-octez-protocol-016-PtMumbai-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-016-PtMumbai-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-016-PtMumbai-libs-plugin from
+   (octez-protocol-016-PtMumbai-libs.plugin -> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin.empty))
+  octez-protocol-017-PtNairob-libs.client.commands-registration
+  octez-protocol-017-PtNairob-libs.baking-commands.registration
+  octez-protocol-017-PtNairob-libs.plugin
+  octez-protocol-018-Proxford-libs.client.commands-registration
+  octez-protocol-018-Proxford-libs.baking-commands.registration
+  octez-protocol-018-Proxford-libs.plugin
+  (select void_for_linking-octez-protocol-alpha-libs-client-commands-registration from
+   (octez-protocol-alpha-libs.client.commands-registration -> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-alpha-libs-baking-commands-registration from
+   (octez-protocol-alpha-libs.baking-commands.registration -> void_for_linking-octez-protocol-alpha-libs-baking-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-baking-commands-registration.empty))
+  (select void_for_linking-octez-protocol-alpha-libs-plugin from
+   (octez-protocol-alpha-libs.plugin -> void_for_linking-octez-protocol-alpha-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-plugin.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -137,34 +143,36 @@
   (progn
    (write-file void_for_linking-tezos-client-genesis.empty "")
    (write-file void_for_linking-tezos-client-demo-counter.empty "")
-   (write-file void_for_linking-tezos-client-000-Ps9mPmXa.empty "")
-   (write-file void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration.empty "")
-   (write-file void_for_linking-tezos-client-002-PsYLVpVv-commands-registration.empty "")
-   (write-file void_for_linking-tezos-client-003-PsddFKi3-commands-registration.empty "")
-   (write-file void_for_linking-tezos-client-004-Pt24m4xi-commands-registration.empty "")
-   (write-file void_for_linking-tezos-client-005-PsBabyM1-commands-registration.empty "")
-   (write-file void_for_linking-tezos-client-006-PsCARTHA-commands-registration.empty "")
-   (write-file void_for_linking-tezos-client-007-PsDELPH1-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty "")
-   (write-file void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-tezos-client-009-PsFLoren-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty "")
-   (write-file void_for_linking-tezos-client-010-PtGRANAD-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty "")
-   (write-file void_for_linking-tezos-client-011-PtHangz2-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty "")
-   (write-file void_for_linking-tezos-client-012-Psithaca-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca.empty "")
-   (write-file void_for_linking-tezos-client-013-PtJakart-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart.empty "")
-   (write-file void_for_linking-tezos-client-014-PtKathma-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma.empty "")
-   (write-file void_for_linking-tezos-client-015-PtLimaPt-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty "")
-   (write-file void_for_linking-tezos-client-alpha-commands-registration.empty "")
-   (write-file void_for_linking-tezos-baking-alpha-commands-registration.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))
+   (write-file void_for_linking-octez-protocol-000-Ps9mPmXa-libs-client.empty "")
+   (write-file void_for_linking-octez-protocol-001-PtCJ7pwo-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-002-PsYLVpVv-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-003-PsddFKi3-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-004-Pt24m4xi-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-005-PsBabyM1-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-006-PsCARTHA-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-007-PsDELPH1-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-008-PtEdo2Zk-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-009-PsFLoren-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-009-PsFLoren-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-010-PtGRANAD-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-011-PtHangz2-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-011-PtHangz2-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-012-Psithaca-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-012-Psithaca-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-013-PtJakart-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-013-PtJakart-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-014-PtKathma-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-014-PtKathma-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-015-PtLimaPt-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-baking-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-plugin.empty ""))))
 
 (install
  (package octez-client)

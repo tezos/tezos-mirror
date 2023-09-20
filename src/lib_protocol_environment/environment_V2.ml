@@ -818,7 +818,7 @@ struct
       canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
   end
 
-  module Logging = Internal_event.Legacy_logging.Make (Param)
+  module Logging = Legacy_logging
 
   module Updater = struct
     type nonrec validation_result = validation_result = {
@@ -953,7 +953,7 @@ struct
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
-    include IgnoreCaches (Environment_protocol_T.V0toV7 (LiftV2 (P)))
+    include IgnoreCaches (Environment_protocol_T.V0toV10 (LiftV2 (P)))
 
     let set_log_message_consumer _ = ()
 

@@ -1,0 +1,9 @@
+{0 Octez-protocol-007-PsDELPH1-libs: octez protocol 007-PsDELPH1 libraries}
+
+This is a package containing some libraries related to the Tezos 007-PsDELPH1 protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_007_PsDELPH1}Tezos_client_007_PsDELPH1}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_protocol_plugin_007_PsDELPH1}Tezos_protocol_plugin_007_PsDELPH1}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_007_PsDELPH1_registerer}Tezos_protocol_plugin_007_PsDELPH1_registerer}: Protocol plugin registerer

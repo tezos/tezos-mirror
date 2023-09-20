@@ -58,7 +58,8 @@ type t = {
   cors_origins : string list;
   cors_headers : string list;
   rpc_tls : Config_file.tls option;
-  log_output : Lwt_log_sink_unix.Output.t option;
+  log_output : Logs_simple_config.Output.t option;
+  log_coloring : bool option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
   synchronisation_threshold : int option;
@@ -130,6 +131,16 @@ module Event = struct
       ~msg:"The command-line option `--enable-testchain` is deprecated."
       ()
 
+  let disable_mempool_precheck_is_deprecated =
+    Internal_event.Simple.declare_0
+      ~section
+      ~level:Warning
+      ~name:"disable_mempool_precheck_is_deprecated"
+      ~msg:
+        "The command-line option `--disable-mempool-precheck` is deprecated \
+         and has no effects."
+      ()
+
   let overriding_config_file_arg =
     declare_1
       ~section
@@ -185,9 +196,9 @@ let wrap data_dir config_file network connections max_download_speed
     advertised_net_port discovery_addr peers no_bootstrap_peers
     bootstrap_threshold private_mode disable_p2p_maintenance disable_p2p_swap
     disable_mempool disable_mempool_precheck enable_testchain expected_pow
-    rpc_listen_addrs rpc_tls cors_origins cors_headers log_output history_mode
-    synchronisation_threshold latency disable_config_validation allow_all_rpc
-    media_type metrics_addr operation_metadata_size_limit =
+    rpc_listen_addrs rpc_tls cors_origins cors_headers log_output log_coloring
+    history_mode synchronisation_threshold latency disable_config_validation
+    allow_all_rpc media_type metrics_addr operation_metadata_size_limit =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -225,6 +236,7 @@ let wrap data_dir config_file network connections max_download_speed
     cors_headers;
     rpc_tls;
     log_output;
+    log_coloring;
     peer_table_size;
     bootstrap_threshold;
     history_mode;
@@ -259,10 +271,10 @@ end
 module Term = struct
   let log_output_converter =
     ( (fun s ->
-        match Lwt_log_sink_unix.Output.of_string s with
+        match Logs_simple_config.Output.of_string s with
         | Some res -> `Ok res
         | None -> `Error s),
-      Lwt_log_sink_unix.Output.pp )
+      Logs_simple_config.Output.pp )
 
   let history_mode_converter =
     let open History_mode in
@@ -379,6 +391,13 @@ module Term = struct
       value
       & opt (some log_output_converter) None
       & info ~docs ~docv:"OUTPUT" ~doc ["log-output"])
+
+  let log_coloring =
+    let doc =
+      "Enable or disable light coloring in default stdout logs. Coloring is \
+       enabled by default."
+    in
+    Arg.(value & opt (some bool) None & info ~docs ~doc ["log-coloring"])
 
   let data_dir =
     let doc =
@@ -606,15 +625,10 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5767
+     Remove this flag in Octez V19. *)
   let disable_mempool_precheck =
-    let doc =
-      "If set to [true], the node's prevalidator will fully execute operations \
-       before gossiping valid operations over the network. Default value is \
-       [false], in which case the node's prevalidator only performs a fast \
-       check over operations before gossiping them. If set to [true], this \
-       option can slow down your node and should be used for testing or \
-       debugging purposes."
-    in
+    let doc = "DEPRECATED. This flag no longer does anything." in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool-precheck"])
 
   let enable_testchain =
@@ -723,7 +737,7 @@ module Term = struct
     $ disable_p2p_maintenance $ disable_p2p_swap $ disable_mempool
     $ disable_mempool_precheck $ enable_testchain $ expected_pow
     $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers $ log_output
-    $ history_mode $ synchronisation_threshold $ latency
+    $ log_coloring $ history_mode $ synchronisation_threshold $ latency
     $ disable_config_validation $ allow_all_rpc $ media_type $ metrics_addr
     $ operation_metadata_size_limit
 end
@@ -861,6 +875,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     cors_origins;
     cors_headers;
     log_output;
+    log_coloring;
     bootstrap_threshold;
     history_mode;
     network = network_arg;
@@ -993,6 +1008,11 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     if enable_testchain then emit Event.testchain_is_deprecated ()
     else Lwt.return_unit
   in
+  let*! () =
+    if disable_mempool_precheck then
+      emit Event.disable_mempool_precheck_is_deprecated ()
+    else Lwt.return_unit
+  in
   Config_file.update
     ~disable_config_validation
     ?data_dir
@@ -1017,12 +1037,12 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~disable_p2p_maintenance
     ~disable_p2p_swap
     ~disable_mempool
-    ~disable_mempool_precheck
     ~enable_testchain
     ~cors_origins
     ~cors_headers
     ?rpc_tls
     ?log_output
+    ?log_coloring
     ?synchronisation_threshold
     ?history_mode
     ?latency

@@ -52,6 +52,9 @@ module Store : sig
 
   (** [create engine] instantiate a WebAssembly runtime store. *)
   val create : Engine.t -> t
+
+  (** [delete store] destroys the handle to the WebAssembly store. *)
+  val delete : t -> unit
 end
 
 module Ref : sig
@@ -138,6 +141,8 @@ module Module : sig
 end
 
 module Memory : sig
+  exception Out_of_bounds
+
   module Array : module type of Ctypes.CArray
 
   (** WebAssembly memory *)
@@ -150,8 +155,16 @@ module Memory : sig
   (** [get mem addr] reads a byte at address [addr]. *)
   val get : t -> int -> Unsigned.uint8
 
+  (** [get_string mem addr len] reads [len] bytes from address [addr] in
+      mmemory [mem]. *)
+  val get_string : t -> address:int -> length:int -> string
+
   (** [set mem addr value] sets a byte at address [addr] to [value]. *)
   val set : t -> int -> Unsigned.uint8 -> unit
+
+  (** [set_string mem ~address ~data] writes a series of bytes represented by [data]
+      at address [address] in the provided memory [mem]. *)
+  val set_string : t -> address:int -> data:string -> unit
 
   (** [length mem] gives you the memory size in bytes. *)
   val length : t -> int
@@ -186,6 +199,11 @@ module Exports : sig
 
   (** [from_intance instance] extracts the exports from the given instance. *)
   val from_instance : Instance.t -> t
+
+  (** [delete exports] cleans up the exports collection to free its associated
+      objects. You must not use previously extracted export objects after
+      calling call. *)
+  val delete : t -> unit
 
   (** [fn exports name typ] looks for a function called [name] and type checks
       it against [typ]. *)

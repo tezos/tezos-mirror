@@ -12,6 +12,9 @@ FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as intermediate
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin/* /home/tezos/bin/
 # Add parameters for active protocols
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/parameters /home/tezos/scripts/
+# Add EVM kernel artifacts
+RUN mkdir -p /home/tezos/scripts/evm_kernel
+COPY --chown=tezos:nogroup --from=builder /home/tezos/evm_kernel/evm_installer.wasm* /home/tezos/evm_kernel/_evm_installer_preimages* /home/tezos/scripts/evm_kernel/
 # Add entrypoint scripts
 COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 # Add scripts

@@ -128,7 +128,7 @@ let init (cctxt : Protocol_client_context.full)
   in
   let init_one (alias, params) =
     let* contract =
-      Client_proto_contracts.ContractAlias.get_contract cctxt alias
+      Client_proto_contracts.Contract_alias.get_contract cctxt alias
     in
     let* smart_contract =
       match List.find (fun x -> String.equal alias x.alias) all_contracts with
@@ -175,7 +175,7 @@ let originate_command =
     ~desc:"Originate all supported smart contracts for use in the stresstest."
     no_options
     (prefixes ["stresstest"; "originate"; "smart"; "contracts"; "from"]
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"src"
          ~desc:"name of the source contract"
     @@ stop)

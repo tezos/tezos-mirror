@@ -1,3 +1,0 @@
-(executable
- (name update)
- (libraries tezt uri))

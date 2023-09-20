@@ -40,7 +40,7 @@ module Tree = Generators_tree.Tree
 module List_extra = Generators_tree.List_extra
 module Block = Generators_tree.Block
 
-let make_operation = Shell_operation.Internal_for_tests.make_operation
+let parse hash raw = Some (Internal_for_tests.make_operation hash raw ())
 
 (** Function to unwrap an [option] when it MUST be a [Some] *)
 let force_opt ~loc = function
@@ -118,8 +118,6 @@ module Handle_operations = struct
   let dummy_classes =
     Classification.(
       create {map_size_limit = 1; on_discarded_operation = (fun _oph -> ())})
-
-  let parse raw hash = Some (make_operation hash raw ())
 
   (** Test that operations returned by [handle_live_operations]
       are all in the alive branch. *)
@@ -415,7 +413,6 @@ module Recyle_operations = struct
     assume @@ Option.is_some pair_blocks_opt ;
     let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
-    let parse raw hash = Some (make_operation hash raw ()) in
     let actual : unit operation Op_map.t =
       Classification.recycle_operations
         ~block_store:Block.tools
@@ -465,8 +462,7 @@ module Recyle_operations = struct
     in
     let expected_from_classification =
       Classification.Internal_for_tests.to_map
-        ~applied:true
-        ~prechecked:true
+        ~validated:true
         ~branch_delayed:true
         ~branch_refused:handle_branch_refused
         ~refused:false
@@ -482,7 +478,6 @@ module Recyle_operations = struct
            expected_from_classification)
         expected_from_pending
     in
-    let parse raw hash = Some (make_operation hash raw ()) in
     let actual : Operation_hash.Set.t =
       Classification.recycle_operations
         ~block_store:Block.tools
@@ -517,8 +512,7 @@ module Recyle_operations = struct
     in
     let expected : unit operation Op_map.t =
       Classification.Internal_for_tests.to_map
-        ~applied:false
-        ~prechecked:false
+        ~validated:false
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
@@ -527,7 +521,6 @@ module Recyle_operations = struct
     in
     let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
-    let parse raw hash = Some (make_operation hash raw ()) in
     let () =
       Classification.recycle_operations
         ~block_store:Block.tools
@@ -543,8 +536,7 @@ module Recyle_operations = struct
     in
     let actual =
       Classification.Internal_for_tests.to_map
-        ~applied:true
-        ~prechecked:true
+        ~validated:true
         ~branch_delayed:true
         ~branch_refused:true
         ~refused:true

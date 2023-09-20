@@ -27,32 +27,41 @@
 open Alpha_context
 
 let parse_ticket ~consume_deserialization_gas ~ticketer ~contents ~ty ctxt =
-  Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
-  >>?= fun (ty, ctxt) ->
-  Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
-  >>?= fun (contents, ctxt) ->
-  Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
-  >>?= fun (Ex_comparable_ty contents_type, ctxt) ->
-  Script_ir_translator.parse_comparable_data
-    ctxt
-    contents_type
-    (Micheline.root contents)
-  >>=? fun (contents, ctxt) ->
+  let open Lwt_result_syntax in
+  let*? ty, ctxt =
+    Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
+  in
+  let*? contents, ctxt =
+    Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
+  in
+  let*? Ex_comparable_ty contents_type, ctxt =
+    Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+  in
+  let* contents, ctxt =
+    Script_ir_translator.parse_comparable_data
+      ctxt
+      contents_type
+      (Micheline.root contents)
+  in
   let token = Ticket_token.Ex_token {ticketer; contents_type; contents} in
   return (ctxt, token)
 
 let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
     ~ty ~sender ~destination ~entrypoint ~amount ctxt =
-  parse_ticket ~consume_deserialization_gas ~ticketer ~contents ~ty ctxt
-  >>=? fun ( ctxt,
-             (Ticket_token.Ex_token {contents; contents_type; ticketer} as
-             token) ) ->
-  Script_typed_ir.ticket_t Micheline.dummy_location contents_type
-  >>?= fun ticket_ty ->
+  let open Lwt_result_syntax in
+  let* ( ctxt,
+         (Ticket_token.Ex_token {contents; contents_type; ticketer} as token) )
+      =
+    parse_ticket ~consume_deserialization_gas ~ticketer ~contents ~ty ctxt
+  in
+  let*? ticket_ty =
+    Script_typed_ir.ticket_t Micheline.dummy_location contents_type
+  in
   let ticket = Script_typed_ir.{ticketer; contents; amount} in
-  Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
-  >>=? fun (unparsed_parameters, ctxt) ->
-  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let* unparsed_parameters, ctxt =
+    Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
+  in
+  let*? ctxt, nonce = fresh_internal_nonce ctxt in
   let op =
     Script_typed_ir.Internal_operation
       {
@@ -76,18 +85,26 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
 let transfer_ticket_with_hashes ctxt ~sender_hash ~dst_hash
     (qty : Ticket_amount.t) =
   let qty = Script_int.(to_zint (qty :> n num)) in
-  Ticket_balance.adjust_balance ctxt sender_hash ~delta:(Z.neg qty)
-  >>=? fun (sender_storage_diff, ctxt) ->
-  Ticket_balance.adjust_balance ctxt dst_hash ~delta:qty
-  >>=? fun (dst_storage_diff, ctxt) ->
-  Ticket_balance.adjust_storage_space
-    ctxt
-    ~storage_diff:(Z.add sender_storage_diff dst_storage_diff)
-  >>=? fun (diff, ctxt) -> return (ctxt, diff)
+  let open Lwt_result_syntax in
+  let* sender_storage_diff, ctxt =
+    Ticket_balance.adjust_balance ctxt sender_hash ~delta:(Z.neg qty)
+  in
+  let* dst_storage_diff, ctxt =
+    Ticket_balance.adjust_balance ctxt dst_hash ~delta:qty
+  in
+  let* diff, ctxt =
+    Ticket_balance.adjust_storage_space
+      ctxt
+      ~storage_diff:(Z.add sender_storage_diff dst_storage_diff)
+  in
+  return (ctxt, diff)
 
 let transfer_ticket ctxt ~sender ~dst ex_token qty =
-  Ticket_balance_key.of_ex_token ctxt ~owner:sender ex_token
-  >>=? fun (sender_hash, ctxt) ->
-  Ticket_balance_key.of_ex_token ctxt ~owner:dst ex_token
-  >>=? fun (dst_hash, ctxt) ->
+  let open Lwt_result_syntax in
+  let* sender_hash, ctxt =
+    Ticket_balance_key.of_ex_token ctxt ~owner:sender ex_token
+  in
+  let* dst_hash, ctxt =
+    Ticket_balance_key.of_ex_token ctxt ~owner:dst ex_token
+  in
   transfer_ticket_with_hashes ctxt ~sender_hash ~dst_hash qty

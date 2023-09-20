@@ -76,7 +76,9 @@ let check_node_synchronization_state =
     ~__FILE__
     ~title:"check synchronization state"
     ~tags:
-      ["ci_disable"; "synchronisation_threshold"; "bootstrap"; "node"; "sync"]
+      [
+        Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "node"; "sync";
+      ]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
@@ -163,7 +165,7 @@ let check_prevalidator_start =
     ~title:"Check prevalidator start"
     ~tags:
       [
-        "ci_disable";
+        Tag.ci_disabled;
         "synchronisation_threshold";
         "bootstrap";
         "node";
@@ -227,7 +229,8 @@ let test_threshold_zero =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold zero"
-    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info "Setup network" ;
   let* node, client =
@@ -299,7 +302,8 @@ let test_threshold_two =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold two"
-    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -365,7 +369,8 @@ let test_threshold_stuck =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold stuck"
-    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   let sync_latency = 3 in
 
@@ -426,7 +431,8 @@ let test_threshold_split_view =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold split view"
-    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   Log.info
     "Add two peers with threshold zero, and one with threshold 2 and a high \
@@ -492,7 +498,8 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:["ci_disable"; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in

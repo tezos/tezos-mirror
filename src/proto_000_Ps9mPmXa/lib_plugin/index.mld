@@ -1,0 +1,7 @@
+{0 Octez-protocol-000-Ps9mPmXa-libs: octez protocol 000-Ps9mPmXa libraries}
+
+This is a package containing some libraries related to the Tezos 000-Ps9mPmXa protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_000_Ps9mPmXa}Tezos_client_000_Ps9mPmXa}: Protocol specific library for `tezos-client`

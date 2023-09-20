@@ -98,9 +98,10 @@ module type T = sig
         ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and type Timelock.chest = Tezos_crypto.Timelock.chest
-       and type Timelock.chest_key = Tezos_crypto.Timelock.chest_key
-       and type Timelock.opening_result = Tezos_crypto.Timelock.opening_result
+       and type Timelock.chest = Tezos_crypto.Timelock_legacy.chest
+       and type Timelock.chest_key = Tezos_crypto.Timelock_legacy.chest_key
+       and type Timelock.opening_result =
+        Tezos_crypto.Timelock_legacy.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls.Primitive.Fr.t = Bls12_381.Fr.t
@@ -114,15 +115,13 @@ module type T = sig
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
+       and type Wasm_2_0_0.reveal =
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal
        and type Wasm_2_0_0.version = Tezos_scoru_wasm.Wasm_pvm_state.version
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
        and type Wasm_2_0_0.reveal_hash =
-        Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
-       and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal
-       and type Wasm_2_0_0.input_request =
-        Tezos_scoru_wasm.Wasm_pvm_state.input_request
-       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal_hash
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -308,7 +307,7 @@ struct
   module P256 = Tezos_crypto.Signature.P256
   module Bls = Tezos_crypto.Signature.Bls
   module Signature = Tezos_crypto.Signature.V1
-  module Timelock = Tezos_crypto.Timelock
+  module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
 
   module S = struct
@@ -1110,18 +1109,18 @@ struct
       message_index : Z.t;
     }
 
-    type reveal_hash = Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
+    type reveal_hash = Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal_hash
 
-    type reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal =
+    type reveal = Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal =
       | Reveal_raw_data of reveal_hash
       | Reveal_metadata
 
-    type input_request = Tezos_scoru_wasm.Wasm_pvm_state.input_request =
+    type input_request =
       | No_input_required
       | Input_required
       | Reveal_required of reveal
 
-    type info = Tezos_scoru_wasm.Wasm_pvm_state.info = {
+    type info = {
       current_tick : Z.t;
       last_input_read : input option;
       input_request : input_request;
@@ -1145,6 +1144,40 @@ struct
 
         let wrap t = PVM_tree t
       end)
+
+      let reveal_compat reveal =
+        match
+          Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.of_current_opt reveal
+        with
+        | Some r -> r
+        | None ->
+            (* The WASM PVM before environment V11 will not request a value
+               outside of the [Compatibility.reveal] domain. As a consequence,
+               the only execution path leading to executing this branch is
+               by having two dishonest nodes playing against each other.
+
+               As a consequence, it is safe to return an arbitrary value here,
+               and we do so to avoid raising an exception. *)
+            Reveal_raw_data "this line costs 10k XTZ to execute"
+
+      let input_request_compat = function
+        | Tezos_scoru_wasm.Wasm_pvm_state.No_input_required -> No_input_required
+        | Input_required -> Input_required
+        | Reveal_required req -> Reveal_required (reveal_compat req)
+
+      let info_compat
+          Tezos_scoru_wasm.Wasm_pvm_state.
+            {current_tick; last_input_read; input_request} =
+        {
+          current_tick;
+          last_input_read;
+          input_request = input_request_compat input_request;
+        }
+
+      let get_info tree =
+        let open Lwt_syntax in
+        let+ info = get_info tree in
+        info_compat info
     end
   end
 
@@ -1154,6 +1187,18 @@ struct
     let expected_context_hash = Predecessor_resulting_context
 
     include P
+
+    let block_header_metadata_encoding_with_legacy_attestation_name =
+      block_header_metadata_encoding
+
+    let operation_data_encoding_with_legacy_attestation_name =
+      operation_data_encoding
+
+    let operation_receipt_encoding_with_legacy_attestation_name =
+      operation_receipt_encoding
+
+    let operation_data_and_receipt_encoding_with_legacy_attestation_name =
+      operation_data_and_receipt_encoding
 
     let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =

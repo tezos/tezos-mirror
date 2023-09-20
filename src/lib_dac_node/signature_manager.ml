@@ -158,30 +158,9 @@ let () =
       Public_key_for_committee_member_not_available
         (Aggregate_signature.Public_key_hash.of_b58check_exn hash))
 
-let bind_es (f : 'a -> 'b option tzresult Lwt.t) v_opt =
-  let open Lwt_result_syntax in
-  match v_opt with None -> return None | Some v -> f v
-
-let rev_collect_indexed_signatures cctxt dac_sk_uris bytes_to_sign =
-  let open Lwt_result_syntax in
-  List.rev_mapi_es
-    (fun index sk_uri_opt ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4306
-         Implement Option.bind_es and revisit this. *)
-      bind_es
-        (fun sk_uri ->
-          let*! signature_res =
-            Tezos_client_base.Client_keys.aggregate_sign
-              cctxt
-              sk_uri
-              bytes_to_sign
-          in
-          let signature_opt = Result.to_option signature_res in
-          return
-          @@ Option.map (fun signature -> (index, signature)) signature_opt)
-        sk_uri_opt)
-    dac_sk_uris
-
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5578
+     Check that computed witness field is correct with respect to signatures.
+*)
 let compute_signatures_with_witnesses rev_indexed_signatures =
   let open Lwt_result_syntax in
   List.fold_left_es
@@ -195,50 +174,22 @@ let compute_signatures_with_witnesses rev_indexed_signatures =
     ([], Z.zero)
     rev_indexed_signatures
 
-let verify dac_plugin ~public_keys_opt root_page_hash signature witnesses =
-  let open Lwt_result_syntax in
-  let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_page_hash in
-  let hash_as_bytes =
-    Data_encoding.Binary.to_bytes_opt Plugin.encoding root_hash
-  in
-  let hex_root_hash = Plugin.to_hex root_hash in
-  match hash_as_bytes with
-  | None -> tzfail @@ Cannot_convert_root_page_hash_to_bytes hex_root_hash
-  | Some bytes ->
-      let* pk_msg_list =
-        public_keys_opt
-        |> List.mapi (fun i public_key_opt -> (i, public_key_opt))
-        |> List.filter_map_es (fun (i, public_key_opt) ->
-               let is_witness = Z.testbit witnesses i in
-               match public_key_opt with
-               | None ->
-                   if is_witness then
-                     tzfail
-                     @@ Public_key_for_witness_not_available (i, hex_root_hash)
-                   else return None
-               | Some public_key ->
-                   if is_witness then return @@ Some (public_key, None, bytes)
-                   else return None)
-      in
-      return
-      @@ Tezos_crypto.Aggregate_signature.aggregate_check pk_msg_list signature
-
 let verify_signature ((module Plugin) : Dac_plugin.t) pk signature root_hash =
   let root_hash_bytes = Dac_plugin.hash_to_bytes root_hash in
   fail_unless
     (Aggregate_signature.check pk signature root_hash_bytes)
     (Signature_verification_failed (pk, signature, Plugin.to_hex root_hash))
 
-let add_dac_member_signature dac_plugin signature_store
-    Signature_repr.{root_hash; signer_pkh; signature} =
+let add_dac_member_signature dac_plugin signature_store signature =
   let open Lwt_result_syntax in
-  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
+  let*? root_hash =
+    Dac_plugin.raw_to_hash dac_plugin (Signature_repr.get_root_hash signature)
+  in
   Store.Signature_store.add
     signature_store
     ~primary_key:root_hash
-    ~secondary_key:signer_pkh
-    signature
+    ~secondary_key:(Signature_repr.get_signer_pkh signature)
+    (Signature_repr.get_signature signature)
 
 let rev_find_indexed_signatures node_store dac_members_pkh root_hash =
   let open Lwt_result_syntax in
@@ -261,6 +212,7 @@ let update_aggregate_sig_store node_store dac_members_pk_opt root_hash =
   let* signatures, witnesses =
     compute_signatures_with_witnesses rev_indexed_signature
   in
+  let raw_root_hash = Dac_plugin.hash_to_raw root_hash in
   let final_signature =
     Tezos_crypto.Aggregate_signature.aggregate_signature_opt signatures
   in
@@ -273,8 +225,9 @@ let update_aggregate_sig_store node_store dac_members_pk_opt root_hash =
       let* () =
         Store.Certificate_store.add
           node_store
-          root_hash
-          Store.{aggregate_signature; witnesses}
+          raw_root_hash
+          Certificate_repr.(
+            V0 (V0.make raw_root_hash aggregate_signature witnesses))
       in
       return @@ (aggregate_signature, witnesses)
 
@@ -304,17 +257,20 @@ let check_coordinator_knows_root_hash dac_plugin page_store root_hash =
   | Ok false -> raise Not_found
   | Ok true -> return ()
 
-let should_update_certificate dac_plugin cctxt ro_node_store committee_members
-    Signature_repr.{signer_pkh; root_hash; signature} =
+let should_update_certificate dac_plugin get_public_key_opt ro_node_store
+    committee_members signature =
   let open Lwt_result_syntax in
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let*? root_hash = Dac_plugin.raw_to_hash dac_plugin root_hash in
+  let*? root_hash =
+    Dac_plugin.raw_to_hash dac_plugin (Signature_repr.get_root_hash signature)
+  in
+  let signer_pkh = Signature_repr.get_signer_pkh signature in
   let* () =
     fail_unless
       (check_is_dac_member committee_members signer_pkh)
       (Public_key_is_non_committee_member signer_pkh)
   in
-  let* pub_key_opt = Wallet_cctxt_helpers.get_public_key cctxt signer_pkh in
+  let pub_key_opt = get_public_key_opt signer_pkh in
   let* pub_key =
     Option.fold_f
       ~none:(fun () ->
@@ -327,11 +283,18 @@ let should_update_certificate dac_plugin cctxt ro_node_store committee_members
   in
   if dac_member_has_signed then return false
   else
-    let* () = verify_signature dac_plugin pub_key signature root_hash in
+    let* () =
+      verify_signature
+        dac_plugin
+        pub_key
+        (Signature_repr.get_signature signature)
+        root_hash
+    in
     return true
 
-let stream_certificate_update dac_plugin committee_members
-    (Certificate_repr.{root_hash; _} as certificate) certificate_streamers =
+let stream_certificate_update dac_plugin committee_members certificate
+    certificate_streamers =
+  let root_hash = Certificate_repr.get_root_hash certificate in
   let open Result_syntax in
   let* () =
     Certificate_streamers.push
@@ -351,20 +314,18 @@ let stream_certificate_update dac_plugin committee_members
     return ()
   else return ()
 
-let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
-    rw_node_store page_store cctxt committee_members committee_member_signature
-    =
+let handle_put_dac_member_signature dac_plugin get_public_key_opt
+    certificate_streamers_opt rw_node_store page_store committee_members
+    committee_member_signature =
   let open Lwt_result_syntax in
   let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-  let Signature_repr.{root_hash = raw_root_hash; _} =
-    committee_member_signature
-  in
+  let raw_root_hash = Signature_repr.get_root_hash committee_member_signature in
   let*? root_hash = Dac_plugin.raw_to_hash dac_plugin raw_root_hash in
   let* () = check_coordinator_knows_root_hash dac_plugin page_store root_hash in
   let* should_update_certificate =
     should_update_certificate
       dac_plugin
-      cctxt
+      get_public_key_opt
       rw_node_store
       committee_members
       committee_member_signature
@@ -384,8 +345,8 @@ let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
         (stream_certificate_update
            dac_plugin
            committee_members
-           Certificate_repr.
-             {root_hash = raw_root_hash; aggregate_signature; witnesses})
+           Certificate_repr.(
+             V0 (V0.make raw_root_hash aggregate_signature witnesses)))
         certificate_streamers_opt
     in
     return ()
@@ -393,49 +354,24 @@ let handle_put_dac_member_signature dac_plugin certificate_streamers_opt
 
 module Coordinator = struct
   let handle_put_dac_member_signature ctx dac_plugin rw_node_store page_store
-      cctxt dac_member_signature =
+      dac_member_signature =
     let committee_members = Node_context.Coordinator.committee_members ctx in
+    let get_public_key_opt committee_member_address =
+      List.find_map
+        (fun Wallet_account.Coordinator.{public_key_hash; public_key} ->
+          if
+            Tezos_crypto.Aggregate_signature.Public_key_hash.(
+              committee_member_address <> public_key_hash)
+          then None
+          else Some public_key)
+        ctx.committee_members
+    in
     handle_put_dac_member_signature
       dac_plugin
+      get_public_key_opt
       (Some ctx.certificate_streamers)
       rw_node_store
       page_store
-      cctxt
-      committee_members
-      dac_member_signature
-end
-
-module Legacy = struct
-  let sign_root_hash ((module P) : Dac_plugin.t) cctxt dac_sk_uris root_hash =
-    let open Lwt_result_syntax in
-    let bytes_to_sign =
-      Data_encoding.Binary.to_bytes_opt P.encoding root_hash
-    in
-    let root_hash = P.to_hex root_hash in
-    match bytes_to_sign with
-    | None -> tzfail @@ Cannot_convert_root_page_hash_to_bytes root_hash
-    | Some bytes_to_sign -> (
-        let* rev_indexed_signatures =
-          rev_collect_indexed_signatures cctxt dac_sk_uris bytes_to_sign
-        in
-        let* signatures, witnesses =
-          compute_signatures_with_witnesses rev_indexed_signatures
-        in
-        match
-          Tezos_crypto.Aggregate_signature.aggregate_signature_opt signatures
-        with
-        | None -> tzfail @@ Cannot_compute_aggregate_signature root_hash
-        | Some signature -> return @@ (signature, witnesses))
-
-  let handle_put_dac_member_signature ctx dac_plugin rw_node_store page_store
-      cctxt dac_member_signature =
-    let committee_members = Node_context.Legacy.committee_members ctx in
-    handle_put_dac_member_signature
-      dac_plugin
-      None
-      rw_node_store
-      page_store
-      cctxt
       committee_members
       dac_member_signature
 end

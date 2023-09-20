@@ -3,30 +3,31 @@
 
 (library
  (name tezos_shell)
- (public_name tezos-shell)
+ (public_name octez-shell-libs.shell)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt-watcher
   lwt-canceler
   prometheus
-  tezos-base
-  tezos-base.unix
-  tezos-rpc
-  tezos-context
-  tezos-store
-  tezos-store.shared
-  tezos-protocol-environment
-  tezos-context-ops
-  tezos-shell-context
-  tezos-p2p
-  tezos-stdlib-unix
-  tezos-shell-services
-  tezos-p2p-services
-  tezos-protocol-updater
-  tezos-requester
-  tezos-workers
-  tezos-validation
-  tezos-version
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.rpc
+  octez-libs.tezos-context
+  octez-shell-libs.store
+  octez-shell-libs.store.shared
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.context-ops
+  octez-shell-libs.shell-context
+  octez-shell-libs.p2p
+  octez-libs.stdlib-unix
+  octez-shell-libs.shell-services
+  octez-libs.tezos-p2p-services
+  octez-shell-libs.protocol-updater
+  octez-libs.requester
+  octez-libs.tezos-workers
+  octez-shell-libs.validation
+  octez-libs.version
+  octez-libs.crypto-dal.dal-config
   lwt-exit)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
@@ -49,6 +50,7 @@
   -open Tezos_requester
   -open Tezos_workers
   -open Tezos_validation
-  -open Tezos_version))
+  -open Tezos_version
+  -open Tezos_crypto_dal_octez_dal_config))
 
-(documentation (package tezos-shell))
+(documentation (package octez-shell-libs) (mld_files octez_shell))

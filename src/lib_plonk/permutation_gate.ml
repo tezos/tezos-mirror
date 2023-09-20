@@ -47,6 +47,8 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
     let name prefix i = prefix ^ Csir.string_key_of_int ~nb_digits (i + 1) in
     (name "Si", name "Ss")
 
+  let shared_z_names = [z_name]
+
   (* element preprocessed and known by both prover and verifier *)
   type public_parameters = {
     g_map_perm_PP : Poly.t SMap.t;
@@ -245,87 +247,6 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       in
       res_evaluation
 
-    (* evaluations must contain z’s evaluation *)
-    let prover_identities ~external_prefix:e_pref ~prefix wires_names beta gamma
-        n evaluations =
-      let z_name = e_pref z_name in
-      let raw_z_name = z_name in
-      let zg_name = zg_name z_name in
-      let z_evaluation =
-        Evaluations.find_evaluation evaluations (prefix z_name)
-      in
-      let z_evaluation_len = Evaluations.length z_evaluation in
-      let tmp_evaluation = Evaluations.create z_evaluation_len in
-      let tmp2_evaluation = Evaluations.create z_evaluation_len in
-      let id1_evaluation = Evaluations.create z_evaluation_len in
-      let id2_evaluation = Evaluations.create z_evaluation_len in
-
-      let wires_names = List.map prefix wires_names in
-
-      let identity_zfg =
-        let nb_wires = List.length wires_names in
-
-        (* changes f (resp g) array to f'(resp g') array, and multiply them together
-            and with z (resp zg) *)
-        let f_evaluation =
-          let sid_names = List.init nb_wires si_name in
-          compute_prime
-            ~prefix
-            tmp_evaluation
-            id2_evaluation
-            tmp2_evaluation
-            beta
-            gamma
-            evaluations
-            wires_names
-            sid_names
-            (raw_z_name, z_name)
-            n
-        in
-        let g_evaluation =
-          let ss_names =
-            List.init nb_wires (fun i -> prefix @@ e_pref (ss_name i))
-          in
-          compute_prime
-            ~prefix
-            id2_evaluation
-            id1_evaluation
-            tmp2_evaluation
-            beta
-            gamma
-            evaluations
-            wires_names
-            ss_names
-            (raw_z_name, zg_name)
-            n
-        in
-        Evaluations.linear_c
-          ~res:id1_evaluation
-          ~evaluations:[f_evaluation; g_evaluation]
-          ~linear_coeffs:[one; mone]
-          ()
-      in
-      let identity_l1_z =
-        let l1_evaluation = Evaluations.find_evaluation evaluations l1 in
-        let z_mone_evaluation =
-          Evaluations.linear_c
-            ~res:tmp_evaluation
-            ~evaluations:[z_evaluation]
-            ~add_constant:mone
-            ()
-        in
-
-        Evaluations.mul_c
-          ~res:id2_evaluation
-          ~evaluations:[l1_evaluation; z_mone_evaluation]
-          ()
-      in
-      SMap.of_list
-        [
-          (prefix (e_pref "Perm.a"), identity_l1_z);
-          (prefix (e_pref "Perm.b"), identity_zfg);
-        ]
-
     (* compute_Z performs the following steps in the two loops.
        ----------------------
        | f_11 f_21 ... f_k1 | -> f_prod_1 (no need to compute as Z(g) is always one)
@@ -406,22 +327,24 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
      C(X) := \sum_i delta^{i-1} c_i(X)
      We will perform a single permutation argument for A, B and C. *)
   module Shared_argument = struct
-    let build_batched_wires_values ~delta ~wires:wires_list_map =
-      (* agg_map = {a -> [] ; b -> [] ; …} *)
-      let agg_map =
-        SMap.(map (Fun.const []) (List.hd (choose wires_list_map |> snd)))
-      in
-      (* builds {a -> linear(a in l) ; b -> linear(b in l) ; …} *)
-      let aggreg_wires_list l =
-        List.fold_left
-          (fun acc wires -> (SMap.mapi (fun k v -> SMap.find k wires :: v)) acc)
-          agg_map
-          (List.rev l)
-        |> SMap.map (fun ws_list ->
-               Evaluations.linear_with_powers ws_list delta)
-      in
-      SMap.map aggreg_wires_list wires_list_map
-      |> SMap.(map (update_keys String.capitalize_ascii))
+    let build_batched_wires_values ?(batched_keys = String.capitalize_ascii)
+        ~delta ~wires:wires_list_map () =
+      if SMap.is_empty wires_list_map then SMap.empty
+      else
+        (* builds {a -> linear(a in l) ; b -> linear(b in l) ; …} *)
+        let aggreg_wires_list l =
+          (* agg_map = {a -> [] ; b -> [] ; …} *)
+          let agg_map = SMap.(map (Fun.const []) (List.hd l)) in
+          List.fold_left
+            (fun acc wires ->
+              (SMap.mapi (fun k v -> SMap.find k wires :: v)) acc)
+            agg_map
+            (List.rev l)
+          |> SMap.map (fun ws_list ->
+                 Evaluations.linear_with_powers ws_list delta)
+        in
+        SMap.map aggreg_wires_list wires_list_map
+        |> SMap.(map (update_keys batched_keys))
 
     (* For each circuit, interpolates the batched wires A, B, C from the
        batched witness *)
@@ -484,7 +407,15 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       batched_witness_polys |> SMap.Aggregation.smap_of_smap_smap
 
     let merge_batched_values m1 m2 =
-      SMap.mapi (fun k v -> SMap.union_disjoint v (SMap.find k m1)) m2
+      if SMap.is_empty m1 then m2
+      else if SMap.is_empty m2 then m1
+      else
+        SMap.mapi
+          (fun k v1 ->
+            match SMap.find_opt k m2 with
+            | Some v2 -> SMap.union_disjoint v1 v2
+            | None -> v1)
+          m1
   end
 
   (* max degree needed is the degree of Perm.b, which is sum of wire’s degree plus z degree *)
@@ -529,21 +460,96 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
        Depending on that, we want to change Z, Ss & identities names *)
     if s = z_name && ext <> "" then ext ^ "Perm_" ^ s else ext ^ s
 
+  (* Note that this function uses a sorted version of wires_names list ; having
+     a sorted list avoids errors when the list is not sorted as the map used to
+     create Z *)
   let prover_identities ?(external_prefix = "") ?(circuit_prefix = Fun.id)
       ~wires_names ~beta ~gamma ~n () =
-    let external_prefix = external_prefix_fun external_prefix in
+    let e_pref = external_prefix_fun external_prefix in
     fun evaluations ->
-      Permutation_poly.prover_identities
-        ~external_prefix
-        ~prefix:circuit_prefix
-        wires_names
-        beta
-        gamma
-        n
-        evaluations
+      let sorted_wires_names = List.sort String.compare wires_names in
+      let z_name = e_pref z_name in
+      let raw_z_name = z_name in
+      let zg_name = zg_name z_name in
+      let z_evaluation =
+        Evaluations.find_evaluation evaluations (circuit_prefix z_name)
+      in
+      let z_evaluation_len = Evaluations.length z_evaluation in
+      let tmp_evaluation = Evaluations.create z_evaluation_len in
+      let tmp2_evaluation = Evaluations.create z_evaluation_len in
+      let id1_evaluation = Evaluations.create z_evaluation_len in
+      let id2_evaluation = Evaluations.create z_evaluation_len in
+
+      let wires_names = List.map circuit_prefix sorted_wires_names in
+
+      let identity_zfg =
+        let nb_wires = List.length wires_names in
+
+        (* changes f (resp g) array to f'(resp g') array, and multiply them together
+            and with z (resp zg) *)
+        let f_evaluation =
+          let sid_names = List.init nb_wires si_name in
+          Permutation_poly.compute_prime
+            ~prefix:circuit_prefix
+            tmp_evaluation
+            id2_evaluation
+            tmp2_evaluation
+            beta
+            gamma
+            evaluations
+            wires_names
+            sid_names
+            (raw_z_name, z_name)
+            n
+        in
+        let g_evaluation =
+          let ss_names =
+            List.init nb_wires (fun i -> circuit_prefix @@ e_pref (ss_name i))
+          in
+          Permutation_poly.compute_prime
+            ~prefix:circuit_prefix
+            id2_evaluation
+            id1_evaluation
+            tmp2_evaluation
+            beta
+            gamma
+            evaluations
+            wires_names
+            ss_names
+            (raw_z_name, zg_name)
+            n
+        in
+        Evaluations.linear_c
+          ~res:id1_evaluation
+          ~evaluations:[f_evaluation; g_evaluation]
+          ~linear_coeffs:[one; mone]
+          ()
+      in
+      let identity_l1_z =
+        let l1_evaluation = Evaluations.find_evaluation evaluations l1 in
+        let z_mone_evaluation =
+          Evaluations.linear_c
+            ~res:tmp_evaluation
+            ~evaluations:[z_evaluation]
+            ~add_constant:mone
+            ()
+        in
+
+        Evaluations.mul_c
+          ~res:id2_evaluation
+          ~evaluations:[l1_evaluation; z_mone_evaluation]
+          ()
+      in
+
+      SMap.of_list
+        [
+          (circuit_prefix (e_pref "Perm.a"), identity_l1_z);
+          (circuit_prefix (e_pref "Perm.b"), identity_zfg);
+        ]
 
   let verifier_identities ?(external_prefix = "") ?(circuit_prefix = Fun.id)
       ~nb_proofs ~generator ~n ~wires_names ~beta ~gamma ~delta () =
+    let wires_names = List.sort String.compare wires_names in
     let e_pref = external_prefix_fun external_prefix in
     let prefix_j i =
       SMap.Aggregation.add_prefix
@@ -599,37 +605,40 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       (external_prefix_fun external_prefix z_name)
       (Permutation_poly.compute_Z permutation domain beta gamma values)
 
-  let cs ~sum_alpha_i ~l1 ~ss_list ~beta ~gamma ~delta ~x ~z ~zg ~wires =
+  let cs ?(external_prefix = "") ~l1 ~ss_list ~beta ~gamma ~x ~z ~zg
+      ~aggregated_wires () =
     let open L in
-    let* cs_perm_a = Num.custom ~qr:Scalar.(negate one) ~qm:Scalar.(one) z l1 in
-    let wires = List.transpose wires in
-    let nb_wires = List.length wires in
-    assert (Plompiler.Csir.nb_wires_arch = nb_wires) ;
-    let* batched_wires = mapM (fun x -> sum_alpha_i x delta) wires in
-    let* beta_ids =
-      mapM (fun i -> Num.mul ~qm:(get_k i) beta x) @@ List.init nb_wires Fun.id
+    let* perm_a = Num.custom ~qr:Scalar.(negate one) ~qm:Scalar.(one) z l1 in
+    let* perm_b =
+      let i = ref 0 in
+      let* left, right =
+        fold2M
+          (fun (left, right) ss dw ->
+            let* betaid = Num.mul ~qm:(get_k !i) beta x in
+            let* bsigma = Num.mul beta ss in
+            let* wid = Num.add_list (to_list [dw; betaid; gamma]) in
+            let* wss = Num.add_list (to_list [dw; bsigma; gamma]) in
+            let* left = Num.mul left wid in
+            let* right = Num.mul right wss in
+            incr i ;
+            ret (left, right))
+          (z, zg)
+          ss_list
+          aggregated_wires
+      in
+      Num.add ~qr:Scalar.(negate one) left right
     in
-    let* beta_sigmas = mapM (Num.mul beta) ss_list in
-    let* w_ids =
-      map2M
-        (fun w beta_id -> Num.add_list (to_list [w; beta_id; gamma]))
-        batched_wires
-        beta_ids
-    in
-    let* w_sigmas =
-      map2M
-        (fun w beta_sigma -> Num.add_list (to_list [w; beta_sigma; gamma]))
-        batched_wires
-        beta_sigmas
-    in
-    let* left_term = Num.mul_list (to_list (z :: w_ids)) in
-    let* right_term = Num.mul_list (to_list (zg :: w_sigmas)) in
-    let* cs_perm_b = Num.add ~qr:Scalar.(negate one) left_term right_term in
-    ret (cs_perm_a, cs_perm_b)
+    ret
+      [
+        (external_prefix ^ "Perm.a", perm_a);
+        (external_prefix ^ "Perm.b", perm_b);
+      ]
 end
 
 module type S = sig
   module PP : Polynomial_protocol.S
+
+  val shared_z_names : string list
 
   val srs_size : zero_knowledge:bool -> n:int -> int
 
@@ -686,22 +695,24 @@ module type S = sig
     Poly.t SMap.t
 
   val cs :
-    sum_alpha_i:(L.scalar L.repr list -> L.scalar L.repr -> L.scalar L.repr L.t) ->
+    ?external_prefix:string ->
     l1:L.scalar L.repr ->
     ss_list:L.scalar L.repr list ->
     beta:L.scalar L.repr ->
     gamma:L.scalar L.repr ->
-    delta:L.scalar L.repr ->
     x:L.scalar L.repr ->
     z:L.scalar L.repr ->
     zg:L.scalar L.repr ->
-    wires:L.scalar L.repr list list ->
-    (L.scalar L.repr * L.scalar L.repr) L.t
+    aggregated_wires:L.scalar L.repr list ->
+    unit ->
+    (string * L.scalar L.repr) list L.t
 
   module Shared_argument : sig
     val build_batched_wires_values :
-      delta:Scalar.t ->
+      ?batched_keys:(string -> string) ->
+      delta:Poly.scalar ->
       wires:Evaluations.t SMap.t list SMap.t ->
+      unit ->
       Evaluations.t SMap.t SMap.t
 
     val batched_wires_poly_of_batched_wires :

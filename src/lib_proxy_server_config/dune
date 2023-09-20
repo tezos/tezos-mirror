@@ -6,8 +6,8 @@
  (public_name tezos-proxy-server-config)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.stdlib-unix
   uri)
  (flags
   (:standard)

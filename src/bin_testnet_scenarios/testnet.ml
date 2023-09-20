@@ -23,16 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {network : string; snapshot : string option; protocol : Protocol.t}
+type t = {
+  network : string;
+  snapshot : string option;
+  protocol : Protocol.t;
+  data_dir : string option;
+}
 
 let get_testnet_config path =
   let conf = JSON.parse_file path in
   let snapshot = JSON.(conf |-> "snapshot" |> as_string_opt) in
   let network = JSON.(conf |-> "network" |> as_string) in
+  let data_dir = JSON.(conf |-> "data-dir" |> as_string_opt) in
   let protocol =
-    match JSON.(conf |-> "protocol" |> as_string) with
-    | "alpha" -> Protocol.Alpha
-    | "mumbai" -> Protocol.Mumbai
-    | tag -> failwith (tag ^ " is not a valid protocol name")
+    let tags =
+      List.map (fun proto -> (proto, Protocol.tag proto)) Protocol.all
+    in
+    let protocol_tag = JSON.(conf |-> "protocol" |> as_string) in
+    match List.find_opt (fun (_proto, tag) -> tag = protocol_tag) tags with
+    | Some (proto, _tag) -> proto
+    | None -> failwith (protocol_tag ^ " is not a valid protocol name")
   in
-  {snapshot; network; protocol}
+  {snapshot; network; protocol; data_dir}

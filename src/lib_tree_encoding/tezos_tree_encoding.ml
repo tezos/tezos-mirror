@@ -482,11 +482,36 @@ module Encodings_util = struct
     val empty : index -> t
   end
 
+  module type S = sig
+    type t
+
+    module Tree : sig
+      include
+        Tezos_context_sigs.Context.TREE
+          with type key := string list
+           and type value := bytes
+
+      val select : Tree.tree_instance -> tree
+
+      val wrap : tree -> Tree.tree_instance
+    end
+
+    module Tree_encoding_runner : Runner.S with type tree = Tree.tree
+
+    (* Create an empty tree *)
+    val empty_tree : unit -> Tree.tree Lwt.t
+  end
+
   (* TREE instance for Tezos context *)
-  module Make (Ctx : Bare_tezos_context_sig) = struct
+  module Make (Ctx : Bare_tezos_context_sig) :
+    S with type t = Ctx.t and type Tree.tree = Ctx.tree = struct
     type Tree.tree_instance += Tree of Ctx.tree
 
+    type t = Ctx.t
+
     module Tree = struct
+      type t = Ctx.t
+
       type tree = Ctx.tree
 
       include Ctx.Tree

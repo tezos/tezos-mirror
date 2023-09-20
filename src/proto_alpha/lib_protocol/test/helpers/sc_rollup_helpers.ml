@@ -32,6 +32,9 @@ let originated_rollup op =
   in
   Contract.Internal_for_tests.originated_contract nonce
 
+module Arith_pvm = Pvm_in_memory.Arith
+module Wasm_pvm = Pvm_in_memory.Wasm
+
 module Make_in_memory_context (Context : sig
   type tree
 
@@ -90,19 +93,8 @@ struct
     .tree_proof_encoding
 end
 
-module In_memory_context =
-  Make_in_memory_context (Tezos_context_memory.Context_binary)
 module Wrong_in_memory_context =
   Make_in_memory_context (Tezos_context_memory.Context)
-
-module Arith_pvm :
-  Sc_rollup.PVM.S
-    with type context = In_memory_context.Tree.t
-     and type state = In_memory_context.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.ArithPVM.Make (In_memory_context)
 
 module Wrong_arith_pvm :
   Sc_rollup.PVM.S
@@ -113,86 +105,10 @@ module Wrong_arith_pvm :
       Tezos_context_memory.Context.Proof.t =
   Sc_rollup.ArithPVM.Make (Wrong_in_memory_context)
 
-module Wasm_pvm :
-  Sc_rollup.PVM.S
-    with type context = In_memory_context.Tree.t
-     and type state = In_memory_context.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.Wasm_2_0_0PVM.Make (Environment.Wasm_2_0_0.Make) (In_memory_context)
-
-let make_empty_context = Tezos_context_memory.Context_binary.make_empty_context
-
-let make_empty_tree = Tezos_context_memory.Context_binary.make_empty_tree
-
-let compute_origination_proof ~boot_sector = function
-  | Sc_rollup.Kind.Example_arith ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let+ proof = Arith_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) proof
-  | Sc_rollup.Kind.Wasm_2_0_0 ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let+ proof = Wasm_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Wasm_pvm) proof
-
-(** [wrong_arith_origination_proof ~alter_binary_bit ~boot_sector]
-    returns a serialized proof computed with a Arith PVM using 32-ary
-    trees.
-
-    If [alter_binary_bit] is set to true, the resulting proof lies
-    about the arity of its trees. *)
-let wrong_arith_origination_proof ~alter_binary_bit ~boot_sector =
+let genesis_commitment ~boot_sector ~origination_level kind =
   let open Lwt_syntax in
-  let context = Tezos_context_memory.Context.make_empty_context () in
-  let+ proof = Wrong_arith_pvm.produce_origination_proof context boot_sector in
-  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-  let proof =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4386 This should
-       be exposed more cleanly in the Tezos context libraries.
-
-       Basically, the 2nd bit of the `version` field is set to 1 to
-       signal a proof for a [Context_binary] tree.*)
-    if alter_binary_bit then {proof with version = proof.version land 0b10}
-    else proof
-  in
-  WithExceptions.Result.get_ok ~loc:__LOC__
-  @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) proof
-
-let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
-    Sc_rollup.Proof.serialized tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  match proof_string_opt with
-  | None ->
-      let*! origination_proof = compute_origination_proof ~boot_sector kind in
-      return origination_proof
-  | Some proof_string -> return proof_string
-
-let genesis_commitment ~boot_sector ~origination_level = function
-  | Sc_rollup.Kind.Example_arith ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let* proof = Arith_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      let genesis_state_hash = Arith_pvm.proof_stop_state proof in
-      return
-        Sc_rollup.Commitment.(
-          genesis_commitment ~origination_level ~genesis_state_hash)
-  | Sc_rollup.Kind.Wasm_2_0_0 ->
-      let open Lwt_syntax in
-      let context = make_empty_context () in
-      let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
-      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      let genesis_state_hash = Wasm_pvm.proof_stop_state proof in
-      return
-        Sc_rollup.Commitment.(
-          genesis_commitment ~origination_level ~genesis_state_hash)
+  let+ genesis_state_hash = Sc_rollup.genesis_state_hash_of kind ~boot_sector in
+  Sc_rollup.Commitment.genesis_commitment ~origination_level ~genesis_state_hash
 
 let genesis_commitment_raw ~boot_sector ~origination_level kind =
   let open Lwt_syntax in
@@ -614,26 +530,19 @@ let dumb_init_repr level =
     level
 
 let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ?origination_proof ?(boot_sector = "") ?(parameters_ty = "unit") ctxt src
-    kind =
-  let open Lwt_result_syntax in
-  let*! origination_proof =
-    match origination_proof with
-    | Some origination_proof -> Lwt.return origination_proof
-    | None -> compute_origination_proof ~boot_sector kind
-  in
+    ?(boot_sector = "") ?(parameters_ty = "unit") ?whitelist ctxt src kind =
   Op.sc_rollup_origination
     ?force_reveal
     ?counter
     ?fee
     ?gas_limit
     ?storage_limit
+    ?whitelist
     ctxt
     src
     kind
     ~boot_sector
     ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
-    ~origination_proof
 
 let latest_level_proof inbox =
   Sc_rollup.Inbox.Internal_for_tests.level_proof_of_history_proof
@@ -871,3 +780,227 @@ module Protocol_inbox_with_ctxt = struct
     in
     return (block, list_of_messages)
 end
+
+let is_reveal_enabled_default =
+  Sc_rollup.is_reveal_enabled_predicate
+    Default_parameters.constants_mainnet.sc_rollup.reveal_activation_level
+
+let tick_of_int_exn ?(__LOC__ = __LOC__) n =
+  WithExceptions.Option.get ~loc:__LOC__ (Sc_rollup.Tick.of_int n)
+
+module type PVM_eval = sig
+  include Sc_rollup.PVM.S
+
+  val make_empty_context : unit -> context
+
+  val initial_hash : hash Lwt.t
+
+  val eval_until_input :
+    fuel:int option ->
+    our_states:(int * hash) trace ->
+    int ->
+    state ->
+    (state * int option * int * (int * hash) trace) Lwt.t
+
+  val eval_inputs_from_initial_state :
+    metadata:Sc_rollup.Metadata.t ->
+    ?fuel:int ->
+    ?bootsector:string ->
+    Sc_rollup.input trace trace ->
+    (state * Sc_rollup.Tick.t * (Sc_rollup.Tick.t * hash) trace, 'a) result
+    Lwt.t
+end
+
+module Make_PVM_eval (PVM : sig
+  include Sc_rollup.PVM.S
+
+  val make_empty_state : unit -> state
+
+  val make_empty_context : unit -> context
+end) : PVM_eval with type context = PVM.context and type state = PVM.state =
+struct
+  include PVM
+
+  let bootsector_state ~bootsector =
+    let open Lwt_syntax in
+    let empty = make_empty_state () in
+    let* state = initial_state ~empty in
+    let* state = install_boot_sector state bootsector in
+    return state
+
+  let initial_hash =
+    let open Lwt_syntax in
+    let empty = make_empty_state () in
+    let* state = initial_state ~empty in
+    state_hash state
+
+  let consume_fuel = Option.map pred
+
+  let continue_with_fuel ~our_states ~(tick : int) fuel state f =
+    let open Lwt_syntax in
+    match fuel with
+    | Some 0 -> return (state, fuel, tick, our_states)
+    | _ -> f tick our_states (consume_fuel fuel) state
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3498
+
+     the following is almost the same code as in the rollup node, except that it
+     creates the association list (tick, state_hash). *)
+  let eval_until_input ~fuel ~our_states start_tick state =
+    let open Lwt_syntax in
+    let rec go ~our_states fuel (tick : int) state =
+      let* input_request =
+        is_input_state ~is_reveal_enabled:is_reveal_enabled_default state
+      in
+      match fuel with
+      | Some 0 -> return (state, fuel, tick, our_states)
+      | None | Some _ -> (
+          match input_request with
+          | No_input_required ->
+              let* state = eval state in
+              let* state_hash = state_hash state in
+              let our_states = (tick, state_hash) :: our_states in
+              go ~our_states (consume_fuel fuel) (tick + 1) state
+          | Needs_reveal (Request_dal_page _pid) ->
+              (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4160
+                 We assume that there are no confirmed Dal slots.
+                 We'll reuse the infra to provide Dal pages in the future. *)
+              let input = Sc_rollup.(Reveal (Dal_page None)) in
+              let* state = set_input input state in
+              let* state_hash = state_hash state in
+              let our_states = (tick, state_hash) :: our_states in
+              go ~our_states (consume_fuel fuel) (tick + 1) state
+          | Needs_reveal (Reveal_raw_data _)
+          | Needs_reveal Reveal_metadata
+          | Initial | First_after _ ->
+              return (state, fuel, tick, our_states))
+    in
+    go ~our_states fuel start_tick state
+
+  let eval_metadata ~fuel ~our_states tick state ~metadata =
+    let open Lwt_syntax in
+    continue_with_fuel ~our_states ~tick fuel state
+    @@ fun tick our_states fuel state ->
+    let input = Sc_rollup.(Reveal (Metadata metadata)) in
+    let* state = set_input input state in
+    let* state_hash = state_hash state in
+    let our_states = (tick, state_hash) :: our_states in
+    let tick = succ tick in
+    return (state, fuel, tick, our_states)
+
+  let feed_input ~fuel ~our_states ~tick state input =
+    let open Lwt_syntax in
+    let* state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    continue_with_fuel ~our_states ~tick fuel state
+    @@ fun tick our_states fuel state ->
+    let* state = set_input input state in
+    let* state_hash = state_hash state in
+    let our_states = (tick, state_hash) :: our_states in
+    let tick = tick + 1 in
+    let* state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    return (state, fuel, tick, our_states)
+
+  let eval_inbox ?fuel ~inputs ~tick state =
+    let open Lwt_result_syntax in
+    List.fold_left_es
+      (fun (state, fuel, tick, our_states) input ->
+        let*! state, fuel, tick, our_states =
+          feed_input ~fuel ~our_states ~tick state input
+        in
+        return (state, fuel, tick, our_states))
+      (state, fuel, tick, [])
+      inputs
+
+  let eval_inputs ~fuel ~tick ?(our_states = []) ~inputs_per_levels state =
+    let open Lwt_result_syntax in
+    List.fold_left_es
+      (fun (state, fuel, tick, our_states) inputs ->
+        let* state, fuel, tick, our_states' =
+          eval_inbox ?fuel ~inputs ~tick state
+        in
+        return (state, fuel, tick, our_states @ our_states'))
+      (state, fuel, tick, our_states)
+      inputs_per_levels
+
+  let eval_inputs_from_initial_state ~metadata ?fuel ?(bootsector = "")
+      inputs_per_levels =
+    let open Lwt_result_syntax in
+    let*! state = bootsector_state ~bootsector in
+    let*! state_hash = state_hash state in
+    let tick = 0 in
+    let our_states = [(tick, state_hash)] in
+    let tick = succ tick in
+    (* 1. We evaluate the boot sector. *)
+    let*! state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    (* 2. We evaluate the metadata. *)
+    let*! state, fuel, tick, our_states =
+      eval_metadata ~fuel ~our_states tick state ~metadata
+    in
+    (* 3. We evaluate the inbox. *)
+    let* state, _fuel, tick, our_states =
+      eval_inputs state ~fuel ~tick ~our_states ~inputs_per_levels
+    in
+    let our_states =
+      List.sort (fun (x, _) (y, _) -> Compare.Int.compare x y) our_states
+    in
+    let our_states =
+      List.map
+        (fun (tick_int, state) -> (tick_of_int_exn tick_int, state))
+        our_states
+    in
+    let tick = tick_of_int_exn tick in
+    return (state, tick, our_states)
+end
+
+module Arith_pvm_eval = Make_PVM_eval (Arith_pvm)
+module Wasm_pvm_eval = Make_PVM_eval (Wasm_pvm)
+
+let make_pvm_with_context_and_state (type context state)
+    (module PVM : Sc_rollup.PVM.S
+      with type context = context
+       and type state = state) ~state ~context ~reveal ~inbox () :
+    (module Sc_rollup.Proof.PVM_with_context_and_state) =
+  let Node_inbox.{payloads_histories; history; inbox} = inbox in
+  (module struct
+    include PVM
+
+    let context : context = context
+
+    let state = state
+
+    let reveal = reveal
+
+    module Inbox_with_history = struct
+      let inbox = Sc_rollup.Inbox.old_levels_messages inbox
+
+      let get_history inbox =
+        Sc_rollup.Inbox.History.find inbox history |> Lwt.return
+
+      let get_payloads_history witness_hash =
+        Payloads_histories.find witness_hash payloads_histories
+        |> WithExceptions.Option.get ~loc:__LOC__
+        |> Lwt.return
+    end
+
+    (* FIXME/DAL-REFUTATION: https://gitlab.com/tezos/tezos/-/issues/3992
+       Extend refutation game to handle Dal refutation case. *)
+    module Dal_with_history = struct
+      let confirmed_slots_history = Dal.Slots_history.genesis
+
+      let get_history _hash = Lwt.return_none
+
+      let page_info = None
+
+      let dal_parameters =
+        Default_parameters.constants_test.dal.cryptobox_parameters
+
+      let dal_attestation_lag =
+        Default_parameters.constants_test.dal.attestation_lag
+    end
+  end)

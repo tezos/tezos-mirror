@@ -6,29 +6,31 @@
  (package octez-smart-rollup-node-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-client-017-PtNairob
-  tezos-context.encoding
-  tezos-context.helpers
-  tezos-protocol-017-PtNairob
-  tezos-protocol-plugin-017-PtNairob
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-protocol-017-PtNairob-libs.client
+  octez-libs.tezos-context.encoding
+  octez-libs.tezos-context.helpers
+  tezos-protocol-017-PtNairob.protocol
+  octez-protocol-017-PtNairob-libs.plugin
   tezos-protocol-017-PtNairob.parameters
-  tezos-rpc
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-workers
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-libs.tezos-workers
   tezos-dal-node-services
-  tezos_dal_node_lib
-  tezos-shell-services
-  tezos-smart-rollup-017-PtNairob
-  tezos-smart-rollup-layer2-017-PtNairob
-  tezos-layer2-utils-017-PtNairob
-  tezos_layer2_store
+  tezos-dal-node-lib
+  tezos-dac-lib
+  octez-shell-libs.shell-services
+  octez-l2-libs.smart-rollup
+  octez-protocol-017-PtNairob-libs.smart-rollup
+  octez-protocol-017-PtNairob-libs.smart-rollup-layer2
+  octez-protocol-017-PtNairob-libs.layer2-utils
+  octez-l2-libs.layer2_store
   octez-crawler
-  tezos-tree-encoding
+  octez-libs.tree-encoding
   data-encoding
   irmin-pack
   irmin-pack.unix
@@ -36,10 +38,11 @@
   aches
   aches-lwt
   octez-injector
-  octez-smart-rollup-node
-  tezos-scoru-wasm
-  tezos-scoru-wasm-fast
-  tezos-crypto-dal)
+  octez-smart-rollup-node-lib
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-fast
+  octez-libs.crypto-dal
+  octez-version.value)
  (flags
   (:standard)
   -open Tezos_base
@@ -54,7 +57,9 @@
   -open Tezos_protocol_017_PtNairob_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
+  -open Tezos_dac_lib
   -open Tezos_shell_services
+  -open Octez_smart_rollup
   -open Tezos_smart_rollup_017_PtNairob
   -open Tezos_smart_rollup_layer2_017_PtNairob
   -open Tezos_layer2_utils_017_PtNairob

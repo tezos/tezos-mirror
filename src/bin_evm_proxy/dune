@@ -7,25 +7,17 @@
  (package octez-evm-proxy)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-clic
-  tezos-rpc
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-rpc-http-client-unix
-  tezos-stdlib-unix
-  tezos-crypto
-  tezos-stdlib
-  tezos-version
-  lwt-exit)
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-version.value
+  evm_proxy_lib)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_rpc_http
-  -open Tezos_stdlib_unix
-  -open Tezos_crypto
-  -open Tezos_stdlib))
+  -open Tezos_rpc_http))

@@ -98,6 +98,25 @@ module Free_variables :
    variables. *)
 module Eval : S with type 'a repr = 'a and type size = float
 
+(* Collects names of unapplied arguments
+   Use [arg_name] to acquire the name of argument, specified as [~name] of [lam]
+   Use [unwrap_bool] or [unwrap_size] to access inner arguments
+
+   Example: the following assertions will succeed
+   let term = lam ~name:"a" @@ fun x -> lam ~name:"b" @@ fun y -> x + y in
+   assert (arg_name term = "a");
+   assert (arg_name (unwrap_size term) === "b")
+*)
+module Arg_names : sig
+  include S
+
+  val arg_name : ('a -> 'b) repr -> string
+
+  val unwrap_bool : (bool -> 'a) repr -> 'a repr
+
+  val unwrap_size : (size -> 'a) repr -> 'a repr
+end
+
 (* Evaluating implementation.
    Expects terms to be linear combinations with free variables as coefficients.
    Fails otherwise. Takes a substitution as a parameter. *)

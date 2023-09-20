@@ -62,12 +62,63 @@ module Make_wrapped_tree (Tree : TreeS) :
   let wrap t = PVM_tree t
 end
 
-module Make_backend (Tree : TreeS) =
-  Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+module Make_backend (Tree : TreeS) = struct
+  include Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+
+  let reveal_exn reveal =
+    match
+      Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.of_current_opt reveal
+    with
+    | Some r -> r
+    | None ->
+        (* The WASM PVM before environment V11 will not request a value
+           outside of the [Compatibility.reveal] domain. *)
+        Stdlib.failwith
+          "The rollup node tried to interact with an inconsistent state."
+
+  let input_request_exn = function
+    | Tezos_scoru_wasm.Wasm_pvm_state.No_input_required ->
+        Environment.Wasm_2_0_0.No_input_required
+    | Input_required -> Input_required
+    | Reveal_required req -> Reveal_required (reveal_exn req)
+
+  let info_exn
+      Tezos_scoru_wasm.Wasm_pvm_state.
+        {current_tick; last_input_read; input_request} =
+    Environment.Wasm_2_0_0.
+      {
+        current_tick;
+        last_input_read;
+        input_request = input_request_exn input_request;
+      }
+
+  let get_info tree =
+    let open Lwt_syntax in
+    let+ info = get_info tree in
+    info_exn info
+end
+
+(** Durable part of the storage of this PVM. *)
+module type Durable_state = sig
+  type state
+
+  (** [value_length state key] returns the length of data stored
+        for the [key] in the durable storage of the PVM state [state], if any. *)
+  val value_length : state -> string -> int64 option Lwt.t
+
+  (** [lookup state key] returns the data stored
+        for the [key] in the durable storage of the PVM state [state], if any. *)
+  val lookup : state -> string -> bytes option Lwt.t
+
+  (** [subtrees state key] returns subtrees
+        for the [key] in the durable storage of the PVM state [state].
+        Empty list in case if path doesn't exist. *)
+  val list : state -> string -> string list Lwt.t
+end
 
 module Make_durable_state
     (T : Tezos_tree_encoding.TREE with type tree = Context.tree) :
-  Wasm_2_0_0_rpc.Durable_state with type state = T.tree = struct
+  Durable_state with type state = T.tree = struct
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
   type state = T.tree
@@ -102,7 +153,10 @@ module Make_durable_state
     Tezos_scoru_wasm.Durable.list durable key
 end
 
-module Impl : Pvm.S = struct
+module Durable_state =
+  Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
+
+module Impl : Pvm_sig.S = struct
   module PVM =
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM
@@ -112,9 +166,12 @@ module Impl : Pvm.S = struct
   let new_dissection = Game_helpers.Wasm.new_dissection
 
   module State = Context.PVMState
-  module Durable_state =
-    Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
-  module RPC = Wasm_2_0_0_rpc.Make_RPC (Durable_state)
+
+  module Inspect_durable_state = struct
+    let lookup state keys =
+      let key = "/" ^ String.concat "/" keys in
+      Durable_state.lookup state key
+  end
 
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"

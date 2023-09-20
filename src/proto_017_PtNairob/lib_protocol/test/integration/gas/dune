@@ -7,10 +7,10 @@
  (libraries
   tezt.core
   octez-alcotezt
-  tezos-base
-  tezos-protocol-017-PtNairob
-  tezos-017-PtNairob-test-helpers
-  tezos-base-test-helpers)
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol
+  octez-protocol-017-PtNairob-libs.test-helpers
+  octez-libs.base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

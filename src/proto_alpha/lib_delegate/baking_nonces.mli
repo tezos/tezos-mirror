@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Baking_cache
 
 type state = {
   cctxt : Protocol_client_context.full;
@@ -33,6 +34,7 @@ type state = {
   config : Baking_configuration.nonce_config;
   nonces_location : [`Nonce] Baking_files.location;
   mutable last_predecessor : Block_hash.t;
+  cycle_cache : Block_hash.t list Cycle_cache.t;
 }
 
 type t = state
@@ -71,13 +73,6 @@ val get_outdated_nonces :
 
 val filter_outdated_nonces :
   t -> Nonce.t Block_hash.Map.t -> Nonce.t Block_hash.Map.t tzresult Lwt.t
-
-val blocks_from_current_cycle :
-  t ->
-  Block_services.block ->
-  ?offset:int32 ->
-  unit ->
-  Block_hash.t list tzresult Lwt.t
 
 val get_unrevealed_nonces :
   t -> Nonce.t Block_hash.Map.t -> (Raw_level.t * Nonce.t) list tzresult Lwt.t

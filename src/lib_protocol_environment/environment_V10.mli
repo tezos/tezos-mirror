@@ -55,6 +55,8 @@ module type T = sig
        and type Context_hash.Version.t = Context_hash.Version.t
        and type Context.config = Tezos_context_sigs.Config.t
        and module Context.Proof = Environment_context.Context.Proof
+       and type Context_binary.t = Tezos_context_memory.Context_binary.t
+       and type Context_binary.tree = Tezos_context_memory.Context_binary.tree
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
@@ -114,17 +116,24 @@ module type T = sig
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
+       and type Wasm_2_0_0.reveal =
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal
        and type Wasm_2_0_0.version = Tezos_scoru_wasm.Wasm_pvm_state.version
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
        and type Wasm_2_0_0.reveal_hash =
-        Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
-       and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal
-       and type Wasm_2_0_0.input_request =
-        Tezos_scoru_wasm.Wasm_pvm_state.input_request
-       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
-       and type Smart_rollup_address.t =
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal_hash
+       and module Skip_list = Tezos_base.Skip_list
+       and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t
+       and type Smart_rollup.Commitment_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_commitment_hash.t
+       and type Smart_rollup.State_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+       and type Smart_rollup.Inbox_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_inbox_hash.t
+       and type Smart_rollup.Merkelized_payload_hashes_hash.t =
+        Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 

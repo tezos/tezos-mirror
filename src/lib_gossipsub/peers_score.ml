@@ -85,7 +85,7 @@ struct
     application_score : float;  (** P5: Application-specific score. *)
     topic_status : topic_status Topic.Map.t;
     peer_status : peer_status;
-    parameters : (topic, span) score_parameters;
+    parameters : (topic, span) score_limits;
   }
 
   type t = {
@@ -99,13 +99,13 @@ struct
 
   let get_topic_params parameters topic =
     match parameters.topics with
-    | Topic_score_parameters_single tp -> tp
-    | Topic_score_parameters_family {parameters; _} -> parameters topic
+    | Topic_score_limits_single tp -> tp
+    | Topic_score_limits_family {parameters; _} -> parameters topic
 
   let get_topic_weight parameters topic =
     match parameters.topics with
-    | Topic_score_parameters_single _ -> 1.0
-    | Topic_score_parameters_family {weights; _} -> weights topic
+    | Topic_score_limits_single _ -> 1.0
+    | Topic_score_limits_family {weights; _} -> weights topic
 
   (* Please refer to the `SCORE` module type documentation for the meaning of each
      score function. *)
@@ -115,11 +115,12 @@ struct
     | Inactive -> 0.0
     | Active {since = _; during} ->
         let seconds_in_mesh = Span.to_float_s during in
-        let weighted_time =
-          topic_parameters.time_in_mesh_weight *. seconds_in_mesh
-          /. topic_parameters.time_in_mesh_quantum
+        let v =
+          seconds_in_mesh
+          /. Span.(to_float_s topic_parameters.time_in_mesh_quantum)
         in
-        Float.min weighted_time topic_parameters.time_in_mesh_cap
+        topic_parameters.time_in_mesh_weight
+        *. Float.min v topic_parameters.time_in_mesh_cap
 
   let p2 topic_parameters {first_message_deliveries; _} =
     let weighted_deliveries =
@@ -150,7 +151,7 @@ struct
     mesh_failure_penalty *. mesh_failure_penalty_weight
 
   let p4 {invalid_message_deliveries_weight; _} {invalid_messages; _} =
-    invalid_messages *. invalid_message_deliveries_weight
+    invalid_messages *. invalid_messages *. invalid_message_deliveries_weight
 
   let topic_scores {parameters; topic_status; _} =
     Topic.Map.fold
@@ -214,15 +215,14 @@ struct
 
   let set_connected {stats; _} = make {stats with peer_status = Connected}
 
-  let fresh_mesh_status () =
+  let fresh_active_mesh_status () =
     let since = Time.now () in
     let during = Span.zero in
     Active {since; during}
 
   let fresh_topic_stats () =
-    let mesh_status = fresh_mesh_status () in
     {
-      mesh_status;
+      mesh_status = Inactive;
       first_message_deliveries = 0.0;
       mesh_message_deliveries_active = false;
       mesh_message_deliveries = 0.0;
@@ -240,11 +240,14 @@ struct
       Topic.Map.update
         topic
         (function
-          | None -> Some (fresh_topic_stats ())
+          | None ->
+              let status = fresh_topic_stats () in
+              let mesh_status = fresh_active_mesh_status () in
+              Some {status with mesh_status}
           | Some status ->
               (* This should not happen: the automaton prevents grafting
                  a peer twice on the same topic. *)
-              let mesh_status = fresh_mesh_status () in
+              let mesh_status = fresh_active_mesh_status () in
               Some {status with mesh_status})
         stats.topic_status
     in
@@ -525,5 +528,13 @@ struct
 
   module Internal_for_tests = struct
     let get_topic_params = get_topic_params
+
+    let to_float = Fun.id
+
+    let is_active topic {stats; score = _} =
+      match Topic.Map.find topic stats.topic_status with
+      | None -> false
+      | Some {mesh_status; _} -> (
+          match mesh_status with Active _ -> true | Inactive -> false)
   end
 end

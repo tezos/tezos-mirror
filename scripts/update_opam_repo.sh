@@ -47,6 +47,7 @@ trap cleanup EXIT INT
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 
+# shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
 
 ## Shallow clone of opam repository (requires git protocol version 2)
@@ -63,7 +64,7 @@ mkdir -p "$tmp_dir"/packages/octez-deps/octez-deps.dev
 cp opam/virtual/octez-deps.opam "$tmp_dir"/packages/octez-deps/octez-deps.dev/opam
 
 ## Filtering unrequired packages
-cd $tmp_dir
+cd "$tmp_dir"
 git reset --hard "$full_opam_repository_tag"
 
 ## we add a dummy package that conflict with all "hidden" packages
@@ -84,12 +85,16 @@ echo "depends: [ \"ocaml\" { = \"$ocaml_version\" } \"mirage-runtime\" { >= \"4.
 echo 'conflicts:[' >> $dummy_opam
 grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
 do
-    f=$(dirname $f)
-    f=$(basename $f)
-    p=$(echo $f | cut -d '.' -f '1')
-    v=$(echo $f | cut -d '.' -f '2-')
+    f=$(dirname "$f")
+    f=$(basename "$f")
+    p=$(echo "$f" | cut -d '.' -f '1')
+    v=$(echo "$f" | cut -d '.' -f '2-')
     echo "\"$p\" {= \"$v\"}" >> $dummy_opam
 done
+# FIXME: https://gitlab.com/tezos/tezos/-/issues/5832
+# opam unintentionally picks up a windows dependency. We add a
+# conflict here to work around it.
+echo '"ocamlbuild" {= "0.14.2+win" }' >> $dummy_opam
 echo ']' >> $dummy_opam
 
 # Opam < 2.1 requires opam-depext as a plugin, later versions include it
@@ -148,6 +153,6 @@ git diff HEAD -- packages > "$target"
 
 echo
 echo "Wrote proposed update in: $target."
-echo 'Please add this patch to: `https://gitlab.com/tezos/opam-repository`'
-echo 'And update accordingly the commit hash in: `.gitlab/ci/templates.yml` and `scripts/version.sh`'
+echo 'Please add this patch to: https://gitlab.com/tezos/opam-repository'
+echo 'And update accordingly the commit hash in: .gitlab/ci/templates.yml and scripts/version.sh'
 echo

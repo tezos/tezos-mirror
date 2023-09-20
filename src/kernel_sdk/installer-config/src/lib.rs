@@ -4,8 +4,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod binary;
 #[cfg(feature = "alloc")]
-pub mod bin;
-pub mod instr;
-pub mod nom;
-pub mod size;
+pub mod yaml;

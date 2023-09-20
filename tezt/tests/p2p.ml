@@ -401,7 +401,11 @@ module Swap = struct
 
      If [disable_swap = true], checks that disabled nodes does not answer to
      swap request. Disable the swap for nodes 1a and 1b and check that swaper
-     does not receive a swap ack after it sends a swap request. *)
+     does not receive a swap ack after it sends a swap request.
+
+     If [terminate = true], all the nodes are terminated at the end of
+     the test to cleanup resources of this particularly greedy
+     test. *)
 
   (* NOTE: This test has previously been flaky because of some race conditions that
      where caused by inconsistencies regarding the way the maintenance was
@@ -410,11 +414,11 @@ module Swap = struct
      https://gitlab.com/tezos/tezos/-/commit/9df348f7447df7c89bd1456e8640b7686e51aebe
 
      More precisely, as the node [swaper] is configured with [Connection = 2],
-     the max number of connexions it accepted was [3]. Thus, during the swap,
+     the max number of connections it accepted was [3]. Thus, during the swap,
      as a connection is added (before removing the replaced one), the number
-     of connections was equal to [3]. The maintainance was then triggered
+     of connections was equal to [3]. The maintenance was then triggered
      unexpectedly. This should not occur anymore. *)
-  let test_swap_raw ?(disable_swap = false) () =
+  let test_swap_raw ?(disable_swap = false) ?(terminate = true) () =
     let create_node name params =
       Node.create ~name (Disable_p2p_maintenance :: params)
     in
@@ -551,7 +555,7 @@ module Swap = struct
     in
     let* () = check_conns swaper_expected_conns swaper in
     let* () = check_conns requested_node_expected_conns requested_node in
-    unit
+    if terminate then Lwt_list.iter_s Node.terminate nodes else unit
 
   (* Same as [test_swap_raw] with default parameters. *)
   let test_swap () =
@@ -566,8 +570,22 @@ module Swap = struct
       ~title:"p2p-swap-disable"
       ~tags:["p2p"; "node"; "swap"]
     @@ fun () ->
+    (* Since we try to verify that something does not happen, we need
+       to find when we consider having waited enough time to consider
+       the event will not happen. The idea is to define this duration
+       from the duration that it takes to have the thing to happen in
+       a normal situation. Thus, we record the tezt_swap_raw_duration
+       to calibrate that duration. *)
+    let start = Tezos_base.Time.System.now () in
+    let* () = test_swap_raw () in
+    let stop = Tezos_base.Time.System.now () in
+    let tezt_swap_raw_duration =
+      Ptime.Span.to_float_s
+        (Ptime.Span.sub (Ptime.to_span stop) (Ptime.to_span start))
+    in
+    Log.info "swap_raw test terminated in %f sec." tezt_swap_raw_duration ;
     (* Test that nodes with swap disabled does not answer to swap requests. *)
-    let _ = test_swap_raw ~disable_swap:true () in
+    let _ = test_swap_raw ~disable_swap:true ~terminate:false () in
     (* Test that nodes with swap disabled does not send swap requests.
        Launch a node with swap disabled and 2 neighbors and checks that it does
        not send swap request. *)
@@ -583,12 +601,9 @@ module Swap = struct
     let _ = swap_request_received node1 in
     let _ = swap_request_received node2 in
     (* Test Succeed after 10 sec + normal test finished *)
-    let* () = Lwt_unix.sleep 10. in
-    (* Since we try to verify that something does not happen, we need to find
-       when we consider having waited enough time to consider the event will
-       not happen. The idea is to define this duration from the duration that
-       it takes to have the thing to happen in a normal situation. *)
-    test_swap_raw ()
+    let wait_threshold = 10. +. tezt_swap_raw_duration in
+    Log.info "Waiting %f sec. for no swap disable request" wait_threshold ;
+    Lwt_unix.sleep wait_threshold
 
   let tests () =
     test_swap () ;

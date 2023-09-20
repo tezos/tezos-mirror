@@ -6,15 +6,15 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-micheline
-  tezos-client-017-PtNairob
-  tezos-protocol-017-PtNairob
-  tezos-base-test-helpers
-  tezos-baking-017-PtNairob.mockup-simulator
-  tezos-baking-017-PtNairob
+  octez-libs.base
+  octez-libs.micheline
+  octez-protocol-017-PtNairob-libs.client
+  tezos-protocol-017-PtNairob.protocol
+  octez-libs.base-test-helpers
+  octez-protocol-017-PtNairob-libs.bakings.mockup-simulator
+  octez-protocol-017-PtNairob-libs.baking
   tezos-protocol-017-PtNairob.parameters
-  tezos-crypto
+  octez-libs.crypto
   octez-alcotezt
   uri)
  (library_flags (:standard -linkall))
@@ -46,7 +46,7 @@
 
 (rule
  (alias runtest)
- (package tezos-baking-017-PtNairob)
+ (package octez-protocol-017-PtNairob-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

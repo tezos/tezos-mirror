@@ -31,9 +31,9 @@ open Alpha_context
 
 let lift promise = Lwt.map Environment.wrap_tzresult promise
 
-let get_messages Node_context.{cctxt; _} head =
+let get_messages Node_context.{l1_ctxt; _} head =
   let open Lwt_result_syntax in
-  let* block = Layer1.fetch_tezos_block cctxt head in
+  let* block = Layer1_helpers.fetch_tezos_block l1_ctxt head in
   let apply (type kind) accu ~source:_ (operation : kind manager_operation)
       _result =
     let open Result_syntax in
@@ -78,20 +78,31 @@ let get_messages Node_context.{cctxt; _} head =
         block.operations
         {apply; apply_internal})
   in
-  return (List.rev rev_messages)
+  let*? messages =
+    Environment.wrap_tzresult
+    @@ List.rev_map_e
+         (fun msg ->
+           let open Result_syntax in
+           let+ msg = Sc_rollup.Inbox_message.serialize msg in
+           Sc_rollup.Inbox_message.unsafe_to_string msg)
+         rev_messages
+  in
+  return messages
 
-let same_inbox_as_layer_1 node_ctxt head_hash inbox =
+let same_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
   let head_block = `Hash (head_hash, 0) in
   let Node_context.{cctxt; _} = node_ctxt in
+  let cctxt = new Protocol_client_context.wrap_full cctxt in
   let* layer1_inbox =
     Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, head_block)
   in
+  let layer1_inbox = Sc_rollup_proto_types.Inbox.to_octez layer1_inbox in
   fail_unless
-    (Sc_rollup.Inbox.equal layer1_inbox inbox)
+    (Octez_smart_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
+let add_messages ~is_first_block ~predecessor_timestamp ~predecessor inbox
     messages =
   let open Lwt_result_syntax in
   let no_history = Sc_rollup.Inbox.History.empty ~capacity:0L in
@@ -102,7 +113,7 @@ let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
              witness,
              messages_with_protocol_internal_messages ) =
        Sc_rollup.Inbox.add_all_messages
-         ~first_block:is_migration_block
+         ~first_block:is_first_block
          ~predecessor_timestamp
          ~predecessor
          no_history
@@ -118,25 +129,40 @@ let add_messages ~is_migration_block ~predecessor_timestamp ~predecessor inbox
          inbox,
          messages_with_protocol_internal_messages )
 
-let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
-    ~(predecessor : Layer1.header) ~level messages =
+let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
+    ~(predecessor : Layer1.header) (head : Layer1.header) messages =
   let open Lwt_result_syntax in
+  let level = head.level in
   let* inbox =
     Node_context.inbox_of_head node_ctxt (Layer1.head_of_header predecessor)
   in
   let predecessor_timestamp = predecessor.header.timestamp in
   let inbox_metrics = Metrics.Inbox.metrics in
   Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
+  let inbox = Sc_rollup_proto_types.Inbox.of_octez inbox in
+  let serialized_messages = messages in
+  let*? messages =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun msg ->
+           Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string msg))
+         messages
+  in
   let* ( _messages_history,
          witness_hash,
          inbox,
          messages_with_protocol_internal_messages ) =
     add_messages
-      ~is_migration_block
+      ~is_first_block
       ~predecessor_timestamp
       ~predecessor:predecessor.hash
       inbox
       messages
+  in
+  let inbox = Sc_rollup_proto_types.Inbox.to_octez inbox in
+  let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+  let witness_hash =
+    Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez witness_hash
   in
   Metrics.Inbox.Stats.set
     messages_with_protocol_internal_messages
@@ -147,23 +173,25 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_migration_block
     Node_context.save_messages
       node_ctxt
       witness_hash
-      {
-        is_migration_block;
-        predecessor = predecessor.hash;
-        predecessor_timestamp;
-        messages;
-      }
+      ~block_hash:head.hash
+      serialized_messages
   in
-  let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+  let*? messages_with_protocol_internal_messages =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun msg ->
+           let open Result_syntax in
+           let+ msg = Sc_rollup.Inbox_message.serialize msg in
+           Sc_rollup.Inbox_message.unsafe_to_string msg)
+         messages_with_protocol_internal_messages
+  in
   return
     (inbox_hash, inbox, witness_hash, messages_with_protocol_internal_messages)
 
 let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
     (head : Layer1.header) =
   let open Lwt_result_syntax in
-  let first_inbox_level =
-    Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
-  in
+  let first_inbox_level = node_ctxt.genesis_info.level |> Int32.succ in
   if head.level >= first_inbox_level then
     (* We compute the inbox of this block using the inbox of its
        predecessor. That way, the computation of inboxes is robust to chain
@@ -175,38 +203,44 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
         head.level
         (List.length collected_messages)
     in
-    let is_migration_block =
-      head.header.proto_level <> predecessor.header.proto_level
-    in
-    let* (( _inbox_hash,
-            inbox,
-            _witness_hash,
-            _messages_with_protocol_internal_messages ) as res) =
-      process_messages
-        node_ctxt
-        ~is_migration_block
-        ~predecessor
-        ~level:head.level
-        collected_messages
-    in
-    let* () = same_inbox_as_layer_1 node_ctxt head.hash inbox in
-    return res
+    let* head_proto = Node_context.protocol_of_level node_ctxt head.level in
+    let is_first_block = head_proto.first_level_of_protocol in
+    process_messages
+      node_ctxt
+      ~is_first_block
+      ~predecessor
+      head
+      collected_messages
   else
-    let* inbox = Node_context.genesis_inbox node_ctxt in
-    return
-      ( Sc_rollup.Inbox.hash inbox,
-        inbox,
-        Sc_rollup.Inbox.current_witness inbox,
-        [] )
+    let* inbox =
+      Layer1_helpers.genesis_inbox
+        node_ctxt.cctxt
+        ~genesis_level:node_ctxt.genesis_info.level
+    in
+    let Octez_smart_rollup.Inbox.{hash = witness; _} =
+      Octez_smart_rollup.Inbox.Skip_list.content inbox.old_levels_messages
+    in
+    let* () =
+      Node_context.save_messages node_ctxt witness ~block_hash:head.hash []
+    in
+    let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+    return (inbox_hash, inbox, witness, [])
 
 let start () = Inbox_event.starting ()
 
-let payloads_history_of_messages ~is_migration_block ~predecessor
+let payloads_history_of_messages ~is_first_block ~predecessor
     ~predecessor_timestamp messages =
   let open Result_syntax in
   let dummy_inbox =
     (* The inbox is not necessary to compute the payloads *)
     Sc_rollup.Inbox.genesis ~predecessor_timestamp ~predecessor Raw_level.root
+  in
+  let* messages =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun msg ->
+           Sc_rollup.Inbox_message.(deserialize @@ unsafe_of_string msg))
+         messages
   in
   let+ ( payloads_history,
          _history,
@@ -218,7 +252,7 @@ let payloads_history_of_messages ~is_migration_block ~predecessor
        (N after next snapshot). *)
     Environment.wrap_tzresult
     @@ Sc_rollup.Inbox.add_all_messages
-         ~first_block:is_migration_block
+         ~first_block:is_first_block
          ~predecessor_timestamp
          ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)
@@ -226,6 +260,14 @@ let payloads_history_of_messages ~is_migration_block ~predecessor
          messages
   in
   payloads_history
+
+let serialize_external_message msg =
+  Environment.wrap_tzresult
+  @@
+  let open Result_syntax in
+  let open Sc_rollup.Inbox_message in
+  let+ msg = serialize @@ External msg in
+  unsafe_to_string msg
 
 module Internal_for_tests = struct
   let process_messages = process_messages

@@ -28,12 +28,27 @@ module S = Csir.Scalar
 (* Difference between the scalar order and the succeeding power of 2 *)
 let alpha = Z.(shift_left one (Z.numbits S.order) - S.order)
 
-let bitlist : ?le:bool -> bytes -> bool list =
- fun ?(le = false) b ->
+(*
+  Plompiler uses lists of bits where the lower positions are less significant
+  e.g. the least significant bit of [bs] is [List.nth bs 0].
+
+  [bitlist] default endianess follows the semantics of [get_uint16] that can be
+  tested in utop:
+
+  Bytes.get_uint16_le (Bytes.of_string "\001\000") 0;;
+  - : int = 1
+
+  Bytes.get_uint16_be (Bytes.of_string "\001\000") 0;;
+  - : int = 256
+*)
+
+let bitlist : le:bool -> bytes -> bool list =
+ fun ~le b ->
   let l = Bytes.length b in
+  (* Depending on endianess we start, stop and step in different directions. *)
   let start = if le then 0 else l - 1 in
   let stop = if le then l else -1 in
-  let next a = if le then a + 1 else a - 1 in
+  let next = if le then succ else pred in
   let rec loop_byte acc n =
     if n = stop then acc
     else
@@ -41,6 +56,10 @@ let bitlist : ?le:bool -> bytes -> bool list =
       let rec loop_bit acc m =
         if m = 8 then acc
         else
+          (* For each position in a byte, a mask is built where all bits are
+             zero except the one at position. The masked byte is compute by
+             locagical AND of the mask and the current byte. If the masked
+             result is zero the bit at position is zero, otherwise it's one. *)
           let mask = 1 lsl m in
           let bit = byte land mask in
           let bit = if bit = 0 then false else true in
@@ -51,9 +70,45 @@ let bitlist : ?le:bool -> bytes -> bool list =
   in
   List.rev @@ loop_byte [] start
 
+(* Takes a list of booleans (typically from the Plompiler Bytes representation)
+   and returns OCaml Bytes. Works only if the input length is a multiple of a
+   byte. *)
+let of_bitlist : le:bool -> bool list -> bytes =
+ fun ~le bl ->
+  assert (List.length bl mod 8 = 0) ;
+  let rec loop_byte acc rest =
+    match rest with
+    | [] ->
+        let res = if le then List.rev acc else acc in
+        Bytes.(concat empty res)
+    | _ ->
+        let rec loop_bit acc pos rest =
+          if pos = 8 then (acc, rest)
+          else
+            match rest with
+            | [] -> assert false
+            | bit :: rest ->
+                (* For each position in a byte, a mask is built where all bits
+                   are zero except the one at position. The mask is then summed
+                   to the accumulator using a logical OR. *)
+                let mask = if bit then 1 lsl pos else 0 in
+                let acc = acc lor mask in
+                loop_bit acc (succ pos) rest
+        in
+        (* Each sequence of 8 bits is converted to an integer in the previous
+           loop and here it is interpreted as a uint8. *)
+        let byte_as_int, rest = loop_bit 0 0 rest in
+        let byte = Bytes.create 1 in
+        Bytes.set_uint8 byte 0 byte_as_int ;
+        loop_byte (byte :: acc) rest
+  in
+  loop_byte [] bl
+
 let bytes_of_hex hs =
   let h = `Hex hs in
   Hex.to_bytes h
+
+let hex_of_bytes bs = Hex.of_bytes bs |> Hex.show
 
 let bool_list_to_scalar : bool list -> S.t =
  fun b_list ->
@@ -94,6 +149,29 @@ let bool_list_of_z : ?nb_bits:int -> Z.t -> bool list =
   in
   aux [] z @@ Option.value ~default:(Z.numbits z) nb_bits
 
+let split_exactly list size_chunk =
+  let len = List.length list in
+  let nb_chunks = len / size_chunk in
+  assert (len = size_chunk * nb_chunks) ;
+  List.init nb_chunks (fun i ->
+      let array = Array.of_list list in
+      let array = Array.sub array (i * size_chunk) size_chunk in
+      Array.to_list array)
+
+let bool_list_change_endianness b =
+  assert (List.length b mod 8 = 0) ;
+  split_exactly b 8 |> List.rev |> List.concat
+
+let limbs_of_bool_list ~nb_bits bl =
+  let bl = split_exactly bl nb_bits in
+  let sum x =
+    List.fold_left
+      (fun acc a -> (acc lsl 1) + if a then 1 else 0)
+      0
+      (List.rev x)
+  in
+  List.map sum bl
+
 module Z = struct
   include Z
 
@@ -104,6 +182,100 @@ module Z = struct
         (fun bs -> Z.of_bits (Bytes.unsafe_to_string bs))
         (fun s -> Z.to_bits s |> Bytes.of_string))
 end
+
+let ( %! ) = Z.rem
+
+(* [next_multiple_of k n] is the first multiple of [k : int] greater than
+   or equal to [n : int] *)
+let next_multiple_of k n = k * (1 + ((n - 1) / k))
+
+(* [is_power_of_2 n] returns [true] iff [n : Z.t] is a perfect power of 2 *)
+let is_power_of_2 n = Z.log2 n = Z.log2up n
+
+(* [min_nb_limbs ~modulus ~base] is the smallest integer k such that
+   base^k >= modulus *)
+let min_nb_limbs ~modulus ~base =
+  assert (Z.(modulus > one)) ;
+  assert (Z.(base > one)) ;
+  (* we want to compute ceil(log_base(modulus)), but we use this iterative
+     method as we only have support for log2 (and not log_base) over Z.t *)
+  let rec aux acc k =
+    if acc >= modulus then k else aux Z.(acc * base) (k + 1)
+  in
+  aux base 1
+
+(* [z_to_limbs ~len ~base n] takes an integer (n : Z.t) and returns a Z.t list
+   of [len] elements encoding its big-endian representation in base [base].
+   It fails if [n < 0 or n >= base^len]. *)
+let z_to_limbs ~len ~base n =
+  let rec aux output n =
+    let q, r = Z.div_rem n base in
+    if Z.(q = zero) then r :: output else aux (r :: output) q
+  in
+  if n < Z.zero then
+    raise @@ Failure "z_to_limbs: n must be greater than or equal to zero" ;
+  let limbs = aux [] n in
+  let nb_limbs = List.length limbs in
+  if nb_limbs > len then
+    raise @@ Failure "z_to_limbs: n must be strictly lower than base^len"
+  else List.init (len - nb_limbs) (Fun.const Z.zero) @ limbs
+
+(* [z_of_limbs ~base ls] returns the Z.t encoded in the given Z.t list [ls],
+   its big-endian representation in base [base]. *)
+let z_of_limbs ~base limbs =
+  List.fold_left (fun acc x -> Z.((base * acc) + x)) Z.zero limbs
+
+(* [mod_add_limbs ~modulus ~base xs ys] returns the result of adding [xs]
+   and [ys] modulo [modulus], where the inputs and the output are in big-endian
+   form in base [base]. *)
+let mod_add_limbs ~modulus ~base xs ys =
+  let nb_limbs = List.length xs in
+  assert (List.compare_length_with ys nb_limbs = 0) ;
+  let x = z_of_limbs ~base xs in
+  let y = z_of_limbs ~base ys in
+  let z = Z.((x + y) %! modulus) in
+  let z = if z < Z.zero then Z.(z + modulus) else z in
+  z_to_limbs ~len:nb_limbs ~base z
+
+let mod_sub_limbs ~modulus ~base xs ys =
+  mod_add_limbs ~modulus ~base xs (List.map Z.neg ys)
+
+(* [mod_mul_limbs ~modulus ~base xs ys] returns the result of multiplying [xs]
+   by [ys] modulo [modulus], where the inputs and the output are in big-endian
+   form in base [base]. *)
+let mod_mul_limbs ~modulus ~base xs ys =
+  let nb_limbs = List.length xs in
+  assert (List.compare_length_with ys nb_limbs = 0) ;
+  let x = z_of_limbs ~base xs in
+  let y = z_of_limbs ~base ys in
+  let z = Z.(x * y %! modulus) in
+  let z = if z < Z.zero then Z.(z + modulus) else z in
+  z_to_limbs ~len:nb_limbs ~base z
+
+(* [mod_div_limbs ~modulus ~base xs ys] returns the result of dividing [xs]
+   by [ys] modulo [modulus], where the inputs and the output are in big-endian
+   form in base [base]. Dividing [x] by [y] raises a failure if the division cannot be
+   performed, i.e. if there does not exist [z] s.t. [x = z * y (mod modulus)].
+   Note that division may be performed even if the divisor is not invertible
+   with respect to the given modulus, e.g., dividing [10] by [2] will always
+   be possible (and result in [5]), even if the modulus is even. *)
+let mod_div_limbs ~modulus ~base xs ys =
+  let nb_limbs = List.length xs in
+  assert (List.compare_length_with ys nb_limbs = 0) ;
+  let x = z_of_limbs ~base xs in
+  let y = z_of_limbs ~base ys in
+  let d, y_inv, _v = Z.gcdext y modulus in
+  if Z.(rem x d <> zero) then
+    raise
+    @@ Failure
+         (Format.sprintf
+            "mod_div_limbs: %s is not divisible by %s (modulo %s)"
+            (Z.to_string x)
+            (Z.to_string y)
+            (Z.to_string modulus)) ;
+  let z = Z.(divexact x d * y_inv %! modulus) in
+  let z = if z < Z.zero then Z.(z + modulus) else z in
+  z_to_limbs ~len:nb_limbs ~base z
 
 let rec transpose = function
   | [] | [] :: _ -> []
@@ -170,4 +342,12 @@ let dump_label_traces path (cs : Csir.CS.t) =
       Array.iter (fun c ->
           Printf.fprintf outc "%s 1\n" @@ String.concat "; " (List.rev c.label)))
     cs ;
+  close_out outc
+
+let dump_label_range_checks_traces path fg =
+  let outc = open_out path in
+  List.iter
+    (fun (label, nb) ->
+      Printf.fprintf outc "%s %d\n" (String.concat "; " label) nb)
+    fg ;
   close_out outc

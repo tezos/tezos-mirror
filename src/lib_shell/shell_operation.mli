@@ -47,6 +47,7 @@ type 'protocol_operation operation = private {
           validation context, it notably means that the signature is
           correct. Therefore, when this field is [true], we can tell the
           protocol to skip signature checks. *)
+  size : int;  (** Size of the operation in bytes. *)
 }
 
 (** Return the operation with the {!signature_checked} field set to [true]. *)
@@ -78,15 +79,22 @@ module MakeParser : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
 (**/**)
 
 module Internal_for_tests : sig
-  (** Returns the {!Operation.t} underlying an {!operation} *)
-  val to_raw : _ operation -> Operation.t
+  (** A constructor for the [operation] datatype.
 
-  (** The hash of an {!operation} *)
-  val hash_of : _ operation -> Operation_hash.t
+      It allows tests to bypass the checks and parsing done by the
+      [parse] function, and/or tune the values of the internal fields.
 
-  (** A constructor for the [operation] datatype. It by-passes the
-      checks done by the [parse] function. *)
-  val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
+      [size] defaults to [0] for tests that don't care about it.
+
+      [signature_checked] defaults to [false] (the initial value
+      that is always returned by [parse]). *)
+  val make_operation :
+    ?signature_checked:bool ->
+    ?size:int ->
+    Operation_hash.t ->
+    Operation.t ->
+    'protocol_operation ->
+    'protocol_operation operation
 
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding].
       Any error happening during parsing becomes {!Parse_error}.

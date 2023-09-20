@@ -14,7 +14,7 @@ providing storage abstractions for blockchain data such as blocks and operations
 Store
 #####
 
-The store component is the :package:`tezos-store` package implemented in the :src:`src/lib_store` library. It handles the on-disk storage of static objects such as
+The store component is the :package-api:`Tezos_store <octez-shell-libs/Tezos_store/index.html>` module implemented in the :src:`src/lib_store` directory. It handles the on-disk storage of static objects such as
 blocks, operations, block's metadata, protocols and chain data. The
 store also handles the chain's current state: current head, invalid
 blocks, active test chains, etc. The store component is designed to
@@ -165,9 +165,9 @@ The Store maintains data on disk in the
 Context
 #######
 
-The context component is the the :package:`tezos-context` package, implemented in the :src:`src/lib_context`
+The context component is the the :package-api:`tezos-context <octez-libs/Tezos_context/index.html>` package, implemented in the :src:`src/lib_context`
 library. It is a versioned key/value store that associates to each
-block a view of its ledger state. The :package-api:`on-disk context API <tezos-context/Tezos_context_disk/index.html>` exports versioning concepts similar
+block a view of its ledger state. The :package-api:`on-disk context API <octez-libs/Tezos_context_disk/index.html>` exports versioning concepts similar
 to `Git <https://git-scm.com/>`_. The current implementation is using
 `Irmin <https://github.com/mirage/irmin>`_ as a backend.
 

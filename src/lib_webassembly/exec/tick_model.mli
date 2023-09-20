@@ -9,7 +9,7 @@ val zero : tick
 (* Tick of cost `1`. *)
 val one : tick
 
-(** [of_int32 i] returns the tick representation of [i], or {None} if [i]
+(** [of_int32 i] returns the tick representation of [i], or [None] if [i]
     is negative.
 *)
 val of_int32 : int32 -> tick option
@@ -20,7 +20,7 @@ val of_int32 : int32 -> tick option
 *)
 val of_int32_exn : int32 -> tick
 
-(** [to_int32 t] returns the signed int32 representation of [t] or {None} if [t]
+(** [to_int32 t] returns the signed int32 representation of [t] or [None] if [t]
     overflows the signed int32 representation.
 *)
 val to_int32 : tick -> int32 option
@@ -31,7 +31,7 @@ val to_int32 : tick -> int32 option
 *)
 val to_int32_exn : tick -> int32
 
-(** [of_int64 i] returns the tick representation of [i], or {None} if [i]
+(** [of_int64 i] returns the tick representation of [i], or [None] if [i]
     is negative.
 *)
 val of_int64 : int64 -> tick option
@@ -42,7 +42,7 @@ val of_int64 : int64 -> tick option
 *)
 val of_int64_exn : int64 -> tick
 
-(** [to_int64 t] returns the signed int64 representation of [t] or {None} if [t]
+(** [to_int64 t] returns the signed int64 representation of [t] or [None] if [t]
     overflows the signed int64 representation.
 *)
 val to_int64 : tick -> int64 option
@@ -53,7 +53,7 @@ val to_int64 : tick -> int64 option
 *)
 val to_int64_exn : tick -> int64
 
-(* [of_z z] returns the tick representation of [z], or {None} if [z]
+(* [of_z z] returns the tick representation of [z], or [None] if [z]
     is negative. *)
 val of_z : Z.t -> tick option
 

@@ -30,7 +30,7 @@ From a higher-level, *abstract* perspective, the validation system in
 the Tezos protocol implements this business logic in a functional,
 state-passing machine where:
 
-- Its state is given by the :ref:`context<Context>`, the internal
+- Its state is given by the :ref:`context<def_context_nairobi>`, the internal
   representation of the state of the Tezos ledger at a given blockchain
   level. For instance, the context contains the information of all
   activated accounts and contracts, and their balances. More
@@ -67,7 +67,7 @@ operations included in newly received blocks, whose validation is
 triggered by the :ref:`block validator<block_validator>`, in order to
 localize validation rules as needed. The resulting concrete API is
 specified by the :package-api:`Protocol
-<tezos-protocol-environment/Tezos_protocol_environment/V8/module-type-T/Updater/module-type-PROTOCOL/index.html>`
+<octez-proto-libs/Tezos_protocol_environment/V8/module-type-T/Updater/module-type-PROTOCOL/index.html>`
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V8``, and it is
 implemented by this protocol in the
@@ -79,6 +79,7 @@ the different validation modes implemented by this Tezos economic
 protocol, and then we delve deeper into the particulars of validation
 and application for blocks and the operations supported.
 
+.. _validation_modes:
 .. _validation_modes_nairobi:
 
 Validation modes
@@ -93,6 +94,7 @@ specified by the protocol environment offers an entry point so that
 protocol-agnostic components, the Tezos shell for instance, are able
 to use these different modes.
 
+.. _full_application:
 .. _full_application_nairobi:
 
 Full Application
@@ -108,6 +110,7 @@ signature is correct, and **all** operations included in the block are
 valid; the correct amount of consensus operations have been included
 in order to satisfy the consensus' threshold, etc.
 
+.. _full_construction:
 .. _full_construction_nairobi:
 
 Full Construction
@@ -126,6 +129,7 @@ construction is finalized.
 
 In Octez, this mode is mainly used by the baker daemon.
 
+.. _partial_construction:
 .. _partial_construction_nairobi:
 
 Partial Construction
@@ -142,6 +146,7 @@ potential validity of operations (and whether they can safely included
 into a block), so that the latter can **classify** incoming
 operations, and further decide how to process them accordingly.
 
+.. _protocol_classification:
 .. _protocol_classification_nairobi:
 
 The protocol provides the shell with the following classification of
@@ -176,6 +181,7 @@ protocol environment:
   case of an endorsement which was received *too late*, but that could
   still be used to form a consensus quorum.
 
+.. _partial_application:
 .. _partial_application_nairobi:
 
 Partial Application
@@ -206,6 +212,7 @@ application` mode provides an over-approximation of the branch's
 validity, and as a result intermediate results are not committed on
 disk in order to prevent potential attacks.
 
+.. _block_validation_overview:
 .. _block_validation_overview_nairobi:
 
 Block Validation
@@ -223,8 +230,8 @@ The first step in the process is to decide whether a candidate block
 is *well-formed*, that is, that it has the expected "shape" of a valid
 block under the current Tezos economic protocol. Given a block
 candidate, the block validation process will then verify that the
-candidate block declares consistent :ref:`level<Level>`,
-:ref:`round<Round>`, and timestamp values; that it carries a valid
+candidate block declares consistent :ref:`level<def_level_nairobi>`,
+:ref:`round<def_round_nairobi>`, and timestamp values; that it carries a valid
 signature, etc. At this step, the block validation process will also
 initialize the data-structures required for subsequent steps.
 
@@ -253,6 +260,7 @@ course, as this is an over-approximation, this feature cannot be
 considered to provide a safe guarantee that a block will be valid: in
 particular, it does not validate all kinds of operations.
 
+.. _operation_validity:
 .. _operation_validity_nairobi:
 
 Operation Validation and Application
@@ -280,6 +288,7 @@ application process for each of the different validation passes.
 
    Expand validity and application for other validation classes.
 
+.. _manager_operations_validity:
 .. _manager_operations_validity_nairobi:
 
 Validity of Manager Operations
@@ -355,6 +364,7 @@ defined as the conjunction of the following conditions:
   solvent to pay the announced fees for all the operations in the
   batch.
 
+.. _manager_operations_application:
 .. _manager_operations_application_nairobi:
 
 Application of Manager Operations

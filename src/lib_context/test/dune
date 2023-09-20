@@ -6,14 +6,14 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base.unix
-  tezos-context.sigs
-  tezos-context.disk
-  tezos-context.memory
-  tezos-context.encoding
-  tezos-stdlib-unix
-  tezos-test-helpers
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.context.sigs
+  octez-libs.tezos-context.disk
+  octez-libs.tezos-context.memory
+  octez-libs.tezos-context.encoding
+  octez-libs.stdlib-unix
+  octez-libs.test-helpers
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -37,7 +37,7 @@
 
 (rule
  (alias runtest)
- (package tezos-context)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

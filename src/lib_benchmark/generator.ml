@@ -33,20 +33,21 @@ type 'aspect probe = {
   get : 'aspect -> float list;
 }
 
-(** The type of benchmarks. The piece of code being measured is [closure].
+(** The type of benchmarks.
+    Measurements of benchmarks are directly calculated by [measure]
+    or measured as the execution time of [closure].
     Some benchmark requires to set-up/cleanup artifacts when being run,
     in that case use [With_context] with a proper implementation of the
     [with_context] function. *)
 type 'workload benchmark =
+  | Calculated : {
+      workload : 'workload;
+      measure : unit -> float;
+    }
+      -> 'workload benchmark
   | Plain : {
       workload : 'workload;
       closure : unit -> unit;
-    }
-      -> 'workload benchmark
-  | PlainWithAllocation : {
-      workload : 'workload;
-      closure : unit -> unit;
-      measure_allocation : unit -> int option;
     }
       -> 'workload benchmark
   | With_context : {

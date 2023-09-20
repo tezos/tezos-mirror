@@ -1,0 +1,7 @@
+{0 Octez-protocol-005-PsBabyM1-libs: octez protocol 005-PsBabyM1 libraries}
+
+This is a package containing some libraries related to the Tezos 005-PsBabyM1 protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_005_PsBabyM1}Tezos_client_005_PsBabyM1}: Protocol specific library for `tezos-client`

@@ -503,37 +503,42 @@ val qt : ?pixel_size:int * int -> unit -> target
     gnuplot). Returns [None] if the list of targets could not be obtained. *)
 val get_targets : ?path:string -> unit -> string list option
 
-(** The type of actions to perform with a plot. *)
-type action
+(** [run ?path ?detach ?filename ?exec ~target plot] performs plotting of
+    [plot] using [target].
 
-(** [exec] executes the plot *)
-val exec : action
+    - [path] : The path of Gnuplot, defaults to ["gnuplot"]
+    - [detach] : If [true], Gnuplot process does not block the main process.
+                 The default is [false].
+    - [filename] : If specified, the plot script is saved to this file.
+    - [exec] : If [false], execution of Gnuplot is skipped.  The default is
+               [true].
+*)
+val run :
+  ?path:string ->
+  ?detach:bool ->
+  ?filename:string ->
+  ?exec:bool ->
+  target:target ->
+  plot ->
+  unit
 
-(** [exec_detach] executes the plot but doesn't block the program *)
-val exec_detach : action
+(** [run_matrix ?path ?detach ?filename ?exec ~target ?title plots] performs
+    plotting of [plots] using [target].
 
-(** [save_to filename] saves the script to [filename] (does not execute the script) *)
-val save_to : string -> action
-
-(** [exec_and_save_to filename] executes the plot and also saves the script [filename] *)
-val exec_and_save_to : string -> action
-
-(** [run ?path ~plot ~target action] performs [action] on [plot] using [target].
-    - The optional argument [?path] defaults to ["gnuplot"].
-
-    For instance, to run some [plot] to the [qt] backend, one would perform the call:
-    {[
-      run ~plot ~target:(qt ()) exec
-    ]} *)
-val run : ?path:string -> target:target -> action -> plot -> unit
-
-(** [run_matrix ?path ~plots ~target action] performs [action] on the plot matrix [plots] using [target].
-    - The optional argument [?path] defaults to ["gnuplot"].
-    - The optional argument [?title] specifies a title for the collection of sub-plots. It defaults to [""]. *)
+    - [path] : The path of Gnuplot, defaults to ["gnuplot"]
+    - [detach] : If [true], Gnuplot process does not block the main process.
+                 The default is [false].
+    - [filename] : If specified, the plot script is saved to this file.
+    - [exec] : If [false], execution of Gnuplot is skipped.  The default is
+               [true].
+    - [title] : The title of the plots.  The default is [""]
+*)
 val run_matrix :
   ?path:string ->
+  ?detach:bool ->
+  ?filename:string ->
+  ?exec:bool ->
   target:target ->
   ?title:string ->
-  action ->
   plot option array array ->
   unit

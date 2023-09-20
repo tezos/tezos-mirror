@@ -3,22 +3,22 @@
 
 (library
  (name tezos_scoru_wasm_test_helpers)
- (package tezos-scoru-wasm-test-helpers)
+ (public_name octez-l2-libs.scoru_wasm_test_helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-tree-encoding
-  tezos-base.unix
-  tezos-context.disk
-  tezos-base-test-helpers
-  tezos-test-helpers
-  tezos-scoru-wasm
-  tezos_scoru_wasm_durable_snapshot
-  tezos-scoru-wasm-fast
-  tezos-scoru-wasm-helpers
+  octez-libs.base
+  octez-libs.tree-encoding
+  octez-libs.base.unix
+  octez-libs.tezos-context.disk
+  octez-libs.base-test-helpers
+  octez-libs.test-helpers
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru_wasm_durable_snapshot
+  octez-l2-libs.scoru-wasm-fast
+  octez-l2-libs.scoru-wasm-helpers
   qcheck-alcotest
   octez-alcotezt
-  tezos-webassembly-interpreter-extra)
+  octez-l2-libs.webassembly-interpreter-extra)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags
   (:standard)

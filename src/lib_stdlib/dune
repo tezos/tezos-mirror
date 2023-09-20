@@ -3,7 +3,7 @@
 
 (library
  (name tezos_stdlib)
- (public_name tezos-stdlib)
+ (public_name octez-libs.stdlib)
  (instrumentation (backend bisect_ppx))
  (libraries
   hex

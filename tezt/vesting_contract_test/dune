@@ -1,9 +1,9 @@
 (executable
  (name main)
- (libraries tezos-stdlib
-            tezos-alpha-test-helpers
-            tezos-micheline
-            tezos-protocol-alpha
+ (libraries octez-libs.stdlib
+            octez-protocol-alpha-libs.test-helpers
+            octez-libs.micheline
+            tezos-protocol-alpha.protocol
             tezt-tezos
             ptime)
  (flags (:standard

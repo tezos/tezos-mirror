@@ -52,12 +52,10 @@ module BoolCheck : Base_sig = struct
     let a = wires.(0) in
     Scalar.[q * sub one a * a]
 
-  let blinds = SMap.of_list [(wire_name 0, [|1; 0|])]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let a = wires.(0) in
     let one_minus_a =
@@ -124,20 +122,10 @@ module CondSwap : Base_sig = struct
     Scalar.
       [q * ((bbit * b) + sub (bit * c) d); q * ((bit * b) + sub (bbit * c) e)]
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|1; 0|]);
-        (wire_name 1, [|1; 0|]);
-        (wire_name 2, [|1; 0|]);
-        (wire_name 3, [|1; 0|]);
-        (wire_name 4, [|1; 0|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain:_ evaluations =
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let b = wires.(0) in
     let x, y = (wires.(1), wires.(2)) in
@@ -179,7 +167,7 @@ module CondSwap : Base_sig = struct
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
     let ({q; wires; _} : answers) =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~q_label ~prefix ~prefix_common answers
     in
     let bit = wires.(0) in
     let x, y = (wires.(1), wires.(2)) in
@@ -210,26 +198,25 @@ module CondSwap : Base_sig = struct
     let u = wires.(3) in
     let v = wires.(4) in
     let open L in
-    let open Num in
-    let* bit_times_x = mul bit x in
-    let* bit_times_y = mul bit y in
+    let* bit_times_x = Num.mul bit x in
+    let* bit_times_y = Num.mul bit y in
     (* id1 = qbool · [(1 - b) · x + b · y - u] *)
     let* id1 =
       let* all =
-        add_list
+        Num.add_list
           ~coeffs:[one; mone; one; mone]
           (to_list [x; bit_times_x; bit_times_y; u])
       in
-      mul qbool all
+      Num.mul qbool all
     in
     (* id1 = qbool · [b · x + (1 - b) · y - v] *)
     let* id2 =
       let* all =
-        add_list
+        Num.add_list
           ~coeffs:[one; one; mone; mone]
           (to_list [bit_times_x; y; bit_times_y; v])
       in
-      mul qbool all
+      Num.mul qbool all
     in
     ret [id1; id2]
 end

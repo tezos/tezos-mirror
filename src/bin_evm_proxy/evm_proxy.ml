@@ -2,6 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +25,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Evm_proxy_lib
+
 type rollup_node_endpoint = Mockup | Endpoint of Uri.t
 
 type config = {
@@ -30,6 +34,8 @@ type config = {
   rpc_port : int;
   debug : bool;
   rollup_node_endpoint : rollup_node_endpoint;
+  cors_origins : string list;
+  cors_headers : string list;
 }
 
 let default_config =
@@ -38,17 +44,19 @@ let default_config =
     rpc_port = 8545;
     debug = true;
     rollup_node_endpoint = Mockup;
+    cors_origins = [];
+    cors_headers = [];
   }
 
-let make_config ?rpc_addr ?rpc_port ?debug ~rollup_node_endpoint () =
+let make_config ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
+    ~rollup_node_endpoint () =
   {
     rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
     rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
     debug = Option.value ~default:default_config.debug debug;
-    rollup_node_endpoint =
-      Option.value
-        ~default:default_config.rollup_node_endpoint
-        rollup_node_endpoint;
+    rollup_node_endpoint;
+    cors_origins = Option.value ~default:[] cors_origins;
+    cors_headers = Option.value ~default:[] cors_headers;
   }
 
 let install_finalizer server =
@@ -91,7 +99,15 @@ module Event = struct
       ("port", Data_encoding.uint16)
 end
 
-let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
+let start
+    {
+      rpc_addr;
+      rpc_port;
+      debug;
+      rollup_node_endpoint;
+      cors_origins;
+      cors_headers;
+    } =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -101,19 +117,45 @@ let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
   let* rollup_node_config =
     match rollup_node_endpoint with
     | Endpoint endpoint ->
-        let module Rollup_node_rpc = Rollup_node.Make (struct
+        let module Current_rollup_node_rpc = Current_rollup_node.Make (struct
           let base = endpoint
         end) in
-        let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
-        return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+        let module Next_rollup_node_rpc = Next_rollup_node.Make (struct
+          let base = endpoint
+        end) in
+        let* smart_rollup_address =
+          Current_rollup_node_rpc.smart_rollup_address
+        in
+        return
+          Services.
+            {
+              current_rpc =
+                (module Current_rollup_node_rpc : Current_rollup_node.S);
+              next_rpc = (module Next_rollup_node_rpc : Next_rollup_node.S);
+              smart_rollup_address;
+              kernel_version = None;
+            }
     | Mockup ->
         let* smart_rollup_address = Mockup.smart_rollup_address in
-        return ((module Mockup : Rollup_node.S), smart_rollup_address)
+        let* kernel_version = Mockup.kernel_version () in
+        return
+          Services.
+            {
+              current_rpc = (module Mockup : Current_rollup_node.S);
+              next_rpc = (module Mockup : Next_rollup_node.S);
+              smart_rollup_address;
+              kernel_version = Some kernel_version;
+            }
   in
   let directory = Services.directory rollup_node_config in
+  let cors =
+    Resto_cohttp.Cors.
+      {allowed_headers = cors_headers; allowed_origins = cors_origins}
+  in
   let server =
     RPC_server.init_server
       ~acl
+      ~cors
       ~media_types:Media_type.all_media_types
       directory
   in
@@ -147,6 +189,11 @@ module Params = struct
           | uri -> Endpoint (Uri.of_string uri)
         in
         Lwt.return_ok endpoint)
+
+  let string_list =
+    Tezos_clic.parameter (fun _ s ->
+        let list = String.split ',' s in
+        Lwt.return_ok list)
 end
 
 let rpc_addr_arg =
@@ -163,13 +210,26 @@ let rpc_port_arg =
     ~doc:"The EVM proxy server rpc port."
     Params.int
 
-let rollup_node_endpoint_arg =
+let cors_allowed_headers_arg =
   Tezos_clic.arg
-    ~long:"rollup-node-endpoint"
-    ~placeholder:"ADDR:PORT"
-    ~doc:
-      "The smart rollup node endpoint address the proxy server will \
-       communicate with, or [mockup] if you want to use mock values."
+    ~long:"cors-headers"
+    ~placeholder:"ALLOWED_HEADERS"
+    ~doc:"List of accepted cors headers."
+    Params.string_list
+
+let cors_allowed_origins_arg =
+  Tezos_clic.arg
+    ~long:"cors-origin"
+    ~placeholder:"ALLOWED_ORIGINS"
+    ~doc:"List of accepted cors origins."
+    Params.string_list
+
+let rollup_node_endpoint_param =
+  Tezos_clic.param
+    ~name:"rollup-node-endpoint"
+    ~desc:
+      "The smart rollup node endpoint address (as ADDR:PORT) the proxy server \
+       will communicate with, or [mockup] if you want to use mock values."
     Params.rollup_node_endpoint
 
 let main_command =
@@ -177,12 +237,26 @@ let main_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the RPC server"
-    (args3 rpc_addr_arg rpc_port_arg rollup_node_endpoint_arg)
-    (prefixes ["run"] @@ stop)
-    (fun (rpc_addr, rpc_port, rollup_node_endpoint) () ->
+    (args4
+       rpc_addr_arg
+       rpc_port_arg
+       cors_allowed_origins_arg
+       cors_allowed_headers_arg)
+    (prefixes ["run"; "with"; "endpoint"] @@ rollup_node_endpoint_param @@ stop)
+    (fun (rpc_addr, rpc_port, cors_origins, cors_headers)
+         rollup_node_endpoint
+         () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting () in
-      let config = make_config ?rpc_addr ?rpc_port ~rollup_node_endpoint () in
+      let config =
+        make_config
+          ?rpc_addr
+          ?rpc_port
+          ?cors_origins
+          ?cors_headers
+          ~rollup_node_endpoint
+          ()
+      in
       let* server = start config in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
       let wait, _resolve = Lwt.wait () in
@@ -194,38 +268,53 @@ let commands = [main_command]
 
 let global_options = Tezos_clic.no_options
 
+let executable_name = Filename.basename Sys.executable_name
+
+let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
+
 let dispatch initial_ctx args =
   let open Lwt_result_syntax in
+  let commands =
+    Tezos_clic.add_manual
+      ~executable_name
+      ~global_options
+      (if Unix.isatty Unix.stdout then Tezos_clic.Ansi else Tezos_clic.Plain)
+      Format.std_formatter
+      commands
+  in
   let* ctx, remaining_args =
     Tezos_clic.parse_global_options global_options initial_ctx args
   in
   Tezos_clic.dispatch commands ctx remaining_args
 
+let handle_error = function
+  | Ok _ -> ()
+  | Error [Tezos_clic.Version] ->
+      let version = Tezos_version_value.Bin_version.version_string in
+      Format.printf "%s\n" version ;
+      exit 0
+  | Error [Tezos_clic.Help command] ->
+      Tezos_clic.usage
+        Format.std_formatter
+        ~executable_name
+        ~global_options
+        (match command with None -> [] | Some c -> [c]) ;
+      Stdlib.exit 0
+  | Error errs ->
+      Tezos_clic.pp_cli_errors
+        Format.err_formatter
+        ~executable_name
+        ~global_options
+        ~default:Error_monad.pp
+        errs ;
+      Stdlib.exit 1
+
 let () =
-  ignore
+  let _ =
     Tezos_clic.(
       setup_formatter
         Format.std_formatter
         (if Unix.isatty Unix.stdout then Ansi else Plain)
-        Short) ;
-  let args = Array.to_list Sys.argv |> List.tl |> Option.value ~default:[] in
-  let result = Lwt_main.run (dispatch () args) in
-  match result with
-  | Ok _ -> ()
-  | Error [Tezos_clic.Version] ->
-      let version = Tezos_version.Bin_version.version_string in
-      Format.printf "%s\n" version ;
-      exit 0
-  | Error e ->
-      Format.eprintf
-        "%a\n%!"
-        Tezos_clic.(
-          fun ppf errs ->
-            pp_cli_errors
-              ppf
-              ~executable_name:"evm_proxy"
-              ~global_options:no_options
-              ~default:pp
-              errs)
-        e ;
-      exit 1
+        Short)
+  in
+  Lwt_main.run (dispatch () (argv ())) |> handle_error

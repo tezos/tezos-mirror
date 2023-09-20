@@ -60,8 +60,6 @@ module type S = sig
     unit ->
     L.scalar L.repr list L.t
 
-  val aggregate_blinds : gates:'a SMap.t -> int SMap.t
-
   val aggregate_prover_identities :
     ?circuit_prefix:(string -> string) ->
     input_coms_size:int ->
@@ -113,6 +111,7 @@ module Aggregator = struct
     let open Boolean_gates in
     let open Hash_gates in
     let open Ecc_gates in
+    let open Mod_arith_gates in
     let linear_monomials =
       let open Plompiler.Csir in
       List.init nb_wires_arch (fun i -> (linear_selector_name i, i))
@@ -131,6 +130,10 @@ module Aggregator = struct
          (BoolCheck.q_label, (module BoolCheck));
          (CondSwap.q_label, (module CondSwap));
          (AnemoiDouble.q_label, (module AnemoiDouble));
+         (AddMod25519.q_label, (module AddMod25519));
+         (MulMod25519.q_label, (module MulMod25519));
+         (AddMod64.q_label, (module AddMod64));
+         (MulMod64.q_label, (module MulMod64));
        ]
       @ List.map (fun (q, i) -> (q, linear_monomial i q)) linear_monomials
       @ List.map
@@ -157,10 +160,6 @@ module Aggregator = struct
     | None ->
         failwith
           (Printf.sprintf "\nCustom_gates.find_gate : unknown selector %s." q)
-
-  let get_blinds q =
-    let module M = (val find_gate q : Base_sig) in
-    M.blinds
 
   let get_prover_identities q =
     let module M = (val find_gate q : Base_sig) in
@@ -202,47 +201,22 @@ module Aggregator = struct
     let module M = (val find_gate q : Base_sig) in
     M.gx_composition
 
-  let aggregate_blinds ~gates =
-    let f_union _key a1 a2 =
-      if Array.length a1 <> Array.length a2 then
-        raise (Invalid_argument "All blinds arrays must have the same size.")
-      else Some Array.(init (length a1) (fun i -> max a1.(i) a2.(i)))
-    in
-    let blinds_array =
-      SMap.(
-        fold
-          (fun gate _ acc_blinds -> union f_union acc_blinds (get_blinds gate))
-          (filter_gates gates)
-          empty)
-    in
-    let sum_array a = Array.fold_left ( + ) 0 a in
-    SMap.map sum_array blinds_array
+  let exists_gx_composition ~gates =
+    SMap.exists (fun q _ -> get_gx_composition q) (filter_gates gates)
+
+  let wires_map prefix get =
+    List.init Plompiler.Csir.nb_wires_arch (fun i ->
+        let w = prefix @@ wire_name i in
+        (w, get w))
+    |> SMap.of_list
 
   let filter_evaluations ~evaluations ~prefix ~circuit_prefix gates =
     let get_eval = Evaluations.find_evaluation evaluations in
-    let base =
-      List.fold_left
-        (fun acc x ->
-          if SMap.exists (fun y _ -> String.equal x y) evaluations then
-            SMap.add x (get_eval x) acc
-          else acc)
-        SMap.empty
-        ["X"; "GX"]
-    in
+    let base = SMap.singleton "X" (get_eval "X") in
+    (* Add wires *)
+    let wires = SMap.union_disjoint base (wires_map prefix get_eval) in
     List.fold_left
       (fun acc gate ->
-        (* Adding wires *)
-        let acc =
-          SMap.fold
-            (fun wire blinds acc2 ->
-              let wire = prefix wire in
-              if SMap.exists (fun w _ -> String.equal w wire) acc then acc2
-              else
-                let used = blinds.(0) = 1 || blinds.(1) = 1 in
-                if used then SMap.add wire (get_eval wire) acc2 else acc2)
-            (get_blinds gate)
-            acc
-        in
         (* Adding commitments *)
         let acc =
           match get_coms gate with
@@ -261,9 +235,9 @@ module Aggregator = struct
         in
         (* Adding selector *)
         let gate = circuit_prefix gate in
-        if String.starts_with ~prefix:(circuit_prefix "qpub") gate then acc
+        if gate = circuit_prefix "qpub" then acc
         else SMap.add gate (get_eval gate) acc)
-      base
+      wires
       gates
 
   let filter_answers ~answers ~prefix ~circuit_prefix gates =
@@ -272,29 +246,19 @@ module Aggregator = struct
     let add_mapmap k' k v mm =
       SMap.(update k' (fun m -> Option.bind m (fun m -> Some (add k v m)))) mm
     in
-    let add_x, add_gx = (add_mapmap x, add_mapmap gx) in
-    let exists_mapmap k' k mm = SMap.exists k (SMap.find k' mm) in
-    let exists_x, exists_gx = (exists_mapmap x, exists_mapmap gx) in
-    let base = SMap.of_list [(x, SMap.empty); (gx, SMap.empty)] in
-    List.fold_left
-      (fun acc gate ->
-        (* Adding wires *)
-        let acc =
-          SMap.fold
-            (fun wire blinds acc2 ->
-              let wire = prefix wire in
-              let acc3 =
-                if exists_x (fun w _ -> String.equal w wire) acc then acc2
-                else if blinds.(0) = 1 then add_x wire (get_x wire) acc2
-                else acc2
-              in
-              if exists_gx (fun w _ -> String.equal w wire) acc then acc3
-              else if blinds.(1) = 1 then add_gx wire (get_gx wire) acc3
-              else acc3)
-            (get_blinds gate)
-            acc
-        in
-        (* Adding commitments *)
+    let add_x = add_mapmap x in
+    (* Wires map *)
+    let wires =
+      let base = SMap.singleton x (wires_map prefix get_x) in
+      let wires_g =
+        if exists_gx_composition ~gates then wires_map prefix get_gx
+        else SMap.empty
+      in
+      SMap.add_unique gx wires_g base
+    in
+    SMap.fold
+      (fun gate _ acc ->
+        (* Adding input_commitments *)
         let acc =
           match get_coms gate with
           | None -> acc
@@ -312,10 +276,10 @@ module Aggregator = struct
         in
         (* Adding selector *)
         let gate = circuit_prefix gate in
-        if String.starts_with ~prefix:(circuit_prefix "qpub") gate then acc
+        if gate = circuit_prefix "qpub" then acc
         else add_x gate (get_x gate) acc)
-      base
       gates
+      wires
 
   let aggregate_prover_identities ?(circuit_prefix = Fun.id) ~input_coms_size
       ~proof_prefix:prefix ~gates ~public_inputs ~domain () : prover_identities
@@ -371,7 +335,7 @@ module Aggregator = struct
       ~proof_prefix:prefix ~gates ~public_inputs ~generator ~size_domain () :
       verifier_identities =
    fun x answers ->
-    let gates = filter_gates gates |> SMap.keys in
+    let gates = filter_gates gates in
     let answers = filter_answers ~answers ~prefix ~circuit_prefix gates in
     let arith_id = SMap.singleton (prefix @@ arith ^ ".0") Scalar.zero in
     let union key s1 s2 =
@@ -381,8 +345,8 @@ module Aggregator = struct
     let public =
       {public_inputs; input_coms_size = List.fold_left ( + ) 0 input_com_sizes}
     in
-    List.fold_left
-      (fun accumulated_ids gate ->
+    SMap.fold
+      (fun gate _ accumulated_ids ->
         let gate_ids =
           get_verifier_identities
             gate
@@ -393,8 +357,8 @@ module Aggregator = struct
             ~size_domain
         in
         SMap.union union accumulated_ids (gate_ids x answers))
-      arith_id
       gates
+      arith_id
 
   let aggregate_polynomials_degree ~gates =
     SMap.fold
@@ -404,9 +368,6 @@ module Aggregator = struct
       (filter_gates gates)
       0
 
-  let exists_gx_composition ~gates =
-    SMap.exists (fun q _ -> get_gx_composition q) (filter_gates gates)
-
   (* - (x^n -1)/n·(w0/(x -1) + w1/(x/g - 1) + … + wn/(x/g^n - 1)) *)
   let cs_pi ~generator ~n ~x ~zs pi_list =
     let open L in
@@ -415,7 +376,7 @@ module Aggregator = struct
     let n_inv = Scalar.(inverse_exn (negate n)) in
     let g_inv = Scalar.inverse_exn generator in
     match pi_list with
-    | [] -> constant_scalar Scalar.zero
+    | [] -> Num.zero
     | hd :: tl_pi ->
         (* negate because we want -PI(x) *)
         let* left_term = mul_by_constant n_inv zs in

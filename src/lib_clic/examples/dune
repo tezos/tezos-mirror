@@ -4,5 +4,5 @@
 (executable
  (name clic_example)
  (libraries
-  tezos-clic
+  octez-libs.clic
   lwt.unix))

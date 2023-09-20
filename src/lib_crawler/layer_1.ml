@@ -58,6 +58,7 @@ let () =
 
 type t = {
   name : string;
+  protocols : Protocol_hash.t list option;
   reconnection_delay : float;
   heads : (Block_hash.t * Block_header.t) Lwt_stream.t;
   cctxt : Client_context.full;
@@ -65,7 +66,7 @@ type t = {
   mutable running : bool;
 }
 
-let rec connect ~name ?(count = 0) ~delay cctxt =
+let rec connect ~name ?(count = 0) ~delay ~protocols cctxt =
   let open Lwt_syntax in
   let* () =
     if count = 0 then return_unit
@@ -83,7 +84,9 @@ let rec connect ~name ?(count = 0) ~delay cctxt =
       let* () = Layer1_event.wait_reconnect ~name delay in
       Lwt_unix.sleep delay
   in
-  let* res = Tezos_shell_services.Monitor_services.heads cctxt cctxt#chain in
+  let* res =
+    Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
+  in
   match res with
   | Ok (heads, stopper) ->
       let heads =
@@ -94,31 +97,35 @@ let rec connect ~name ?(count = 0) ~delay cctxt =
             (hash, header))
           heads
       in
-      return_ok (heads, stopper)
+      return (heads, stopper)
   | Error e ->
       let* () = Layer1_event.cannot_connect ~name ~count e in
-      connect ~name ~delay ~count:(count + 1) cctxt
+      connect ~name ~delay ~protocols ~count:(count + 1) cctxt
 
-let start ~name ~reconnection_delay (cctxt : #Client_context.full) =
-  let open Lwt_result_syntax in
-  let*! () = Layer1_event.starting ~name in
-  let+ heads, stopper = connect ~name ~delay:reconnection_delay cctxt in
+let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
+  let open Lwt_syntax in
+  let* () = Layer1_event.starting ~name in
+  let+ heads, stopper =
+    connect ~name ~delay:reconnection_delay ~protocols cctxt
+  in
   {
     name;
     cctxt = (cctxt :> Client_context.full);
     heads;
     stopper;
     reconnection_delay;
+    protocols;
     running = true;
   }
 
 let reconnect l1_ctxt =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let* heads, stopper =
     connect
       ~name:l1_ctxt.name
       ~count:1
       ~delay:l1_ctxt.reconnection_delay
+      ~protocols:l1_ctxt.protocols
       l1_ctxt.cctxt
   in
   return {l1_ctxt with heads; stopper}
@@ -165,12 +172,24 @@ let iter_heads l1_ctxt f =
     in
     when_ l1_ctxt.running @@ fun () ->
     let*! () = Layer1_event.connection_lost ~name:l1_ctxt.name in
-    let* l1_ctxt = reconnect l1_ctxt in
+    let*! l1_ctxt = reconnect l1_ctxt in
     loop l1_ctxt
   in
   Lwt.catch
     (fun () -> Lwt.no_cancel @@ loop l1_ctxt)
-    (function Iter_error e -> Lwt.return_error e | exn -> fail (Exn exn))
+    (function Iter_error e -> Lwt.return_error e | exn -> fail_with_exn exn)
+
+let wait_first l1_ctxt =
+  let rec loop l1_ctxt =
+    let open Lwt_syntax in
+    let* head = Lwt_stream.peek l1_ctxt.heads in
+    match head with
+    | Some head -> return head
+    | None ->
+        let* l1_ctxt = reconnect l1_ctxt in
+        loop l1_ctxt
+  in
+  Lwt.no_cancel @@ loop l1_ctxt
 
 (** [predecessors_of_blocks hashes] given a list of successive block hashes,
     from newest to oldest, returns an associative list that associates a hash to
@@ -184,13 +203,22 @@ let predecessors_of_blocks hashes =
     number of RPCs, this information is requested for a batch of hashes
     and cached locally. *)
 let get_predecessor =
-  let max_cached = 1023 and max_read = 8 in
+  let max_cached = 65536 in
+  let hard_max_read = max_cached in
+  (* 2MB *)
   let module HM =
     Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
   in
   let cache = HM.create max_cached in
-  fun cctxt (chain : Tezos_shell_services.Chain_services.chain) ancestor ->
+  fun ~max_read
+      cctxt
+      (chain : Tezos_shell_services.Chain_services.chain)
+      ancestor ->
     let open Lwt_result_syntax in
+    (* Don't read more than the hard limit in one RPC call. *)
+    let max_read = min max_read hard_max_read in
+    (* But read at least two because the RPC also returns the head. *)
+    let max_read = max max_read 2 in
     match HM.find_opt cache ancestor with
     | Some pred -> return_some pred
     | None -> (
@@ -214,17 +242,17 @@ let get_predecessor =
             | Some predecessor -> return_some predecessor)
         | _ -> return_none)
 
-let get_predecessor_opt state (hash, level) =
+let get_predecessor_opt ?(max_read = 8) state (hash, level) =
   let open Lwt_result_syntax in
   if level = 0l then return_none
   else
     let level = Int32.pred level in
-    let+ hash = get_predecessor state.cctxt state.cctxt#chain hash in
+    let+ hash = get_predecessor ~max_read state.cctxt state.cctxt#chain hash in
     Option.map (fun hash -> (hash, level)) hash
 
-let get_predecessor state ((hash, _) as head) =
+let get_predecessor ?max_read state ((hash, _) as head) =
   let open Lwt_result_syntax in
-  let* pred = get_predecessor_opt state head in
+  let* pred = get_predecessor_opt ?max_read state head in
   match pred with
   | None -> tzfail (Cannot_find_predecessor hash)
   | Some pred -> return pred
@@ -269,9 +297,10 @@ let get_tezos_reorg_for_new_head l1_state
     if old_head_level = new_head_level then
       return (old_head, new_head, Reorg.no_reorg)
     else if old_head_level < new_head_level then
+      let max_read = distance + 1 (* reading includes the head *) in
       let+ new_head, new_chain =
         nth_predecessor
-          ~get_predecessor:(get_predecessor l1_state)
+          ~get_predecessor:(get_predecessor ~max_read l1_state)
           distance
           new_head
       in
@@ -295,10 +324,12 @@ let get_tezos_reorg_for_new_head l1_state ?get_old_predecessor old_head new_head
       (* No known tezos head, we want all blocks from l. *)
       if new_head_level < l then return Reorg.no_reorg
       else
+        let distance = Int32.sub new_head_level l |> Int32.to_int in
+        let max_read = distance + 1 (* reading includes the head *) in
         let* _block_at_l, new_chain =
           nth_predecessor
-            ~get_predecessor:(get_predecessor l1_state)
-            (Int32.sub new_head_level l |> Int32.to_int)
+            ~get_predecessor:(get_predecessor ~max_read l1_state)
+            distance
             new_head
         in
         return Reorg.{old_chain = []; new_chain}
@@ -318,6 +349,7 @@ module Internal_for_tests = struct
       heads;
       cctxt = (cctxt :> Client_context.full);
       stopper = Fun.id;
+      protocols = None;
       running = false;
     }
 end

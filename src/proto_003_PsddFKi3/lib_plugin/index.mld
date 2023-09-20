@@ -1,0 +1,7 @@
+{0 Octez-protocol-003-PsddFKi3-libs: octez protocol 003-PsddFKi3 libraries}
+
+This is a package containing some libraries related to the Tezos 003-PsddFKi3 protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_003_PsddFKi3}Tezos_client_003_PsddFKi3}: Protocol specific library for `tezos-client`

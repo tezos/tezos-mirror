@@ -6,25 +6,26 @@ SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
 TMPDOCDIR     = /tmp/octezdoc
 BUILDDIR      = _build
-TOPBUILDDIR   = ../_build/default
+TOPBUILDDIR   = ../_build
+TOPBUILDDIR_ABS  = $(abspath $(CURDIR)/$(TOPBUILDDIR))
 
 DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
-P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
-RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
-ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
+P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
+RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
+ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = mumbai nairobi
+NAMED_PROTOS  = nairobi oxford
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-mumbai_long   = PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1
 nairobi_long  = PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
+oxford_long   = ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-mumbai_short  = PtMumbai
 nairobi_short = PtNairob
+oxford_short  = Proxford
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -52,7 +53,7 @@ full: odoc
 	@../octez-smart-rollup-node-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-smart-rollup-client.html:
 	@../octez-smart-rollup-client-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-
+	
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
@@ -64,15 +65,20 @@ manuals: \
 	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
 	@../octez-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-codec.html
 	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
+	@ ../octez-dac-node man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-node.html
+	@ ../octez-dac-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-client.html
 	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
 		./scripts/man2txt.py > api/octez-node.txt
 	@../octez-proxy-server --help | grep -v '^Octez-proxy-server' | grep -v 'OCTEZ-PROXY-SERVER(1)' | \
 		./scripts/man2txt.py > api/octez-proxy-server.txt
+	@../octez-smart-rollup-node man -verbosity 3 -format html | \
+		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
 
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
 odoc: docexes
-	cd $$(pwd)/.. ; dune build @doc
+	cd $$(pwd)/.. ; dune build @doc >docs/odoc.log 2>&1; \
+	  RESULT=$$?; (grep '^Error:' docs/odoc.log || true); exit $$RESULT
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
@@ -81,20 +87,16 @@ odoc-lite: docexes
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms \
-	  --include="src/proto_016*" \
-	  --include="src/proto_017*" \
-	  --exclude="src/proto_0*" \
-		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
-	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2971
-	# The new version of odoc (2.1.0) is stricter than the old version (1.5.3),
-	# we temporarily deactivate the odoc checks.
-	# cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc
-	@echo "Running odoc, outputs messages to $(TMPDOCDIR)/odoc.log"
-	cd $(TMPDOCDIR); dune build @doc >odoc.log 2>&1; \
-	  RESULT=$$?; (grep '^Error:' odoc.log || true); exit $$RESULT
-	@rm -rf _build/api/odoc
-	@mkdir -p _build/api
-	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
+		../scripts ../script-inputs ../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
+	cd $(TMPDOCDIR)/ && ./scripts/remove-old-protocols.sh
+	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in $(TMPDOCDIR)/odoc.log"
+	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(TMPDOCDIR)/odoc.log 2>&1; \
+		RESULT=$$?; \
+		(grep '^Error:' $(TMPDOCDIR)/odoc.log || true) ; \
+		exit $$RESULT
+	rm -rf $(CURDIR)/_build/api/odoc
+	mkdir -p $(CURDIR)/_build/api
+	cp -r $(TOPBUILDDIR_ABS)/default/_doc $(CURDIR)/_build/api/odoc
 
 .PHONY: linkcheck
 linkcheck: html
@@ -114,22 +116,23 @@ redirectcheck: html
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) mumbai
 	$(CHECKXREFS) nairobi
+	$(CHECKXREFS) -l oxford
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
-	scripts/test_doc_scripts.sh install-bin-bionic
 	scripts/test_doc_scripts.sh install-bin-focal
-	scripts/test_doc_scripts.sh install-bin-fedora36
-	scripts/test_doc_scripts.sh install-bin-rc-bionic
+	scripts/test_doc_scripts.sh install-bin-jammy
+	scripts/test_doc_scripts.sh install-bin-fedora37
+	scripts/test_doc_scripts.sh install-bin-fedora38
 	scripts/test_doc_scripts.sh install-bin-rc-focal
-	scripts/test_doc_scripts.sh install-bin-rc-fedora36
+	scripts/test_doc_scripts.sh install-bin-rc-jammy
+	scripts/test_doc_scripts.sh install-bin-rc-fedora37
+	scripts/test_doc_scripts.sh install-bin-rc-fedora38
 	scripts/test_doc_scripts.sh install-opam-scratch
-	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
-	scripts/test_doc_scripts.sh compile-release-sources-buster
-	scripts/test_doc_scripts.sh compile-sources-buster
+	scripts/test_doc_scripts.sh compile-release-sources-bullseye
+	scripts/test_doc_scripts.sh compile-sources-bullseye
 
 # build dune targets together to avoid concurrent dunes
 docexes:
@@ -173,7 +176,7 @@ html: api/errors.rst developer/metrics.csv user/node-config.json \
 		rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/mumbai" || true
+	@ln -s active "$(BUILDDIR)/nairobi" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -230,6 +233,6 @@ black:
 fmt: black
 
 clean:
-	@-rm -Rf "$(BUILDDIR)" linkcheck
+	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/octez-*.html api/octez-*.txt mumbai/octez-*.html nairobi/octez-*.html alpha/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt nairobi/octez-*.html oxford/octez-*.html alpha/octez-*.html

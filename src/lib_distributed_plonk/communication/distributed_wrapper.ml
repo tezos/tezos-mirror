@@ -30,12 +30,12 @@
       {li
         The master asks all the workers to compute the same function over
         different inputs. We call these messages {e requests}. Each protocol
-        step will define a [request] (see {Message} module), whose payload
+        step will define a [request] (see {!Message} module), whose payload
         will change for every worker.}
       {li
         Each worker computes the {e reply} to the received request, and sends
         it back to the master. Each protocol step will define a [reply]
-        (see {Message} module).
+        (see {!Message} module).
       }
       {li
         The master waits to receive all the replies from the workers.

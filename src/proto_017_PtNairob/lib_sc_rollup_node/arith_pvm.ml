@@ -44,7 +44,7 @@ module Arith_proof_format =
         .tree_proof_encoding
     end)
 
-module Impl : Pvm.S = struct
+module Impl : Pvm_sig.S = struct
   module PVM = Sc_rollup.ArithPVM.Make (Arith_proof_format)
   include PVM
 
@@ -52,8 +52,9 @@ module Impl : Pvm.S = struct
 
   module State = Context.PVMState
 
-  module RPC = struct
-    let build_directory _node_ctxt = Tezos_rpc.Directory.empty
+  module Inspect_durable_state = struct
+    let lookup _state _keys =
+      raise (Invalid_argument "No durable storage for arith PVM")
   end
 
   let new_dissection = Game_helpers.default_new_dissection

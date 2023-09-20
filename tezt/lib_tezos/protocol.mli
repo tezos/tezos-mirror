@@ -24,12 +24,18 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Mumbai | Nairobi | Alpha
+type t = Nairobi | Oxford | Alpha
 
 (** Protocol parameters.
 
     These values denote which file to use from the ["parameters"] directory. *)
-type constants = Constants_sandbox | Constants_mainnet | Constants_test
+type constants =
+  | Constants_sandbox
+  | Constants_mainnet
+  | Constants_mainnet_with_chain_id
+  | Constants_test
+
+val constants_to_string : constants -> string
 
 (** The default constants used by tests: [Constants_sandbox]. *)
 val default_constants : constants
@@ -80,10 +86,6 @@ val accuser : t -> string
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
 val baker : t -> string
 
-(** Get the path of the smart rollup node of a protocol, such as
-    ["./octez-smart-rollup-node-alpha"]. *)
-val sc_rollup_node : t -> string
-
 (** Get the path of the smart rollup client of a protocol, such as
     ["./octez-smart-rollup-client-alpha"]. *)
 val sc_rollup_client : t -> string
@@ -107,6 +109,20 @@ val encoding_prefix : t -> string
 type parameter_overrides =
   (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list
 
+type bootstrap_smart_rollup = {
+  address : string;
+  pvm_kind : string;
+  boot_sector : string;
+  parameters_ty : Ezjsonm.value;
+}
+
+type bootstrap_contract = {
+  delegate : string option;
+  amount : Tez.t;
+  script : Ezjsonm.value;
+  hash : string option;
+}
+
 (** Write a protocol parameter file.
 
     This function first builds a default parameter file from the [base]
@@ -123,10 +139,15 @@ type parameter_overrides =
       add to activation parameters. Each account is a triplet
       [(key, balance, revealed)]. If [revealed] the public key is added,
       else the public key hash is added. Revealed keys are expected to bake
-      from the start. Default [balance] is 4000000 tez. *)
+      from the start. Default [balance] is 4000000 tez.
+    - [bootstrap_smart_rollups] when given.
+    - [bootstrap_contracts] when given.
+*)
 val write_parameter_file :
   ?bootstrap_accounts:(Account.key * int option) list ->
   ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
+  ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
+  ?bootstrap_contracts:bootstrap_contract list ->
   base:(string, t * constants option) Either.t ->
   parameter_overrides ->
   string Lwt.t

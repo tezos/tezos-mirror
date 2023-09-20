@@ -36,17 +36,3 @@ let handle_python_error msg closure =
           (Py.Object.to_string y)
       in
       Stdlib.failwith s
-
-let import_once module_name =
-  let imported = ref None in
-  fun () ->
-    match !imported with
-    | None ->
-        let msg = "While loading " ^ module_name in
-        let pymod =
-          handle_python_error msg (fun () ->
-              Py.import module_name (* Py.Import.import_module module_name *))
-        in
-        imported := Some pymod ;
-        pymod
-    | Some pymod -> pymod

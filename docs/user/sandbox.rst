@@ -103,7 +103,7 @@ we can do so with the following command:
 
 ::
 
-   $ octez-client bake for bootstrap1
+   $ octez-client bake for --minimal-timestamp
 
 If the previous transaction is valid, the operation is included in the
 chain and the transfer terminates returning the usual receipt.

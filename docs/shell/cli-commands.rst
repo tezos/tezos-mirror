@@ -59,7 +59,7 @@ The command line of the Octez node is documented in Unix ``man`` format, as show
 
 The manual briefly shows the available node commands.
 Each command accepts its own set of options and arguments, that you can discover by running ``octez-node <command> --help``.
-For more details on the node invocation and configuration, see see :doc:`../user/node-configuration`.
+For more details on the node invocation and configuration, see :doc:`../user/node-configuration`.
 
 .. include:: ../api/octez-node.txt
 
@@ -71,3 +71,26 @@ Proxy server manual
 The command line of the :doc:`Octez proxy server <../user/proxy-server>` is documented in Unix ``man`` format, as shown below. You can also obtain this manual by running ``octez-proxy-server --help``.
 
 .. include:: ../api/octez-proxy-server.txt
+
+.. _dac_node_manual:
+
+DAC node manual (Experimental)
+==============================
+.. raw:: html
+        :file: ../api/octez-dac-node.html
+
+.. _dac_client_manual:
+
+DAC client manual (Experimental)
+================================
+.. raw:: html
+        :file: ../api/octez-dac-client.html
+
+
+.. _smart_rollup_node_manual:
+
+Smart rollup node manual
+========================
+
+.. raw:: html
+         :file: ../api/octez-smart-rollup-node.html

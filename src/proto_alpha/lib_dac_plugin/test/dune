@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-dac-alpha
-  tezos-protocol-alpha
-  tezos-base-test-helpers
-  tezos-alpha-test-helpers
+  octez-libs.base
+  octez-protocol-alpha-libs.dac
+  tezos-protocol-alpha.protocol
+  octez-libs.base-test-helpers
+  octez-protocol-alpha-libs.test-helpers
   tezos-dac-lib
   tezos_dac_node_lib
   octez-alcotezt)
@@ -43,7 +43,7 @@
 
 (rule
  (alias runtest)
- (package tezos-dac-alpha)
+ (package octez-protocol-alpha-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

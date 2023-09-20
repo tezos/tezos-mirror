@@ -10,17 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
-  "tezos-stdlib-unix"
-  "tezos-shell-services"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
-  "tezos-context"
-  "tezos-store"
-  "tezos-validation"
+  "octez-libs"
+  "octez-shell-libs"
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

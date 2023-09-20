@@ -27,8 +27,6 @@
 
 open Protocol.Alpha_context
 
-let tx_rollup_finality_period = 40_000
-
 (** The challenge window is about two weeks with 15s block-time,
     (4 * 60 * 24 * 14).
     WARNING: changing this value also impacts
@@ -92,7 +90,7 @@ let default_dal =
     {
       feature_enable = false;
       number_of_slots = 256;
-      attestation_lag = 1;
+      attestation_lag = 4;
       attestation_threshold = 50;
       blocks_per_epoch = 32l;
       cryptobox_parameters = default_cryptobox_parameters;
@@ -104,14 +102,18 @@ let constants_mainnet =
   let Constants.Generated.
         {
           consensus_threshold;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
+          issuance_weights =
+            {
+              base_total_issued_per_minute;
+              baking_reward_fixed_portion_weight;
+              baking_reward_bonus_weight;
+              attesting_reward_weight;
+              liquidity_baking_subsidy_weight;
+              seed_nonce_revelation_tip_weight;
+              vdf_revelation_tip_weight;
+            };
         } =
-    Constants.Generated.generate
-      ~consensus_committee_size
-      ~blocks_per_minute:{numerator = 60; denominator = block_time}
+    Constants.Generated.generate ~consensus_committee_size
   in
   {
     Constants.Parametric.preserved_cycles = 5;
@@ -126,6 +128,7 @@ let constants_mainnet =
        the block production's overhead is not too important. *)
     proof_of_work_threshold = Int64.(sub (shift_left 1L 48) 1L);
     minimal_stake = Tez.(mul_exn one 6_000);
+    minimal_frozen_stake = Tez.(mul_exn one 600);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
           - 8000 ~= 512 * 15 that is nonce_revelation_threshold * block time
@@ -134,19 +137,29 @@ let constants_mainnet =
           - 5: security factor (strictly higher than the ratio between highest CPU
          clock rate and benchmark machine that is 8.43/2.8 ~= 3 *)
     vdf_difficulty = 8_000_000_000L;
-    seed_nonce_revelation_tip =
-      (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
     origination_size = 257;
-    baking_reward_fixed_portion (* 5_000_000 mutez *);
-    baking_reward_bonus_per_slot (* 2_143 mutez *);
-    endorsing_reward_per_slot (* 1_428 mutez *);
+    issuance_weights =
+      {
+        base_total_issued_per_minute;
+        (* 85.007812 tez/minute *)
+        baking_reward_fixed_portion_weight;
+        (* 1/4th of total block rewards *)
+        baking_reward_bonus_weight;
+        (* all bonus rewards = fixed rewards *)
+        attesting_reward_weight;
+        (* all baking rewards = all attesting rewards *)
+        liquidity_baking_subsidy_weight;
+        (* 1/16th of block rewards *)
+        seed_nonce_revelation_tip_weight;
+        (* 1/20480 of block rewards *)
+        vdf_revelation_tip_weight;
+        (* 1/20480 of block rewards *)
+      };
     hard_storage_limit_per_operation = Z.of_int 60_000;
     cost_per_byte = Tez.of_mutez_exn 250L;
     quorum_min = 20_00l;
     quorum_max = 70_00l;
     min_proposal_quorum = 5_00l;
-    (* liquidity_baking_subsidy is 1/16th of maximum total rewards for a block *)
-    liquidity_baking_subsidy (* 1_250_000 mutez *);
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
     liquidity_baking_toggle_ema_threshold = 1_000_000_000l;
@@ -165,10 +178,9 @@ let constants_mainnet =
     (* 4667 slots *)
     minimal_participation_ratio = {numerator = 2; denominator = 3};
     max_slashing_period = 2;
-    frozen_deposits_percentage = 10;
-    double_baking_punishment = Tez.(mul_exn one 640);
-    ratio_of_frozen_deposits_slashed_per_double_endorsement =
-      {numerator = 1; denominator = 2};
+    limit_of_delegation_over_baking = 9;
+    percentage_of_frozen_deposits_slashed_per_double_baking = 10;
+    percentage_of_frozen_deposits_slashed_per_double_attestation = 50;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
     initial_seed = None;
@@ -180,56 +192,6 @@ let constants_mainnet =
     cache_stake_distribution_cycles = 8;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 8;
-    tx_rollup =
-      {
-        enable = false;
-        (* Based on how storage burn is implemented for
-           transaction rollups, this means that a rollup operator
-           can create 100 inboxes (40 bytes per inbox) before
-           having to pay storage burn. *)
-        origination_size = 4_000;
-        (* Considering an average size of layer-2 operations of
-           20, this gives a TPS per rollup higher than 400, and
-           the capability to have two rollups at full speed on
-           mainnet (as long as they do not reach scalability
-           issues related to proof size). *)
-        hard_size_limit_per_inbox = 500_000;
-        hard_size_limit_per_message = 5_000;
-        commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
-        finality_period = tx_rollup_finality_period;
-        max_inboxes_count = tx_rollup_finality_period + 100;
-        (* [60_000] blocks is about two weeks. *)
-        withdraw_period = tx_rollup_finality_period;
-        max_messages_per_inbox = 1_010;
-        (* Must be greater than the withdraw period. *)
-        max_commitments_count = (2 * tx_rollup_finality_period) + 100;
-        cost_per_byte_ema_factor = 120;
-        (* Tickets are transmitted in batches in the
-           [Tx_rollup_dispatch_tickets] operation.
-
-           The semantics is that this operation is used to
-           concretize the withdraw orders emitted by the layer-2,
-           one layer-1 operation per messages of an
-           inbox. Therefore, it is of significant importance that
-           a valid batch does not produce a list of withdraw
-           orders which could not fit in a layer-1 operation.
-
-           With these values, at least 2048 bytes remain available
-           to store the rest of the operands of
-           [Tx_rollup_dispatch_tickets] (in practice, even more,
-           because we overapproximate the size of tickets). So we
-           are safe. *)
-        max_withdrawals_per_batch = 15;
-        max_ticket_payload_size = 2_048;
-        (* Must be smaller than maximum limit of a manager operation
-           (minus overhead), since we need to limit our proofs to those
-           that can fit in an operation. *)
-        rejection_max_proof_size = 30000;
-        (* This is the first block of cycle 618, which is expected to
-           be about one year after the activation of protocol J.  See
-           https://tzstats.com/cycle/618 *)
-        sunset_level = 3_473_409l;
-      };
     dal = default_dal;
     sc_rollup =
       {
@@ -265,6 +227,23 @@ let constants_mainnet =
             mempool. *)
         max_number_of_stored_cemented_commitments = 5;
         max_number_of_parallel_games = 32;
+        reveal_activation_level =
+          {
+            raw_data = {blake2B = Raw_level.root};
+            metadata = Raw_level.root;
+            dal_page =
+              (if default_dal.feature_enable then Raw_level.root
+              else
+                (* Deactivate the reveal if the dal is not enabled. *)
+                (* https://gitlab.com/tezos/tezos/-/issues/5968
+                   Encoding error with Raw_level
+
+                   We set the activation level to [pred max_int] to deactivate
+                   the feature. The [pred] is needed to not trigger an encoding
+                   exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
+                Raw_level.of_int32_exn Int32.(pred max_int));
+          };
+        private_enable = false;
       };
     zk_rollup =
       {
@@ -273,6 +252,22 @@ let constants_mainnet =
            The following constants need to be refined. *)
         origination_size = 4_000;
         min_pending_to_process = 10;
+        max_ticket_payload_size = 2_048;
+      };
+    adaptive_issuance =
+      {
+        global_limit_of_staking_over_baking = 5;
+        edge_of_staking_over_delegation = 2;
+        launch_ema_threshold = 1_600_000_000l;
+        adaptive_rewards_params =
+          {
+            issuance_ratio_min = Q.(5 // 10000);
+            issuance_ratio_max = Q.(1 // 20);
+            max_bonus = 50_000_000_000_000L;
+            growth_rate = 115_740_740L;
+            center_dz = Q.(1 // 2);
+            radius_dz = Q.(1 // 50);
+          };
       };
   }
 
@@ -292,17 +287,8 @@ let derive_cryptobox_parameters ~redundancy_factor ~mainnet_constants_divider =
 let constants_sandbox =
   let consensus_committee_size = 256 in
   let block_time = 1 in
-  let Constants.Generated.
-        {
-          consensus_threshold = _;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
-        } =
-    Constants.Generated.generate
-      ~consensus_committee_size
-      ~blocks_per_minute:{numerator = 60; denominator = block_time}
+  let Constants.Generated.{consensus_threshold = _; issuance_weights} =
+    Constants.Generated.generate ~consensus_committee_size
   in
   {
     constants_mainnet with
@@ -317,6 +303,7 @@ let constants_sandbox =
               ~redundancy_factor:8
               ~mainnet_constants_divider:32;
         };
+    issuance_weights;
     Constants.Parametric.preserved_cycles = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
@@ -325,31 +312,18 @@ let constants_sandbox =
     cycles_per_voting_period = 8l;
     proof_of_work_threshold = Int64.(sub (shift_left 1L 62) 1L);
     vdf_difficulty = 50_000L;
-    liquidity_baking_subsidy;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
     consensus_threshold = 0;
-    baking_reward_fixed_portion (* 333_333 mutez *);
-    baking_reward_bonus_per_slot (* 3_921 mutez *);
-    endorsing_reward_per_slot (* 2_604 mutez *);
     max_slashing_period = 2;
-    frozen_deposits_percentage = 5;
+    limit_of_delegation_over_baking = 19;
   }
 
 let constants_test =
   let consensus_committee_size = 25 in
-  let Constants.Generated.
-        {
-          consensus_threshold;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
-        } =
-    Constants.Generated.generate
-      ~consensus_committee_size
-      ~blocks_per_minute:{numerator = 2; denominator = 1}
+  let Constants.Generated.{consensus_threshold; issuance_weights} =
+    Constants.Generated.generate ~consensus_committee_size
   in
   {
     constants_mainnet with
@@ -364,6 +338,7 @@ let constants_test =
               ~redundancy_factor:4
               ~mainnet_constants_divider:64;
         };
+    issuance_weights;
     Constants.Parametric.preserved_cycles = 3;
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;
@@ -373,18 +348,13 @@ let constants_test =
     proof_of_work_threshold =
       Int64.(sub (shift_left 1L 62) 1L) (* 1/4 of nonces are accepted *);
     vdf_difficulty = 50_000L;
-    liquidity_baking_subsidy;
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
     max_slashing_period = 2;
-    baking_reward_fixed_portion (* 10 tez *);
-    baking_reward_bonus_per_slot (* 1.25 tez *);
-    endorsing_reward_per_slot (* 0.8 tez *);
-    frozen_deposits_percentage =
-      5
-      (* not 10 so that multiplication and
-         divisions do not easily get
-         intermingled *);
+    limit_of_delegation_over_baking =
+      19
+      (* Not 9 so that multiplication by a percentage and
+         divisions by a limit do not easily get intermingled. *);
   }
 
 let test_commitments =
@@ -446,16 +416,31 @@ let make_bootstrap_account (pkh, pk, amount, delegate_to, consensus_key) =
     }
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
-    ?(bootstrap_contracts = []) ?(commitments = []) constants =
+    ?(bootstrap_contracts = []) ?(bootstrap_smart_rollups = [])
+    ?(commitments = []) constants =
   Parameters.
     {
       bootstrap_accounts;
       bootstrap_contracts;
+      bootstrap_smart_rollups;
       commitments;
       constants;
       security_deposit_ramp_up_cycles = None;
       no_reward_cycles = None;
     }
 
-let json_of_parameters parameters =
-  Data_encoding.Json.construct Parameters.encoding parameters
+module Protocol_parameters_overrides = struct
+  type t = {parameters : Parameters.t; chain_id : Chain_id.t option}
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {parameters; chain_id} -> (parameters, chain_id))
+      (fun (parameters, chain_id) -> {parameters; chain_id})
+      (merge_objs Parameters.encoding (obj1 (opt "chain_id" Chain_id.encoding)))
+end
+
+let json_of_parameters ?chain_id parameters =
+  Data_encoding.Json.construct
+    Protocol_parameters_overrides.encoding
+    Protocol_parameters_overrides.{parameters; chain_id}

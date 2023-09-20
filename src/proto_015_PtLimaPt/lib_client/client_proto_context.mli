@@ -254,7 +254,7 @@ val register_as_delegate :
   tzresult
   Lwt.t
 
-(** Calls {!RawContractAlias.add}. *)
+(** Calls {!Raw_contract_alias.add}. *)
 val save_contract :
   force:bool ->
   #Protocol_client_context.full ->

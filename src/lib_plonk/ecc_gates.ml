@@ -67,12 +67,6 @@ module AddWeierstrass : Base_sig = struct
       let y = Scalar.(sub (lambda * sub a x) ag) in
       Scalar.[sub x c; sub y cg]
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
    fun evaluations ->
@@ -84,7 +78,7 @@ module AddWeierstrass : Base_sig = struct
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let a = wires.(0) in
     let b = wires.(1) in
@@ -175,7 +169,7 @@ module AddWeierstrass : Base_sig = struct
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     let a, b, c = (wires.(0), wires.(1), wires.(2)) in
     let ag, bg, cg = (wires_g.(0), wires_g.(1), wires_g.(2)) in
@@ -284,19 +278,13 @@ module AddEdwards : Base_sig = struct
       in
       Scalar.[rx' + negate rx; ry' + negate ry]
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|1; 1|]); (wire_name 1, [|1; 1|]); (wire_name 2, [|1; 1|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain :
       prover_identities =
    fun evaluations ->
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let s = q in
     let p = wires.(0) in
@@ -403,7 +391,7 @@ module AddEdwards : Base_sig = struct
       ~size_domain:_ : verifier_identities =
    fun _ answers ->
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     let px, py = (wires.(0), wires_g.(0)) in
     let qx, qy = (wires.(1), wires_g.(1)) in
@@ -537,21 +525,11 @@ module ConditionalAddEdwards : Base_sig = struct
       in
       Scalar.[rx' + negate rx; ry' + negate ry]
 
-  let blinds =
-    SMap.of_list
-      [
-        (wire_name 0, [|1; 0|]);
-        (wire_name 1, [|1; 0|]);
-        (wire_name 2, [|1; 0|]);
-        (wire_name 3, [|1; 1|]);
-        (wire_name 4, [|1; 1|]);
-      ]
-
   let prover_identities ~prefix_common ~prefix ~public:_ ~domain evaluations =
     let domain_size = Domain.length domain in
     let tmps, ids = get_buffers ~nb_buffers ~nb_ids:(snd identity) in
     let ({q; wires} : witness) =
-      get_evaluations ~q_label ~blinds ~prefix ~prefix_common evaluations
+      get_evaluations ~q_label ~prefix ~prefix_common evaluations
     in
     let b = wires.(0) in
     let qx, qy = (wires.(1), wires.(2)) in
@@ -683,7 +661,7 @@ module ConditionalAddEdwards : Base_sig = struct
   let verifier_identities ~prefix_common ~prefix ~public:_ ~generator:_
       ~size_domain:_ _ answers =
     let {q; wires; wires_g} =
-      get_answers ~q_label ~blinds ~prefix ~prefix_common answers
+      get_answers ~gx:true ~q_label ~prefix ~prefix_common answers
     in
     let b = wires.(0) in
     let qx, qy = (wires.(1), wires.(2)) in
@@ -736,46 +714,45 @@ module ConditionalAddEdwards : Base_sig = struct
     let rx = wires_g.(3) in
     let ry = wires_g.(4) in
     let open L in
-    let open Num in
-    let sub x y = add ~qr:mone x y in
-    let* px_qy = mul px qy in
-    let* py_qx = mul py qx in
-    let* pqs = mul px_qy py_qx in
-    let* denom_first = custom ~qm:param_d bit pqs ~qc:one in
+    let sub x y = Num.add ~qr:mone x y in
+    let* px_qy = Num.mul px qy in
+    let* py_qx = Num.mul py qx in
+    let* pqs = Num.mul px_qy py_qx in
+    let* denom_first = Num.custom ~qm:param_d bit pqs ~qc:one in
     (* q · [rx · (1 + d · b · px · qx · py · qy)
          - (b · px · qy + b · py · qx - b · px + px)] = 0 *)
     let* first_identity =
       (* left  = rx · (1 + d · b · px · qx · py · qy) *)
-      let* left = mul denom_first rx in
+      let* left = Num.mul denom_first rx in
       (* right = b · (px · qy + py · qx - px) + px    *)
-      let* px_qy_plus_py_qx = add px_qy py_qx in
+      let* px_qy_plus_py_qx = Num.add px_qy py_qx in
       let* px_qy_plus_py_qx_minux_px = sub px_qy_plus_py_qx px in
-      let* right_b = mul bit px_qy_plus_py_qx_minux_px in
-      let* right = add px right_b in
+      let* right_b = Num.mul bit px_qy_plus_py_qx_minux_px in
+      let* right = Num.add px right_b in
       (* all = left - right
              = rx · (1 + d · b · px · qx · py · qy)
                - (b · px · qy + b · py · qx - b · px + px) *)
       let* all = sub left right in
-      mul qec all
+      Num.mul qec all
     in
     (* q · [ry · (1 - d · b · px · qx · py · qy)
         - (b · py · qy - a · b · px · qx - b · py + py )] = 0 *)
     let* second_identity =
       (* left  = ry · (1 - d · b · px · qx · py · qy)  *)
-      let* denom_second = add_constant ~ql:mone two denom_first in
-      let* left = mul ry denom_second in
+      let* denom_second = Num.add_constant ~ql:mone two denom_first in
+      let* left = Num.mul ry denom_second in
       (* right = b · (py · qy - a · px · qx - py) + py *)
-      let* py_qy = mul py qy in
-      let* a_px_qx = mul ~qm:param_a px qx in
+      let* py_qy = Num.mul py qy in
+      let* a_px_qx = Num.mul ~qm:param_a px qx in
       let* py_qy_plus_a_px_qx = sub py_qy a_px_qx in
       let* py_qy_plus_a_px_qx_minus_py = sub py_qy_plus_a_px_qx py in
-      let* right_b = mul bit py_qy_plus_a_px_qx_minus_py in
-      let* right = add right_b py in
+      let* right_b = Num.mul bit py_qy_plus_a_px_qx_minus_py in
+      let* right = Num.add right_b py in
       (* all = left - right
              = y · (1 - d · b · px · qx · py · qy)
                - (b · py · qy - a · b · px · qx - b · py + py ) *)
       let* all = sub left right in
-      mul qec all
+      Num.mul qec all
     in
     ret [first_identity; second_identity]
 end

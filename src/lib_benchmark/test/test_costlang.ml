@@ -55,6 +55,19 @@ module Term (X : S) = struct
   let applied_linear = app (app linear_sum (int 10)) (int 33)
 
   let applied_not_linear = app not_linear (int 10)
+
+  (*
+   Term to test Arg_names
+   (\f w -> f 0 w) (\x y z -> x + y + z)
+   == \w -> \z -> 0 + w + z
+  *)
+  let arg_list_test =
+    app
+      ( lam ~name:"f" @@ fun f ->
+        lam ~name:"w" @@ fun w -> app (app f (int 0)) w )
+      ( lam ~name:"x" @@ fun x ->
+        lam ~name:"y" @@ fun y ->
+        lam ~name:"z" @@ fun z -> x + y + z )
 end
 
 (* Test pretty-printing *)
@@ -140,6 +153,19 @@ let test_eval_to_lincomb_fail () =
   | exception Eval_linear_combination "*" -> true
   | _ -> false
 
+(* Test Arg_names *)
+module Args = Term (Arg_names)
+
+let test_arg_names_1 () = Arg_names.arg_name Args.linear_sum = "size1"
+
+let test_arg_names_2 () =
+  Arg_names.arg_name @@ Arg_names.unwrap_size Args.linear_sum = "size2"
+
+let test_arg_names_3 () = Arg_names.arg_name Args.arg_list_test = "w"
+
+let test_arg_names_4 () =
+  Arg_names.arg_name @@ Arg_names.unwrap_size Args.arg_list_test = "z"
+
 let tests =
   [
     Test.tztest_assert "pp1" `Quick test_pp_1;
@@ -152,6 +178,10 @@ let tests =
       "eval_to_linear_comb_fail"
       `Quick
       test_eval_to_lincomb_fail;
+    Test.tztest_assert "arg_names_1" `Quick test_arg_names_1;
+    Test.tztest_assert "arg_names_2" `Quick test_arg_names_2;
+    Test.tztest_assert "arg_names_3" `Quick test_arg_names_3;
+    Test.tztest_assert "arg_names_4" `Quick test_arg_names_4;
   ]
 
 let () =

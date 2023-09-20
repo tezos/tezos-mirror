@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,7 +30,7 @@ module Encodings =
 Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let file = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
 
 module Size = Gas_input_size
@@ -205,41 +206,42 @@ module Typechecking_data : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let typechecking_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
+    let open Lwt_result_syntax in
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
-        let workload =
-          match
-            Translator_workload.data_typechecker_workload
-              ctxt
-              Translator_workload.Parsing
-              (Micheline.root node)
-              ex_ty
-          with
-          | None -> bad_data name node michelson_type Workload_production
-          | Some workload -> workload
-        in
-        match ex_ty with
-        | Script_typed_ir.Ex_ty ty ->
-            let closure () =
-              match
-                Lwt_main.run
-                  (Script_ir_translator.parse_data
-                     ctxt
-                     ~elab_conf:strict
-                     ~allow_forged:false
-                     ty
-                     (Micheline.root node))
-              with
-              | Error _ | (exception _) ->
-                  bad_data name node michelson_type In_protocol
-              | Ok _ -> ()
-            in
-            return (Generator.Plain {workload; closure}) )
+      (let* ctxt, _ = Execution_context.make ~rng_state () in
+       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
+       let workload =
+         match
+           Translator_workload.data_typechecker_workload
+             ctxt
+             Translator_workload.Parsing
+             (Micheline.root node)
+             ex_ty
+         with
+         | None -> bad_data name node michelson_type Workload_production
+         | Some workload -> workload
+       in
+       match ex_ty with
+       | Script_typed_ir.Ex_ty ty ->
+           let closure () =
+             match
+               Lwt_main.run
+                 (Script_ir_translator.parse_data
+                    ctxt
+                    ~elab_conf:strict
+                    ~allow_forged:false
+                    ty
+                    (Micheline.root node))
+             with
+             | Error _ | (exception _) ->
+                 bad_data name node michelson_type In_protocol
+             | Ok _ -> ()
+           in
+           return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure
     | Error errs -> global_error name errs
@@ -266,7 +268,9 @@ module Typechecking_data : Benchmark.S = struct
         List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Typechecking_data)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Typechecking_data)
 
 module Unparsing_data : Benchmark.S = struct
   include Config
@@ -281,49 +285,53 @@ module Unparsing_data : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Protocol.Script_repr.expr) =
+    let open Lwt_result_syntax in
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
-        let workload =
-          match
-            Translator_workload.data_typechecker_workload
-              ctxt
-              Translator_workload.Unparsing
-              (Micheline.root node)
-              ex_ty
-          with
-          | None -> bad_data name node michelson_type Workload_production
-          | Some workload -> workload
-        in
-        match ex_ty with
-        | Script_typed_ir.Ex_ty ty ->
-            Script_ir_translator.parse_data
-              ctxt
-              ~elab_conf:strict
-              ~allow_forged:false
-              ty
-              (Micheline.root node)
-            >|= Environment.wrap_tzresult
-            >>=? fun (typed, ctxt) ->
-            let closure () =
-              match
-                Lwt_main.run
-                  (Script_ir_translator.Internal_for_benchmarking.unparse_data
-                     ~stack_depth:0
-                     ctxt
-                     Script_ir_unparser.Optimized
-                     ty
-                     typed)
-              with
-              | Error _ | (exception _) ->
-                  bad_data name node michelson_type In_protocol
-              | Ok _ -> ()
-            in
-            return (Generator.Plain {workload; closure}) )
+      (let* ctxt, _ = Execution_context.make ~rng_state () in
+       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
+       let workload =
+         match
+           Translator_workload.data_typechecker_workload
+             ctxt
+             Translator_workload.Unparsing
+             (Micheline.root node)
+             ex_ty
+         with
+         | None -> bad_data name node michelson_type Workload_production
+         | Some workload -> workload
+       in
+       match ex_ty with
+       | Script_typed_ir.Ex_ty ty ->
+           let* typed, ctxt =
+             let*! result =
+               Script_ir_translator.parse_data
+                 ctxt
+                 ~elab_conf:strict
+                 ~allow_forged:false
+                 ty
+                 (Micheline.root node)
+             in
+             Lwt.return (Environment.wrap_tzresult result)
+           in
+           let closure () =
+             match
+               Lwt_main.run
+                 (Script_ir_translator.Internal_for_benchmarking.unparse_data
+                    ~stack_depth:0
+                    ctxt
+                    Script_ir_unparser.Optimized
+                    ty
+                    typed)
+             with
+             | Error _ | (exception _) ->
+                 bad_data name node michelson_type In_protocol
+             | Ok _ -> ()
+           in
+           return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure
     | Error errs -> global_error name errs
@@ -350,7 +358,9 @@ module Unparsing_data : Benchmark.S = struct
         List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Unparsing_data)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Unparsing_data)
 
 module Typechecking_code : Benchmark.S = struct
   include Config
@@ -364,44 +374,45 @@ module Typechecking_code : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let typechecking_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
+    let open Lwt_result_syntax in
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let ex_stack_ty =
-          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
-        in
-        let workload =
-          match
-            Translator_workload.code_typechecker_workload
-              ctxt
-              Translator_workload.Parsing
-              (Micheline.root node)
-              ex_stack_ty
-          with
-          | None -> bad_code name node stack Workload_production
-          | Some workload -> workload
-        in
-        let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
-        let closure () =
-          let result =
-            Lwt_main.run
-              (Script_ir_translator.parse_instr
-                 Script_tc_context.data
-                 ctxt
-                 ~elab_conf:strict
-                 (Micheline.root node)
-                 bef)
-          in
-          match Environment.wrap_tzresult result with
-          | Error errs ->
-              Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
-              bad_code name node stack In_protocol
-          | Ok _ -> ()
-        in
-        return (Generator.Plain {workload; closure}) )
+      (let* ctxt, _ = Execution_context.make ~rng_state () in
+       let ex_stack_ty =
+         Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
+       in
+       let workload =
+         match
+           Translator_workload.code_typechecker_workload
+             ctxt
+             Translator_workload.Parsing
+             (Micheline.root node)
+             ex_stack_ty
+         with
+         | None -> bad_code name node stack Workload_production
+         | Some workload -> workload
+       in
+       let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
+       let closure () =
+         let result =
+           Lwt_main.run
+             (Script_ir_translator.parse_instr
+                Script_tc_context.data
+                ctxt
+                ~elab_conf:strict
+                (Micheline.root node)
+                bef)
+         in
+         match Environment.wrap_tzresult result with
+         | Error errs ->
+             Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
+             bad_code name node stack In_protocol
+         | Ok _ -> ()
+       in
+       return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure
     | Error errs -> global_error name errs
@@ -429,7 +440,9 @@ module Typechecking_code : Benchmark.S = struct
         List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Typechecking_code)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Typechecking_code)
 
 module Unparsing_code : Benchmark.S = struct
   include Config
@@ -444,52 +457,56 @@ module Unparsing_code : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let unparsing_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
+    let open Lwt_result_syntax in
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let ex_stack_ty =
-          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
-        in
-        let workload =
-          match
-            Translator_workload.code_typechecker_workload
-              ctxt
-              Translator_workload.Unparsing
-              (Micheline.root node)
-              ex_stack_ty
-          with
-          | None -> bad_code name node stack Workload_production
-          | Some workload -> workload
-        in
-        let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
-        (* We parse the code just to check it is well-typed. *)
-        Script_ir_translator.parse_instr
-          Script_tc_context.data
-          ctxt
-          ~elab_conf:strict
-          (Micheline.root node)
-          bef
-        >|= Environment.wrap_tzresult
-        >>=? fun (_typed, ctxt) ->
-        let closure () =
-          let result =
-            Lwt_main.run
-              (Script_ir_translator.Internal_for_benchmarking.unparse_code
-                 ~stack_depth:0
-                 ctxt
-                 Optimized
-                 (Micheline.root node))
-          in
-          match Environment.wrap_tzresult result with
-          | Error errs ->
-              Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
-              bad_code name node stack In_protocol
-          | Ok _ -> ()
-        in
-        return (Generator.Plain {workload; closure}) )
+      (let* ctxt, _ = Execution_context.make ~rng_state () in
+       let ex_stack_ty =
+         Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
+       in
+       let workload =
+         match
+           Translator_workload.code_typechecker_workload
+             ctxt
+             Translator_workload.Unparsing
+             (Micheline.root node)
+             ex_stack_ty
+         with
+         | None -> bad_code name node stack Workload_production
+         | Some workload -> workload
+       in
+       let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
+       (* We parse the code just to check it is well-typed. *)
+       let* _typed, ctxt =
+         let*! result =
+           Script_ir_translator.parse_instr
+             Script_tc_context.data
+             ctxt
+             ~elab_conf:strict
+             (Micheline.root node)
+             bef
+         in
+         Lwt.return (Environment.wrap_tzresult result)
+       in
+       let closure () =
+         let result =
+           Lwt_main.run
+             (Script_ir_translator.Internal_for_benchmarking.unparse_code
+                ~stack_depth:0
+                ctxt
+                Optimized
+                (Micheline.root node))
+         in
+         match Environment.wrap_tzresult result with
+         | Error errs ->
+             Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
+             bad_code name node stack In_protocol
+         | Ok _ -> ()
+       in
+       return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure
     | Error errs -> global_error name errs
@@ -515,7 +532,9 @@ module Unparsing_code : Benchmark.S = struct
     | None -> List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Unparsing_code)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Unparsing_code)
 
 let rec check_printable_ascii v i =
   if Compare.Int.(i < 0) then true
@@ -543,7 +562,9 @@ let check_printable_benchmark =
       Generator.Plain {workload; closure})
     ()
 
-let () = Registration_helpers.register check_printable_benchmark
+let () = Registration_helpers.register_simple_with_num check_printable_benchmark
+
+open Benchmarks_proto
 
 module Ty_eq : Benchmark.S = struct
   type config = {max_size : int}
@@ -577,57 +598,55 @@ module Ty_eq : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
   let tags = [Tags.translator]
 
-  let intercept_var = fv (Format.asprintf "%s_const" (Namespace.basename name))
+  let group = Benchmark.Group "size_translator_model"
 
-  let coeff_var = fv (Format.asprintf "%s_coeff" (Namespace.basename name))
-
-  let size_model =
-    Model.make
-      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:(Model.affine ~name ~intercept:intercept_var ~coeff:coeff_var)
-
-  let models = [("size_translator_model", size_model)]
+  let model ~name =
+    Model.set_takes_saturation_reprs true
+    @@ Model.make
+         ~name
+         ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
+         ~model:Model.affine
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
+    let open Lwt_result_syntax in
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let ctxt = Gas_helpers.set_limit ctxt in
-        match ty with
-        | Ex_ty ty ->
-            let dummy_loc = 0 in
-            Lwt.return
-              (Gas_monad.run ctxt
-              @@ Script_ir_translator.ty_eq
-                   ~error_details:(Informative dummy_loc)
-                   ty
-                   ty)
-            >|= Environment.wrap_tzresult
-            >>=? fun (_, ctxt') ->
-            let consumed =
-              Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'
-            in
-            let workload =
-              Ty_eq_workload
-                {nodes; consumed = Z.to_int (Gas_helpers.fp_to_z consumed)}
-            in
-            let closure () =
-              ignore
-                (Gas_monad.run ctxt
-                @@ Script_ir_translator.ty_eq
+      (let* ctxt, _ = Execution_context.make ~rng_state () in
+       let ctxt = Gas_helpers.set_limit ctxt in
+       match ty with
+       | Ex_ty ty ->
+           let dummy_loc = 0 in
+           let*? _, ctxt' =
+             Environment.wrap_tzresult
+               (Gas_monad.run
+                  ctxt
+                  (Script_ir_translator.ty_eq
                      ~error_details:(Informative dummy_loc)
                      ty
-                     ty)
-            in
-            return (Generator.Plain {workload; closure}) )
+                     ty))
+           in
+           let consumed = Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt' in
+           let workload =
+             Ty_eq_workload
+               {nodes; consumed = Z.to_int (Gas_helpers.fp_to_z consumed)}
+           in
+           let closure () =
+             ignore
+               (Gas_monad.run ctxt
+               @@ Script_ir_translator.ty_eq
+                    ~error_details:(Informative dummy_loc)
+                    ty
+                    ty)
+           in
+           return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let make_bench rng_state (cfg : config) () =
+  let create_benchmark ~rng_state (cfg : config) =
     let nodes =
       Base_samplers.(
         sample_in_interval ~range:{min = 1; max = cfg.max_size} rng_state)
@@ -636,12 +655,9 @@ module Ty_eq : Benchmark.S = struct
       Michelson_generation.Samplers.Random_type.m_type ~size:nodes rng_state
     in
     ty_eq_benchmark rng_state nodes ty
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Ty_eq)
+let () = Registration.register (module Ty_eq)
 
 (* A dummy type generator, sampling linear terms of a given size.
    The generator always returns types of the shape:
@@ -726,52 +742,43 @@ module Parse_type_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
-  let make_bench rng_state config () =
-    ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
-      let ctxt = Gas_helpers.set_limit ctxt in
-      let size = Random.State.int rng_state config.max_size in
-      let ty = dummy_type_generator size in
-      match ty with
-      | Ex_ty ty ->
-          Environment.wrap_tzresult @@ unparse_ty ctxt ty
-          >>? fun (unparsed, _) ->
-          Environment.wrap_tzresult @@ parse_ty ctxt unparsed
-          >>? fun (_, ctxt') ->
-          let consumed =
-            Z.to_int
-              (Gas_helpers.fp_to_z
-                 (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
-          in
-          let nodes =
-            let x = Script_typed_ir.ty_size ty in
-            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
-          in
-          let workload = Type_workload {nodes; consumed} in
-          let closure () = ignore (parse_ty ctxt unparsed) in
-          ok (Generator.Plain {workload; closure}) )
+  let group = Benchmark.Group "size_translator_model"
+
+  let create_benchmark ~rng_state config =
+    let open Result_syntax in
+    (let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state ()) in
+     let ctxt = Gas_helpers.set_limit ctxt in
+     let size = Random.State.int rng_state config.max_size in
+     let ty = dummy_type_generator size in
+     match ty with
+     | Ex_ty ty ->
+         let* unparsed, _ = Environment.wrap_tzresult @@ unparse_ty ctxt ty in
+         let* _, ctxt' = Environment.wrap_tzresult @@ parse_ty ctxt unparsed in
+         let consumed =
+           Z.to_int
+             (Gas_helpers.fp_to_z
+                (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
+         in
+         let nodes =
+           let x = Script_typed_ir.ty_size ty in
+           Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+         in
+         let workload = Type_workload {nodes; consumed} in
+         let closure () = ignore (parse_ty ctxt unparsed) in
+         return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let size_model =
+  let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
-
-  let models = [("size_translator_model", size_model)]
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
+      ~model:Model.affine
 end
 
-let () = Registration_helpers.register (module Parse_type_benchmark)
+let () = Registration.register (module Parse_type_benchmark)
 
 module Unparse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared
@@ -782,46 +789,39 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let generated_code_destination = None
+  let purpose = Benchmark.Generate_code "michelson_v1_gas"
 
-  let make_bench rng_state config () =
-    ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
-      let ctxt = Gas_helpers.set_limit ctxt in
-      let size = Random.State.int rng_state config.max_size in
-      let ty = dummy_type_generator size in
-      match ty with
-      | Ex_ty ty ->
-          Environment.wrap_tzresult @@ unparse_ty ctxt ty >>? fun (_, ctxt') ->
-          let consumed =
-            Z.to_int
-              (Gas_helpers.fp_to_z
-                 (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
-          in
-          let nodes =
-            let x = Script_typed_ir.ty_size ty in
-            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
-          in
-          let workload = Type_workload {nodes; consumed} in
-          let closure () = ignore (unparse_ty ctxt ty) in
-          ok (Generator.Plain {workload; closure}) )
+  let group = Benchmark.Group "size_translator_model"
+
+  let create_benchmark ~rng_state config =
+    let open Result_syntax in
+    (let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state ()) in
+     let ctxt = Gas_helpers.set_limit ctxt in
+     let size = Random.State.int rng_state config.max_size in
+     let ty = dummy_type_generator size in
+     match ty with
+     | Ex_ty ty ->
+         let* _, ctxt' = Environment.wrap_tzresult @@ unparse_ty ctxt ty in
+         let consumed =
+           Z.to_int
+             (Gas_helpers.fp_to_z
+                (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
+         in
+         let nodes =
+           let x = Script_typed_ir.ty_size ty in
+           Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+         in
+         let workload = Type_workload {nodes; consumed} in
+         let closure () = ignore (unparse_ty ctxt ty) in
+         return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let size_model =
+  let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
-
-  let models = [("size_translator_model", size_model)]
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
+      ~model:Model.affine
 end
 
-let () = Registration_helpers.register (module Unparse_type_benchmark)
+let () = Registration.register (module Unparse_type_benchmark)

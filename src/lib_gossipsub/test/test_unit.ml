@@ -117,6 +117,18 @@ let assert_topic_mesh ~__LOC__ ~topic ~expected_peers state =
       ~error_msg:"Expected %R, got %L"
       ~__LOC__)
 
+let assert_peer_score ~__LOC__ ~expected_score peer state =
+  let view = GS.Introspection.view state in
+  let actual_score =
+    GS.Introspection.get_peer_score peer view
+    |> GS.Score.Internal_for_tests.to_float
+  in
+  Check.(
+    (actual_score = expected_score)
+      float
+      ~error_msg:"Expected score %R, got %L"
+      ~__LOC__)
+
 let many_peers limits = (4 * limits.degree_optimal) + 1
 
 let make_peers ~number =
@@ -172,6 +184,14 @@ let init_state ~rng ~limits ~parameters ~peers ~topics
       topics
   in
   state
+
+let gen_message =
+  let counter = ref 0 in
+  fun () ->
+    let message_id = !counter in
+    let message = "message" ^ string_of_int message_id in
+    incr counter ;
+    (message_id, message)
 
 (** Test that grafting an unknown topic is ignored.
 
@@ -978,11 +998,11 @@ let test_unsubscribe_backoff rng limits parameters =
     ~tags:["gossipsub"; "heartbeat"; "join"; "leave"]
   @@ fun () ->
   let topic = "topic" in
-  let per_topic_score_parameters =
-    GS.Score.Internal_for_tests.get_topic_params limits.score_parameters topic
+  let per_topic_score_limits =
+    GS.Score.Internal_for_tests.get_topic_params limits.score_limits topic
   in
   let mesh_message_deliveries_activation =
-    per_topic_score_parameters.mesh_message_deliveries_activation
+    per_topic_score_limits.mesh_message_deliveries_activation
   in
   (* Only one peer => mesh too small and will try to regraft as early as possible *)
   let peers = make_peers ~number:1 in
@@ -1833,6 +1853,437 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
       check_subset_message_ids ~__LOC__ ids message_ids) ;
   unit
 
+(* Check the following scenario:
+   * we joined a topic and we have a unique peer in the mesh
+   * the peer has a negative score
+   * the heartbeat removes that peer
+   * a new peer subscribes to the same topic
+   * a new heartbeat adds to the new peer to the mesh
+*)
+let test_heartbeat_scenario rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: simple heartbeat scenario"
+    ~tags:["gossipsub"; "heartbeat"]
+  @@ fun () ->
+  let peer_topics_map_to_list map =
+    map |> Peer.Map.bindings
+    |> List.map (fun (peer, topics) -> (peer, Topic.Set.elements topics))
+  in
+  let topic = "topic" in
+  let peer = 0 in
+  let s = GS.make rng limits parameters in
+  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  assert_output ~__LOC__ output Peer_added ;
+  let s, output = GS.handle_subscribe {topic; peer} s in
+  assert_output ~__LOC__ output Subscribed ;
+  let s, output = GS.join {topic} s in
+  (match output with
+  | Joining_topic {to_graft} when Peer.Set.elements to_graft = [peer] -> ()
+  | _ -> Test.fail ~__LOC__ "Unexpected Join output.") ;
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:1 s ;
+  let s, GS.Set_application_score =
+    GS.set_application_score ({peer; score = -1.0} : GS.set_application_score) s
+  in
+  let s, Heartbeat {to_prune; _} = GS.heartbeat s in
+  Check.(
+    (peer_topics_map_to_list to_prune = [(peer, [topic])])
+      (list (tuple2 int (list string)))
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:0 s ;
+  let peer = 1 in
+  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  assert_output ~__LOC__ output Peer_added ;
+  let s, output = GS.handle_subscribe {peer; topic} s in
+  assert_output ~__LOC__ output Subscribed ;
+  let s, Heartbeat {to_graft; _} = GS.heartbeat s in
+  Check.(
+    (peer_topics_map_to_list to_graft = [(peer, [topic])])
+      (list (tuple2 int (list string)))
+      ~error_msg:"Expected %R, got %L"
+      ~__LOC__) ;
+  assert_mesh_size ~__LOC__ ~topic ~expected_size:1 s ;
+  unit
+
+(** Test for P1 (Time in Mesh).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3166 *)
+let test_scoring_p1 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P1"
+    ~tags:["gossipsub"; "scoring"; "p1"]
+  @@ fun () ->
+  let time_in_mesh_quantum = Milliseconds.of_int_ms 50 in
+  let time_in_mesh_weight = 2.0 in
+  let time_in_mesh_cap = 10.0 in
+  let limits =
+    Default_limits.default_limits
+      ~time_in_mesh_weight
+      ~time_in_mesh_quantum
+      ~time_in_mesh_cap
+      ()
+  in
+  let peers = make_peers ~number:1 in
+  let peer = Stdlib.List.hd peers in
+  let topic = "topic" in
+  (* Build mesh with one peer. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* sleep for 2 times the mesh_quantum *)
+  Time.elapse GS.Span.(mul time_in_mesh_quantum 2) ;
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score should be 2 * time_in_mesh_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(time_in_mesh_weight *. 2.0)
+    peer
+    state ;
+  (* sleep again for 2 times the mesh_quantum *)
+  Time.elapse GS.Span.(mul time_in_mesh_quantum 2) ;
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score should be 4 * time_in_mesh_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(time_in_mesh_weight *. 4.0)
+    peer
+    state ;
+  (* sleep for enough periods to reach maximum *)
+  Time.elapse
+    GS.Span.(
+      mul time_in_mesh_quantum (Float.to_int @@ (time_in_mesh_cap +. 10.0))) ;
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score should be exactly time_in_mesh_cap * time_in_mesh_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(time_in_mesh_weight *. time_in_mesh_cap)
+    peer
+    state ;
+  unit
+
+(** Test for P2 (First Message Deliveries).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3247 *)
+let test_scoring_p2 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P2"
+    ~tags:["gossipsub"; "scoring"; "p2"]
+  @@ fun () ->
+  let first_message_deliveries_weight = 2.0 in
+  let first_message_deliveries_cap = 10 in
+  let first_message_deliveries_decay = 0.9 in
+  let limits =
+    Default_limits.default_limits
+      ~time_in_mesh_weight:0.0 (* deactivate time in mesh *)
+      ~first_message_deliveries_weight
+      ~first_message_deliveries_cap
+      ~first_message_deliveries_decay
+      ()
+  in
+  let peers = make_peers ~number:2 in
+  let topic = "topic" in
+  (* Build mesh with one peer. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let receive_message ~__LOC__ peer message_id message state =
+    let state, output =
+      GS.handle_receive_message
+        {sender = peer; topic; message_id; message}
+        state
+    in
+    match output with
+    | GS.Route_message _ | Already_received -> state
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Output should have been Route_message or Already_received"
+  in
+  (* peer 0 delivers message first *)
+  let message_id, message = gen_message () in
+  let state = receive_message ~__LOC__ peers.(0) message_id message state in
+  (* peer 1 delivers message second *)
+  let state = receive_message ~__LOC__ peers.(1) message_id message state in
+  (* score for peer 0 should be exactly first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:first_message_deliveries_weight
+    peers.(0)
+    state ;
+  (* score for peer 1 should stay at 0. *)
+  assert_peer_score ~__LOC__ ~expected_score:0.0 peers.(1) state ;
+  (* peer 1 delivers two new messages *)
+  let message_id, message = gen_message () in
+  let state = receive_message ~__LOC__ peers.(1) message_id message state in
+  let message_id, message = gen_message () in
+  let state = receive_message ~__LOC__ peers.(1) message_id message state in
+  (* Score for peer1 should be exactly 2 * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(2.0 *. first_message_deliveries_weight)
+    peers.(1)
+    state ;
+  (* test decaying *)
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* score of peer 0 should be exactly
+     first_message_deliveries_decay * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (first_message_deliveries_decay *. first_message_deliveries_weight)
+    peers.(0)
+    state ;
+  (* score of peer 1 should be exactly
+     2 * first_message_deliveries_decay * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (2. *. first_message_deliveries_decay *. first_message_deliveries_weight)
+    peers.(1)
+    state ;
+  (* test cap *)
+  (* peer 1 delivers first_message_deliveries_cap more messages *)
+  let state =
+    Stdlib.List.init first_message_deliveries_cap (fun _i -> gen_message ())
+    |> List.fold_left
+         (fun state (message_id, message) ->
+           receive_message ~__LOC__ peers.(1) message_id message state)
+         state
+  in
+  (* score of peer 1 should be exactly
+     first_message_deliveries_cap * first_message_deliveries_weight *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (float_of_int first_message_deliveries_cap
+      *. first_message_deliveries_weight)
+    peers.(1)
+    state ;
+  unit
+
+(** Test for P4 (Invalid Messages).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3895
+    and https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3979 *)
+let test_scoring_p4 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P4"
+    ~tags:["gossipsub"; "scoring"; "p4"]
+  @@ fun () ->
+  let invalid_message_deliveries_weight = -2.0 in
+  let invalid_message_deliveries_decay = 0.9 in
+  let limits =
+    Default_limits.default_limits
+      ~time_in_mesh_weight:0.0 (* deactivate time in mesh *)
+      ~first_message_deliveries_weight:0.0
+        (* deactivate first time deliveries *)
+      ~mesh_message_deliveries_weight:0.0 (* deactivate message deliveries *)
+      ~mesh_failure_penalty_weight:0.0 (* deactivate mesh failure penalties *)
+      ~invalid_message_deliveries_weight
+      ~invalid_message_deliveries_decay
+      ()
+  in
+  let peers = make_peers ~number:1 in
+  let peer = Stdlib.List.hd peers in
+  let topic = "topic" in
+  (* build mesh with one peer *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  (* We remember the old validity function so we can recover it later.
+     We must recover the validity function as it is shared between the tests. *)
+  let validity_function_before = !Validity_hook.validity in
+  (* set validity function so all messages are invalid *)
+  Validity_hook.set (fun _ _ -> `Invalid) ;
+  (* peer sends us three invalid messages *)
+  let state =
+    Stdlib.List.init 3 (fun _i -> ())
+    |> List.fold_left
+         (fun state () ->
+           let message_id, message = gen_message () in
+           let state, _ =
+             GS.handle_receive_message
+               {sender = peer; topic; message_id; message}
+               state
+           in
+           state)
+         state
+  in
+  (* score should be
+     invalid_message_deliveries_weight * (number of invalid messages)^2 *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(invalid_message_deliveries_weight *. 9.0)
+    peer
+    state ;
+  (* test decaying *)
+  (* refresh scores *)
+  let state, _ = GS.heartbeat state in
+  (* the number of invalids gets decayed by 0.9 and then squared in the score *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (invalid_message_deliveries_weight *. (3.0 *. 0.9) *. (3.0 *. 0.9))
+    peer
+    state ;
+  Validity_hook.set validity_function_before ;
+  unit
+
+(** Test for P5 (Application-Specific).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4049 *)
+let test_scoring_p5 rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P5"
+    ~tags:["gossipsub"; "scoring"; "p5"]
+  @@ fun () ->
+  let app_specific_weight = 2.0 in
+  let limits = Default_limits.default_limits ~app_specific_weight () in
+  let peers = make_peers ~number:1 in
+  let peer = Stdlib.List.hd peers in
+  let topic = "topic" in
+  (* build mesh with one peer *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let state, _ = GS.set_application_score {peer; score = 1.1} state in
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(app_specific_weight *. 1.1)
+    peer
+    state ;
+  unit
+
+(** Test for P7 (Behavioural Penalty - Grafts before backoff).
+
+    Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L4203 *)
+let test_scoring_p7_grafts_before_backoff rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Scoring P7 grafts before backoff"
+    ~tags:["gossipsub"; "scoring"; "p7"; "graft"]
+  @@ fun () ->
+  let prune_backoff = Milliseconds.of_int_ms 200 in
+  let graft_flood_threshold = Milliseconds.of_int_ms 100 in
+  let behaviour_penalty_weight = -2.0 in
+  let behaviour_penalty_decay = 0.9 in
+  let limits =
+    {
+      (Default_limits.default_limits
+         ~behaviour_penalty_weight
+         ~behaviour_penalty_decay
+         ())
+      with
+      prune_backoff;
+      graft_flood_threshold;
+    }
+  in
+  let peers = make_peers ~number:2 in
+  let topic = "topic" in
+  (* Build mesh with two peers. *)
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_subscribe:(fun _ -> false)
+      ()
+  in
+  let peers = Array.of_list peers in
+  let add_prune_backoff peer state =
+    (* Introduce prune backoff to [peer] by setting the [peer] score to negative and
+       handling a graft from the [peer]. *)
+    let state, _ = GS.set_application_score {peer; score = -99.0} state in
+    let state, _ = GS.handle_graft {peer; topic} state in
+    let state, _ = GS.set_application_score {peer; score = 0.0} state in
+    state
+  in
+  (* Add prune backoff to the peers. *)
+  let state = add_prune_backoff peers.(0) state in
+  let state = add_prune_backoff peers.(1) state in
+  (* Wait [graft_flood_threshold - 1] ms. *)
+  Time.elapse Milliseconds.(sub graft_flood_threshold (of_int_ms 1)) ;
+  (* First peer tries to graft. *)
+  let state, _ = GS.handle_graft {peer = peers.(0); topic} state in
+  (* Since the time since last prune is below [graft_flood_threshold],
+     the first peer should have double behaviour penalty (squared). *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(2.0 *. 2.0 *. behaviour_penalty_weight)
+    peers.(0)
+    state ;
+  (* Wait for 2 more ms millisecs.
+     Total time passed since last prune is now [graft_flood_threshold + 1] *)
+  Time.elapse @@ Milliseconds.of_int_ms 2 ;
+  (* Second peer tries to graft. *)
+  let state, _ = GS.handle_graft {peer = peers.(1); topic} state in
+  (* Since the time since last prune is above [graft_flood_threshold],
+     the second peer should have a single behaviour penalty (squared). *)
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:(1.0 *. 1.0 *. behaviour_penalty_weight)
+    peers.(1)
+    state ;
+  (* Test decay. *)
+  let state, _ = GS.heartbeat state in
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (2.0 *. behaviour_penalty_decay
+      *. (2.0 *. behaviour_penalty_decay)
+      *. behaviour_penalty_weight)
+    peers.(0)
+    state ;
+  assert_peer_score
+    ~__LOC__
+    ~expected_score:
+      (1.0 *. behaviour_penalty_decay
+      *. (1.0 *. behaviour_penalty_decay)
+      *. behaviour_penalty_weight)
+    peers.(1)
+    state ;
+  unit
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
    Add test the described test scenario *)
 
@@ -1867,4 +2318,10 @@ let register rng limits parameters =
   test_handle_ihave_subscribed_and_msg_seen rng limits parameters ;
   test_handle_ihave_not_subscribed rng limits parameters ;
   test_ignore_too_many_ihaves rng limits parameters ;
-  test_ignore_too_many_messages_in_ihave rng limits parameters
+  test_ignore_too_many_messages_in_ihave rng limits parameters ;
+  test_heartbeat_scenario rng limits parameters ;
+  test_scoring_p1 rng limits parameters ;
+  test_scoring_p2 rng limits parameters ;
+  test_scoring_p4 rng limits parameters ;
+  test_scoring_p5 rng limits parameters ;
+  test_scoring_p7_grafts_before_backoff rng limits parameters

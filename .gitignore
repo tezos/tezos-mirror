@@ -47,14 +47,15 @@ __pycache__
 /tezos-tps-evaluation-*
 /octez-tps-evaluation-*
 /tezos-smart-rollup-node-*
-/octez-smart-rollup-node-*
+/octez-smart-rollup-node*
+/octez-smart-rollup-sequencer-node
 /tezos-smart-rollup-client-*
 /octez-smart-rollup-client-*
 /octez-smart-rollup-wasm-*
 /octez-evm-proxy-server
 /tezos-dal-node
 /octez-dal-node
-/octez-dac-node
+/octez-dac-*
 /octez-binaries
 
 /src/proto_*/parameters/*-parameters.json
@@ -94,4 +95,48 @@ opam_repo.patch
 target
 
 evm_kernel.wasm
+evm_installer.wasm
+sequenced_kernel.wasm
 smart-rollup-installer
+_evm_installer_preimages/
+tx_kernel.wasm
+
+# Terraform
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files, which are likely to contain sensitive data, such as
+# password, private keys, and other secrets. These should not be part of version 
+# control as they are data points which are potentially sensitive and subject 
+# to change depending on the environment.
+*.tfvars
+*.tfvars.json
+
+# Ignore override files as they are usually used to override resources locally and so
+# are not checked in
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Include override files you do wish to add to version control using negated pattern
+# !example_override.tf
+
+# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
+# example: *tfplan*
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# Terraform lock files
+*.lock.hcl

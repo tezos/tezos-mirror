@@ -155,6 +155,14 @@ module Aux : sig
       max_bytes:int32 ->
       int32 Lwt.t
 
+    (** @since 2.0.0~r2 *)
+    val store_exists :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      int32 Lwt.t
+
     val store_has :
       durable:Durable.t ->
       memory:memory ->
@@ -354,6 +362,8 @@ module Internal_for_tests : sig
   val write_output : Tezos_webassembly_interpreter.Instance.func_inst
 
   val read_input : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_exists : Tezos_webassembly_interpreter.Instance.func_inst
 
   (** [store_has] returns whether a key corresponds to a value and/or subtrees.
         Namely, it returns the following enum:

@@ -109,20 +109,23 @@ module Graph : sig
   (** Dependency topological iteration *)
   val iter : (Solver.Solved.t -> unit) -> t -> unit
 
+  (** Returns the topological ordered list of [Solver.Sovled.t] *)
+  val to_sorted_list : t -> Solver.Solved.t list
+
   (** Visualize the graph using Graphviz *)
   val save_graphviz : t -> string -> unit
 end
 
-(** [find_model_or_generic model_name model_list] returns the model matching
-    the local name [model_name] from a [model_list] of a benchmark. If none
-    match, then searches for models named ["*"]. *)
+(** [find_model_or_generic local_model_name local_model_list] returns the model
+    matching [local_model_name] from a [local_model_list] of a benchmark. If
+    none match, then searches for models named ["*"]. *)
 val find_model_or_generic : string -> (string * 'model) list -> 'model option
 
-(** [load_workload_files ~model_name files] loads [.workload] files given in [files],
-    looks for the model [model_name], and if found, adds it to a dependency
+(** [load_workload_files ~local_model_name files] loads [.workload] files given in [files],
+    looks for the model [local_model_name], and if found, adds it to a dependency
     graph. Returns [(G, H)] where [G] is the final graph obtained this way,
     and [H] is a table that maps the name of a benchmark with its contents. *)
 val load_workload_files :
-  model_name:string ->
+  local_model_name:string ->
   string list ->
   Graph.t * Measure.packed_measurement Namespace.Hashtbl.t

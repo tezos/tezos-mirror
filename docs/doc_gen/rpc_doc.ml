@@ -41,6 +41,10 @@ let protocols =
       "Nairobi",
       Some "/include/rpc_introduction.rst.inc",
       "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf" );
+    ( "oxford",
+      "Oxford",
+      Some "/include/rpc_introduction.rst.inc",
+      "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8" );
   ]
 
 let pp_name ppf = function
@@ -372,7 +376,15 @@ let pp_document ppf _name intro prefix rpc_dir version =
 
 let make_index node required_version =
   let open Lwt_syntax in
-  let shell_dir = Node.build_rpc_directory node in
+  let version = Tezos_version_value.Current_git_info.version in
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
+  let shell_dir = Node.build_rpc_directory ~version ~commit_info node in
   let protocol_dirs =
     List.map
       (fun (version, name, intro, hash) ->

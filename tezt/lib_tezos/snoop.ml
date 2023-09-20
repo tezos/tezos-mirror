@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,7 +40,7 @@ type tag =
   | Io
   | Misc
   | Builtin
-  | Gtoc
+  | Global_constants
   | Cache
   | Carbonated_map
   | Tickets
@@ -47,6 +48,10 @@ type tag =
   | Skip_list
   | Sc_rollup
   | Shell
+  | Apply
+  | Example
+  | Micheline
+  | Dal
 
 type michelson_term_kind = Data | Code
 
@@ -118,7 +123,7 @@ let benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_file
 
 (* Infer command *)
 
-let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
+let infer_command ~local_model_name ~workload_data ~regression_method ~dump_csv
     ~solution ?report ?graph () =
   let regression_method =
     match regression_method with
@@ -143,7 +148,7 @@ let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
     "parameters";
     "for";
     "model";
-    model_name;
+    local_model_name;
     "on";
     "data";
     workload_data;
@@ -153,12 +158,12 @@ let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
   @ ["--dump-csv"; dump_csv; "--save-solution"; solution]
   @ report @ graph
 
-let spawn_infer_parameters ~model_name ~workload_data ~regression_method
+let spawn_infer_parameters ~local_model_name ~workload_data ~regression_method
     ~dump_csv ~solution ?report ?graph snoop =
   spawn_command
     snoop
     (infer_command
-       ~model_name
+       ~local_model_name
        ~workload_data
        ~regression_method
        ~dump_csv
@@ -167,10 +172,10 @@ let spawn_infer_parameters ~model_name ~workload_data ~regression_method
        ?graph
        ())
 
-let infer_parameters ~model_name ~workload_data ~regression_method ~dump_csv
-    ~solution ?report ?graph snoop =
+let infer_parameters ~local_model_name ~workload_data ~regression_method
+    ~dump_csv ~solution ?report ?graph snoop =
   spawn_infer_parameters
-    ~model_name
+    ~local_model_name
     ~workload_data
     ~regression_method
     ~dump_csv
@@ -348,7 +353,7 @@ let string_of_tag (tag : tag) =
   | Io -> "io"
   | Misc -> "misc"
   | Builtin -> "builtin"
-  | Gtoc -> "global_constants"
+  | Global_constants -> "global_constants"
   | Cache -> "cache"
   | Carbonated_map -> "carbonated_map"
   | Tickets -> "tickets"
@@ -356,6 +361,10 @@ let string_of_tag (tag : tag) =
   | Skip_list -> "skip_list"
   | Sc_rollup -> "sc_rollup"
   | Shell -> "shell"
+  | Apply -> "apply"
+  | Example -> "example"
+  | Micheline -> "micheline"
+  | Dal -> "dal"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in
@@ -395,7 +404,7 @@ let write_config ~(benchmark : string) ~(bench_config : string) ~(file : string)
   in
   spawn_command snoop command |> Process.check
 
-let generate_code_using_solution ~solution ?fixed_point snoop =
+let generate_code_using_solution ~solution ?save_to ?fixed_point snoop =
   let command =
     [
       "generate";
@@ -407,11 +416,13 @@ let generate_code_using_solution ~solution ?fixed_point snoop =
       "inferred";
       "models";
     ]
-    @ match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn]
+    @ (match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn])
+    @ match save_to with None -> [] | Some file -> ["--save-to"; file]
   in
+
   let process = spawn_command snoop command in
   let* output = Process.check_and_read_stdout process in
-  Lwt.return output
+  match save_to with None -> Lwt.return output | _ -> Lwt.return ""
 
 let check_definitions ~files snoop =
   let open Process in

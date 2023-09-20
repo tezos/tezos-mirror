@@ -128,9 +128,12 @@ let boot boot_sector f =
   pre_boot boot_sector @@ fun ctxt state -> eval state >>= f ctxt
 
 let test_boot () =
-  let open Sc_rollup_PVM_sig in
+  let open Sc_rollup_helpers.Arith_pvm in
   boot "" @@ fun _ctxt state ->
-  is_input_state state >>= function
+  is_input_state
+    ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+    state
+  >>= function
   | Needs_reveal Reveal_metadata -> return ()
   | Initial | Needs_reveal _ | First_after _ ->
       failwith "After booting, the machine should be waiting for the metadata."
@@ -138,19 +141,25 @@ let test_boot () =
       failwith "After booting, the machine must be waiting for input."
 
 let test_metadata () =
-  let open Sc_rollup_PVM_sig in
+  let open Sc_rollup_helpers.Arith_pvm in
+  let open Alpha_context in
+  let open Alpha_context.Sc_rollup in
   let open Lwt_result_syntax in
   boot "" @@ fun _ctxt state ->
   let metadata =
-    Sc_rollup_metadata_repr.
+    Metadata.
       {
         address = Sc_rollup_repr.Address.zero;
-        origination_level = Raw_level_repr.root;
+        origination_level = Raw_level.root;
       }
   in
   let input = Reveal (Metadata metadata) in
   let*! state = set_input input state in
-  let*! input_request = is_input_state state in
+  let*! input_request =
+    is_input_state
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+      state
+  in
   match input_request with
   | Initial -> return ()
   | Needs_reveal _ | First_after _ | No_input_required ->
@@ -159,25 +168,29 @@ let test_metadata () =
          state."
 
 let test_input_message () =
-  let open Sc_rollup_PVM_sig in
+  let open Sc_rollup_helpers.Arith_pvm in
   boot "" @@ fun _ctxt state ->
-  let input = Sc_rollup_helpers.make_external_input_repr "MESSAGE" in
+  let input = Sc_rollup_helpers.make_external_input "MESSAGE" in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
-  is_input_state state >>= function
+  is_input_state
+    ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+    state
+  >>= function
   | Initial | Needs_reveal _ | First_after _ ->
       failwith
         "After receiving a message, the rollup must not be waiting for input."
   | No_input_required -> return ()
 
-let go ~max_steps target_status state =
+let go ?(is_reveal_enabled = fun ~current_block_level:_ _ -> true) ~max_steps
+    target_status state =
   let rec aux i state =
     pp state >>= fun pp ->
     Format.eprintf "%a" pp () ;
     if i > max_steps then
       failwith "Maximum number of steps reached before target status."
     else
-      get_status state >>= fun current_status ->
+      get_status ~is_reveal_enabled state >>= fun current_status ->
       if target_status = current_status then return state
       else eval state >>= aux (i + 1)
   in
@@ -311,6 +324,97 @@ let test_evaluation_messages () =
   >>=? fun () ->
   List.iter_es (test_evaluation_message ~valid:false) invalid_messages
 
+let boot_then_reveal_metadata sc_rollup_address origination_level
+    ~is_reveal_enabled =
+  let open Sc_rollup_PVM_sig in
+  let open Lwt_result_syntax in
+  boot "" @@ fun _ctxt state ->
+  let metadata =
+    Sc_rollup_metadata_repr.{address = sc_rollup_address; origination_level}
+  in
+  let input = Reveal (Metadata metadata) in
+  let*! state = set_input input state in
+  let*! input_state = is_input_state ~is_reveal_enabled state in
+  match input_state with
+  | Initial -> return state
+  | No_input_required | Needs_reveal _ | First_after _ ->
+      failwith
+        "After booting, the machine should be waiting for the initial input."
+
+let test_reveal ~threshold ~inbox_level ~hash ~preimage_reveal_step
+    ~hash_reveal_step () =
+  let open Lwt_result_syntax in
+  let blake2B = Protocol.Raw_level_repr.of_int32_exn threshold in
+  let inbox_level = Protocol.Raw_level_repr.of_int32_exn inbox_level in
+  let reveal_enabled :
+      Constants_parametric_repr.sc_rollup_reveal_activation_level =
+    {
+      raw_data = {blake2B};
+      metadata = Protocol.Raw_level_repr.root;
+      dal_page = Protocol.Raw_level_repr.root;
+    }
+  in
+  let is_reveal_enabled =
+    Sc_rollup_PVM_sig.is_reveal_enabled_predicate reveal_enabled
+  in
+  let* state =
+    boot_then_reveal_metadata
+      Sc_rollup_repr.Address.zero
+      Raw_level_repr.root
+      ~is_reveal_enabled
+  in
+  let* state = go ~max_steps:10_000 Waiting_for_input_message state in
+  let source = "hash:" ^ Sc_rollup_reveal_hash.to_hex hash in
+  let input = Sc_rollup_helpers.make_external_input_repr ~inbox_level source in
+  let*! state = set_input input state in
+  let* state =
+    go
+      ~is_reveal_enabled
+      ~max_steps:10_000
+      (Waiting_for_reveal (Reveal_raw_data hash_reveal_step))
+      state
+  in
+  let*! state = set_input (Reveal (Raw_data preimage_reveal_step)) state in
+  go ~max_steps:10_000 Waiting_for_input_message state
+
+let test_reveal_disabled ~threshold ~inbox_level () =
+  let open Lwt_result_wrap_syntax in
+  let preimage = "1 1 +" in
+  let hash = Sc_rollup_reveal_hash.(hash_string ~scheme:Blake2B [preimage]) in
+  let* state =
+    test_reveal
+      ~threshold
+      ~inbox_level
+      ~hash
+      ~hash_reveal_step:Sc_rollup_reveal_hash.well_known_reveal_hash
+      ~preimage_reveal_step:Sc_rollup_reveal_hash.well_known_reveal_preimage
+      ()
+  in
+  let*! stack = get_stack state in
+  match stack with
+  | [] -> return_unit
+  | l ->
+      failwith
+        "Expected empty stack, got: %a"
+        (Format.pp_print_list Format.pp_print_int)
+        l
+
+let test_reveal_enabled ~threshold ~inbox_level () =
+  let open Lwt_result_wrap_syntax in
+  let preimage = "1 1 +" in
+  let hash = Sc_rollup_reveal_hash.(hash_string ~scheme:Blake2B [preimage]) in
+  let* state =
+    test_reveal
+      ~threshold
+      ~inbox_level
+      ~hash
+      ~hash_reveal_step:hash
+      ~preimage_reveal_step:preimage
+      ()
+  in
+  let*! stack = get_stack state in
+  match stack with [2] -> return_unit | _ -> failwith "invalid stack"
+
 let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
   let open Lwt_result_syntax in
   boot "" @@ fun ctxt state ->
@@ -327,15 +431,17 @@ let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
     if valid then
       match result with
       | Ok proof ->
-          let*! valid = verify_output_proof proof in
-          fail_unless valid (Exn (Failure "An output proof is not valid."))
+          let*! output = verify_output_proof proof in
+          fail_unless
+            (Result.is_ok output)
+            (Exn (Failure "An output proof is not valid."))
       | Error _ -> failwith "Error during proof generation"
     else
       match result with
       | Ok proof ->
           let*! proof_is_valid = verify_output_proof proof in
           fail_when
-            proof_is_valid
+            (Result.is_ok proof_is_valid)
             (Exn
                (Failure
                   (Format.asprintf
@@ -426,7 +532,7 @@ let test_invalid_outbox_level () =
 let test_initial_state_hash_arith_pvm () =
   let open Alpha_context in
   let open Lwt_result_syntax in
-  let empty = Sc_rollup_helpers.make_empty_tree () in
+  let empty = Sc_rollup_helpers.Arith_pvm.make_empty_state () in
   let*! state = Sc_rollup_helpers.Arith_pvm.initial_state ~empty in
   let*! hash = Sc_rollup_helpers.Arith_pvm.state_hash state in
   let expected = Sc_rollup.ArithPVM.reference_initial_state_hash in
@@ -441,6 +547,7 @@ let test_initial_state_hash_arith_pvm () =
 
 let dummy_internal_transfer address =
   let open Lwt_result_syntax in
+  let open Alpha_context.Sc_rollup in
   let* ctxt =
     let* block, _baker, _contract, _src2 = Contract_helpers.init () in
     let+ incr = Incremental.begin_construction block in
@@ -465,11 +572,11 @@ let dummy_internal_transfer address =
     >|= Environment.wrap_tzresult
   in
   let transfer =
-    Sc_rollup_inbox_message_repr.Internal
+    Inbox_message.Internal
       (Transfer {payload; sender; source; destination = address})
   in
   let*? serialized_transfer =
-    Environment.wrap_tzresult (Sc_rollup_inbox_message_repr.serialize transfer)
+    Environment.wrap_tzresult (Inbox_message.serialize transfer)
   in
   return serialized_transfer
 
@@ -487,17 +594,24 @@ let test_filter_internal_message () =
   (* We will set an input where the destination is the same as the one given
      in the static metadata. The pvm should process the input. *)
   let* () =
+    let open Sc_rollup_helpers.Arith_pvm in
+    let open Alpha_context in
+    let open Alpha_context.Sc_rollup in
     let* internal_transfer = dummy_internal_transfer address in
     let input =
       Inbox_message
         {
-          inbox_level = Raw_level_repr.root;
+          inbox_level = Raw_level.root;
           message_counter = Z.zero;
           payload = internal_transfer;
         }
     in
     let*! state = set_input input state in
-    let*! input_state = is_input_state state in
+    let*! input_state =
+      is_input_state
+        ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+        state
+    in
     match input_state with
     | No_input_required -> return ()
     | _ -> failwith "The arith pvm should be processing the internal transfer"
@@ -506,6 +620,9 @@ let test_filter_internal_message () =
   (* We will set an input where the destination is *not* the same as the
      one given in the static metadata. The pvm should ignore the input. *)
   let* () =
+    let open Sc_rollup_helpers.Arith_pvm in
+    let open Alpha_context in
+    let open Alpha_context.Sc_rollup in
     let dummy_address =
       Sc_rollup_repr.Address.of_b58check_exn
         "sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctGkmso"
@@ -514,13 +631,17 @@ let test_filter_internal_message () =
     let input =
       Inbox_message
         {
-          inbox_level = Raw_level_repr.root;
+          inbox_level = Raw_level.root;
           message_counter = Z.zero;
           payload = internal_transfer;
         }
     in
     let*! state = set_input input state in
-    let*! input_state = is_input_state state in
+    let*! input_state =
+      is_input_state
+        ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+        state
+    in
     match input_state with
     | No_input_required ->
         failwith "The arith pvm should avoid ignored the internal transfer"
@@ -528,6 +649,104 @@ let test_filter_internal_message () =
   in
 
   return ()
+
+module Arith_pvm = Sc_rollup_helpers.Arith_pvm
+
+(** Instructs the PVM to reveal [hashed_preimage], and providing
+   [input_preimage] when required. The proof for the reveal step
+   is generated and then verified. *)
+let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
+  let open Lwt_result_wrap_syntax in
+  let open Alpha_context in
+  let rollup = Sc_rollup.Address.zero in
+  let level = Raw_level.root in
+
+  let*? inbox =
+    Sc_rollup_helpers.Node_inbox.new_inbox ~inbox_creation_level:level ()
+  in
+  let snapshot = Sc_rollup.Inbox.take_snapshot inbox.inbox in
+  let dal_snapshot = Dal.Slots_history.genesis in
+  let dal_parameters = Default_parameters.constants_mainnet.dal in
+  let ctxt = Sc_rollup_helpers.Arith_pvm.make_empty_context () in
+
+  let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
+  let metadata =
+    Sc_rollup.Metadata.{address = rollup; origination_level = level}
+  in
+  let reveal_hash =
+    Sc_rollup_reveal_hash.(
+      hash_string ~scheme:Blake2B [hashed_preimage] |> to_hex)
+  in
+
+  let source = "hash:" ^ reveal_hash in
+  let input =
+    Sc_rollup_helpers.make_external_input ~inbox_level:inbox.inbox.level source
+  in
+  let* state, _, _ =
+    Sc_rollup_helpers.Arith_pvm_eval.eval_inputs_from_initial_state
+      ~metadata
+      [[input]]
+  in
+
+  let pvm_with_context_and_state =
+    Sc_rollup_helpers.make_pvm_with_context_and_state
+      (module Arith_pvm)
+      ~state
+      ~context:ctxt
+      ~reveal:(fun _ -> Lwt.return_some input_preimage)
+      ~inbox
+      ()
+  in
+  let*@ proof =
+    Sc_rollup.Proof.produce
+      ~metadata
+      pvm_with_context_and_state
+      Raw_level.root
+      ~is_reveal_enabled
+  in
+  let*?@ pvm_step =
+    Sc_rollup.Proof.unserialize_pvm_step ~pvm:(module Arith_pvm) proof.pvm_step
+  in
+
+  wrap
+  @@ Sc_rollup.Proof.valid
+       ~pvm:(module Arith_pvm)
+       ~metadata
+       snapshot
+       Raw_level.root
+       dal_snapshot
+       dal_parameters.cryptobox_parameters
+       ~dal_attestation_lag:dal_parameters.attestation_lag
+       ~is_reveal_enabled
+       {proof with pvm_step}
+
+(** Test that sending a invalid serialized reveal proof to
+    {Sc_rollup_proof_repr.valid} is rejected. *)
+let test_invalid_serialized_reveal_proof () : (unit, tztrace) result Lwt.t =
+  let open Lwt_result_syntax in
+  let*! check =
+    test_serialized_reveal_proof
+      ~hashed_preimage:"preimage"
+      ~input_preimage:"wrong preimage"
+      ()
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    check
+    (( = ) (Sc_rollup_proof_repr.Sc_rollup_proof_check "Invalid reveal"))
+
+(** Test that sending a valid serialized reveal proof to
+    {Sc_rollup_proof_repr.valid} is accepted. *)
+let test_valid_serialized_reveal_proof () : (unit, tztrace) result Lwt.t =
+  let open Lwt_result_syntax in
+  let hashed_preimage = "preimage" in
+  let*! _check =
+    test_serialized_reveal_proof
+      ~hashed_preimage
+      ~input_preimage:hashed_preimage
+      ()
+  in
+  return_unit
 
 let tests =
   [
@@ -545,6 +764,34 @@ let tests =
       `Quick
       test_initial_state_hash_arith_pvm;
     Tztest.tztest "Filter internal message" `Quick test_filter_internal_message;
+    Tztest.tztest
+      "Reveal below threshold"
+      `Quick
+      (test_reveal_disabled ~threshold:10_000l ~inbox_level:1_000l);
+    Tztest.tztest
+      "Reveal at threshold (block level zero)"
+      `Quick
+      (test_reveal_enabled ~threshold:0l ~inbox_level:0l);
+    Tztest.tztest
+      "Reveal below threshold (block level zero)"
+      `Quick
+      (test_reveal_disabled ~threshold:10_000l ~inbox_level:0l);
+    Tztest.tztest
+      "Reveal at threshold"
+      `Quick
+      (test_reveal_enabled ~threshold:10_000l ~inbox_level:10_000l);
+    Tztest.tztest
+      "Reveal above threshold"
+      `Quick
+      (test_reveal_enabled ~threshold:10_000l ~inbox_level:10_001l);
+    Tztest.tztest
+      "Invalid serialized reveal proof"
+      `Quick
+      test_invalid_serialized_reveal_proof;
+    Tztest.tztest
+      "Valid serialized reveal proof"
+      `Quick
+      test_valid_serialized_reveal_proof;
   ]
 
 let () =

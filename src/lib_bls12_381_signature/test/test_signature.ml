@@ -1,3 +1,36 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Testing
+   -------
+   Component:    BLS12_381 signature
+   Invocation:   dune exec src/lib_bls12_381_signature/test/main.exe \
+                  -- --file test_signature.ml
+   Subject:      Test BLS12_381 signature
+*)
+
 open Utils
 
 (* Related to sk *)
@@ -918,6 +951,9 @@ struct
     ]
 end
 
+let path_test_vectors name =
+  project_root // Filename.dirname __FILE__ // "test_vectors" // name
+
 let () =
   let open Alcotest in
   let module TestMinPk =
@@ -925,50 +961,61 @@ let () =
       (struct
         let sig_basic_filenames =
           [
-            "sig_g2_basic_fips_186_3_B233_blst";
-            "sig_g2_basic_fips_186_3_B283_blst";
-            "sig_g2_basic_fips_186_3_B409_blst";
-            "sig_g2_basic_fips_186_3_B571_blst";
-            "sig_g2_basic_fips_186_3_K233_blst";
-            "sig_g2_basic_fips_186_3_K409_blst";
-            "sig_g2_basic_fips_186_3_K571_blst";
-            "sig_g2_basic_fips_186_3_P224_blst";
-            "sig_g2_basic_fips_186_3_P256_blst";
-            "sig_g2_basic_fips_186_3_P384_blst";
-            "sig_g2_basic_fips_186_3_P521_blst";
-            "sig_g2_basic_rfc6979_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_B233_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_B283_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_B409_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_B571_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_K233_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_K409_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_K571_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_P224_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_P256_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_P384_blst";
+            path_test_vectors "sig_g2_basic"
+            // "sig_g2_basic_fips_186_3_P521_blst";
+            path_test_vectors "sig_g2_basic" // "sig_g2_basic_rfc6979_blst";
           ]
 
         let sig_aug_filenames =
           [
-            "sig_g2_aug_fips_186_3_B233_blst";
-            "sig_g2_aug_fips_186_3_B283_blst";
-            "sig_g2_aug_fips_186_3_B409_blst";
-            "sig_g2_aug_fips_186_3_B571_blst";
-            "sig_g2_aug_fips_186_3_K233_blst";
-            "sig_g2_aug_fips_186_3_K409_blst";
-            "sig_g2_aug_fips_186_3_K571_blst";
-            "sig_g2_aug_fips_186_3_P224_blst";
-            "sig_g2_aug_fips_186_3_P256_blst";
-            "sig_g2_aug_fips_186_3_P384_blst";
-            "sig_g2_aug_fips_186_3_P521_blst";
-            "sig_g2_aug_rfc6979_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_B233_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_B283_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_B409_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_B571_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_K233_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_K409_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_K571_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_P224_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_P256_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_P384_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_fips_186_3_P521_blst";
+            path_test_vectors "sig_g2_aug" // "sig_g2_aug_rfc6979_blst";
           ]
 
         let sig_pop_filenames =
           [
-            "sig_g2_pop_fips_186_3_B233_blst";
-            "sig_g2_pop_fips_186_3_B283_blst";
-            "sig_g2_pop_fips_186_3_B409_blst";
-            "sig_g2_pop_fips_186_3_B571_blst";
-            "sig_g2_pop_fips_186_3_K233_blst";
-            "sig_g2_pop_fips_186_3_K409_blst";
-            "sig_g2_pop_fips_186_3_K571_blst";
-            "sig_g2_pop_fips_186_3_P224_blst";
-            "sig_g2_pop_fips_186_3_P256_blst";
-            "sig_g2_pop_fips_186_3_P384_blst";
-            "sig_g2_pop_fips_186_3_P521_blst";
-            "sig_g2_pop_rfc6979_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_B233_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_B283_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_B409_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_B571_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_K233_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_K409_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_K571_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_P224_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_P256_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_P384_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_fips_186_3_P521_blst";
+            path_test_vectors "sig_g2_pop" // "sig_g2_pop_rfc6979_blst";
           ]
 
         (* These elements have been generated by bls12-381-unix-blst, commit
@@ -1003,18 +1050,18 @@ let () =
 
         let pop_filenames =
           [
-            "pop_g2_fips_186_3_B233_blst";
-            "pop_g2_fips_186_3_B283_blst";
-            "pop_g2_fips_186_3_B409_blst";
-            "pop_g2_fips_186_3_B571_blst";
-            "pop_g2_fips_186_3_K233_blst";
-            "pop_g2_fips_186_3_K409_blst";
-            "pop_g2_fips_186_3_K571_blst";
-            "pop_g2_fips_186_3_P224_blst";
-            "pop_g2_fips_186_3_P256_blst";
-            "pop_g2_fips_186_3_P384_blst";
-            "pop_g2_fips_186_3_P521_blst";
-            "pop_g2_rfc6979_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_B233_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_B283_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_B409_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_B571_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_K233_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_K409_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_K571_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_P224_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_P256_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_P384_blst";
+            path_test_vectors "pop_g2" // "pop_g2_fips_186_3_P521_blst";
+            path_test_vectors "pop_g2" // "pop_g2_rfc6979_blst";
           ]
       end)
       (Bls12_381.G1)
@@ -1026,50 +1073,61 @@ let () =
       (struct
         let sig_basic_filenames =
           [
-            "sig_g1_basic_fips_186_3_B233_blst";
-            "sig_g1_basic_fips_186_3_B283_blst";
-            "sig_g1_basic_fips_186_3_B409_blst";
-            "sig_g1_basic_fips_186_3_B571_blst";
-            "sig_g1_basic_fips_186_3_K233_blst";
-            "sig_g1_basic_fips_186_3_K409_blst";
-            "sig_g1_basic_fips_186_3_K571_blst";
-            "sig_g1_basic_fips_186_3_P224_blst";
-            "sig_g1_basic_fips_186_3_P256_blst";
-            "sig_g1_basic_fips_186_3_P384_blst";
-            "sig_g1_basic_fips_186_3_P521_blst";
-            "sig_g1_basic_rfc6979_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_B233_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_B283_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_B409_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_B571_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_K233_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_K409_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_K571_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_P224_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_P256_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_P384_blst";
+            path_test_vectors "sig_g1_basic"
+            // "sig_g1_basic_fips_186_3_P521_blst";
+            path_test_vectors "sig_g1_basic" // "sig_g1_basic_rfc6979_blst";
           ]
 
         let sig_aug_filenames =
           [
-            "sig_g1_aug_fips_186_3_B233_blst";
-            "sig_g1_aug_fips_186_3_B283_blst";
-            "sig_g1_aug_fips_186_3_B409_blst";
-            "sig_g1_aug_fips_186_3_B571_blst";
-            "sig_g1_aug_fips_186_3_K233_blst";
-            "sig_g1_aug_fips_186_3_K409_blst";
-            "sig_g1_aug_fips_186_3_K571_blst";
-            "sig_g1_aug_fips_186_3_P224_blst";
-            "sig_g1_aug_fips_186_3_P256_blst";
-            "sig_g1_aug_fips_186_3_P384_blst";
-            "sig_g1_aug_fips_186_3_P521_blst";
-            "sig_g1_aug_rfc6979_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_B233_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_B283_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_B409_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_B571_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_K233_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_K409_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_K571_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_P224_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_P256_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_P384_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_fips_186_3_P521_blst";
+            path_test_vectors "sig_g1_aug" // "sig_g1_aug_rfc6979_blst";
           ]
 
         let sig_pop_filenames =
           [
-            "sig_g1_pop_fips_186_3_B233_blst";
-            "sig_g1_pop_fips_186_3_B283_blst";
-            "sig_g1_pop_fips_186_3_B409_blst";
-            "sig_g1_pop_fips_186_3_B571_blst";
-            "sig_g1_pop_fips_186_3_K233_blst";
-            "sig_g1_pop_fips_186_3_K409_blst";
-            "sig_g1_pop_fips_186_3_K571_blst";
-            "sig_g1_pop_fips_186_3_P224_blst";
-            "sig_g1_pop_fips_186_3_P256_blst";
-            "sig_g1_pop_fips_186_3_P384_blst";
-            "sig_g1_pop_fips_186_3_P521_blst";
-            "sig_g1_pop_rfc6979_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_B233_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_B283_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_B409_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_B571_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_K233_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_K409_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_K571_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_P224_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_P256_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_P384_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_fips_186_3_P521_blst";
+            path_test_vectors "sig_g1_pop" // "sig_g1_pop_rfc6979_blst";
           ]
 
         (* These elements have been generated by bls12-381-unix-blst, commit
@@ -1104,18 +1162,18 @@ let () =
 
         let pop_filenames =
           [
-            "pop_g1_fips_186_3_B233_blst";
-            "pop_g1_fips_186_3_B283_blst";
-            "pop_g1_fips_186_3_B409_blst";
-            "pop_g1_fips_186_3_B571_blst";
-            "pop_g1_fips_186_3_K233_blst";
-            "pop_g1_fips_186_3_K409_blst";
-            "pop_g1_fips_186_3_K571_blst";
-            "pop_g1_fips_186_3_P224_blst";
-            "pop_g1_fips_186_3_P256_blst";
-            "pop_g1_fips_186_3_P384_blst";
-            "pop_g1_fips_186_3_P521_blst";
-            "pop_g1_rfc6979_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_B233_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_B283_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_B409_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_B571_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_K233_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_K409_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_K571_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_P224_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_P256_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_P384_blst";
+            path_test_vectors "pop_g1" // "pop_g1_fips_186_3_P521_blst";
+            path_test_vectors "pop_g1" // "pop_g1_rfc6979_blst";
           ]
       end)
       (Bls12_381.G2)
@@ -1132,6 +1190,7 @@ let () =
   in
   let all_tests = List.concat [min_pk_tests; min_sig_tests] in
   run
+    ~__FILE__
     "BLS Signature"
     (( "Common features to both instanciations",
        [

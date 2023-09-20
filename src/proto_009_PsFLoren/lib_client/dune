@@ -3,18 +3,18 @@
 
 (library
  (name tezos_client_009_PsFLoren)
- (public_name tezos-client-009-PsFLoren)
+ (public_name octez-protocol-009-PsFLoren-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-shell-services
-  tezos-client-base
-  tezos-protocol-009-PsFLoren
-  tezos-protocol-009-PsFLoren.lifted
-  tezos-signer-backends
-  tezos-protocol-plugin-009-PsFLoren
-  tezos-rpc
+  octez-libs.base
+  octez-libs.clic
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  tezos-protocol-009-PsFLoren.protocol
+  tezos-protocol-009-PsFLoren.protocol.lifted
+  octez-shell-libs.signer-backends
+  octez-protocol-009-PsFLoren-libs.plugin
+  octez-libs.rpc
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

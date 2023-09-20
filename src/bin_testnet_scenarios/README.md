@@ -25,3 +25,18 @@ to match the current Mondaynet).
 
 The `snapshot` can be omitted and the nodes will bootstrap themself (but it
 can becomes very long).
+
+
+Alternatively, if you have an octez node available and you want to use the
+data-dir you can provide the path:
+
+```
+{
+  "protocol": "alpha",
+  "network": "https://teztnets.xyz/mondaynet-2023-MM-DD",
+  "data-dir": /home/.octez-node-mondaynet"
+}
+```
+This also mean that you cannot run scenarios in parallel and need to stop
+your own node.
+

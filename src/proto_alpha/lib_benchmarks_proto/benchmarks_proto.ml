@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,12 +27,20 @@
 module Benchmark_base = Benchmark
 
 module Benchmark = struct
+  type group = Benchmark_base.group = Standalone | Group of string | Generic
+
+  type purpose = Benchmark_base.purpose =
+    | Other_purpose of string
+    | Generate_code of string
+
   module type S = sig
     val name : Namespace.t
 
     val info : string
 
     val module_filename : string
+
+    val group : group
 
     val tags : string list
 
@@ -49,7 +58,7 @@ module Benchmark = struct
 
     val model : name:Namespace.t -> workload Model.t
 
-    val generated_code_destination : string option
+    val purpose : Benchmark_base.purpose
 
     val create_benchmark :
       rng_state:Random.State.t -> config -> workload Generator.benchmark
@@ -65,28 +74,59 @@ module Registration = struct
     let module B : Benchmark_base.S = struct
       include Bench
 
-      let generated_code_destination =
-        Option.map
-          (fun destination ->
-            Filename.concat
-              "src/proto_alpha/lib_protocol"
-              (destination ^ "_costs_generated.ml"))
-          Bench.generated_code_destination
-
       let models =
-        [(Namespace.(cons name "model" |> to_string), Bench.model ~name)]
+        [
+          ( (match Bench.group with
+            | Generic -> "*"
+            | Group g -> g
+            | Standalone -> Namespace.(cons Bench.name "model" |> to_string)),
+            Bench.model ~name );
+        ]
 
       let create_benchmarks ~rng_state ~bench_num config =
         List.repeat bench_num (fun () ->
             Bench.create_benchmark ~rng_state config)
     end in
     Registration_helpers.register (module B)
+
+  let register_simple_with_num ((module Bench) : Benchmark_base.simple_with_num)
+      =
+    let module B : Benchmark_base.Simple_with_num = struct
+      include Bench
+
+      let tags = Tags.common :: tags
+    end in
+    Registration.register_simple_with_num (module B)
+
+  let register_as_simple_with_num (module B : Benchmark_base.S) =
+    let modules =
+      List.map
+        (fun (model_name, model) : (module Benchmark_base.Simple_with_num) ->
+          (module struct
+            include B
+
+            let name = Namespace.cons name model_name
+
+            let group = Benchmark_base.Group model_name
+
+            let model = model
+          end))
+        B.models
+    in
+    List.iter (fun x -> register_simple_with_num x) modules
 end
 
 module Model = struct
   include Model
 
+  type 'workload t = 'workload Model.t
+
   let make ~name ~conv ~model = make ~conv ~model:(model name)
+
+  let unknown_const1 ?const name =
+    let ns s = Free_variable.of_namespace (Namespace.cons name s) in
+    let const = Option.value ~default:(ns "const") const in
+    unknown_const1 ~name ~const
 
   let affine ?intercept ?coeff name =
     let ns s = Free_variable.of_namespace (Namespace.cons name s) in

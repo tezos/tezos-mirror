@@ -3,21 +3,21 @@
 
 (library
  (name tezos_client_015_PtLimaPt)
- (public_name tezos-client-015-PtLimaPt)
+ (public_name octez-protocol-015-PtLimaPt-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-clic
-  tezos-shell-services
-  tezos-client-base
-  tezos-protocol-015-PtLimaPt
-  tezos-protocol-015-PtLimaPt.lifted
-  tezos-mockup-registration
-  tezos-proxy
-  tezos-signer-backends
-  tezos-protocol-plugin-015-PtLimaPt
+  octez-libs.base
+  octez-libs.clic
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  tezos-protocol-015-PtLimaPt.protocol
+  tezos-protocol-015-PtLimaPt.protocol.lifted
+  octez-shell-libs.mockup-registration
+  octez-shell-libs.proxy
+  octez-shell-libs.signer-backends
+  octez-protocol-015-PtLimaPt-libs.plugin
   tezos-protocol-015-PtLimaPt.parameters
-  tezos-rpc
+  octez-libs.rpc
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

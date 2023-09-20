@@ -35,10 +35,6 @@ let default_rpc_address = "127.0.0.1"
 
 let default_rpc_port = 10832
 
-let default_dac_threshold = 0
-
-let default_dac_addresses = []
-
 let default_reveal_data_dir =
   Filename.concat
     (Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node")
@@ -46,52 +42,48 @@ let default_reveal_data_dir =
 
 module Coordinator = struct
   type t = {
-    threshold : int;
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
+    committee_members : Tezos_crypto.Aggregate_signature.public_key list;
   }
 
-  let make threshold committee_members_addresses =
-    {threshold; committee_members_addresses}
+  let make committee_members = {committee_members}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {threshold; committee_members_addresses} ->
-          (threshold, committee_members_addresses))
-        (fun (threshold, committee_members_addresses) ->
-          {threshold; committee_members_addresses})
-        (obj2
-           (req "threshold" uint8)
+        (fun {committee_members} -> committee_members)
+        (fun committee_members -> {committee_members})
+        (obj1
            (req
               "committee_members"
-              (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))))
+              (list Tezos_crypto.Aggregate_signature.Public_key.encoding))))
 
-  let committee_members_addresses t = t.committee_members_addresses
+  let committee_members_addresses t =
+    List.map
+      Tezos_crypto.Aggregate_signature.Public_key.hash
+      t.committee_members
 
   let name = "Coordinator"
 end
 
 module Committee_member = struct
   type t = {
-    coordinator_rpc_address : string;
-    coordinator_rpc_port : int;
+    coordinator_rpc_address : Uri.t;
     address : Tezos_crypto.Aggregate_signature.public_key_hash;
   }
 
-  let make coordinator_rpc_address coordinator_rpc_port address =
-    {coordinator_rpc_address; coordinator_rpc_port; address}
+  let make coordinator_rpc_address address = {coordinator_rpc_address; address}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {coordinator_rpc_address; coordinator_rpc_port; address} ->
-          (coordinator_rpc_address, coordinator_rpc_port, address))
-        (fun (coordinator_rpc_address, coordinator_rpc_port, address) ->
-          {coordinator_rpc_address; coordinator_rpc_port; address})
-        (obj3
+        (fun {coordinator_rpc_address; address} ->
+          let coordinator_rpc_address = Uri.to_string coordinator_rpc_address in
+          (coordinator_rpc_address, address))
+        (fun (coordinator_rpc_address, address) ->
+          let coordinator_rpc_address = Uri.of_string coordinator_rpc_address in
+          {coordinator_rpc_address; address})
+        (obj2
            (req "coordinator_rpc_address" string)
-           (req "coordinator_rpc_port" uint16)
            (req
               "address"
               Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
@@ -100,124 +92,56 @@ module Committee_member = struct
 end
 
 module Observer = struct
-  type t = {coordinator_rpc_address : string; coordinator_rpc_port : int}
-
-  let make coordinator_rpc_address coordinator_rpc_port =
-    {coordinator_rpc_address; coordinator_rpc_port}
-
-  let encoding =
-    Data_encoding.(
-      conv
-        (fun {coordinator_rpc_address; coordinator_rpc_port} ->
-          (coordinator_rpc_address, coordinator_rpc_port))
-        (fun (coordinator_rpc_address, coordinator_rpc_port) ->
-          {coordinator_rpc_address; coordinator_rpc_port})
-        (obj2
-           (req "coordinator_rpc_address" string)
-           (req "coordinator_rpc_port" uint16)))
-
-  let name = "Observer"
-end
-
-module Legacy = struct
   type t = {
-    threshold : int;
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
-    dac_cctxt_config : host_and_port option;
-    committee_member_address_opt :
-      Tezos_crypto.Aggregate_signature.public_key_hash option;
+    coordinator_rpc_address : Uri.t;
+    committee_rpc_addresses : Uri.t list;
+    timeout : int;
   }
 
-  let make ?coordinator_host_and_port threshold committee_members_addresses
-      committee_member_address_opt =
-    {
-      threshold;
-      committee_members_addresses;
-      dac_cctxt_config = coordinator_host_and_port;
-      committee_member_address_opt;
-    }
+  let default_timeout = 6
 
-  let committee_members_addresses t = t.committee_members_addresses
-
-  let threshold t = t.threshold
-
-  let dac_cctxt_config t = t.dac_cctxt_config
-
-  let committee_member_address_opt t = t.committee_member_address_opt
-
-  let host_and_port_encoding =
-    let open Data_encoding in
-    conv
-      (fun {host; port} -> (host, port))
-      (fun (host, port) -> {host; port})
-      (obj2 (req "rpc-host" string) (req "rpc-port" uint16))
+  let make ~committee_rpc_addresses ?(timeout = default_timeout)
+      coordinator_rpc_address =
+    {coordinator_rpc_address; timeout; committee_rpc_addresses}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {
-               threshold;
-               committee_members_addresses;
-               dac_cctxt_config;
-               committee_member_address_opt;
-             } ->
-          ( threshold,
-            committee_members_addresses,
-            dac_cctxt_config,
-            committee_member_address_opt ))
-        (fun ( threshold,
-               committee_members_addresses,
-               dac_cctxt_config,
-               committee_member_address_opt ) ->
-          {
-            threshold;
-            committee_members_addresses;
-            dac_cctxt_config;
-            committee_member_address_opt;
-          })
-        (obj4
-           (dft "threshold" uint8 default_dac_threshold)
-           (dft
-              "committee_members"
-              (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
-              default_dac_addresses)
-           (opt "dac_cctxt_config" host_and_port_encoding)
-           (opt
-              "committee_member_address_opt"
-              Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
+        (fun {coordinator_rpc_address; committee_rpc_addresses; timeout} ->
+          let coordinator_rpc_address = Uri.to_string coordinator_rpc_address in
+          let committee_rpc_addresses =
+            List.map Uri.to_string committee_rpc_addresses
+          in
+          (coordinator_rpc_address, committee_rpc_addresses, timeout))
+        (fun (coordinator_rpc_address, committee_rpc_addresses, timeout) ->
+          let coordinator_rpc_address = Uri.of_string coordinator_rpc_address in
+          let committee_rpc_addresses =
+            List.map Uri.of_string committee_rpc_addresses
+          in
+          {coordinator_rpc_address; committee_rpc_addresses; timeout})
+        (obj3
+           (req "coordinator_rpc_address" string)
+           (req "committee_rpc_addresses" (Data_encoding.list string))
+           (req "timeout" Data_encoding.uint8)))
 
-  let name = "Legacy"
+  let name = "Observer"
 end
 
 type mode =
   | Coordinator of Coordinator.t
   | Committee_member of Committee_member.t
   | Observer of Observer.t
-  | Legacy of Legacy.t
 
-let make_coordinator threshold committee_members_addresses =
-  Coordinator (Coordinator.make threshold committee_members_addresses)
+let make_coordinator committee_members =
+  Coordinator (Coordinator.make committee_members)
 
-let make_committee_member coordinator_rpc_address coordinator_rpc_port
-    committee_member_address =
+let make_committee_member ~coordinator_rpc_address committee_member_address =
   Committee_member
-    (Committee_member.make
-       coordinator_rpc_address
-       coordinator_rpc_port
-       committee_member_address)
+    (Committee_member.make coordinator_rpc_address committee_member_address)
 
-let make_observer coordinator_rpc_address coordinator_rpc_port =
-  Observer (Observer.make coordinator_rpc_address coordinator_rpc_port)
-
-let make_legacy ?coordinator_host_and_port threshold committee_members_addresses
-    committee_member_address_opt =
-  Legacy
-    (Legacy.make
-       ?coordinator_host_and_port
-       threshold
-       committee_members_addresses
-       committee_member_address_opt)
+let make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address =
+  Observer
+    (Observer.make ~committee_rpc_addresses ?timeout coordinator_rpc_address)
 
 type t = {
   data_dir : string;  (** The path to the DAC node data directory. *)
@@ -228,6 +152,7 @@ type t = {
   mode : mode;
       (** Configuration parameters specific to the operating mode of the
           DAC. *)
+  allow_v1_api : bool;
 }
 
 let mode_name t =
@@ -235,10 +160,9 @@ let mode_name t =
   | Coordinator _ -> Coordinator.name
   | Committee_member _ -> Committee_member.name
   | Observer _ -> Observer.name
-  | Legacy _ -> Legacy.name
 
-let make ~data_dir ~reveal_data_dir rpc_address rpc_port mode =
-  {data_dir; reveal_data_dir; rpc_address; rpc_port; mode}
+let make ~data_dir ~reveal_data_dir ~allow_v1_api rpc_address rpc_port mode =
+  {data_dir; reveal_data_dir; rpc_address; rpc_port; mode; allow_v1_api}
 
 let data_dir_path config subpath = Filename.concat config.data_dir subpath
 
@@ -272,22 +196,16 @@ let mode_encoding =
           Observer.encoding
           (function Observer t -> Some t | _ -> None)
           (fun t -> Observer t);
-        case
-          ~title:Legacy.name
-          (Tag (3, Legacy.name))
-          Legacy.encoding
-          (function Legacy t -> Some t | _ -> None)
-          (fun t -> Legacy t);
       ])
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {data_dir; rpc_address; rpc_port; reveal_data_dir; mode} ->
-      (data_dir, rpc_address, rpc_port, reveal_data_dir, mode))
-    (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, mode) ->
-      {data_dir; rpc_address; rpc_port; reveal_data_dir; mode})
-    (obj5
+    (fun {data_dir; rpc_address; rpc_port; reveal_data_dir; mode; allow_v1_api} ->
+      (data_dir, rpc_address, rpc_port, reveal_data_dir, mode, allow_v1_api))
+    (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, mode, allow_v1_api) ->
+      {data_dir; rpc_address; rpc_port; reveal_data_dir; mode; allow_v1_api})
+    (obj6
        (dft
           "data-dir"
           ~description:"Location of the data dir"
@@ -300,7 +218,8 @@ let encoding : t Data_encoding.t =
           ~description:"Reveal data directory"
           string
           default_reveal_data_dir)
-       (req "mode" ~description:"Running mode" mode_encoding))
+       (req "mode" ~description:"Running mode" mode_encoding)
+       (dft "allow_v1_api" ~description:"Allow V1 API boolean flag" bool false))
 
 type error += DAC_node_unable_to_write_configuration_file of string
 

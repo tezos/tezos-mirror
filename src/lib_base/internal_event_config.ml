@@ -27,19 +27,18 @@ open Error_monad
 
 type t = {active_sinks : Uri.t list}
 
-let lwt_log =
-  {active_sinks = [Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()]}
-
 let make_section_prefix ~pattern level =
   Format.sprintf "%s:%s" pattern (Internal_event.Level.to_string level)
 
 let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
-    ?fresh ?(section_prefixes = []) kind =
+    ?colors ?fresh ?(section_prefixes = []) kind =
   let scheme, path =
     match kind with
     | `Stdout -> ("file-descriptor-stdout", None)
     | `Stderr -> ("file-descriptor-stderr", None)
     | `Path path -> ("file-descriptor-path", Some path)
+    | `Null -> ("file-descriptor-null", None)
+    | `Syslog str -> ("file-descriptor-" ^ str, None)
   in
   let add prop str v conf =
     match v with Some c -> (prop, [str c]) :: conf | None -> conf
@@ -58,10 +57,14 @@ let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
       |> add "level-at-least" Internal_event.Level.to_string level
       |> add "create-dirs" bool create_dirs
       |> add "daily-logs" string_of_int daily_logs
-      |> add "fresh" bool fresh
+      |> add "fresh" bool fresh |> add "colors" bool colors
       |> add "chmod" string_of_int chmod
       |> add "with_pid" bool with_pid)
     ()
+
+let short_stdout_uri = make_config_uri ~format:"pp-short" ~level:Notice `Stdout
+
+let stdout = {active_sinks = [short_stdout_uri]}
 
 let empty = {active_sinks = []}
 
@@ -107,6 +110,6 @@ let apply {active_sinks} =
 
 let reapply config =
   let open Lwt_result_syntax in
-  let except u = Uri.scheme u = Some "lwt-log" in
+  let except u = u = short_stdout_uri in
   let* () = Internal_event.All_sinks.close ~except () in
   apply config

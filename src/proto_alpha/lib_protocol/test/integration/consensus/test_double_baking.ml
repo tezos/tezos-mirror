@@ -68,8 +68,10 @@ let double_baking ctxt ?(correct_order = true) bh1 bh2 =
     exposed by a double baking evidence operation. *)
 let test_valid_double_baking_evidence () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
-  Context.get_constants (B genesis)
-  >>=? fun Constants.{parametric = {double_baking_punishment; _}; _} ->
+  Context.get_constants (B genesis) >>=? fun c ->
+  let p =
+    c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
+  in
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork ~policy:(By_account baker1) contracts genesis
   >>=? fun (blk_a, blk_b) ->
@@ -80,18 +82,21 @@ let test_valid_double_baking_evidence () =
   >>=? fun frozen_deposits_before ->
   Context.Delegate.current_frozen_deposits (B blk_final) baker1
   >>=? fun frozen_deposits_after ->
-  let slashed_amount =
-    Test_tez.(frozen_deposits_before -! frozen_deposits_after)
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
   in
-  Assert.equal_tez ~loc:__LOC__ slashed_amount double_baking_punishment
+  Assert.equal_tez
+    ~loc:__LOC__
+    frozen_deposits_after
+    expected_frozen_deposits_after
   >>=? fun () ->
   (* Check that the initial frozen deposits has not changed *)
   Context.Delegate.initial_frozen_deposits (B blk_final) baker1
   >>=? fun initial_frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
 
-(* auxiliary function used in [double_endorsement] *)
-let order_endorsements ~correct_order op1 op2 =
+(* auxiliary function used in [double_attestation] *)
+let order_attestations ~correct_order op1 op2 =
   let oph1 = Operation.hash op1 in
   let oph2 = Operation.hash op2 in
   let c = Operation_hash.compare oph1 oph2 in
@@ -100,13 +105,13 @@ let order_endorsements ~correct_order op1 op2 =
   else (op1, op2)
 
 (* auxiliary function used in
-   [test_valid_double_baking_followed_by_double_endorsing] and
-   [test_valid_double_endorsing_followed_by_double_baking] *)
-let double_endorsement ctxt ?(correct_order = true) op1 op2 =
-  let e1, e2 = order_endorsements ~correct_order op1 op2 in
-  Op.double_endorsement ctxt e1 e2
+   [test_valid_double_baking_followed_by_double_attesting] and
+   [test_valid_double_attesting_followed_by_double_baking] *)
+let double_attestation ctxt ?(correct_order = true) op1 op2 =
+  let e1, e2 = order_attestations ~correct_order op1 op2 in
+  Op.double_attestation ctxt e1 e2
 
-let test_valid_double_baking_followed_by_double_endorsing () =
+let test_valid_double_baking_followed_by_double_attesting () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   Block.bake genesis >>=? fun b ->
@@ -116,45 +121,43 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
   Block.bake ~policy:(By_account baker2) ~operation blk_a
   >>=? fun blk_with_db_evidence ->
-  Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
+  Context.get_first_different_attesters (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  Op.raw_endorsement ~delegate blk_a >>=? fun endorsement_a ->
-  Op.raw_endorsement ~delegate blk_b >>=? fun endorsement_b ->
-  let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
+  Op.raw_attestation ~delegate blk_a >>=? fun attestation_a ->
+  Op.raw_attestation ~delegate blk_b >>=? fun attestation_b ->
+  let operation = double_attestation (B genesis) attestation_a attestation_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
   >>=? fun blk_final ->
   Context.Delegate.current_frozen_deposits (B blk_final) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let r =
-    csts.parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let p_de =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
-  let expected_frozen_deposits_after_de =
-    Test_tez.(
-      frozen_deposits_before
-      *! Int64.of_int (r.denominator - r.numerator)
-      /! Int64.of_int r.denominator)
+  let p_db =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  (* the deposit after double baking and double endorsing equals the
-     expected deposit after double endorsing minus the double baking
-     punishment *)
+  let p = p_de + p_db (* assuming the sum doesn't exceed 100% *) in
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+  in
+  (* Both slashings are computed on the initial amount of frozen deposits so
+     the percentages are additive, not multiplicative. *)
   Assert.equal_tez
     ~loc:__LOC__
-    Test_tez.(
-      expected_frozen_deposits_after_de
-      -! csts.parametric.double_baking_punishment)
+    expected_frozen_deposits_after
     frozen_deposits_after
 
-(* auxiliary function used in [test_valid_double_endorsing_followed_by_double_baking] *)
+(* auxiliary function used in [test_valid_double_attesting_followed_by_double_baking] *)
 let block_fork_diff b =
   Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
   Block.bake ~policy:(By_account baker_2) b >|=? fun blk_b -> (blk_a, blk_b)
 
-let test_valid_double_endorsing_followed_by_double_baking () =
+let test_valid_double_attesting_followed_by_double_baking () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork_diff genesis >>=? fun (blk_1, blk_2) ->
@@ -162,14 +165,14 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   >>=? fun frozen_deposits_before ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
+  Context.get_first_different_attesters (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  Op.raw_endorsement ~delegate blk_a >>=? fun endorsement_a ->
-  Op.raw_endorsement ~delegate blk_b >>=? fun endorsement_b ->
-  let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
+  Op.raw_attestation ~delegate blk_a >>=? fun attestation_a ->
+  Op.raw_attestation ~delegate blk_b >>=? fun attestation_b ->
+  let operation = double_attestation (B genesis) attestation_a attestation_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_a
   >>=? fun blk_with_de_evidence ->
   block_fork ~policy:(By_account baker1) contracts blk_1
@@ -180,23 +183,21 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   Context.Delegate.current_frozen_deposits (B blk_with_db_evidence) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let r =
-    csts.parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  let p_de =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
-  let expected_frozen_deposits_after_de =
-    Test_tez.(
-      frozen_deposits_before
-      *! Int64.of_int (r.denominator - r.numerator)
-      /! Int64.of_int r.denominator)
+  let p_db =
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  (* the deposit after double baking and double endorsing equals the
-     expected deposit after double endorsing minus the double baking
-     punishment *)
+  let p = p_de + p_db (* assuming the sum doesn't exceed 100% *) in
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+  in
+  (* Both slashings are computed on the initial amount of frozen deposits so
+     the percentages are additive, not multiplicative. *)
   Assert.equal_tez
     ~loc:__LOC__
-    Test_tez.(
-      expected_frozen_deposits_after_de
-      -! csts.parametric.double_baking_punishment)
+    expected_frozen_deposits_after
     frozen_deposits_after
 
 (** Test that the payload producer of the block containing a double
@@ -204,13 +205,12 @@ let test_valid_double_endorsing_followed_by_double_baking () =
    the reward. *)
 let test_payload_producer_gets_evidence_rewards () =
   Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, contracts) ->
-  Context.get_constants (B genesis)
-  >>=? fun Constants.
-             {
-               parametric =
-                 {double_baking_punishment; baking_reward_fixed_portion; _};
-               _;
-             } ->
+  Context.get_constants (B genesis) >>=? fun c ->
+  let p =
+    c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
+  in
+  Context.get_baking_reward_fixed_portion (B genesis)
+  >>=? fun baking_reward_fixed_portion ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   let c1_c2 =
     match contracts with c1 :: c2 :: _ -> (c1, c2) | _ -> assert false
@@ -219,22 +219,22 @@ let test_payload_producer_gets_evidence_rewards () =
   double_baking (B b1) b1.header b2.header |> fun db_evidence ->
   Block.bake ~policy:(By_account baker2) ~operation:db_evidence b1
   >>=? fun b_with_evidence ->
-  Context.get_endorsers (B b_with_evidence) >>=? fun endorsers ->
+  Context.get_attesters (B b_with_evidence) >>=? fun attesters ->
   List.map_es
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-    endorsers
-  >>=? fun preendorsers ->
+    attesters
+  >>=? fun preattesters ->
   List.map_ep
-    (fun (endorser, _slots) ->
-      Op.preendorsement ~delegate:endorser b_with_evidence)
-    preendorsers
-  >>=? fun preendos ->
+    (fun (attester, _slots) ->
+      Op.preattestation ~delegate:attester b_with_evidence)
+    preattesters
+  >>=? fun preattestations ->
   Block.bake
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker1)
-    ~operations:(preendos @ [db_evidence])
+    ~operations:(preattestations @ [db_evidence])
     b1
   >>=? fun b' ->
   (* the frozen deposits of the double-signer [baker1] are slashed *)
@@ -242,16 +242,28 @@ let test_payload_producer_gets_evidence_rewards () =
   >>=? fun frozen_deposits_before ->
   Context.Delegate.current_frozen_deposits (B b') baker1
   >>=? fun frozen_deposits_after ->
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+  in
+  Assert.equal_tez
+    ~loc:__LOC__
+    frozen_deposits_after
+    expected_frozen_deposits_after
+  >>=? fun () ->
   let slashed_amount =
     Test_tez.(frozen_deposits_before -! frozen_deposits_after)
   in
-  Assert.equal_tez ~loc:__LOC__ slashed_amount double_baking_punishment
-  >>=? fun () ->
   (* [baker2] included the double baking evidence in [b_with_evidence]
      and so it receives the reward for the evidence included in [b']
      (besides the reward for proposing the payload). *)
   Context.Delegate.full_balance (B b1) baker2 >>=? fun full_balance ->
-  let evidence_reward = Test_tez.(slashed_amount /! 2L) in
+  let divider =
+    Int64.add
+      2L
+      (Int64.of_int
+         c.parametric.adaptive_issuance.global_limit_of_staking_over_baking)
+  in
+  let evidence_reward = Test_tez.(slashed_amount /! divider) in
   let expected_reward =
     Test_tez.(baking_reward_fixed_portion +! evidence_reward)
   in
@@ -266,7 +278,7 @@ let test_payload_producer_gets_evidence_rewards () =
   Assert.equal_tez
     ~loc:__LOC__
     full_balance_at_b'
-    Test_tez.(full_balance_at_b1 -! double_baking_punishment)
+    Test_tez.(full_balance_at_b1 -! slashed_amount)
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
@@ -452,13 +464,13 @@ let tests =
       `Quick
       test_double_evidence;
     Tztest.tztest
-      "double baking followed by double endorsing"
+      "double baking followed by double attesting"
       `Quick
-      test_valid_double_baking_followed_by_double_endorsing;
+      test_valid_double_baking_followed_by_double_attesting;
     Tztest.tztest
-      "double endorsing followed by double baking"
+      "double attesting followed by double baking"
       `Quick
-      test_valid_double_endorsing_followed_by_double_baking;
+      test_valid_double_attesting_followed_by_double_baking;
   ]
 
 let () =

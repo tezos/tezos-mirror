@@ -126,6 +126,22 @@ val get_balance :
   Contract.t ->
   Tez.t tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_alpha.Protocol.Contract_services.val-staked_balance}. *)
+val get_staked_balance :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Tez.t option tzresult Lwt.t
+
+(** Calls {!Tezos_protocol_alpha.Protocol.Contract_services.val-full_balance}. *)
+val get_full_balance :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Tez.t tzresult Lwt.t
+
 (** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_ticket_balance}. *)
 val get_contract_ticket_balance :
   #Protocol_client_context.rpc_context ->
@@ -145,14 +161,6 @@ val get_contract_all_ticket_balances :
 
 val ticket_balances_encoding :
   (Ticket_token.unparsed_token * Z.t) list Data_encoding.t
-
-(** Calls {!Tezos_protocol_alpha.Protocol.Delegate_services.val-frozen_deposits_limit}. *)
-val get_frozen_deposits_limit :
-  #Protocol_client_context.rpc_context ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  Signature.Public_key_hash.t ->
-  Tez.t option tzresult Lwt.t
 
 (** Calls {!Injection.prepare_manager_operation}
     with {!Alpha_context.Delegation} [delegate_opt] as operation. *)
@@ -213,25 +221,6 @@ val drain_delegate :
   Kind.drain_delegate Injection.result tzresult Lwt.t
 
 (** Calls {!Injection.inject_manager_operation}
-    with {!Annotated_manager_operation.Single_manager} {!Alpha_context.Set_deposits_limit} [limit_opt]
-    as operation. *)
-val set_deposits_limit :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?simulation:bool ->
-  ?fee:Tez.tez ->
-  public_key_hash ->
-  src_pk:public_key ->
-  manager_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  Tez.t option ->
-  Kind.set_deposits_limit Kind.manager Injection.result tzresult Lwt.t
-
-(** Calls {!Injection.inject_manager_operation}
     with {!Annotated_manager_operation.Single_manager} {!Alpha_context.Increase_paid_storage}
     [{amount_in_bytes; destination}] as operation. *)
 val increase_paid_storage :
@@ -274,7 +263,7 @@ val register_as_delegate :
   tzresult
   Lwt.t
 
-(** Calls {!RawContractAlias.add}. *)
+(** Calls {!Raw_contract_alias.add}. *)
 val save_contract :
   force:bool ->
   #Protocol_client_context.full ->
@@ -630,6 +619,7 @@ val sc_rollup_originate :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
+  ?whitelist:Sc_rollup.Whitelist.t ->
   source:public_key_hash ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
@@ -695,7 +685,6 @@ val sc_rollup_cement :
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
-  commitment:Alpha_context.Sc_rollup.Commitment.Hash.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
@@ -945,4 +934,31 @@ val zk_rollup_update :
     * Kind.zk_rollup_update Kind.manager Apply_results.contents_result,
     tztrace )
   result
+  Lwt.t
+
+(** Injects a DAL publish commitment operation using
+    {!Injection.inject_operation}.
+*)
+val dal_publish :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
+  source:public_key_hash ->
+  slot_header:Alpha_context.Dal.Operations.Publish_slot_header.t ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  (Operation_hash.t
+  * Kind.dal_publish_slot_header Kind.manager contents
+  * Kind.dal_publish_slot_header Kind.manager Apply_results.contents_result)
+  tzresult
   Lwt.t

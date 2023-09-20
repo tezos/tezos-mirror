@@ -3,12 +3,13 @@
 
 (library
  (name tezos_smart_rollup_layer2_017_PtNairob)
- (public_name tezos-smart-rollup-layer2-017-PtNairob)
+ (public_name octez-protocol-017-PtNairob-libs.smart-rollup-layer2)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-protocol-017-PtNairob
-  octez-injector)
+  octez-libs.base
+  tezos-protocol-017-PtNairob.protocol
+  octez-injector
+  octez-l2-libs.smart-rollup)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -16,4 +17,5 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_017_PtNairob
-  -open Octez_injector))
+  -open Octez_injector
+  -open Octez_smart_rollup))

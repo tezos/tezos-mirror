@@ -24,32 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open RPC_directory_helpers
+open Rpc_directory_helpers
 
-(** Durable part of the storage of this PVM. *)
-module type Durable_state = sig
-  type state
-
-  (** [value_length state key] returns the length of data stored
-        for the [key] in the durable storage of the PVM state [state], if any. *)
-  val value_length : state -> string -> int64 option Lwt.t
-
-  (** [lookup state key] returns the data stored
-        for the [key] in the durable storage of the PVM state [state], if any. *)
-  val lookup : state -> string -> bytes option Lwt.t
-
-  (** [subtrees state key] returns subtrees
-        for the [key] in the durable storage of the PVM state [state].
-        Empty list in case if path doesn't exist. *)
-  val list : state -> string -> string list Lwt.t
-end
-
-module Make_RPC (Durable_state : Durable_state with type state = Context.tree) =
+module Make_RPC
+    (Durable_state : Wasm_2_0_0_pvm.Durable_state with type state = Context.tree) =
 struct
-  module Block_directory = Make_directory (struct
-    include Sc_rollup_services.Global.Block
+  module Block_directory = Make_sub_directory (struct
+    include Sc_rollup_services.Block
 
-    type context = Node_context.ro * Block_hash.t
+    type context = Node_context.rw
+
+    type subcontext = Node_context.ro * Block_hash.t
 
     let context_of_prefix node_ctxt (((), block) : prefix) =
       let open Lwt_result_syntax in
@@ -66,7 +51,7 @@ struct
   let register () =
     let open Protocol.Alpha_context.Sc_rollup in
     ( Block_directory.register0
-        (Sc_rollup_services.Global.Block.durable_state_value Kind.Wasm_2_0_0)
+        (Sc_rollup_services.Block.durable_state_value Kind.Wasm_2_0_0)
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
@@ -74,7 +59,7 @@ struct
       return value ) ;
 
     ( Block_directory.register0
-        (Sc_rollup_services.Global.Block.durable_state_length Kind.Wasm_2_0_0)
+        (Sc_rollup_services.Block.durable_state_length Kind.Wasm_2_0_0)
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
@@ -82,14 +67,14 @@ struct
       return leng ) ;
 
     Block_directory.register0
-      (Sc_rollup_services.Global.Block.durable_state_subkeys Kind.Wasm_2_0_0)
+      (Sc_rollup_services.Block.durable_state_subkeys Kind.Wasm_2_0_0)
     @@ fun (node_ctxt, block) {key} () ->
     let open Lwt_result_syntax in
     let* state = get_state node_ctxt block in
     let*! subkeys = Durable_state.list state key in
     return subkeys
 
-  let build_directory =
+  let build_sub_directory node_ctxt =
     register () ;
-    Block_directory.build_directory
+    Block_directory.build_sub_directory node_ctxt
 end

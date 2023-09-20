@@ -97,10 +97,14 @@ type 'f t = Function : ('f, 'r Lwt.t) params * 'r results -> 'f t
 let to_owned (Function (params, results)) =
   let inputs = param_types params in
   let outputs = result_types results in
-  (* Note, this consumes the elements in [inputs] and [outputs] but not the
-     structures themselves. Ctypes will free the structures once they go out
-     of scope. *)
-  Functions.Functype.new_ (Ctypes.addr inputs) (Ctypes.addr outputs)
+  let type_ =
+    Functions.Functype.new_ (Ctypes.addr inputs) (Ctypes.addr outputs)
+  in
+  (* Since creating a new function type does not consume the input and output
+     type vectors, we can safely delete them here. *)
+  Functions.Valtype_vec.delete (Ctypes.addr inputs) ;
+  Functions.Valtype_vec.delete (Ctypes.addr outputs) ;
+  type_
 
 exception
   Wrong_number_of_params of {expected : Unsigned.size_t; got : Unsigned.size_t}

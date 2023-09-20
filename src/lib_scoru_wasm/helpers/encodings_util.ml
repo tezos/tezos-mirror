@@ -23,5 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Tezos_tree_encoding.Encodings_util.Make (Tezos_context_memory.Context_binary)
+include Wasm_utils.In_memory_context

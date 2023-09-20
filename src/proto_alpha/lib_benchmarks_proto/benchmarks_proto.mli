@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,8 +27,15 @@
 module Benchmark_base = Benchmark
 
 module Benchmark : sig
+  type group = Benchmark_base.group = Standalone | Group of string | Generic
+
+  type purpose = Benchmark_base.purpose =
+    | Other_purpose of string
+    | Generate_code of string
+
   (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
       [registration_simple] below. *)
+
   module type S = sig
     (** Name of the benchmark *)
     val name : Namespace.t
@@ -37,6 +45,9 @@ module Benchmark : sig
 
     (** Filename of the benchmark module *)
     val module_filename : string
+
+    (** Inference group of the benchmark *)
+    val group : group
 
     (** Tags of the benchmark *)
     val tags : string list
@@ -62,17 +73,14 @@ module Benchmark : sig
     (** Cost model *)
     val model : name:Namespace.t -> workload Model.t
 
-    (** Generated code file location, automatically prefix by
-        "src/proto_alpha/lib_protocol/"
-        and suffixed by
-        "_costs_generated.ml".
-        It is optional in case some benchmarks don't output code, but are used
-        for verification purposes. *)
-    val generated_code_destination : string option
+    (** Benchmark purpose.
+        The developer can submit an explanation as to what the benchmark is for when it's not generating code
+        (i.e. in the case of [Other_purpose]). *)
+    val purpose : Benchmark_base.purpose
 
     (** Creates a  benchmark, ready to be run.
-        The benchmarks are thunked to prevent evaluating the workload until
-        needed. *)
+            The benchmarks are thunked to prevent evaluating the workload until
+            needed. *)
     val create_benchmark :
       rng_state:Random.State.t -> config -> workload Generator.benchmark
   end
@@ -86,16 +94,22 @@ module Registration : sig
   (** Registers a benchmark with a model, model names are uniformely generated
   *)
   val register : Benchmark.t -> unit
+
+  val register_as_simple_with_num : Benchmark_base.t -> unit
 end
 
 module Model : sig
   open Model
+
+  type 'workload t = 'workload Model.t
 
   val make :
     name:Namespace.t ->
     conv:('a -> 'b) ->
     model:(Namespace.t -> 'b model) ->
     'a t
+
+  val unknown_const1 : ?const:Free_variable.t -> Namespace.t -> unit model
 
   val affine :
     ?intercept:Free_variable.t ->
@@ -112,4 +126,6 @@ module Model : sig
     (int * unit) model
 
   val linear : ?coeff:Free_variable.t -> Namespace.t -> (int * unit) model
+
+  val set_takes_saturation_reprs : bool -> 'a t -> 'a t
 end

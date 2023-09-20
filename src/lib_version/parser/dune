@@ -3,7 +3,7 @@
 
 (library
  (name tezos_version_parser)
- (public_name tezos-version.parser)
+ (public_name octez-libs.version.parser)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_deriving.show))
  (js_of_ocaml))

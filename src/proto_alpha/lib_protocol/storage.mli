@@ -49,9 +49,32 @@ end
 
 module Block_round : Simple_single_data_storage with type value = Round_repr.t
 
-type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
+type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
-type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
+module Slashed_deposits_history : sig
+  type slashed_percentage = int
+
+  type t = (Cycle_repr.t * slashed_percentage) list
+
+  (** [add cycle percentage history] adds the [percentage] for the [cycle] in
+      the [history].
+      If the cycle exists, the associated percentage is updated and capped at
+      100 and the cycle order in the list is unchanged.
+      If the cycle does not exist, the new pair [(cycle, percentage)] is added
+      at the beginning of the list.
+  *)
+  val add : Cycle_repr.t -> slashed_percentage -> t -> t
+end
+
+module Unstake_request : sig
+  type request = Cycle_repr.t * Tez_repr.t
+
+  type requests = request list
+
+  type t = {delegate : Signature.Public_key_hash.t; requests : requests}
+
+  val add : Cycle_repr.t -> Tez_repr.t -> requests -> requests tzresult
+end
 
 module Contract : sig
   (** Storage from this submodule must only be accessed through the
@@ -91,22 +114,22 @@ module Contract : sig
        and type t := Raw_context.t
        and type local_context := local_context
 
-  (** If the value is not set, the delegate didn't miss any endorsing
+  (** If the value is not set, the delegate didn't miss any attesting
      opportunity.  If it is set, this value is a record of type
-     [missed_endorsements_info], where:
+     [missed_attestations_info], where:
    - [remaining_slots] is the difference between the maximum number of
      slots that can be missed and the number of missed slots;
      therefore, when the number is positive, it represents the number
      of slots that a delegate can still miss before forfeiting its
-     endorsing rewards for the current cycle; when the number is zero
+     attesting rewards for the current cycle; when the number is zero
      it means rewards are not lost, but no further slots can be
      missed anymore;
    - [missed_levels] represents the number of missed levels (for
-     endorsing). *)
-  module Missed_endorsements :
+     attesting). *)
+  module Missed_attestations :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = missed_endorsements_info
+       and type value = missed_attestations_info
        and type t := Raw_context.t
 
   (** The manager of a contract *)
@@ -125,7 +148,7 @@ module Contract : sig
        and type t := Raw_context.t
 
   (** The pending consensus key of a delegate *)
-  module Pending_consensus_keys :
+  module Pending_consensus_keys_up_to_Nairobi :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Signature.Public_key.t
@@ -136,6 +159,12 @@ module Contract : sig
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Signature.Public_key_hash.t
+       and type t := Raw_context.t
+
+  module Staking_parameters :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Staking_parameters_repr.t
        and type t := Raw_context.t
 
   (** All contracts (implicit and originated) that are delegated, if any  *)
@@ -152,7 +181,43 @@ module Contract : sig
   module Frozen_deposits :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = deposits
+       and type value = Deposits_repr.t
+       and type t := Raw_context.t
+
+  (** Tez that were part of {!Frozen_deposits} but have been requested to be
+      unstaked by a staker.
+      They won't be part of the stake for future distributions.
+      For cycles [current_cycle - preserved_cycles - max_slashing_period + 1] to
+      [current_cycle] they are still slashable.
+      For cycle [current_cycle - preserved_cycles - max_slashing_period] they are
+      not slashable anymore and hence any other older cycles must be squashed
+      into this one at cycle end. *)
+  module Unstaked_frozen_deposits :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Unstaked_frozen_deposits_repr.t
+       and type t := Raw_context.t
+
+  (** The contract's unstake requests that haven't been finalized yet. *)
+  module Unstake_requests :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Unstake_request.t
+       and type t := Raw_context.t
+
+  (** The sum of all pseudotokens owned by stakers (the delegate included)
+      corresponding to shares of the {!Frozen_deposits} current amount. *)
+  module Frozen_deposits_pseudotokens :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Staking_pseudotoken_repr.t
+       and type t := Raw_context.t
+
+  (** Share of the contract's delegate frozen deposits the contract owns. *)
+  module Staking_pseudotokens :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Staking_pseudotoken_repr.t
        and type t := Raw_context.t
 
   (** If there is a value, the frozen balance for the contract won't
@@ -208,6 +273,27 @@ module Contract : sig
        and type value = Z.t
        and type t := Raw_context.t
 
+  (** History of slashed deposits: an associative list of cycles to slashed
+      percentages.
+
+      This storage is inefficient but is not expected to grow large (as of
+      2023-05-22, the last slashing on mainnet dates back to:
+      - 2021-12-17 for double baking (154 events in total),
+      - 2019-08-08 for double endorsing (24 events in total).
+
+      The slashing percentages are used to compute the real value of stake
+      withdrawals.
+      Currently there is no limit to the age of the events we need to store
+      because there is no such limit for stake withdrawals.
+      At worst we can revisit this decision in a later protocol amendment (in
+      25 cycles) or clean up this storage manually or automatically.
+  *)
+  module Slashed_deposits :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Slashed_deposits_history.t
+       and type t := Raw_context.t
+
   (** Associates a contract and a bond_id with a bond, i.e. an amount of tez
       that is frozen. *)
   module Frozen_bonds :
@@ -229,6 +315,10 @@ module Contract : sig
       with type key = Contract_repr.t
        and type value = Tez_repr.t
        and type t := Raw_context.t
+
+  (** Stores the amount of tokens currently present on chain *)
+  module Total_supply :
+    Single_data_storage with type value = Tez_repr.t and type t := Raw_context.t
 end
 
 module Big_map : sig
@@ -379,7 +469,17 @@ module Consensus_keys :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
+(** The pending consensus key of a delegate at the given cycle *)
+module Pending_consensus_keys :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key = Contract_repr.t
+     and type value = Signature.public_key
+
+type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
+
+(** [slashed_level] with all fields being [false]. *)
+val default_slashed_level : slashed_level
 
 (** Set used to avoid slashing multiple times the same event *)
 module Slashed_deposits :
@@ -388,14 +488,30 @@ module Slashed_deposits :
      and type key = Raw_level_repr.t * Signature.Public_key_hash.t
      and type value = slashed_level
 
+module Pending_staking_parameters :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key = Contract_repr.t
+     and type value = Staking_parameters_repr.t
+
 module Stake : sig
   (** The map of all the staking balances of all delegates, including
      those with less than
      {!Constants_parametric_repr.minimal_stake}. It might be large *)
-  module Staking_balance :
+  module Staking_balance_up_to_Nairobi :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
        and type value = Tez_repr.t
+       and type snapshot = int
+       and type t := Raw_context.t
+
+  (** The map of all the stake of all delegates, including those with
+      less than {!Constants_parametric_repr.minimal_stake}. It might
+      be large. *)
+  module Staking_balance :
+    Indexed_data_snapshotable_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Stake_repr.Full.t
        and type snapshot = int
        and type t := Raw_context.t
 
@@ -412,11 +528,25 @@ module Stake : sig
   module Last_snapshot :
     Single_data_storage with type value = int and type t := Raw_context.t
 
+  (* Remove me in P. *)
+  module Selected_distribution_for_cycle_up_to_Nairobi :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
+       and type t := Raw_context.t
+
   (** List of active stake *)
   module Selected_distribution_for_cycle :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
+       and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
+       and type t := Raw_context.t
+
+  (* Remove me in P. *)
+  module Total_active_stake_up_to_Nairobi :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Tez_repr.t
        and type t := Raw_context.t
 
   (** Sum of the active stakes of all the delegates with
@@ -424,7 +554,7 @@ module Stake : sig
   module Total_active_stake :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value = Tez_repr.t
+       and type value = Stake_repr.t
        and type t := Raw_context.t
 end
 
@@ -434,6 +564,21 @@ module Delegate_sampler_state :
   Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Raw_context.consensus_pk Sampler.t
+     and type t := Raw_context.t
+
+(** Compounding reward bonus for Adaptive Issuance *)
+module Issuance_bonus :
+  Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Int64.t
+     and type t := Raw_context.t
+
+(** Multiplicative coefficient for rewards under Adaptive Issuance
+    (Includes the bonus) *)
+module Issuance_coeff :
+  Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Q.t
      and type t := Raw_context.t
 
 (** Votes *)
@@ -559,7 +704,7 @@ module Ramp_up : sig
   type reward = {
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
-    endorsing_reward_per_slot : Tez_repr.t;
+    attesting_reward_per_slot : Tez_repr.t;
   }
 
   module Rewards :
@@ -601,6 +746,21 @@ module Liquidity_baking : sig
     Single_data_storage
       with type t := Raw_context.t
        and type value = Contract_hash.t
+end
+
+module Adaptive_issuance : sig
+  (** Exponential moving average (ema) of votes set in the block header
+      protocol_data.contents. Once the feature is activated, it can no
+      longer be deactivated without a protocol amendment. **)
+  module Launch_ema :
+    Single_data_storage with type t := Raw_context.t and type value = Int32.t
+
+  (** Cycle [Some c] from which adaptive issuance is (or will be)
+     active, or [None] if the feature is not yet planned to activate. **)
+  module Activation :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Cycle_repr.t option
 end
 
 (** A map of [Script_repr.expr] values, indexed by their hash ([Script_expr_hash.t]).
@@ -646,59 +806,31 @@ module Tenderbake : sig
       with type t := Raw_context.t
        and type value = Raw_level_repr.t
 
-  (** [Endorsement_branch] stores a single value composed of the
+  (** [Attestation_branch] stores a single value composed of the
       grandparent hash and the predecessor's payload (computed with
       the grandparent hash) used to verify the validity of
-      endorsements. *)
+      attestations. *)
+  module Attestation_branch :
+    Single_data_storage
+      with type value = Block_hash.t * Block_payload_hash.t
+       and type t := Raw_context.t
+
+  (** Similar to [Attestation_branch] but only used for the stitching from
+      Nairobi.
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/6082
+      This should be removed once in the next protocol. *)
   module Endorsement_branch :
     Single_data_storage
       with type value = Block_hash.t * Block_payload_hash.t
        and type t := Raw_context.t
-end
 
-module Tx_rollup : sig
-  (** [State] stores the state of a transaction rollup. *)
-  module State :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Tx_rollup_repr.t
-       and type value = Tx_rollup_state_repr.t
+  (** [Forbidden_delegates] stores the set of delegates that are not
+      allowed to bake or attest blocks. *)
+  module Forbidden_delegates :
+    Single_data_storage
+      with type value = Signature.Public_key_hash.Set.t
        and type t := Raw_context.t
-
-  (** The representation of an inbox. See {!Tx_rollup_inbox_repr.t}
-     for a description of the actual content. *)
-  module Inbox :
-    Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Tx_rollup_repr.t
-       and type key = Tx_rollup_level_repr.t
-       and type value = Tx_rollup_inbox_repr.t
-
-  (** A carbonated storage of the set of withdrawals revealed of those
-      potentially associated to each message of an inbox. The key is the message
-      number, which is sequentially assigned from 0. *)
-  module Revealed_withdrawals :
-    Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Tx_rollup_repr.t
-       and type key = Tx_rollup_level_repr.t
-       and type value = Bitset.t
-
-  (** A rollup can have at most one commitment per rollup level. Some
-      metadata are saved in addition to the commitment itself. See
-     {!Tx_rollup_commitment_repr.Submitted_commitment.t} for the exact
-     content. *)
-  module Commitment :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Tx_rollup_level_repr.t
-       and type value = Tx_rollup_commitment_repr.Submitted_commitment.t
-       and type t := Raw_context.t * Tx_rollup_repr.t
-
-  (** This stores information about which contracts have bonds
-     for each rollup, and how many commitments those bonds
-     stake. *)
-  module Commitment_bond :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Signature.public_key_hash
-       and type value = int
-       and type t := Raw_context.t * Tx_rollup_repr.t
 end
 
 module Sc_rollup : sig
@@ -866,6 +998,36 @@ module Sc_rollup : sig
       with type t = Raw_context.t * Sc_rollup_repr.t
        and type key = int32
        and type value = Raw_level_repr.t * Bitset.t
+
+  (** A carbonated storage for stakers (identified by their public key hashes)
+      that are able to stake on commitments. If the storage is
+      empty then the rollup is public (anyone can publish commitments for the rollup),
+      otherwise it is private (only the members of the whitelist can publish commitments). *)
+  module Whitelist :
+    Carbonated_data_set_storage
+      with type t := Raw_context.t * Sc_rollup_repr.t
+       and type elt = Signature.Public_key_hash.t
+
+  (** Maximal space available for the whitelist without needing to burn new fees. *)
+  module Whitelist_paid_storage_space :
+    Indexed_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Z.t
+       and type t = Raw_context.t
+
+  (** Current storage space in bytes used by the whitelist. *)
+  module Whitelist_used_storage_space :
+    Indexed_data_storage
+      with type t = Raw_context.t
+       and type key = Sc_rollup_repr.t
+       and type value = Z.t
+
+  (** Outbox level and message of the latest whitelist update of a given rollup. *)
+  module Last_whitelist_update :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t = Raw_context.t
+       and type key = Sc_rollup_repr.t
+       and type value = Raw_level_repr.t * Z.t
 end
 
 module Dal : sig

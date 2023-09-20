@@ -66,23 +66,23 @@ functor
       let* tmp = Bytes.add ~ignore_carry:true tmp x in
       v.(a) <- tmp ;
       let* tmp = Bytes.xor v.(d) v.(a) in
-      let tmp = Bytes.rotate tmp r1 in
+      let* tmp = Bytes.rotate_right tmp r1 in
       v.(d) <- tmp ;
       let* tmp = Bytes.add ~ignore_carry:true v.(c) v.(d) in
       v.(c) <- tmp ;
       let* tmp = Bytes.xor v.(b) v.(c) in
-      let tmp = Bytes.rotate tmp r2 in
+      let* tmp = Bytes.rotate_right tmp r2 in
       v.(b) <- tmp ;
       let* tmp = Bytes.add ~ignore_carry:true v.(a) v.(b) in
       let* tmp = Bytes.add ~ignore_carry:true tmp y in
       v.(a) <- tmp ;
       let* tmp = Bytes.xor v.(d) v.(a) in
-      let tmp = Bytes.rotate tmp r3 in
+      let* tmp = Bytes.rotate_right tmp r3 in
       v.(d) <- tmp ;
       let* tmp = Bytes.add ~ignore_carry:true v.(c) v.(d) in
       v.(c) <- tmp ;
       let* tmp = Bytes.xor v.(b) v.(c) in
-      let tmp = Bytes.rotate tmp r4 in
+      let* tmp = Bytes.rotate_right tmp r4 in
       v.(b) <- tmp ;
       ret v
 
@@ -106,7 +106,7 @@ functor
       with_label ~label:"Blake2s.compression"
       @@ let* constants =
            mapM
-             (fun c -> constant_bytes (Utils.bytes_of_hex c))
+             (fun c -> Bytes.constant ~le:false (Utils.bytes_of_hex c))
              [
                "6A09E667";
                "BB67AE85";
@@ -120,16 +120,20 @@ functor
          in
          let constants = Array.of_list constants in
          let v = Array.append h constants in
-         let* tmp = constant_uint32 Stdint.Uint64.(to_uint32 t) in
+         let* tmp =
+           Bytes.constant_uint32 ~le:false Stdint.Uint64.(to_uint32 t)
+         in
          let* tmp = Bytes.xor v.(12) tmp in
          v.(12) <- tmp ;
          let* tmp =
-           constant_uint32 Stdint.Uint64.(to_uint32 (shift_right t 32))
+           Bytes.constant_uint32
+             ~le:false
+             Stdint.Uint64.(to_uint32 (shift_right t 32))
          in
          let* tmp = Bytes.xor v.(13) tmp in
          v.(13) <- tmp ;
          (* TODO here we assign many times the same constant *)
-         let* tmp = constant_uint32 Stdint.Uint32.max_int in
+         let* tmp = Bytes.constant_uint32 ~le:false Stdint.Uint32.max_int in
          let* tmp = if f then Bytes.xor v.(14) tmp else ret v.(14) in
          v.(14) <- tmp ;
          let* v =
@@ -175,7 +179,7 @@ functor
       let* h =
         foldM
           (fun acc c ->
-            let* w = constant_bytes (Utils.bytes_of_hex c) in
+            let* w = Bytes.constant ~le:false (Utils.bytes_of_hex c) in
             ret (w :: acc))
           []
           [
@@ -191,7 +195,7 @@ functor
           ]
       in
       let h = Array.of_list (List.rev h) in
-      let* z = constant_bool false in
+      let* z = Bool.constant false in
 
       let rec loop (blocks, acc_block, acc_u32) (nblock, nu32) rest =
         let blocks, acc_block, acc_u32, nblock, nu32 =

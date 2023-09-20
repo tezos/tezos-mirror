@@ -111,35 +111,42 @@ module StringMap = struct
       failwith "sub_map : first argument is not contained in the second." ;
     res
 
-  let two_maps_of_pair_map m =
-    fold
-      (fun k (v1, v2) (acc1, acc2) -> (add k v1 acc1, add k v2 acc2))
-      m
-      (empty, empty)
-
   let update_keys f map = fold (fun k v acc -> add (f k) v acc) map empty
 
   module Aggregation = struct
     (* separator between prefixes & name ; must be only one character *)
     let sep = "~"
 
+    let update_key_name f str =
+      match String.rindex_from_opt str (String.length str - 1) sep.[0] with
+      | None -> f str
+      | Some i ->
+          String.sub str 0 (i + 1)
+          ^ f (String.sub str (i + 1) (String.length str - i - 1))
+
     let padded ~n i =
       let str = string_of_int i in
       let len = String.length (string_of_int (n - 1)) in
       String.(make (len - length str) '0') ^ str
 
-    let add_prefix ?(no_sep = false) ?(n = 1) ?(i = 0) ?(shift = 0) prefix str =
+    let add_prefix ?(no_sep = false) ?(n = 0) ?(i = 0) ?(shift = 0) prefix str =
       let prefix = if prefix = "" || no_sep then prefix else prefix ^ sep in
-      if n = 1 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
+      if n = 0 then prefix ^ str else prefix ^ padded ~n (i + shift) ^ sep ^ str
+
+    let build_all_names prefix n name =
+      List.init n (fun i -> add_prefix ~n ~i prefix name)
 
     let prefix_map ?n ?i ?shift prefix str_map =
       fold (fun k -> add (add_prefix ?n ?i ?shift prefix k)) str_map empty
 
-    (* This function will merge the maps of the list, by prefixing each key with it’s index in the list, optionnally with a shift, with the index prefix prefixed with zero to we able to handle [n] elements with the same prefix size ; if a [prefix] is given, it will be put before the index.
+    let of_list ?n ?shift prefix name l =
+      of_list
+      @@ List.mapi (fun i x -> (add_prefix ?n ~i ?shift prefix name, x)) l
+
+    (* This function will merge the maps of the list, by prefixing each key with it’s index in the list, optionnally with a shift, with the index prefix prefixed with zero to we able to handle n elements with the same prefix size (with n either given by [shift] or by the length of [list_map]) ; if a [prefix] is given, it will be put before the index.
        *)
-    let map_of_list_map ?(prefix = "") ?shift ?n list_map =
-      let n = match n with None -> List.length list_map | Some n -> n in
-      let shift = match shift with None -> 0 | Some shift -> shift in
+    let map_of_list_map ?(prefix = "") ?shift list_map =
+      let shift, n = Option.value ~default:(0, List.length list_map) shift in
       List.mapi (fun i m -> prefix_map ~n ~i ~shift prefix m) list_map
       |> union_disjoint_list
 
@@ -150,12 +157,7 @@ module StringMap = struct
     let gather_maps ?(shifts_map = empty) map_list_map =
       mapi
         (fun name list_map ->
-          let shift, n =
-            match find_opt name shifts_map with
-            | None -> (None, None)
-            | Some (shift, n) -> (Some shift, Some n)
-          in
-          map_of_list_map ?shift ?n list_map)
+          map_of_list_map ?shift:(find_opt name shifts_map) list_map)
         map_list_map
       |> smap_of_smap_smap
 
@@ -174,6 +176,14 @@ module StringMap = struct
 
     let select_answers_by_circuit circuit_name =
       map (filter_by_circuit_name circuit_name)
+
+    let add_map_list_map m1 m2 =
+      mapi
+        (fun k l1 ->
+          match find_opt k m2 with
+          | Some l2 -> List.map2 union_disjoint l1 l2
+          | None -> l1)
+        m1
   end
 end
 
@@ -188,6 +198,7 @@ module type S = sig
 
   val values : 'a t -> 'a list
 
+  (* Splits a map of pairs into a pair of maps *)
   val to_pair : ('a * 'b) t -> 'a t * 'b t
 
   (* [add_unique k v map] adds [k -> v] to [map] & throw an error if [k] is
@@ -211,9 +222,6 @@ module type S = sig
   *)
   val sub_map : 'a t -> 'b t -> 'b t
 
-  (* Splits a map of couple into a couple of maps *)
-  val two_maps_of_pair_map : ('a * 'b) t -> 'a t * 'b t
-
   (* USE WITH CAUTION : be sure your update function won’t create duplications *)
   val update_keys : (key -> key) -> 'a t -> 'a t
 
@@ -221,11 +229,20 @@ module type S = sig
     (* Separator for prefixing *)
     val sep : string
 
+    (* applies the input function on the last part of the input string (parts
+       are delimited by sep).
+       [update_key_name f ("hello" ^ sep ^ "world" ^ sep ^ "!!")]
+       returns ["hello" ^ sep ^ "world" ^ sep ^ (f "!!")]
+    *)
+    val update_key_name : (key -> key) -> key -> key
+
     (* [add_prefix ~n ~i ~shift prefix str] return idx^prefix^sep^str
        idx = [i] + [shift] as a string, eventually padded with '0' before to
        allow a numbering until [n] with the same number of caracters
        for instance, [prefix ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
        "06~hello~world"
+       [n] is zero by default, this means if no n is specified, no idx will be
+        added
        [no_sep] is false by default ; if set to true, the separator before the
         string to prefix will be ommitted :
        [prefix ~no_sep:true ~n:11 ~i:5 ~shift:1 "hello" "world"] will return
@@ -240,6 +257,11 @@ module type S = sig
       string ->
       string
 
+    (* [build_all_names prefix n k] build the list of all prefixed [k] with
+       n proofs : [build_all_names "hello" 11 "world"] will return
+       ["hello~00~world" ; "hello~01~world" ; … ; "hello~10~world"] *)
+    val build_all_names : key -> int -> key -> key list
+
     (* adds prefix to each key of str_map ; [i] will be added as a string
        before the prefix
        For instance [prefix_map ~n:3000 ~i:5 ~shift:1 "hello" map] will prefix
@@ -247,8 +269,9 @@ module type S = sig
     *)
     val prefix_map : ?n:int -> ?i:int -> ?shift:int -> string -> 'a t -> 'a t
 
-    val map_of_list_map :
-      ?prefix:key -> ?shift:int -> ?n:int -> 'a t list -> 'a t
+    (* [Aggregation.of_list ~n ~shift s name l] is the same as
+       [of_list @@ List.mapi (fun i x -> Aggregation.add_prefix ~n ~i ~shift s name, x) l] *)
+    val of_list : ?n:int -> ?shift:int -> string -> string -> 'a list -> 'a t
 
     (* "c1" -> {"a" ; "b"} ; "c2" -> {"a" ; "c"} becomes
        {"c1~a" ; "c1~b" ; "c2~a" ; "c2~c"} with the same values *)
@@ -294,6 +317,9 @@ module type S = sig
        and filters the keys of the inner map, keeping the elements whose key
        corresponds to the given circuit name. *)
     val select_answers_by_circuit : string -> 'a t t -> 'a t t
+
+    (* [add_map_list_map m1 m2] will merge [m1] & [m2] ; the resulting map will contain the same keys as [m1] ; [m1] & [m2] can be disjoint, if a key is not found in [m2], the resulting map contains the same binding as [m1] for this key  *)
+    val add_map_list_map : 'a t list t -> 'a t list t -> 'a t list t
   end
 end
 

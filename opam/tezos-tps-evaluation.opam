@@ -10,23 +10,21 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "caqti"
   "caqti-dynload"
   "caqti-lwt"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "lwt" { >= "5.6.0" }
-  "tezos-baking-alpha"
-  "tezos-client-alpha"
-  "tezos-client-base-unix"
+  "octez-protocol-alpha-libs"
+  "octez-shell-libs"
   "tezos-protocol-alpha"
-  "tezt" { >= "3.1.0" }
+  "tezt" { >= "3.1.1" }
   "tezt-tezos"
-  "tezt-performance-regression"
   "uri" { >= "3.1.0" }
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

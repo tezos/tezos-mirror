@@ -5,11 +5,11 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-webassembly-interpreter
-  tezos-webassembly-interpreter-extra
+  octez-l2-libs.webassembly-interpreter
+  octez-l2-libs.webassembly-interpreter-extra
   lwt.unix
-  tezos-tree-encoding
-  tezos-lazy-containers)
+  octez-libs.tree-encoding
+  octez-libs.lazy-containers)
  (flags
   (:standard)
   -open Tezos_webassembly_interpreter

@@ -109,6 +109,10 @@ type t
     whose name is derived from [name]. It will be created
     as a named pipe so that node events can be received.
 
+    Default value for [net_addr] is either [127.0.0.1] if no [runner] is
+    provided, or a value allowing the local Tezt program to connect to it
+    if it is.
+
     Default values for [net_port] or [rpc_port] are chosen automatically
     with values starting from 16384 (configurable with `--starting-port`).
     They are used by [config_init]
@@ -133,6 +137,7 @@ val create :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
+  ?net_addr:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
   ?rpc_host:string ->
@@ -302,6 +307,15 @@ module Config_file : sig
   val set_sandbox_network_with_user_activated_overrides :
     (string * string) list -> JSON.t -> JSON.t
 
+  (** Set the network config to a sandbox with the given dal config. *)
+  val set_sandbox_network_with_dal_config :
+    Tezos_crypto_dal.Cryptobox.Config.t -> JSON.t -> JSON.t
+
+  (** Update the network config with the given user
+      activated upgrades. *)
+  val update_network_with_user_activated_upgrades :
+    (int * Protocol.t) list -> JSON.t -> JSON.t
+
   (** Set the prevalidator configuration in the given configuration. *)
   val set_prevalidator :
     ?operations_request_timeout:float ->
@@ -362,10 +376,12 @@ val snapshot_info : ?json:bool -> t -> string -> unit Lwt.t
 val spawn_snapshot_info : ?json:bool -> t -> string -> Process.t
 
 (** Run [octez-node snapshot import]. *)
-val snapshot_import : ?reconstruct:bool -> t -> string -> unit Lwt.t
+val snapshot_import :
+  ?no_check:bool -> ?reconstruct:bool -> t -> string -> unit Lwt.t
 
 (** Same as [snapshot_import], but do not wait for the process to exit. *)
-val spawn_snapshot_import : ?reconstruct:bool -> t -> string -> Process.t
+val spawn_snapshot_import :
+  ?no_check:bool -> ?reconstruct:bool -> t -> string -> Process.t
 
 (** Run [octez-node reconstruct]. *)
 val reconstruct : t -> unit Lwt.t

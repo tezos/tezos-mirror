@@ -68,6 +68,8 @@ let ( + ) = Int64.add
 
 let ( - ) = Int64.sub
 
+let ( /! ) = Int64.div
+
 let parse_floating tez_string =
   let re = rex "(\\d+)\\.?(\\d*)" in
   let fail () = Test.fail "Invalid tez value: '%s'." tez_string in

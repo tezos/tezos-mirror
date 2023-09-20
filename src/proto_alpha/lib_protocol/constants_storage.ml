@@ -72,29 +72,21 @@ let minimal_stake c =
   let constants = Raw_context.constants c in
   constants.minimal_stake
 
+let minimal_frozen_stake c =
+  let constants = Raw_context.constants c in
+  constants.minimal_frozen_stake
+
 let vdf_difficulty c =
   let constants = Raw_context.constants c in
   constants.vdf_difficulty
-
-let seed_nonce_revelation_tip c =
-  let constants = Raw_context.constants c in
-  constants.seed_nonce_revelation_tip
 
 let origination_size c =
   let constants = Raw_context.constants c in
   constants.origination_size
 
-let baking_reward_fixed_portion c =
+let issuance_weights c =
   let constants = Raw_context.constants c in
-  constants.baking_reward_fixed_portion
-
-let baking_reward_bonus_per_slot c =
-  let constants = Raw_context.constants c in
-  constants.baking_reward_bonus_per_slot
-
-let endorsing_reward_per_slot c =
-  let constants = Raw_context.constants c in
-  constants.endorsing_reward_per_slot
+  constants.issuance_weights
 
 let quorum_min c =
   let constants = Raw_context.constants c in
@@ -108,17 +100,11 @@ let min_proposal_quorum c =
   let constants = Raw_context.constants c in
   constants.min_proposal_quorum
 
-let liquidity_baking_subsidy c =
-  let constants = Raw_context.constants c in
-  constants.liquidity_baking_subsidy
-
 let liquidity_baking_toggle_ema_threshold c =
   let constants = Raw_context.constants c in
   constants.liquidity_baking_toggle_ema_threshold
 
 let parametric c = Raw_context.constants c
-
-let tx_rollup c = (Raw_context.constants c).tx_rollup
 
 let sc_rollup c = (Raw_context.constants c).sc_rollup
 
@@ -146,77 +132,17 @@ let max_slashing_period c =
   let constants = Raw_context.constants c in
   constants.max_slashing_period
 
-let frozen_deposits_percentage c =
+let limit_of_delegation_over_baking c =
   let constants = Raw_context.constants c in
-  constants.frozen_deposits_percentage
+  constants.limit_of_delegation_over_baking
 
-let double_baking_punishment c =
+let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
-  constants.double_baking_punishment
+  constants.percentage_of_frozen_deposits_slashed_per_double_baking
 
-let tx_rollup_enable c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.enable
-
-let tx_rollup_sunset_level c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.sunset_level
-
-let tx_rollup_origination_size c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.origination_size
-
-let tx_rollup_hard_size_limit_per_inbox c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.hard_size_limit_per_inbox
-
-let tx_rollup_hard_size_limit_per_message c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.hard_size_limit_per_message
-
-let tx_rollup_max_withdrawals_per_batch c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_withdrawals_per_batch
-
-let tx_rollup_commitment_bond c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.commitment_bond
-
-let tx_rollup_finality_period c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.finality_period
-
-let tx_rollup_withdraw_period c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.withdraw_period
-
-let tx_rollup_max_inboxes_count c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_inboxes_count
-
-let tx_rollup_max_messages_per_inbox c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_messages_per_inbox
-
-let tx_rollup_max_commitments_count c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_commitments_count
-
-let tx_rollup_cost_per_byte_ema_factor c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.cost_per_byte_ema_factor
-
-let tx_rollup_max_ticket_payload_size c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_ticket_payload_size
-
-let tx_rollup_rejection_max_proof_size c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.rejection_max_proof_size
-
-let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
+let percentage_of_frozen_deposits_slashed_per_double_attestation c =
   let constants = Raw_context.constants c in
-  constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
+  constants.percentage_of_frozen_deposits_slashed_per_double_attestation
 
 let testnet_dictator c =
   let constants = Raw_context.constants c in
@@ -274,6 +200,14 @@ let max_number_of_stored_cemented_commitments c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.max_number_of_stored_cemented_commitments
 
+let sc_rollup_reveal_activation_level c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.reveal_activation_level
+
+let sc_rollup_private_enable c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.private_enable
+
 let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots
@@ -293,3 +227,23 @@ let zk_rollup_min_pending_to_process c =
 let zk_rollup_origination_size c =
   let zk_rollup = Raw_context.zk_rollup c in
   zk_rollup.origination_size
+
+let zk_rollup_max_ticket_payload_size c =
+  let zk_rollup = Raw_context.zk_rollup c in
+  zk_rollup.max_ticket_payload_size
+
+let adaptive_issuance c = (Raw_context.constants c).adaptive_issuance
+
+let adaptive_issuance_enable c = Raw_context.adaptive_issuance_enable c
+
+let adaptive_issuance_global_limit_of_staking_over_baking c =
+  (adaptive_issuance c).global_limit_of_staking_over_baking
+
+let adaptive_issuance_edge_of_staking_over_delegation c =
+  (adaptive_issuance c).edge_of_staking_over_delegation
+
+let adaptive_issuance_launch_ema_threshold c =
+  (adaptive_issuance c).launch_ema_threshold
+
+let adaptive_issuance_rewards_params c =
+  (adaptive_issuance c).adaptive_rewards_params

@@ -44,32 +44,50 @@ let make_unix_cctxt ~scheme ~host ~port =
   in
   new unix_cctxt ~rpc_config
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
-   If the preimage was generated using a different plugin, the computation of
-   the hash might fail. In practice it would be better to retrieve the
-   hash of the protocol that the coordinator was using when the page hash
-   was computed.
-*)
-let get_preimage (cctxt : #cctxt) ~page_hash =
-  cctxt#call_service RPC_services.get_preimage ((), page_hash) () ()
+let of_uri uri =
+  let endpoint = uri in
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
+  in
+  new unix_cctxt ~rpc_config
 
-let post_store_preimage (cctxt : #cctxt) ~payload ~pagination_scheme =
-  cctxt#call_service
-    RPC_services.post_store_preimage
-    ()
-    ()
-    (payload, pagination_scheme)
+module V0 = struct
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
+     If the preimage was generated using a different plugin, the computation of
+     the hash might fail. In practice it would be better to retrieve the
+     hash of the protocol that the coordinator was using when the page hash
+     was computed.
+  *)
+  let get_preimage (cctxt : #cctxt) ~page_hash =
+    cctxt#call_service RPC_services.V0.get_preimage ((), page_hash) () ()
 
-let get_verify_signature (cctxt : #cctxt) ~external_message =
-  cctxt#call_service RPC_services.get_verify_signature () external_message ()
+  let put_dac_member_signature (cctxt : #cctxt) ~signature =
+    cctxt#call_service RPC_services.V0.put_dac_member_signature () () signature
 
-let put_dac_member_signature (cctxt : #cctxt) ~signature =
-  cctxt#call_service RPC_services.put_dac_member_signature () () signature
+  let get_certificate (cctxt : #cctxt) ~root_page_hash =
+    cctxt#call_service
+      RPC_services.V0.get_certificate
+      ((), root_page_hash)
+      ()
+      ()
 
-let get_certificate (cctxt : #cctxt) ~root_page_hash =
-  cctxt#call_service RPC_services.get_certificate ((), root_page_hash) () ()
+  let get_serialized_certificate (cctxt : #cctxt) ~root_page_hash =
+    cctxt#call_service
+      RPC_services.V0.get_serialized_certificate
+      ((), root_page_hash)
+      ()
+      ()
 
-module Coordinator = struct
-  let post_preimage (cctxt : #cctxt) ~payload =
-    cctxt#call_service RPC_services.Coordinator.post_preimage () () payload
+  let monitor_certificate (cctxt : #cctxt) ~root_hash =
+    Monitor_services.V0.certificate cctxt root_hash
+
+  module Coordinator = struct
+    let post_preimage (cctxt : #cctxt) ~payload =
+      cctxt#call_service RPC_services.V0.Coordinator.post_preimage () () payload
+  end
+
+  module Observer = struct
+    let get_missing_page (cctxt : #cctxt) page_hash =
+      cctxt#call_service RPC_services.V0.get_missing_page ((), page_hash) () ()
+  end
 end

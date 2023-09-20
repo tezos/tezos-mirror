@@ -82,7 +82,7 @@ let launch_rpc_server dir {address; port; tls_cert_and_key; forwarding_endpoint}
       in
       Lwt.return_ok server)
     (function
-      | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
+      | Unix.Unix_error (EADDRINUSE, "bind", "") ->
           tzfail (Proxy_server_RPC_Port_already_in_use [(address, port)])
       | exn -> fail_with_exn exn)
 

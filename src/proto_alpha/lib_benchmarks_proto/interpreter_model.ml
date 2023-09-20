@@ -93,9 +93,13 @@ let sf = Format.asprintf
 
 let division_cost name =
   let const = fv (sf "%s_const" name) in
-  let coeff = fv (sf "%s_coeff" name) in
+  let size1_coeff = fv (sf "%s_size1_coeff" name) in
+  let q_coeff = fv (sf "%s_q_coeff" name) in
+  let q_size2_coeff = fv (sf "%s_q_size2_coeff" name) in
   let module M = struct
     type arg_type = int * (int * unit)
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -104,6 +108,12 @@ let division_cost name =
 
       let arity = Model.arity_2
 
+      (* Actual [ediv] implementation uses different algorithms
+         depending on the size of the arguments.
+         Ideally, the cost function should be the combination of
+         multiple affine functions branching on the arguments,
+         but the current model fits with only one affine function for simplicity.
+         For more discussion, see https://gitlab.com/tezos/tezos/-/issues/5480 *)
       let model =
         lam ~name:"size1" @@ fun size1 ->
         lam ~name:"size2" @@ fun size2 ->
@@ -111,7 +121,10 @@ let division_cost name =
            saturated subtraction. When [size1 < size2], the model evaluates to
            [const] as expected. *)
         let_ ~name:"q" (sat_sub size1 size2) @@ fun q ->
-        (free ~name:coeff * q * size2) + free ~name:const
+        (free ~name:q_size2_coeff * q * size2)
+        + (free ~name:size1_coeff * size1)
+        + (free ~name:q_coeff * q)
+        + free ~name:const
     end
 
     let name = ns name
@@ -125,6 +138,8 @@ let addlogadd name =
     type arg_type = int * (int * unit)
 
     let name = ns name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -158,6 +173,15 @@ module Models = struct
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
+  let affine_offset_model name ~offset =
+    (* For instructions with cost function
+       [\lambda size. const + coeff * (size - offset)] *)
+    Model.affine_offset
+      ~name:(ns name)
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff:(fv (sf "%s_coeff" name))
+      ~offset
+
   let break_model name break =
     Model.breakdown
       ~name:(ns name)
@@ -183,6 +207,17 @@ module Models = struct
       ~const:(fv (sf "%s_const" name))
       ~break1
       ~break2
+
+  let break_model_2_const_offset name break1 break2 ~offset =
+    Model.breakdown2_const_offset
+      ~name:(ns name)
+      ~coeff1:(fv (sf "%s_coeff1" name))
+      ~coeff2:(fv (sf "%s_coeff2" name))
+      ~coeff3:(fv (sf "%s_coeff3" name))
+      ~const:(fv (sf "%s_const" name))
+      ~break1
+      ~break2
+      ~offset
 
   let nlogm_model name =
     (* For instructions with cost function
@@ -221,6 +256,15 @@ module Models = struct
       ~intercept:(fv (sf "%s_const" name))
       ~coeff:(fv (sf "%s_coeff" name))
 
+  let linear_min_offset_model name ~offset =
+    (* For instructions with cost function
+       [\lambda size1. \lambda size2. const + coeff * (min(size1,size2) - offset)] *)
+    Model.linear_min_offset
+      ~name:(ns name)
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff:(fv (sf "%s_coeff" name))
+      ~offset
+
   let pack_model name =
     Model.trilinear
       ~name:(ns name)
@@ -231,6 +275,8 @@ module Models = struct
   let open_chest_model name =
     let module M = struct
       type arg_type = int * (int * unit)
+
+      let takes_saturation_reprs = false
 
       module Def (X : Costlang.S) = struct
         open X
@@ -243,7 +289,8 @@ module Models = struct
           lam ~name:"size1" @@ fun size1 ->
           lam ~name:"size2" @@ fun size2 ->
           free ~name:(fv (sf "%s_const" name))
-          + (free ~name:(fv (sf "%s_log_time_coeff" name)) * size1)
+          + free ~name:(fv (sf "%s_log_time_coeff" name))
+            * sat_sub size1 (int 1)
           + (free ~name:(fv (sf "%s_plaintext_coeff" name)) * size2)
       end
 
@@ -261,6 +308,8 @@ module Models = struct
   let list_enter_body_model name =
     let module M = struct
       type arg_type = int * (int * unit)
+
+      let takes_saturation_reprs = false
 
       module Def (X : Costlang.S) = struct
         open X
@@ -287,6 +336,8 @@ module Models = struct
     let module M = struct
       type arg_type = int * unit
 
+      let takes_saturation_reprs = false
+
       module Def (X : Costlang.S) = struct
         open X
 
@@ -309,11 +360,38 @@ module Models = struct
   let empty_branch_model name =
     branching_model ~case_0:"empty" ~case_1:"nonempty" name
 
-  let apply_model name = branching_model ~case_0:"lam" ~case_1:"lamrec" name
+  let max_branching_model ~case_0 ~case_1 name =
+    let module M = struct
+      type arg_type = unit
+
+      let takes_saturation_reprs = false
+
+      module Def (X : Costlang.S) = struct
+        open X
+
+        type model_type = size
+
+        let arity = Model.arity_0
+
+        let model =
+          max
+            (free ~name:(fv (sf "%s_%s" name case_0)))
+            (free ~name:(fv (sf "%s_%s" name case_1)))
+      end
+
+      let name = ns name
+    end in
+    (module M : Model.Model_impl with type arg_type = unit)
+
+  let lambda_model name =
+    (* branch whether lambda is rec or nonrec *)
+    branching_model ~case_0:"lam" ~case_1:"lamrec" name
 
   let join_tickets_model name =
     let module M = struct
       type arg_type = int * (int * (int * (int * unit)))
+
+      let takes_saturation_reprs = false
 
       module Def (X : Costlang.S) = struct
         open X
@@ -350,6 +428,8 @@ module Models = struct
 
       let name = ns name
 
+      let takes_saturation_reprs = false
+
       module Def (X : Costlang.S) = struct
         open X
 
@@ -374,6 +454,8 @@ module Models = struct
     let module M = struct
       type arg_type = int * (int * unit)
 
+      let takes_saturation_reprs = false
+
       module Def (X : Costlang.S) = struct
         open X
 
@@ -396,25 +478,48 @@ module Models = struct
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
 end
 
+type ir_model =
+  | TimeModel : 'a Model.model -> ir_model
+  | TimeAllocModel : {
+      name : Namespace.t; (* name for synthesized model *)
+      time : 'a Model.model;
+      alloc : 'a Model.model;
+    }
+      -> ir_model
+
 let ir_model instr_or_cont =
   let open Interpreter_workload in
   let open Models in
   let name = name_of_instr_or_cont instr_or_cont in
-  let m s = Model.Model s in
+  let m s = TimeModel s in
+  let m2 name (time, alloc) =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6072
+       Change naming convention.
+       The current naming convention is for backward compatibility.
+       When we finally switch to the time-allocation model,
+       "_synthesized" should be removed and the time model should be qualified with "_time"
+    *)
+    TimeAllocModel
+      {
+        name = ns (name ^ "_synthesized");
+        time = time name;
+        alloc = alloc (name ^ "_alloc");
+      }
+  in
   match instr_or_cont with
   | Instr_name instr -> (
       match instr with
       | N_IDrop | N_IDup | N_ISwap | N_IPush | N_IUnit | N_ICons_pair | N_ICar
-      | N_ICdr | N_ICons_some | N_ICons_none | N_IIf_none | N_IOpt_map | N_ILeft
-      | N_IRight | N_IIf_left | N_ICons_list | N_INil | N_IIf_cons
-      | N_IEmpty_set | N_IEmpty_map | N_IEmpty_big_map | N_IOr | N_IAnd | N_IXor
-      | N_INot | N_IIf | N_ILoop | N_ILoop_left | N_IDip | N_IExec | N_IView
-      | N_ILambda | N_IFailwith | N_IAddress | N_ICreate_contract
-      | N_ISet_delegate | N_INow | N_IMin_block_time | N_IBalance | N_IHash_key
-      | N_IUnpack | N_ISource | N_ISender | N_ISelf | N_IAmount | N_IChainId
-      | N_ILevel | N_ISelf_address | N_INever | N_IUnpair | N_IVoting_power
-      | N_ITotal_voting_power | N_IList_size | N_ISet_size | N_IMap_size
-      | N_ISapling_empty_state ->
+      | N_ICdr | N_ICons_some | N_ICons_none | N_IIf_none | N_ILeft | N_IRight
+      | N_IIf_left | N_ICons_list | N_INil | N_IIf_cons | N_IEmpty_set
+      | N_IEmpty_map | N_IEmpty_big_map | N_IOr | N_IAnd | N_IXor | N_INot
+      | N_IIf | N_ILoop_in | N_ILoop_out | N_ILoop_left_in | N_ILoop_left_out
+      | N_IDip | N_IExec | N_IView | N_IFailwith | N_IAddress
+      | N_ICreate_contract | N_ISet_delegate | N_INow | N_IMin_block_time
+      | N_IBalance | N_IHash_key | N_IUnpack | N_ISource | N_ISender | N_ISelf
+      | N_IAmount | N_IChainId | N_ILevel | N_ISelf_address | N_INever
+      | N_IUnpair | N_IVoting_power | N_ITotal_voting_power | N_IList_size
+      | N_ISet_size | N_IMap_size | N_ISapling_empty_state ->
           const1_model name |> m
       | N_ISet_mem | N_ISet_update | N_IMap_mem | N_IMap_get | N_IMap_update
       | N_IBig_map_mem | N_IBig_map_get | N_IBig_map_update
@@ -462,7 +567,7 @@ let ir_model instr_or_cont =
       | N_IAnd_int_nat -> linear_min_model name |> m
       | N_IXor_nat -> linear_max_model name |> m
       | N_INot_int -> affine_model name |> m
-      | N_ICompare -> linear_min_model name |> m
+      | N_ICompare -> linear_min_offset_model name ~offset:1 |> m
       | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe -> const1_model name |> m
       | N_IPack -> pack_model name |> m
       | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
@@ -474,7 +579,7 @@ let ir_model instr_or_cont =
           const1_model name |> m
       (* The following two instructions are expected to have an affine model. However,
          we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)
-      | N_IDupN -> break_model_2 name 300 400 |> m
+      | N_IDupN -> break_model_2_const_offset name 300 400 ~offset:1 |> m
       | N_IDropN -> break_model_2_const name 300 400 |> m
       | N_IDig | N_IDug | N_IDipN -> affine_model name |> m
       | N_IAdd_bls12_381_g1 | N_IAdd_bls12_381_g2 | N_IAdd_bls12_381_fr
@@ -485,8 +590,8 @@ let ir_model instr_or_cont =
       | N_IMul_bls12_381_fr_z | N_IMul_bls12_381_z_fr
       | N_IPairing_check_bls12_381 ->
           affine_model name |> m
-      | N_IComb_get | N_IComb | N_IComb_set | N_IUncomb ->
-          affine_model name |> m
+      | N_IComb | N_IUncomb -> affine_offset_model name ~offset:2 |> m
+      | N_IComb_get | N_IComb_set -> affine_model name |> m
       | N_ITicket | N_IRead_ticket -> const1_model name |> m
       | N_ISplit_ticket -> linear_max_model name |> m
       | N_IJoin_tickets -> join_tickets_model name |> m
@@ -497,14 +602,18 @@ let ir_model instr_or_cont =
       | N_IMap_map -> affine_model name |> m
       | N_IMap_iter -> affine_model name |> m
       | N_ISet_iter -> affine_model name |> m
-      | N_IHalt -> const1_model name |> m
-      | N_IApply -> apply_model name |> m
+      | N_IHalt -> (const1_model, const1_model) |> m2 name
+      | N_IApply -> lambda_model name |> m
+      | N_ILambda_lam -> const1_model name |> m
+      | N_ILambda_lamrec -> const1_model name |> m
       | N_ILog -> const1_model name |> m
       | N_IOpen_chest -> open_chest_model name |> m
-      | N_IEmit -> const1_model name |> m)
+      | N_IEmit -> const1_model name |> m
+      | N_IOpt_map_none -> const1_model name |> m
+      | N_IOpt_map_some -> const1_model name |> m)
   | Cont_name cont -> (
       match cont with
-      | N_KNil -> const1_model name |> m
+      | N_KNil -> (const1_model, const1_model) |> m2 name
       | N_KCons -> const1_model name |> m
       | N_KReturn -> const1_model name |> m
       | N_KView_exit -> const1_model name |> m
@@ -512,12 +621,41 @@ let ir_model instr_or_cont =
       | N_KUndip -> const1_model name |> m
       | N_KLoop_in -> const1_model name |> m
       | N_KLoop_in_left -> const1_model name |> m
-      | N_KIter -> empty_branch_model name |> m
+      | N_KIter_empty -> const1_model name |> m
+      | N_KIter_nonempty -> const1_model name |> m
       | N_KList_enter_body -> list_enter_body_model name |> m
       | N_KList_exit_body -> const1_model name |> m
       | N_KMap_enter_body -> empty_branch_model name |> m
       | N_KMap_exit_body -> nlogm_model name |> m
       | N_KLog -> const1_model name |> m)
+
+let gas_unit_per_allocation_word = 4
+
+module SynthesizeTimeAlloc : Model.Binary_operation = struct
+  module Def (X : Costlang.S) = struct
+    let op time alloc = X.(max time (alloc * int gas_unit_per_allocation_word))
+  end
+end
+
+let pack_time_model = function
+  | TimeModel m -> Model.Model m
+  | TimeAllocModel {time; _} -> Model.Model time
+
+let pack_alloc_model = function
+  | TimeModel _ -> assert false
+  | TimeAllocModel {alloc; _} -> Model.Model alloc
+
+let pack_time_alloc_model = function
+  | TimeModel _ -> assert false
+  | TimeAllocModel {name; time; alloc} ->
+      Model.Model
+        (Model.synthesize
+           ~name
+           ~binop:(module SynthesizeTimeAlloc)
+           ~x_label:"time"
+           ~x_model:time
+           ~y_label:"alloc"
+           ~y_model:alloc)
 
 let amplification_loop_iteration = fv "amplification_loop_iteration"
 
@@ -531,7 +669,7 @@ let amplification_loop_model =
 
 (* The following model stitches together the per-instruction models and
    adds a term corresponding to the amplification (if needed). *)
-let interpreter_model ?amplification sub_model =
+let interpreter_model ?amplification pack_model sub_model =
   Model.make_aggregated
     ~model:(fun trace ->
       let module Def (X : Costlang.S) = struct
@@ -551,7 +689,7 @@ let interpreter_model ?amplification sub_model =
           List.fold_left
             (fun (acc : X.size X.repr) instr_trace ->
               let name = instr_trace.Interpreter_workload.name in
-              let (Model.Model model) = ir_model name in
+              let (Model.Model model) = pack_model (ir_model name) in
               let (module Applied_instr) =
                 Model.apply (model_with_conv name model) instr_trace
               in
@@ -561,8 +699,26 @@ let interpreter_model ?amplification sub_model =
             trace
       end in
       ((module Def) : Model.applied))
-    ~sub_models:[sub_model]
+    ~sub_models:[pack_model sub_model]
 
-let make_model ?amplification instr_name =
+type benchmark_type = Registration_helpers.benchmark_type = Time | Alloc
+
+let make_time_model ?amplification instr_name =
   let ir_model = ir_model instr_name in
-  [("interpreter", interpreter_model ?amplification ir_model)]
+  [("interpreter", interpreter_model ?amplification pack_time_model ir_model)]
+
+let make_alloc_model instr_name =
+  let ir_model = ir_model instr_name in
+  [("interpreter", interpreter_model pack_alloc_model ir_model)]
+
+let make_model ?amplification benchmark_type instr_name =
+  match benchmark_type with
+  | Time -> make_time_model ?amplification instr_name
+  | Alloc ->
+      (* amplification wouldn't make sense,
+         because the measurement resolution doesn't matter for the allocation *)
+      assert (amplification = None) ;
+      make_alloc_model instr_name
+
+let make_time_alloc_codegen_model instr_name =
+  pack_time_alloc_model (ir_model instr_name)

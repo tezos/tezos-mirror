@@ -103,13 +103,13 @@ function EverCrypt_HMAC_compute(a, tag, key, key_len, data, data_len) {
 }
 
 //Provides: EverCrypt_Hash_Incremental_hash
-//Requires: caml_failwith, Hacl_Hash_SHA2_hash_256, Hacl_Hash_SHA2_hash_512, Spec_Hash_Definitions
+//Requires: caml_failwith, Hacl_Streaming_SHA2_hash_256, Hacl_Streaming_SHA2_hash_512, Spec_Hash_Definitions
 function EverCrypt_Hash_Incremental_hash(a, hash, input, input_len) {
   switch (a) {
     case Spec_Hash_Definitions.SHA2_256:
-      return Hacl_Hash_SHA2_hash_256(input, input_len, hash);
+      return Hacl_Streaming_SHA2_hash_256(input, input_len, hash);
     case Spec_Hash_Definitions.SHA2_512:
-      return Hacl_Hash_SHA2_hash_512(input, input_len, hash);
+      return Hacl_Streaming_SHA2_hash_512(input, input_len, hash);
     default:
       caml_failwith("EverCrypt_Hash_Incremental_hash unimplemented for this algo" + a);
   }

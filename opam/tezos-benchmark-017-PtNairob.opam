@@ -10,21 +10,17 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-stdlib"
-  "tezos-base"
-  "tezos-error-monad"
-  "tezos-micheline"
+  "octez-libs"
   "tezos-micheline-rewriting"
   "tezos-benchmark"
   "tezos-benchmark-type-inference-017-PtNairob"
   "tezos-protocol-017-PtNairob"
-  "tezos-crypto"
   "hashcons"
-  "tezos-017-PtNairob-test-helpers"
+  "octez-protocol-017-PtNairob-libs"
   "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

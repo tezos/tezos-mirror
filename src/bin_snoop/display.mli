@@ -78,7 +78,7 @@ val default_options : options
 (** Performs the plot. Returns the list of files produced. *)
 val perform_plot :
   measure:Measure.packed_measurement ->
-  model_name:string ->
+  local_model_name:string ->
   problem:Inference.problem ->
   solution:Inference.solution ->
   plot_target:plot_target ->

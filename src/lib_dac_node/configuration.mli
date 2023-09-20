@@ -33,9 +33,7 @@ type host_and_port = {host : string; port : int}
 module Coordinator : sig
   (** The type of a coordinator specific configuration mode. *)
   type t = {
-    threshold : int;
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
+    committee_members : Tezos_crypto.Aggregate_signature.public_key list;
   }
 
   (** [committee_members_addresses t] retrieves the addresses of the committee
@@ -48,8 +46,7 @@ end
 module Committee_member : sig
   (** The type of a Committee_member specific configuration mode. *)
   type t = {
-    coordinator_rpc_address : string;
-    coordinator_rpc_port : int;
+    coordinator_rpc_address : Uri.t;
     address : Tezos_crypto.Aggregate_signature.public_key_hash;
   }
 end
@@ -57,37 +54,14 @@ end
 (** Observer specific configuration. *)
 module Observer : sig
   (** The type of an Observer specific configuration mode. *)
-  type t = {coordinator_rpc_address : string; coordinator_rpc_port : int}
-end
-
-(** Legacy specific configuration. *)
-module Legacy : sig
-  (** The type of a legacy-specific configuration mode. *)
   type t = {
-    threshold : int;
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
-    dac_cctxt_config : host_and_port option;
-    committee_member_address_opt :
-      Tezos_crypto.Aggregate_signature.public_key_hash option;
+    coordinator_rpc_address : Uri.t;
+    committee_rpc_addresses : Uri.t list;
+    timeout : int;
   }
 
-  (** [committee_members_addresses t] retrieves the addresses of the committee
-     members from the legacy configuration [t].*)
-  val committee_members_addresses :
-    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
-
-  (** [threshold t] retrieves the Data Availability Committee threshold from
-     the legacy configuration [t]. *)
-  val threshold : t -> int
-
-  (** [host_and_port t] retrieves the host and port of the node that serves
-     as a coordinator for the DAC, if any is specified in the legacy node
-     condiguration. *)
-  val dac_cctxt_config : t -> host_and_port option
-
-  val committee_member_address_opt :
-    t -> Tezos_crypto.Aggregate_signature.public_key_hash option
+  (** Default timeout for fetching a missing page from Committee members. *)
+  val default_timeout : int
 end
 
 (** Mode specific fragment of a configuration. *)
@@ -95,7 +69,6 @@ type mode = private
   | Coordinator of Coordinator.t
   | Committee_member of Committee_member.t
   | Observer of Observer.t
-  | Legacy of Legacy.t
 
 type t = private {
   data_dir : string;  (** The path to the DAC node data directory. *)
@@ -106,46 +79,43 @@ type t = private {
   mode : mode;
       (** Configuration parameters specific to the operating mode of the
           DAC. *)
+  allow_v1_api : bool;  (** Feature flag for registering [V1] API endpoints.*)
 }
 
 (** [mode_name t] returns a string representation of the operating mode
     for the configuration [t]. *)
 val mode_name : t -> string
 
-(** [make_coordinator threshold dac_members_addresses] creates a new coordinator
-    configuration mode using the given [threshold] and [dac_members_addresses].
+(** [make_coordinator committee_members] creates a new coordinator
+    configuration mode using the given [committee_members] public keys.
 *)
-val make_coordinator :
-  int -> Tezos_crypto.Aggregate_signature.public_key_hash list -> mode
+val make_coordinator : Tezos_crypto.Aggregate_signature.public_key list -> mode
 
-(** [make_committee_member coordinator_rpc_address coordinator_rpc_port
-    committee_member_address] creates a new committee-member configuration
-    mode using the given address and port for the coordinator, and the given
-    [committee_member_address]. *)
+(** [make_committee_member ~coordinator_rpc_address committee_member_address] 
+    creates a new committee member configuration with [committee_member_address]
+    as the signer and [coordinator_rpc_address] as the coordinator. *)
 val make_committee_member :
-  string -> int -> Tezos_crypto.Aggregate_signature.public_key_hash -> mode
-
-(** [make_observer coordinator_rpc_address coordinator_rpc_port]
-    creates a new observer configuration using the given address and
-    port for the coordinator, and the given [committee_member_address]. *)
-val make_observer : string -> int -> mode
-
-(** [make_legacy ?coordinator_host_and_port threshold
-    committee_members_addresses]
-    creates a new legacy configuration mode with the specified input
-    parameters. If [host_and_port] is specified, then it will use as the
-    address of the coordinator node for the Data Availability Committee. *)
-val make_legacy :
-  ?coordinator_host_and_port:host_and_port ->
-  int ->
-  Tezos_crypto.Aggregate_signature.public_key_hash trace ->
-  Tezos_crypto.Aggregate_signature.public_key_hash option ->
+  coordinator_rpc_address:Uri.t ->
+  Tezos_crypto.Aggregate_signature.public_key_hash ->
   mode
 
-(** [make ~data_dir ~reveal_data_dir rpc_address rpc_port mode] creates a
-    configuration value from the specified parameters. *)
+(** [make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address]
+    creates a new observer configuration that sets the DAC Committee
+    rpc addresses to [committee_rpc_addresses] and Coordinator endpoint to
+    [coordinator_rpc_address]. *)
+val make_observer :
+  committee_rpc_addresses:Uri.t list -> ?timeout:int -> Uri.t -> mode
+
+(** [make ~data_dir ~reveal_data_dir ~allow_v1_api rpc_address rpc_port mode]
+    creates a configuration value from the specified parameters. *)
 val make :
-  data_dir:string -> reveal_data_dir:string -> string -> int -> mode -> t
+  data_dir:string ->
+  reveal_data_dir:string ->
+  allow_v1_api:bool ->
+  string ->
+  int ->
+  mode ->
+  t
 
 (** [filename config] gets the path to config file *)
 val filename : t -> string
@@ -160,12 +130,12 @@ val reveal_data_dir : t -> string
 
 (** [default_data_dir] is the data directory that the DAC node
     will use, when one is not specified in the configuration:
-    currently set to "${HOME}/.tezos-dac-node." *)
+    currently set to [${HOME}/.tezos-dac-node]. *)
 val default_data_dir : string
 
 (** [default_reveal_data_dir] is the directory that the DAC node
     will use to store pages on disk. Currently set to
-    "${HOME}/.tezos_rollup_node/wasm_2_0_0". *)
+    [${HOME}/.tezos_rollup_node/wasm_2_0_0]. *)
 val default_reveal_data_dir : string
 
 (** [default_rpc_address] is the default address of the RPC server

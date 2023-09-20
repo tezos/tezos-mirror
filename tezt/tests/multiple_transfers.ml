@@ -167,12 +167,7 @@ let test_multiple_transfer =
       Client.get_balance_for ~account:Constant.bootstrap3.alias client
     in
     let source_fee =
-      if payer = source then
-        Tez.of_mutez_int
-          (match protocol with
-          | Nairobi | Alpha -> 0_000_434
-          | Mumbai -> 0_000_608)
-      else Tez.zero
+      if payer = source then Tez.of_mutez_int 0_000_434 else Tez.zero
     in
     Check.(
       (Tez.(balance_source - amount1 - amount3 - source_fee)

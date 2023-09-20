@@ -62,7 +62,7 @@ let test_level_5 () =
   in
   run ~config [(3, (module Hooks)); (2, (module Hooks))]
 
-let test_preendorse_on_valid () =
+let test_preattest_on_valid () =
   let level_to_reach = 2l in
   let round_to_reach = 1l in
   let module Hooks : Hooks = struct
@@ -180,19 +180,19 @@ let test_reset_delayed_pqc () =
 Scenario T1
 
 1. Node A proposes at the round 0.
-2. Both node A and node B preendorse.
+2. Both node A and node B preattest.
 3. Node A stops.
-4. Node B endorses in the round 0 and locks. No decision is taken at the
-   round 0 because A did not endorse.
+4. Node B attests in the round 0 and locks. No decision is taken at the
+   round 0 because A did not attest.
 5. We check that in round 1 (the next slot for B), B proposes the same
    value as A proposed in the round 0, not a new proposal.
 *)
 
 let test_scenario_t1 () =
   let original_proposal = ref None in
-  let a_preendorsed = ref false in
-  let b_preendorsed = ref false in
-  let b_endorsed = ref false in
+  let a_preattested = ref false in
+  let b_preattested = ref false in
+  let b_attested = ref false in
   let b_reproposed = ref false in
   (* Here we use custom hooks to make each node/baker behave according to
      its role in the scenario. *)
@@ -205,17 +205,17 @@ let test_scenario_t1 () =
         ~predicate:
           (op_is_both
              (op_is_signed_by ~public_key:Mockup_simulator.bootstrap1)
-             (op_is_preendorsement ~level:1l ~round:0l))
-        ~var:a_preendorsed
+             (op_is_preattestation ~level:1l ~round:0l))
+        ~var:a_preattested
 
-    let stop_on_event _ = !a_preendorsed
+    let stop_on_event _ = !a_preattested
   end in
   let module Node_b_hooks : Hooks = struct
     include Default_hooks
 
     let check_block_before_processing ~level ~round ~block_hash ~block_header
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
-      (match (!b_endorsed, level, round) with
+      (match (!b_attested, level, round) with
       | false, 1l, 0l ->
           (* If any of the checks fails the whole scenario will fail. *)
           check_block_signature
@@ -246,16 +246,16 @@ let test_scenario_t1 () =
         ~predicate:
           (op_is_both
              (op_is_signed_by ~public_key:Mockup_simulator.bootstrap2)
-             (op_is_preendorsement ~level:1l ~round:0l))
-        ~var:b_preendorsed
+             (op_is_preattestation ~level:1l ~round:0l))
+        ~var:b_preattested
       >>=? fun () ->
       mempool_has_op_ref
         ~mempool
         ~predicate:
           (op_is_both
              (op_is_signed_by ~public_key:Mockup_simulator.bootstrap2)
-             (op_is_preendorsement ~level:1l ~round:0l))
-        ~var:b_endorsed
+             (op_is_preattestation ~level:1l ~round:0l))
+        ~var:b_attested
 
     let stop_on_event _ = !b_reproposed
   end in
@@ -322,8 +322,8 @@ Scenario T3
 1. There are four nodes: A, B, C, and D.
 2. C is the proposer at the round 0. It sends the proposal, which is
    received by all bakers except for D.
-3. Due to how the messages propagate, only B sees 3 preendorsements. It
-   endorses and locks. Other nodes all see fewer than 3 preendorsements.
+3. Due to how the messages propagate, only B sees 3 preattestations. It
+   attests and locks. Other nodes all see fewer than 3 preattestations.
 
    A -> A and B
    B -> B
@@ -333,7 +333,7 @@ Scenario T3
 
    D -> D, B, C
 
-5. B does not preendorse because it is locked.
+5. B does not preattest because it is locked.
 6. No decision is taken at the round 1.
 7. B proposes at the round 2. There are no more problems with propagation of
    messages, so a decision is reached.
@@ -351,9 +351,9 @@ let test_scenario_t3 () =
     let on_inject_operation ~op_hash ~op =
       if !b_observed_pqc then return (op_hash, op, [Pass; Pass; Pass; Pass])
       else
-        op_is_preendorsement ~level:1l ~round:0l op_hash op
-        >>=? fun is_preendorsement ->
-        if is_preendorsement then
+        op_is_preattestation ~level:1l ~round:0l op_hash op
+        >>=? fun is_preattestation ->
+        if is_preattestation then
           return (op_hash, op, [Pass; Pass; Block; Block])
         else failwith "unexpected operation from the node D"
 
@@ -387,19 +387,19 @@ let test_scenario_t3 () =
     let on_inject_operation ~op_hash ~op =
       if !b_observed_pqc then return (op_hash, op, [Pass; Pass; Pass; Pass])
       else
-        op_is_preendorsement ~level:1l ~round:0l op_hash op
-        >>=? fun is_preendorsement ->
-        if is_preendorsement then
+        op_is_preattestation ~level:1l ~round:0l op_hash op
+        >>=? fun is_preattestation ->
+        if is_preattestation then
           return (op_hash, op, [Block; Pass; Block; Block])
         else failwith "unexpected operation from the node B"
 
     let check_mempool_after_processing ~mempool =
       let predicate op_hash op =
-        op_is_preendorsement ~level:1l ~round:0l op_hash op
+        op_is_preattestation ~level:1l ~round:0l op_hash op
       in
       mempool_count_ops ~mempool ~predicate >>=? fun n ->
       if n > 3 then
-        failwith "B received too many preendorsements, expected to see only 3"
+        failwith "B received too many preattestations, expected to see only 3"
       else if n = 3 then (
         b_observed_pqc := true ;
         return_unit)
@@ -432,9 +432,9 @@ let test_scenario_t3 () =
     let on_inject_operation ~op_hash ~op =
       if !b_observed_pqc then return (op_hash, op, [Pass; Pass; Pass; Pass])
       else
-        op_is_preendorsement ~level:1l ~round:0l op_hash op
-        >>=? fun is_preendorsement ->
-        if is_preendorsement then
+        op_is_preattestation ~level:1l ~round:0l op_hash op
+        >>=? fun is_preattestation ->
+        if is_preattestation then
           return (op_hash, op, [Block; Pass; Pass; Block])
         else failwith "unexpected operation from the node C"
 
@@ -500,7 +500,7 @@ Scenario F1
 
 1. Node C (bootstrap3) proposes at level 1 round 0, its proposal reaches all
    nodes.
-2. Propagation of preendorsements happens in such a way that only Node A
+2. Propagation of preattestations happens in such a way that only Node A
    (bootstrap1) observes PQC:
 
    A -> A
@@ -858,7 +858,7 @@ Scenario M3
    bootstrap2 in delegate selection they have equal voting power. Therefore
    it is necessary to have 2 votes for prequorums (which is achieved when A
    is proposing) and 2 votes for quorums (impossible because B has no way to
-   obtain PQC and thus cannot send endorsements).
+   obtain PQC and thus cannot send attestations).
 
 *)
 
@@ -927,11 +927,11 @@ Scenario M4
 2. A proposes at level 1 round 0. Its proposal reaches A, B, C, and D, but
    with a delay of 0.5 seconds.
 3. 3 votes are enough for consensus, because voting powers of all delegates
-   are equal. Preendorsements propagate freely, however endorsements from C
+   are equal. Preattestations propagate freely, however attestations from C
    are blocked.
 4. Check that at level 1 round 0 quorum is reached (from the point of view
-   of A). This means that D sends an endorsement despite receiving
-   preendorsements before the proposal.
+   of A). This means that D sends an attestation despite receiving
+   preattestations before the proposal.
 
 *)
 
@@ -960,11 +960,11 @@ let test_scenario_m4 () =
 
     let check_mempool_after_processing ~mempool =
       let predicate op_hash op =
-        op_is_endorsement ~level:1l ~round:0l op_hash op
+        op_is_attestation ~level:1l ~round:0l op_hash op
       in
       mempool_count_ops ~mempool ~predicate >>=? fun n ->
       if n > 3 then
-        failwith "A received too many endorsements, expected to see only 3"
+        failwith "A received too many attestations, expected to see only 3"
       else if n = 3 then (
         a_observed_qc := true ;
         return_unit)
@@ -981,12 +981,12 @@ let test_scenario_m4 () =
     include Default_hooks
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_attestation ->
       return
         ( op_hash,
           op,
-          if is_endorsement then [Block; Block; Block; Block]
+          if is_attestation then [Block; Block; Block; Block]
           else [Pass; Pass; Pass; Pass] )
 
     let stop_on_event = stop_on_event0
@@ -1029,7 +1029,7 @@ Scenario M5
 1. There are four bakers: A, B, C, and D.
 2. A proposes at level 1 round 0. Its proposal reaches A, B, C, and D, but with
    a delay of 1 second. There are no problems with propagation of
-   preendorsements and endorsements.
+   preattestations and attestations.
 3. At the level 1 all four bakers have proposer slots, however we block possible
    proposals from B and C at higher rounds.
 4. Check that D proposes at the level 2 round 0, which means that it has
@@ -1142,12 +1142,12 @@ let test_scenario_m6 () =
       return (block_hash, block_header, operations, propagation_vector)
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_a10_attestation ->
       return
         ( op_hash,
           op,
-          if is_a10_endorsement then [Pass; Block; Block; Block]
+          if is_a10_attestation then [Pass; Block; Block; Block]
           else [Pass; Pass; Pass; Pass] )
 
     let stop_on_event = stop_on_event0
@@ -1176,12 +1176,12 @@ let test_scenario_m6 () =
       return (block_hash, block_header, operations, propagation_vector)
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_a10_attestation ->
       return
         ( op_hash,
           op,
-          if is_a10_endorsement then [Pass; Block; Block; Block]
+          if is_a10_attestation then [Pass; Block; Block; Block]
           else [Pass; Pass; Pass; Pass] )
 
     let stop_on_event = stop_on_event0
@@ -1194,12 +1194,12 @@ let test_scenario_m6 () =
       return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_a10_attestation ->
       return
         ( op_hash,
           op,
-          if is_a10_endorsement then [Pass; Block; Block; Block]
+          if is_a10_attestation then [Pass; Block; Block; Block]
           else [Pass; Pass; Pass; Pass] )
 
     let stop_on_event = stop_on_event0
@@ -1283,12 +1283,12 @@ let test_scenario_m7 () =
       return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_a10_attestation ->
       return
         ( op_hash,
           op,
-          if is_a10_endorsement then [Pass; Block; Block; Block]
+          if is_a10_attestation then [Pass; Block; Block; Block]
           else [Pass; Pass; Pass; Pass] )
 
     let stop_on_event = stop_on_event0
@@ -1308,14 +1308,14 @@ let test_scenario_m7 () =
       return (block_hash, block_header, operations, propagation_vector)
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_endorsement ->
-      op_is_preendorsement ~level:2l op_hash op
-      >>=? fun level2_preendorsement ->
-      op_is_endorsement ~level:2l op_hash op >>=? fun level2_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_a10_attestation ->
+      op_is_preattestation ~level:2l op_hash op
+      >>=? fun level2_preattestation ->
+      op_is_attestation ~level:2l op_hash op >>=? fun level2_attestation ->
       let propagation_vector =
         match
-          (is_a10_endorsement, level2_preendorsement, level2_endorsement)
+          (is_a10_attestation, level2_preattestation, level2_attestation)
         with
         | true, _, _ -> [Pass; Block; Block; Block]
         | _, true, _ | _, _, true -> [Block; Block; Block; Block]
@@ -1346,17 +1346,17 @@ let test_scenario_m7 () =
       | _ -> return_unit
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_endorsement ->
-      op_is_preendorsement ~level:2l op_hash op
-      >>=? fun level2_preendorsement ->
-      op_is_endorsement ~level:2l op_hash op >>=? fun level2_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_a10_attestation ->
+      op_is_preattestation ~level:2l op_hash op
+      >>=? fun level2_preattestation ->
+      op_is_attestation ~level:2l op_hash op >>=? fun level2_attestation ->
       let propagation_vector =
         match
-          ( is_a10_endorsement,
+          ( is_a10_attestation,
             !c_received_2_1,
-            level2_preendorsement,
-            level2_endorsement )
+            level2_preattestation,
+            level2_attestation )
         with
         | true, _, _, _ -> [Pass; Block; Block; Block]
         | _, false, true, _ | _, false, _, true -> [Block; Block; Block; Block]
@@ -1387,17 +1387,17 @@ let test_scenario_m7 () =
       | _ -> return_unit
 
     let on_inject_operation ~op_hash ~op =
-      op_is_endorsement ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_endorsement ->
-      op_is_preendorsement ~level:2l op_hash op
-      >>=? fun level2_preendorsement ->
-      op_is_endorsement ~level:2l op_hash op >>=? fun level2_endorsement ->
+      op_is_attestation ~level:1l ~round:0l op_hash op
+      >>=? fun is_a10_attestation ->
+      op_is_preattestation ~level:2l op_hash op
+      >>=? fun level2_preattestation ->
+      op_is_attestation ~level:2l op_hash op >>=? fun level2_attestation ->
       let propagation_vector =
         match
-          ( is_a10_endorsement,
+          ( is_a10_attestation,
             !d_received_2_1,
-            level2_preendorsement,
-            level2_endorsement )
+            level2_preattestation,
+            level2_attestation )
         with
         | true, _, _, _ -> [Pass; Block; Block; Block]
         | _, false, true, _ | _, false, _, true -> [Block; Block; Block; Block]
@@ -1464,15 +1464,15 @@ let test_scenario_m8 () =
     | _ -> false
   in
   let on_inject_operation0 ~op_hash ~op =
-    op_is_endorsement ~level:1l ~round:0l op_hash op
-    >>=? fun is_a10_endorsement ->
-    op_is_endorsement ~level:2l ~round:0l op_hash op
-    >>=? fun is_b20_endorsement ->
-    op_is_endorsement ~level:2l ~round:1l op_hash op
-    >>=? fun is_c21_endorsement ->
+    op_is_attestation ~level:1l ~round:0l op_hash op
+    >>=? fun is_a10_attestation ->
+    op_is_attestation ~level:2l ~round:0l op_hash op
+    >>=? fun is_b20_attestation ->
+    op_is_attestation ~level:2l ~round:1l op_hash op
+    >>=? fun is_c21_attestation ->
     let propagation_vector =
-      if is_a10_endorsement then [Pass; Block; Block; Block]
-      else if is_b20_endorsement || is_c21_endorsement then
+      if is_a10_attestation then [Pass; Block; Block; Block]
+      else if is_b20_attestation || is_c21_attestation then
         [Block; Block; Block; Block]
       else [Pass; Pass; Pass; Pass]
     in
@@ -1597,7 +1597,7 @@ let () =
        [
          (Protocol.name ^ ": reaches level 5", test_level_5);
          ( Protocol.name ^ ": cannot progress without new head",
-           test_preendorse_on_valid );
+           test_preattest_on_valid );
          (Protocol.name ^ ": reset delayed pqc", test_reset_delayed_pqc);
          (Protocol.name ^ ": scenario t1", test_scenario_t1);
          (Protocol.name ^ ": scenario t2", test_scenario_t2);

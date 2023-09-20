@@ -4,13 +4,16 @@ you must instead use an installer.
 To generate the `installer` kernel, you can use the `smart-rollup-installer` tool.
 
 ## Prerequisites
-You will need: 
- - at least **rust-1.66** installed (you can check with `cargo --version`), with the `wasm32-unknown-unknown` toolchain.
- - the [WebAssemblyBinaryToolkit](https://github.com/WebAssembly/wabt) (`wabt`) installed. In particular, the `wasm-strip` executable.
- - `$HOME/.cargo/bin` should be available on your `$PATH`.
- - `clang>=11` installed, and set as `CC` environment variable.
+
+You will need:
+
+- at least **rust-1.66** installed (you can check with `cargo --version`), with the `wasm32-unknown-unknown` toolchain.
+- the [WebAssemblyBinaryToolkit](https://github.com/WebAssembly/wabt) (`wabt`) installed. In particular, the `wasm-strip` executable.
+- `$HOME/.cargo/bin` should be available on your `$PATH`.
+- `clang>=11` installed, and set as `CC` environment variable.
 
 ## Installing `smart-rollup-installer`
+
 Run the following to install:
 
 ```
@@ -59,5 +62,5 @@ smart-rollup-installer get-reveal-installer \
 You can then run the installer in the [debugger](https://tezos.gitlab.io/alpha/smart_rollups.html#testing-your-kernel), using the `--preimage-dir` argument to point to the preimages generated previously:
 
 ```
-octez-smart-rollup-wasm-debugger installer.wasm --inputs inputs.json --preimage-dir <preimages-dir>
+octez-smart-rollup-wasm-debugger --kernel installer.wasm --inputs inputs.json --preimage-dir <preimages-dir>
 ```

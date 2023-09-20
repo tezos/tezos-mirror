@@ -3,10 +3,10 @@
 
 (library
  (name tezos_protocol_environment_005_PsBabyM1)
- (public_name tezos-protocol-005-PsBabyM1.environment)
+ (public_name tezos-protocol-005-PsBabyM1.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_005_PsBabyM1))
 
@@ -19,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_005_PsBabyM1)
- (public_name tezos-protocol-005-PsBabyM1.raw)
+ (public_name tezos-protocol-005-PsBabyM1.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-005-PsBabyM1.environment)
+  tezos-protocol-005-PsBabyM1.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -105,12 +105,12 @@
 
 (library
  (name tezos_protocol_005_PsBabyM1)
- (public_name tezos-protocol-005-PsBabyM1)
+ (public_name tezos-protocol-005-PsBabyM1.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-005-PsBabyM1.raw)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
+  tezos-protocol-005-PsBabyM1.protocol.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -120,7 +120,7 @@
 (install
  (package tezos-protocol-005-PsBabyM1)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -218,12 +218,12 @@
 
 (library
  (name tezos_protocol_005_PsBabyM1_lifted)
- (public_name tezos-protocol-005-PsBabyM1.lifted)
+ (public_name tezos-protocol-005-PsBabyM1.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-005-PsBabyM1)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
+  tezos-protocol-005-PsBabyM1.protocol)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -241,8 +241,8 @@
 (library
  (name tezos_protocol_005_PsBabyM1_functor)
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -330,12 +330,12 @@
 
 (library
  (name tezos_embedded_protocol_005_PsBabyM1)
- (public_name tezos-embedded-protocol-005-PsBabyM1)
+ (public_name tezos-protocol-005-PsBabyM1.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-005-PsBabyM1
-  tezos-protocol-updater
-  tezos-protocol-environment)
+  tezos-protocol-005-PsBabyM1.protocol
+  octez-shell-libs.protocol-updater
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

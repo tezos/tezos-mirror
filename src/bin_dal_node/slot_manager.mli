@@ -70,28 +70,48 @@ val get_commitment_slot :
   Cryptobox.commitment ->
   (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
 
-(** [add_commitment_shards node_store cryptobox commitment ~with_proof]
-    registers the shards of the slot whose commitment is given.
+(** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
+    commitment ~with_proof] registers the shards of the slot whose commitment is
+    given.
+
+    If [with_proof] is true, proofs are generated for the computed
+    shards using [shards_proofs_precomputation] and stored in a bounded
+    structure in memory.
 
     In addition to decoding errors, the function returns [`Not_found]
     if there is no slot content for [commitment] in [node_store]. *)
 val add_commitment_shards :
+  shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation ->
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  Services.Types.with_proof ->
+  with_proof:bool ->
   (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
 
-(** [store_slot_headers ~block_level ~block_hash slot_headers node_store] stores
-    [slot_headers] onto the [node_store] associated to the given [block_hash]
-    baked at level [block_level].
-*)
+(** This function publishes the shards of a commitment that is waiting for
+    attestion on L1 if this node has those shards on disk and their proofs in
+    memory. *)
+val publish_slot_data :
+  level_committee:
+    (level:int32 ->
+    Committee_cache.shard_indices Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
+  Store.node_store ->
+  Gossipsub.Worker.t ->
+  Cryptobox.t ->
+  Dal_plugin.proto_parameters ->
+  Cryptobox.commitment ->
+  int32 ->
+  int ->
+  unit tzresult Lwt.t
+
+(** [store_slot_headers  ~block_level ~block_hash slot_headers node_store]
+    stores [slot_headers] onto the [node_store] associated to the given [block_hash]
+    baked at level [block_level]. *)
 val store_slot_headers :
   block_level:int32 ->
-  block_hash:Block_hash.t ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
-  unit Lwt.t
+  unit tzresult Lwt.t
 
 (** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots store] updates the statuses of the

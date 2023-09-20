@@ -252,43 +252,96 @@ commands. The following was generated:
 .. code-block:: JSON
 
    {
-        "initial_timestamp": "1970-01-01T00:00:00Z",
-        "chain_id": "NetXynUjJNZm7wi",
-        "delay_per_missing_endorsement": "1",
-        "initial_endorsers": 1,
-        "min_proposal_quorum": 500,
-        "quorum_max": 7000,
-        "quorum_min": 2000,
-        "hard_storage_limit_per_operation": "60000",
-        "cost_per_byte": "250",
-        "endorsement_reward": [
-            "1250000",
-            "833333"
-        ],
-        "baking_reward_per_endorsement": [
-            "1250000",
-            "187500"
-        ],
-        "endorsement_security_deposit": "64000000",
-        "block_security_deposit": "512000000",
-        "origination_size": 257,
-        "seed_nonce_revelation_tip": "125000",
-        "michelson_maximum_type_size": 1000,
-        "tokens_per_roll": "8000000000",
-        "proof_of_work_threshold": "-1",
-        "hard_gas_limit_per_block": "10400000",
-        "hard_gas_limit_per_operation": "1040000",
-        "endorsers_per_block": 32,
-        "time_between_blocks": [
-            "1",
-            "0"
-        ],
-        "cycles_per_voting_period": 8,
-        "blocks_per_roll_snapshot": 4,
-        "blocks_per_commitment": 4,
+        "preserved_cycles": 2,
         "blocks_per_cycle": 8,
-        "preserved_cycles": 2
-    }
+        "blocks_per_commitment": 4,
+        "nonce_revelation_threshold": 4,
+        "blocks_per_stake_snapshot": 4,
+        "cycles_per_voting_period": 8,
+        "hard_gas_limit_per_operation": "1040000",
+        "hard_gas_limit_per_block": "2600000",
+        "proof_of_work_threshold": "4611686018427387903",
+        "minimal_stake": "6000000000",
+        "vdf_difficulty": "50000",
+        "origination_size": 257,
+        "reward_weights": {
+            "base_total_rewards_per_minute": "85007812",
+            "baking_reward_fixed_portion_weight": 5120,
+            "baking_reward_bonus_weight": 5120,
+            "attesting_reward_weight": 10240,
+            "liquidity_baking_subsidy_weight": 1280,
+            "seed_nonce_revelation_tip_weight": 1,
+            "vdf_revelation_tip_weight": 1
+        },
+        "cost_per_byte": "250",
+        "hard_storage_limit_per_operation": "60000",
+        "quorum_min": 2000,
+        "quorum_max": 7000,
+        "min_proposal_quorum": 500,
+        "liquidity_baking_toggle_ema_threshold": 1000000000,
+        "max_operations_time_to_live": 240,
+        "minimal_block_delay": "1",
+        "delay_increment_per_round": "1",
+        "consensus_committee_size": 256,
+        "consensus_threshold": 0,
+        "minimal_participation_ratio": {
+            "numerator": 2,
+            "denominator": 3
+        },
+        "max_slashing_period": 2,
+        "limit_of_delegation_over_baking": 19,
+        "percentage_of_frozen_deposits_slashed_per_double_baking": 10,
+        "percentage_of_frozen_deposits_slashed_per_double_attestation": 50,
+        "cache_script_size": 100000000,
+        "cache_stake_distribution_cycles": 8,
+        "cache_sampler_state_cycles": 8,
+        "dal_parametric": {
+            "feature_enable": false,
+            "number_of_slots": 16,
+            "attestation_lag": 4,
+            "attestation_threshold": 50,
+            "blocks_per_epoch": 2,
+            "redundancy_factor": 8,
+            "page_size": 128,
+            "slot_size": 32768,
+            "number_of_shards": 64
+        },
+        "smart_rollup_enable": true,
+        "smart_rollup_arith_pvm_enable": false,
+        "smart_rollup_origination_size": 6314,
+        "smart_rollup_challenge_window_in_blocks": 80640,
+        "smart_rollup_stake_amount": "10000000000",
+        "smart_rollup_commitment_period_in_blocks": 60,
+        "smart_rollup_max_lookahead_in_blocks": 172800,
+        "smart_rollup_max_active_outbox_levels": 80640,
+        "smart_rollup_max_outbox_messages_per_level": 100,
+        "smart_rollup_number_of_sections_in_dissection": 32,
+        "smart_rollup_timeout_period_in_blocks": 40320,
+        "smart_rollup_max_number_of_cemented_commitments": 5,
+        "smart_rollup_max_number_of_parallel_games": 32,
+        "smart_rollup_reveal_activation_level": {
+            "raw_data": { "Blake2B": 0 },
+            "metadata": 0,
+            "dal_page": 0
+        },
+        "zk_rollup_enable": false,
+        "zk_rollup_origination_size": 4000,
+        "zk_rollup_min_pending_to_process": 10,
+        "zk_rollup_max_ticket_payload_size": 2048,
+        "global_limit_of_staking_over_baking": 5,
+        "edge_of_staking_over_delegation": 2,
+        "adaptive_issuance_launch_ema_threshold": 1600000000,
+        "adaptive_rewards_params": {
+            "reward_ratio_min": { "numerator": "1", "denominator": "200" },
+            "reward_ratio_max": { "numerator": "1", "denominator": "10" },
+            "max_bonus": "50000000000000",
+            "growth_rate": "115740740",
+            "center_dz": { "numerator": "1", "denominator": "2" },
+            "radius_dz": { "numerator": "1", "denominator": "50" }
+        },
+        "chain_id": "NetXynUjJNZm7wi",
+        "initial_timestamp": "1970-01-01T00:00:00Z"
+  }
 
 Besides usual protocol constants, there are 2 additional fields supported in Mockup mode:
 

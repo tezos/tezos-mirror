@@ -337,3 +337,40 @@ let test_roundtrip ~count ~title ~gen ~eq encoding =
       test Roundtrip.binary input ;
       test Roundtrip.json input ;
       true)
+
+let test_roundtrip_through_binary ~count ~title ~gen ~eq encoding1 encoding2 =
+  let pp fmt x =
+    Data_encoding.Json.construct encoding1 x
+    |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
+  in
+  let test encoding1 encoding2 rdt input =
+    let output =
+      try Roundtrip.make_with_2_encoding encoding1 encoding2 rdt input
+      with exn ->
+        QCheck2.Test.fail_reportf
+          "%s %s roundtrip error: error %s on %a"
+          title
+          (Roundtrip.target rdt)
+          (Printexc.to_string exn)
+          pp
+          input
+    in
+    let success = eq input output in
+    if not success then
+      QCheck2.Test.fail_reportf
+        "%s %s roundtrip error: %a became %a"
+        title
+        (Roundtrip.target rdt)
+        pp
+        input
+        pp
+        output
+  in
+  QCheck2.Test.make
+    ~count
+    ~name:(Format.asprintf "roundtrip through binary %s" title)
+    gen
+    (fun input ->
+      test encoding1 encoding2 Roundtrip.binary input ;
+      test encoding2 encoding1 Roundtrip.binary input ;
+      true)

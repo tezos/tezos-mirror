@@ -1,0 +1,9 @@
+{0 Octez-protocol-009-PsFLoren-libs: octez protocol 009-PsFLoren libraries}
+
+This is a package containing some libraries related to the Tezos 009-PsFLoren protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_009_PsFLoren}Tezos_client_009_PsFLoren}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_protocol_plugin_009_PsFLoren}Tezos_protocol_plugin_009_PsFLoren}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_009_PsFLoren_registerer}Tezos_protocol_plugin_009_PsFLoren_registerer}: Protocol plugin registerer

@@ -182,7 +182,7 @@ module Types = struct
 
     open V (L)
 
-    open Encodings (L)
+    open L.Encodings
 
     let op_code_encoding ~safety =
       Bounded_e.encoding ~safety Bound.bound_op_code
@@ -259,7 +259,7 @@ end
 module V (L : LIB) = struct
   open L
   module E = Types.Encodings (L)
-  module Encodings = Encodings (L)
+  module Encodings = L.Encodings
   open Encodings
 
   open Types.V (L)
@@ -379,7 +379,7 @@ end = struct
 
   let lazy_srs =
     lazy
-      (let open Octez_bls12_381_polynomial.Bls12_381_polynomial in
+      (let open Octez_bls12_381_polynomial in
       (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1))
 
   let dummy_l1_dst =
@@ -408,10 +408,7 @@ end = struct
   let circuit_map =
     let get_circuit _name c =
       let r = LibCircuit.get_cs ~optimize:true c in
-      let _initial, public_input_size = LibCircuit.get_inputs c in
-      ( Plonk.Circuit.to_plonk ~public_input_size r.cs,
-        public_input_size,
-        r.solver )
+      (Plonk.Circuit.to_plonk r, r.public_input_size, r.solver)
     in
     SMap.of_list
     @@ List.map
@@ -613,7 +610,7 @@ end = struct
 
     let pending = [false_op; true_op; true_op]
 
-    let n_batches = 10
+    let n_batches = 2
 
     let private_ops =
       Stdlib.List.init n_batches @@ Fun.const

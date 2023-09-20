@@ -28,12 +28,6 @@
 open Protocol
 open Alpha_context
 
-type error_classification =
-  [ `Branch_delayed of tztrace
-  | `Branch_refused of tztrace
-  | `Refused of tztrace
-  | `Outdated of tztrace ]
-
 type nanotez = Q.t
 
 let nanotez_enc : nanotez Data_encoding.t =
@@ -62,22 +56,12 @@ type config = {
   minimal_fees : Tez.t;
   minimal_nanotez_per_gas_unit : nanotez;
   minimal_nanotez_per_byte : nanotez;
-  allow_script_failure : bool;
-      (** If [true], this makes [post_filter_manager] unconditionally return
-            [`Passed_postfilter filter_state], no matter the operation's
-            success. *)
   clock_drift : Period.t option;
   replace_by_fee_factor : Q.t;
-      (** This field determines the amount of additional fees (given as a
-            factor of the declared fees) a manager should add to an operation
-            in order to (eventually) replace an existing (prechecked) one
-            in the mempool. Note that other criteria, such as the gas ratio,
-            are also taken into account to decide whether to accept the
-            replacement or not. *)
-  max_prechecked_manager_operations : int;
-      (** Maximal number of prechecked operations to keep. The mempool only
-            keeps the [max_prechecked_manager_operations] operations with the
-            highest fee/gas and fee/size ratios. *)
+      (** Factor by which the fee and fee/gas ratio of an old operation in
+          the mempool are both multiplied to determine the values that a new
+          operation must exceed in order to replace the old operation. See
+          the [better_fees_and_ratio] function further below. *)
 }
 
 let default_minimal_fees =
@@ -101,12 +85,10 @@ let default_config =
     minimal_fees = default_minimal_fees;
     minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
     minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
-    allow_script_failure = true;
     clock_drift = None;
     replace_by_fee_factor =
       Q.make (Z.of_int 105) (Z.of_int 100)
       (* Default value of [replace_by_fee_factor] is set to 5% *);
-    max_prechecked_manager_operations = 5_000;
   }
 
 let config_encoding : config Data_encoding.t =
@@ -116,35 +98,27 @@ let config_encoding : config Data_encoding.t =
            minimal_fees;
            minimal_nanotez_per_gas_unit;
            minimal_nanotez_per_byte;
-           allow_script_failure;
            clock_drift;
            replace_by_fee_factor;
-           max_prechecked_manager_operations;
          } ->
       ( minimal_fees,
         minimal_nanotez_per_gas_unit,
         minimal_nanotez_per_byte,
-        allow_script_failure,
         clock_drift,
-        replace_by_fee_factor,
-        max_prechecked_manager_operations ))
+        replace_by_fee_factor ))
     (fun ( minimal_fees,
            minimal_nanotez_per_gas_unit,
            minimal_nanotez_per_byte,
-           allow_script_failure,
            clock_drift,
-           replace_by_fee_factor,
-           max_prechecked_manager_operations ) ->
+           replace_by_fee_factor ) ->
       {
         minimal_fees;
         minimal_nanotez_per_gas_unit;
         minimal_nanotez_per_byte;
-        allow_script_failure;
         clock_drift;
         replace_by_fee_factor;
-        max_prechecked_manager_operations;
       })
-    (obj7
+    (obj5
        (dft "minimal_fees" Tez.encoding default_config.minimal_fees)
        (dft
           "minimal_nanotez_per_gas_unit"
@@ -154,59 +128,14 @@ let config_encoding : config Data_encoding.t =
           "minimal_nanotez_per_byte"
           nanotez_enc
           default_config.minimal_nanotez_per_byte)
-       (dft "allow_script_failure" bool default_config.allow_script_failure)
        (opt "clock_drift" Period.encoding)
        (dft
           "replace_by_fee_factor"
           manager_op_replacement_factor_enc
-          default_config.replace_by_fee_factor)
-       (dft
-          "max_prechecked_manager_operations"
-          int31
-          default_config.max_prechecked_manager_operations))
-
-(** An Alpha_context manager operation, packed so that the type is not
-    parametrized by ['kind]. *)
-type manager_op = Manager_op : 'kind Kind.manager operation -> manager_op
-
-(** Information stored for each prechecked manager operation.
-
-    Note that this record does not include the operation hash because
-    it is instead used as key in the map that stores this information
-    in the [state] below. *)
-type manager_op_info = {
-  manager_op : manager_op;
-      (** Used when we want to remove the operation with
-          {!Validate.remove_manager_operation}. *)
-  fee : Tez.t;
-  gas_limit : Fixed_point_repr.integral_tag Gas.Arith.t;
-      (** Both [fee] and [gas_limit] are used to determine whether a new
-          operation from the same manager should replace this one. *)
-  weight : Q.t;
-      (** Used to update [ops_prechecked] and [min_prechecked_op_weight]
-          in [state] when appropriate. *)
-}
-
-type manager_op_weight = {operation_hash : Operation_hash.t; weight : Q.t}
-
-(** Build a {!manager_op_weight} from operation hash and {!manager_op_info}. *)
-let mk_op_weight oph (info : manager_op_info) =
-  {operation_hash = oph; weight = info.weight}
-
-let compare_manager_op_weight op1 op2 =
-  let c = Q.compare op1.weight op2.weight in
-  if c <> 0 then c
-  else Operation_hash.compare op1.operation_hash op2.operation_hash
-
-module ManagerOpWeightSet = Set.Make (struct
-  type t = manager_op_weight
-
-  (* Sort by weight *)
-  let compare = compare_manager_op_weight
-end)
+          default_config.replace_by_fee_factor))
 
 (** Static information to store in the filter state. *)
-type state_info = {
+type info = {
   head : Block_header.shell_header;
   round_durations : Round.round_durations;
   hard_gas_limit_per_block : Gas.Arith.integral;
@@ -214,36 +143,6 @@ type state_info = {
   round_zero_duration : Period.t;
   grandparent_level_start : Timestamp.t;
 }
-
-(** State that tracks validated manager operations. *)
-type ops_state = {
-  prechecked_manager_op_count : int;
-      (** Number of prechecked manager operations.
-          Invariants:
-          - [prechecked_manager_op_count
-               = Operation_hash.Map.cardinal prechecked_manager_ops
-               = ManagerOpWeightSet.cardinal prechecked_op_weights]
-          - [prechecked_manager_op_count <= max_prechecked_manager_operations] *)
-  prechecked_manager_ops : manager_op_info Operation_hash.Map.t;
-      (** All prechecked manager operations. See {!manager_op_info}. *)
-  prechecked_op_weights : ManagerOpWeightSet.t;
-      (** The {!manager_op_weight} of all prechecked manager operations. *)
-  min_prechecked_op_weight : manager_op_weight option;
-      (** The prechecked operation in [op_prechecked_managers], if any, with
-            the minimal weight.
-            Invariant:
-            - [min_prechecked_op_weight = min { x | x \in prechecked_op_weights }] *)
-}
-
-type state = {state_info : state_info; ops_state : ops_state}
-
-let empty_ops_state =
-  {
-    prechecked_manager_op_count = 0;
-    prechecked_manager_ops = Operation_hash.Map.empty;
-    prechecked_op_weights = ManagerOpWeightSet.empty;
-    min_prechecked_op_weight = None;
-  }
 
 let init_state_prototzresult ~head round_durations hard_gas_limit_per_block =
   let open Lwt_result_syntax in
@@ -266,7 +165,7 @@ let init_state_prototzresult ~head round_durations hard_gas_limit_per_block =
     Period.(add proposal_level_offset proposal_round_offset)
   in
   let grandparent_level_start = Timestamp.(head.timestamp - proposal_offset) in
-  let state_info =
+  return
     {
       head;
       round_durations;
@@ -275,8 +174,6 @@ let init_state_prototzresult ~head round_durations hard_gas_limit_per_block =
       round_zero_duration;
       grandparent_level_start;
     }
-  in
-  return {state_info; ops_state = empty_ops_state}
 
 let init_state ~head round_durations hard_gas_limit_per_block =
   Lwt.map
@@ -299,7 +196,7 @@ let init context ~(head : Tezos_base.Block_header.shell_header) =
   let hard_gas_limit_per_block = Constants.hard_gas_limit_per_block ctxt in
   init_state ~head round_durations hard_gas_limit_per_block
 
-let flush old_state ~head =
+let flush old_info ~head =
   (* To avoid the need to prepare a context as in [init], we retrieve
      the [round_durations] from the previous state. Indeed, they are
      only determined by the [minimal_block_delay] and
@@ -308,10 +205,7 @@ let flush old_state ~head =
      during the lifetime of a protocol. As to
      [hard_gas_limit_per_block], it is directly a protocol
      constant. *)
-  init_state
-    ~head
-    old_state.state_info.round_durations
-    old_state.state_info.hard_gas_limit_per_block
+  init_state ~head old_info.round_durations old_info.hard_gas_limit_per_block
 
 let manager_prio p = `Low p
 
@@ -319,7 +213,7 @@ let consensus_prio = `High
 
 let other_prio = `Medium
 
-let get_manager_operation_gas_and_fee contents =
+let compute_manager_contents_fee_and_gas_limit contents =
   let open Operation in
   let l = to_list (Contents_list contents) in
   List.fold_left
@@ -348,125 +242,6 @@ let () =
     (function Fees_too_low -> Some () | _ -> None)
     (fun () -> Fees_too_low)
 
-type Environment.Error_monad.error +=
-  | Manager_restriction of {oph : Operation_hash.t; fee : Tez.t}
-
-let () =
-  Environment.Error_monad.register_error_kind
-    `Temporary
-    ~id:"prefilter.manager_restriction"
-    ~title:"Only one manager operation per manager per block allowed"
-    ~description:"Only one manager operation per manager per block allowed"
-    ~pp:(fun ppf (oph, fee) ->
-      Format.fprintf
-        ppf
-        "Only one manager operation per manager per block allowed (found %a \
-         with %atez fee. You may want to use --replace to provide adequate fee \
-         and replace it)."
-        Operation_hash.pp
-        oph
-        Tez.pp
-        fee)
-    Data_encoding.(
-      obj2
-        (req "operation_hash" Operation_hash.encoding)
-        (req "operation_fee" Tez.encoding))
-    (function Manager_restriction {oph; fee} -> Some (oph, fee) | _ -> None)
-    (fun (oph, fee) -> Manager_restriction {oph; fee})
-
-type Environment.Error_monad.error +=
-  | Manager_operation_replaced of {
-      old_hash : Operation_hash.t;
-      new_hash : Operation_hash.t;
-    }
-
-let () =
-  Environment.Error_monad.register_error_kind
-    `Permanent
-    ~id:"plugin.manager_operation_replaced"
-    ~title:"Manager operation replaced"
-    ~description:"The manager operation has been replaced"
-    ~pp:(fun ppf (old_hash, new_hash) ->
-      Format.fprintf
-        ppf
-        "The manager operation %a has been replaced with %a"
-        Operation_hash.pp
-        old_hash
-        Operation_hash.pp
-        new_hash)
-    (Data_encoding.obj2
-       (Data_encoding.req "old_hash" Operation_hash.encoding)
-       (Data_encoding.req "new_hash" Operation_hash.encoding))
-    (function
-      | Manager_operation_replaced {old_hash; new_hash} ->
-          Some (old_hash, new_hash)
-      | _ -> None)
-    (fun (old_hash, new_hash) ->
-      Manager_operation_replaced {old_hash; new_hash})
-
-type Environment.Error_monad.error += Fees_too_low_for_mempool of Tez.t
-
-let () =
-  Environment.Error_monad.register_error_kind
-    `Temporary
-    ~id:"prefilter.fees_too_low_for_mempool"
-    ~title:"Operation fees are too low to be considered in full mempool"
-    ~description:"Operation fees are too low to be considered in full mempool"
-    ~pp:(fun ppf required_fees ->
-      Format.fprintf
-        ppf
-        "The mempool is full, the number of prechecked manager operations has \
-         reached the limit max_prechecked_manager_operations set by the \
-         filter. Increase operation fees to at least %atz for the operation to \
-         be considered and propagated by THIS node. Note that the operations \
-         with the minimum fees in the mempool risk being removed if better \
-         ones are received."
-        Tez.pp
-        required_fees)
-    Data_encoding.(obj1 (req "required_fees" Tez.encoding))
-    (function
-      | Fees_too_low_for_mempool required_fees -> Some required_fees | _ -> None)
-    (fun required_fees -> Fees_too_low_for_mempool required_fees)
-
-type Environment.Error_monad.error += Removed_fees_too_low_for_mempool
-
-let () =
-  Environment.Error_monad.register_error_kind
-    `Temporary
-    ~id:"plugin.removed_fees_too_low_for_mempool"
-    ~title:"Operation removed because fees are too low for full mempool"
-    ~description:"Operation removed because fees are too low for full mempool"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The mempool is full, the number of prechecked manager operations has \
-         reached the limit max_prechecked_manager_operations set by the \
-         filter. Operation was removed because another operation with a better \
-         fees/gas-size ratio was received and accepted by the mempool.")
-    Data_encoding.unit
-    (function Removed_fees_too_low_for_mempool -> Some () | _ -> None)
-    (fun () -> Removed_fees_too_low_for_mempool)
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2238
-   Write unit tests for the feature 'replace-by-fee' and for other changes
-   introduced by other MRs in the plugin. *)
-(* In order to decide if the new operation can replace an old one from the
-   same manager, we check if its fees (resp. fees/gas ratio) are greater than
-   (or equal to) the old operations's fees (resp. fees/gas ratio), bumped by
-   the factor [config.replace_by_fee_factor].
-*)
-let better_fees_and_ratio =
-  let bump config q = Q.mul q config.replace_by_fee_factor in
-  fun config old_gas old_fee new_gas new_fee ->
-    let old_fee = Tez.to_mutez old_fee |> Z.of_int64 |> Q.of_bigint in
-    let old_gas = Gas.Arith.integral_to_z old_gas |> Q.of_bigint in
-    let new_fee = Tez.to_mutez new_fee |> Z.of_int64 |> Q.of_bigint in
-    let new_gas = Gas.Arith.integral_to_z new_gas |> Q.of_bigint in
-    let old_ratio = Q.div old_fee old_gas in
-    let new_ratio = Q.div new_fee new_gas in
-    Q.compare new_ratio (bump config old_ratio) >= 0
-    && Q.compare new_fee (bump config old_fee) >= 0
-
 let size_of_operation op =
   (WithExceptions.Option.get ~loc:__LOC__
   @@ Data_encoding.Binary.fixed_length
@@ -493,54 +268,10 @@ let weight_and_resources_manager_operation ~hard_gas_limit_per_block ?size ~fee
   let resources = Q.max size_ratio gas_ratio in
   (Q.(fee_f / resources), resources)
 
-(** Return fee for an operation that consumes [op_resources] for its weight to
-      be strictly greater than [min_weight]. *)
-let required_fee_manager_operation_weight ~op_resources ~min_weight =
-  let req_mutez_q = Q.((min_weight * op_resources) + Q.one) in
-  Tez.of_mutez_exn @@ Q.to_int64 req_mutez_q
-
-(** Check if an operation as a weight (fees w.r.t gas and size) large enough to
-      be prechecked and return said weight. In the case where the prechecked
-      mempool is full, return an error if the weight is too small, or return the
-      operation to be replaced otherwise. *)
-let check_minimal_weight config state ~fee ~gas_limit op =
-  let weight, op_resources =
-    weight_and_resources_manager_operation
-      ~hard_gas_limit_per_block:state.state_info.hard_gas_limit_per_block
-      ~fee
-      ~gas:gas_limit
-      op
-  in
-  if
-    state.ops_state.prechecked_manager_op_count
-    < config.max_prechecked_manager_operations
-  then
-    (* The precheck mempool is not full yet *)
-    `Weight_ok (`No_replace, [weight])
-  else
-    match state.ops_state.min_prechecked_op_weight with
-    | None ->
-        (* The precheck mempool is empty *)
-        `Weight_ok (`No_replace, [weight])
-    | Some {weight = min_weight; operation_hash = min_oph} ->
-        if Q.(weight > min_weight) then
-          (* The operation has a weight greater than the minimal
-             prechecked operation, replace the latest with the new one *)
-          `Weight_ok (`Replace min_oph, [weight])
-        else
-          (* Otherwise fail and give indication as to what to fee should
-             be for the operation to be prechecked *)
-          let required_fee =
-            required_fee_manager_operation_weight ~op_resources ~min_weight
-          in
-          `Fail
-            (`Branch_delayed
-              [Environment.wrap_tzerror (Fees_too_low_for_mempool required_fee)])
-
 let pre_filter_manager :
     type t.
+    info ->
     config ->
-    state ->
     Operation.packed_protocol_data ->
     t Kind.manager contents_list ->
     [ `Passed_prefilter of Q.t list
@@ -548,7 +279,7 @@ let pre_filter_manager :
     | `Branch_delayed of tztrace
     | `Refused of tztrace
     | `Outdated of tztrace ] =
- fun config filter_state packed_op op ->
+ fun info config packed_op op ->
   let size = size_of_operation packed_op in
   let check_gas_and_fee fee gas_limit =
     let fees_in_nanotez =
@@ -577,17 +308,20 @@ let pre_filter_manager :
     then `Fees_ok
     else `Refused [Environment.wrap_tzerror Fees_too_low]
   in
-  match get_manager_operation_gas_and_fee op with
+  match compute_manager_contents_fee_and_gas_limit op with
   | Error err -> `Refused (Environment.wrap_tztrace err)
   | Ok (fee, gas_limit) -> (
       match check_gas_and_fee fee gas_limit with
       | `Refused _ as err -> err
-      | `Fees_ok -> (
-          match
-            check_minimal_weight config filter_state ~fee ~gas_limit packed_op
-          with
-          | `Fail errs -> errs
-          | `Weight_ok (_, weight) -> `Passed_prefilter weight))
+      | `Fees_ok ->
+          let weight, _op_resources =
+            weight_and_resources_manager_operation
+              ~hard_gas_limit_per_block:info.hard_gas_limit_per_block
+              ~fee
+              ~gas:gas_limit
+              packed_op
+          in
+          `Passed_prefilter [weight])
 
 type Environment.Error_monad.error += Wrong_operation
 
@@ -682,8 +416,10 @@ let () =
       expected timestamp, [op_earliest_ts] is below the current clock with an
       accepted drift for the clock given by a configuration.  *)
 let acceptable ~drift ~op_earliest_ts ~now_timestamp =
+  let open Result_syntax in
   Timestamp.(
-    now_timestamp +? drift >|? fun now_drifted -> op_earliest_ts <= now_drifted)
+    let+ now_drifted = now_timestamp +? drift in
+    op_earliest_ts <= now_drifted)
 
 (** Check that an operation with the given [op_round], at level [op_level]
       is likely to be correct, meaning it could have been produced before
@@ -701,7 +437,7 @@ let acceptable ~drift ~op_earliest_ts ~now_timestamp =
       to the clock.
 
       This is a stricter than necessary filter as it will reject operations that
-      could be valid in the current timeframe if the proposal they endorse is
+      could be valid in the current timeframe if the proposal they attest is
       built over a predecessor of the current proposal that would be of lower
       round than the current one.
 
@@ -718,6 +454,7 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
     ~proposal_round ~proposal_timestamp
     ~(proposal_predecessor_level_start : Timestamp.t) ~op_level ~op_round
     ~now_timestamp =
+  let open Result_syntax in
   if
     Raw_level.(succ op_level < proposal_level)
     || (op_level = proposal_level && op_round <= proposal_round)
@@ -738,60 +475,60 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
        since the previous level. *)
     (* Invariant: [op_level + 1 >= proposal_level] *)
     let level_offset = Raw_level.(diff (succ op_level) proposal_level) in
-    Period.mult level_offset round_zero_duration >>? fun time_shift ->
-    Timestamp.(proposal_predecessor_level_start +? time_shift)
-    >>? fun earliest_op_level_start ->
+    let* time_shift = Period.mult level_offset round_zero_duration in
+    let* earliest_op_level_start =
+      Timestamp.(proposal_predecessor_level_start +? time_shift)
+    in
     (* computing the operations's round start from it's earliest
        possible level start *)
-    Round.timestamp_of_another_round_same_level
-      round_durations
-      ~current_round:Round.zero
-      ~current_timestamp:earliest_op_level_start
-      ~considered_round:op_round
-    >>? fun op_earliest_ts ->
+    let* op_earliest_ts =
+      Round.timestamp_of_another_round_same_level
+        round_durations
+        ~current_round:Round.zero
+        ~current_timestamp:earliest_op_level_start
+        ~considered_round:op_round
+    in
     (* We finally check that the expected time of the operation is
        acceptable *)
     acceptable ~drift ~op_earliest_ts ~now_timestamp
 
-let pre_filter_far_future_consensus_ops config ~filter_state
+let pre_filter_far_future_consensus_ops info config
     ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t =
+  let open Result_syntax in
   let res =
-    let open Result_syntax in
     let now_timestamp = Time.System.now () |> Time.System.to_protocol in
-    let* proposal_level =
-      Raw_level.of_int32 filter_state.state_info.head.level
-    in
+    let* proposal_level = Raw_level.of_int32 info.head.level in
     acceptable_op
       ~config
-      ~round_durations:filter_state.state_info.round_durations
-      ~round_zero_duration:filter_state.state_info.round_zero_duration
+      ~round_durations:info.round_durations
+      ~round_zero_duration:info.round_zero_duration
       ~proposal_level
-      ~proposal_round:filter_state.state_info.head_round
-      ~proposal_timestamp:filter_state.state_info.head.timestamp
-      ~proposal_predecessor_level_start:
-        filter_state.state_info.grandparent_level_start
+      ~proposal_round:info.head_round
+      ~proposal_timestamp:info.head.timestamp
+      ~proposal_predecessor_level_start:info.grandparent_level_start
       ~op_level
       ~op_round
       ~now_timestamp
   in
   match res with Ok b -> Lwt.return b | Error _ -> Lwt.return_false
 
-(** A quasi infinite amount of "valid" (pre)endorsements could be
+(** A quasi infinite amount of "valid" (pre)attestations could be
       sent by a committee member, one for each possible round number.
 
-      This filter rejects (pre)endorsements that refer to a round
+      This filter rejects (pre)attestations that refer to a round
       that could not have been reached within the time span between
       the last head's timestamp and the current local clock.
 
       We add [config.clock_drift] time as a safety margin.
   *)
-let pre_filter config ~filter_state
+let pre_filter info config
     ({shell = _; protocol_data = Operation_data {contents; _} as op} :
       Main.operation) =
+  let open Lwt_syntax in
   let prefilter_manager_op manager_op =
-    Lwt.return
+    return
     @@
-    match pre_filter_manager config filter_state op manager_op with
+    match pre_filter_manager info config op manager_op with
     | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
     | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as err
       ->
@@ -799,194 +536,67 @@ let pre_filter config ~filter_state
   in
   match contents with
   | Single (Failing_noop _) ->
-      Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
-  | Single (Preendorsement consensus_content)
-  | Single (Endorsement consensus_content) ->
-      pre_filter_far_future_consensus_ops ~filter_state config consensus_content
-      >>= fun keep ->
-      if keep then Lwt.return @@ `Passed_prefilter consensus_prio
+      return (`Refused [Environment.wrap_tzerror Wrong_operation])
+  | Single (Preattestation consensus_content)
+  | Single (Attestation consensus_content) ->
+      let* keep =
+        pre_filter_far_future_consensus_ops info config consensus_content
+      in
+      if keep then return (`Passed_prefilter consensus_prio)
       else
-        Lwt.return
+        return
           (`Branch_refused
             [Environment.wrap_tzerror Consensus_operation_in_far_future])
   | Single (Dal_attestation _)
   | Single (Seed_nonce_revelation _)
-  | Single (Double_preendorsement_evidence _)
-  | Single (Double_endorsement_evidence _)
+  | Single (Double_preattestation_evidence _)
+  | Single (Double_attestation_evidence _)
   | Single (Double_baking_evidence _)
   | Single (Activate_account _)
   | Single (Proposals _)
   | Single (Vdf_revelation _)
   | Single (Drain_delegate _)
   | Single (Ballot _) ->
-      Lwt.return @@ `Passed_prefilter other_prio
+      return (`Passed_prefilter other_prio)
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 
-(** Remove a manager operation hash from the ops_state.
-    Do nothing if the operation was not in the state. *)
-let remove_operation ops_state oph =
-  match Operation_hash.Map.find oph ops_state.prechecked_manager_ops with
-  | None ->
-      (* Not present in the ops_state: nothing to do. *)
-      ops_state
-  | Some info ->
-      let prechecked_manager_ops =
-        Operation_hash.Map.remove oph ops_state.prechecked_manager_ops
-      in
-      let prechecked_manager_op_count =
-        ops_state.prechecked_manager_op_count - 1
-      in
-      let prechecked_op_weights =
-        ManagerOpWeightSet.remove
-          (mk_op_weight oph info)
-          ops_state.prechecked_op_weights
-      in
-      let min_prechecked_op_weight =
-        match ops_state.min_prechecked_op_weight with
-        | None -> None
-        | Some min_op_weight ->
-            if Operation_hash.equal min_op_weight.operation_hash oph then
-              ManagerOpWeightSet.min_elt prechecked_op_weights
-            else Some min_op_weight
-      in
-      {
-        prechecked_manager_op_count;
-        prechecked_manager_ops;
-        prechecked_op_weights;
-        min_prechecked_op_weight;
-      }
-
-(** Remove a manager operation hash from the ops_state.
-    Do nothing if the operation was not in the state. *)
-let remove ~filter_state oph =
-  {filter_state with ops_state = remove_operation filter_state.ops_state oph}
-
-(** Add a manager operation hash and information to the filter state.
-    Do nothing if the operation is already present in the state. *)
-let add_manager_op ops_state oph info replacement =
-  let ops_state =
-    match replacement with
-    | `No_replace -> ops_state
-    | `Replace (oph, _classification) -> remove_operation ops_state oph
-  in
-  if Operation_hash.Map.mem oph ops_state.prechecked_manager_ops then
-    (* Already present in the ops_state: nothing to do. *)
-    ops_state
-  else
-    let prechecked_manager_op_count =
-      ops_state.prechecked_manager_op_count + 1
-    in
-    let prechecked_manager_ops =
-      Operation_hash.Map.add oph info ops_state.prechecked_manager_ops
-    in
-    let op_weight = mk_op_weight oph info in
-    let prechecked_op_weights =
-      ManagerOpWeightSet.add op_weight ops_state.prechecked_op_weights
-    in
-    let min_prechecked_op_weight =
-      match ops_state.min_prechecked_op_weight with
-      | Some old_min when compare_manager_op_weight old_min op_weight <= 0 ->
-          Some old_min
-      | _ -> Some op_weight
-    in
-    {
-      prechecked_manager_op_count;
-      prechecked_manager_ops;
-      prechecked_op_weights;
-      min_prechecked_op_weight;
-    }
-
-let add_manager_op_and_enforce_mempool_bound config filter_state oph
-    (op : 'manager_kind Kind.manager operation) =
-  let open Lwt_result_syntax in
-  let*? fee, gas_limit =
-    Result.map_error
-      (fun err -> `Refused (Environment.wrap_tztrace err))
-      (get_manager_operation_gas_and_fee op.protocol_data.contents)
-  in
-  let* replacement, weight =
-    match
-      check_minimal_weight
-        config
-        filter_state
-        ~fee
-        ~gas_limit
-        (Operation_data op.protocol_data)
-    with
-    | `Weight_ok (`No_replace, weight) ->
-        (* The mempool is not full: no need to replace any operation. *)
-        return (`No_replace, weight)
-    | `Weight_ok (`Replace min_weight_oph, weight) ->
-        (* The mempool is full yet the new operation has enough weight
-           to be included: the old operation with the lowest weight is
-           reclassified as [Branch_delayed]. *)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2347 The
-           branch_delayed ring is bounded to 1000, so we may loose
-           operations. We can probably do better. *)
-        let replace_err =
-          Environment.wrap_tzerror Removed_fees_too_low_for_mempool
-        in
-        let replacement =
-          `Replace (min_weight_oph, `Branch_delayed [replace_err])
-        in
-        return (replacement, weight)
-    | `Fail err ->
-        (* The mempool is full and the weight of the new operation is
-           too low: raise the error returned by {!check_minimal_weight}. *)
-        fail err
-  in
-  let weight = match weight with [x] -> x | _ -> assert false in
-  let info = {manager_op = Manager_op op; gas_limit; fee; weight} in
-  let ops_state = add_manager_op filter_state.ops_state oph info replacement in
-  return ({filter_state with ops_state}, replacement)
-
-(** If the provided operation is a manager operation, add it to the
-    filter_state. If the mempool is full, either return an error if the
-    operation does not have enough weight to be included, or return the
-    operation with minimal weight that gets removed to make room.
-
-    Do nothing on non-manager operations.
-
-    If [replace] is provided, then it is removed from [filter_state]
-    before processing [op]. (If [replace] is a non-manager operation,
-    this does nothing since it was never in [filter_state] to begin with.)
-    Note that when this happens, the mempool can no longer be full after
-    the operation has been removed, so this function always returns
-    [`No_replace].
-
-    This function is designed to be called by the shell each time a
-    new operation has been validated by the protocol. It will be
-    removed in the future once the shell is able to bound the number of
-    operations in the mempool by itself. *)
-let add_operation_and_enforce_mempool_bound ?replace config filter_state
-    (oph, op) =
-  let filter_state =
-    match replace with
-    | Some replace_oph ->
-        (* If the operation to replace is not a manager operation, then
-           it cannot be present in the [filter_state]. But then,
-           [remove] does nothing anyway. *)
-        remove ~filter_state replace_oph
-    | None -> filter_state
-  in
-  let {protocol_data = Operation_data protocol_data; _} = op in
-  let call_manager protocol_data =
-    add_manager_op_and_enforce_mempool_bound
-      config
-      filter_state
-      oph
-      {shell = op.shell; protocol_data}
-  in
-  match protocol_data.contents with
-  | Single (Manager_operation _) -> call_manager protocol_data
-  | Cons (Manager_operation _, _) -> call_manager protocol_data
-  | Single _ -> return (filter_state, `No_replace)
+let syntactic_check _ = Lwt.return `Well_formed
 
 let is_manager_operation op =
   match Operation.acceptable_pass op with
   | Some pass -> Compare.Int.equal pass Operation_repr.manager_pass
   | None -> false
+
+(* Should not fail on a valid manager operation. *)
+let compute_fee_and_gas_limit {protocol_data = Operation_data data; _} =
+  compute_manager_contents_fee_and_gas_limit data.contents
+
+let gas_as_q gas = Gas.Arith.integral_to_z gas |> Q.of_bigint
+
+let fee_and_ratio_as_q fee gas =
+  let fee = Tez.to_mutez fee |> Z.of_int64 |> Q.of_bigint in
+  let gas = gas_as_q gas in
+  let ratio = Q.div fee gas in
+  (fee, ratio)
+
+let bumped_fee_and_ratio_as_q config fee gas =
+  let bump = Q.mul config.replace_by_fee_factor in
+  let fee, ratio = fee_and_ratio_as_q fee gas in
+  (bump fee, bump ratio)
+
+(** Determine whether the new manager operation is sufficiently better
+    than the old manager operation to replace it. Sufficiently better
+    means that the new operation's fee and fee/gas ratio are both
+    greater than or equal to the old operation's same metrics bumped by
+    the factor [config.replace_by_fee_factor]. *)
+let better_fees_and_ratio config old_gas old_fee new_gas new_fee =
+  let bumped_old_fee, bumped_old_ratio =
+    bumped_fee_and_ratio_as_q config old_fee old_gas
+  in
+  let new_fee, new_ratio = fee_and_ratio_as_q new_fee new_gas in
+  Q.compare new_fee bumped_old_fee >= 0
+  && Q.compare new_ratio bumped_old_ratio >= 0
 
 (** [conflict_handler config] returns a conflict handler for
     {!Mempool.add_operation} (see {!Mempool.conflict_handler}).
@@ -1001,32 +611,180 @@ let is_manager_operation op =
     Precondition: both operations must be individually valid (because
     of the call to {!Operation.compare}). *)
 let conflict_handler config : Mempool.conflict_handler =
- fun ~existing_operation ~new_operation ->
-  let (_ : Operation_hash.t), old_op = existing_operation in
-  let (_ : Operation_hash.t), new_op = new_operation in
-  if is_manager_operation old_op && is_manager_operation new_op then
-    let new_op_is_better =
-      let open Result_syntax in
-      let {protocol_data = Operation_data old_protocol_data; _} = old_op in
-      let {protocol_data = Operation_data new_protocol_data; _} = new_op in
-      let* old_fee, old_gas_limit =
-        get_manager_operation_gas_and_fee old_protocol_data.contents
+  let open Result_syntax in
+  fun ~existing_operation ~new_operation ->
+    let (_ : Operation_hash.t), old_op = existing_operation in
+    let (_ : Operation_hash.t), new_op = new_operation in
+    if is_manager_operation old_op && is_manager_operation new_op then
+      let new_op_is_better =
+        let* old_fee, old_gas_limit = compute_fee_and_gas_limit old_op in
+        let* new_fee, new_gas_limit = compute_fee_and_gas_limit new_op in
+        return
+          (better_fees_and_ratio
+             config
+             old_gas_limit
+             old_fee
+             new_gas_limit
+             new_fee)
       in
-      let* new_fee, new_gas_limit =
-        get_manager_operation_gas_and_fee new_protocol_data.contents
-      in
-      return
-        (better_fees_and_ratio
-           config
-           old_gas_limit
-           old_fee
-           new_gas_limit
-           new_fee)
-    in
-    match new_op_is_better with
-    | Ok b when b -> `Replace
-    | Ok _ | Error _ -> `Keep
-  else if Operation.compare existing_operation new_operation < 0 then `Replace
-  else `Keep
+      match new_op_is_better with
+      | Ok b when b -> `Replace
+      | Ok _ | Error _ -> `Keep
+    else if Operation.compare existing_operation new_operation < 0 then `Replace
+    else `Keep
 
-let syntactic_check _ = Lwt.return `Well_formed
+let int64_ceil_of_q q =
+  let n = Q.to_int64 q in
+  if Q.(equal q (of_int64 n)) then n else Int64.succ n
+
+(* Compute the minimal fee (expressed in mutez) that [candidate_op]
+   would need to have in order for the {!conflict_handler} to let it
+   replace [op_to_replace], when both operations are manager
+   operations.
+
+   As specified in {!conflict_handler}, this means that [candidate_op]
+   with the returned fee needs to have both its fee and its fee/gas
+   ratio exceed (or match) [op_to_replace]'s same metrics bumped by
+   the {!config}'s [replace_by_fee_factor].
+
+   Return [None] when at least one operation is not a manager
+   operation.
+
+   Also return [None] if both operations are manager operations but
+   there was an error while computing the needed fee. However, note
+   that this cannot happen when both manager operations have been
+   successfully validated by the protocol. *)
+let fee_needed_to_replace_by_fee config ~op_to_replace ~candidate_op =
+  let open Result_syntax in
+  if is_manager_operation candidate_op && is_manager_operation op_to_replace
+  then
+    (let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
+     let* old_fee, old_gas = compute_fee_and_gas_limit op_to_replace in
+     if Gas.Arith.(old_gas = zero || candidate_gas = zero) then
+       (* This should not happen when both operations are valid. *)
+       return_none
+     else
+       let candidate_gas = gas_as_q candidate_gas in
+       let bumped_old_fee, bumped_old_ratio =
+         bumped_fee_and_ratio_as_q config old_fee old_gas
+       in
+       (* The new operation needs to exceed both the bumped fee and the
+          bumped ratio to make {!better_fees_and_ratio} return [true].
+          (Having fee or ratio equal to its bumped counterpart is ok too,
+          hence the [ceil] in [int64_ceil_of_q].) *)
+       let fee_needed_for_fee = int64_ceil_of_q bumped_old_fee in
+       let fee_needed_for_ratio =
+         int64_ceil_of_q Q.(bumped_old_ratio * candidate_gas)
+       in
+       return_some (max fee_needed_for_fee fee_needed_for_ratio))
+    |> Option.of_result |> Option.join
+  else None
+
+let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
+  match contents with
+  | Single (Manager_operation {source; _}) -> Some source
+  | Cons (Manager_operation {source; _}, _) -> Some source
+  | Single
+      ( Preattestation _ | Attestation _ | Dal_attestation _ | Proposals _
+      | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
+      | Double_baking_evidence _ | Double_preattestation_evidence _
+      | Double_attestation_evidence _ | Activate_account _ | Drain_delegate _
+      | Failing_noop _ ) ->
+      None
+
+(* The purpose of this module is to offer a version of
+   [fee_needed_to_replace_by_fee] where the caller doesn't need to
+   provide the [op_to_replace]. Instead, it needs to call
+   [Conflict_map.update] every time a new operation is added to the
+   mempool. This setup prevents the mempool plugin from exposing the
+   notion of manager operations and their source. *)
+module Conflict_map = struct
+  (* The state consists in a map of all validated manager operations,
+     indexed by their source.
+
+     Note that the protocol already enforces that there is at most one
+     operation per source.
+
+     The state only tracks manager operations because other kinds of
+     operations don't have fees that we might adjust to change the
+     outcome of the {!conflict_handler}, so
+     [fee_needed_to_replace_by_fee] will always return [None] when
+     they are involved anyway. *)
+  type t = packed_operation Signature.Public_key_hash.Map.t
+
+  let empty = Signature.Public_key_hash.Map.empty
+
+  (* Remove all the [replacements] from the state, then add
+     [new_operation]. Non-manager operations are ignored.
+
+     It is important to remove before adding: otherwise, we would
+     remove the newly added operation when it has the same manager as
+     one of the replacements. *)
+  let update conflict_map ~new_operation ~replacements =
+    let conflict_map =
+      List.fold_left
+        (fun conflict_map op ->
+          match find_manager op with
+          | Some manager ->
+              Signature.Public_key_hash.Map.remove manager conflict_map
+          | None -> (* Non-manager operation: ignore it. *) conflict_map)
+        conflict_map
+        replacements
+    in
+    match find_manager new_operation with
+    | Some manager ->
+        Signature.Public_key_hash.Map.add manager new_operation conflict_map
+    | None -> (* Non-manager operation: ignore it. *) conflict_map
+
+  let fee_needed_to_replace_by_fee config ~candidate_op ~conflict_map =
+    match find_manager candidate_op with
+    | None -> (* Non-manager operation. *) None
+    | Some manager -> (
+        match Signature.Public_key_hash.Map.find manager conflict_map with
+        | None ->
+            (* This can only happen when the pre-existing conflicting
+               operation is a [Drain_delegate], which cannot be replaced by a
+               manager operation regardless of the latter's fee. *)
+            None
+        | Some op_to_replace ->
+            fee_needed_to_replace_by_fee config ~candidate_op ~op_to_replace)
+end
+
+let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
+  let open Result_syntax in
+  if is_manager_operation candidate_op && is_manager_operation op_to_overtake
+  then
+    (let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
+     let* target_fee, target_gas = compute_fee_and_gas_limit op_to_overtake in
+     if Gas.Arith.(target_gas = zero || candidate_gas = zero) then
+       (* This should not happen when both operations are valid. *)
+       return_none
+     else
+       (* Compute the target ratio as in {!Operation_repr.weight_manager}.
+          We purposefully don't use {!fee_and_ratio_as_q} because the code
+          here needs to stay in sync with {!Operation_repr.weight_manager}
+          rather than {!better_fees_and_ratio}. *)
+       let target_fee = Q.of_int64 (Tez.to_mutez target_fee) in
+       let target_gas = Q.of_bigint (Gas.Arith.integral_to_z target_gas) in
+       let target_ratio = Q.(target_fee / target_gas) in
+       (* Compute the minimal fee needed to have a strictly greater ratio. *)
+       let candidate_gas =
+         Q.of_bigint (Gas.Arith.integral_to_z candidate_gas)
+       in
+       return_some (Int64.succ Q.(to_int64 (target_ratio * candidate_gas))))
+    |> Option.of_result |> Option.join
+  else None
+
+module Internal_for_tests = struct
+  let default_config_with_clock_drift clock_drift =
+    {default_config with clock_drift}
+
+  let default_config_with_replace_factor replace_by_fee_factor =
+    {default_config with replace_by_fee_factor}
+
+  let get_clock_drift {clock_drift; _} = clock_drift
+
+  let acceptable_op = acceptable_op
+
+  let fee_needed_to_replace_by_fee = fee_needed_to_replace_by_fee
+end

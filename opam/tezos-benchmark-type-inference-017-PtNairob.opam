@@ -10,17 +10,14 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-stdlib"
-  "tezos-error-monad"
-  "tezos-crypto"
-  "tezos-micheline"
+  "octez-libs"
   "tezos-micheline-rewriting"
   "tezos-protocol-017-PtNairob"
   "hashcons"
-  "tezos-client-017-PtNairob" {with-test}
+  "octez-protocol-017-PtNairob-libs" {with-test}
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

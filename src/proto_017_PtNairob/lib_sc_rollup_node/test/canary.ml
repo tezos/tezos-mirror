@@ -31,7 +31,8 @@
     Subject:    Canary unit tests to make sure the test helpers work as intended
 *)
 
-open Protocol.Alpha_context
+open Octez_smart_rollup
+open Octez_smart_rollup_node
 
 let build_chain node_ctxt ~genesis ~length =
   let open Lwt_result_syntax in
@@ -55,9 +56,7 @@ let canary_test node_ctxt ~genesis =
           Node_context.get_l2_block node_ctxt block.header.block_hash
         in
         let* store_block_by_level =
-          Node_context.get_l2_block_by_level
-            node_ctxt
-            (Raw_level.to_int32 block.header.level)
+          Node_context.get_l2_block_by_level node_ctxt block.header.level
         in
         Helpers.Assert.L2_block.equal
           ~loc:__LOC__
@@ -86,15 +85,10 @@ let tests =
     Helpers.alcotest
       "canary arith"
       `Quick
-      Sc_rollup.Kind.Example_arith
+      Example_arith
       ~boot_sector:""
       canary_test;
-    Helpers.alcotest
-      "canary wasm"
-      `Quick
-      Sc_rollup.Kind.Wasm_2_0_0
-      ~boot_sector:""
-      canary_test;
+    Helpers.alcotest "canary wasm" `Quick Wasm_2_0_0 ~boot_sector:"" canary_test;
   ]
 
 let () =

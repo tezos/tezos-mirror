@@ -25,13 +25,19 @@
 
 open Runnable.Syntax
 
-type kind = Consensus of {chain_id : string} | Voting | Manager
+type consensus_kind = Attestation | Preattestation
+
+type kind =
+  | Consensus of {kind : consensus_kind; chain_id : string}
+  | Anonymous
+  | Voting
+  | Manager
 
 type t = {
   branch : string;
   contents : JSON.u;
   kind : kind;
-  signer : Account.key;
+  signer : Account.key option;
   mutable raw : Hex.t option;
       (* This is mutable to avoid computing the raw representation several times. *)
 }
@@ -40,7 +46,7 @@ let get_branch ?(offset = 2) client =
   let block = sf "head~%d" offset in
   RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
 
-let make ~branch ~signer ~kind contents =
+let make ~branch ?signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
@@ -84,32 +90,41 @@ let hex ?protocol ?signature t client =
       return (`Hex (raw ^ signature))
 
 let sign ?protocol ({kind; signer; _} as t) client =
-  let watermark =
-    match kind with
-    | Consensus {chain_id} ->
-        Tezos_crypto.Signature.Endorsement
-          (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
-    | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
-  in
-  let* hex = hex ?protocol t client in
-  let bytes = Hex.to_bytes hex in
-  return (Account.sign_bytes ~watermark ~signer bytes)
+  match signer with
+  | None -> return Tezos_crypto.Signature.zero
+  | Some signer ->
+      let watermark =
+        match kind with
+        | Consensus {kind; chain_id} ->
+            let chain_id =
+              Tezos_crypto.Hashed.Chain_id.to_string
+                (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+            in
+            let prefix =
+              match kind with Preattestation -> "\x12" | Attestation -> "\x13"
+            in
+            Tezos_crypto.Signature.Custom
+              (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
+        | Anonymous | Voting | Manager ->
+            Tezos_crypto.Signature.Generic_operation
+      in
+      let* hex = hex ?protocol t client in
+      let bytes = Hex.to_bytes hex in
+      return (Account.sign_bytes ~watermark ~signer bytes)
 
 module Tezos_operation = Tezos_base.TzPervasives.Operation
 
-let to_raw_operation t client : Tezos_operation.t Lwt.t =
-  let open Tezos_base.TzPervasives in
-  let branch = Block_hash.of_b58check_exn t.branch in
-  let* raw = hex t client in
-  return Tezos_operation.{shell = {branch}; proto = Hex.to_bytes_exn raw}
-
 let hash t client : [`OpHash of string] Lwt.t =
-  let* op = to_raw_operation t client in
-  let hash = Tezos_operation.hash op in
-  return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_string hash))
+  let* signature = sign t client in
+  let* (`Hex hex) = hex ~signature t client in
+  let bytes = Hex.to_bytes (`Hex hex) in
+  let op =
+    Data_encoding.Binary.of_bytes_exn Tezos_base.Operation.encoding bytes
+  in
+  let hash = Tezos_base.Operation.hash op in
+  return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_b58check hash))
 
-let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
-    client : [`OpHash of string] Lwt.t =
+let spawn_inject ?(force = false) ?protocol ?signature t client =
   let* signature =
     match signature with
     | None -> sign t client
@@ -120,16 +135,21 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
   in
+  return (RPC.Client.spawn client @@ inject_rpc (Data (`String op)))
+
+let inject ?(request = `Inject) ?force ?protocol ?signature ?error t client :
+    [`OpHash of string] Lwt.t =
   let waiter =
     let mode = Client.get_mode client in
     match Client.mode_to_endpoint mode with
     | None -> Test.fail "Operation.inject: Endpoint expected"
-    | Some (Proxy_server _) ->
+    | Some (Proxy_server _ | Foreign_endpoint _) ->
         Test.fail
-          "Operation.inject: Node endpoint expected instead of proxy server"
+          "Operation.inject: Node endpoint expected instead of proxy server or \
+           foreign endpoint"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let runnable = RPC.Client.spawn client @@ inject_rpc (Data (`String op)) in
+  let* runnable = spawn_inject ?force ?protocol ?signature t client in
   match error with
   | None ->
       let* () = waiter in
@@ -139,6 +159,18 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
       let*? process = runnable in
       let* () = Process.check_error ~msg process in
       hash t client
+
+let inject_and_capture2_stderr ~rex ?force ?protocol ?signature t client =
+  let* runnable = spawn_inject ?force ?protocol ?signature t client in
+  let*? process = runnable in
+  let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
+  match stderr =~** rex with
+  | None ->
+      Test.fail
+        "Injection was expected to fail with:\n%s\nbut instead failed with:\n%s"
+        (show_rex rex)
+        stderr
+  | Some groups -> return groups
 
 let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
     ?use_tmp_file t client : [`OpHash of string] list Lwt.t =
@@ -151,9 +183,10 @@ let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
     let mode = Client.get_mode client in
     match Client.mode_to_endpoint mode with
     | None -> Test.fail "Operation.inject: Endpoint expected"
-    | Some (Proxy_server _) ->
+    | Some (Proxy_server _ | Foreign_endpoint _) ->
         Test.fail
-          "Operation.inject: Node endpoint expected instead of proxy server"
+          "Operation.inject: Node endpoint expected instead of proxy server or \
+           foreign endpoint"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
   let rpc =
@@ -191,12 +224,54 @@ let make_run_operation_input ?chain_id t client =
         ("chain_id", `String chain_id);
       ])
 
+let make_preapply_operation_input ~protocol ~signature t =
+  let protocol = Protocol.hash protocol in
+  `O
+    [
+      ("protocol", `String protocol);
+      ("branch", `String t.branch);
+      ("contents", t.contents);
+      ("signature", `String (Tezos_crypto.Signature.to_b58check signature));
+    ]
+
 module Consensus = struct
-  type t = Dal_attestation of {attestation : bool array; level : int}
+  type t =
+    | Consensus of {
+        kind : consensus_kind;
+        use_legacy_name : bool;
+        slot : int;
+        level : int;
+        round : int;
+        block_payload_hash : string;
+      }
+    | Dal_attestation of {attestation : bool array; level : int}
+
+  let consensus ~use_legacy_name ~kind ~slot ~level ~round ~block_payload_hash =
+    Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
+
+  let attestation = consensus ~kind:Attestation
+
+  let preattestation = consensus ~kind:Preattestation
 
   let dal_attestation ~attestation ~level = Dal_attestation {attestation; level}
 
+  let kind_to_string kind use_legacy_name =
+    let name = function true -> "endorsement" | false -> "attestation" in
+    match kind with
+    | Attestation -> name use_legacy_name
+    | Preattestation -> Format.sprintf "pre%s" (name use_legacy_name)
+
   let json signer = function
+    | Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
+      ->
+        `O
+          [
+            ("kind", Ezjsonm.string (kind_to_string kind use_legacy_name));
+            ("slot", Ezjsonm.int slot);
+            ("level", Ezjsonm.int level);
+            ("round", Ezjsonm.int round);
+            ("block_payload_hash", Ezjsonm.string block_payload_hash);
+          ]
     | Dal_attestation {attestation; level} ->
         let string_of_bool_vector attestation =
           let aux (acc, n) b =
@@ -225,10 +300,90 @@ module Consensus = struct
       | None -> RPC.Client.call client @@ RPC.get_chain_chain_id ()
       | Some branch -> return branch
     in
-    return (make ~branch ~signer ~kind:(Consensus {chain_id}) json)
+    let kind =
+      match consensus_operation with
+      | Consensus {kind; _} -> kind
+      | Dal_attestation _ -> Attestation
+    in
+    return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
 
   let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
+    inject ?request ?force ?error op client
+end
+
+module Anonymous = struct
+  type double_consensus_evidence_kind =
+    | Double_attestation_evidence
+    | Double_preattestation_evidence
+
+  type nonrec t =
+    | Double_consensus_evidence of {
+        kind : double_consensus_evidence_kind;
+        use_legacy_name : bool;
+        op1 : t * Tezos_crypto.Signature.t;
+        op2 : t * Tezos_crypto.Signature.t;
+      }
+
+  let double_consensus_evidence ~kind ~use_legacy_name
+      (({kind = op1_kind; _}, _) as op1) (({kind = op2_kind; _}, _) as op2) =
+    match (kind, op1_kind, op2_kind) with
+    | ( Double_attestation_evidence,
+        Consensus {kind = Attestation; _},
+        Consensus {kind = Attestation; _} ) ->
+        Double_consensus_evidence {kind; use_legacy_name; op1; op2}
+    | ( Double_preattestation_evidence,
+        Consensus {kind = Preattestation; _},
+        Consensus {kind = Preattestation; _} ) ->
+        Double_consensus_evidence {kind; use_legacy_name; op1; op2}
+    | _, _, _ ->
+        Test.fail "Invalid arguments to create a double_consensus_evidence"
+
+  let double_attestation_evidence =
+    double_consensus_evidence ~kind:Double_attestation_evidence
+
+  let double_preattestation_evidence =
+    double_consensus_evidence ~kind:Double_preattestation_evidence
+
+  let kind_to_string kind use_legacy_name =
+    sf
+      "double_%s_evidence"
+      (Consensus.kind_to_string
+         (match kind with
+         | Double_attestation_evidence -> Attestation
+         | Double_preattestation_evidence -> Preattestation)
+         use_legacy_name)
+
+  let denunced_op_json (op, signature) =
+    `O
+      [
+        ("branch", `String op.branch);
+        ("operations", List.hd (Ezjsonm.get_list Fun.id op.contents));
+        ("signature", `String (Tezos_crypto.Signature.to_b58check signature));
+      ]
+
+  let json = function
+    | Double_consensus_evidence {kind; use_legacy_name; op1; op2} ->
+        let op1 = denunced_op_json op1 in
+        let op2 = denunced_op_json op2 in
+        `O
+          [
+            ("kind", Ezjsonm.string (kind_to_string kind use_legacy_name));
+            ("op1", op1);
+            ("op2", op2);
+          ]
+
+  let operation ?branch anonymous_operation client =
+    let json = `A [json anonymous_operation] in
+    let* branch =
+      match branch with
+      | None -> get_branch ~offset:0 client
+      | Some branch -> return branch
+    in
+    return (make ~branch ~kind:Anonymous json)
+
+  let inject ?request ?force ?branch ?error consensus client =
+    let* op = operation ?branch consensus client in
     inject ?request ?force ?error op client
 end
 
@@ -384,7 +539,6 @@ module Manager = struct
       }
     | Origination of {code : JSON.u; storage : JSON.u; balance : int}
     | Dal_publish_slot_header of {
-        level : int;
         index : int;
         commitment : Tezos_crypto_dal.Cryptobox.commitment;
         proof : Tezos_crypto_dal.Cryptobox.commitment_proof;
@@ -406,8 +560,8 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
-  let dal_publish_slot_header ~level ~index ~commitment ~proof =
-    Dal_publish_slot_header {level; index; commitment; proof}
+  let dal_publish_slot_header ~index ~commitment ~proof =
+    Dal_publish_slot_header {index; commitment; proof}
 
   let origination ?(init_balance = 0) ~code ~init_storage () =
     Origination {code; storage = init_storage; balance = init_balance}
@@ -452,12 +606,11 @@ module Manager = struct
           ("balance", json_of_tez balance);
           ("script", script);
         ]
-    | Dal_publish_slot_header {level; index; commitment; proof} ->
+    | Dal_publish_slot_header {index; commitment; proof} ->
         let slot_header =
           `O
             [
               ("slot_index", json_of_int index);
-              ("published_level", json_of_int level);
               ("commitment", json_of_commitment commitment);
               ("commitment_proof", json_of_commitment_proof proof);
             ]
@@ -524,7 +677,12 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Reveal _ | Origination _ | Dal_publish_slot_header _ | Delegation _ ->
+    | Dal_publish_slot_header _ ->
+        let fee = Option.value fee ~default:2_100 in
+        let gas_limit = Option.value gas_limit ~default:17_000 in
+        let storage_limit = Option.value storage_limit ~default:0 in
+        {source; counter; fee; gas_limit; storage_limit; payload}
+    | Reveal _ | Origination _ | Delegation _ ->
         let fee = Option.value fee ~default:1_450 in
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in
@@ -551,6 +709,15 @@ module Manager = struct
     RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
 end
 
-let conflict_error =
+let gas_limit_exceeded =
   rex
-    {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
+    "Gas limit exceeded during typechecking or execution.\n\
+     Try again with a higher gas limit."
+
+let conflict_error_with_needed_fee =
+  rex
+    {|The operation ([\w\d]+) cannot be added because the mempool already contains a conflicting operation\. To replace the latter, this particular operation would need a total fee of at least ([\d]+) mutez\.|}
+
+let rejected_by_full_mempool_with_needed_fee =
+  rex
+    {|Operation ([\w\d]+) has been rejected because the mempool is full\. This specific operation would need a total fee of at least ([\d]+) mutez to be considered and propagated by the mempool of this particular node right now\. Note that if the node receives operations with a better fee over gas limit ratio in the future, the operation may be rejected even with the indicated fee, or it may be successfully injected but removed at a later date\.|}

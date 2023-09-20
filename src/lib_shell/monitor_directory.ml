@@ -24,7 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let build_rpc_directory validator mainchain_validator =
+let build_rpc_directory ~(commit_info : Node_version.commit_info) validator
+    mainchain_validator =
   let open Lwt_syntax in
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in
@@ -320,7 +321,7 @@ let build_rpc_directory validator mainchain_validator =
       let next () = Lwt_stream.get stream in
       Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.commit_hash (fun () () ->
-      Tezos_rpc.Answer.return Tezos_version.Current_git_info.commit_hash) ;
+      Tezos_rpc.Answer.return commit_info.commit_hash) ;
   gen_register0 Monitor_services.S.active_chains (fun () () ->
       let stream, stopper = Validator.chains_watcher validator in
       let shutdown () = Lwt_watcher.shutdown stopper in

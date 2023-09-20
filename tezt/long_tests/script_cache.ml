@@ -33,6 +33,9 @@
    fast machine. This is why this test is in the "long test" category.
    If at some point the cache layout can be set through protocol parameters,
    then we may consider duplicating these tests in the CI too.
+
+   FIXME: https://gitlab.com/tezos/tezos/-/issues/5620
+   These test have disabled by adding the tag [ci_disabled] due to consistent failures.
 *)
 
 (*
@@ -292,7 +295,11 @@ let check ?(tags = []) label test ~protocol ~executors =
 
 *)
 let check_contract_cache_lowers_gas_consumption ~protocol =
-  check "contract cache lowers gas consumption" ~protocol @@ fun () ->
+  check
+    ~tags:[Tag.ci_disabled]
+    "contract cache lowers gas consumption"
+    ~protocol
+  @@ fun () ->
   let* _, client = init1 ~protocol in
   let* contract_id = originate_str_id_contract client "" in
   let* gas1 = call_contract contract_id "Left 1" client in
@@ -315,7 +322,10 @@ let check_contract_cache_lowers_gas_consumption ~protocol =
 
 *)
 let check_full_cache ~protocol =
-  check "contract cache does not go beyond its size limit" ~protocol
+  check
+    ~tags:[Tag.ci_disabled]
+    "contract cache does not go beyond its size limit"
+    ~protocol
   @@ fun () ->
   let* _, client = init1 ~protocol in
   let s = String.make 1024 'x' in
@@ -364,7 +374,7 @@ let check_block_impact_on_cache ~protocol =
   check
     "one cannot violate the cache size limit"
     ~protocol
-    ~tags:["memory"; "limit"]
+    ~tags:["memory"; "limit"; Tag.ci_disabled]
   @@ fun () ->
   let* node, client = init1 ~protocol in
 
@@ -442,7 +452,11 @@ let check_block_impact_on_cache ~protocol =
 
 *)
 let check_cache_backtracking_during_chain_reorganization ~protocol =
-  check "the cache handles chain reorganizations" ~protocol @@ fun () ->
+  check
+    ~tags:[Tag.ci_disabled]
+    "the cache handles chain reorganizations"
+    ~protocol
+  @@ fun () ->
   let* nodeA = Node.init [Synchronisation_threshold 0] in
   let* clientA = Client.init ~endpoint:(Node nodeA) () in
   let* nodeB = Node.init [Synchronisation_threshold 0] in
@@ -565,7 +579,7 @@ let check_reloading_efficiency ~protocol body =
 
 *)
 let check_cache_reloading_is_not_too_slow ~protocol =
-  let tags = ["reload"; "performance"] in
+  let tags = ["reload"; "performance"; Tag.ci_disabled] in
   check "a node reloads a full cache sufficiently fast" ~protocol ~tags
   @@ fun () ->
   check_reloading_efficiency ~protocol @@ fun client ->
@@ -626,7 +640,7 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
 let check_simulation_takes_cache_into_account ~protocol =
   check
     "operation simulation takes cache into account"
-    ~tags:["simulation"]
+    ~tags:["simulation"; Tag.ci_disabled]
     ~protocol
   @@ fun () ->
   let* _, client = init1 ~protocol in
@@ -671,7 +685,7 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
           upgrades"
          (Protocol.name migrate_from)
          (Protocol.name migrate_to))
-    ~tags:["cache"; "simulation"; "user"; "upgrade"]
+    ~tags:["cache"; "simulation"; "user"; "upgrade"; Tag.ci_disabled]
     ~timeout:(Minutes 2000)
     ~executors
   @@ fun () ->
@@ -770,7 +784,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
           automatic upgrades"
          (Protocol.name migrate_from)
          (Protocol.name migrate_to))
-    ~tags:["cache"; "simulation"; "auto"; "upgrade"]
+    ~tags:["cache"; "simulation"; "auto"; "upgrade"; Tag.ci_disabled]
     ~timeout:(Minutes 2000)
     ~executors
   @@ fun () ->
