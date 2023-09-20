@@ -797,20 +797,20 @@ let test_consistent_block_hashes =
   unit
 
 (** The info for the "storage.sol" contract.
-    See [src\kernel_evm\solidity_examples] *)
+    See [src/kernel_evm/solidity_examples] *)
 let simple_storage =
   {
     label = "simpleStorage";
-    abi = kernel_inputs_path ^ "/storage_abi.json";
+    abi = kernel_inputs_path ^ "/storage.abi";
     bin = kernel_inputs_path ^ "/storage.bin";
   }
 
 (** The info for the "erc20tok.sol" contract.
-    See [src\kernel_evm\solidity_examples] *)
+    See [src/kernel_evm/solidity_examples] *)
 let erc20 =
   {
     label = "erc20tok";
-    abi = kernel_inputs_path ^ "/erc20tok_abi.json";
+    abi = kernel_inputs_path ^ "/erc20tok.abi";
     bin = kernel_inputs_path ^ "/erc20tok.bin";
   }
 
