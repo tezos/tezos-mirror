@@ -96,6 +96,8 @@ type injector = {
           never included is retried. *)
 }
 
+type gc_parameters = {frequency_in_blocks : int32}
+
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
@@ -123,6 +125,7 @@ type t = {
   irmin_cache_size : int option;
   log_kernel_debug : bool;
   no_degraded : bool;
+  gc_parameters : gc_parameters;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -198,6 +201,8 @@ val default_l1_blocks_cache_size : int
 (** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
     cached by the rollup node *)
 val default_l2_blocks_cache_size : int
+
+val default_gc_parameters : gc_parameters
 
 (** [max_injector_retention_period] is the maximum allowed value for
     [injector_retention_period]. *)
@@ -287,6 +292,7 @@ module Cli : sig
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
     no_degraded:bool ->
+    gc_frequency:int32 option ->
     t tzresult
 
   val create_or_read_config :
@@ -313,5 +319,6 @@ module Cli : sig
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
     no_degraded:bool ->
+    gc_frequency:int32 option ->
     t tzresult Lwt.t
 end

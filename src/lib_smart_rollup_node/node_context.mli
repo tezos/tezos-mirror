@@ -126,7 +126,7 @@ val is_bailout : _ t -> bool
     failures planned. *)
 val is_loser : _ t -> bool
 
-(** [can_inject config op_kind] determines if a given operation kind can 
+(** [can_inject config op_kind] determines if a given operation kind can
     be injected based on the configuration settings. *)
 val can_inject : _ t -> Configuration.operation_kind -> bool
 
@@ -501,6 +501,11 @@ val find_confirmed_slots_histories :
 
 val save_confirmed_slots_histories :
   rw -> Block_hash.t -> Dal.Slot_history_cache.t -> unit tzresult Lwt.t
+
+(** [gc node_ctxt level] triggers garbage collection for the node in accordance
+    with [node_ctxt.config.gc_parameters]. Upon completion, all data for L2
+    levels lower than [level] will be removed. *)
+val gc : [> `Write] t -> level:int32 -> unit tzresult Lwt.t
 
 (** {2 Helpers} *)
 

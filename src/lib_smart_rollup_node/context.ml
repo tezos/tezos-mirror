@@ -148,7 +148,8 @@ let empty index = {index; tree = IStore.Tree.empty ()}
 let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
 
 (* adapted from lib_context/disk/context.ml *)
-let gc index ?(callback : unit -> unit = fun () -> ()) (hash : hash) =
+let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
+    (hash : hash) =
   let open Lwt_syntax in
   let repo = index.repo in
   let istore_hash = hash_to_istore_hash hash in
@@ -165,7 +166,7 @@ let gc index ?(callback : unit -> unit = fun () -> ()) (hash : hash) =
             let finalise_duration =
               Irmin_pack_unix.Stats.Latest_gc.finalise_duration stats
             in
-            callback () ;
+            let* () = callback () in
             Event.ending_gc
               ( Time.System.Span.of_seconds_exn total_duration,
                 Time.System.Span.of_seconds_exn finalise_duration )
