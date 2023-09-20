@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 include RPC_core
-include RPC_legacy
 
 type 'a t = (Node.t, 'a) RPC_core.t
 
@@ -186,6 +185,16 @@ let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
       "nonces";
       string_of_int block_level;
     ]
+    Fun.id
+
+let get_chain_block_context_seed ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "seed"] Fun.id
+
+let get_chain_block_context_seed_computation ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "seed_computation"]
     Fun.id
 
 let get_chain_block_context_liquidity_baking_cpmm_address ?(chain = "main")
@@ -647,6 +656,16 @@ let get_chain_block_context_raw ?(chain = "main") ?(block = "head")
        ctxt_type_to_string ctxt_type;
      ]
     @ value_path)
+    Fun.id
+
+let get_chain_block_context_raw_bytes ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "raw"; "bytes"] Fun.id
+
+let get_chain_block_context_cache_contracts_all ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "cache"; "contracts"; "all"]
     Fun.id
 
 let get_chain_block_context_constants ?(chain = "main") ?(block = "head") () =

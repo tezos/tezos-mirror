@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +24,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let node_tls () =
-  Test.register ~title:"Test TLS" ~tags:["node"; "tls"] ~__FILE__ @@ fun () ->
-  let certificate_path = "tezt/tests/tls/tezos.crt" in
-  let key_path = "tezt/tests/tls/tezos.key" in
-  let rpc_tls = Node.{certificate_path; key_path} in
-  let* node = Node.init ~rpc_tls [] in
-  Log.info "Check that a curl call to a node RPC fails without --cacert" ;
-  let get_version_url = RPC.(make_uri node get_version |> Uri.to_string) in
-  let* () =
-    let*? process = Curl.get get_version_url in
-    Process.check_error process
-  in
-  Log.info "Check that a curl to a node RPC works with --cacert" ;
-  let*! (_ : JSON.t) =
-    Curl.get ~args:["--cacert"; certificate_path] get_version_url
-  in
-  unit
+let parse url process =
+  let* output = Process.check_and_read_stdout process in
+  return (JSON.parse ~origin:url output)
 
-let register_protocol_independent () = node_tls ()
+let get ?runner ?(args = []) url =
+  let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
+  Runnable.{value = process; run = parse url}
+
+let get_raw ?runner ?(args = []) url =
+  let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
+  Runnable.{value = process; run = Process.check_and_read_stdout}
+
+let post ?runner ?(args = []) url data =
+  let process =
+    Process.spawn
+      ?runner
+      "curl"
+      (args
+      @ [
+          "-X";
+          "POST";
+          "-H";
+          "Content-Type: application/json";
+          "-s";
+          url;
+          "-d";
+          JSON.encode data;
+        ])
+  in
+  Runnable.{value = process; run = parse url}
+
+let post_raw ?runner ?(args = []) url data =
+  let process =
+    Process.spawn
+      ?runner
+      "curl"
+      (args
+      @ [
+          "-X";
+          "POST";
+          "-H";
+          "Content-Type: application/json";
+          "-s";
+          url;
+          "-d";
+          JSON.encode data;
+        ])
+  in
+  Runnable.{value = process; run = Process.check_and_read_stdout}

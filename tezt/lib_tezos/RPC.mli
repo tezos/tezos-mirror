@@ -29,13 +29,6 @@
     It does not contain any RPC definition: those are in this module. *)
 include module type of RPC_core
 
-(** [RPC_legacy] contains RPCs implemented using a deprecated approach
-    that does not allow to use cohttp. If you need to call functions
-    from [RPC_legacy], it is recommended to port them to this module
-    in order to be able to use cohttp, which is more efficient than using
-    the client. *)
-include module type of RPC_legacy
-
 (** {2 Naming Conventions} *)
 
 (** Functions in this module are named after the RPC they implement.
@@ -105,9 +98,24 @@ val get_chain_invalid_blocks : ?chain:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/nonces/<block_level>]
 
-    [chain] defaults to ["main"]. *)
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
 val get_chain_block_context_nonce :
   ?chain:string -> ?block:string -> int -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/seed]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_seed :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/seed_computation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_seed_computation :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/header/raw]
 
@@ -637,6 +645,22 @@ val get_chain_block_context_raw :
   value_path:string list ->
   unit ->
   JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/bytes]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_raw_bytes :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/cache/contracts/all]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_cache_contracts_all :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/constants]
 

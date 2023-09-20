@@ -41,7 +41,10 @@ type seed_computation_status =
 
 let get_seed_computation_status ?(info = false) client level =
   let* seed_status =
-    RPC.Seed.get_seed_status ~block:(string_of_int level) client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_seed_computation
+         ~block:(string_of_int level)
+         ()
   in
   let status =
     match List.map fst (JSON.as_object seed_status) with

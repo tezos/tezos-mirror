@@ -584,7 +584,7 @@ module Mempool = struct
              ())
         |> Uri.to_string)
     in
-    RPC.Curl.get monitor_operations_url
+    Curl.get monitor_operations_url
 
   let check_monitor_mempool p name =
     let* s = Process.check_and_read_stdout p in
@@ -601,7 +601,7 @@ module Mempool = struct
           (get_chain_mempool_monitor_operations ~refused:true ~version:"2" ())
         |> Uri.to_string)
     in
-    let*? p = RPC.Curl.get monitor_operations_url in
+    let*? p = Curl.get monitor_operations_url in
     let* s = Process.check_and_read_stdout p in
     try
       let _ =

@@ -103,7 +103,7 @@ let streamed_certificates_client coordinator_node root_hash =
       Dac_rpc.V0.api_prefix
       root_hash
   in
-  RPC.Curl.get_raw endpoint
+  Curl.get_raw endpoint
   |> Runnable.map (fun output ->
          let as_list = String.split_on_char '\n' output in
          (* Each JSON item in the response of the curl request is
@@ -2490,7 +2490,7 @@ module Api_regression = struct
       Cohttp.Header.of_list [("Content-Type", "application/json")]
     in
     let* () = capture_rpc_request headers verb uri in
-    return @@ (RPC.Curl.get_raw (Uri.to_string uri) |> Runnable.map capture)
+    return @@ (Curl.get_raw (Uri.to_string uri) |> Runnable.map capture)
 
   (** [V0] module is used for regression testing [V0] API. *)
   module V0 = struct
