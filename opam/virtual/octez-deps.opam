@@ -70,7 +70,7 @@ depends: [
   "prometheus-app" { >= "1.2" }
   "ptime" { >= "1.1.0" }
   "pure-splitmix" { = "0.3" }
-  "pyml"
+  "pyml" { >= "20220905" }
   "qcheck-alcotest" { >= "0.20" }
   "qcheck-core"
   "re" { >= "1.9.0" }
