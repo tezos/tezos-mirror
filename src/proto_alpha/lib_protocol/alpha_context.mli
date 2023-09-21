@@ -2266,6 +2266,18 @@ module Delegate : sig
           Used only for RPCs. To get the actual rewards, use the reward functions
           defined above. *)
       val get_reward_coeff : t -> cycle:Cycle.t -> Q.t tzresult Lwt.t
+
+      (** [get_reward_bonus ctxt cycle] reads the reward bonus for the given cycle
+          from the storage. If cycle is [None], returns 0.
+
+          Returns 0 if the given cycle is not between [current_cycle] and
+          [current_cycle + preserved_cycles].
+
+          If adaptive issuance has not been activated,
+          then this function returns 0.
+          Used only for RPCs. To get the actual rewards, use [Delegate_rewards]. *)
+      val get_reward_bonus :
+        t -> cycle:Cycle.t option -> Issuance_bonus_repr.t tzresult Lwt.t
     end
 
     module Internal_for_tests : sig

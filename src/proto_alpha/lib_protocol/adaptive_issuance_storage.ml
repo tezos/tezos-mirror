@@ -348,6 +348,8 @@ let migrate_adaptive_issuance_storages_from_O_to_P ctxt =
 
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
+
+  let get_reward_bonus = get_reward_bonus
 end
 
 module Internal_for_tests = struct
