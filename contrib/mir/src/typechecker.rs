@@ -80,10 +80,8 @@ fn typecheck_instruction(
             ensure_stack_len(stack, dup_height)?;
             stack.push(stack[dup_height - 1].clone());
         }
-        Gt => match stack.as_slice() {
-            [.., Type::Int] => {
-                stack[0] = Type::Bool;
-            }
+        Gt => match stack.pop() {
+            Some(Type::Int) => stack.push(Type::Bool),
             _ => return Err(TcError::GenericTcError),
         },
         If(nested_t, nested_f) => match stack.pop() {
@@ -99,10 +97,8 @@ fn typecheck_instruction(
             }
             _ => return Err(TcError::GenericTcError),
         },
-        Instruction::Int => match stack.as_mut_slice() {
-            [.., val @ Type::Nat] => {
-                *val = Type::Int;
-            }
+        Instruction::Int => match stack.pop() {
+            Some(Type::Nat) => stack.push(Type::Int),
             _ => return Err(TcError::GenericTcError),
         },
         Loop(nested) => match stack.as_slice() {
