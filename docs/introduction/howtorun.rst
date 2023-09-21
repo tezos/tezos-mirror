@@ -1,7 +1,7 @@
 .. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
-How to run Octez
-================
+Running Octez
+=============
 
 In this section, we discuss how to take part in the protocol that runs
 the network.

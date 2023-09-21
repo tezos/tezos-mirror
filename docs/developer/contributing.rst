@@ -16,7 +16,7 @@ Reporting issues
 The simplest way to contribute to Octez is to report issues that you may
 find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
-consult the :doc:`technical support sources <../introduction/support>`
+consult the :doc:`technical support sources <../global/support>`
 first and always make sure
 to search the existing issues before reporting a new one.
 Some information that are probably important to include in the description:
@@ -43,7 +43,7 @@ Alternatively, you may of course create your own MRs for submitting your changes
 Other non-code contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you acquired a good expertise level in using, configuring, or overcoming problems with the various Octez executables, you may bring useful contributions by providing assistance to others via the different channels (Slack,  StackExchange, etc.) listed in the :doc:`technical support page <../introduction/support>`.
+If you acquired a good expertise level in using, configuring, or overcoming problems with the various Octez executables, you may bring useful contributions by providing assistance to others via the different channels (Slack,  StackExchange, etc.) listed in the :doc:`technical support page <../global/support>`.
 
 If you want to shape the future of Octez, you may consider contributing to Tezos Improvement Proposals (TZIPs), that specify new features or define standards. These are located in the `TZIP repo <https://gitlab.com/tezos/tzip/>`__.
 

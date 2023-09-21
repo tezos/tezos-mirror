@@ -146,9 +146,6 @@ Platform developers are also provided reference materials for internal APIs of O
    introduction/howtoget
    introduction/howtouse
    introduction/howtorun
-   introduction/test_networks
-   introduction/get_troubleshooting
-   introduction/support
    BREAKING CHANGES <introduction/breaking_changes>
 
 .. toctree::
@@ -259,4 +256,7 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    global/architecture
+   global/support.rst
+   global/test_networks.rst
+   global/community.rst
    global/timelock

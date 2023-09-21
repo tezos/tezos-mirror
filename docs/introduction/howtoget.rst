@@ -1,6 +1,6 @@
 .. _howtoget:
 
-How to get Tezos
+Installing Octez
 ================
 
 In this how-to we explain how to get up-to-date binaries to run Tezos
@@ -595,3 +595,11 @@ update the sources by doing ``git pull`` in the ``tezos/`` directory and replay
 the compilation scenario starting from ``make build-deps``.
 You may also use ``make clean`` (and ``rm -Rf _opam/`` if needed) before that, for restarting compilation in a
 fresh state.
+
+Appendix
+--------
+
+.. toctree::
+   :maxdepth: 2
+
+   get_troubleshooting

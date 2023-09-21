@@ -322,7 +322,7 @@ Get Free Test Tokens
 ~~~~~~~~~~~~~~~~~~~~
 
 To test the networks and help users get familiar with the system, on
-:doc:`test networks<test_networks>` you can obtain free tokens from
+:doc:`test networks<../global/test_networks>` you can obtain free tokens from
 :ref:`a faucet <faucet>`. Transfer some to Alice's address.
 
 Transfers and Receipts
