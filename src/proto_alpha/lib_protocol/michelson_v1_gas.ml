@@ -109,6 +109,11 @@ module Cost_of = struct
 
     let big_map_elt_size = Script_expr_hash.size
 
+    (* The uses of [cost_N_IMap_*] below are intentional.  They are for
+       the cost of the big_map overlay. The other costs such as the storage
+       access and the deserialization are separately charged in the protocol.
+       We don't use [cost_N_IBig_map_*] here, since they include these partial
+       carbonations. *)
     let big_map_mem ({size; _} : _ Script_typed_ir.big_map_overlay) =
       atomic_step_cost (cost_N_IMap_mem big_map_elt_size size)
 
