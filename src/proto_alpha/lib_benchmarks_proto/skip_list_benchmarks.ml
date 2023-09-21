@@ -70,7 +70,8 @@ module Next : Benchmark.S = struct
   let workload_to_vector len =
     Sparse_vec.String.of_list [("len", float_of_int @@ len)]
 
-  let model = Model.make ~conv:(fun x -> (x, ())) Model.logn
+  let model =
+    Model.make ~conv:(fun x -> (x, ())) Model.logn ~takes_saturation_reprs:true
 
   let create_skip_list_of_len len =
     let rec go n cell =

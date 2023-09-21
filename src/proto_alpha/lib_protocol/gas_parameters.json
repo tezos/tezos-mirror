@@ -436,7 +436,7 @@
     "script_typed_ir_size/VALUE_SIZE_size_coeff": 19.56988810741499,
     "skip_list/hash_cell/coeff": 57,
     "skip_list/hash_cell/intercept": 250,
-    "skip_list/next/coeff": 20,
+    "skip_list/next/coeff": 19.2125537461,
     "storage/list_key_values_intercept": 470,
     "storage/list_key_values_step": 117,
     "tickets/COLLECT_TICKETS_STEP/coeff": 80,

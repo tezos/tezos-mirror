@@ -26,14 +26,6 @@
 
 include Skip_list_costs_generated
 
-(* generated code is not usable: the model is different *)
-(* model skip_list/next *)
-(* fun size -> (19.2125537461 * (log2 (1 + size))) *)
-let cost_next size =
-  let open S.Syntax in
-  let v0 = log2 (S.safe_int 1 + size) in
-  v0 * S.safe_int 20
-
 let model_next ~length = cost_next (S.safe_z length)
 
 let model_hash_cell ~backpointers_count =
