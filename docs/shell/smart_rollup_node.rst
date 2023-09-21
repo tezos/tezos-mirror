@@ -210,9 +210,19 @@ In addition, a rollup node can run under different modes:
    staker) is detected will the "accuser node" publish a commitment and
    participate in the subsequent refutation game.
 
+#. ``bailout`` mode is designed to assist stakers in recovering their bonds. It functions as a slightly modified version of "Accuser", differing in that it does not post any new 
+commitments but instead focuses on defending the ones that have been previously 
+submitted. When operating in bailout mode, the expectation is to initiate a recover bond 
+operation when the operator is no longer staked on any commitment. If the node detects that this 
+operation has been successful, it can gratefully exit.
+
+#. ``custom`` mode refers to a mode where the users individually selects which
+   kinds of operations the rollup node injects. It provides tailored control and
+   flexibility customized to specific requirements, and is mostly used for tests.
+
 The following table summarizes the operation modes, focusing on the L1
 operations which are injected by the rollup node in each mode.
-x
+
 +-------------+--------------+-----------+------------+------------+
 |             | Add messages | Publish   | Cement     | Refute     |
 +=============+==============+===========+============+============+
@@ -225,6 +235,8 @@ x
 | Maintenance | No           | Yes       | Yes        | Yes        |
 +-------------+--------------+-----------+------------+------------+
 | Accuser     | No           | Yes [*]_  | No         | Yes        |
++-------------+--------------+-----------+------------+------------+
+| Bailout     | No           | No        | Yes        | Yes        |
 +-------------+--------------+-----------+------------+------------+
 
 .. [*] An accuser node will publish commitments only when it detects
@@ -982,7 +994,7 @@ module that exports them (in our case, ``smart_rollup_core``).
        ) -> i32;
 
        /// Returns the number of bytes written to the durable storage
-       /// (should be equal to `num_bytes`, or an error code.
+       /// (should be equal to `num_bytes`, or an error code).
        pub fn store_read(
            path: *const u8,
            path_len: usize,
@@ -1149,7 +1161,7 @@ after its origination. Its current state can be inspected with the command
 .. code::
 
   > show status
-  Status: Waiting for inputs
+  Status: Waiting for input
   Internal state: Collect
 
 When started, the kernel is in collection mode internally. This means that it is
@@ -1193,7 +1205,7 @@ the kernel side. We can now start a ``kernel_run`` evaluation:
 
   > step kernel_run
   Evaluation took 11000000000 ticks so far
-  Status: Waiting for inputs
+  Status: Waiting for input
   Internal state: Collect
 
 
@@ -1249,7 +1261,7 @@ take care of the possible reboots asked by the kernel (through the usage of the
 
   > step inbox
   Evaluation took 44000000000 ticks
-  Status: Waiting for inputs
+  Status: Waiting for input
   Internal state: Collect
 
 To obtain more information on the execution, the command ``bench`` will also run
