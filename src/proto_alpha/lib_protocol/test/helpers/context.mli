@@ -134,6 +134,13 @@ val get_seed_nonce_revelation_tip : t -> Tez.t tzresult Lwt.t
 
 val get_vdf_revelation_tip : t -> Tez.t tzresult Lwt.t
 
+val get_ai_current_yearly_rate : t -> string tzresult Lwt.t
+
+val get_ai_current_yearly_rate_exact : t -> Q.t tzresult Lwt.t
+
+val get_ai_expected_issuance :
+  t -> Adaptive_issuance_services.expected_rewards list tzresult Lwt.t
+
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 

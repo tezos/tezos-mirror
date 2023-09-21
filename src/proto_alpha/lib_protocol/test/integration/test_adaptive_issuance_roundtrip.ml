@@ -183,9 +183,11 @@ module State = struct
     constants : Protocol.Alpha_context.Constants.Parametric.t;
     param_requests : (string * staking_parameters * int) list;
     activate_ai : bool;
-    baker : string;
+    baking_policy : Block.baker_policy option;
     last_level_rewards : Protocol.Alpha_context.Raw_level.t;
     snapshot_balances : (string * balance) list String.Map.t;
+    saved_rate : Q.t option;
+    burn_rewards : bool;
     pending_operations : Protocol.Alpha_context.packed_operation list;
   }
 
@@ -204,6 +206,16 @@ module State = struct
     | None -> raise Not_found
     | Some r -> r
 
+  let find_account_from_pkh (pkh : Signature.public_key_hash) (state : t) :
+      string * account_state =
+    String.Map.filter
+      (fun _ acc -> Signature.Public_key_hash.equal pkh acc.pkh)
+      state.account_map
+    |> String.Map.choose
+    |> function
+    | None -> raise Not_found
+    | Some (name, acc) -> (name, acc)
+
   (** Returns true iff account is a delegate *)
   let is_self_delegate (account_name : string) (state : t) : bool =
     let acc = find_account account_name state in
@@ -220,6 +232,11 @@ module State = struct
         log_debug_balance_update x state.account_map new_state.account_map)
       log_updates ;
     new_state
+
+  let apply_burn amount src_name (state : t) : t =
+    let f = apply_burn amount src_name in
+    let state = update_map ~log_updates:[src_name] ~f state in
+    {state with total_supply = Tez.(state.total_supply -! amount)}
 
   let apply_transfer amount src_name dst_name (state : t) : t =
     let f = apply_transfer amount src_name dst_name in
@@ -242,7 +259,7 @@ module State = struct
     (* no log *)
     update_map ~f state
 
-  let apply_rewards block (state : t) : t tzresult Lwt.t =
+  let apply_rewards ~(baker : string) block (state : t) : t tzresult Lwt.t =
     let open Lwt_result_syntax in
     let {last_level_rewards; total_supply; constants = _; _} = state in
     let*? current_level = Context.get_level (B block) in
@@ -254,7 +271,7 @@ module State = struct
         Protocol.Alpha_context.Raw_level.diff current_level last_level_rewards
         |> Int32.to_int
       in
-      let {parameters; _} = find_account state.baker state in
+      let {parameters; _} = find_account baker state in
       let delta_rewards = Tez.mul_exn rewards_per_block delta_time in
       if delta_time = 1 then
         Log.info ~color:tez_color "+%aꜩ" Tez.pp rewards_per_block
@@ -273,12 +290,8 @@ module State = struct
       in
       let to_liquid = Partial_tez.to_tez ~round_up:true to_liquid in
       let to_frozen = Tez.(delta_rewards -! to_liquid) in
-      let state =
-        update_map ~f:(add_liquid_rewards to_liquid state.baker) state
-      in
-      let state =
-        update_map ~f:(add_frozen_rewards to_frozen state.baker) state
-      in
+      let state = update_map ~f:(add_liquid_rewards to_liquid baker) state in
+      let state = update_map ~f:(add_frozen_rewards to_frozen baker) state in
       let* total_supply = Tez.(total_supply + delta_rewards) in
       return {state with last_level_rewards = current_level; total_supply}
 
@@ -477,6 +490,15 @@ let exec_state f =
       let* state = f input in
       return (block, state))
 
+(** Execute a function that does not modify neither the block nor the state.
+    Usually used for checks/asserts *)
+let exec_unit f =
+  let open Lwt_result_syntax in
+  Action
+    (fun input ->
+      let* () = f input in
+      return input)
+
 (* ======== Baking ======== *)
 
 (** After baking and applying rewards in state *)
@@ -494,11 +516,56 @@ let check_all_balances block state : unit tzresult Lwt.t =
   Assert.equal_tez ~loc:__LOC__ actual_total_supply total_supply
 
 (** Apply rewards in state + check *)
-let apply_rewards block state : State.t tzresult Lwt.t =
+let apply_rewards ~(baker : string) block state : State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* state = State.apply_rewards block state in
+  let* state = State.apply_rewards ~baker block state in
   let* () = check_all_balances block state in
   return state
+
+let check_issuance_rpc block : unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  (* We assume one block per minute *)
+  let* rewards_per_block = Context.get_issuance_per_minute (B block) in
+  let* total_supply = Context.get_total_supply (B block) in
+  let* expected_issuance = Context.get_ai_expected_issuance (B block) in
+  let* () =
+    match expected_issuance with
+    | ei :: _ ->
+        (* We assume only the fixed portion is issued *)
+        Assert.equal_tez
+          ~loc:__LOC__
+          rewards_per_block
+          ei.baking_reward_fixed_portion
+    | _ -> failwith "expected_issuance rpc: unexpected value"
+  in
+  let* yearly_rate = Context.get_ai_current_yearly_rate (B block) in
+  let* yearly_rate_exact = Context.get_ai_current_yearly_rate_exact (B block) in
+  let yr = float_of_string yearly_rate in
+  let yre = Q.to_float yearly_rate_exact in
+  (* Precision for yearly rate is 0.001 *)
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      (fun x y -> Float.(abs (x -. y) <= 0.001))
+      "Yearly rate (float)"
+      Format.pp_print_float
+      yr
+      yre
+  in
+  (* Divided by 525_600 minutes per year, x100 because rpc returns a pct *)
+  let issuance_from_rate =
+    Tez.(mul_q total_supply Q.(div yearly_rate_exact ~$525_600_00) |> of_q)
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Tez.equal
+      "Issuance"
+      Tez.pp
+      rewards_per_block
+      issuance_from_rate
+  in
+  return_unit
 
 (** Bake a block, with the given baker and the given operations. *)
 let bake ?baker : t -> t tzresult Lwt.t =
@@ -514,39 +581,75 @@ let bake ?baker : t -> t tzresult Lwt.t =
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
   in
-  let baker =
+  let policy =
     match baker with
-    | None -> (
-        try State.find_account state.baker state
-        with Not_found ->
-          Log.info
-            ~color:warning_color
-            "Invalid baker: %s not found. Aborting"
-            state.baker ;
-          assert false)
-    | Some baker -> baker
+    | None -> state.baking_policy
+    | Some baker ->
+        let {pkh; _} =
+          try State.find_account baker state
+          with Not_found ->
+            Log.info
+              ~color:warning_color
+              "Invalid baker: %s not found. Aborting"
+              baker ;
+            assert false
+        in
+        Some (Block.By_account pkh)
   in
-  let policy = Block.By_account baker.pkh in
+  let* baker, _, _, _ = Block.get_next_baker ?policy block in
+  let baker_name, {contract = baker_contract; _} =
+    State.find_account_from_pkh baker state
+  in
+  let* () = check_issuance_rpc block in
   let state, operations = State.pop_pending_operations state in
-  let* block = Block.bake ~policy ~adaptive_issuance_vote ~operations block in
+  let* block, state =
+    if state.burn_rewards then
+      (* Incremental mode *)
+      let* i =
+        Incremental.begin_construction ?policy ~adaptive_issuance_vote block
+      in
+      let* block' =
+        Block.bake ?policy ~adaptive_issuance_vote ~operations block
+      in
+      let* block_rewards = Context.get_issuance_per_minute (B block') in
+      let ctxt = Incremental.alpha_ctxt i in
+      let* context, _ =
+        Lwt_result_wrap_syntax.wrap
+          (Protocol.Alpha_context.Token.transfer
+             ctxt
+             (`Contract baker_contract)
+             `Burned
+             block_rewards)
+      in
+      let i = Incremental.set_alpha_ctxt i context in
+      let* i = List.fold_left_es Incremental.add_operation i operations in
+      let* block = Incremental.finalize_block i in
+      let state = State.apply_burn block_rewards baker_name state in
+      return (block, state)
+    else
+      let* block =
+        Block.bake ?policy ~adaptive_issuance_vote ~operations block
+      in
+      return (block, state)
+  in
   (* TODO: mistake ? The baking parameters apply before we reach the new cycle... *)
   let new_current_cycle = Block.current_cycle block in
-  let state =
+  let* state =
     if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
-      state
+      return state
     else (
       Log.info
         ~color:time_color
         "Cycle %d"
         (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
-      State.apply_end_cycle new_current_cycle state)
+      return @@ State.apply_end_cycle new_current_cycle state)
   in
-  let* state = apply_rewards block state in
+  let* state = apply_rewards ~baker:baker_name block state in
   return (block, state)
 
-(** Bake until the end of a cycle, using [bake] instead of [Block.bake]
+(** Bake until a cycle is reached, using [bake] instead of [Block.bake]
     Should be slower because checks balances at the end of every block (avoidable in some cases) *)
-let bake_until_cycle_end_slow : t -> t tzresult Lwt.t =
+let bake_until_next_cycle : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
   let open Lwt_result_syntax in
   let current_cycle = Block.current_cycle init_block in
@@ -564,7 +667,14 @@ let bake_until_cycle_end_slow : t -> t tzresult Lwt.t =
 
 (** Sets the de facto baker for all future blocks *)
 let set_baker baker : (t, t) scenarios =
-  exec_state (fun (_block, state) -> return {state with State.baker})
+  exec_state (fun (_block, state) ->
+      let {pkh; _} = State.find_account baker state in
+      return {state with State.baking_policy = Some (Block.By_account pkh)})
+
+(** Unsets the de facto baker, baking policy returns to default ([By round 0]) *)
+let unset_baker : (t, t) scenarios =
+  exec_state (fun (_block, state) ->
+      return {state with State.baking_policy = None})
 
 (** Creates a snapshot of the current balances for the given account names.
     Can be used to check that balances at point A and B in the execution of a test
@@ -589,7 +699,7 @@ let snapshot_balances snap_name names_list : (t, t) scenarios =
 (** Check balances against a previously defined snapshot *)
 let check_snapshot_balances snap_name : (t, t) scenarios =
   let open Lwt_result_syntax in
-  exec_state (fun (_block, state) ->
+  exec_unit (fun (_block, state) ->
       Log.debug
         ~color:low_debug_color
         "Checking equality of balances between \"%s\" and now"
@@ -603,7 +713,7 @@ let check_snapshot_balances snap_name : (t, t) scenarios =
             ~color:warning_color
             "\"%s\" snapshot not found..."
             snap_name ;
-          return state
+          return_unit
       | Some snapshot_balances ->
           let* () =
             List.iter_es
@@ -614,7 +724,26 @@ let check_snapshot_balances snap_name : (t, t) scenarios =
                 assert_balance_equal ~loc:__LOC__ old_balance new_balance)
               snapshot_balances
           in
-          return state)
+          return_unit)
+
+(** Save the current issuance rate for future use *)
+let save_current_rate : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (block, state) ->
+      let* rate = Context.get_ai_current_yearly_rate_exact (B block) in
+      return {state with State.saved_rate = Some rate})
+
+(** Check that [f saved_rate current_rate] is true. [f] is typically a comparison function *)
+let check_rate_evolution (f : Q.t -> Q.t -> bool) : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_unit (fun (block, state) ->
+      let* new_rate = Context.get_ai_current_yearly_rate_exact (B block) in
+      let previous_rate = state.State.saved_rate in
+      match previous_rate with
+      | None -> failwith "check_rate_evolution: no rate previously saved"
+      | Some previous_rate ->
+          if f previous_rate new_rate then return_unit
+          else failwith "check_rate_evolution: assertion failed")
 
 (* ======== Operations ======== *)
 
@@ -627,29 +756,8 @@ let next_block =
 (** Bake until the end of a cycle *)
 let next_cycle =
   exec (fun input ->
-      let open Lwt_result_syntax in
       Log.info ~color:action_color "[Next cycle]" ;
-      let block, (State.{constants; activate_ai; _} as state) = input in
-      if
-        Tez.(constants.issuance_weights.base_total_issued_per_minute = zero)
-        || not activate_ai
-      then
-        (* Apply rewards in state only after the while cycle ends *)
-        let new_cycle = Cycle.succ (Block.current_cycle block) in
-        let baker = State.find_account state.baker state in
-        let policy = Block.By_account baker.pkh in
-        let* block, state =
-          if state.pending_operations = [] then return (block, state)
-          else bake input
-        in
-        let* block = Block.bake_until_cycle new_cycle ~policy block in
-        (* TODO: other way around ?? *)
-        let state = State.apply_end_cycle new_cycle state in
-        let* state = apply_rewards block state in
-        return (block, state)
-      else
-        (* Apply rewards in state every block *)
-        bake_until_cycle_end_slow input)
+      bake_until_next_cycle input)
 
 (** Executes an operation: f should return a new state and a list of operations, which are then applied *)
 let exec_op f =
@@ -664,7 +772,7 @@ let exec_op f =
 (* ======== Definition of basic actions ======== *)
 
 (** Initialize the test, given some initial parameters *)
-let begin_test ~activate_ai
+let begin_test ~activate_ai ?(burn_rewards = false)
     (constants : Protocol.Alpha_context.Constants.Parametric.t)
     delegates_name_list : (unit, t) scenarios =
   exec (fun () ->
@@ -715,7 +823,6 @@ let begin_test ~activate_ai
           delegates_name_list
           delegates
       in
-      let baker = bootstrap in
       let* total_supply = Context.get_total_supply (B block) in
       let state =
         State.
@@ -725,9 +832,11 @@ let begin_test ~activate_ai
             constants;
             param_requests = [];
             activate_ai;
-            baker;
+            baking_policy = None;
             last_level_rewards = init_level;
             snapshot_balances = String.Map.empty;
+            saved_rate = None;
+            burn_rewards;
             pending_operations = [];
           }
       in
@@ -998,22 +1107,27 @@ let rec wait_n_blocks n =
   else if n = 1 then next_block
   else wait_n_blocks (n - 1) --> next_block
 
-(** Wait until AI activates. Bakes one block if AI is already activated,
-    fails if AI is not set to be activated in the future. *)
+(** Wait until AI activates.
+    Fails if AI is not set to be activated in the future. *)
 let wait_ai_activation =
   exec (fun (block, state) ->
       let open Lwt_result_syntax in
       Log.info ~color:time_color "Fast forward to AI activation" ;
-      let* block =
+      let* output =
         if state.State.activate_ai then
           let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
-          (* Bake until the activation. *)
-          Block.bake_until_cycle launch_cycle block
+          let rec bake_while (block, state) =
+            let current_cycle = Block.current_cycle block in
+            if Cycle.(current_cycle >= launch_cycle) then return (block, state)
+            else
+              let* input = bake_until_next_cycle (block, state) in
+              bake_while input
+          in
+          bake_while (block, state)
         else assert false
       in
-      let* state = apply_rewards block state in
       Log.info ~color:event_color "AI activated" ;
-      return (block, state))
+      return output)
 
 (** Create an account and give an initial balance funded by [source] *)
 let add_account_with_funds name source amount =
@@ -1031,7 +1145,7 @@ let test_expected_error =
            ~expected_error:[Inconsistent_number_of_bootstrap_accounts]
            (exec (fun _ -> failwith "")))
 
-let init_constants ?reward_per_block () =
+let init_constants ?reward_per_block ?(deactivate_dynamic = false) () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
@@ -1050,12 +1164,24 @@ let init_constants ?reward_per_block () =
   let minimal_block_delay = Protocol.Alpha_context.Period.one_minute in
   let cost_per_byte = Tez.zero in
   let consensus_threshold = 0 in
+  let adaptive_issuance = default_constants.adaptive_issuance in
+  let adaptive_rewards_params =
+    if deactivate_dynamic then
+      {
+        adaptive_issuance.adaptive_rewards_params with
+        max_bonus =
+          Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero;
+      }
+    else adaptive_issuance.adaptive_rewards_params
+  in
+  let adaptive_issuance = {adaptive_issuance with adaptive_rewards_params} in
   {
     default_constants with
     consensus_threshold;
     issuance_weights;
     minimal_block_delay;
     cost_per_byte;
+    adaptive_issuance;
   }
 
 (** Initialization of scenarios with 3 cases:
@@ -1074,6 +1200,7 @@ let init_scenario ?reward_per_block () =
     begin_test ~activate_ai constants [name]
     --> set_delegate_params name init_params
     --> stake name (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> set_baker "__bootstrap__"
   in
   (Tag "AI activated"
    --> (Tag "self stake" --> begin_test ~activate_ai:true ~self_stake:true
@@ -1307,15 +1434,6 @@ module Roundtrip = struct
     (* Now possible *)
     --> stake "staker" amount
 
-  let test_wait_with_rewards =
-    let constants = init_constants ~reward_per_block:1_000_000_000L () in
-    begin_test ~activate_ai:true constants []
-    --> (Tag "block step" --> wait_n_blocks 200
-        |+ Tag "cycle step" --> wait_n_cycles 20
-        |+ Tag "wait AI activation" --> next_block --> wait_ai_activation
-           --> (Tag "block step" --> wait_n_blocks 100
-               |+ Tag "cycle step" --> wait_n_cycles 10))
-
   let tests =
     tests_of_scenarios
     @@ [
@@ -1332,7 +1450,97 @@ module Roundtrip = struct
          ("Test change delegate", change_delegate);
          ("Test unset delegate", unset_delegate);
          ("Test forbid costake", forbid_costaking);
+       ]
+end
+
+module Rewards = struct
+  let test_wait_with_rewards =
+    let constants = init_constants ~reward_per_block:1_000_000_000L () in
+    begin_test ~activate_ai:true constants ["delegate"]
+    --> (Tag "block step" --> wait_n_blocks 200
+        |+ Tag "cycle step" --> wait_n_cycles 20
+        |+ Tag "wait AI activation" --> next_block --> wait_ai_activation
+           --> (Tag "block step" --> wait_n_blocks 100
+               |+ Tag "cycle step" --> wait_n_cycles 10))
+
+  let test_ai_curve_activation_time =
+    let constants =
+      init_constants
+        ~reward_per_block:1_000_000_000L
+        ~deactivate_dynamic:true
+        ()
+    in
+    let pc = constants.preserved_cycles in
+    begin_test ~activate_ai:true ~burn_rewards:true constants [""]
+    --> next_block --> save_current_rate (* before AI rate *)
+    --> wait_ai_activation
+    (* Rate remains unchanged right after AI activation, we must wait [pc + 1] cycles *)
+    --> check_rate_evolution Q.equal
+    --> wait_n_cycles pc
+    --> check_rate_evolution Q.equal
+    --> next_cycle
+    (* The new rate should be active now. With the chosen constants, it should be lower.
+       We go from 1000tz per day to (at most) 5% of 4_000_000tz per year *)
+    --> check_rate_evolution Q.gt
+
+  let test_static =
+    let constants =
+      init_constants
+        ~reward_per_block:1_000_000_000L
+        ~deactivate_dynamic:true
+        ()
+    in
+    let rate_var_lag = constants.preserved_cycles in
+    (* All rewards in liquid *)
+    let init_params =
+      {
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.one;
+      }
+    in
+    let delta = Amount (Tez.of_mutez 20_000_000_000L) in
+    let cycle_stake =
+      save_current_rate --> stake "delegate" delta --> next_cycle
+      --> check_rate_evolution Q.gt
+    in
+    let cycle_unstake =
+      save_current_rate --> unstake "delegate" delta --> next_cycle
+      --> check_rate_evolution Q.lt
+    in
+    let cycle_stable =
+      save_current_rate --> next_cycle --> check_rate_evolution Q.equal
+    in
+    begin_test ~activate_ai:true ~burn_rewards:true constants ["delegate"]
+    --> set_delegate_params "delegate" init_params
+    --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> save_current_rate --> wait_ai_activation
+    --> (Tag "increase stake, decrease rate" --> next_cycle
+         --> loop rate_var_lag (stake "delegate" delta --> next_cycle)
+         --> loop 10 cycle_stake
+        |+ Tag "decrease stake, increase rate" --> next_cycle
+           --> loop rate_var_lag (unstake "delegate" delta --> next_cycle)
+           --> loop 10 cycle_unstake
+        |+ Tag "stable stake, stable rate" --> next_cycle
+           --> wait_n_cycles rate_var_lag --> loop 10 cycle_stable
+        |+ Tag "test timing" --> wait_n_cycles rate_var_lag
+           --> check_rate_evolution Q.equal
+           --> next_cycle --> check_rate_evolution Q.gt --> save_current_rate
+           --> (Tag "increase stake" --> stake "delegate" delta
+                --> wait_n_cycles rate_var_lag
+                --> check_rate_evolution Q.equal
+                --> next_cycle --> check_rate_evolution Q.gt
+               |+ Tag "decrease stake" --> unstake "delegate" delta
+                  --> wait_n_cycles rate_var_lag
+                  --> check_rate_evolution Q.equal
+                  --> next_cycle --> check_rate_evolution Q.lt))
+
+  let tests =
+    tests_of_scenarios
+    @@ [
          ("Test wait with rewards", test_wait_with_rewards);
+         ("Test ai curve activation time", test_ai_curve_activation_time);
+         ("Test static rate", test_static);
        ]
 end
 
@@ -1342,7 +1550,7 @@ let tests =
        ("Test expected error in assert failure", test_expected_error);
        ("Test init", init_scenario () --> Action (fun _ -> return_unit));
      ])
-  @ Roundtrip.tests
+  @ Roundtrip.tests @ Rewards.tests
 
 let () =
   Alcotest_lwt.run

@@ -51,6 +51,8 @@ module Tez = struct
 
   let of_z a = Z.to_int64 a |> of_mutez
 
+  let of_q a = Q.to_bigint a |> of_z
+
   let ratio num den =
     Q.make (Z.of_int64 (to_mutez num)) (Z.of_int64 (to_mutez den))
 
@@ -501,6 +503,10 @@ let add_frozen_rewards amount account_name account_map =
     {account with frozen_deposits}
   in
   update_account ~f account_name account_map
+
+let apply_burn amount src_name account_map =
+  let f src = {src with liquid = Tez.(src.liquid -! amount)} in
+  update_account ~f src_name account_map
 
 let apply_transfer amount src_name dst_name account_map =
   match
