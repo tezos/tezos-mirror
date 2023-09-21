@@ -10,14 +10,14 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model global_constants_storage/expand_constant_branch *)
-(* fun size -> (4095. * size) *)
+(* fun size -> 4095. * size *)
 let cost_expand_constant_branch size =
   let size = S.safe_int size in
   let v0 = size in
   v0 * S.safe_int 4096
 
 (* model global_constants_storage/expand_no_constant_branch *)
-(* fun size -> (100. + (4.639474 * (size * (log2 (1 + size))))) *)
+(* fun size -> 100. + (4.639474 * (size * (log2 (1 + size)))) *)
 let cost_expand_no_constant_branch size =
   let size = S.safe_int size in
   let v0 = size * log2 (S.safe_int 1 + size) in
