@@ -647,9 +647,9 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let* state = apply_rewards ~baker:baker_name block state in
   return (block, state)
 
-(** Bake until the end of a cycle, using [bake] instead of [Block.bake]
+(** Bake until a cycle is reached, using [bake] instead of [Block.bake]
     Should be slower because checks balances at the end of every block (avoidable in some cases) *)
-let bake_until_cycle_end_slow : t -> t tzresult Lwt.t =
+let bake_until_next_cycle : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
   let open Lwt_result_syntax in
   let current_cycle = Block.current_cycle init_block in
@@ -757,7 +757,7 @@ let next_block =
 let next_cycle =
   exec (fun input ->
       Log.info ~color:action_color "[Next cycle]" ;
-      bake_until_cycle_end_slow input)
+      bake_until_next_cycle input)
 
 (** Executes an operation: f should return a new state and a list of operations, which are then applied *)
 let exec_op f =
@@ -1107,8 +1107,8 @@ let rec wait_n_blocks n =
   else if n = 1 then next_block
   else wait_n_blocks (n - 1) --> next_block
 
-(** Wait until AI activates. Bakes one block if AI is already activated,
-    fails if AI is not set to be activated in the future. *)
+(** Wait until AI activates.
+    Fails if AI is not set to be activated in the future. *)
 let wait_ai_activation =
   exec (fun (block, state) ->
       let open Lwt_result_syntax in
@@ -1120,7 +1120,7 @@ let wait_ai_activation =
             let current_cycle = Block.current_cycle block in
             if Cycle.(current_cycle >= launch_cycle) then return (block, state)
             else
-              let* input = bake_until_cycle_end_slow (block, state) in
+              let* input = bake_until_next_cycle (block, state) in
               bake_while input
           in
           bake_while (block, state)
