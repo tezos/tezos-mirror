@@ -528,6 +528,8 @@ module Delegate = struct
       include Delegate_rewards.For_RPC
       include Adaptive_issuance_storage.For_RPC
     end
+
+    module Internal_for_tests = Adaptive_issuance_storage.Internal_for_tests
   end
 
   module Staking_parameters = Delegate_staking_parameters

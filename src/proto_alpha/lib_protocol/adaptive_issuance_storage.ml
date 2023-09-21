@@ -327,3 +327,9 @@ let update_ema ctxt ~vote =
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
 end
+
+module Internal_for_tests = struct
+  let compute_reward_coeff_ratio = compute_reward_coeff_ratio
+
+  let compute_bonus = compute_bonus
+end
