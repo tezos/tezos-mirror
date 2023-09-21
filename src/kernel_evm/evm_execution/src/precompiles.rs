@@ -13,7 +13,6 @@
 use crate::handler::EvmHandler;
 use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
-use debug::debug_msg;
 use evm::executor::stack::Log;
 use evm::{Context, ExitReason, ExitSucceed, Transfer};
 use host::runtime::Runtime;
@@ -21,6 +20,7 @@ use primitive_types::H160;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use tezos_ethereum::withdrawal::Withdrawal;
+use tezos_evm_logging::{log, Level::*};
 
 /// Outcome of executing a precompiled contract. Covers both successful
 /// return, stop and revert and additionally, it covers contract execution
@@ -111,7 +111,7 @@ fn identity_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    debug_msg!(handler.borrow_host(), "Calling identity precompile");
+    log!(handler.borrow_host(), Info, "Calling identity precompile");
 
     Ok(PrecompileOutcome {
         exit_status: ExitReason::Succeed(ExitSucceed::Returned),
@@ -130,7 +130,7 @@ fn sha256_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    debug_msg!(handler.borrow_host(), "Calling sha2-256 precompile");
+    log!(handler.borrow_host(), Info, "Calling sha2-256 precompile");
 
     let output = Sha256::digest(input);
 
@@ -156,7 +156,7 @@ fn ripemd160_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    debug_msg!(handler.borrow_host(), "Calling ripemd-160 precompile");
+    log!(handler.borrow_host(), Info, "Calling ripemd-160 precompile");
 
     let hash = Ripemd160::digest(input);
     // The 20-byte hash is returned right aligned to 32 bytes
