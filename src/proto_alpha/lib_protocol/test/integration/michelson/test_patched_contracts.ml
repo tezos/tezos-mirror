@@ -105,7 +105,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
       "Expr hash doesn't match"
       legacy_script_hash
       (Script_expr_hash.hash_bytes [bytes]) ;
-    return ()
+    return_unit
 
   (* Test that the binary-encoded versions of the patched contracts used during the
      migration correspond to the content of the `./patched_contracts/<hash>.tz`
@@ -133,7 +133,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
             diff
         in
         Alcotest.fail msg
-    | None -> return ()
+    | None -> return_unit
 
   (* Test that the diff files `./patched_contracts/<hash>.diff`
      are the results of the `diff` command on the corresponding
@@ -159,7 +159,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     in
     let*! actual_diff = Lwt_process.pread ~cwd:path diff_cmd in
     Alcotest.(check string) "same diff" expected_diff actual_diff ;
-    return ()
+    return_unit
 
   let typecheck_patched_script code () =
     let open Lwt_result_syntax in
@@ -176,7 +176,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
            ~code:(Script_repr.lazy_expr code)
            ctxt
     in
-    return ()
+    return_unit
 
   let tests (patch : Patches.t) =
     let script_hash = Patches.script_hash patch in
