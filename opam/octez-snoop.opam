@@ -15,7 +15,7 @@ depends: [
   "tezos-benchmark-examples"
   "octez-shell-libs"
   "tezos-benchmarks-proto-alpha"
-  "pyml"
+  "pyml" { >= "20220905" }
   "prbnmcn-stats" { = "0.0.6" }
   "octez-version"
 ]
