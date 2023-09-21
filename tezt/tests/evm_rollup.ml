@@ -1116,17 +1116,20 @@ let ensure_block_integrity ~block_result evm_setup =
   assert (block.transactions = block_result.transactions) ;
   unit
 
-let latest_block evm_setup =
+let get_block_by_number ?(full_tx_objects = false) evm_setup block_param =
   let* latest_block =
     Evm_proxy_server.(
       call_evm_rpc
         evm_setup.evm_proxy_server
         {
           method_ = "eth_getBlockByNumber";
-          parameters = `A [`String "latest"; `Bool false];
+          parameters = `A [`String block_param; `Bool full_tx_objects];
         })
   in
   return @@ (latest_block |> Evm_proxy_server.extract_result |> Block.of_json)
+
+let latest_block ?(full_tx_objects = false) evm_setup =
+  get_block_by_number ~full_tx_objects evm_setup "latest"
 
 type transfer_result = {
   sender_balance_before : Wei.t;
@@ -2958,6 +2961,27 @@ let test_cover_fees =
   in
   check_for_receipt 6
 
+let test_rpc_gasPrice =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "gas_price"]
+    ~title:"RPC methods eth_gasPrice"
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let expected_gas_price = 21_000l in
+  let* gas_price =
+    Evm_proxy_server.(
+      let* price =
+        call_evm_rpc
+          evm_proxy_server
+          {method_ = "eth_gasPrice"; parameters = `A []}
+      in
+      return JSON.(price |-> "result" |> as_int64))
+  in
+  Check.((gas_price = Int64.of_int32 expected_gas_price) int64)
+    ~error_msg:"Expected %R, but got %L" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -3011,7 +3035,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getUncleCountByBlock protocols ;
   test_rpc_getUncleByBlockArgAndIndex protocols ;
   test_simulation_eip2200 protocols ;
-  test_cover_fees protocols
+  test_cover_fees protocols ;
+  test_rpc_gasPrice protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
