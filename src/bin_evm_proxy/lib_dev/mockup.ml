@@ -66,6 +66,8 @@ let code _ =
 (* Gas limit must be at least 21000 *)
 let gas_price = qty_f @@ Z.of_int 21000
 
+let base_fee_per_gas () = return gas_price
+
 let transaction_counter = ref 0
 
 let transaction_count () = qty_f @@ Z.of_int !transaction_counter

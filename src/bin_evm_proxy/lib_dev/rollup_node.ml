@@ -103,6 +103,8 @@ module Durable_storage_path = struct
 
   let chain_id = EVM.make "/chain_id"
 
+  let base_fee_per_gas = EVM.make "/base_fee_per_gas"
+
   let kernel_version = EVM.make "/kernel_version"
 
   let upgrade_nonce = EVM.make "/upgrade_nonce"
@@ -420,6 +422,12 @@ module RPC = struct
   let chain_id base () =
     inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
 
+  let base_fee_per_gas base () =
+    inspect_durable_and_decode
+      base
+      Durable_storage_path.base_fee_per_gas
+      decode_number
+
   let kernel_version base () =
     inspect_durable_and_decode
       base
@@ -544,6 +552,8 @@ module type S = sig
 
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 
+  val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
+
   val kernel_version : unit -> string tzresult Lwt.t
 
   val upgrade_nonce : unit -> int tzresult Lwt.t
@@ -584,6 +594,8 @@ end) : S = struct
   let txpool = RPC.txpool Base.base
 
   let chain_id = RPC.chain_id Base.base
+
+  let base_fee_per_gas = RPC.base_fee_per_gas Base.base
 
   let kernel_version = RPC.kernel_version Base.base
 
