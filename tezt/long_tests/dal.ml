@@ -272,9 +272,8 @@ let test_produce_and_propagate_shards ~executors ~protocol =
       let number_of_shards = dal_parameters.cryptobox.number_of_shards in
       let shard_count = ref 0 in
       Log.info "Waiting to download %d shards..." number_of_shards ;
-      Dal_node.wait_for dal_node1 "stored_slot_shards.v0" @@ fun e ->
-      let shards_stored = JSON.(e |-> "shards" |> as_int) in
-      shard_count := !shard_count + shards_stored ;
+      Dal_node.wait_for dal_node1 "stored_slot_shard.v0" @@ fun _ ->
+      incr shard_count ;
       if !shard_count = number_of_shards then (
         Log.info "Downloaded %d shards. Ready to attest." number_of_shards ;
         Some ())
@@ -305,6 +304,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
         Dal_node.terminate dal_node2;
       ]
   in
+  Log.info "This repeat has end successfully\n" ;
   return time
 
 let register ~executors ~protocols =
