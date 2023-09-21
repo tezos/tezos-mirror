@@ -18,7 +18,7 @@ for (let i = 0; i < nb_players; i++) {
 let txs_1 = [];
 // every player get the same amount
 for (player of players) {
-    txs_1.push(utils.transfer(faucet, player, nb_players))
+    txs_1.push(utils.transfer(faucet, player, nb_players * 21_000))
 }
 
 let txs_2 = [];
