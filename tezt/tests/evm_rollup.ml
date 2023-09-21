@@ -727,11 +727,9 @@ let test_l2_blocks_progression =
     ~tags:["evm"; "l2_blocks_progression"]
     ~title:"Check L2 blocks progression"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} =
+  let* {node; client; sc_rollup_node; endpoint; _} =
     setup_evm_kernel ~admin:None protocol
   in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* () =
     check_block_progression
       ~sc_rollup_node
@@ -748,6 +746,54 @@ let test_l2_blocks_progression =
       ~endpoint
       ~expected_block_level:2
   in
+  unit
+
+let test_consistent_block_hashes =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_blocks"]
+    ~title:"Check L2 blocks consistency of hashes"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; endpoint; _} =
+    setup_evm_kernel ~admin:None protocol
+  in
+  let new_block () =
+    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+    let* number = Eth_cli.block_number ~endpoint in
+    Eth_cli.get_block ~block_id:(string_of_int number) ~endpoint
+  in
+
+  let* block0 = new_block () in
+  let* block1 = new_block () in
+  let* block2 = new_block () in
+  let* block3 = new_block () in
+
+  let check_parent_hash parent block =
+    let parent_hash = Option.value ~default:"" parent.Block.hash in
+    Check.((block.Block.parent = parent_hash) string)
+      ~error_msg:"Unexpected parent hash, should be %%R, but got %%L"
+  in
+
+  (* Check consistency accross blocks. *)
+  check_parent_hash block0 block1 ;
+  check_parent_hash block1 block2 ;
+  check_parent_hash block2 block3 ;
+
+  let block_hashes, parent_hashes =
+    List.map
+      (fun Block.{hash; parent; _} -> (hash, parent))
+      [block0; block1; block2; block3]
+    |> List.split
+  in
+  let block_hashes_uniq = List.sort_uniq compare block_hashes in
+  let parent_hashes_uniq = List.sort_uniq compare parent_hashes in
+
+  (* Check unicity of hashes and parent hashes. *)
+  Check.(List.(length block_hashes = length block_hashes_uniq) int)
+    ~error_msg:"The list of block hashes must be unique" ;
+  Check.(List.(length parent_hashes = length parent_hashes_uniq) int)
+    ~error_msg:"The list of block parent hashes must be unique" ;
+
   unit
 
 (** The info for the "storage.sol" contract.
@@ -2873,6 +2919,7 @@ let test_rpc_getUncleByBlockArgAndIndex =
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
+  test_consistent_block_hashes protocols ;
   test_rpc_getBalance protocols ;
   test_rpc_getBlockByNumber protocols ;
   test_rpc_getBlockByHash protocols ;

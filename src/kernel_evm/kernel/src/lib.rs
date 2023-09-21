@@ -213,7 +213,7 @@ fn fetch_queue_left<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Err
 
     // fetch Bip
     let bip = storage::read_block_in_progress(host)?;
-    queue.proposals = vec![blueprint::QueueElement::BlockInProgress(bip)];
+    queue.proposals = vec![blueprint::QueueElement::BlockInProgress(Box::new(bip))];
     Ok(queue)
 }
 

@@ -17,7 +17,7 @@ pub struct Blueprint {
 }
 pub enum QueueElement {
     Blueprint(Blueprint),
-    BlockInProgress(BlockInProgress),
+    BlockInProgress(Box<BlockInProgress>),
 }
 #[derive(Default)]
 pub struct Queue {

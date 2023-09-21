@@ -32,7 +32,7 @@ mod old_storage {
     use crate::storage::{store_read_slice, EVM_BLOCKS};
     use crate::OwnedPath;
     use crate::Timestamp;
-    use primitive_types::U256;
+    use primitive_types::{H256, U256};
     use tezos_ethereum::block::L2Block;
     use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
     use tezos_smart_rollup_host::path::*;
@@ -89,8 +89,13 @@ mod old_storage {
         let block_path = block_path(number)?;
         let transactions = read_nth_block_transactions(host, &block_path)?;
         let timestamp = read_nth_block_timestamp(host, &block_path)?;
+        let parent_hash = if number == U256::zero() {
+            H256::zero()
+        } else {
+            H256((number - 1).into())
+        };
         host.store_delete(&block_path)?;
-        Ok(L2Block::new(number, transactions, timestamp))
+        Ok(L2Block::new(number, transactions, timestamp, parent_hash))
     }
 }
 

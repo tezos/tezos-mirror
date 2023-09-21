@@ -41,13 +41,15 @@ pub struct BlockInProgress {
     /// hash to use for receipt
     /// (computed from number, not the correct way to do it)
     pub hash: H256,
+    /// hash of the parent
+    pub parent_hash: H256,
     /// Cumulative number of ticks used
     pub estimated_ticks: u64,
 }
 
 impl Encodable for BlockInProgress {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(7);
+        stream.begin_list(8);
         stream.append(&self.number);
         append_queue(stream, &self.tx_queue);
         append_txs(stream, &self.valid_txs);
@@ -55,6 +57,7 @@ impl Encodable for BlockInProgress {
         stream.append(&self.index);
         stream.append(&self.gas_price);
         stream.append(&self.hash);
+        stream.append(&self.parent_hash);
     }
 }
 
@@ -77,7 +80,7 @@ impl Decodable for BlockInProgress {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 7 {
+        if decoder.item_count()? != 8 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
@@ -90,6 +93,7 @@ impl Decodable for BlockInProgress {
         let index: u32 = decode_field(&next(&mut it)?, "index")?;
         let gas_price: U256 = decode_field(&next(&mut it)?, "gas_price")?;
         let hash: H256 = decode_field(&next(&mut it)?, "hash")?;
+        let parent_hash: H256 = decode_field(&next(&mut it)?, "parent_hash")?;
         let estimated_ticks: u64 = 0;
         let bip = Self {
             number,
@@ -99,6 +103,7 @@ impl Decodable for BlockInProgress {
             index,
             gas_price,
             hash,
+            parent_hash,
             estimated_ticks,
         };
         Ok(bip)
@@ -138,6 +143,7 @@ impl BlockInProgress {
 
     pub fn new_with_ticks(
         number: U256,
+        parent_hash: H256,
         gas_price: U256,
         transactions: VecDeque<Transaction>,
         estimated_ticks: u64,
@@ -153,6 +159,7 @@ impl BlockInProgress {
             // it should be computed at the end, and not included in the receipt
             // the block is referenced in the storage by the block number anyway
             hash: H256(number.into()),
+            parent_hash,
             estimated_ticks,
         }
     }
@@ -166,6 +173,7 @@ impl BlockInProgress {
     ) -> BlockInProgress {
         Self::new_with_ticks(
             number,
+            H256::zero(),
             gas_price,
             transactions,
             tick_model::top_level_overhead_ticks(),
@@ -175,6 +183,7 @@ impl BlockInProgress {
     pub fn from_queue_element(
         proposal: crate::blueprint::QueueElement,
         current_block_number: U256,
+        parent_hash: H256,
         constants: &BlockConstants,
         tick_counter: u64,
     ) -> BlockInProgress {
@@ -184,6 +193,7 @@ impl BlockInProgress {
                 let ring = proposal.transactions.into();
                 BlockInProgress::new_with_ticks(
                     current_block_number,
+                    parent_hash,
                     constants.gas_price,
                     ring,
                     tick_counter,
@@ -191,7 +201,7 @@ impl BlockInProgress {
             }
             crate::blueprint::QueueElement::BlockInProgress(mut bip) => {
                 bip.estimated_ticks = tick_counter;
-                bip
+                *bip
             }
         }
     }
@@ -237,7 +247,7 @@ impl BlockInProgress {
         let new_block = L2Block {
             timestamp,
             gas_used: self.cumulative_gas,
-            ..L2Block::new(self.number, self.valid_txs, timestamp)
+            ..L2Block::new(self.number, self.valid_txs, timestamp, self.parent_hash)
         };
         storage::store_current_block(host, &new_block)
             .context("Failed to store the current block")?;
@@ -402,11 +412,12 @@ mod tests {
             index: 4,
             gas_price: U256::from(5),
             hash: H256::from([6; 32]),
+            parent_hash: H256::from([5; 32]),
             estimated_ticks: 99,
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f901512af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00606060606060606060606060606060606060606060606060606060606060606";
+        let expected = "f901722af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00606060606060606060606060606060606060606060606060606060606060606a00505050505050505050505050505050505050505050505050505050505050505";
         assert_eq!(hex::encode(encoded), expected);
 
         let bytes = hex::decode(expected).expect("Should be valid hex string");
@@ -432,11 +443,12 @@ mod tests {
             index: 4,
             gas_price: U256::from(5),
             hash: H256::from([6; 32]),
+            parent_hash: H256::from([5; 32]),
             estimated_ticks: 99,
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f8e52af87af83ba00101010101010101010101010101010101010101010101010101010101010101d902d70101940101010101010101010101010101010101010101f83ba00808080808080808080808080808080808080808080808080808080808080808d902d70808940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00606060606060606060606060606060606060606060606060606060606060606";
+        let expected = "f901062af87af83ba00101010101010101010101010101010101010101010101010101010101010101d902d70101940101010101010101010101010101010101010101f83ba00808080808080808080808080808080808080808080808080808080808080808d902d70808940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00606060606060606060606060606060606060606060606060606060606060606a00505050505050505050505050505050505050505050505050505050505050505";
         assert_eq!(hex::encode(encoded), expected);
 
         let bytes = hex::decode(expected).expect("Should be valid hex string");
@@ -462,11 +474,12 @@ mod tests {
             index: 4,
             gas_price: U256::from(5),
             hash: H256::from([6; 32]),
+            parent_hash: H256::from([5; 32]),
             estimated_ticks: 99,
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9011b2af8b0f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ba00808080808080808080808080808080808080808080808080808080808080808d902d70808940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00606060606060606060606060606060606060606060606060606060606060606";
+        let expected = "f9013c2af8b0f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ba00808080808080808080808080808080808080808080808080808080808080808d902d70808940808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909030405a00606060606060606060606060606060606060606060606060606060606060606a00505050505050505050505050505050505050505050505050505050505050505";
         assert_eq!(hex::encode(encoded), expected);
 
         let bytes = hex::decode(expected).expect("Should be valid hex string");

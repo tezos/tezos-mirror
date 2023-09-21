@@ -97,10 +97,12 @@ impl L2Block {
         number: U256,
         transactions: Vec<TransactionHash>,
         timestamp: Timestamp,
+        parent_hash: H256,
     ) -> Self {
         L2Block {
             number,
             hash: H256(number.into()),
+            parent_hash,
             timestamp,
             transactions,
             ..Self::default()
