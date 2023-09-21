@@ -6,20 +6,21 @@
 .. TODO https://gitlab.com/tezos/tezos/-/issues/2170:
    search shifted protocol name/number & adapt
 
-Welcome to the Tezos Technical Documentation!
-=============================================
+Welcome to the Octez and Protocol Documentation!
+================================================
 
 To start browsing, either follow one of the guided paths below, or directly pick any topics in the documentation menu.
 
 .. raw:: html
 
     <details>
-    <summary><img alt="Discover Tezos" class="normal" src="discover_tezos_1.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary><img alt="Discover Octez & the Tezos protocol" class="normal" src="discover_tezos_1.png" style="width:min(95%,1000px); cursor: pointer;" />
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
-**Never heard of Tezos?** Let's get acquainted!
+**Never heard of Octez?** Let's get acquainted!
 
-Tezos is a distributed consensus platform (a blockchain) with meta-consensus
+Octez & the Tezos protocol are an implementation of the `Tezos blockchain <https://tezos.com>`__ , a
+distributed consensus platform with meta-consensus
 capability.
 
 This means that, unlike other blockchains like Bitcoin or Ethereum, Tezos comes to consensus not only about the state of its ledger, but also about how the protocol and the nodes should adapt and upgrade.
@@ -27,7 +28,9 @@ This means that, unlike other blockchains like Bitcoin or Ethereum, Tezos comes 
 This is a fundamental design choice, allowing Tezos to be seamlessly upgradable and continuosly evolving.
 Due to this feature, Tezos is built to last, and always stay at the leading edge of blockchain technology.
 
-To learn more about Tezos, its implementation, and its ecosystem, see :doc:`introduction/tezos`.
+To learn more about Tezos, the `Tezos documentation <https://tezos.com>`__.
+
+To learn more about how Octez & the protocol fit into Tezos and its ecosystem, see :doc:`introduction/tezos`.
 
 .. raw:: html
 
@@ -37,7 +40,7 @@ To learn more about Tezos, its implementation, and its ecosystem, see :doc:`intr
     <summary><img alt="Getting started" class="normal" src="getting_started_2.png" style="width:min(95%,1000px); cursor: pointer;" />
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
-**Newcomer to Tezos?** Come and participate!
+**Newcomer to Octez?** Start participating to Tezos using Octez!
 
 Start participating to Tezos by following the ``Introduction`` section in the documentation menu.
 
@@ -62,10 +65,10 @@ and more.
 If you already installed Octez and can participate in the Tezos blockchain, the most useful resources are grouped in the ``User`` section in the documentation menu.
 These pages:
 
-- present the key concepts and mechanisms for setting up Octez, including :doc:`user/setup-client`, :doc:`user/setup-node`, and so on;
+- present the key concepts and mechanisms for setting up Octez, including :doc:`user/setup-client`, :doc:`user/setup-node`, for different production or testing configurations;
 - empowers you to take advantage of Octez' basic and more advanced features, such as :doc:`user/key-management`, :doc:`user/multisig`, :doc:`user/logging`, and much more.
 
-If you intend to participate to Tezos not just as a mere user, but also as a baker, you could also check more specialized resources such as the `NL Knowledge Center <https://docs.nomadic-labs.com/nomadic-labs-knowledge-center/>`__ or `Open Tezos <https://opentezos.com>`__.
+If you intend to participate to Tezos not just as a mere user, but rather as a baker, you should aslo check more specialized documentation such as the ``Baking`` section on `Open Tezos <https://opentezos.com/>`__.
 
 .. raw:: html
 
@@ -77,11 +80,11 @@ If you intend to participate to Tezos not just as a mere user, but also as a bak
 
 **Want to know how it works?** It's no secret, let us explain!
 
-If you want to know more about the Tezos *technology*, there are several sections in the documentation presenting the main design principles of Tezos, and some high-level implementation principles of Octez:
+If you want to know more about the *technology* underlying Octez and the Tezos protocol, the following sections in the documentation present their rationale, main design principles, and some high-level implementation principles:
 
-- Section ``Shell`` introduces the common :ref:`architectural principles of any Tezos implementation <the_big_picture>`, mainly consisting of a "shell" and a "protocol". It also presents in particular the :ref:`architectural principles of the Octez implementation <packages>`. A group of pages in this section detail some major subsystems of :doc:`shell/shell`.
+- Section ``Shell`` explains how the :ref:`architecture of the Octez implementation <packages>` instantiates the common :ref:`architectural principles of any Tezos implementation <the_big_picture>`, consisting in a "shell" and a "protocol" . A group of pages in this section detail some major subsystems of :doc:`shell/shell`.
 
-- Sections named ``<name> Protocol`` explain the design principles and the salient features of several Tezos protocols, current or upcoming, such as: the :doc:`active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
+- Section ``Protocol`` explains the design principles and the salient features of the Tezos protocol. In fact, these pages are versioned for several Tezos protocols, current or upcoming, such as: the :doc:`active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
 
 
 .. raw:: html
@@ -89,20 +92,18 @@ If you want to know more about the Tezos *technology*, there are several section
     </div></details><br/>
 
     <details>
-    <summary><img alt="Building on Tezos" class="normal" src="building_on_tezos_5.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary><img alt="Developer reference" class="normal" src="building_on_tezos_5.png" style="width:min(95%,1000px); cursor: pointer;" />
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
-**Are you an application developer?** Find how to program with Tezos!
+**Are you a Tezos developer?** Find here some useful reference pages!
 
-Tezos is an open platform. As any programmable blockchain, its value lies in the increasing base of smart contracts and distributed applications covering various domains, but also in the tools that make the ecosystem easier to use and more efficient, such as wallets, indexers, and many others.
+If you are a developer on the Tezos platform, you must know the `Tezos Developer Portal <https://tezos.com/developers/>`__ or `Open Tezos <https://opentezos.com>`__, giving accessible and pedagogical expositions on how to write smart contracts or Dapps.
 
-If you are looking for an accessible and pedagogical exposition on how to write smart contracts or Dapps, there are many great resources out there for developing on Tezos, such as the `Tezos Developer Portal <https://tezos.com/developers/>`__ and `Open Tezos <https://opentezos.com>`__.
+This website complements those resources with reference documentation, mostly in section ``Developer reference``, including:
 
-For Tezos developers, this website mostly provides reference and API documentation, but also some guidelines, including:
-
+- Principles of the RPC interface such as the :doc:`developer/rpc`
+- RPC references such as :doc:`shell/rpc`, :doc:`api/openapi`, or :doc:`api/errors`
 - A complete reference of :doc:`active/michelson`
-- Important API concepts such as the :doc:`developer/rpc`
-- API references such as :doc:`shell/rpc`, :doc:`api/openapi`, or :doc:`api/errors`
 - Guidelines for writing smart contracts in Michelson, such as :doc:`active/michelson_anti_patterns`.
 
 .. raw:: html
@@ -115,7 +116,7 @@ For Tezos developers, this website mostly provides reference and API documentati
 
 **Are you a platform developer?** Here are the nuts and bolts!
 
-The main focus of this technical documentation website is on resources for platform developers, that is, those contributing to the Tezos platform, including contributors to its Octez implementation (Octez developers) and contributors to the Tezos protocol (protocol developers).
+The main focus of this technical documentation website is on resources for Tezos platform developers, that is, contributing to Octez (Octez developers) and contributors to the Tezos protocol (protocol developers).
 
 Platform developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Platform Developer`` section, including:
 
