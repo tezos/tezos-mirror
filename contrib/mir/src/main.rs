@@ -23,6 +23,7 @@ mod tests {
     use crate::gas::Gas;
     use crate::interpreter;
     use crate::parser;
+    use crate::stack::stk;
     use crate::typechecker;
 
     fn report_gas<R, F: FnOnce(&mut Gas) -> R>(gas: &mut Gas, f: F) -> R {
@@ -67,15 +68,15 @@ mod tests {
     #[test]
     fn typecheck_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
-        let mut stack = VecDeque::from([Type::Nat]);
+        let mut stack = stk![Type::Nat];
         assert!(typechecker::typecheck(&ast, &mut Gas::default(), &mut stack).is_ok());
-        assert_eq!(stack, VecDeque::from([Type::Int]));
+        assert_eq!(stack, stk![Type::Int]);
     }
 
     #[test]
     fn typecheck_gas() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
-        let mut stack = VecDeque::from([Type::Nat]);
+        let mut stack = stk![Type::Nat];
         let mut gas = Gas::new(11460);
         report_gas(&mut gas, |gas| {
             assert!(typechecker::typecheck(&ast, gas, &mut stack).is_ok());
@@ -86,7 +87,7 @@ mod tests {
     #[test]
     fn typecheck_out_of_gas() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
-        let mut stack = VecDeque::from([Type::Nat]);
+        let mut stack = stk![Type::Nat];
         let mut gas = Gas::new(1000);
         assert_eq!(
             typechecker::typecheck(&ast, &mut gas, &mut stack),
@@ -97,7 +98,7 @@ mod tests {
     #[test]
     fn typecheck_test_expect_fail() {
         let ast = parser::parse(&FIBONACCI_ILLTYPED_SRC).unwrap();
-        let mut stack = VecDeque::from([Type::Nat]);
+        let mut stack = stk![Type::Nat];
         assert_eq!(
             typechecker::typecheck(&ast, &mut Gas::default(), &mut stack),
             Err(typechecker::TcError::StackTooShort)

@@ -10,7 +10,7 @@ use std::slice::SliceIndex;
 
 use crate::ast::*;
 
-pub type TypeStack = VecDeque<Type>;
+pub type TypeStack = Stack<Type>;
 pub type IStack = VecDeque<Value>;
 
 /// Construct a `Stack` with the given content. Note that stack top is the
