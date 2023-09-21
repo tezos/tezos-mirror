@@ -18,7 +18,7 @@ use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
-use primitive_types::U256;
+use primitive_types::{H256, U256};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -116,15 +116,16 @@ pub fn produce<Host: Runtime>(
     queue: Queue,
     chain_id: U256,
 ) -> Result<(), anyhow::Error> {
-    let (mut current_constants, mut current_block_number) =
+    let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
-            Ok(block) => (block.constants(chain_id), block.number + 1),
+            Ok(block) => (block.constants(chain_id), block.number + 1, block.hash),
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
                 (
                     BlockConstants::first_block(timestamp, chain_id),
                     U256::zero(),
+                    H256::zero(),
                 )
             }
         };
@@ -138,6 +139,7 @@ pub fn produce<Host: Runtime>(
         let mut block_in_progress = BlockInProgress::from_queue_element(
             proposal,
             current_block_number,
+            current_block_parent_hash,
             &current_constants,
             tick_counter.c,
         );
@@ -170,6 +172,7 @@ pub fn produce<Host: Runtime>(
                     .finalize_and_store(host)
                     .context("Failed to finalize the block in progress")?;
                 current_block_number = new_block.number + 1;
+                current_block_parent_hash = new_block.hash;
                 current_constants = new_block.constants(chain_id);
                 storage::delete_block_in_progress(host)?;
             }
