@@ -34,6 +34,7 @@ exports.transfer = function (playera, playerb, amount) {
     playera.nonce += 1;
     tx.to = playerb.addr;
     tx.value = amount;
+    tx.gasLimit = 21000;
     let rawTx = sign(tx, playera.privateKey)
     return rawTx.rawTx;
 }

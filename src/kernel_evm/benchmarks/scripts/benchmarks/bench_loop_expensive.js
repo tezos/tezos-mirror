@@ -7,9 +7,19 @@
 
 const utils = require('./utils');
 const addr = require('../lib/address');
-let faucet = require('./players/tezt_bootstraped.json');
+
 let player1 = require('./players/player1.json');
 const { contracts_directory, compile_contract_file } = require("../lib/contract");
+
+var faucet;
+var args = process.argv.slice(2)
+if (args.length == 1) {
+    // for tests
+    faucet = require('./players/tezt_bootstraped.json');
+} else {
+    // for benchmarking
+    faucet = require('./players/faucet.json');
+}
 
 let contract = compile_contract_file(contracts_directory, 'loop.sol')[0];
 
@@ -46,11 +56,11 @@ let total_funds = TOO_MANY_TXS * FUNDS_PER_ACCOUNT
 transfer_txs.push(utils.transfer(faucet, player1, total_funds + FUNDS_PER_ACCOUNT))
 transfer_txs.push(utils.transfer(player1, players[0], total_funds))
 
-for(let i = 0; i < TOO_MANY_TXS - 1; i++) {
+for (let i = 0; i < TOO_MANY_TXS - 1; i++) {
     transfer_txs.push(
         utils.transfer(
             players[i],
-            players[i+1],
+            players[i + 1],
             (TOO_MANY_TXS - i - 1) * FUNDS_PER_ACCOUNT
         )
     )
@@ -64,7 +74,6 @@ for (let i = 0; i < TOO_MANY_TXS; i++) {
     txs.push(utils.send(players[i], create.addr, 0, call_data(NB_LOOP)))
 }
 
-var args = process.argv.slice(2)
 
 if (args.length == 1 && args[0] == "raw") {
     utils.print_raw_txs(transfer_txs)
@@ -75,5 +84,5 @@ if (args.length == 1 && args[0] == "raw") {
     console.log("calls")
     utils.print_raw_txs(txs)
 } else {
-    utils.print_bench([txs])
+    utils.print_bench([transfer_txs.concat(txs)])
 }

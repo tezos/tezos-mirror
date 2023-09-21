@@ -17,15 +17,15 @@ let create_data = contract.bytecode;
 let call_getMessageHash =
     contract.interface.encodeFunctionData(
         "getMessageHash", [
-            '0x14723A09ACff6D2A60DcdF7aA4AFf308FDDC160C',
-            123n,
-            'coffee and donuts',
-            1n
-        ]);
+        '0x14723A09ACff6D2A60DcdF7aA4AFf308FDDC160C',
+        123n,
+        'coffee and donuts',
+        1n
+    ]);
 let call_getEthSignedMessageHash =
     contract.interface.encodeFunctionData(
         "getEthSignedMessageHash",
-        [ "0xcf36ac4f97dc10d91fc2cbb20d718e94a8cbfe0f82eaedc6a4aa38946fb797cd" ]
+        ["0xcf36ac4f97dc10d91fc2cbb20d718e94a8cbfe0f82eaedc6a4aa38946fb797cd"]
     );
 let call_verify =
     contract.interface.encodeFunctionData(
@@ -47,6 +47,9 @@ let create = utils.create(player1, 0, create_data)
 txs.push(create.tx)
 txs.push(utils.send(player1, create.addr, 0, call_getMessageHash))
 txs.push(utils.send(player1, create.addr, 0, call_getEthSignedMessageHash))
-txs.push(utils.send(player1, create.addr, 0, call_verify))
+
+// following tx needs more than 3999000 gas
+// tick model can't accept more for now
+txs.push(utils.send(player1, create.addr, 0, call_verify, gasLimit = 3999000))
 
 utils.print_bench([txs])
