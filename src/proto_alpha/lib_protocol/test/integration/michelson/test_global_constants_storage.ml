@@ -36,7 +36,8 @@ open Transfers
 *)
 
 let get_next_context b =
-  Incremental.begin_construction b >>=? fun b ->
+  let open Lwt_result_syntax in
+  let* b = Incremental.begin_construction b in
   return (Incremental.alpha_ctxt b)
 
 let assert_proto_error_id loc id result =
@@ -47,76 +48,92 @@ let assert_proto_error_id loc id result =
   Assert.error ~loc result test
 
 let expr_to_hash expr =
+  let open Result_syntax in
   let lexpr = Script_repr.lazy_expr @@ Expr.from_string expr in
-  Script_repr.force_bytes lexpr >|? fun b -> Script_expr_hash.hash_bytes [b]
+  let+ b = Script_repr.force_bytes lexpr in
+  Script_expr_hash.hash_bytes [b]
 
 (* This test has a long wind-up, but is very simple: it just asserts
    that values written to the global table of constants persist across
    blocks. *)
 let get_happy_path () =
-  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (alice, bob)) ->
-  Incremental.begin_construction b >>=? fun b ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (alice, bob) = Context.init2 ~consensus_threshold:0 () in
+  let* b = Incremental.begin_construction b in
   let expr_str = "Pair 3 7" in
   let expr = Expr.from_string expr_str in
-  Environment.wrap_tzresult @@ expr_to_hash expr_str >>?= fun hash ->
-  Op.register_global_constant
-    (I b)
-    ~source:alice
-    ~value:(Script_repr.lazy_expr expr)
-  >>=? fun op ->
-  Incremental.add_operation b op >>=? fun b ->
-  Incremental.finalize_block b >>=? fun b ->
+  let*?@ hash = expr_to_hash expr_str in
+  let* op =
+    Op.register_global_constant
+      (I b)
+      ~source:alice
+      ~value:(Script_repr.lazy_expr expr)
+  in
+  let* b = Incremental.add_operation b op in
+  let* b = Incremental.finalize_block b in
   let assert_unchanged b =
-    get_next_context b >>=? fun context ->
-    Global_constants_storage.get context hash >|= Environment.wrap_tzresult
-    >>=? fun (_, result_expr) ->
-    Test_global_constants.assert_expr_equal __LOC__ expr result_expr
-    >|=? fun () -> b
+    let* context = get_next_context b in
+    let*! result = Global_constants_storage.get context hash in
+    let*?@ _, result_expr = result in
+    let+ () =
+      Test_global_constants.assert_expr_equal __LOC__ expr result_expr
+    in
+    b
   in
-  assert_unchanged b >>=? fun b ->
+  let* b = assert_unchanged b in
   let do_many_transfers b =
-    Incremental.begin_construction b >>=? fun b ->
-    n_transactions 10 b alice bob (Tez.of_mutez_exn 1000L) >>=? fun b ->
-    Incremental.finalize_block b >>=? fun b -> assert_unchanged b
+    let* b = Incremental.begin_construction b in
+    let* b = n_transactions 10 b alice bob (Tez.of_mutez_exn 1000L) in
+    let* b = Incremental.finalize_block b in
+    assert_unchanged b
   in
-  do_many_transfers b >>=? do_many_transfers >>=? do_many_transfers
-  >>=? fun (_ : Block.t) -> Lwt.return_ok ()
+  let* (_ : Block.t) =
+    let* b = do_many_transfers b in
+    let* b = do_many_transfers b in
+    do_many_transfers b
+  in
+  return_unit
 
 (* Blocks that include a registration of a bad expression should
    fail. *)
 let test_registration_of_bad_expr_fails () =
-  Context.init1 () >>=? fun (b, alice) ->
-  Incremental.begin_construction b >>=? fun b ->
+  let open Lwt_result_syntax in
+  let* b, alice = Context.init1 () in
+  let* b = Incremental.begin_construction b in
   (* To produce the failure, we attempt to register an expression with
      a malformed hash. *)
   let expr = Expr.from_string "Pair 1 (constant \"foo\")" in
-  Op.register_global_constant
-    (I b)
-    ~source:alice
-    ~value:(Script_repr.lazy_expr expr)
-  >>=? fun op ->
-  Incremental.add_operation b op
-  >>= assert_proto_error_id __LOC__ "Badly_formed_constant_expression"
+  let* op =
+    Op.register_global_constant
+      (I b)
+      ~source:alice
+      ~value:(Script_repr.lazy_expr expr)
+  in
+  let*! result = Incremental.add_operation b op in
+  assert_proto_error_id __LOC__ "Badly_formed_constant_expression" result
 
 (* You cannot register the same expression twice. *)
 let test_no_double_register () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (b, alice) ->
+  let open Lwt_result_syntax in
+  let* b, alice = Context.init1 ~consensus_threshold:0 () in
   let expr = Expr.from_string "Pair 1 2" in
-  Op.register_global_constant
-    (B b)
-    ~source:alice
-    ~value:(Script_repr.lazy_expr expr)
-  >>=? fun operation ->
-  Block.bake ~operation b >>=? fun b ->
+  let* operation =
+    Op.register_global_constant
+      (B b)
+      ~source:alice
+      ~value:(Script_repr.lazy_expr expr)
+  in
+  let* b = Block.bake ~operation b in
   (* Register the same expression again *)
-  Op.register_global_constant
-    (B b)
-    ~source:alice
-    ~value:(Script_repr.lazy_expr expr)
-  >>=? fun op ->
-  Incremental.begin_construction b >>=? fun i ->
-  Incremental.add_operation i op
-  >>= assert_proto_error_id __LOC__ "Expression_already_registered"
+  let* op =
+    Op.register_global_constant
+      (B b)
+      ~source:alice
+      ~value:(Script_repr.lazy_expr expr)
+  in
+  let* i = Incremental.begin_construction b in
+  let*! result = Incremental.add_operation i op in
+  assert_proto_error_id __LOC__ "Expression_already_registered" result
 
 let tests =
   [

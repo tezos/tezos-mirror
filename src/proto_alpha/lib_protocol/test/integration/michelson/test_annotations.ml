@@ -61,34 +61,37 @@ let contract_factory_with_annotations =
 let lazy_none = Script.lazy_expr (Expr.from_string "None")
 
 let init_and_originate contract_code_string =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (b, source) ->
-  Incremental.begin_construction b >>=? fun inc ->
+  let open Lwt_result_syntax in
+  let* b, source = Context.init1 ~consensus_threshold:0 () in
+  let* inc = Incremental.begin_construction b in
   let code = Expr.toplevel_from_string contract_code_string in
   let script = Script.{code = lazy_expr code; storage = lazy_none} in
-  Op.contract_origination_hash (I inc) source ~script
-  >>=? fun (operation, addr) ->
-  Incremental.add_operation inc operation >|=? fun inc -> (inc, source, addr)
+  let* operation, addr = Op.contract_origination_hash (I inc) source ~script in
+  let+ inc = Incremental.add_operation inc operation in
+  (inc, source, addr)
 
 let assert_stored_script_equal inc addr expected_code_string =
-  Context.Contract.script (I inc) addr >>=? fun stored_script ->
+  let open Lwt_result_syntax in
+  let* stored_script = Context.Contract.script (I inc) addr in
   Assert.equal_string
     ~loc:__LOC__
     expected_code_string
     (Expr.to_string stored_script)
 
 let get_address_from_storage inc factory_addr =
-  Context.Contract.storage (I inc) factory_addr >>=? fun factory_storage ->
+  let open Lwt_result_wrap_syntax in
+  let* factory_storage = Context.Contract.storage (I inc) factory_addr in
   let ctxt = Incremental.alpha_ctxt inc in
-  Environment.wrap_tzresult Script_typed_ir.(option_t 0 address_t)
-  >>?= fun option_address_t ->
-  Script_ir_translator.parse_data
-    ctxt
-    ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-    ~allow_forged:false
-    option_address_t
-    (Micheline.root factory_storage)
-  >>= fun res ->
-  Environment.wrap_tzresult res >>?= fun (factory_storage, _ctxt) ->
+  let*?@ option_address_t = Script_typed_ir.(option_t 0 address_t) in
+  let*! res =
+    Script_ir_translator.parse_data
+      ctxt
+      ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+      ~allow_forged:false
+      option_address_t
+      (Micheline.root factory_storage)
+  in
+  let*?@ factory_storage, _ctxt = res in
   match factory_storage with
   | Some {entrypoint; _} when not (Entrypoint.is_default entrypoint) ->
       failwith "Did not expect non-default entrypoint"
@@ -104,25 +107,29 @@ let get_address_from_storage inc factory_addr =
 
 (* Checks that [contract_with_annotations] once originated is stored as is. *)
 let test_external_origination () =
-  init_and_originate contract_with_annotations >>=? fun (inc, _source, addr) ->
+  let open Lwt_result_syntax in
+  let* inc, _source, addr = init_and_originate contract_with_annotations in
   assert_stored_script_equal inc addr contract_with_annotations
 
 (* Checks that [contract_with_annotations] originated from
    [contract_factory_with_annotations] is stored as is. *)
 let test_internal_origination () =
-  init_and_originate contract_factory_with_annotations
-  >>=? fun (inc, source, factory) ->
-  Op.transaction
-    (I inc)
-    source
-    (Contract.Originated factory)
-    ~parameters:lazy_none
-    Tez.zero
-  >>=? fun operation ->
-  Incremental.finalize_block inc >>=? fun b ->
-  Incremental.begin_construction b >>=? fun inc ->
-  Incremental.add_operation inc operation >>=? fun inc ->
-  get_address_from_storage inc factory >>=? fun addr ->
+  let open Lwt_result_syntax in
+  let* inc, source, factory =
+    init_and_originate contract_factory_with_annotations
+  in
+  let* operation =
+    Op.transaction
+      (I inc)
+      source
+      (Contract.Originated factory)
+      ~parameters:lazy_none
+      Tez.zero
+  in
+  let* b = Incremental.finalize_block inc in
+  let* inc = Incremental.begin_construction b in
+  let* inc = Incremental.add_operation inc operation in
+  let* addr = get_address_from_storage inc factory in
   assert_stored_script_equal inc addr contract_with_annotations
 
 let tests =
