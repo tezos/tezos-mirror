@@ -34,7 +34,7 @@
 open Protocol
 module Votes_EMA = Per_block_votes_repr.Liquidity_baking_toggle_EMA
 
-let ema_of_int32 ema = Votes_EMA.of_int32 ema >|= Environment.wrap_tzresult
+let ema_of_int32 ema = Lwt_result_wrap_syntax.wrap @@ Votes_EMA.of_int32 ema
 
 let ema_to_int32 = Votes_EMA.to_int32
 
@@ -94,9 +94,10 @@ let ema_range =
 
 (* Test that new_ema = old_ema when voting Pass. *)
 let test_ema_pass () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun old_ema ->
-      ema_of_int32 old_ema >>=? fun ema ->
+      let* ema = ema_of_int32 old_ema in
       Assert.equal_int32
         ~loc:__LOC__
         (compute_new_ema ~per_block_vote:Per_block_vote_pass ema)
@@ -105,20 +106,22 @@ let test_ema_pass () =
 
 (* Test that new_ema is still between 0 and 2,000,000,000 after an Off vote. *)
 let test_ema_in_bound_off () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun old_ema ->
-      ema_of_int32 old_ema >>=? fun ema ->
+      let* ema = ema_of_int32 old_ema in
       let new_ema = compute_new_ema ~per_block_vote:Per_block_vote_off ema in
-      Assert.leq_int32 ~loc:__LOC__ 0l new_ema >>=? fun () ->
+      let* () = Assert.leq_int32 ~loc:__LOC__ 0l new_ema in
       Assert.leq_int32 ~loc:__LOC__ new_ema 2_000_000_000l)
     ema_range
 
 (* Test that new_ema > old_ema when voting Off, except if old_ema is
    already very close to the upper bound. *)
 let test_ema_increases_off () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun old_ema ->
-      ema_of_int32 old_ema >>=? fun ema ->
+      let* ema = ema_of_int32 old_ema in
       Assert.lt_int32
         ~loc:__LOC__
         old_ema
@@ -127,9 +130,10 @@ let test_ema_increases_off () =
 
 (* Test that the increase in EMA caused by an Off vote is bounded by 1,000,000 *)
 let test_ema_increases_off_bound () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun old_ema ->
-      ema_of_int32 old_ema >>=? fun ema ->
+      let* ema = ema_of_int32 old_ema in
       Assert.leq_int32
         ~loc:__LOC__
         (Int32.sub
@@ -140,20 +144,22 @@ let test_ema_increases_off_bound () =
 
 (* Test that new_ema is still between 0 and 2,000,000,000 after an Off vote. *)
 let test_ema_in_bound_on () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun old_ema ->
-      ema_of_int32 old_ema >>=? fun ema ->
+      let* ema = ema_of_int32 old_ema in
       let new_ema = compute_new_ema ~per_block_vote:Per_block_vote_on ema in
-      Assert.leq_int32 ~loc:__LOC__ 0l new_ema >>=? fun () ->
+      let* () = Assert.leq_int32 ~loc:__LOC__ 0l new_ema in
       Assert.leq_int32 ~loc:__LOC__ new_ema 2_000_000_000l)
     ema_range
 
 (* Test that new_ema < old_ema when voting On, except if old_ema is
    already very close to the lower bound. *)
 let test_ema_decreases_on () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun old_ema ->
-      ema_of_int32 old_ema >>=? fun ema ->
+      let* ema = ema_of_int32 old_ema in
       Assert.lt_int32
         ~loc:__LOC__
         (compute_new_ema ~per_block_vote:Per_block_vote_on ema)
@@ -162,9 +168,10 @@ let test_ema_decreases_on () =
 
 (* Test that the decrease in EMA caused by an On vote is bounded by 1,000,000 *)
 let test_ema_decreases_on_bound () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun old_ema ->
-      ema_of_int32 old_ema >>=? fun ema ->
+      let* ema = ema_of_int32 old_ema in
       Assert.leq_int32
         ~loc:__LOC__
         (Int32.sub
@@ -175,15 +182,17 @@ let test_ema_decreases_on_bound () =
 
 (* Test that 1385 Off votes are needed to reach the threshold from 0. *)
 let test_ema_many_off () =
+  let open Lwt_result_syntax in
   let open Per_block_votes_repr in
-  ema_of_int32 0l >>=? fun initial_ema ->
-  Assert.leq_int32
-    ~loc:__LOC__
-    (compute_new_ema_n
-       (Stdlib.List.init 1385 (fun _ -> Per_block_vote_off))
-       initial_ema)
-    1_000_000_000l
-  >>=? fun () ->
+  let* initial_ema = ema_of_int32 0l in
+  let* () =
+    Assert.leq_int32
+      ~loc:__LOC__
+      (compute_new_ema_n
+         (Stdlib.List.init 1385 (fun _ -> Per_block_vote_off))
+         initial_ema)
+      1_000_000_000l
+  in
   Assert.leq_int32
     ~loc:__LOC__
     1_000_000_000l
@@ -193,15 +202,17 @@ let test_ema_many_off () =
 
 (* Test that 1385 On votes are needed to reach the threshold from the max value of the EMA (2,000,000,000). *)
 let test_ema_many_on () =
+  let open Lwt_result_syntax in
   let open Per_block_votes_repr in
-  ema_of_int32 2_000_000_000l >>=? fun initial_ema ->
-  Assert.leq_int32
-    ~loc:__LOC__
-    1_000_000_000l
-    (compute_new_ema_n
-       (Stdlib.List.init 1385 (fun _ -> Per_block_vote_on))
-       initial_ema)
-  >>=? fun () ->
+  let* initial_ema = ema_of_int32 2_000_000_000l in
+  let* () =
+    Assert.leq_int32
+      ~loc:__LOC__
+      1_000_000_000l
+      (compute_new_ema_n
+         (Stdlib.List.init 1385 (fun _ -> Per_block_vote_on))
+         initial_ema)
+  in
   Assert.leq_int32
     ~loc:__LOC__
     (compute_new_ema_n
@@ -215,11 +226,12 @@ let test_ema_many_on () =
    much than voting Off on the second one increases it.
 *)
 let test_ema_symmetry () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun ema ->
       let opposite_ema = Int32.(sub 2_000_000_000l ema) in
-      ema_of_int32 ema >>=? fun ema ->
-      ema_of_int32 opposite_ema >>=? fun opposite_ema ->
+      let* ema = ema_of_int32 ema in
+      let* opposite_ema = ema_of_int32 opposite_ema in
       let new_ema = compute_new_ema ~per_block_vote:Per_block_vote_on ema in
       let new_opposite_ema =
         compute_new_ema ~per_block_vote:Per_block_vote_off opposite_ema
