@@ -36,30 +36,8 @@ open Adaptive_issuance_helpers
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
-(** For [assert_failure], when expected error does not match the actual error.
-    First error is the expected error, the second is the actual error. *)
-type error += Unexpected_error of (error trace * error trace)
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Temporary
-    ~id:"adaptive_issuance_integration_test.unexpected_error"
-    ~title:"Unexpected error"
-    ~description:"Expected error does not match actual error"
-    ~pp:(fun ppf (expected, actual) ->
-      Format.fprintf
-        ppf
-        "Unexpected error:@.%a@.Expected:@.%a@."
-        (Format.pp_print_list pp)
-        actual
-        (Format.pp_print_list pp)
-        expected)
-    (obj2
-       (req "expected" (list error_encoding))
-       (req "actual" (list error_encoding)))
-    (function Unexpected_error (a, b) -> Some (a, b) | _ -> None)
-    (fun (a, b) -> Unexpected_error (a, b))
+(** For [assert_failure], when expected error does not match the actual error. *)
+type error += Unexpected_error
 
 let default_param_wait, default_unstake_wait =
   let constants = Default_parameters.constants_test in
@@ -379,7 +357,7 @@ type t = Block.t * State.t
     from the same point. This allows easy compositionality of behaviors with minimal code sharing.
     The [Tag] allows to give meaningful identifiers to the branches. It is good practice to tag each
     case in a branch (it's not necessary, but since test names must be unique, at most one branch can
-    remain unnamed, and even then it can create conflictng names.)
+    remain unnamed, and even then it can create conflicting names.)
  *)
 type ('input, 'output) scenarios =
   | Action : ('input -> 'output tzresult Lwt.t) -> ('input, 'output) scenarios
@@ -934,7 +912,15 @@ let check_failure_aux ?expected_error :
           if e = exp_e then (
             Log.info ~color:assert_block_color "Rollback" ;
             return input)
-          else fail (Unexpected_error (exp_e, e)))
+          else (
+            Log.info
+              ~color:Log.Color.FG.red
+              "Unexpected error:@.%a@.Expected:@.%a@."
+              (Format.pp_print_list pp)
+              e
+              (Format.pp_print_list pp)
+              exp_e ;
+            fail Unexpected_error))
 
 let check_fail_and_rollback ?expected_error :
     ('a, 'b) single_scenario -> 'a -> 'a tzresult Lwt.t =
@@ -1040,11 +1026,7 @@ let test_expected_error =
     ~expected_error:[Exn (Failure "")]
     (exec (fun _ -> failwith ""))
   --> assert_failure
-        ~expected_error:
-          [
-            Unexpected_error
-              ([Inconsistent_number_of_bootstrap_accounts], [Exn (Failure "")]);
-          ]
+        ~expected_error:[Unexpected_error]
         (assert_failure
            ~expected_error:[Inconsistent_number_of_bootstrap_accounts]
            (exec (fun _ -> failwith "")))
@@ -1342,7 +1324,7 @@ module Roundtrip = struct
          ("Test preserved balance", init_scenario () --> status_quo_rountrip);
          ("Test finalize", init_scenario () --> scenario_finalize);
          ("Test no finalize", init_scenario () --> scenario_not_finalize);
-         ( "Test forbidden operaitons",
+         ( "Test forbidden operations",
            init_scenario () --> scenario_forbidden_operations );
          ( "Test full balance in finalizable",
            init_scenario () --> full_balance_in_finalizable );
