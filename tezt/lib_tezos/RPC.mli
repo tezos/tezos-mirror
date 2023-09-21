@@ -1116,6 +1116,13 @@ val get_chain_block_context_issuance_current_yearly_rate :
 val get_chain_block_context_issuance_current_yearly_rate_exact :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/current_yearly_rate_details]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_issuance_current_yearly_rate_details :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/issuance_per_minute]
 
     [chain] defaults to ["main"].

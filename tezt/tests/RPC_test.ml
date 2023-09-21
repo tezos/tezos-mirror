@@ -405,7 +405,7 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
   in
   unit
 
-let test_adaptive_issuance_on_alpha ~contracts ?endpoint client =
+let test_adaptive_issuance_on_oxford ~contracts ?endpoint client =
   Log.info "Test adaptive issuance parameters retrieval" ;
 
   let* _ =
@@ -440,6 +440,13 @@ let test_adaptive_issuance_on_alpha ~contracts ?endpoint client =
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_stakers bootstrap
+  in
+  unit
+
+let test_adaptive_issuance_after_oxford ~contracts:_ ?endpoint client =
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_issuance_current_yearly_rate_details ()
   in
   unit
 
@@ -622,9 +629,12 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
 
 (* Test the adaptive issuance RPC. *)
-let test_adaptive_issuance _test_mode_tag _protocol ?endpoint client =
+let test_adaptive_issuance _test_mode_tag protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
-  test_adaptive_issuance_on_alpha ~contracts ?endpoint client
+  let* () = test_adaptive_issuance_on_oxford ~contracts ?endpoint client in
+  if Protocol.(protocol > Oxford) then
+    test_adaptive_issuance_after_oxford ~contracts ?endpoint client
+  else unit
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =

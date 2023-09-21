@@ -1387,6 +1387,21 @@ let get_chain_block_context_issuance_current_yearly_rate_exact ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_issuance_current_yearly_rate_details
+    ?(chain = "main") ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "issuance";
+      "current_yearly_rate_details";
+    ]
+    Fun.id
+
 let get_chain_block_context_issuance_issuance_per_minute ?(chain = "main")
     ?(block = "head") () =
   make
