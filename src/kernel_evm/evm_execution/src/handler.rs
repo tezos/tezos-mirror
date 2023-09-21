@@ -123,6 +123,7 @@ impl<'config> TransactionLayerData<'config> {
     }
 }
 
+#[cfg(feature = "benchmark")]
 mod benchmarks {
 
     use super::*;
@@ -402,9 +403,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
-    /// Execute a SputnikVM runtime with this handler
-    // Never inlined to ensure we can see it in the profiling results
-    #[inline(never)]
+    /// Execute a SputnikVM run with this handler
+    ///
+    /// Never inlined when the kernel is compiled for benchmarks, to ensure the
+    /// function is visible in the profiling results.
+    #[cfg_attr(feature = "benchmark", inline(never))]
     fn execute(
         &mut self,
         runtime: &mut evm::Runtime,
@@ -414,17 +417,29 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // consumption of opcode and implement the tick model at the opcode
             // level. At the end of each step if the kernel takes more than the
             // allocated ticks the transaction is marked as failed.
+
+            // Note the opcode is not used yet outside of benchmarking, but will
+            // be used when accounting for gas, this flag is temporary.
+            #[cfg(feature = "benchmark")]
             let opcode = runtime.machine().inspect().map(|p| p.0);
 
+            #[cfg(feature = "benchmark")]
             if let Some(opcode) = opcode {
                 benchmarks::start_section(self.host, &opcode);
             }
+
+            // For now, these variables capturing the gas one will be marked
+            // unused without benchmarking, but they will be used during the
+            // tick accounting.
+            #[cfg_attr(not(feature = "benchmark"), allow(unused_variables))]
             let gas_before = self.gas_used();
 
             let step_result = runtime.step(self);
 
+            #[cfg_attr(not(feature = "benchmark"), allow(unused_variables))]
             let gas_after = self.gas_used();
 
+            #[cfg(feature = "benchmark")]
             if opcode.is_some() {
                 let gas = gas_after - gas_before;
                 benchmarks::end_section(self.host, gas, &step_result);
