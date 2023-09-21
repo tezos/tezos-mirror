@@ -22,7 +22,6 @@ unified_coverage:
   # /!\ Warning: this list is read by `scripts/ci/download_coverage/download.ml`.
   # The 'dependencies' field must be followed directly by the 'script' field.
   dependencies:
-    - "test-liquidity-baking-scripts"
     - "tezt 1/60"
     - "tezt 2/60"
     - "tezt 3/60"
