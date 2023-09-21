@@ -111,6 +111,8 @@ val get_constants : t -> Constants.t tzresult Lwt.t
     [init_with_constants]. *)
 val default_test_constants : Constants.Parametric.t
 
+val get_issuance_per_minute : t -> Tez.t tzresult Lwt.t
+
 val get_baking_reward_fixed_portion : t -> Tez.t tzresult Lwt.t
 
 val get_bonus_reward : t -> attesting_power:int -> Tez.t tzresult Lwt.t

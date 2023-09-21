@@ -216,6 +216,9 @@ let get_constants ctxt = Alpha_services.Constants.all rpc_ctxt ctxt
 let default_test_constants =
   Tezos_protocol_alpha_parameters.Default_parameters.constants_test
 
+let get_issuance_per_minute ctxt =
+  Adaptive_issuance_services.current_issuance_per_minute rpc_ctxt ctxt
+
 let get_baking_reward_fixed_portion ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return

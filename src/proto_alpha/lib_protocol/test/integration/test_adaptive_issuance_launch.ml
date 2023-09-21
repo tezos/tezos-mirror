@@ -162,8 +162,11 @@ let test_launch threshold expected_vote_duration () =
       set_delegate_parameters
         (B block)
         delegate
-        ~limit_of_staking_over_baking:1_000_000
-        ~edge_of_baking_over_staking_billionth:1_000_000_000
+        ~parameters:
+          {
+            limit_of_staking_over_baking = Q.one;
+            edge_of_baking_over_staking = Q.one;
+          }
     in
     Block.bake ~operation ~adaptive_issuance_vote:Per_block_vote_on block
   in
