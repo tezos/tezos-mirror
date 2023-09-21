@@ -5,7 +5,4 @@ test-liquidity-baking-scripts:
   dependencies:
     - "build_x86_64-released"
     - "build_x86_64-exp-dev-extra"
-  needs:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
   script: ./scripts/ci/test_liquidity_baking_scripts.sh
