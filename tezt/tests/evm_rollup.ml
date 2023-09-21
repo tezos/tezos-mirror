@@ -727,11 +727,9 @@ let test_l2_blocks_progression =
     ~tags:["evm"; "l2_blocks_progression"]
     ~title:"Check L2 blocks progression"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; _} =
+  let* {node; client; sc_rollup_node; endpoint; _} =
     setup_evm_kernel ~admin:None protocol
   in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* () =
     check_block_progression
       ~sc_rollup_node
