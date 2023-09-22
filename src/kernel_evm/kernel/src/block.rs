@@ -12,7 +12,6 @@ use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
 use crate::storage;
 use crate::storage::init_account_index;
-use crate::tick_model;
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
@@ -133,7 +132,7 @@ pub fn produce<Host: Runtime>(
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
-    let mut tick_counter = TickCounter::new(tick_model::top_level_overhead_ticks());
+    let mut tick_counter = TickCounter::new(0u64);
 
     for proposal in queue.proposals {
         let mut block_in_progress = BlockInProgress::from_queue_element(
@@ -861,10 +860,7 @@ mod tests {
             "Gas used for contract creation"
         );
 
-        assert_eq!(
-            ticks,
-            tick_model::ticks_of_gas(21123) + tick_model::top_level_overhead_ticks()
-        );
+        assert_eq!(ticks, tick_model::ticks_of_gas(21123));
     }
 
     #[test]
@@ -898,11 +894,7 @@ mod tests {
 
         assert_eq!(block.gas_used, U256::zero(), "no gas used");
         // crypto + tx overhead + init overhead
-        assert_eq!(
-            ticks,
-            tick_model::ticks_of_invalid_transaction()
-                + tick_model::top_level_overhead_ticks()
-        );
+        assert_eq!(ticks, tick_model::ticks_of_invalid_transaction());
     }
 
     #[test]

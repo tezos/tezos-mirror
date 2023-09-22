@@ -16,6 +16,11 @@ pub mod constants {
     /// Maximum number of ticks for a kernel run as set by the PVM
     pub(crate) const MAX_TICKS: u64 = 11_000_000_000;
 
+    /// Maximum number of allowed ticks for a kernel run. We consider a safety
+    /// margin and an incompressible initilisation overhead.
+    pub const MAX_ALLOWED_TICKS: u64 =
+        MAX_TICKS - SAFETY_MARGIN - INITIALISATION_OVERHEAD;
+
     /// Maximum number of reboots for a level as set by the PVM.
     pub(crate) const _MAX_NUMBER_OF_REBOOTS: u32 = 1_000;
 
@@ -42,6 +47,12 @@ pub mod constants {
 
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
+
+    /// The maximum gas limit allowed for a transaction. We need to set a limit
+    /// on the gas so we can consider the transaction in a reboot. If we don't
+    /// set a limit, we could reboot again and again until the transaction
+    /// fits in a reboot, which will never happen.
+    pub const MAX_TRANSACTION_GAS_LIMIT: u64 = MAX_ALLOWED_TICKS / TICKS_PER_GAS;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
@@ -62,16 +73,8 @@ pub fn ticks_of_gas(gas: u64) -> u64 {
 
 /// Check that a transaction can fit inside the tick limit
 pub fn estimate_would_overflow(estimated_ticks: u64, transaction: &Transaction) -> bool {
-    estimate_ticks_for_transaction(transaction)
-        .saturating_add(estimated_ticks)
-        .saturating_add(constants::SAFETY_MARGIN)
-        > constants::MAX_TICKS
-}
-
-/// Initial amount for the tick accumulator, corresponding to the overhead of a
-/// block
-pub fn top_level_overhead_ticks() -> u64 {
-    constants::INITIALISATION_OVERHEAD
+    estimate_ticks_for_transaction(transaction).saturating_add(estimated_ticks)
+        > constants::MAX_ALLOWED_TICKS
 }
 
 /// An invalid transaction could not be transmitted to the VM, eg. the nonce
