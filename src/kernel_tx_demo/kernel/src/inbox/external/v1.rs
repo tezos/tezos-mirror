@@ -17,6 +17,7 @@ use crypto::hash::{ContractKt1Hash, ContractTz1Hash};
 use crypto::CryptoError;
 use nom::combinator::map;
 use nom::multi::many0;
+use tezos_crypto_rs::blake2b::Blake2bError;
 use tezos_data_encoding::enc::{BinError, BinWriter};
 use tezos_data_encoding::encoding::Encoding;
 use tezos_data_encoding::encoding::HasEncoding;
@@ -205,6 +206,9 @@ pub enum ToBytesError {
     /// Serialization error
     #[error("Unable to serialize operation: {0}")]
     Binary(#[from] BinError),
+    /// Digest error
+    #[error("Unable to digest operation: {0}")]
+    Digest(#[from] Blake2bError),
     /// Incorrect signing key
     #[error("BlsKey did not match Signer")]
     IncorrectKey,

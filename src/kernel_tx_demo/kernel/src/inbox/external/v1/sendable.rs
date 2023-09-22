@@ -6,6 +6,7 @@
 
 use super::{Operation, ToBytesError};
 use crypto::hash::SecretKeyEd25519;
+use tezos_crypto_rs::blake2b::digest_256;
 use tezos_data_encoding::enc::{self, BinError, BinWriter};
 use tezos_data_encoding::encoding::{Encoding, HasEncoding};
 
@@ -35,7 +36,10 @@ impl BinWriter for Batch {
             .map(|(op, sk)| {
                 let mut bytes = Vec::new();
                 op.bin_write(&mut bytes)?;
-                let mut sig = sk.sign(bytes.as_slice())?;
+                // TODO: https://github.com/trilitech/tezedge/issues/44
+                // Consider moving the hashing logic into `sk.sign`.
+                let hash = digest_256(&bytes)?;
+                let mut sig = sk.sign(hash.as_slice())?;
                 bytes.append(&mut sig.0);
 
                 Ok(bytes)
