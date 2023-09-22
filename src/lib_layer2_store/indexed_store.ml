@@ -446,7 +446,8 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
       (fun () ->
         let* res =
           let open Lwt_result_syntax in
-          protect @@ fun () ->
+          trace (Gc_failed N.name) @@ protect
+          @@ fun () ->
           let*! () =
             (* Copy items from the stale indexes to the temporary one. *)
             List.iter_s (unsafe_retain_one_item store tmp_index filter) retain
@@ -482,7 +483,8 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
 
   let gc ?(async = true) store ~retain =
     let open Lwt_result_syntax in
-    protect @@ fun () ->
+    trace (Gc_failed N.name) @@ protect
+    @@ fun () ->
     let*! () = gc_internal ~async store retain (fun _ -> true) in
     return_unit
 end
@@ -551,7 +553,8 @@ struct
 
   let gc ?(async = true) store ~retain =
     let open Lwt_result_syntax in
-    protect @@ fun () ->
+    trace (Gc_failed N.name) @@ protect
+    @@ fun () ->
     let*! () = gc_internal ~async store retain Option.is_some in
     return_unit
 end
@@ -1022,7 +1025,8 @@ struct
     Lwt.dont_wait
       (fun () ->
         let*! res =
-          protect @@ fun () ->
+          trace (Gc_failed N.name) @@ protect
+          @@ fun () ->
           let* () = List.iter_es (unsafe_retain_one_item store tmp) retain in
           finalize_gc store tmp
         in
@@ -1055,7 +1059,7 @@ struct
             (function Lwt.Canceled -> return_unit | e -> raise e)
 
   let gc ?(async = true) store ~retain =
-    protect @@ fun () -> gc_internal ~async store retain
+    trace (Gc_failed N.name) @@ gc_internal ~async store retain
 end
 
 module Make_simple_indexed_file
