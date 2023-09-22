@@ -155,9 +155,11 @@ async function analyze_profiler_output(path) {
 
 // Run given benchmark
 async function run_benchmark(path) {
+    var inbox_size = fs.statSync(path).size
     run_profiler_result = await run_profiler(path);
     profiler_output_analysis_result = await analyze_profiler_output(run_profiler_result.profiler_output_path);
     return {
+        inbox_size,
         ...profiler_output_analysis_result,
         ...run_profiler_result
     }
@@ -236,8 +238,19 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         console.log("Warning: runtime not matched with a transaction in: " + benchmark_name);
     }
 
-    // first kernel run and reboots
-    for (var j = 0; j < kernel_run_ticks.length; j++) {
+    // first kernel run
+    rows.push({
+        benchmark_name: benchmark_name + "(all)",
+        interpreter_init_ticks: interpreter_init_ticks[0],
+        interpreter_decode_ticks: interpreter_decode_ticks[0],
+        fetch_blueprint_ticks: fetch_blueprint_ticks[0],
+        kernel_run_ticks: kernel_run_ticks[0],
+        estimated_ticks: estimated_ticks[0],
+        inbox_size: run_benchmark_result.inbox_size
+    });
+
+    //reboots
+    for (var j = 1; j < kernel_run_ticks.length; j++) {
         rows.push({
             benchmark_name: benchmark_name + "(all)",
             interpreter_init_ticks: interpreter_init_ticks[j],
@@ -275,7 +288,8 @@ async function run_all_benchmarks(benchmark_scripts) {
         "kernel_run_ticks",
         "unaccounted_ticks",
         "status",
-        "estimated_ticks"
+        "estimated_ticks",
+        "inbox_size"
     ];
     let output = output_filename();
     console.log(`Output in ${output}`);
