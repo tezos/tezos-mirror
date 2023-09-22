@@ -41,7 +41,7 @@ fn interpret_one(i: &Instruction, gas: &mut Gas, stack: &mut IStack) -> Result<(
     match i {
         Add => match stack.make_contiguous() {
             [NumberValue(o1), NumberValue(o2), ..] => {
-                gas.consume(interpret_cost::add_int(*o1, *o2))?;
+                gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
                 let sum = *o1 + *o2;
                 stack.pop_front();
                 stack.pop_front();
@@ -50,20 +50,20 @@ fn interpret_one(i: &Instruction, gas: &mut Gas, stack: &mut IStack) -> Result<(
             _ => unimplemented!(),
         },
         Dip(opt_height, nested) => {
-            gas.consume(interpret_cost::dip(*opt_height))?;
+            gas.consume(interpret_cost::dip(*opt_height)?)?;
             let protected_height: usize = opt_height.unwrap_or(1);
             let mut live = stack.split_off(protected_height);
             interpret(nested, gas, &mut live)?;
-            gas.consume(interpret_cost::undip(protected_height))?;
+            gas.consume(interpret_cost::undip(protected_height)?)?;
             stack.append(&mut live);
         }
         Drop(opt_height) => {
-            gas.consume(interpret_cost::drop(*opt_height))?;
+            gas.consume(interpret_cost::drop(*opt_height)?)?;
             let drop_height: usize = opt_height.unwrap_or(1);
             *stack = stack.split_off(drop_height);
         }
         Dup(opt_height) => {
-            gas.consume(interpret_cost::dup(*opt_height))?;
+            gas.consume(interpret_cost::dup(*opt_height)?)?;
             let dup_height: usize = opt_height.unwrap_or(1);
             stack.push_front(stack.get(dup_height - 1).unwrap().clone());
         }

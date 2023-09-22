@@ -56,7 +56,7 @@ fn typecheck_instruction(
         Dip(opt_height, nested) => {
             let protected_height: usize = opt_height.unwrap_or(1);
 
-            gas.consume(gas::tc_cost::dip_n(opt_height))?;
+            gas.consume(gas::tc_cost::dip_n(opt_height)?)?;
 
             ensure_stack_len(stack, protected_height)?;
             // Here we split the stack into protected and live segments, and after typechecking
@@ -68,7 +68,7 @@ fn typecheck_instruction(
         }
         Drop(opt_height) => {
             let drop_height: usize = opt_height.unwrap_or(1);
-            gas.consume(gas::tc_cost::drop_n(opt_height))?;
+            gas.consume(gas::tc_cost::drop_n(opt_height)?)?;
             ensure_stack_len(&stack, drop_height)?;
             *stack = stack.split_off(drop_height);
         }

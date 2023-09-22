@@ -37,7 +37,7 @@ pub fn ensure_stacks_eq(gas: &mut Gas, stack1: &[Type], stack2: &[Type]) -> Resu
 }
 
 fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
-    gas.consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas()))?;
+    gas.consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
     if ty1 != ty2 {
         Err(TcError::StacksNotEqual)
     } else {

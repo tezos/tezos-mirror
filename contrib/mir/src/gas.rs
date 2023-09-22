@@ -13,6 +13,13 @@ pub struct Gas {
 #[derive(Debug, PartialEq, Eq)]
 pub struct OutOfGas;
 
+/// Overflow errors can be treated as out-of-gas errors
+impl From<std::num::TryFromIntError> for OutOfGas {
+    fn from(_: std::num::TryFromIntError) -> Self {
+        OutOfGas
+    }
+}
+
 // Default gas limit per transaction, according to
 // https://opentezos.com/tezos-basics/economics-and-rewards/#transaction-cost
 const DEFAULT_GAS_AMOUNT: u32 = 1_040_000;
@@ -46,32 +53,39 @@ impl Gas {
 }
 
 pub mod tc_cost {
+    use super::OutOfGas;
+
     // Due to the quirk of the Tezos protocol implementation, step gas is
     // charged twice as often as in MIR.
     pub const INSTR_STEP: u32 = 220 * 2;
 
     pub const VALUE_STEP: u32 = 100;
 
-    fn variadic(depth: usize) -> u32 {
-        (depth * 50).try_into().unwrap()
+    fn variadic(depth: usize) -> Result<u32, OutOfGas> {
+        Ok(depth.checked_mul(50).ok_or(OutOfGas)?.try_into()?)
     }
 
-    pub fn drop_n(depth: &Option<usize>) -> u32 {
-        depth.map(variadic).unwrap_or(0)
+    pub fn drop_n(depth: &Option<usize>) -> Result<u32, OutOfGas> {
+        depth.map_or(Ok(0), variadic)
     }
 
-    pub fn dip_n(depth: &Option<usize>) -> u32 {
-        depth.map(variadic).unwrap_or(0)
+    pub fn dip_n(depth: &Option<usize>) -> Result<u32, OutOfGas> {
+        depth.map_or(Ok(0), variadic)
     }
 
-    pub fn ty_eq(sz1: usize, sz2: usize) -> u32 {
+    pub fn ty_eq(sz1: usize, sz2: usize) -> Result<u32, OutOfGas> {
         // complexity of comparing types T and U is O(min(|T|, |U|)), as
         // comparison short-circuits at the first mismatch
-        (std::cmp::min(sz1, sz2) * 60).try_into().unwrap() // according to Nairobi
+        Ok(std::cmp::min(sz1, sz2)
+            .checked_mul(60) // according to Nairobi
+            .ok_or(OutOfGas)?
+            .try_into()?)
     }
 }
 
 pub mod interpret_cost {
+    use super::OutOfGas;
+
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
     pub const DUP: u32 = 10;
@@ -86,48 +100,57 @@ pub mod interpret_cost {
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;
 
-    fn dropn(n: usize) -> u32 {
+    fn dropn(n: usize) -> Result<u32, OutOfGas> {
         // Approximates 30 + 2.713108*n, copied from the Tezos protocol
-        (30 + (2 * n) + (n >> 1) + (n >> 3)).try_into().unwrap()
+        let go = |n: usize| {
+            n.checked_mul(2)?
+                .checked_add(30)?
+                .checked_add(n >> 1)?
+                .checked_add(n >> 3)
+        };
+        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
     }
 
-    pub fn drop(mb_n: Option<usize>) -> u32 {
-        mb_n.map(dropn).unwrap_or(DROP)
+    pub fn drop(mb_n: Option<usize>) -> Result<u32, OutOfGas> {
+        mb_n.map_or(Ok(DROP), dropn)
     }
 
-    fn dipn(n: usize) -> u32 {
+    fn dipn(n: usize) -> Result<u32, OutOfGas> {
         // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
-        (15 + (4 * n)).try_into().unwrap()
+        let go = |n: usize| n.checked_mul(4)?.checked_add(15);
+        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
     }
 
-    pub fn dip(mb_n: Option<usize>) -> u32 {
-        mb_n.map(dipn).unwrap_or(DIP)
+    pub fn dip(mb_n: Option<usize>) -> Result<u32, OutOfGas> {
+        mb_n.map_or(Ok(DIP), dipn)
     }
 
-    pub fn undip(n: usize) -> u32 {
+    pub fn undip(n: usize) -> Result<u32, OutOfGas> {
         // this is derived by observing gas costs as of Nairobi, as charged by
         // the Tezos protocol. It seems undip cost is charged as
         // cost_N_KUndip * n + cost_N_KCons,
         // where cost_N_KUndip = cost_N_KCons = 10
-        (10 * (n + 1)).try_into().unwrap()
+        let go = |n: usize| n.checked_add(1)?.checked_mul(10);
+        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
     }
 
-    fn dupn(n: usize) -> u32 {
+    fn dupn(n: usize) -> Result<u32, OutOfGas> {
         // Approximates 20 + 1.222263*n, copied from the Tezos protocol
-        (20 + n + (n >> 2)).try_into().unwrap()
+        let go = |n: usize| n.checked_add(20)?.checked_add(n >> 2);
+        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
     }
 
-    pub fn dup(mb_n: Option<usize>) -> u32 {
-        mb_n.map(dupn).unwrap_or(DUP)
+    pub fn dup(mb_n: Option<usize>) -> Result<u32, OutOfGas> {
+        mb_n.map_or(Ok(DUP), dupn)
     }
 
-    pub fn add_int(i1: i32, i2: i32) -> u32 {
+    pub fn add_int(i1: i32, i2: i32) -> Result<u32, OutOfGas> {
         // NB: eventually when using BigInts, use BigInt::bits() &c
         use std::mem::size_of_val;
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
         let sz = std::cmp::max(size_of_val(&i1), size_of_val(&i2));
-        (35 + (sz >> 1)).try_into().unwrap()
+        Ok((sz >> 1).checked_add(35).ok_or(OutOfGas)?.try_into()?)
     }
 }
 
@@ -155,5 +178,21 @@ mod test {
         assert_eq!(gas.consume(1000), Err(OutOfGas));
 
         let _ = gas.consume(1000); // panics
+    }
+
+    #[test]
+    fn overflow_to_out_of_gas() {
+        fn check<F: Fn(usize) -> Result<u32, OutOfGas>>(f: F) -> () {
+            assert_eq!(f(usize::MAX), Err(OutOfGas));
+            assert_eq!(f(usize::MAX / 2), Err(OutOfGas));
+            assert_eq!(f(usize::MAX / 4), Err(OutOfGas));
+        }
+        check(|n| super::tc_cost::dip_n(&Some(n)));
+        check(|n| super::tc_cost::drop_n(&Some(n)));
+        check(|n| super::tc_cost::ty_eq(n, n));
+        check(|n| super::interpret_cost::dip(Some(n)));
+        check(|n| super::interpret_cost::drop(Some(n)));
+        check(|n| super::interpret_cost::dup(Some(n)));
+        check(|n| super::interpret_cost::undip(n));
     }
 }
