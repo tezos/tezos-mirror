@@ -232,36 +232,56 @@ val parse_instr :
   the `value` in `big_map key value`.
 *)
 val parse_big_map_value_ty :
-  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+  legacy:bool -> Script.node -> (ex_ty, error trace) Gas_monad.t
 
+(**
+  [parse_ty] specialized for packable types.
+*)
 val parse_packable_ty :
-  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+  legacy:bool -> Script.node -> (ex_ty, error trace) Gas_monad.t
 
+(**
+  [parse_ty] specialized for types which can be passed as parameter of
+  contract calls. See also [parse_parameter_ty_and_entrypoints].
+*)
 val parse_passable_ty :
-  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+  legacy:bool -> Script.node -> (ex_ty, error trace) Gas_monad.t
 
+(**
+  [parse_ty] specialized for comparable types.
+*)
 val parse_comparable_ty :
-  context -> Script.node -> (ex_comparable_ty * context) tzresult
+  Script.node -> (ex_comparable_ty, error trace) Gas_monad.t
 
+(**
+  [parse_ty] specialized for the parameter type declared with the
+  `parameter` toplevel primitive. This function also returns typed
+  information about the available entrypoints.
+*)
 val parse_parameter_ty_and_entrypoints :
-  context ->
   legacy:bool ->
   Script.node ->
-  (ex_parameter_ty_and_entrypoints * context) tzresult
+  (ex_parameter_ty_and_entrypoints, error trace) Gas_monad.t
 
+(**
+  [parse_ty] specialized for the types which are allowed as inputs for
+  views.
+*)
 val parse_view_input_ty :
-  context ->
   stack_depth:int ->
   legacy:bool ->
   Script.node ->
-  (ex_ty * context) tzresult
+  (ex_ty, error trace) Gas_monad.t
 
+(**
+  [parse_ty] specialized for the types which are allowed as outputs
+  for views.
+*)
 val parse_view_output_ty :
-  context ->
   stack_depth:int ->
   legacy:bool ->
   Script.node ->
-  (ex_ty * context) tzresult
+  (ex_ty, error trace) Gas_monad.t
 
 val parse_view :
   elab_conf:Script_ir_translator_config.elab_config ->
@@ -281,20 +301,19 @@ val parse_views :
   [parse_ty] allowing big_map values, operations, contract and tickets.
 *)
 val parse_any_ty :
-  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+  legacy:bool -> Script.node -> (ex_ty, error trace) Gas_monad.t
 
 (** We expose [parse_ty] for convenience to external tools. Please use
     specialized versions such as [parse_packable_ty], [parse_passable_ty],
     [parse_comparable_ty], or [parse_big_map_value_ty] if possible. *)
 val parse_ty :
-  context ->
   legacy:bool ->
   allow_lazy_storage:bool ->
   allow_operation:bool ->
   allow_contract:bool ->
   allow_ticket:bool ->
   Script.node ->
-  (ex_ty * context) tzresult
+  (ex_ty, error trace) Gas_monad.t
 
 val parse_toplevel :
   context -> Script.expr -> (toplevel * context) tzresult Lwt.t

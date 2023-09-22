@@ -410,8 +410,9 @@ let register () =
     match types with
     | None -> return_none
     | Some (_, value_type) -> (
-        let*? Ex_ty value_type, ctxt =
-          parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
+        let*? (Ex_ty value_type) =
+          Gas_monad.run_unaccounted
+          @@ parse_big_map_value_ty ~legacy:true (Micheline.root value_type)
         in
         let* _ctxt, value = Big_map.get_opt ctxt id key in
         match value with
@@ -435,8 +436,9 @@ let register () =
     match types with
     | None -> raise Not_found
     | Some (_, value_type) ->
-        let*? Ex_ty value_type, ctxt =
-          parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
+        let*? (Ex_ty value_type) =
+          Gas_monad.run_unaccounted
+          @@ parse_big_map_value_ty ~legacy:true (Micheline.root value_type)
         in
         let* ctxt, key_values =
           Big_map.list_key_values ?offset ?length ctxt id
@@ -549,27 +551,30 @@ let register () =
                   ctxt
                   expr
               in
-              let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
-              let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
-                parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+              let* {arg_type; _}, (_ctxt : context) =
+                parse_toplevel ctxt expr
               in
-              let*? r, ctxt =
-                Gas_monad.run ctxt
-                @@ Script_ir_translator.find_entrypoint
-                     ~error_details:(Informative ())
-                     arg_type
-                     entrypoints
-                     entrypoint
+              let r =
+                Gas_monad.run_unaccounted
+                  (let open Gas_monad.Syntax in
+                  let* (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints})
+                      =
+                    parse_parameter_ty_and_entrypoints ~legacy arg_type
+                  in
+                  let* (Ex_ty_cstr {ty; original_type_expr; _}) =
+                    Script_ir_translator.find_entrypoint
+                      ~error_details:(Informative ())
+                      arg_type
+                      entrypoints
+                      entrypoint
+                  in
+                  if normalize_types then
+                    let+ ty_node = Script_ir_unparser.unparse_ty ~loc:() ty in
+                    Micheline.strip_locations ty_node
+                  else return @@ Micheline.strip_locations original_type_expr)
               in
               r |> function
-              | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
-                  if normalize_types then
-                    let*? ty_node, _ctxt =
-                      Script_ir_unparser.unparse_ty ~loc:() ctxt ty
-                    in
-                    return_some (Micheline.strip_locations ty_node)
-                  else
-                    return_some (Micheline.strip_locations original_type_expr)
+              | Ok node -> return_some node
               | Error _ -> return_none))) ;
   opt_register1
     ~chunked:true
@@ -594,9 +599,9 @@ let register () =
               let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
               Lwt.return
                 (let open Result_syntax in
-                let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _
-                    =
-                  parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+                let* (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
+                  Gas_monad.run_unaccounted
+                  @@ parse_parameter_ty_and_entrypoints ~legacy arg_type
                 in
                 let unreachable_entrypoint, map =
                   Script_ir_translator.list_entrypoints_uncarbonated
@@ -611,7 +616,8 @@ let register () =
                       let* ty_expr, ctxt =
                         if normalize_types then
                           let* ty_node, ctxt =
-                            Script_ir_unparser.unparse_ty ~loc:() ctxt ty
+                            Gas_monad.run_pure ctxt
+                            @@ Script_ir_unparser.unparse_ty ~loc:() ty
                           in
                           return (Micheline.strip_locations ty_node, ctxt)
                         else
@@ -632,8 +638,9 @@ let register () =
       | Originated contract -> (
           let* ctxt, script = Contract.get_script ctxt contract in
           let key_type_node = Micheline.root key_type in
-          let*? Ex_comparable_ty key_type, ctxt =
-            Script_ir_translator.parse_comparable_ty ctxt key_type_node
+          let*? (Ex_comparable_ty key_type) =
+            Gas_monad.run_unaccounted
+            @@ Script_ir_translator.parse_comparable_ty key_type_node
           in
           let* key, ctxt =
             Script_ir_translator.parse_comparable_data
