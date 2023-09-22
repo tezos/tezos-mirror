@@ -818,6 +818,15 @@ let loop =
     bin = kernel_inputs_path ^ "/loop.bin";
   }
 
+(** The info for the "mapping_storage.sol" contract.
+    See [src\kernel_evm\solidity_examples] *)
+let mapping_storage =
+  {
+    label = "mappingStorage";
+    abi = kernel_inputs_path ^ "/mapping_storage_abi.json";
+    bin = kernel_inputs_path ^ "/mapping_storage.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -3007,6 +3016,71 @@ let test_rpc_gasPrice =
     ~error_msg:"Expected %R, but got %L" ;
   unit
 
+let send_foo_mapping_storage contract_address sender
+    {sc_rollup_node; node; client; endpoint; _} =
+  let call_foo (sender : Eth_account.t) =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:mapping_storage.label
+      ~address:contract_address
+      ~method_call:"foo()"
+  in
+  wait_for_application ~sc_rollup_node ~node ~client (call_foo sender) ()
+
+let test_rpc_getStorageAt =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_storage_at"]
+    ~title:"RPC methods eth_getStorageAt"
+  @@ fun protocol ->
+  (* setup *)
+  let* ({endpoint; evm_proxy_server; _} as evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* deploy contract *)
+  let* address, _tx = deploy ~contract:mapping_storage ~sender evm_setup in
+  (* Example from
+      https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getstorageat
+  *)
+  let expected_value0 = 1234 in
+  let expected_value1 = 5678 in
+
+  (* set values *)
+  let* tx = send_foo_mapping_storage address sender evm_setup in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* hex_value =
+    Evm_proxy_server.(
+      let* value =
+        call_evm_rpc
+          evm_proxy_server
+          {
+            method_ = "eth_getStorageAt";
+            parameters = `A [`String address; `String "0x0"; `String "latest"];
+          }
+      in
+      return JSON.(value |-> "result" |> as_string))
+  in
+  Check.((Helpers.no_0x hex_value = hex_256_of expected_value0) string)
+    ~error_msg:"Expected %R, but got %L" ;
+  let pos = Helpers.mapping_position sender.address 1 in
+  let* hex_value =
+    Evm_proxy_server.(
+      let* value =
+        call_evm_rpc
+          evm_proxy_server
+          {
+            method_ = "eth_getStorageAt";
+            parameters = `A [`String address; `String pos; `String "latest"];
+          }
+      in
+      return JSON.(value |-> "result" |> as_string))
+  in
+  Check.((Helpers.no_0x hex_value = hex_256_of expected_value1) string)
+    ~error_msg:"Expected %R, but got %L" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -3062,7 +3136,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getUncleByBlockArgAndIndex protocols ;
   test_simulation_eip2200 protocols ;
   test_cover_fees protocols ;
-  test_rpc_gasPrice protocols
+  test_rpc_gasPrice protocols ;
+  test_rpc_getStorageAt protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;

@@ -6,7 +6,8 @@
  (package tezt-ethereum)
  (libraries
   tezt
-  tezt-tezos.tezt-performance-regression)
+  tezt-tezos.tezt-performance-regression
+  octez-libs.crypto)
  (flags
   (:standard)
   -open Tezt
