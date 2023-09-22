@@ -102,20 +102,20 @@ module Attr = struct
                }));
     }
 
-  let u1 = int1_type_attr_spec ~signed:false
+  let uint8 = int1_type_attr_spec ~signed:false
 
-  let s1 = int1_type_attr_spec ~signed:true
+  let int8 = int1_type_attr_spec ~signed:true
 
-  let u2 = int_multi_type_atrr_spec ~id:"uint16" ~signed:false DataType.W2
+  let uint16 = int_multi_type_atrr_spec ~id:"uint16" ~signed:false DataType.W2
 
-  let s2 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
+  let int16 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
 
-  let u4 ?(id = "uint32") () =
+  let uint32 ?(id = "uint32") () =
     int_multi_type_atrr_spec ~id ~signed:false DataType.W4
 
-  let s4 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
+  let int32 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
 
-  let s8 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
+  let int64 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
 
   let int31 =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6261
@@ -123,7 +123,7 @@ module Attr = struct
              range. *)
     int_multi_type_atrr_spec ~id:"int31" ~signed:true DataType.W4
 
-  let f8 = float_multi_type_attr_spec ~id:"float"
+  let float = float_multi_type_attr_spec ~id:"float"
 
   let fixed_size_header_class_spec =
     {
@@ -131,7 +131,7 @@ module Attr = struct
                               to custom defined class spec. *)
       (Helpers.default_class_spec ~encoding_name:"fixed_bytes" ())
       with
-      seq = [u4 ~id:"size" (); bytes_limit_type_attr_spec ~id:"value"];
+      seq = [uint32 ~id:"size" (); bytes_limit_type_attr_spec ~id:"value"];
       isTopLevel = false;
     }
 
@@ -159,28 +159,28 @@ module Class = struct
       Attr.bool
 
   let uint8 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.u1
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.uint8
 
   let int8 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.s1
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int8
 
   let uint16 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.u2
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.uint16
 
   let int16 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.s2
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int16
 
   let int32 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.s4
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int32
 
   let int64 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.s8
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int64
 
   let int31 ~encoding_name ?description () =
     Helpers.class_spec_of_attr ~encoding_name ?description Attr.int31
 
   let float ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.f8
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.float
 
   let bytes ~encoding_name ?description () =
     Helpers.class_spec_of_attr ~encoding_name ?description Attr.bytes
@@ -194,7 +194,7 @@ module Class = struct
                             to custom defined class spec. *)
       (Helpers.default_class_spec ~encoding_name:"group" ())
       with
-      seq = [{Attr.u1 with id = "b"}];
+      seq = [{Attr.uint8 with id = "b"}];
       instances =
         [
           ( "has_next",

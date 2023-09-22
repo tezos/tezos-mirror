@@ -42,7 +42,7 @@ let rec seq_field_of_data_encoding :
   | Ignore -> (enums, [])
   | Constant _ -> (enums, [])
   | Bool -> (Helpers.add_uniq_assoc enums Ground.Enum.bool, [Ground.Attr.bool])
-  | Uint8 -> (enums, [Ground.Attr.u1])
+  | Uint8 -> (enums, [Ground.Attr.uint8])
   | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding
   | Tup e ->
       (* This case corresponds to a [tup1] combinator being called inside a

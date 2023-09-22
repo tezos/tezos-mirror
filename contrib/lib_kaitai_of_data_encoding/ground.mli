@@ -40,38 +40,38 @@ end
 
 (** [Attr] is module for getting [AttrSpec.t] of ground types. *)
 module Attr : sig
-  (** [bool] returns [AttrSpec.t] definition of bool ground type. *)
+  (** [bool] is an [AttrSpec.t] definition of bool ground type. *)
   val bool : AttrSpec.t
 
-  (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
-  val u1 : AttrSpec.t
+  (** [uint8] is an [AttrSpec.t] definition of 8-bit unsigned integer. *)
+  val uint8 : AttrSpec.t
 
-  (** [s1] returns [AttrSpec.t] definition of 8-bit signed integer. *)
-  val s1 : AttrSpec.t
+  (** [int8] is an [AttrSpec.t] definition of 8-bit signed integer. *)
+  val int8 : AttrSpec.t
 
-  (** [u2] returns [AttrSpec.t] definition of 16-bit unsigned integer. *)
-  val u2 : AttrSpec.t
+  (** [uint16] is an [AttrSpec.t] definition of 16-bit unsigned integer. *)
+  val uint16 : AttrSpec.t
 
-  (** [s2] returns [AttrSpec.t] definition of 16-bit signed integer. *)
-  val s2 : AttrSpec.t
+  (** [int16] is an [AttrSpec.t] definition of 16-bit signed integer. *)
+  val int16 : AttrSpec.t
 
-  (** [s4] returns [AttrSpec.t] definition of 32-bit signed integer. *)
-  val s4 : AttrSpec.t
+  (** [int32] is an [AttrSpec.t] definition of 32-bit signed integer. *)
+  val int32 : AttrSpec.t
 
-  (** [s8] returns [AttrSpec.t] definition of 64-bit signed integer. *)
-  val s8 : AttrSpec.t
+  (** [int64] is an [AttrSpec.t] definition of 64-bit signed integer. *)
+  val int64 : AttrSpec.t
 
-  (** [int31] returns [AttrSpec.t] definition of 31-bit signed integer.
+  (** [int31] is an [AttrSpec.t] definition of 31-bit signed integer.
       For more about this type see [Data_encoding.int31]. *)
   val int31 : AttrSpec.t
 
-  (** [f8] returns [AttrSpec.t] definition of 64-bit float. *)
-  val f8 : AttrSpec.t
+  (** [float] is an [AttrSpec.t] definition of 64-bit float. *)
+  val float : AttrSpec.t
 
-  (** [bytes] returns [AttrSpec.t] definition of [Data_encoding.bytes]. *)
+  (** [bytes] is an [AttrSpec.t] definition of [Data_encoding.bytes]. *)
   val bytes : AttrSpec.t
 
-  (** [string] returns [AttrSpec.t] definition of [Data_encoding.string]. *)
+  (** [string] is an [AttrSpec.t] definition of [Data_encoding.string]. *)
   val string : AttrSpec.t
 end
 
