@@ -117,6 +117,7 @@ let write_parameter_file :
     ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
     ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
     ?bootstrap_contracts:bootstrap_contract list ->
+    ?output_file:string ->
     base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
@@ -124,10 +125,10 @@ let write_parameter_file :
      ?(additional_bootstrap_accounts = [])
      ?(bootstrap_smart_rollups = [])
      ?(bootstrap_contracts = [])
+     ?(output_file = Temp.file "parameters.json")
      ~base
      parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
-  let overriden_parameters = Temp.file "parameters.json" in
   let original_parameters =
     let file =
       Either.fold
@@ -256,8 +257,8 @@ let write_parameter_file :
       path
       (Some (`A (existing_accounts @ additional_bootstrap_accounts)))
   in
-  JSON.encode_to_file_u overriden_parameters parameters ;
-  Lwt.return overriden_parameters
+  JSON.encode_to_file_u output_file parameters ;
+  Lwt.return output_file
 
 let next_protocol = function
   | Nairobi -> Some Oxford

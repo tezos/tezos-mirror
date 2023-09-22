@@ -56,7 +56,9 @@ let default_number_of_bakers = 10
 
 let bakers = "BAKERS"
 
-let baker_alias n = Printf.sprintf "baker_%d" n
+let baker_prefix = "baker_"
+
+let baker_alias n = Printf.sprintf "%s%d" baker_prefix n
 
 let number_of_bakers =
   Sys.getenv_opt bakers |> Option.map int_of_string
@@ -78,6 +80,32 @@ let network_name_default = "TEZOS_EXPERIMENT_NET"
 let network_name =
   Sys.getenv_opt "NETWORK" |> Option.value ~default:network_name_default
 
+let output_parameters_filename =
+  Sys.getenv_opt "NETWORK_PARAMETERS_OUTPUT"
+  |> Option.value
+       ~default:Filename.(concat output_dir "network_parameters.json")
+
+let network_parameters_templates_dir =
+  Filename.current_dir_name // "devtools" // "testnet_experiment_tools"
+  // "activation_parameters_templates"
+
+let protocol_alpha_parameters_template =
+  Filename.current_dir_name // "src" // "proto_alpha" // "parameters"
+  // "mainnet_parameters.json"
+
+let network_activation_parameters_templates protocol_hash =
+  match protocol_hash with
+  | Tezt_tezos.Protocol.Nairobi ->
+      Some
+        (Filename.concat
+           network_parameters_templates_dir
+           "proto_017_PtNairob_mainnet.json")
+  | Tezt_tezos.Protocol.Alpha ->
+      (* Fetching the network parameters from the src/proto_alpha directory,
+         to be sure that we are in synch with current protocl parameters. *)
+      Some protocol_alpha_parameters_template
+  | _ -> None
+
 let genesis_prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
 
 let generate_baker_accounts n client =
@@ -90,7 +118,7 @@ let generate_baker_accounts n client =
   in
   let* () = Lwt_io.printf "Generating accounts" in
   let* () = generate_baker_account (n - 1) in
-  Lwt_io.printf "\n\n"
+  Lwt_io.printf "\n"
 
 let rec genesis () =
   let* time = Lwt_process.pread_line (Lwt_process.shell "date -u +%FT%TZ") in
@@ -109,7 +137,7 @@ let save_config (Node_config.{data_dir; _} as configuration) =
   let file = Filename.concat data_dir "config.json" in
   let* () =
     Lwt_io.printf
-      "Configuration for %s will be written in %s\n\n."
+      "Configuration for %s will be written in %s\n."
       network_name
       file
   in
@@ -136,13 +164,13 @@ module Local = struct
     let* () =
       Lwt_io.printf
         "Keys will be saved in %s. You can change this by setting the \
-         OUTPUT_DIR environment variable\n\n"
+         OUTPUT_DIR environment variable\n"
         output_dir
     in
     let* () =
       Lwt_io.printf
         "%d baker accounts will be generated. You can change this by setting \
-         the BAKERS environment variable.\n\n"
+         the BAKERS environment variable.\n"
         number_of_bakers
     in
     let client = Client.create ~base_dir:output_dir () in
@@ -201,6 +229,50 @@ module Local = struct
     let* () = save_config node_configuration in
     Lwt.return_unit
 
+  let generate_network_activation_parameters protocol_hash () =
+    let* () =
+      Lwt_io.printf
+        "All relative paths in commands will use %s as the current working \
+         directory\n"
+        Filename.current_dir_name
+    in
+    let activation_parameters_filename =
+      match network_activation_parameters_templates protocol_hash with
+      | None ->
+          Test.fail "Protocol %s not supported" (Protocol.name protocol_hash)
+      | Some activation_parameters_filename -> activation_parameters_filename
+    in
+    let client = Client.create ~base_dir:output_dir () in
+    let* () = Lwt_io.printf "Fetching client accounts\n" in
+    let* client_accounts_with_pkhs = Client.list_known_addresses client in
+    let baker_accounts =
+      client_accounts_with_pkhs |> List.map fst
+      |> List.filter (String.starts_with ~prefix:baker_prefix)
+    in
+    let* () = Lwt_io.printf "Fetching client accounts from %s\n" output_dir in
+    let bootstrap_amount_mutez = Some 4_000_000_000_000 in
+    let* bootstrap_accounts =
+      baker_accounts
+      |> Lwt_list.map_s (fun alias ->
+             let* () = Lwt_io.printf "." in
+             let* account_key = Client.show_address ~alias client in
+             return (account_key, bootstrap_amount_mutez))
+    in
+    let* () = Lwt_io.printf "\n" in
+    let* () =
+      Lwt_io.printf
+        "Retrieving activation parameters template from %s\n"
+        activation_parameters_filename
+    in
+    let* _filename =
+      Tezt_tezos.Protocol.write_parameter_file
+        ~bootstrap_accounts
+        ~base:(Either.Left activation_parameters_filename)
+        ~output_file:output_parameters_filename
+        []
+    in
+    Lwt.return_unit
+
   let generate_manager_operations () = Test.fail "Not implemented"
 end
 
@@ -227,6 +299,11 @@ let () =
     ~title:"Generate Network Configuration"
     ~tags:["generate_network_configuration"]
     (Local.generate_network_configuration network_name output_dir) ;
+  register
+    ~__FILE__
+    ~title:"Generate Network Activation Parameters"
+    ~tags:["generate_activation_parameters"]
+    (Local.generate_network_activation_parameters Protocol.Nairobi) ;
   register
     ~__FILE__
     ~title:"Generate manager operations"
