@@ -17,7 +17,8 @@ function inbox_name(inbox_dir, benchmark_script) {
 function build_benchmark_scenario(inbox, benchmark_script) {
     try {
         let inbox_filename = inbox_name(inbox, benchmark_script)
-        execSync(`node ${benchmark_script} > ${inbox_filename}`);
+        execSync(`node ${benchmark_script} > ${inbox_filename}`,
+            { env: { ...process.env } })
         return inbox_filename
     } catch (error) {
         console.error(`Error running script ${benchmark_script}. Please fixed the error in the script before running this benchmark script`)
