@@ -185,7 +185,7 @@ let%expect_test "test bool translation" =
       enum: bool
   |}]
 
-let%expect_test "test fixed size bytes translation" =
+let%expect_test "test dynamic size bytes translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
       ~encoding_name:"ground_bytes"
@@ -206,10 +206,9 @@ let%expect_test "test fixed size bytes translation" =
           size: size
     seq:
     - id: ground_bytes
-      type: fixed_bytes
-  |}]
+      type: fixed_bytes |}]
 
-let%expect_test "test fixed size string translation" =
+let%expect_test "test dynamic size string translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
       ~encoding_name:"ground_string"
@@ -230,8 +229,7 @@ let%expect_test "test fixed size string translation" =
           size: size
     seq:
     - id: ground_string
-      type: fixed_bytes
-  |}]
+      type: fixed_bytes |}]
 
 let%expect_test "test big numbers translation" =
   let s =

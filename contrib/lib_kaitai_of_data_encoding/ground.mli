@@ -84,6 +84,22 @@ module Attr : sig
 
   (** [string ~id] is an [AttrSpec.t] definition of [Data_encoding.string]. *)
   val string : id:string -> AttrSpec.t
+
+  (** [bytes_fixed] is an [AttrSpec.t] definition of [Data_encoding.bytes] of
+      fixed length. *)
+  val bytes_fixed : id:string -> int -> AttrSpec.t
+
+  (** [string_fixed] is an [AttrSpec.t] definition of [Data_encoding.string] of
+      fixed length. *)
+  val string_fixed : id:string -> int -> AttrSpec.t
+
+  (** [bytes_eos] is an [AttrSpec.t] definition of [Data_encoding.bytes] of
+      variable length. *)
+  val bytes_eos : id:string -> AttrSpec.t
+
+  (** [string_eos] is an [AttrSpec.t] definition of [Data_encoding.string] of
+      variable length. *)
+  val string_eos : id:string -> AttrSpec.t
 end
 
 (** [Class] module consists of [ClassSpec.t] for ground types. *)

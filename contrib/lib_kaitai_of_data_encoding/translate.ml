@@ -81,6 +81,10 @@ let rec seq_field_of_data_encoding :
   | Int64 -> (enums, [Ground.Attr.int64 ~id])
   | Int31 -> (enums, [Ground.Attr.int31 ~id])
   | Float -> (enums, [Ground.Attr.float ~id])
+  | Bytes (`Fixed n, _) -> (enums, [Ground.Attr.bytes_fixed ~id n])
+  | Bytes (`Variable, _) -> (enums, [Ground.Attr.bytes_eos ~id])
+  | String (`Fixed n, _) -> (enums, [Ground.Attr.string_fixed ~id n])
+  | String (`Variable, _) -> (enums, [Ground.Attr.string_eos ~id])
   | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding id tid_gen
   | Tup e ->
       (* This case corresponds to a [tup1] combinator being called inside a

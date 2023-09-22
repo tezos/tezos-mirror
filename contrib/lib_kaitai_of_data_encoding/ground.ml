@@ -146,7 +146,30 @@ module Attr = struct
         DataType.(ComplexDataType (UserType fixed_size_header_class_spec));
     }
 
+  let bytes_eos ~id =
+    {
+      Helpers.default_attr_spec with
+      id;
+      dataType =
+        DataType.(
+          BytesType
+            (BytesEosType
+               {
+                 terminator = None;
+                 include_ = false;
+                 padRight = None;
+                 process = None;
+               }));
+    }
+
+  let bytes_fixed ~id n =
+    {Helpers.default_attr_spec with id; size = Some (Ast.IntNum n)}
+
   let string ~id = bytes ~id
+
+  let string_fixed ~id n = bytes_fixed ~id n
+
+  let string_eos ~id = bytes_eos ~id
 end
 
 module Class = struct
