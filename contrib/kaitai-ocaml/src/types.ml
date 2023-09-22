@@ -353,8 +353,9 @@ end = struct
               |> Option.value ~default:"")
         | _ -> failwith "not supported")
     | NumericType (Float_type (FloatMultiType {width = _; endian = _})) -> "f8"
-    | BytesType (BytesLimitType _) -> "fixed size (uint30) bytes"
-    | ComplexDataType (UserType class_spec) -> Option.get class_spec.meta.id
+    | BytesType (BytesLimitType _) -> "fixed size bytes"
+    | BytesType (BytesEosType _) -> "variable size bytes"
+    | ComplexDataType (UserType {meta = {id = Some id; _}; _}) -> id
     | _ -> failwith "not supported"
 end
 
