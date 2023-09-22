@@ -307,7 +307,9 @@ let commands =
       ~desc:
         "Run a simulation scenario on a yes-node with the given operation file \
          by injecting operations in the node's mempool. This tool will try to \
-         target 2500 manager operations present in the mempool at all time."
+         target 2500 manager operations present in the mempool at all time. \
+         Terminates whenever there are not enough operations to reach the \
+         threshold target."
       (args1 op_per_mempool_arg)
       (prefixes ["run"; "simulation"] @@ operations_file_param @@ stop)
       (fun op_per_mempool operations_file_path (cctxt : Client_context.full) ->

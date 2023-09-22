@@ -572,7 +572,7 @@ let choose_and_inject_operations cctxt state prohibited_managers n =
      discarded@."
     nb_injected
     nb_erroneous ;
-  return new_state
+  return (nb_injected, new_state)
 
 let start_injector cctxt ~op_per_mempool ~operations_file_path =
   let* state = init ~operations_file_path in
@@ -657,7 +657,7 @@ let start_injector cctxt ~op_per_mempool ~operations_file_path =
         Format.printf
           "Injecting %d new manager operations...@."
           nb_missing_operations ;
-        let* state =
+        let* nb_injected, state =
           choose_and_inject_operations
             cctxt
             state
@@ -665,7 +665,14 @@ let start_injector cctxt ~op_per_mempool ~operations_file_path =
             nb_missing_operations
         in
         Format.printf "Current state: %a@." pp_state state ;
-        loop state header.shell.level
+        (* Stop when there are not enough operations anymore to fill the mempool *)
+        if nb_injected < nb_missing_operations then (
+          Format.printf
+            "Not enough operations left to fill the mempool up to %d. \
+             Terminating.@."
+            op_per_mempool ;
+          return_unit)
+        else loop state header.shell.level
   in
   loop state current_level
 
