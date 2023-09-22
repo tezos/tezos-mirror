@@ -23,6 +23,7 @@ let default_attr_spec =
       valid = None;
       doc = default_doc_spec;
       enum = None;
+      size = None;
     }
 
 let default_meta_spec ~encoding_name =

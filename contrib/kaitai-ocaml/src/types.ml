@@ -371,6 +371,7 @@ and AttrSpec : sig
     valid : ValidationSpec.t option;
     enum : string option;
     doc : DocSpec.t;
+    size : Ast.expr option;
   }
 end = struct
   module ConditionalSpec = struct
@@ -385,6 +386,7 @@ end = struct
     valid : ValidationSpec.t option;
     enum : string option;
     doc : DocSpec.t;
+    size : Ast.expr option;
   }
 end
 

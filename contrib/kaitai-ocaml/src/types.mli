@@ -274,6 +274,7 @@ and AttrSpec : sig
     valid : ValidationSpec.t option;
     enum : string option;
     doc : DocSpec.t;
+    size : Ast.expr option;
   }
 end
 

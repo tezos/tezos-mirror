@@ -104,6 +104,11 @@ let repeat_spec =
 let enum_spec attr =
   map_list_of_option (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
 
+let size_spec attr =
+  map_list_of_option
+    (fun e -> ("size", scalar (Ast.to_string e)))
+    attr.AttrSpec.size
+
 let attr_spec attr =
   (* TODO: pp doc spec as well. *)
   match attr.AttrSpec.dataType with
@@ -122,6 +127,7 @@ let attr_spec attr =
           [
             [("id", scalar attr.AttrSpec.id)];
             attr_type_if_not_any attr;
+            size_spec attr;
             repeat_spec attr.cond.repeat;
             enum_spec attr;
           ];
