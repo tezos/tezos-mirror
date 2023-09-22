@@ -120,6 +120,35 @@ let rec seq_field_of_data_encoding :
       in
       let seq = left @ right in
       (enums, types, seq)
+  | Describe {encoding; id; description; title} ->
+      let id = escape_id id in
+      let description =
+        match (title, description) with
+        | None, None -> None
+        | None, (Some _ as s) | (Some _ as s), None -> s
+        | Some t, Some d -> Some (t ^ ": " ^ d)
+      in
+      let enums, types, attrs =
+        seq_field_of_data_encoding enums types encoding id tid_gen
+      in
+      let attr =
+        {
+          Helpers.default_attr_spec with
+          id;
+          dataType =
+            DataType.(
+              ComplexDataType
+                (UserType
+                   (Helpers.class_spec_of_attrs
+                      ~encoding_name:id
+                      ?description
+                      ~enums:[]
+                      ~types:[]
+                      ~instances:[]
+                      attrs)));
+        }
+      in
+      (enums, types, [attr])
   | _ -> failwith "Not implemented"
 
 let rec from_data_encoding :

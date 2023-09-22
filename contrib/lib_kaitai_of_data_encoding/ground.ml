@@ -104,12 +104,12 @@ module Type = struct
 
   let n =
     let class_spec =
-      Helpers.class_spec_of_attr
+      Helpers.class_spec_of_attrs
         ~encoding_name:"n"
         ~enums:[]
         ~types:[("n_group", n_group)]
         ~instances:[]
-        n_attr
+        [n_attr]
     in
     ("n", class_spec)
 
@@ -142,12 +142,12 @@ module Type = struct
                   }) );
         ]
       in
-      Helpers.class_spec_of_attr
+      Helpers.class_spec_of_attrs
         ~encoding_name:"z"
         ~enums:[]
         ~types:[("n_group", n_group)]
         ~instances
-        n_attr
+        [n_attr]
     in
     ("z", class_spec)
 end
@@ -297,75 +297,75 @@ end
 
 module Class = struct
   let bool ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
       ~enums:[Enum.bool]
-      (Attr.bool ~id:encoding_name)
+      [Attr.bool ~id:encoding_name]
 
   let uint8 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.uint8 ~id:encoding_name)
+      [Attr.uint8 ~id:encoding_name]
 
   let int8 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.int8 ~id:encoding_name)
+      [Attr.int8 ~id:encoding_name]
 
   let uint16 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.uint16 ~id:encoding_name)
+      [Attr.uint16 ~id:encoding_name]
 
   let int16 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.int16 ~id:encoding_name)
+      [Attr.int16 ~id:encoding_name]
 
   let int32 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.int32 ~id:encoding_name)
+      [Attr.int32 ~id:encoding_name]
 
   let int64 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.int64 ~id:encoding_name)
+      [Attr.int64 ~id:encoding_name]
 
   let int31 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.int31 ~id:encoding_name)
+      [Attr.int31 ~id:encoding_name]
 
   let float ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.float ~id:encoding_name)
+      [Attr.float ~id:encoding_name]
 
   let bytes ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.bytes ~id:encoding_name)
+      [Attr.bytes ~id:encoding_name]
 
   let string ~encoding_name ?description () =
-    Helpers.class_spec_of_attr
+    Helpers.class_spec_of_attrs
       ~encoding_name
       ?description
-      (Attr.string ~id:encoding_name)
+      [Attr.string ~id:encoding_name]
 
   let n ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description (Attr.n ~id:"n")
+    Helpers.class_spec_of_attrs ~encoding_name ?description [Attr.n ~id:"n"]
 
   let z ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description (Attr.n ~id:"z")
+    Helpers.class_spec_of_attrs ~encoding_name ?description [Attr.n ~id:"z"]
 end
