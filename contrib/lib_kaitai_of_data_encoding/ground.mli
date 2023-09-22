@@ -26,14 +26,15 @@
 
 open Kaitai.Types
 
-(** [Enum] module defines enum definitions needed for describing data-encoding
-    ground types. *)
+(** Enum definitions needed for describing data-encoding ground types. *)
 module Enum : sig
-  (** [map] describes mapping of enum id (string) with the corresponding
-      [EnumSpec.t]. *)
-  type map = (string * EnumSpec.t) list
+  (** An [Enum.assoc] is an association list of enum id ([string]) with the
+      corresponding [EnumSpec.t].
 
-  (** [bool] is a mapping for boolean type. *)
+      See [Helpers.add_uniq_assoc] for handling helper. *)
+  type assoc = (string * EnumSpec.t) list
+
+  (** [bool] is an association for boolean type. *)
   val bool : string * EnumSpec.t
 end
 

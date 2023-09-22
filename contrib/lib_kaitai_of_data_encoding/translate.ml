@@ -27,15 +27,14 @@
 open Kaitai.Types
 
 (* We need to access the definition of data-encoding's [descr] type. For this
-   reason we open the private/internal module [Data_encoding__Encoding] (rather
+   reason we alias the private/internal module [Data_encoding__Encoding] (rather
    than the public module [Data_encoding.Encoding]. *)
-open Data_encoding__Encoding
+module DataEncoding = Data_encoding__Encoding
 
 let rec seq_field_of_data_encoding :
     type a.
-    (string * EnumSpec.t) list ->
-    a Data_encoding.t ->
-    (string * EnumSpec.t) list * AttrSpec.t list =
+    Ground.Enum.assoc -> a DataEncoding.t -> Ground.Enum.assoc * AttrSpec.t list
+    =
  fun enums {encoding; json_encoding = _} ->
   match encoding with
   | Null -> (enums, [])
@@ -66,7 +65,7 @@ let rec from_data_encoding :
     type a.
     encoding_name:string ->
     ?description:string ->
-    a Data_encoding.t ->
+    a DataEncoding.t ->
     ClassSpec.t =
  fun ~encoding_name ?description {encoding; json_encoding = _} ->
   match encoding with
