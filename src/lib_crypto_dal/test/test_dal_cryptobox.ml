@@ -993,31 +993,32 @@ let () =
       ("Unit tests", test);
       ( "PBT",
         Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
-          [
-            Test.test_erasure_code;
-            Test.test_erasure_code_with_slot_conversion;
-            Test.test_erasure_code_failure_out_of_range;
-            Test.test_erasure_code_failure_not_enough_shards;
-            Test.test_erasure_code_failure_invalid_shard_length;
-            Test.test_page_proofs;
-            Test.test_page_proofs_invalid;
-            Test.test_shard_proofs;
-            Test.test_shard_proof_invalid;
-            Test.test_commitment_proof;
-            Test.test_commitment_proof_invalid;
-            Test.test_polynomial_slot_conversions;
-            Test.test_select_fft_domain;
-            Test.test_shard_proofs_load_from_file;
-            Test.test_shard_proofs_load_from_file_invalid_hash;
-            Test.test_dal_initialisation_twice_failure;
-            Test.test_wrong_slot_size;
-            Test.test_page_length_mismatch;
-            Test.test_shard_length_mismatch;
-            Test.test_prove_page_out_of_bounds;
-            Test.test_verify_page_out_of_bounds;
-            Test.test_verify_shard_out_of_bounds;
-            Test.test_commit;
-            Test.test_commit_failure;
-            Test.test_encoded_share_size;
-          ] );
+          Test.
+            [
+              test_erasure_code;
+              test_erasure_code_with_slot_conversion;
+              test_erasure_code_failure_out_of_range;
+              test_erasure_code_failure_not_enough_shards;
+              test_erasure_code_failure_invalid_shard_length;
+              test_page_proofs;
+              test_page_proofs_invalid;
+              test_shard_proofs;
+              test_shard_proof_invalid;
+              test_commitment_proof;
+              test_commitment_proof_invalid;
+              test_polynomial_slot_conversions;
+              test_select_fft_domain;
+              test_shard_proofs_load_from_file;
+              test_shard_proofs_load_from_file_invalid_hash;
+              test_dal_initialisation_twice_failure;
+              test_wrong_slot_size;
+              test_page_length_mismatch;
+              test_shard_length_mismatch;
+              test_prove_page_out_of_bounds;
+              test_verify_page_out_of_bounds;
+              test_verify_shard_out_of_bounds;
+              test_commit;
+              test_commit_failure;
+              test_encoded_share_size;
+            ] );
     ]
