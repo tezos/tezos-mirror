@@ -11,20 +11,24 @@
      ./_build/default/devtools/testnet_experiment_tools/extract_data.exe \
      extract profiling info for block hash \
      --profiling-reports-directory <profiling_reports_directory> \
-     --searched-block <searched_block>
+     --searched-blocks <searched_block>
    Requirements:
      <profiling-reports-directory>  - directory where the profiling reports are stored
-     <searched-block>               - the searched block hash
+     <searched-block>               - the searched block hashes
    Description:
      This file contains the script to extract all the results
      of profiling reports related to the given block hash.
      It produces one file per profiling report, for example,
-     for the block BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw
+     for the blocks BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw and BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY
      the following reports will be generated:
         - chain_validator_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+        - chain_validator_profiling_BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY.txt
         - p2p_reader_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+        - p2p_reader_profiling_BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY.txt
         - requester_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+        - requester_profiling_BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY.txt
         - rpc_server_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+        - rpc_server_profiling_BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY.txt
      all these files are generated inside the folder where
      the profiler reports are stored.
 *)
@@ -32,7 +36,6 @@
 open Tezos_clic
 
 let profiling_reports_directory_arg =
-  let open Lwt_result_syntax in
   default_arg
     ~doc:"Profiling reports directory"
     ~short:'D'
@@ -41,17 +44,22 @@ let profiling_reports_directory_arg =
     ~default:"./baker"
     ( parameter @@ fun _ data_dir ->
       if Sys.file_exists data_dir && Sys.is_directory data_dir then
-        return data_dir
+        Lwt_result_syntax.return data_dir
       else failwith "%s does not exists or is not a directory" data_dir )
 
-let searched_block_arg =
-  let open Lwt_result_syntax in
+let searched_blocks_arg =
   arg
-    ~doc:"Block from which one we want the profiling results"
+    ~doc:
+      "Blocks list from which ones we want the profiling results. Argument \
+       must be block hashes list separetaed by white space and surrounded by \
+       \", example:  \"BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw and \
+       BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY\""
     ~short:'B'
-    ~long:"searched-block"
-    ~placeholder:"searched-block-path"
-    (parameter @@ fun _ searched_block -> return searched_block)
+    ~long:"searched-blocks"
+    ~placeholder:"searched-blocks-path"
+    ( parameter @@ fun _ searched_blocks ->
+      let searched_blocks = String.split_on_char ' ' searched_blocks in
+      Lwt_result_syntax.return searched_blocks )
 
 let split_lines_starting_with_b input_str =
   let regexp = Str.regexp "\nB" in
@@ -125,7 +133,6 @@ let find_and_process_profiling_file dir search_block =
     profiling_files
 
 let commands () =
-  let open Lwt_result_syntax in
   [
     command
       ~group:
@@ -135,20 +142,21 @@ let commands () =
             "Command for extracting profiling reports of specified block hash";
         }
       ~desc:"Extract block profiling info."
-      (args2 profiling_reports_directory_arg searched_block_arg)
+      (args2 profiling_reports_directory_arg searched_blocks_arg)
       (fixed ["extract"; "profiling"; "info"; "for"; "block"; "hash"])
-      (fun (profiling_reports_directory, search_block) _cctxt ->
-        match search_block with
-        | Some search_block ->
-            return
-            @@ find_and_process_profiling_file
-                 profiling_reports_directory
-                 search_block
-        | None -> failwith "No block hash specified, it is mandatory.");
+      (fun (profiling_reports_directory, search_blocks) _cctxt ->
+        match search_blocks with
+        | Some search_blocks ->
+            Lwt_result_syntax.return
+            @@ List.iter
+                 (fun search_block ->
+                   find_and_process_profiling_file
+                     profiling_reports_directory
+                     search_block)
+                 search_blocks
+        | _ -> failwith "No block hash specified, it is mandatory.");
   ]
 
-let select_commands _ _ =
-  let open Lwt_result_syntax in
-  return (commands ())
+let select_commands _ _ = Lwt_result_syntax.return (commands ())
 
 let () = Client_main_run.run (module Client_config) ~select_commands
