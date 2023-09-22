@@ -74,6 +74,13 @@ let rec seq_field_of_data_encoding :
   | Bool ->
       (Helpers.add_uniq_assoc enums Ground.Enum.bool, [Ground.Attr.bool ~id])
   | Uint8 -> (enums, [Ground.Attr.uint8 ~id])
+  | Int8 -> (enums, [Ground.Attr.int8 ~id])
+  | Uint16 -> (enums, [Ground.Attr.uint16 ~id])
+  | Int16 -> (enums, [Ground.Attr.int16 ~id])
+  | Int32 -> (enums, [Ground.Attr.int32 ~id])
+  | Int64 -> (enums, [Ground.Attr.int64 ~id])
+  | Int31 -> (enums, [Ground.Attr.int31 ~id])
+  | Float -> (enums, [Ground.Attr.float ~id])
   | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding id tid_gen
   | Tup e ->
       (* This case corresponds to a [tup1] combinator being called inside a
