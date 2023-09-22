@@ -60,39 +60,48 @@ module DataEncoding = Data_encoding__Encoding
 let rec seq_field_of_data_encoding :
     type a.
     Ground.Enum.assoc ->
+    Ground.Type.assoc ->
     a DataEncoding.t ->
     string ->
     Helpers.tid_gen option ->
-    Ground.Enum.assoc * AttrSpec.t list =
- fun enums {encoding; _} id tid_gen ->
+    Ground.Enum.assoc * Ground.Type.assoc * AttrSpec.t list =
+ fun enums types {encoding; _} id tid_gen ->
   let id = escape_id id in
   match encoding with
-  | Null -> (enums, [])
-  | Empty -> (enums, [])
-  | Ignore -> (enums, [])
-  | Constant _ -> (enums, [])
+  | Null -> (enums, types, [])
+  | Empty -> (enums, types, [])
+  | Ignore -> (enums, types, [])
+  | Constant _ -> (enums, types, [])
   | Bool ->
-      (Helpers.add_uniq_assoc enums Ground.Enum.bool, [Ground.Attr.bool ~id])
-  | Uint8 -> (enums, [Ground.Attr.uint8 ~id])
-  | Int8 -> (enums, [Ground.Attr.int8 ~id])
-  | Uint16 -> (enums, [Ground.Attr.uint16 ~id])
-  | Int16 -> (enums, [Ground.Attr.int16 ~id])
-  | Int32 -> (enums, [Ground.Attr.int32 ~id])
-  | Int64 -> (enums, [Ground.Attr.int64 ~id])
-  | Int31 -> (enums, [Ground.Attr.int31 ~id])
-  | Float -> (enums, [Ground.Attr.float ~id])
-  | Bytes (`Fixed n, _) -> (enums, [Ground.Attr.bytes_fixed ~id n])
-  | Bytes (`Variable, _) -> (enums, [Ground.Attr.bytes_eos ~id])
-  | String (`Fixed n, _) -> (enums, [Ground.Attr.string_fixed ~id n])
-  | String (`Variable, _) -> (enums, [Ground.Attr.string_eos ~id])
-  | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding id tid_gen
+      let enums = Helpers.add_uniq_assoc enums Ground.Enum.bool in
+      (enums, types, [Ground.Attr.bool ~id])
+  | Uint8 -> (enums, types, [Ground.Attr.uint8 ~id])
+  | Int8 -> (enums, types, [Ground.Attr.int8 ~id])
+  | Uint16 -> (enums, types, [Ground.Attr.uint16 ~id])
+  | Int16 -> (enums, types, [Ground.Attr.int16 ~id])
+  | Int32 -> (enums, types, [Ground.Attr.int32 ~id])
+  | Int64 -> (enums, types, [Ground.Attr.int64 ~id])
+  | Int31 -> (enums, types, [Ground.Attr.int31 ~id])
+  | Float -> (enums, types, [Ground.Attr.float ~id])
+  | Bytes (`Fixed n, _) -> (enums, types, [Ground.Attr.bytes_fixed ~id n])
+  | Bytes (`Variable, _) -> (enums, types, [Ground.Attr.bytes_eos ~id])
+  | String (`Fixed n, _) -> (enums, types, [Ground.Attr.string_fixed ~id n])
+  | String (`Variable, _) -> (enums, types, [Ground.Attr.string_eos ~id])
+  | N ->
+      let types = Helpers.add_uniq_assoc types Ground.Type.n in
+      (enums, types, [Ground.Attr.n ~id])
+  | Z ->
+      let types = Helpers.add_uniq_assoc types Ground.Type.n in
+      (enums, types, [Ground.Attr.z ~id])
+  | Conv {encoding; _} ->
+      seq_field_of_data_encoding enums types encoding id tid_gen
   | Tup e ->
       (* This case corresponds to a [tup1] combinator being called inside a
          [tup*] combinator. It's probably never used, but it's still a valid use
          of data-encoding. Note that we erase the information that there is an
          extraneous [tup1] in the encoding. *)
       let id = match tid_gen with None -> id | Some tid_gen -> tid_gen () in
-      seq_field_of_data_encoding enums e id tid_gen
+      seq_field_of_data_encoding enums types e id tid_gen
   | Tups {kind = _; left; right} ->
       (* This case corresponds to a [tup*] combinator being called inside a
          [tup*] combinator. It's probably never used, but it's still a valid use
@@ -103,10 +112,14 @@ let rec seq_field_of_data_encoding :
         | None -> Some (Helpers.mk_tid_gen id)
         | Some _ as tid_gen -> tid_gen
       in
-      let enums, left = seq_field_of_data_encoding enums left id tid_gen in
-      let enums, right = seq_field_of_data_encoding enums right id tid_gen in
+      let enums, types, left =
+        seq_field_of_data_encoding enums types left id tid_gen
+      in
+      let enums, types, right =
+        seq_field_of_data_encoding enums types right id tid_gen
+      in
       let seq = left @ right in
-      (enums, seq)
+      (enums, types, seq)
   | _ -> failwith "Not implemented"
 
 let rec from_data_encoding :
@@ -137,14 +150,14 @@ let rec from_data_encoding :
       from_data_encoding ~encoding_name e
   | Tups {kind = _; left; right} ->
       let tid_gen = Some (Helpers.mk_tid_gen encoding_name) in
-      let enums, left =
-        seq_field_of_data_encoding [] left encoding_name tid_gen
+      let enums, types, left =
+        seq_field_of_data_encoding [] [] left encoding_name tid_gen
       in
-      let enums, right =
-        seq_field_of_data_encoding enums right encoding_name tid_gen
+      let enums, types, right =
+        seq_field_of_data_encoding enums types right encoding_name tid_gen
       in
       let seq = left @ right in
-      {(Helpers.default_class_spec ~encoding_name ()) with seq; enums}
+      {(Helpers.default_class_spec ~encoding_name ()) with seq; enums; types}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
   | Describe {encoding; description; _} ->
       from_data_encoding ~encoding_name ?description encoding

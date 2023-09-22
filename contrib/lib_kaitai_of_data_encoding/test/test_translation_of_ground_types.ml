@@ -244,20 +244,28 @@ let%expect_test "test big numbers translation" =
       id: ground_n
       endian: be
     types:
-      group:
-        instances:
-          has_next:
-            value: ((b & 128) != 0)
-          value:
-            value: (b & 127)
+      n:
+        meta:
+          id: n
+          endian: be
+        types:
+          n_group:
+            instances:
+              has_next:
+                value: ((b & 128) != 0)
+              value:
+                value: (b & 127)
+            seq:
+            - id: b
+              type: u1
         seq:
-        - id: b
-          type: u1
+        - id: n
+          type: n_group
+          repeat: until
+          repeat-until: not (_.has_next)
     seq:
-    - id: groups
-      type: group
-      repeat: until
-      repeat-until: not (_.has_next)
+    - id: n
+      type: n
   |}]
 
 let%expect_test "test big numbers translation" =
@@ -273,21 +281,26 @@ let%expect_test "test big numbers translation" =
       id: ground_z
       endian: be
     types:
-      group:
-        instances:
-          has_next:
-            value: ((b & 128) != 0)
-          value:
-            value: (b & 127)
+      n:
+        meta:
+          id: n
+          endian: be
+        types:
+          n_group:
+            instances:
+              has_next:
+                value: ((b & 128) != 0)
+              value:
+                value: (b & 127)
+            seq:
+            - id: b
+              type: u1
         seq:
-        - id: b
-          type: u1
-    instances:
-      is_negative:
-        value: (((groups[0].value) >> 6) == 1)
+        - id: n
+          type: n_group
+          repeat: until
+          repeat-until: not (_.has_next)
     seq:
-    - id: groups
-      type: group
-      repeat: until
-      repeat-until: not (_.has_next)
+    - id: z
+      type: n
   |}]
