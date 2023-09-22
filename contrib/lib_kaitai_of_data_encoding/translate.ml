@@ -120,6 +120,37 @@ let rec seq_field_of_data_encoding :
       in
       let seq = left @ right in
       (enums, types, seq)
+  | Dynamic_size {kind; encoding} ->
+      (* TODO: special case for [encoding=Bytes] and [encoding=String] *)
+      let len_id = "len_" ^ id in
+      let enums, types, attrs =
+        seq_field_of_data_encoding enums types encoding id tid_gen
+      in
+      let attr =
+        {
+          Helpers.default_attr_spec with
+          id;
+          dataType =
+            DataType.(
+              ComplexDataType
+                (UserType
+                   (Helpers.class_spec_of_attrs
+                      ~encoding_name:id
+                      ~enums:[]
+                      ~types:[]
+                      ~instances:[]
+                      attrs)));
+          size = Some (Ast.Name len_id);
+        }
+      in
+      let len_attr =
+        match kind with
+        | `N -> failwith "Not implemented"
+        | `Uint30 -> Ground.Attr.uint30 ~id:len_id
+        | `Uint16 -> Ground.Attr.uint16 ~id:len_id
+        | `Uint8 -> Ground.Attr.uint8 ~id:len_id
+      in
+      (enums, types, [len_attr; attr])
   | Describe {encoding; id; description; title} ->
       let id = escape_id id in
       let description =

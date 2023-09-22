@@ -214,6 +214,12 @@ module Attr = struct
              range. *)
     int_multi_type_atrr_spec ~id ~signed:true DataType.W4
 
+  let uint30 ~id =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6261
+             There should be a validation that [Uint30] is in the appropriate
+             range. *)
+    int_multi_type_atrr_spec ~id ~signed:true DataType.W4
+
   let float ~id = float_multi_type_attr_spec ~id
 
   let bytes_limit_type_attr_spec ~id =

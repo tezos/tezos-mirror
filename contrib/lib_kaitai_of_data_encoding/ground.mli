@@ -88,6 +88,10 @@ module Attr : sig
       For more about this type see [Data_encoding.int31]. *)
   val int31 : id:string -> AttrSpec.t
 
+  (** [uint30 ~id] is an [AttrSpec.t] definition of 30-bit unsigned integer.
+      For more about this type see [Data_encoding.int31]. *)
+  val uint30 : id:string -> AttrSpec.t
+
   (** [float ~id] is an [AttrSpec.t] definition of 64-bit float. *)
   val float : id:string -> AttrSpec.t
 
