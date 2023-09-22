@@ -128,6 +128,9 @@ trigger:
   timeout: "10m"
   script:
     - echo 'Trigger pipeline 🤠'
+    # Check that the Alpine version of the trigger job's image
+    # corresponds to the value in scripts/version.sh.
+    - ./scripts/ci/check_alpine_version.sh
 
 include:
   # /!\ These rules should be be mutually exclusive and kept in sync

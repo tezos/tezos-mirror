@@ -18,6 +18,12 @@ export opam_version=2
 export recommended_rust_version=1.64.0
 export recommended_node_version=16.18.1
 
+# The Alpine minor version used to build the opam-repository images
+# and used to run the `trigger` job in the CI. This value SHOULD
+# correspond to the Alpine minor version given by the `trigger` job's
+# `image:`.
+export alpine_version='3.17'
+
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
 export full_opam_repository_tag=d091786ce64a52275ae4925b8eaca10460edebc4
