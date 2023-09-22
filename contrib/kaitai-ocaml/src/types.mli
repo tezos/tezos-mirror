@@ -15,7 +15,7 @@ module Identifier : sig
 end
 
 (** [Ast] module defines Kaitai Struct expression language.
-   
+
     - For more about it see {{:https://doc.kaitai.io/user_guide.html#_expression_language} the Kaitai Struct User Guide}.
     - For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/exprlang/Ast.scala} see}.*)
 module Ast : sig
@@ -61,7 +61,7 @@ module Ast : sig
     | IntNum of int
         (** [IntNum] is originally represented by {@scala[scala.math.BigInt]}. *)
     | FloatNum of float
-        (** [FloatNum] is originally represented by  {@scala[scala.math.BigDecimal]}. *)
+        (** [FloatNum] is originally represented by {@scala[scala.math.BigDecimal]}. *)
     | Str of string  (** [Str] is a string expression. *)
     | Bool of bool  (** [Bool] is a bool expression. *)
     | EnumByLabel of {
@@ -76,9 +76,9 @@ module Ast : sig
     | CastToType of {value : t; typeName : typeId}
         (** [CastToType] is used for casting types. *)
     | ByteSizeOfType of {typeName : typeId}
-        (** [BytesSizeOfType] expression for specifying type size in bytes.   *)
+        (** [BytesSizeOfType] expression for specifying type size in bytes. *)
     | BitSizeOfType of {typeName : typeId}
-        (** [BitSizeOfType] expression for specifying type size in bits.   *)
+        (** [BitSizeOfType] expression for specifying type size in bits. *)
     | Subscript of {value : t; idx : t}  (** Represents [[X[Y]]]. *)
     | Name of Identifier.t
         (** [Name] is used for defining variable, e.g. [x]. *)
@@ -314,7 +314,7 @@ and ClassSpec : sig
     fileName : string option;
     path : string list;
     isTopLevel : bool;
-        (** if [isTopLevel  class_spec] is true, we have a corresponding meta section. *)
+        (** if [isTopLevel class_spec] is true, we have a corresponding meta section. *)
     meta : MetaSpec.t;
     doc : DocSpec.t;
     toStringExpr : Ast.expr option;
