@@ -16,7 +16,7 @@ let cost_hash_cell size =
   S.safe_int 250 + (v0 * S.safe_int 57)
 
 (* model skip_list/next *)
-(* fun size -> (19.2125537461 * (log2 (1 + size))) *)
+(* fun size -> 19.2125537461 * (log2 (1 + size)) *)
 let cost_next size =
   let v0 = log2 (S.safe_int 1 + size) in
   (v0 lsr 1) + (v0 * S.safe_int 19)

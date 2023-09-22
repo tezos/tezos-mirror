@@ -10,7 +10,7 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model storage/List_key_values *)
-(* fun size -> (470. + (117. * size)) *)
+(* fun size -> 470. + (117. * size) *)
 let cost_List_key_values size =
   let size = S.safe_int size in
   let v0 = size in
