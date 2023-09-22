@@ -7425,6 +7425,32 @@ let _simulation_scenario =
     ~bisect_ppx:No
     ~linkall:true
 
+let _extract_data =
+  private_exe
+    "extract_data"
+    ~path:("devtools" // "testnet_experiment_tools")
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~synopsis:"A script to extract data from profiling."
+    ~opam:""
+    ~deps:
+      [
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_store |> open_;
+        octez_clic;
+        octez_store_unix_snapshots |> open_;
+        octez_store_shared |> open_;
+        octez_node_config |> open_;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
+        simulation_scenario_lib |> open_;
+      ]
+    ~modules:["extract_data"]
+    ~bisect_ppx:No
+    ~linkall:true
+
 let _safety_checker =
   private_exe
     "safety_checker"
