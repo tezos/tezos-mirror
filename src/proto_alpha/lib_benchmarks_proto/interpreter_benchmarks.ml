@@ -55,6 +55,8 @@ type ex_value =
 
 type benchmark_type = Registration_helpers.benchmark_type = Time | Alloc
 
+let gas_unit_per_allocation_word = 4
+
 (* ------------------------------------------------------------------------- *)
 
 let sf = Printf.sprintf
@@ -317,7 +319,7 @@ let alloc_benchmark_from_kinstr_and_stack :
           Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
         in
 
-        float_of_int (size_after - size_before))
+        float_of_int ((size_after - size_before) * gas_unit_per_allocation_word))
       result
   in
 
@@ -793,7 +795,7 @@ let alloc_benchmark_from_continuation :
           Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef, cont))
         in
 
-        float_of_int (size_after - size_before))
+        float_of_int ((size_after - size_before) * gas_unit_per_allocation_word))
       result
   in
   Generator.Calculated {workload; measure}
