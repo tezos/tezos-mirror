@@ -7,11 +7,11 @@
 
 mod ast;
 mod gas;
+mod interpreter;
 mod parser;
 mod stack;
 mod syntax;
 mod typechecker;
-mod interpreter;
 
 fn main() {}
 
@@ -21,16 +21,47 @@ mod tests {
 
     use crate::ast::*;
     use crate::gas::Gas;
+    use crate::interpreter;
     use crate::parser;
     use crate::typechecker;
-    use crate::interpreter;
+
+    fn report_gas<R, F: FnOnce(&mut Gas) -> R>(gas: &mut Gas, f: F) -> R {
+        let initial_milligas = gas.milligas();
+        let r = f(gas);
+        let gas_diff = initial_milligas - gas.milligas();
+        println!("Gas consumed: {}.{:0>3}", gas_diff / 1000, gas_diff % 1000,);
+        r
+    }
 
     #[test]
     fn interpret_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut istack = VecDeque::from([Value::NumberValue(10)]);
-        interpreter::interpret(&ast, &mut istack);
+        let mut gas = Gas::default();
+        assert!(interpreter::interpret(&ast, &mut gas, &mut istack).is_ok());
         assert!(istack.len() == 1 && istack[0] == Value::NumberValue(55));
+    }
+
+    #[test]
+    fn interpret_test_gas_consumption() {
+        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let mut istack = VecDeque::from([Value::NumberValue(5)]);
+        let mut gas = Gas::new(1305);
+        report_gas(&mut gas, |gas| {
+            assert!(interpreter::interpret(&ast, gas, &mut istack).is_ok());
+        });
+        assert_eq!(gas.milligas(), 0);
+    }
+
+    #[test]
+    fn interpret_test_gas_out_of_gas() {
+        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let mut istack = VecDeque::from([Value::NumberValue(5)]);
+        let mut gas = Gas::new(1);
+        assert_eq!(
+            interpreter::interpret(&ast, &mut gas, &mut istack),
+            Err(interpreter::InterpretError::OutOfGas),
+        );
     }
 
     #[test]
@@ -46,7 +77,9 @@ mod tests {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut stack = VecDeque::from([Type::Nat]);
         let mut gas = Gas::new(11460);
-        assert!(typechecker::typecheck(&ast, &mut gas, &mut stack).is_ok());
+        report_gas(&mut gas, |gas| {
+            assert!(typechecker::typecheck(&ast, gas, &mut stack).is_ok());
+        });
         assert_eq!(gas.milligas(), 0);
     }
 

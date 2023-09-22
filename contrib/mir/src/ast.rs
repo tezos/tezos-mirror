@@ -32,7 +32,7 @@ pub enum Value {
 
 pub type InstructionBlock = Vec<Instruction>;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction {
     Add,
     Dip(Option<usize>, InstructionBlock),
