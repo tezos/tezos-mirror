@@ -319,6 +319,9 @@ Docker Images
 -  Bump up base image to ``alpine:3.17``. In particular, this changes Rust
    version to 1.64.0.
 
+- The rollup node is protocol agnostic and released as part of the Docker
+  image. (MR :gl:`!10086`)
+
 Smart Rollup node
 -----------------
 
@@ -340,6 +343,13 @@ Smart Rollup node
 
 - Fixed an issue where the rollup node could forget to update its L2 head for a
   block. (MR :gl:`!9868`)
+
+- The protocol specific rollup nodes binaries are now deprecated and replaced
+  by symbolic links to the protocol agnostic rollup node. In the future, the
+  symbolic links will be removed. (MR :gl:`!10086`)
+
+- Released the protocol agnostic rollup node ``octez-smart-rollup-node`` as part
+  of the Octez distribution. (MR :gl:`!10086`)
 
 Smart Rollup client
 -------------------
