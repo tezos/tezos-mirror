@@ -118,6 +118,8 @@ module Durable_storage_path = struct
 
     let code = "/code"
 
+    let storage = "/storage"
+
     let account (Address (Hex s)) = accounts ^ "/" ^ s
 
     let balance address = account address ^ balance
@@ -125,6 +127,8 @@ module Durable_storage_path = struct
     let nonce address = account address ^ nonce
 
     let code address = account address ^ code
+
+    let storage address index = account address ^ storage ^ "/" ^ index
   end
 
   module Block = struct
@@ -513,6 +517,25 @@ module RPC = struct
         }
     in
     Simulation.is_tx_valid r
+
+  let storage_at base address (Qty pos) =
+    let open Lwt_result_syntax in
+    let pad32left0 s =
+      let open Ethereum_types in
+      (* Strip 0x *)
+      let (Hex s) = hex_of_string s in
+      let len = String.length s in
+      (* This is a Hex string of 32 bytes, therefore the length is 64 *)
+      String.make (64 - len) '0' ^ s
+    in
+    let index = Z.format "#x" pos |> pad32left0 in
+    let key = Durable_storage_path.Accounts.storage address index in
+    let+ answer = call_service ~base durable_state_value () {key} () in
+    match answer with
+    | Some bytes ->
+        Bytes.to_string bytes |> Hex.of_string |> Hex.show
+        |> Ethereum_types.hex_of_string
+    | None -> Ethereum_types.Hex (pad32left0 "0")
 end
 
 module type S = sig
@@ -564,6 +587,11 @@ module type S = sig
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 
   val is_tx_valid : Ethereum_types.hex -> (unit, string) result tzresult Lwt.t
+
+  val storage_at :
+    Ethereum_types.address ->
+    Ethereum_types.quantity ->
+    Ethereum_types.hex tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -606,4 +634,6 @@ end) : S = struct
   let estimate_gas = RPC.estimate_gas Base.base
 
   let is_tx_valid = RPC.is_tx_valid Base.base
+
+  let storage_at = RPC.storage_at Base.base
 end

@@ -280,6 +280,23 @@ module Get_balance = MethodMaker (struct
   let method_ = "eth_getBalance"
 end)
 
+module Get_storage_at = MethodMaker (struct
+  open Ethereum_types
+
+  type method_
+
+  type input = address * quantity * block_param
+
+  type output = hex
+
+  let input_encoding =
+    Data_encoding.tup3 address_encoding quantity_encoding block_param_encoding
+
+  let output_encoding = hex_encoding
+
+  let method_ = "eth_getStorageAt"
+end)
+
 module Block_number = MethodMaker (struct
   open Ethereum_types
 
@@ -655,6 +672,7 @@ let methods : (module METHOD) list =
     (module Chain_id);
     (module Accounts);
     (module Get_balance);
+    (module Get_storage_at);
     (module Block_number);
     (module Get_block_by_number);
     (module Get_block_by_hash);
