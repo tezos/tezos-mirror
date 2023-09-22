@@ -910,7 +910,7 @@ a ``.cargo/config.toml`` file, containing the following line.
    target = "wasm32-unknown-unknown"
 
    [rust]
-   lld = true%
+   lld = true
 
 The resulting project looks as follows.
 
@@ -938,7 +938,8 @@ Host Functions in Rust
 
 The host functions exported by the WASM runtime to Rust programs
 are exposed by the following API. The ``link`` pragma is used to specify the
-module that exports them (in our case, ``smart_rollup_core``).
+module that exports them (in our case, ``smart_rollup_core``). Define these functions
+in the ``host.rs`` as follows:
 
 .. code:: rust
 
@@ -1034,9 +1035,15 @@ provide a safe API on top of them. For instance, the ``read_input`` host
 function can be used to declare a safe function which allocates a
 fresh Rust Vector to receive the input.
 
+Define these functions in the ``lib.rs`` as follows:
+
 .. code:: rust
 
    // Assuming the host functions are defined in a module `host`.
+
+   mod host;
+   use crate::host::read_input;
+   use crate::host:ReadInputMessageInfo;
 
    pub const MAX_MESSAGE_SIZE: u32 = 4096u32;
 
@@ -1053,10 +1060,10 @@ fresh Rust Vector to receive the input.
        let mut message_info = ReadInputMessageInfo { level: 0, id: 0 };
 
        let size = unsafe {
-            host::read_input(
+            read_input(
                &mut message_info,
                payload.as_mut_ptr(),
-               MAX_MESSAGE_SIZE,
+               MAX_MESSAGE_SIZE.try_into().unwrap(),
            )
        };
 
@@ -1174,7 +1181,7 @@ these inputs and ``End_of_level`` after the inputs.
 .. code::
 
   > load inputs
-  Loaded 3 inputs at level 0
+  Loaded 1 inputs at level 0
 
   > show status
   Status: Evaluating
@@ -1186,15 +1193,18 @@ command ``show inbox``.
 .. code::
 
   > show inbox
-  Inbox has 3 messages:
+  Inbox has 4 messages:
   { raw_level: 0;
     counter: 0
     payload: Start_of_level }
   { raw_level: 0;
     counter: 1
-    payload: 0000000023030b01d1a37c088a1221b636bb5fccb35e05181038ba7c000000000764656661756c74 }
+    payload: Info_per_level {predecessor_timestamp = 1970-01-01T00:00:00-00:00; predecessor = BKiHLREqU3JkXfzEDYAkmmfX48gBDtYhMrpA98s7Aq4SzbUAB6M} }
   { raw_level: 0;
     counter: 2
+    payload: 0000000023030b01d1a37c088a1221b636bb5fccb35e05181038ba7c000000000764656661756c74 }
+  { raw_level: 0;
+    counter: 3
     payload: End_of_level }
 
 The first input of an inbox at the beginning of a level is
@@ -1264,19 +1274,33 @@ take care of the possible reboots asked by the kernel (through the usage of the
   Status: Waiting for input
   Internal state: Collect
 
-To obtain more information on the execution, the command ``bench`` will also run
+To obtain more information on the execution, the command ``profile`` will also run
 the kernel on a full inbox, consumed all inputs, run until more inputs are
 required, and output some information about the run.
 
 .. code::
 
-  > bench
-  Ran for 5 kernel_run call:
-  3173 ticks in 0.014739 seconds
-  4853 ticks in 0.004381 seconds
-  4914 ticks in 0.003762 seconds
-  23352 ticks in 0.008684 seconds
-  2369 ticks in 0.003198 seconds
+    > profile
+    Starting the profiling until new messages are expected. Please note that it will take some time and does not reflect a real computation time.
+    Profiling result can be found in /tmp/wasm-debugger-profiling-2023-09-26T09:10:09.860-00:00.out
+    ----------------------
+    Detailed results for a `kernel_run`:
+    %interpreter(decode): 35948 ticks (277ms)
+    %interpreter(link): 6 ticks (3.605us)
+    %interpreter(init): 201823 ticks (62.246ms)
+    kernel_run: 22962 ticks (20.280ms)
+
+    Full execution: 260739 ticks (359ms)
+    ----------------------
+    Detailed results for a `kernel_run`:
+    %interpreter(decode): 35948 ticks (273ms)
+    %interpreter(link): 6 ticks (7.287us)
+    %interpreter(init): 201823 ticks (63.946ms)
+    kernel_run: 29388 ticks (9.275ms)
+
+    Full execution: 267165 ticks (346ms)
+    ----------------------
+    Full execution with padding: 22000000000 ticks
 
 Each cycle is a call of the ``kernel_run`` function.
 For each cycle, the number of _effective_ ticks used is shown (ticks corresponding
