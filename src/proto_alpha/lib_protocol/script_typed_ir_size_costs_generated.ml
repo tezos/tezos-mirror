@@ -10,25 +10,25 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model script_typed_ir_size/KINSTR_SIZE *)
-(* fun size -> 0. + (16.9107287794 * size) *)
+(* fun size -> max 10 (0. + (16.9107287794 * size)) *)
 let cost_KINSTR_SIZE size =
   let size = S.safe_int size in
-  size * S.safe_int 17
+  S.max (S.safe_int 10) (size * S.safe_int 17)
 
 (* model script_typed_ir_size/NODE_SIZE *)
-(* fun size -> 0. + (25.3968974269 * size) *)
+(* fun size -> max 10 (0. + (25.3968974269 * size)) *)
 let cost_NODE_SIZE size =
   let size = S.safe_int size in
-  (size lsr 1) + (size * S.safe_int 25)
+  S.max (S.safe_int 10) ((size lsr 1) + (size * S.safe_int 25))
 
 (* model script_typed_ir_size/TYPE_SIZE *)
-(* fun size -> 0. + (16.223250671 * size) *)
+(* fun size -> max 10 (0. + (16.223250671 * size)) *)
 let cost_TYPE_SIZE size =
   let size = S.safe_int size in
-  (size lsr 1) + (size * S.safe_int 16)
+  S.max (S.safe_int 10) ((size lsr 1) + (size * S.safe_int 16))
 
 (* model script_typed_ir_size/VALUE_SIZE *)
-(* fun size -> 0. + (19.5698881074 * size) *)
+(* fun size -> max 10 (0. + (19.5698881074 * size)) *)
 let cost_VALUE_SIZE size =
   let size = S.safe_int size in
-  size * S.safe_int 20
+  S.max (S.safe_int 10) (size * S.safe_int 20)

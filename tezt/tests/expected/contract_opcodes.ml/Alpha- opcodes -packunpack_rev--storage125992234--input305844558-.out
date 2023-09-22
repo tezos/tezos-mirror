@@ -813,7 +813,7 @@ trace
     [  ]
   - location: 265 (just consumed gas: 0.010)
     [ 0x ]
-  - location: 268 (just consumed gas: 0.260)
+  - location: 268 (just consumed gas: 0.270)
     [ None ]
   - location: 271 (just consumed gas: 0.010)
     [  ]

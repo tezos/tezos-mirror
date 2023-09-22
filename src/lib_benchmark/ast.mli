@@ -102,6 +102,8 @@ module Transform (F : functor (Ast : S) -> sig
   val transform : 'a Ast.t -> 'a Ast.t
 end) : Costlang.Transform
 
-(** A Costlang transformer taking the max with 10,
-    then perform various code optimizations *)
+(** A Costlang transformer for various code optimizations *)
 module Optimize : Transform
+
+(** A Costlang transformer taking the max with 10 *)
+module At_least_10 : Transform
