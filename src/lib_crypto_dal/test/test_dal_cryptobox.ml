@@ -1,3 +1,17 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Testing
+    -------
+    Component:  Lib_crypto_dal Test_dal_cryptobox
+    Invocation: dune exec src/lib_crypto_dal/test/main.exe -- --file test_dal_cryptobox.ml
+    Subject:    Tests the cryptography used in the Data Availability Layer (DAL)
+*)
+
 module Test = struct
   (* [randrange ?(min=0) max] returns a random integer in the range [min, max - 1]. *)
   let randrange ?(min = 0) max =
