@@ -64,6 +64,8 @@ let sapling_benchmark_config =
 
 let interpreter_benchmark_config =
   let open Ezjsonm in
+  (* Must be equal to the one in Interpreter_benchmarks.Default_config
+     of Proto alpha *)
   let sampler_parameters =
     dict
       [
@@ -105,21 +107,20 @@ let typecheck_benchmark_config dir =
 (* Having to patch here is annoying. Some of these constants should go to
    the benchmark definition site. *)
 
-type patch = No_patch | Patched_config of Ezjsonm.value
+type parameters = {nsamples : int; bench_num : int}
 
-type parameters_override =
-  | No_parameter_override
-  | Overriden_parameters of {nsamples : int; bench_num : int}
+type patch_rule =
+  Tezt.Base.rex
+  * (Ezjsonm.value option * parameters ->
+    (Ezjsonm.value option * parameters) Lwt.t)
 
-type patch_rule = Tezt.Base.rex * (unit -> (patch * parameters_override) Lwt.t)
-
-let patch_benchmark_config ~patches ~bench_name =
-  let patch_opt =
-    List.find_opt (fun (regex, _) -> bench_name =~ regex) patches
-  in
-  match patch_opt with
-  | None -> return (No_patch, No_parameter_override)
-  | Some (_regex, callback) -> callback ()
+(* [patches] are applied top-down *)
+let patch_benchmark_config ~patches ~bench_name init =
+  Lwt_list.fold_left_s
+    (fun acc (regex, callback) ->
+      if bench_name =~ regex then callback acc else Lwt.return acc)
+    init
+    patches
 
 let with_config_dir snoop bench_name json_opt f =
   match json_opt with
@@ -154,18 +155,11 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
           save_to ;
         return ())
       else
-        let* bench_num, nsamples, config =
-          let* patch, override = patch_benchmark_config ~patches ~bench_name in
-          let* config =
-            match patch with
-            | No_patch -> return None
-            | Patched_config json -> return (Some json)
-          in
-          match override with
-          | No_parameter_override ->
-              return (default_bench_num, default_nsamples, config)
-          | Overriden_parameters {nsamples; bench_num} ->
-              return (bench_num, nsamples, config)
+        let* config, {nsamples; bench_num} =
+          patch_benchmark_config
+            ~patches
+            ~bench_name
+            (None, {nsamples = default_nsamples; bench_num = default_bench_num})
         in
         with_config_dir snoop bench_name config (fun config_file ->
             Snoop.benchmark
@@ -185,11 +179,12 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
     benchmarks
 
 let perform_interpreter_benchmarks snoop proto =
+  (* Patches are applied from top to bottom *)
   let patches =
     [
       ( rex "Concat_(bytes|string).*",
-        fun () ->
-          let json = interpreter_benchmark_config in
+        fun (json, parameters) ->
+          let json = Option.value ~default:interpreter_benchmark_config json in
           let json =
             json.%{["sampler"; "list_size"; "max"]} <- Ezjsonm.int 100
           in
@@ -199,19 +194,18 @@ let perform_interpreter_benchmarks snoop proto =
           let json =
             json.%{["sampler"; "string_size"; "max"]} <- Ezjsonm.int 1024
           in
-          return (Patched_config json, No_parameter_override) );
+          return (Some json, parameters) );
       ( rex "Pairing_check_bls12_381.*",
-        fun () ->
-          let bench_num = 300 in
-          let nsamples = 100 in
-          return (No_patch, Overriden_parameters {nsamples; bench_num}) );
+        fun (json, parameters) -> return (json, {parameters with nsamples = 100})
+      );
       ( rex "Sapling_verify_update.*",
-        fun () ->
-          let bench_num = 300 in
-          let nsamples = 500 in
-          return
-            ( Patched_config interpreter_benchmark_config,
-              Overriden_parameters {nsamples; bench_num} ) );
+        fun (_json, parameters) ->
+          return (Some interpreter_benchmark_config, parameters) );
+      (* This patch must come at the end to make sure each alloc benchmark has only
+         1 sample. *)
+      ( rex "/alloc",
+        fun (json, parameters) -> return (json, {parameters with nsamples = 1})
+      );
     ]
   in
   let* benches =
@@ -219,7 +213,7 @@ let perform_interpreter_benchmarks snoop proto =
   in
   perform_benchmarks patches snoop benches
 
-let create_config file =
+let create_config file (json_opt, parameters) =
   let* dir_nonempty =
     Files.(is_directory_nonempty (working_dir // michelson_data_dir))
   in
@@ -228,18 +222,18 @@ let create_config file =
       typecheck_benchmark_config
         Files.(working_dir // michelson_data_dir // file)
     in
-    return (Patched_config json, No_parameter_override)
-  else return (No_patch, No_parameter_override)
+    return (Some json, parameters)
+  else return (json_opt, parameters)
 
 let perform_typechecker_benchmarks snoop proto =
   let patches =
     [
       ( rex "(TYPECHECKING|UNPARSING)_CODE.*",
-        fun () -> create_config Files.michelson_code_file );
+        create_config Files.michelson_code_file );
       ( rex "(TYPECHECKING|UNPARSING)_DATA.*",
-        fun () -> create_config Files.michelson_data_file );
-      (rex "VALUE_SIZE.*", fun () -> create_config Files.michelson_data_file);
-      (rex "KINSTR_SIZE.*", fun () -> create_config Files.michelson_code_file);
+        create_config Files.michelson_data_file );
+      (rex "VALUE_SIZE.*", create_config Files.michelson_data_file);
+      (rex "KINSTR_SIZE.*", create_config Files.michelson_code_file);
     ]
   in
   let* benches =
@@ -251,7 +245,7 @@ let perform_encoding_benchmarks snoop proto =
   let patches =
     [
       ( rex "(ENCODING|DECODING)_MICHELINE.*",
-        fun () -> create_config Files.michelson_data_file );
+        create_config Files.michelson_data_file );
     ]
   in
   let* proto_indepenent =
@@ -315,9 +309,8 @@ let perform_sapling_benchmarks snoop =
   let patches =
     [
       ( rex ".*",
-        fun () ->
-          return (Patched_config sapling_benchmark_config, No_parameter_override)
-      );
+        fun (_json, parameters) ->
+          return (Some sapling_benchmark_config, parameters) );
     ]
   in
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Sapling] snoop) in
