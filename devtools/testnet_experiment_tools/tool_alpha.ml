@@ -468,14 +468,19 @@ let init ~operations_file_path =
     }
 
 let choose_new_operations state prohibited_managers n =
-  let seq = ManagerMap.to_seq state.operation_queues in
+  (* Prioritize large operations queues *)
+  let sorted_queues =
+    ManagerMap.bindings state.operation_queues
+    |> List.sort (fun (_, q) (_, q') ->
+           Int.compare (Queue.length q') (Queue.length q))
+  in
   let ops = ref [] in
   let cpt = ref 0 in
   let updated_operation_queues = ref state.operation_queues in
   let selected_ops =
     let exception End in
     try
-      Seq.iter
+      List.iter
         (fun (manager, op_q) ->
           if !cpt = n then raise End ;
           if not (ManagerSet.mem manager prohibited_managers) then
@@ -486,7 +491,7 @@ let choose_new_operations state prohibited_managers n =
             | None ->
                 updated_operation_queues :=
                   ManagerMap.remove manager !updated_operation_queues)
-        seq ;
+        sorted_queues ;
       !ops
     with End -> !ops
   in
