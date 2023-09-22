@@ -99,7 +99,8 @@ let repeat_spec =
       [
         ("repeat", scalar "until"); ("repeat-until", scalar (Ast.to_string expr));
       ]
-  | _ -> failwith "not supported"
+  | RepeatEos -> [("repeat", scalar "eos")]
+  | RepeatExpr _ -> failwith "not supported (RepeatExpr)"
 
 let enum_spec attr =
   map_list_of_option (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
