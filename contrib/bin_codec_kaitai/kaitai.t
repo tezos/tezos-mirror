@@ -5,7 +5,7 @@ ground.uint8 test
     endian: be
   doc: Unsigned 8 bit integers
   seq:
-  - id: uint8
+  - id: ground__uint8
     type: u1
 ground.bool test
   $ ./codec.exe dump kaitai for ground.bool
@@ -18,7 +18,7 @@ ground.bool test
       0: false
       255: true
   seq:
-  - id: bool
+  - id: ground__bool
     type: u1
     enum: bool
 ground.int8 test
@@ -28,7 +28,7 @@ ground.int8 test
     endian: be
   doc: Signed 8 bit integers
   seq:
-  - id: int8
+  - id: ground__int8
     type: s1
 ground.uint16 test
   $ ./codec.exe dump kaitai for ground.uint16
@@ -37,7 +37,7 @@ ground.uint16 test
     endian: be
   doc: Unsigned 16 bit integers
   seq:
-  - id: uint16
+  - id: ground__uint16
     type: u2
 ground.int16 test
   $ ./codec.exe dump kaitai for ground.int16
@@ -46,7 +46,7 @@ ground.int16 test
     endian: be
   doc: Signed 16 bit integers
   seq:
-  - id: int16
+  - id: ground__int16
     type: s2
 ground.int32 test
   $ ./codec.exe dump kaitai for ground.int32
@@ -55,7 +55,7 @@ ground.int32 test
     endian: be
   doc: Signed 32 bit integers
   seq:
-  - id: int32
+  - id: ground__int32
     type: s4
 ground.int64 test
   $ ./codec.exe dump kaitai for ground.int64
@@ -64,7 +64,7 @@ ground.int64 test
     endian: be
   doc: Signed 64 bit integers
   seq:
-  - id: int64
+  - id: ground__int64
     type: s8
 ground.int31 test
   $ ./codec.exe dump kaitai for ground.int31
@@ -73,7 +73,7 @@ ground.int31 test
     endian: be
   doc: Signed 31 bit integers
   seq:
-  - id: int31
+  - id: ground__int31
     type: s4
 ground.float test
   $ ./codec.exe dump kaitai for ground.float
@@ -82,7 +82,7 @@ ground.float test
     endian: be
   doc: Floating point numbers
   seq:
-  - id: float
+  - id: ground__float
     type: f8
 ground.bytes test
   $ ./codec.exe dump kaitai for ground.bytes
@@ -97,7 +97,7 @@ ground.bytes test
       - id: value
         size: size
   seq:
-  - id: fixed size (uint30) bytes
+  - id: ground__bytes
     type: fixed_bytes
 ground.string test
   $ ./codec.exe dump kaitai for ground.string
@@ -112,12 +112,12 @@ ground.string test
       - id: value
         size: size
   seq:
-  - id: fixed size (uint30) bytes
+  - id: ground__string
     type: fixed_bytes
 ground.N test
   $ ./codec.exe dump kaitai for ground.N
   meta:
-    id: ground__N
+    id: ground__n
     endian: be
   doc: Arbitrary precision natural numbers
   types:
@@ -138,7 +138,7 @@ ground.N test
 ground.Z test
   $ ./codec.exe dump kaitai for ground.Z
   meta:
-    id: ground__Z
+    id: ground__z
     endian: be
   doc: Arbitrary precision integers
   types:

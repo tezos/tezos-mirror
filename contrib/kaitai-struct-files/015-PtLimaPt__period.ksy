@@ -1,6 +1,6 @@
 meta:
-  id: 015-PtLimaPt__period
+  id: id_015__ptlimapt__period
   endian: be
 seq:
-- id: int64
+- id: id_015__ptlimapt__period
   type: s8

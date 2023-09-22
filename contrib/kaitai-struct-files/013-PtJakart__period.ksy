@@ -1,6 +1,6 @@
 meta:
-  id: 013-PtJakart__period
+  id: id_013__ptjakart__period
   endian: be
 seq:
-- id: int64
+- id: id_013__ptjakart__period
   type: s8

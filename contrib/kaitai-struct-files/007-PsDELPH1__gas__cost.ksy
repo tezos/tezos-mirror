@@ -1,5 +1,5 @@
 meta:
-  id: 007-PsDELPH1__gas__cost
+  id: id_007__psdelph1__gas__cost
   endian: be
 types:
   group:

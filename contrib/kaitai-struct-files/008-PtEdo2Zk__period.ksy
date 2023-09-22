@@ -1,6 +1,6 @@
 meta:
-  id: 008-PtEdo2Zk__period
+  id: id_008__ptedo2zk__period
   endian: be
 seq:
-- id: int64
+- id: id_008__ptedo2zk__period
   type: s8

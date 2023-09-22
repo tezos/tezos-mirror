@@ -1,5 +1,5 @@
 meta:
-  id: 017-PtNairob__nonce
+  id: id_017__ptnairob__nonce
   endian: be
 types:
   fixed_bytes:
@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: id_017__ptnairob__nonce
   type: fixed_bytes

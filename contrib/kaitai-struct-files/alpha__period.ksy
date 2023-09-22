@@ -2,5 +2,5 @@ meta:
   id: alpha__period
   endian: be
 seq:
-- id: int64
+- id: alpha__period
   type: s8

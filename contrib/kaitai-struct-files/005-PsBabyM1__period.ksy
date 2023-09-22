@@ -1,6 +1,6 @@
 meta:
-  id: 005-PsBabyM1__period
+  id: id_005__psbabym1__period
   endian: be
 seq:
-- id: int64
+- id: id_005__psbabym1__period
   type: s8

@@ -3,5 +3,5 @@ meta:
   endian: be
 doc: A version number for the p2p layer.
 seq:
-- id: uint16
+- id: p2p_version
   type: u2

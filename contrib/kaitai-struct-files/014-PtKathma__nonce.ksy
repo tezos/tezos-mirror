@@ -1,5 +1,5 @@
 meta:
-  id: 014-PtKathma__nonce
+  id: id_014__ptkathma__nonce
   endian: be
 types:
   fixed_bytes:
@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: id_014__ptkathma__nonce
   type: fixed_bytes

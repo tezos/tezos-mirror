@@ -41,10 +41,10 @@ let%expect_test "test tuple translation" =
         0: false
         255: true
     seq:
-    - id: field_0
+    - id: simple_tuple_field0
       type: u1
       enum: bool
-    - id: field_1
+    - id: simple_tuple_field1
       type: u1
   |}]
 
@@ -65,17 +65,17 @@ let%expect_test "test long tuple translation" =
         0: false
         255: true
     seq:
-    - id: field_0
+    - id: simple_tuple_field0
       type: u1
       enum: bool
-    - id: field_1
+    - id: simple_tuple_field1
       type: u1
-    - id: field_2
+    - id: simple_tuple_field2
       type: u1
       enum: bool
-    - id: field_3
+    - id: simple_tuple_field3
       type: u1
-    - id: field_4
+    - id: simple_tuple_field4
       type: u1 |}]
 
 let%expect_test "test tup1 tuple translation" =
@@ -91,7 +91,7 @@ let%expect_test "test tup1 tuple translation" =
       id: tup1
       endian: be
     seq:
-    - id: uint8
+    - id: tup1
       type: u1
   |}]
 
@@ -113,15 +113,15 @@ let%expect_test "test tuples with tup1 translation" =
         0: false
         255: true
     seq:
-    - id: field_0
+    - id: tup1tup_field1
       type: u1
       enum: bool
-    - id: field_1
+    - id: tup1tup_field3
       type: u1
-    - id: field_2
+    - id: tup1tup_field4
       type: u1
       enum: bool
-    - id: field_3
+    - id: tup1tup_field7
       type: u1
-    - id: field_4
+    - id: tup1tup_field8
       type: u1 |}]

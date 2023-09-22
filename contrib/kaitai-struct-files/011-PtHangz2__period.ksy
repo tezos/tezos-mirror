@@ -1,6 +1,6 @@
 meta:
-  id: 011-PtHangz2__period
+  id: id_011__pthangz2__period
   endian: be
 seq:
-- id: int64
+- id: id_011__pthangz2__period
   type: s8

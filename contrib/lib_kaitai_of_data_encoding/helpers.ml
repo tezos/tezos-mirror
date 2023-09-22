@@ -8,6 +8,16 @@
 
 open Kaitai.Types
 
+(* Generator for ids in a tuple. *)
+type tid_gen = unit -> string
+
+let mk_tid_gen prefix : tid_gen =
+  let i = ref 0 in
+  fun () ->
+    let id = prefix ^ "_field" ^ string_of_int !i in
+    incr i ;
+    id
+
 let default_doc_spec = DocSpec.{summary = None; refs = []}
 
 let cond_no_cond =

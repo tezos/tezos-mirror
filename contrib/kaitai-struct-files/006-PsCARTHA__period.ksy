@@ -1,6 +1,6 @@
 meta:
-  id: 006-PsCARTHA__period
+  id: id_006__pscartha__period
   endian: be
 seq:
-- id: int64
+- id: id_006__pscartha__period
   type: s8

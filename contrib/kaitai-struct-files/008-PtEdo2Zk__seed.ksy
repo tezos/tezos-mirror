@@ -1,5 +1,5 @@
 meta:
-  id: 008-PtEdo2Zk__seed
+  id: id_008__ptedo2zk__seed
   endian: be
 types:
   fixed_bytes:
@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: id_008__ptedo2zk__seed
   type: fixed_bytes

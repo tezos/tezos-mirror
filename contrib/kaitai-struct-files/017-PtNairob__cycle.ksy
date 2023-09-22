@@ -1,6 +1,6 @@
 meta:
-  id: 017-PtNairob__cycle
+  id: id_017__ptnairob__cycle
   endian: be
 seq:
-- id: int32
+- id: id_017__ptnairob__cycle
   type: s4

@@ -1,6 +1,6 @@
 meta:
-  id: 007-PsDELPH1__cycle
+  id: id_007__psdelph1__cycle
   endian: be
 seq:
-- id: int32
+- id: id_007__psdelph1__cycle
   type: s4

@@ -1,6 +1,6 @@
 meta:
-  id: 010-PtGRANAD__raw_level
+  id: id_010__ptgranad__raw_level
   endian: be
 seq:
-- id: int32
+- id: id_010__ptgranad__raw_level
   type: s4

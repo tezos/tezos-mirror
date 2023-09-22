@@ -3,5 +3,5 @@ meta:
   endian: be
 doc: Unsigned 8 bit integers
 seq:
-- id: uint8
+- id: ground__uint8
   type: u1

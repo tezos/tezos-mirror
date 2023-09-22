@@ -1,6 +1,6 @@
 meta:
-  id: 005-PsBabyM1__voting_period
+  id: id_005__psbabym1__voting_period
   endian: be
 seq:
-- id: int32
+- id: id_005__psbabym1__voting_period
   type: s4

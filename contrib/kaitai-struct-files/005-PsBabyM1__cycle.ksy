@@ -1,6 +1,6 @@
 meta:
-  id: 005-PsBabyM1__cycle
+  id: id_005__psbabym1__cycle
   endian: be
 seq:
-- id: int32
+- id: id_005__psbabym1__cycle
   type: s4

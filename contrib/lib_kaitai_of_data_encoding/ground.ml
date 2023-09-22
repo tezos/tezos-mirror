@@ -44,19 +44,19 @@ module Enum = struct
 end
 
 module Attr = struct
-  let bool =
+  let bool ~id =
     {
       Helpers.default_attr_spec with
-      id = "bool";
+      id;
       dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
       valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
       enum = Some (fst Enum.bool);
     }
 
-  let int1_type_attr_spec ~signed =
+  let int1_type_attr_spec ~id ~signed =
     {
       Helpers.default_attr_spec with
-      id = (if signed then "int8" else "uint8");
+      id;
       dataType = DataType.(NumericType (Int_type (Int1Type {signed})));
     }
 
@@ -85,6 +85,28 @@ module Attr = struct
                   })));
     }
 
+  let uint8 ~id = int1_type_attr_spec ~id ~signed:false
+
+  let int8 ~id = int1_type_attr_spec ~id ~signed:true
+
+  let uint16 ~id = int_multi_type_atrr_spec ~id ~signed:false DataType.W2
+
+  let int16 ~id = int_multi_type_atrr_spec ~id ~signed:true DataType.W2
+
+  let uint32 ~id = int_multi_type_atrr_spec ~id ~signed:false DataType.W4
+
+  let int32 ~id = int_multi_type_atrr_spec ~id ~signed:true DataType.W4
+
+  let int64 ~id = int_multi_type_atrr_spec ~id ~signed:true DataType.W8
+
+  let int31 ~id =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6261
+             There should be a validation that [Int31] is in the appropriate
+             range. *)
+    int_multi_type_atrr_spec ~id ~signed:true DataType.W4
+
+  let float ~id = float_multi_type_attr_spec ~id
+
   let bytes_limit_type_attr_spec ~id =
     {
       Helpers.default_attr_spec with
@@ -102,52 +124,29 @@ module Attr = struct
                }));
     }
 
-  let uint8 = int1_type_attr_spec ~signed:false
-
-  let int8 = int1_type_attr_spec ~signed:true
-
-  let uint16 = int_multi_type_atrr_spec ~id:"uint16" ~signed:false DataType.W2
-
-  let int16 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
-
-  let uint32 ?(id = "uint32") () =
-    int_multi_type_atrr_spec ~id ~signed:false DataType.W4
-
-  let int32 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
-
-  let int64 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
-
-  let int31 =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6261
-             There should be a validation that [Int31] is in the appropriate
-             range. *)
-    int_multi_type_atrr_spec ~id:"int31" ~signed:true DataType.W4
-
-  let float = float_multi_type_attr_spec ~id:"float"
-
   let fixed_size_header_class_spec =
     {
       (* TODO / nice to have: Add a docstring, i.e. [?description]
                               to custom defined class spec. *)
       (Helpers.default_class_spec ~encoding_name:"fixed_bytes" ())
       with
-      seq = [uint32 ~id:"size" (); bytes_limit_type_attr_spec ~id:"value"];
+      seq = [uint32 ~id:"size"; bytes_limit_type_attr_spec ~id:"value"];
       isTopLevel = false;
     }
 
-  let bytes =
+  let bytes ~id =
     (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
               We fix size header to [`Uint30] for now. This corresponds to
               size header of ground bytes encoding. Later on we want to add
               support for [`Uint16], [`Uint8] and [`N]. *)
     {
       Helpers.default_attr_spec with
-      id = "fixed size (uint30) bytes";
+      id;
       dataType =
         DataType.(ComplexDataType (UserType fixed_size_header_class_spec));
     }
 
-  let string = bytes
+  let string ~id = bytes ~id
 end
 
 module Class = struct
@@ -156,37 +155,67 @@ module Class = struct
       ~encoding_name
       ?description
       ~enums:[Enum.bool]
-      Attr.bool
+      (Attr.bool ~id:encoding_name)
 
   let uint8 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.uint8
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.uint8 ~id:encoding_name)
 
   let int8 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int8
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.int8 ~id:encoding_name)
 
   let uint16 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.uint16
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.uint16 ~id:encoding_name)
 
   let int16 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int16
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.int16 ~id:encoding_name)
 
   let int32 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int32
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.int32 ~id:encoding_name)
 
   let int64 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int64
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.int64 ~id:encoding_name)
 
   let int31 ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int31
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.int31 ~id:encoding_name)
 
   let float ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.float
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.float ~id:encoding_name)
 
   let bytes ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.bytes
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.bytes ~id:encoding_name)
 
   let string ~encoding_name ?description () =
-    Helpers.class_spec_of_attr ~encoding_name ?description Attr.string
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      (Attr.string ~id:encoding_name)
 
   let byte_group =
     {
@@ -194,7 +223,7 @@ module Class = struct
                             to custom defined class spec. *)
       (Helpers.default_class_spec ~encoding_name:"group" ())
       with
-      seq = [{Attr.uint8 with id = "b"}];
+      seq = [Attr.uint8 ~id:"b"];
       instances =
         [
           ( "has_next",

@@ -1,5 +1,5 @@
 meta:
-  id: ground__N
+  id: ground__n
   endian: be
 doc: Arbitrary precision natural numbers
 types:

@@ -1,6 +1,6 @@
 meta:
-  id: 016-PtMumbai__period
+  id: id_016__ptmumbai__period
   endian: be
 seq:
-- id: int64
+- id: id_016__ptmumbai__period
   type: s8

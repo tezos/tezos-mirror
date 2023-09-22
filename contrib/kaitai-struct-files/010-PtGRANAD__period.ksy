@@ -1,6 +1,6 @@
 meta:
-  id: 010-PtGRANAD__period
+  id: id_010__ptgranad__period
   endian: be
 seq:
-- id: int64
+- id: id_010__ptgranad__period
   type: s8

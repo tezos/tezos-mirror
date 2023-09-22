@@ -1,5 +1,5 @@
 meta:
-  id: 015-PtLimaPt__seed
+  id: id_015__ptlimapt__seed
   endian: be
 types:
   fixed_bytes:
@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: id_015__ptlimapt__seed
   type: fixed_bytes

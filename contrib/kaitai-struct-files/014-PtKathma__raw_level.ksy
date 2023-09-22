@@ -1,6 +1,6 @@
 meta:
-  id: 014-PtKathma__raw_level
+  id: id_014__ptkathma__raw_level
   endian: be
 seq:
-- id: int32
+- id: id_014__ptkathma__raw_level
   type: s4

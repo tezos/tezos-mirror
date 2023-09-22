@@ -1,6 +1,6 @@
 meta:
-  id: 008-PtEdo2Zk__cycle
+  id: id_008__ptedo2zk__cycle
   endian: be
 seq:
-- id: int32
+- id: id_008__ptedo2zk__cycle
   type: s4

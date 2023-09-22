@@ -1,6 +1,6 @@
 meta:
-  id: 012-Psithaca__raw_level
+  id: id_012__psithaca__raw_level
   endian: be
 seq:
-- id: int32
+- id: id_012__psithaca__raw_level
   type: s4

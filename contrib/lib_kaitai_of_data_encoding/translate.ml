@@ -24,6 +24,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Identifiers have a strict pattern to follow, this function removes the
+   irregularities.
+
+   Without escaping, the kaitai-struct-compiler throws the following error
+   message: [error: invalid meta ID, expected /^[a-z][a-z0-9_]*$/] *)
+let escape_id id =
+  if String.length id < 1 then raise (Invalid_argument "empty id") ;
+  let b = Buffer.create (String.length id) in
+  if match id.[0] with 'a' .. 'z' | 'A' .. 'Z' -> false | _ -> true then
+    Buffer.add_string b "id_" ;
+  String.iter
+    (function
+      | ('a' .. 'z' | '0' .. '9' | '_') as c -> Buffer.add_char b c
+      | 'A' .. 'Z' as c -> Buffer.add_char b (Char.lowercase_ascii c)
+      | '.' | '-' | ' ' -> Buffer.add_string b "__"
+      | c ->
+          (* we print [%S] to force escaping of the character *)
+          raise
+            (Failure
+               (Format.asprintf
+                  "Unsupported: special character (%C) in id (%S)"
+                  c
+                  id)))
+    id ;
+  Buffer.contents b
+
 open Kaitai.Types
 
 (* We need to access the definition of data-encoding's [descr] type. For this
@@ -33,30 +59,41 @@ module DataEncoding = Data_encoding__Encoding
 
 let rec seq_field_of_data_encoding :
     type a.
-    Ground.Enum.assoc -> a DataEncoding.t -> Ground.Enum.assoc * AttrSpec.t list
-    =
- fun enums {encoding; json_encoding = _} ->
+    Ground.Enum.assoc ->
+    a DataEncoding.t ->
+    string ->
+    Helpers.tid_gen option ->
+    Ground.Enum.assoc * AttrSpec.t list =
+ fun enums {encoding; _} id tid_gen ->
+  let id = escape_id id in
   match encoding with
   | Null -> (enums, [])
   | Empty -> (enums, [])
   | Ignore -> (enums, [])
   | Constant _ -> (enums, [])
-  | Bool -> (Helpers.add_uniq_assoc enums Ground.Enum.bool, [Ground.Attr.bool])
-  | Uint8 -> (enums, [Ground.Attr.uint8])
-  | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding
+  | Bool ->
+      (Helpers.add_uniq_assoc enums Ground.Enum.bool, [Ground.Attr.bool ~id])
+  | Uint8 -> (enums, [Ground.Attr.uint8 ~id])
+  | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding id tid_gen
   | Tup e ->
       (* This case corresponds to a [tup1] combinator being called inside a
          [tup*] combinator. It's probably never used, but it's still a valid use
          of data-encoding. Note that we erase the information that there is an
          extraneous [tup1] in the encoding. *)
-      seq_field_of_data_encoding enums e
+      let id = match tid_gen with None -> id | Some tid_gen -> tid_gen () in
+      seq_field_of_data_encoding enums e id tid_gen
   | Tups {kind = _; left; right} ->
       (* This case corresponds to a [tup*] combinator being called inside a
          [tup*] combinator. It's probably never used, but it's still a valid use
          of data-encoding. Note that we erase the information that there is an
          extraneous [tup*] in the encoding. *)
-      let enums, left = seq_field_of_data_encoding enums left in
-      let enums, right = seq_field_of_data_encoding enums right in
+      let tid_gen =
+        match tid_gen with
+        | None -> Some (Helpers.mk_tid_gen id)
+        | Some _ as tid_gen -> tid_gen
+      in
+      let enums, left = seq_field_of_data_encoding enums left id tid_gen in
+      let enums, right = seq_field_of_data_encoding enums right id tid_gen in
       let seq = left @ right in
       (enums, seq)
   | _ -> failwith "Not implemented"
@@ -67,7 +104,8 @@ let rec from_data_encoding :
     ?description:string ->
     a DataEncoding.t ->
     ClassSpec.t =
- fun ~encoding_name ?description {encoding; json_encoding = _} ->
+ fun ~encoding_name ?description {encoding; _} ->
+  let encoding_name = escape_id encoding_name in
   match encoding with
   | Bool -> Ground.Class.bool ~encoding_name ?description ()
   | Uint8 -> Ground.Class.uint8 ~encoding_name ?description ()
@@ -87,14 +125,14 @@ let rec from_data_encoding :
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e
   | Tups {kind = _; left; right} ->
-      let enums, left = seq_field_of_data_encoding [] left in
-      let enums, right = seq_field_of_data_encoding enums right in
-      let seq = left @ right in
-      let seq =
-        List.mapi
-          (fun i attr -> AttrSpec.{attr with id = Printf.sprintf "field_%d" i})
-          seq
+      let tid_gen = Some (Helpers.mk_tid_gen encoding_name) in
+      let enums, left =
+        seq_field_of_data_encoding [] left encoding_name tid_gen
       in
+      let enums, right =
+        seq_field_of_data_encoding enums right encoding_name tid_gen
+      in
+      let seq = left @ right in
       {(Helpers.default_class_spec ~encoding_name ()) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
   | Describe {encoding; description; _} ->

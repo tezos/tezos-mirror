@@ -40,7 +40,7 @@ let%expect_test "test uint8 translation" =
       id: ground_uint8
       endian: be
     seq:
-    - id: uint8
+    - id: ground_uint8
       type: u1
   |}]
 
@@ -57,7 +57,7 @@ let%expect_test "test int8 translation" =
       id: ground_int8
       endian: be
     seq:
-    - id: int8
+    - id: ground_int8
       type: s1
   |}]
 
@@ -74,7 +74,7 @@ let%expect_test "test uint16 translation" =
       id: ground_uint16
       endian: be
     seq:
-    - id: uint16
+    - id: ground_uint16
       type: u2
   |}]
 
@@ -91,7 +91,7 @@ let%expect_test "test int16 translation" =
       id: ground_int16
       endian: be
     seq:
-    - id: int16
+    - id: ground_int16
       type: s2
   |}]
 
@@ -108,7 +108,7 @@ let%expect_test "test int32 translation" =
       id: ground_int32
       endian: be
     seq:
-    - id: int32
+    - id: ground_int32
       type: s4
   |}]
 
@@ -125,7 +125,7 @@ let%expect_test "test int64 translation" =
       id: ground_int64
       endian: be
     seq:
-    - id: int64
+    - id: ground_int64
       type: s8
   |}]
 
@@ -142,7 +142,7 @@ let%expect_test "test int31 translation" =
       id: ground_int31
       endian: be
     seq:
-    - id: int31
+    - id: ground_int31
       type: s4
   |}]
 
@@ -159,7 +159,7 @@ let%expect_test "test float translation" =
       id: ground_float
       endian: be
     seq:
-    - id: float
+    - id: ground_float
       type: f8
   |}]
 
@@ -180,7 +180,7 @@ let%expect_test "test bool translation" =
         0: false
         255: true
     seq:
-    - id: bool
+    - id: ground_bool
       type: u1
       enum: bool
   |}]
@@ -205,7 +205,7 @@ let%expect_test "test fixed size bytes translation" =
         - id: value
           size: size
     seq:
-    - id: fixed size (uint30) bytes
+    - id: ground_bytes
       type: fixed_bytes
   |}]
 
@@ -229,7 +229,7 @@ let%expect_test "test fixed size string translation" =
         - id: value
           size: size
     seq:
-    - id: fixed size (uint30) bytes
+    - id: ground_string
       type: fixed_bytes
   |}]
 

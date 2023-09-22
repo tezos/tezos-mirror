@@ -1,6 +1,6 @@
 meta:
-  id: 010-PtGRANAD__roll
+  id: id_010__ptgranad__roll
   endian: be
 seq:
-- id: int32
+- id: id_010__ptgranad__roll
   type: s4

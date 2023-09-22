@@ -1,6 +1,6 @@
 meta:
-  id: 012-Psithaca__cycle
+  id: id_012__psithaca__cycle
   endian: be
 seq:
-- id: int32
+- id: id_012__psithaca__cycle
   type: s4

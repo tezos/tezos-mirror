@@ -2,5 +2,5 @@ meta:
   id: alpha__cycle
   endian: be
 seq:
-- id: int32
+- id: alpha__cycle
   type: s4

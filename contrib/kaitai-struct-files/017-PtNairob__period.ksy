@@ -1,6 +1,6 @@
 meta:
-  id: 017-PtNairob__period
+  id: id_017__ptnairob__period
   endian: be
 seq:
-- id: int64
+- id: id_017__ptnairob__period
   type: s8

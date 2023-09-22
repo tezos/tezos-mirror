@@ -1,6 +1,6 @@
 meta:
-  id: 010-PtGRANAD__cycle
+  id: id_010__ptgranad__cycle
   endian: be
 seq:
-- id: int32
+- id: id_010__ptgranad__cycle
   type: s4

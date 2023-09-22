@@ -1,5 +1,5 @@
 meta:
-  id: 014-PtKathma__seed
+  id: id_014__ptkathma__seed
   endian: be
 types:
   fixed_bytes:
@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: id_014__ptkathma__seed
   type: fixed_bytes

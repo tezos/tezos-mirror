@@ -1,6 +1,6 @@
 meta:
-  id: 007-PsDELPH1__period
+  id: id_007__psdelph1__period
   endian: be
 seq:
-- id: int64
+- id: id_007__psdelph1__period
   type: s8
