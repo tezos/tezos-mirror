@@ -5,6 +5,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Extract profiling result for provided block hash
+   ------------------------
+   Invocation:
+     ./_build/default/devtools/testnet_experiment_tools/extract_data.exe \
+     extract profiling info for block hash \
+     --profiling-reports-directory <profiling_reports_directory> \
+     --searched-block <searched_block>
+   Requirements:
+     <profiling-reports-directory>  - directory where the profiling reports are stored
+     <searched-block>               - the searched block hash
+   Description:
+     This file contains the script to extract all the results
+     of profiling reports related to the given block hash.
+     It produces one file per profiling report, for example,
+     for the block BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw
+     the following reports will be generated:
+        - chain_validator_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+        - p2p_reader_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+        - requester_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+        - rpc_server_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
+     all these files are generated inside the folder where
+     the profiler reports are stored.
+*)
+
 open Tezos_clic
 
 let profiling_reports_directory_arg =
@@ -107,7 +131,8 @@ let commands () =
       ~group:
         {
           name = "devtools";
-          title = "Command for extracting reports of specified block hash";
+          title =
+            "Command for extracting profiling reports of specified block hash";
         }
       ~desc:"Extract block profiling info."
       (args2 profiling_reports_directory_arg searched_block_arg)
