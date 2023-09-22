@@ -57,6 +57,7 @@
 - Add support for `eth_getUncleByBlockHashAndIndex` and `eth_getUncleByBlockNumberAndIndex`. (!10134)
 - Add 2300 unit of gas for the RPC `eth_estimateGas` to account for the EIP2200. (!10176)
 - Add support for `eth_gasPrice`. (!10195)
+- Add support for `eth_getStorageAt`. (!10214)
 
 ### Bug fixes
 
