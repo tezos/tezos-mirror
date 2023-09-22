@@ -3253,14 +3253,14 @@ let generate_opam_files_for_release packages_dir opam_release_graph
 
 (* Bumping the dune lang version can result in different dune stanza
    semantic and could require changes to the generation logic. *)
-let dune_lang_version = "3.0"
+let dune_lang_version = "3.7"
 
 let generate_dune_project_files () =
   write "dune-project" @@ fun fmt ->
   Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
-  Format.fprintf fmt "(using ctypes 0.1)@." ;
+  Format.fprintf fmt "(using ctypes 0.3)@." ;
   ( Target.iter_internal_by_opam @@ fun package internals ->
     let has_public_target =
       List.exists
