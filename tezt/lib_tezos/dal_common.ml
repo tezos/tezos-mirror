@@ -426,8 +426,6 @@ module Helpers = struct
   type slot = string
 
   let make_slot ?(padding = true) ~slot_size slot =
-    if String.contains slot '\000' then
-      Test.fail "make_slot: The content of a slot cannot contain `\000`" ;
     let actual_slot_size = String.length slot in
     if actual_slot_size < slot_size && padding then
       pad (slot_size - actual_slot_size) slot
