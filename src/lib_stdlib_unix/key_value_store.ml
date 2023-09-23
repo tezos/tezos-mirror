@@ -80,6 +80,8 @@ module Directories : sig
 
   val read :
     'value t -> ('b, 'value) directory_spec -> 'b -> 'value tzresult Lwt.t
+
+  val value_exists : 'value t -> ('b, 'value) directory_spec -> 'b -> bool Lwt.t
 end = struct
   module LRU = Ringo.LRU_Collection
 
@@ -331,6 +333,12 @@ end = struct
           return data
       | Some v -> return v
     else tzfail (Missing_stored_kvs_data (spec.path, index))
+
+  let value_exists dirs spec file =
+    let open Lwt_syntax in
+    let index = spec.index_of file in
+    bind_dir_and_lock_file dirs spec index @@ fun _cached handle ->
+    return @@ file_exists handle index
 end
 
 type ('dir, 'file, 'value) t =
@@ -388,6 +396,12 @@ let read_value :
   let dir = directory_of dir in
   Directories.read directories dir file
 
+let value_exists :
+    type dir file value. (dir, file, value) t -> dir -> file -> bool Lwt.t =
+ fun (E {directories; directory_of}) dir file ->
+  let dir = directory_of dir in
+  Directories.value_exists directories dir file
+
 let write_values ?override t seq =
   Seq.ES.iter
     (fun (dir, file, value) -> write_value ?override t dir file value)
@@ -398,4 +412,11 @@ let read_values t seq =
   Seq_s.of_seq seq
   |> Seq_s.S.map (fun (dir, file) ->
          let* maybe_value = read_value t dir file in
+         return (dir, file, maybe_value))
+
+let values_exist t seq =
+  let open Lwt_syntax in
+  Seq_s.of_seq seq
+  |> Seq_s.S.map (fun (dir, file) ->
+         let* maybe_value = value_exists t dir file in
          return (dir, file, maybe_value))
