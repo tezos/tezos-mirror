@@ -74,19 +74,16 @@ let parse_block_reception_row (hash, application_time, validation_time, source)
 let select_cycle_info db_pool level =
   let cycle_request =
     Caqti_request.Infix.(
-      Caqti_type.int32
-      ->! Caqti_type.(tup3 (option int32) (option int32) (option int32)))
-      "SELECT id, $1 - MAX(level), size FROM cycles WHERE level <= $1"
+      Caqti_type.int32 ->? Caqti_type.(tup3 int32 int32 int32))
+      "SELECT id, $1 - level, size FROM cycles WHERE level = (SELECT MAX \
+       (level) FROM cycles WHERE level <= $1)"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Lwt.map
-        (function
-          | Error e -> Error e
-          | Ok (Some cycle, Some cycle_position, Some cycle_size) ->
-              Ok (Some Teztale_lib.Data.{cycle; cycle_position; cycle_size})
-          | Ok _ -> Ok None)
-        (Db.find cycle_request level))
+      Lwt_result.map
+        (Option.map (fun (cycle, cycle_position, cycle_size) ->
+             Teztale_lib.Data.{cycle; cycle_position; cycle_size}))
+        (Db.find_opt cycle_request level))
     db_pool
 
 let select_blocks db_pool level =
