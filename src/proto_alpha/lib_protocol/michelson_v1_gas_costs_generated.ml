@@ -122,7 +122,7 @@ let cost_BLS_FR_FROM_Z = S.safe_int 180
 let cost_BLS_FR_TO_Z = S.safe_int 85
 
 (* model encoding/CHECK_PRINTABLE *)
-(* fun size -> (14. + (10. * size)) *)
+(* fun size -> 14. + (10. * size) *)
 let cost_CHECK_PRINTABLE size =
   let size = S.safe_int size in
   let v0 = size in
@@ -514,7 +514,7 @@ let cost_N_IComb_set size =
   S.safe_int 30 + ((v0 lsr 5) + ((v0 lsr 2) + v0))
 
 (* model interpreter/N_ICompare *)
-(* fun size1 -> fun size2 -> (35. + (0.0234375 * (sat_sub (min size1 size2) 1))) *)
+(* fun size1 -> fun size2 -> 35. + (0.0234375 * (sub (min size1 size2) 1)) *)
 let cost_N_ICompare size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -679,7 +679,7 @@ let cost_N_IHalt = S.safe_int 15
 let cost_N_IHalt_alloc = S.safe_int 0
 
 (* model interpreter/N_IHalt_synthesized *)
-(* let time = 15. in let alloc = 0. in max time (alloc * 4) *)
+(* let time = 15. in let alloc = 0. in max time alloc *)
 let cost_N_IHalt_synthesized = S.safe_int 15
 
 (* model interpreter/N_IHash_key *)
@@ -831,7 +831,7 @@ let cost_N_ILsr_nat size =
 let cost_N_ILt = S.safe_int 10
 
 (* model interpreter/N_IMap_get *)
-(* fun size1 -> fun size2 -> (45. + (0.046875 * (size1 * (log2 (1 + size2))))) *)
+(* fun size1 -> fun size2 -> 45. + (0.046875 * (size1 * (log2 (1 + size2)))) *)
 let cost_N_IMap_get size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -839,7 +839,7 @@ let cost_N_IMap_get size1 size2 =
   S.safe_int 45 + ((v0 lsr 5) + (v0 lsr 6))
 
 (* model interpreter/N_IMap_get_and_update *)
-(* fun size1 -> fun size2 -> (75. + (0.140625 * (size1 * (log2 (1 + size2))))) *)
+(* fun size1 -> fun size2 -> 75. + (0.140625 * (size1 * (log2 (1 + size2)))) *)
 let cost_N_IMap_get_and_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -861,7 +861,7 @@ let cost_N_IMap_map size =
   S.safe_int 40 + ((v0 lsr 1) + (v0 * S.safe_int 8))
 
 (* model interpreter/N_IMap_mem *)
-(* fun size1 -> fun size2 -> (45. + (0.046875 * (size1 * (log2 (1 + size2))))) *)
+(* fun size1 -> fun size2 -> 45. + (0.046875 * (size1 * (log2 (1 + size2)))) *)
 let cost_N_IMap_mem size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -873,7 +873,7 @@ let cost_N_IMap_mem size1 size2 =
 let cost_N_IMap_size = S.safe_int 10
 
 (* model interpreter/N_IMap_update *)
-(* fun size1 -> fun size2 -> (55. + (0.09375 * (size1 * (log2 (1 + size2))))) *)
+(* fun size1 -> fun size2 -> 55. + (0.09375 * (size1 * (log2 (1 + size2)))) *)
 let cost_N_IMap_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -911,7 +911,9 @@ let cost_N_IMul_bls12_381_z_fr size =
   S.safe_int 265 + ((v0 lsr 4) + v0)
 
 (* model interpreter/N_IMul_int *)
-(* fun size1 -> fun size2 -> let a = (size1 + size2) in ((0.8125 * (a * (log2 (1 + a)))) + 55.) *)
+(* fun size1 ->
+     fun size2 ->
+       let a = size1 + size2 in (0.8125 * (a * (log2 (1 + a)))) + 55. *)
 let cost_N_IMul_int size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -920,7 +922,9 @@ let cost_N_IMul_int size1 size2 =
   (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4) + S.safe_int 55
 
 (* model interpreter/N_IMul_nat *)
-(* fun size1 -> fun size2 -> let a = (size1 + size2) in ((0.8125 * (a * (log2 (1 + a)))) + 55.) *)
+(* fun size1 ->
+     fun size2 ->
+       let a = size1 + size2 in (0.8125 * (a * (log2 (1 + a)))) + 55. *)
 let cost_N_IMul_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1037,7 +1041,7 @@ let cost_N_IOr_nat size1 size2 =
   S.safe_int 35 + (v0 lsr 1)
 
 (* model interpreter/N_IPairing_check_bls12_381 *)
-(* fun size -> (450000. + (342500. * size)) *)
+(* fun size -> 450000. + (342500. * size) *)
 let cost_N_IPairing_check_bls12_381 size =
   let size = S.safe_int size in
   let v0 = size in
@@ -1060,7 +1064,8 @@ let cost_N_IRight = S.safe_int 10
 let cost_N_ISapling_empty_state = S.safe_int 300
 
 (* model interpreter/N_ISapling_verify_update *)
-(* fun size1 -> fun size2 -> ((432500. + (5740000. * size1)) + (4636500. * size2)) *)
+(* fun size1 ->
+     fun size2 -> (432500. + (5740000. * size1)) + (4636500. * size2) *)
 let cost_N_ISapling_verify_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1092,7 +1097,9 @@ let cost_N_ISet_iter size =
   S.safe_int 50 + ((v0 lsr 3) + ((v0 lsr 1) + (v0 * S.safe_int 7)))
 
 (* model interpreter/N_ISet_mem *)
-(* fun size1 -> fun size2 -> (39.3805426747 + (0.0564536354586 * (size1 * (log2 (1 + size2))))) *)
+(* fun size1 ->
+     fun size2 ->
+       39.3805426747 + (0.0564536354586 * (size1 * (log2 (1 + size2)))) *)
 let cost_N_ISet_mem size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1104,7 +1111,9 @@ let cost_N_ISet_mem size1 size2 =
 let cost_N_ISet_size = S.safe_int 10
 
 (* model interpreter/N_ISet_update *)
-(* fun size1 -> fun size2 -> (49.8905426747 + (0.140036207663 * (size1 * (log2 (1 + size2))))) *)
+(* fun size1 ->
+     fun size2 ->
+       49.8905426747 + (0.140036207663 * (size1 * (log2 (1 + size2)))) *)
 let cost_N_ISet_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1353,7 +1362,7 @@ let cost_Parsing_Data_size size1 size2 size3 =
   + (v0 * S.safe_int 70)
 
 (* model translator/TY_EQ *)
-(* fun size -> (31.1882471167 + (21.8805791266 * size)) *)
+(* fun size -> 31.1882471167 + (21.8805791266 * size) *)
 let cost_TY_EQ size =
   let v0 = size in
   S.safe_int 35 + (v0 * S.safe_int 22)
