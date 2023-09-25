@@ -320,15 +320,9 @@ struct
     let* _ = Store.close store in
     return_unit
 
-  let run scenario =
+  let run_in_dir scenario dir =
     let open Lwt_result_syntax in
-    incr uid ;
-    (* To avoid any conflict with previous runs of this test. *)
-    let pid = Unix.getpid () in
-    let path =
-      Filename.(concat @@ get_temp_dir_name ())
-        (Format.sprintf "tezos-layer2-indexed-store-test-%d-%d" pid !uid)
-    in
+    let path = Filename.concat dir "store" in
     (* Use use a hash table as a witness for the result of our scenario. Each
        action is performed both on the witness (in memory) and the real
        store. *)
@@ -384,6 +378,11 @@ struct
       check_store_agree_witness store witness keys
     in
     return keys
+
+  let run scenario =
+    Tezos_stdlib_unix.Lwt_utils_unix.with_tempdir
+      "tezos-layer2-indexed-store-test-"
+      (run_in_dir scenario)
 
   let check_run scenario =
     let promise =
@@ -611,12 +610,9 @@ let () =
     R.check_run
 
 let test_load () =
-  incr uid ;
-  let pid = Unix.getpid () in
-  let path =
-    Filename.(concat @@ get_temp_dir_name ())
-      (Format.sprintf "tezos-layer2-indexed-store-test-load-%d-%d" pid !uid)
-  in
+  Tezos_stdlib_unix.Lwt_utils_unix.with_tempdir
+    "tezos-layer2-indexed-store-test-load-"
+  @@ fun path ->
   let open Lwt_result_syntax in
   let* store =
     Indexed_file_for_test.S.load
