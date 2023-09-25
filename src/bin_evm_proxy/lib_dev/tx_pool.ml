@@ -9,6 +9,7 @@ module Types = struct
   type state = {
     rollup_node : (module Rollup_node.S);
     smart_rollup_address : string;
+    mutable level : Ethereum_types.block_height;
   }
 
   type parameters = (module Rollup_node.S) * string
@@ -74,7 +75,11 @@ type worker = Worker.infinite Worker.queue Worker.t
 
 let on_transaction _state _raw_tx = Lwt_result_syntax.return_unit
 
-let on_head _state _block_height = Lwt_result_syntax.return_unit
+let on_head state block_height =
+  let open Lwt_result_syntax in
+  let open Types in
+  state.level <- block_height ;
+  return_unit
 
 module Handlers = struct
   type self = worker
@@ -94,7 +99,9 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w () (rollup_node, smart_rollup_address) =
-    let state = Types.{rollup_node; smart_rollup_address} in
+    let state =
+      Types.{rollup_node; smart_rollup_address; level = Block_height Z.zero}
+    in
     Lwt_result_syntax.return state
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
@@ -120,6 +127,31 @@ let worker =
     | Lwt.Return worker -> Ok worker
     | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
 
+(** Sends New_l2_level each time there is a new l2 level 
+TODO: https://gitlab.com/tezos/tezos/-/issues/6079
+listen to the node instead of pulling the level each 5s
+*)
+let rec subscribe_l2_block worker =
+  let open Lwt_result_syntax in
+  let*! () = Lwt_unix.sleep 5.0 in
+  let state = Worker.state worker in
+  let Types.{rollup_node = (module Rollup_node_rpc); _} = state in
+  (* Get the current eth level.*)
+  let*! res = Rollup_node_rpc.current_block_number () in
+  match res with
+  | Error _ ->
+      (* Kind of retry strategy *)
+      Format.printf
+        "Connection with the rollup node has been lost, retrying...\n" ;
+      subscribe_l2_block worker
+  | Ok block_number ->
+      if state.level != block_number then
+        let*! _pushed =
+          Worker.Queue.push_request worker (Request.New_l2_head block_number)
+        in
+        subscribe_l2_block worker
+      else subscribe_l2_block worker
+
 let start ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
   let open Lwt_result_syntax in
   let+ worker =
@@ -129,6 +161,7 @@ let start ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
       ((module Rollup_node_rpc), smart_rollup_address)
       (module Handlers)
   in
+  let () = Lwt.dont_wait (fun () -> subscribe_l2_block worker) (fun _ -> ()) in
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
