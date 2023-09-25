@@ -33,24 +33,24 @@ pub fn typecheck(ast: AST, gas: &mut Gas, stack: &mut TypeStack) -> Result<AST, 
 }
 
 fn typecheck_instruction(
-    i: Instruction,
+    i: ParsedInstruction,
     gas: &mut Gas,
     stack: &mut TypeStack,
-) -> Result<Instruction, TcError> {
+) -> Result<ParsedInstruction, TcError> {
     use Instruction as I;
     use Type as T;
 
     gas.consume(gas::tc_cost::INSTR_STEP)?;
 
     Ok(match i {
-        I::Add => match stack.as_slice() {
+        I::Add(..) => match stack.as_slice() {
             [.., T::Nat, T::Nat] => {
                 stack.pop();
-                I::Add
+                I::Add(())
             }
             [.., T::Int, T::Int] => {
                 stack.pop();
-                I::Add
+                I::Add(())
             }
             _ => unimplemented!(),
         },
@@ -306,7 +306,10 @@ mod typecheck_tests {
         let mut stack = stk![Type::Int, Type::Int];
         let expected_stack = stk![Type::Int];
         let mut gas = Gas::new(10000);
-        assert_eq!(typecheck_instruction(Add, &mut gas, &mut stack), Ok(Add));
+        assert_eq!(
+            typecheck_instruction(Add(()), &mut gas, &mut stack),
+            Ok(Add(()))
+        );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440);
     }
@@ -316,7 +319,10 @@ mod typecheck_tests {
         let mut stack = stk![Type::Nat, Type::Nat];
         let expected_stack = stk![Type::Nat];
         let mut gas = Gas::new(10000);
-        assert_eq!(typecheck_instruction(Add, &mut gas, &mut stack), Ok(Add));
+        assert_eq!(
+            typecheck_instruction(Add(()), &mut gas, &mut stack),
+            Ok(Add(()))
+        );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440);
     }

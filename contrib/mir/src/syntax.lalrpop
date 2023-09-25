@@ -44,20 +44,20 @@ value: Value = {
 }
 
 use Instruction::*;
-instruction: Instruction = {
+instruction: ParsedInstruction = {
   "PUSH" <t:type_> <v:value> => Push(t, v),
   "INT" => Int,
   "GT" => Gt,
   "LOOP" <ib: instructionBlock> => Loop(ib),
   "DIP" <n:usize?> <ib: instructionBlock> => Dip(n, ib),
-  "ADD" => Add,
+  "ADD" => Add(()),
   "DROP" <n:usize?> => Drop(n),
   "SWAP" => Swap,
   "IF" <t: instructionBlock> <f: instructionBlock> => If(t, f),
   "DUP" <n:usize?> => Dup(n),
 }
 
-instructionSeq: Vec<Instruction> = {
+instructionSeq: Vec<ParsedInstruction> = {
   <mut ib:(<instruction>";")*><i:instruction?> => {
     // A sequence of instruction-followed-by-a-semicolon matched by
     // `(<instruction>";")*` resulting in `Vec<instruction>` and bound to `ib`,

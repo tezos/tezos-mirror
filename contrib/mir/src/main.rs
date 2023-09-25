@@ -172,7 +172,9 @@ mod tests {
                             -1,
                         ),
                     ),
-                    Add,
+                    Add(
+                        (),
+                    ),
                 ],
             ),
             Push(
@@ -195,7 +197,9 @@ mod tests {
                             2,
                         ),
                     ),
-                    Add,
+                    Add(
+                        (),
+                    ),
                     Dip(
                         Some(
                             2,
@@ -207,7 +211,9 @@ mod tests {
                                     -1,
                                 ),
                             ),
-                            Add,
+                            Add(
+                                (),
+                            ),
                         ],
                     ),
                     Dup(
