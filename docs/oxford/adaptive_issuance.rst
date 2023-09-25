@@ -32,7 +32,7 @@ This document describes Adaptive Issuance and Staking, two new features of the O
 
 .. note::
 
-  For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://medium.com/p/4ff0c50a57a8>`__.
+  For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://medium.com/the-aleph/a-walkthrough-of-tezos-new-staking-mechanism-4ff0c50a57a8>`__.
 
 .. _adaptive_issuance_oxford:
 
@@ -359,7 +359,7 @@ with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
 Pseudo-operations are self-transfers: a transfer operation where the
 destination matches the source – each involving a special entry-point of
-the same name introduced for `implicit accounts <def_implicit_account_oxford>`__.
+the same name introduced for :ref:`implicit accounts <def_implicit_account_oxford>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
