@@ -41,6 +41,7 @@ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 const ADMIN: RefPath = RefPath::assert_from(b"/admin");
+pub const ADMIN_TO_MIGRATE: RefPath = ADMIN;
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");

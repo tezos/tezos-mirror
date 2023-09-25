@@ -5,7 +5,9 @@
 
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
+use crate::storage::{
+    read_storage_version, store_storage_version, ADMIN_TO_MIGRATE, STORAGE_VERSION,
+};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 // The lowest(*) benchmarked number was 14453, but we let some margin in case
@@ -44,6 +46,8 @@ mod old_storage {
 
     const BLOCK_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
     const BLOCK_TIMESTAMP: RefPath = RefPath::assert_from(b"/timestamp");
+
+    pub const DICTATOR: RefPath = RefPath::assert_from(b"/dictator_key");
 
     fn block_path(number: U256) -> Result<OwnedPath, Error> {
         let number: &str = &number.to_string();
@@ -427,7 +431,6 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
         // MIGRATION CODE - START
 
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6282
-        // Migrate the upgrade mechanism in the storage.
         // Replace the ticketer address by the exchanger contract.
 
         match migration_block_helpers::migrate_l2_blocks(host)? {
@@ -445,6 +448,15 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
         // up the temporary paths used for migration
         migration_block_helpers::delete_next_block_number_to_migrate(host)?;
         migration_receipts_helpers::delete_next_tx_id_to_migrate(host)?;
+
+        // Replace the dictator key by the administrator contract.
+        host.store_delete(&old_storage::DICTATOR)?;
+        // KT1Xu4UMxzdhk3tJwa73bXNwBBR3jVdN7QQ2
+        let new_admin = hex::decode(
+            "4B5431587534554D787A64686B33744A7761373362584E77424252336A56644E37515132",
+        )
+        .unwrap();
+        host.store_write_all(&ADMIN_TO_MIGRATE, &new_admin)?;
 
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
