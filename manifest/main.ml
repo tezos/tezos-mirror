@@ -7435,17 +7435,11 @@ let _extract_data =
     ~opam:""
     ~deps:
       [
-        octez_stdlib_unix |> open_;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_store |> open_;
         octez_clic;
-        octez_store_unix_snapshots |> open_;
-        octez_store_shared |> open_;
-        octez_node_config |> open_;
-        octez_client_base |> open_;
         octez_client_base_unix |> open_;
-        simulation_scenario_lib |> open_;
       ]
     ~modules:["extract_data"]
     ~bisect_ppx:No

@@ -90,33 +90,21 @@
 (executable
  (name extract_data)
  (libraries
-  octez-libs.stdlib-unix
   octez-libs.base
   octez-libs.base.unix
   octez-shell-libs.store
   octez-libs.clic
-  octez-shell-libs.store.unix-snapshots
-  octez-shell-libs.store.shared
-  octez-node-config
-  octez-shell-libs.client-base
-  octez-shell-libs.client-base-unix
-  simulation_scenario_lib)
+  octez-shell-libs.client-base-unix)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
   (-linkall))
  (flags
   (:standard)
-  -open Tezos_stdlib_unix
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_store
-  -open Tezos_store_unix_snapshots
-  -open Tezos_store_shared
-  -open Octez_node_config
-  -open Tezos_client_base
-  -open Tezos_client_base_unix
-  -open Simulation_scenario_lib)
+  -open Tezos_client_base_unix)
  (modules extract_data))
 
 (executable

@@ -8,13 +8,11 @@
 (* Extract profiling result for provided block hash
    ------------------------
    Invocation:
-     ./_build/default/devtools/testnet_experiment_tools/extract_data.exe \
-     extract profiling info for block hash \
-     --profiling-reports-directory <profiling_reports_directory> \
-     --searched-blocks <searched_block>
+     ./_build/default/devtools/testnet_experiment_tools/extract_data.exe extract \
+     --profiling-dir <profiling-dir> --blocks <blocks>
    Requirements:
-     <profiling-reports-directory>  - directory where the profiling reports are stored
-     <searched-block>               - the searched block hashes
+     <profiling-dir>  - directory where the profiling reports are stored
+     <blocks>         - a list of block hashes to be searched, separated by a space
    Description:
      This file contains the script to extract all the results
      of profiling reports related to the given block hash.
@@ -36,12 +34,11 @@
 open Tezos_clic
 
 let profiling_reports_directory_arg =
-  default_arg
+  arg
     ~doc:"Profiling reports directory"
     ~short:'D'
-    ~long:"profiling-reports-directory"
-    ~placeholder:"profiling-reports-directory-path"
-    ~default:"./baker"
+    ~long:"profiling-dir"
+    ~placeholder:"profiling-dir-path"
     ( parameter @@ fun _ data_dir ->
       if Sys.file_exists data_dir && Sys.is_directory data_dir then
         Lwt_result_syntax.return data_dir
@@ -55,8 +52,8 @@ let searched_blocks_arg =
        \", example:  \"BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw and \
        BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY\""
     ~short:'B'
-    ~long:"searched-blocks"
-    ~placeholder:"searched-blocks-path"
+    ~long:"blocks"
+    ~placeholder:"blocks"
     ( parameter @@ fun _ searched_blocks ->
       let searched_blocks = String.split_on_char ' ' searched_blocks in
       Lwt_result_syntax.return searched_blocks )
@@ -64,7 +61,7 @@ let searched_blocks_arg =
 let split_lines_starting_with_b input_str =
   let regexp = Str.regexp "\nB" in
   let lines = Str.split regexp input_str in
-  (* Split get rif of the searched characters, let's re-add the B. *)
+  (* Split gets rid of the searched characters, let's re-add the 'B'. *)
   let lines = List.map (fun line -> "B" ^ line) lines in
   lines
 
@@ -143,10 +140,10 @@ let commands () =
         }
       ~desc:"Extract block profiling info."
       (args2 profiling_reports_directory_arg searched_blocks_arg)
-      (fixed ["extract"; "profiling"; "info"; "for"; "block"; "hash"])
+      (fixed ["extract"])
       (fun (profiling_reports_directory, search_blocks) _cctxt ->
-        match search_blocks with
-        | Some search_blocks ->
+        match (profiling_reports_directory, search_blocks) with
+        | Some profiling_reports_directory, Some search_blocks ->
             Lwt_result_syntax.return
             @@ List.iter
                  (fun search_block ->
@@ -154,7 +151,14 @@ let commands () =
                      profiling_reports_directory
                      search_block)
                  search_blocks
-        | _ -> failwith "No block hash specified, it is mandatory.");
+        | Some _, _ ->
+            failwith
+              "No profiling reports directory specified, it is mandatory."
+        | _, Some _ -> failwith "No block hash specified, it is mandatory."
+        | _ ->
+            failwith
+              "No profiling reports directory specified and no block hash \
+               specified, both are mandatory.");
   ]
 
 let select_commands _ _ = Lwt_result_syntax.return (commands ())
