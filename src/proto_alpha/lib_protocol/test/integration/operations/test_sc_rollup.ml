@@ -181,7 +181,6 @@ let context_init ?commitment_period_in_blocks
       sc_rollup =
         {
           Context.default_test_constants.sc_rollup with
-          enable = true;
           arith_pvm_enable = true;
           private_enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
@@ -194,26 +193,6 @@ let context_init ?commitment_period_in_blocks
           timeout_period_in_blocks;
         };
     }
-
-(** [test_disable_feature_flag ()] tries to originate a smart contract
-    rollup when the feature flag is deactivated and checks that it
-    fails. *)
-let test_disable_feature_flag () =
-  let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~sc_rollup_enable:false () in
-  let* i = Incremental.begin_construction b in
-  let kind = Sc_rollup.Kind.Example_arith in
-  let* op, _ = Sc_rollup_helpers.origination_op (B b) contract kind in
-  let expect_failure = function
-    | Environment.Ecoproto_error
-        (Validate_errors.Manager.Sc_rollup_feature_disabled as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
-  in
-  let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
-  return_unit
 
 (** [test_disable_arith_pvm_feature_flag ()] tries to originate a Arith smart
     rollup when the Arith PVM feature flag is deactivated and checks that it
@@ -3664,10 +3643,6 @@ let test_whitelist_update_make_rollup_public () =
 
 let tests =
   [
-    Tztest.tztest
-      "check effect of disabled feature flag"
-      `Quick
-      test_disable_feature_flag;
     Tztest.tztest
       "check effect of disabled arith pvm flag"
       `Quick

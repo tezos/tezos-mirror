@@ -208,7 +208,6 @@ let constants_mainnet =
     dal = default_dal;
     sc_rollup =
       {
-        enable = true;
         arith_pvm_enable = false;
         (* The following value is chosen to prevent spam. *)
         origination_size = 6_314;

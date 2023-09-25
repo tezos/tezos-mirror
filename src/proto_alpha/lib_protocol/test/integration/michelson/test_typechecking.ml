@@ -35,18 +35,14 @@ open Protocol
 open Alpha_context
 open Micheline
 
-let context_init_with_sc_rollup_enabled tup =
+let context_init_with_sc_rollup_arith_enabled tup =
   Context.init_with_constants_gen
     tup
     {
       Context.default_test_constants with
       consensus_threshold = 0;
       sc_rollup =
-        {
-          Context.default_test_constants.sc_rollup with
-          enable = true;
-          arith_pvm_enable = true;
-        };
+        {Context.default_test_constants.sc_rollup with arith_pvm_enable = true};
     }
 
 let sc_originate block contract parameters_ty =
@@ -95,19 +91,9 @@ let test_context () =
   let* v = Incremental.begin_construction b in
   return (Incremental.alpha_ctxt v)
 
-let test_context_with_nat_nat_big_map ?(sc_rollup_enable = false) () =
+let test_context_with_nat_nat_big_map () =
   let open Lwt_result_wrap_syntax in
-  let* b, source =
-    Context.init_with_constants1
-      {
-        Context.default_test_constants with
-        sc_rollup =
-          {
-            Context.default_test_constants.sc_rollup with
-            enable = sc_rollup_enable;
-          };
-      }
-  in
+  let* b, source = Context.init1 () in
   let* operation, originated =
     Op.contract_origination_hash (B b) source ~script:Op.dummy_script
   in
@@ -579,9 +565,7 @@ let test_parse_comb_data () =
 let test_parse_address () =
   let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
-  let* ctxt, _big_map_id =
-    test_context_with_nat_nat_big_map ~sc_rollup_enable:true ()
-  in
+  let* ctxt, _big_map_id = test_context_with_nat_nat_big_map () in
   (* KT1% (empty entrypoint) *)
   let*?@ kt1fake =
     Contract.of_b58check "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
@@ -869,7 +853,7 @@ let test_forbidden_op_in_view op () =
 (** Test [parse_contract_data] for rollup with unit type. *)
 let test_parse_contract_data_for_unit_rollup () =
   let open Lwt_result_wrap_syntax in
-  let* block, (contract, _) = context_init_with_sc_rollup_enabled T2 in
+  let* block, (contract, _) = context_init_with_sc_rollup_arith_enabled T2 in
   let* block, rollup = sc_originate block contract "unit" in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
@@ -902,7 +886,7 @@ let test_parse_contract_data_for_unit_rollup () =
 (** Test that [parse_contract_data] for rollup with invalid type fails. *)
 let test_parse_contract_data_for_rollup_with_invalid_type () =
   let open Lwt_result_wrap_syntax in
-  let* block, (contract, _) = context_init_with_sc_rollup_enabled T2 in
+  let* block, (contract, _) = context_init_with_sc_rollup_arith_enabled T2 in
   let* block, rollup = sc_originate block contract "string" in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in

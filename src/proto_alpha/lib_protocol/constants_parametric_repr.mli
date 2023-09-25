@@ -47,7 +47,6 @@ type sc_rollup_reveal_activation_level = {
 }
 
 type sc_rollup = {
-  enable : bool;
   arith_pvm_enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;

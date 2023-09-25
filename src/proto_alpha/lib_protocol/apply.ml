@@ -36,7 +36,6 @@ type error +=
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
   | Non_empty_transaction_from of Destination.t
-  | Sc_rollup_feature_disabled
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
   | Multiple_revelation
@@ -137,17 +136,6 @@ let () =
     Data_encoding.(obj1 (req "source" Destination.encoding))
     (function Non_empty_transaction_from c -> Some c | _ -> None)
     (fun c -> Non_empty_transaction_from c) ;
-
-  let description = "Smart rollups are disabled." in
-  register_error_kind
-    `Permanent
-    ~id:"operation.smart_rollup_disabled"
-    ~title:"Smart rollups are disabled"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.unit
-    (function Sc_rollup_feature_disabled -> Some () | _ -> None)
-    (fun () -> Sc_rollup_feature_disabled) ;
 
   register_error_kind
     `Permanent
@@ -298,9 +286,6 @@ let () =
 open Apply_results
 open Apply_operation_result
 open Apply_internal_results
-
-let assert_sc_rollup_feature_enabled ctxt =
-  error_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
 let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     lazy_storage_diff ticket_diffs operations =
@@ -865,7 +850,6 @@ let apply_internal_operation_contents :
           parameters;
           unparsed_parameters = payload;
         } ->
-        let*? () = assert_sc_rollup_feature_enabled ctxt in
         let*? sender =
           match sender with
           | Destination.Contract (Originated hash) -> Ok hash

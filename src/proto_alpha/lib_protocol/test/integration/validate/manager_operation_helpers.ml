@@ -410,11 +410,7 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
   in
   let dal = {params.constants.dal with feature_enable = flags.dal} in
   let sc_rollup =
-    {
-      params.constants.sc_rollup with
-      enable = flags.scoru;
-      arith_pvm_enable = flags.scoru;
-    }
+    {params.constants.sc_rollup with arith_pvm_enable = flags.scoru}
   in
   let zk_rollup = {params.constants.zk_rollup with enable = flags.zkru} in
   let constants =
