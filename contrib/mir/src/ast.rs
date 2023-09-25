@@ -6,8 +6,10 @@
 /******************************************************************************/
 
 pub mod parsed;
+pub mod typechecked;
 
 pub use parsed::{ParsedInstruction, ParsedStage};
+pub use typechecked::{TypecheckedInstruction, TypecheckedStage};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
@@ -55,3 +57,5 @@ pub enum Instruction<T: Stage> {
 }
 
 pub type AST = Vec<ParsedInstruction>;
+
+pub type TypecheckedAST = Vec<TypecheckedInstruction>;
