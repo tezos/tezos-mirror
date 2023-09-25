@@ -477,7 +477,8 @@ Run the Migration on the Sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we run the migration on an empty context, then we would start a sandboxed
-node as usual. In our example we can run the following::
+node as usual after having prepared the migration test (see previous section).
+In our example we can run the following::
 
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
 
