@@ -40,6 +40,7 @@ const SMART_ROLLUP_ADDRESS: RefPath =
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
+pub const TICKETER_TO_MIGRATE: RefPath = TICKETER;
 const ADMIN: RefPath = RefPath::assert_from(b"/admin");
 pub const ADMIN_TO_MIGRATE: RefPath = ADMIN;
 

@@ -7,6 +7,7 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
     read_storage_version, store_storage_version, ADMIN_TO_MIGRATE, STORAGE_VERSION,
+    TICKETER_TO_MIGRATE,
 };
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -430,9 +431,6 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
 
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6282
-        // Replace the ticketer address by the exchanger contract.
-
         match migration_block_helpers::migrate_l2_blocks(host)? {
             MigrationStatus::InProgress => return Ok(MigrationStatus::InProgress),
             MigrationStatus::None | MigrationStatus::Done => (),
@@ -457,6 +455,15 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
         )
         .unwrap();
         host.store_write_all(&ADMIN_TO_MIGRATE, &new_admin)?;
+
+        // Replace the bridge address by the exchanger contract.
+        host.store_delete(&TICKETER_TO_MIGRATE)?;
+        // KT1Em7PrGiQnh9XnadvEQA1MvbNAij6fauGP
+        let new_ticketer = hex::decode(
+            "4B5431456D3750724769516E6839586E616476455141314D76624E41696A366661754750",
+        )
+        .unwrap();
+        host.store_write_all(&TICKETER_TO_MIGRATE, &new_ticketer)?;
 
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
