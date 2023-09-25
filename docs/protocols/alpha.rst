@@ -29,6 +29,9 @@ Smart Rollups
   rollups will see their PVM automatically upgrade, and newly originated smart
   rollups will use this version directly (MR :gl:`!9735`)
 
+- Added the updated whitelist for private rollups in the receipt of
+  the outbox message execution receipt. (MR :gl:`!10095`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
