@@ -1763,6 +1763,31 @@ let parse_bls12_381_fr ctxt :
       return (Script_bls.Fr.of_z v, ctxt)
   | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
+let parse_sapling_transaction ctxt ~memo_size :
+    Script.node -> (Sapling.transaction * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bytes) as expr -> (
+      match
+        Data_encoding.Binary.of_bytes_opt Sapling.transaction_encoding bytes
+      with
+      | Some transaction -> (
+          match Sapling.transaction_get_memo_size transaction with
+          | None -> return (transaction, ctxt)
+          | Some transac_memo_size ->
+              let* () =
+                memo_size_eq
+                  ~error_details:(Informative ())
+                  memo_size
+                  transac_memo_size
+              in
+              return (transaction, ctxt))
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid Sapling transaction")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
 (* -- parse data of complex types -- *)
 
 let parse_pair (type r) parse_l parse_r ctxt ~legacy
@@ -2378,31 +2403,9 @@ let rec parse_data :
                    of identifiers with [allow_forged].
                *)
   (* Sapling *)
-  | Sapling_transaction_t memo_size, expr -> (
+  | Sapling_transaction_t memo_size, expr ->
       Lwt.return @@ traced_no_lwt
-      @@
-      let open Result_syntax in
-      match expr with
-      | Bytes (loc, bytes) as expr -> (
-          match
-            Data_encoding.Binary.of_bytes_opt Sapling.transaction_encoding bytes
-          with
-          | Some transaction -> (
-              match Sapling.transaction_get_memo_size transaction with
-              | None -> return (transaction, ctxt)
-              | Some transac_memo_size ->
-                  let* () =
-                    memo_size_eq
-                      ~error_details:(Informative ())
-                      memo_size
-                      transac_memo_size
-                  in
-                  return (transaction, ctxt))
-          | None ->
-              tzfail
-                (Invalid_syntactic_constant
-                   (loc, strip_locations expr, "a valid Sapling transaction")))
-      | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
+      @@ parse_sapling_transaction ctxt ~memo_size expr
   | Sapling_transaction_deprecated_t memo_size, expr -> (
       Lwt.return @@ traced_no_lwt
       @@
