@@ -1732,6 +1732,20 @@ let parse_bls12_381_g1 ctxt :
                (loc, strip_locations expr, "a valid BLS12-381 G1 element")))
   | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
+let parse_bls12_381_g2 ctxt :
+    Script.node -> (Script_bls.G2.t * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bs) as expr -> (
+      let* ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_g2 in
+      match Script_bls.G2.of_bytes_opt bs with
+      | Some pt -> return (pt, ctxt)
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid BLS12-381 G2 element")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
 (* -- parse data of complex types -- *)
 
 let parse_pair (type r) parse_l parse_r ctxt ~legacy
@@ -2338,20 +2352,8 @@ let rec parse_data :
   (* Bls12_381 types *)
   | Bls12_381_g1_t, expr ->
       Lwt.return @@ traced_no_lwt @@ parse_bls12_381_g1 ctxt expr
-  | Bls12_381_g2_t, expr -> (
-      Lwt.return @@ traced_no_lwt
-      @@
-      let open Result_syntax in
-      match expr with
-      | Bytes (loc, bs) as expr -> (
-          let* ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_g2 in
-          match Script_bls.G2.of_bytes_opt bs with
-          | Some pt -> return (pt, ctxt)
-          | None ->
-              tzfail
-                (Invalid_syntactic_constant
-                   (loc, strip_locations expr, "a valid BLS12-381 G2 element")))
-      | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
+  | Bls12_381_g2_t, expr ->
+      Lwt.return @@ traced_no_lwt @@ parse_bls12_381_g2 ctxt expr
   | Bls12_381_fr_t, expr -> (
       Lwt.return @@ traced_no_lwt
       @@
