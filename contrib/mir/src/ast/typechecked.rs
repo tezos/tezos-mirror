@@ -11,7 +11,15 @@ use super::{Instruction, Stage};
 pub enum TypecheckedStage {}
 
 impl Stage for TypecheckedStage {
-    type AddMeta = ();
+    type AddMeta = overloads::Add;
 }
 
 pub type TypecheckedInstruction = Instruction<TypecheckedStage>;
+
+pub mod overloads {
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum Add {
+        IntInt,
+        NatNat,
+    }
+}

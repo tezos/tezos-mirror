@@ -50,11 +50,11 @@ fn typecheck_instruction(
         I::Add(..) => match stack.as_slice() {
             [.., T::Nat, T::Nat] => {
                 stack.pop();
-                I::Add(())
+                I::Add(overloads::Add::NatNat)
             }
             [.., T::Int, T::Int] => {
                 stack.pop();
-                I::Add(())
+                I::Add(overloads::Add::IntInt)
             }
             _ => unimplemented!(),
         },
@@ -312,7 +312,7 @@ mod typecheck_tests {
         let mut gas = Gas::new(10000);
         assert_eq!(
             typecheck_instruction(Add(()), &mut gas, &mut stack),
-            Ok(Add(()))
+            Ok(Add(overloads::Add::IntInt))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440);
@@ -325,7 +325,7 @@ mod typecheck_tests {
         let mut gas = Gas::new(10000);
         assert_eq!(
             typecheck_instruction(Add(()), &mut gas, &mut stack),
-            Ok(Add(()))
+            Ok(Add(overloads::Add::NatNat))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440);
