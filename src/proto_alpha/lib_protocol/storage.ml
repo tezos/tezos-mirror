@@ -862,7 +862,7 @@ module Sapling = struct
   let ciphertexts_init ctx id =
     let open Lwt_syntax in
     let+ ctx, (_id : id) =
-      Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
+      Indexed_context.Raw_context.remove (ctx, id) ["ciphertexts"]
     in
     ctx
 
