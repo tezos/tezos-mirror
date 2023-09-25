@@ -312,6 +312,7 @@ build-simulation-scenario:
 	@dune build devtools/testnet_experiment_tools/
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f _build/default/devtools/testnet_experiment_tools/simulation_scenario.exe $(OCTEZ_BIN_DIR)/simulation-scenario
+	@cp -f _build/default/devtools/testnet_experiment_tools/safety_checker.exe $(OCTEZ_BIN_DIR)/safety-checker
 
 .PHONY: test-tezt
 test-tezt: build-additional-tezt-test-dependency-executables
