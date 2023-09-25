@@ -50,17 +50,18 @@ let mapping l =
       m_members = List.map (fun (k, v) -> (scalar k, v)) l;
     }
 
-let ( @? ) x xs = match x with None -> xs | Some x -> x :: xs
+let mapping_flatten l = mapping (List.flatten l)
 
-let ( @@? ) xs ys = match xs with None -> ys | Some xs -> xs @ ys
+let map_list_of_option f = function None -> [] | Some x -> [f x]
 
 let metaSpec (t : MetaSpec.t) =
-  mapping
-  @@ Option.map (fun id -> ("id", scalar id)) t.id
-  @? Option.map
-       (fun endian -> ("endian", scalar (Endianness.to_string endian)))
-       t.endian
-  @? []
+  mapping_flatten
+    [
+      map_list_of_option (fun id -> ("id", scalar id)) t.id;
+      map_list_of_option
+        (fun endian -> ("endian", scalar (Endianness.to_string endian)))
+        t.endian;
+    ]
 
 let instanceSpec InstanceSpec.{doc = _; descr} =
   match descr with
@@ -83,18 +84,23 @@ let enums_spec enums =
 (** We only add "type" to Yaml if not [AnyType].
     TODO: This is only correct if [AnyType] means no type? *)
 let attr_type_if_not_any attr =
-  if attr.AttrSpec.dataType = AnyType then None
-  else Some ("type", scalar (DataType.to_string attr.AttrSpec.dataType))
+  match attr.AttrSpec.dataType with
+  | AnyType -> []
+  | NumericType _ | BooleanType | BytesType _ | StrType _ | ComplexDataType _ ->
+      [("type", scalar (DataType.to_string attr.AttrSpec.dataType))]
 
 let repeat_spec =
   let open RepeatSpec in
   function
-  | NoRepeat -> None
+  | NoRepeat -> []
   | RepeatUntil expr ->
-      Some
-        (("repeat", scalar "until")
-        :: [("repeat-until", scalar (Ast.to_string expr))])
+      [
+        ("repeat", scalar "until"); ("repeat-until", scalar (Ast.to_string expr));
+      ]
   | _ -> failwith "not supported"
+
+let enum_spec attr =
+  map_list_of_option (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
 
 let attr_spec attr =
   match attr.AttrSpec.dataType with
@@ -102,35 +108,36 @@ let attr_spec attr =
   | BytesType (BytesLimitType {size; _}) ->
       [
         mapping
-          (Some ("id", scalar attr.AttrSpec.id)
-          @? Some ("size", scalar (Ast.to_string size))
-          @? []);
+          [
+            ("id", scalar attr.AttrSpec.id);
+            ("size", scalar (Ast.to_string size));
+          ];
       ]
   | _ ->
       [
-        mapping
-          (Some ("id", scalar attr.AttrSpec.id)
-          @? attr_type_if_not_any attr
-          @? repeat_spec attr.cond.repeat
-          @@? Option.map (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
-          @? []);
+        mapping_flatten
+          [
+            [("id", scalar attr.AttrSpec.id)];
+            attr_type_if_not_any attr;
+            repeat_spec attr.cond.repeat;
+            enum_spec attr;
+          ];
       ]
 
 let seq_spec seq = sequence (List.concat_map attr_spec seq)
 
-let not_empty = function [] -> false | _ -> true
-
 let spec_if_non_empty name args f =
-  if not_empty args then Some (name, f args) else None
+  match args with [] -> [] | _ :: _ -> [(name, f args)]
 
 let rec to_yaml (t : ClassSpec.t) =
-  mapping
-  @@ (if t.isTopLevel then Some ("meta", metaSpec t.meta) else None)
-  @? spec_if_non_empty "types" t.types types_spec
-  @? spec_if_non_empty "instances" t.instances instances_spec
-  @? spec_if_non_empty "enums" t.enums enums_spec
-  @? spec_if_non_empty "seq" t.seq seq_spec
-  @? []
+  mapping_flatten
+    [
+      (if t.isTopLevel then [("meta", metaSpec t.meta)] else []);
+      spec_if_non_empty "types" t.types types_spec;
+      spec_if_non_empty "instances" t.instances instances_spec;
+      spec_if_non_empty "enums" t.enums enums_spec;
+      spec_if_non_empty "seq" t.seq seq_spec;
+    ]
 
 and types_spec types = mapping (types |> List.map (fun (k, v) -> (k, to_yaml v)))
 
