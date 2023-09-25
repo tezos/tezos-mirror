@@ -536,7 +536,7 @@ module Indexable_for_test = struct
 
   let close = S.close
 
-  let gc s ~retain = S.gc ~async:false s ~retain
+  let gc s ~retain = S.gc ~async:false s (Retain retain)
 end
 
 let () =
@@ -583,7 +583,7 @@ module Indexable_removable_for_test = struct
 
   let close = S.close
 
-  let gc s ~retain = S.gc ~async:false s ~retain
+  let gc s ~retain = S.gc ~async:false s (Retain retain)
 end
 
 let () =
@@ -659,7 +659,7 @@ module Indexed_file_for_test = struct
 
   let close = S.close
 
-  let gc s ~retain = S.gc ~async:false s ~retain
+  let gc s ~retain = S.gc ~async:false s (Retain retain)
 end
 
 let () =
