@@ -517,6 +517,155 @@ fn next_ticket_id(host: &mut impl Runtime) -> Result<u64, RuntimeError> {
     Ok(value)
 }
 
+/// A name space for DAL storage related functions
+pub mod dal {
+    use super::concat;
+    use super::Error;
+    use super::OwnedPath;
+    use super::RefPath;
+    use super::Runtime;
+
+    /// All errors that may happen as result of using this DAL storage
+    /// interface.
+    #[derive(Error, Debug)]
+    pub enum StorageError {
+        /// Some runtime error happened while using the hosts durable storage.
+        #[error("Runtime error")]
+        RuntimeError(tezos_smart_rollup_host::runtime::RuntimeError),
+        /// Some error happened when constructing the path to some resource
+        /// associated with an account.
+        #[error("Path error")]
+        PathError(tezos_smart_rollup_host::path::PathError),
+    }
+
+    impl From<tezos_smart_rollup_host::path::PathError> for StorageError {
+        fn from(error: tezos_smart_rollup_host::path::PathError) -> Self {
+            StorageError::PathError(error)
+        }
+    }
+
+    impl From<tezos_smart_rollup_host::runtime::RuntimeError> for StorageError {
+        fn from(error: tezos_smart_rollup_host::runtime::RuntimeError) -> Self {
+            StorageError::RuntimeError(error)
+        }
+    }
+
+    const BASE_PATH: RefPath<'static> = RefPath::assert_from(b"/dal/parameters");
+
+    fn slot_index_path() -> OwnedPath {
+        let suffix = RefPath::assert_from(b"/slot_index");
+        concat(&BASE_PATH, &suffix).expect("slot index path too long")
+    }
+
+    fn number_of_slots_path() -> OwnedPath {
+        let suffix = RefPath::assert_from(b"/number_of_slots");
+        concat(&BASE_PATH, &suffix).expect("number of slots path too long")
+    }
+
+    fn page_size_path() -> OwnedPath {
+        let suffix = RefPath::assert_from(b"/page_size");
+        concat(&BASE_PATH, &suffix).expect("page size path too long")
+    }
+
+    fn slot_size_path() -> OwnedPath {
+        let suffix = RefPath::assert_from(b"/slot_size");
+        concat(&BASE_PATH, &suffix).expect("slot size path too long")
+    }
+
+    fn attestation_lag_path() -> OwnedPath {
+        let suffix = RefPath::assert_from(b"/attestation_lag");
+        concat(&BASE_PATH, &suffix).expect("attestation lag path too long")
+    }
+
+    /// Set
+    fn set<T, U>(host: &mut impl Runtime, path: &OwnedPath, value: T) -> Result<(), StorageError>
+    where
+        T: num_traits::ops::bytes::ToBytes<Bytes = U>,
+        U: TryInto<Vec<u8>>,
+        <U as TryInto<Vec<u8>>>::Error: std::fmt::Debug,
+    {
+        host.store_write(
+            path,
+            &value
+                .to_le_bytes()
+                .try_into()
+                .expect("Error while writing DAL parameter"),
+            0,
+        )?;
+        Ok(())
+    }
+
+    /// Get
+    fn get<T, U>(host: &mut impl Runtime, path: &OwnedPath) -> Result<T, StorageError>
+    where
+        U: TryFrom<Vec<u8>>,
+        <U as TryFrom<Vec<u8>>>::Error: std::fmt::Debug,
+        T: num_traits::ops::bytes::FromBytes<Bytes = U>,
+    {
+        host.store_read(path, 0, std::mem::size_of::<T>())
+            .map(|vec| {
+                T::from_le_bytes(&(vec.try_into().expect("Error while reading DAL parameter")))
+            })
+            .map_err(StorageError::from)
+    }
+
+    /// Set slot index
+    pub fn set_slot_index(host: &mut impl Runtime, slot_index: u16) -> Result<(), StorageError> {
+        set(host, &slot_index_path(), slot_index)
+    }
+
+    /// Get slot index
+    pub fn get_slot_index(host: &mut impl Runtime) -> Result<u16, StorageError> {
+        get(host, &slot_index_path())
+    }
+
+    /// Set number of slots
+    pub fn set_number_of_slots(
+        host: &mut impl Runtime,
+        number_of_slots: u16,
+    ) -> Result<(), StorageError> {
+        set(host, &number_of_slots_path(), number_of_slots)
+    }
+
+    /// Get number of slots
+    pub fn get_number_of_slots(host: &mut impl Runtime) -> Result<u16, StorageError> {
+        get(host, &number_of_slots_path())
+    }
+
+    /// Set page size
+    pub fn set_page_size(host: &mut impl Runtime, page_size: u16) -> Result<(), StorageError> {
+        set(host, &page_size_path(), page_size)
+    }
+
+    /// Get page size
+    pub fn get_page_size(host: &mut impl Runtime) -> Result<u16, StorageError> {
+        get(host, &page_size_path())
+    }
+
+    /// Set slot size
+    pub fn set_slot_size(host: &mut impl Runtime, slot_size: u32) -> Result<(), StorageError> {
+        set(host, &slot_size_path(), slot_size)
+    }
+
+    /// Get slot size
+    pub fn get_slot_size(host: &mut impl Runtime) -> Result<u32, StorageError> {
+        get(host, &slot_size_path())
+    }
+
+    /// Attestation lag
+    pub fn set_attestation_lag(
+        host: &mut impl Runtime,
+        attestation_lag: u16,
+    ) -> Result<(), StorageError> {
+        set(host, &attestation_lag_path(), attestation_lag)
+    }
+
+    /// Get attestation lag
+    pub fn get_attestation_lag(host: &mut impl Runtime) -> Result<u16, StorageError> {
+        get(host, &attestation_lag_path())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::inbox::external::testing::gen_ed25519_keys;
