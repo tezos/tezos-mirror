@@ -1835,6 +1835,24 @@ let parse_chest_key ctxt :
                (loc, strip_locations expr, "a valid time-lock chest key")))
   | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
+let parse_chest ctxt : Script.node -> (Script_timelock.chest * context) tzresult
+    =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bytes) as expr -> (
+      let* ctxt =
+        Gas.consume ctxt (Typecheck_costs.chest ~bytes:(Bytes.length bytes))
+      in
+      match
+        Data_encoding.Binary.of_bytes_opt Script_timelock.chest_encoding bytes
+      with
+      | Some chest -> return (chest, ctxt)
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid time-lock chest")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
 (* -- parse data of complex types -- *)
 
 let parse_pair (type r) parse_l parse_r ctxt ~legacy
@@ -2479,26 +2497,7 @@ let rec parse_data :
   (* Time lock*)
   | Chest_key_t, expr ->
       Lwt.return @@ traced_no_lwt @@ parse_chest_key ctxt expr
-  | Chest_t, expr -> (
-      Lwt.return @@ traced_no_lwt
-      @@
-      let open Result_syntax in
-      match expr with
-      | Bytes (loc, bytes) as expr -> (
-          let* ctxt =
-            Gas.consume ctxt (Typecheck_costs.chest ~bytes:(Bytes.length bytes))
-          in
-          match
-            Data_encoding.Binary.of_bytes_opt
-              Script_timelock.chest_encoding
-              bytes
-          with
-          | Some chest -> return (chest, ctxt)
-          | None ->
-              tzfail
-                (Invalid_syntactic_constant
-                   (loc, strip_locations expr, "a valid time-lock chest")))
-      | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
+  | Chest_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_chest ctxt expr
 
 and parse_view :
     type storage storagec.
