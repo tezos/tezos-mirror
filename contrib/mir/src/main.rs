@@ -67,7 +67,7 @@ mod tests {
     fn typecheck_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut stack = stk![Type::Nat];
-        assert!(typechecker::typecheck(&ast, &mut Gas::default(), &mut stack).is_ok());
+        assert!(typechecker::typecheck(ast, &mut Gas::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![Type::Int]);
     }
 
@@ -77,7 +77,7 @@ mod tests {
         let mut stack = stk![Type::Nat];
         let mut gas = Gas::new(11460);
         report_gas(&mut gas, |gas| {
-            assert!(typechecker::typecheck(&ast, gas, &mut stack).is_ok());
+            assert!(typechecker::typecheck(ast, gas, &mut stack).is_ok());
         });
         assert_eq!(gas.milligas(), 0);
     }
@@ -88,7 +88,7 @@ mod tests {
         let mut stack = stk![Type::Nat];
         let mut gas = Gas::new(1000);
         assert_eq!(
-            typechecker::typecheck(&ast, &mut gas, &mut stack),
+            typechecker::typecheck(ast, &mut gas, &mut stack),
             Err(typechecker::TcError::OutOfGas)
         );
     }
@@ -98,7 +98,7 @@ mod tests {
         let ast = parser::parse(&FIBONACCI_ILLTYPED_SRC).unwrap();
         let mut stack = stk![Type::Nat];
         assert_eq!(
-            typechecker::typecheck(&ast, &mut Gas::default(), &mut stack),
+            typechecker::typecheck(ast, &mut Gas::default(), &mut stack),
             Err(typechecker::TcError::StackTooShort)
         );
     }
