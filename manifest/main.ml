@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -8094,6 +8095,7 @@ let evm_proxy_lib_dev =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_rpc_http |> open_;
+        octez_workers |> open_;
         octez_rpc_http_client_unix;
         octez_version_value;
         lwt_exit;

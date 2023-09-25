@@ -67,11 +67,19 @@ let make_config ?mode ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
     verbose;
   }
 
-let install_finalizer server =
+let install_finalizer_prod server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let+ () = Tezos_rpc_http_server.RPC_server.shutdown server in
   Format.printf "Server exited with code %d\n%!" exit_status
+
+let install_finalizer_dev server =
+  let open Lwt_syntax in
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
+  Format.printf "Server exited with code %d\n%!" exit_status ;
+  let+ () = Evm_proxy_lib_dev.Tx_pool.shutdown () in
+  Format.printf "Shutting down Tx-Pool\n%!"
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -318,22 +326,30 @@ let main_command =
           ~verbose
           ()
       in
-      let* server =
+      let* () =
         match config.mode with
         | Prod ->
             let* rollup_config =
               rollup_node_config_prod ~rollup_node_endpoint
             in
             let* directory = prod_directory rollup_config in
-            start config ~directory
+            let* server = start config ~directory in
+            let (_ : Lwt_exit.clean_up_callback_id) =
+              install_finalizer_prod server
+            in
+            return_unit
         | Dev ->
             let* rollup_config = rollup_node_config_dev ~rollup_node_endpoint in
+            let* () = Evm_proxy_lib_dev.Tx_pool.start rollup_config in
             let* directory =
               dev_directory ~verbose:config.verbose rollup_config
             in
-            start config ~directory
+            let* server = start config ~directory in
+            let (_ : Lwt_exit.clean_up_callback_id) =
+              install_finalizer_dev server
+            in
+            return_unit
       in
-      let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
       let wait, _resolve = Lwt.wait () in
       let* () = wait in
       return_unit)
