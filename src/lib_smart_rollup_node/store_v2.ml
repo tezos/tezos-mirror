@@ -431,3 +431,144 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
             loop header.predecessor
       in
       loop head.header.block_hash
+
+let gc_l2_blocks l2_blocks ~(head : Sc_rollup_block.t) ~level =
+  L2_blocks.gc
+    l2_blocks
+    (Indexed_store.Iterator
+       {
+         first = head.header.block_hash;
+         next =
+           (fun _hash (_content, header) ->
+             if header.Sc_rollup_block.level <= level then Lwt.return_none
+             else Lwt.return_some header.predecessor);
+       })
+
+let gc_commitments commitments ~last_commitment ~level =
+  Commitments.gc
+    commitments
+    (Indexed_store.Iterator
+       {
+         first = last_commitment;
+         next =
+           (fun _hash (commitment, ()) ->
+             if commitment.Commitment.inbox_level <= level then Lwt.return_none
+             else Lwt.return_some commitment.predecessor);
+       })
+
+let gc_levels_to_hashes levels_to_hashes ~(head : Sc_rollup_block.t) ~level =
+  Levels_to_hashes.gc
+    levels_to_hashes
+    (Indexed_store.Iterator
+       {
+         first = head.header.level;
+         next =
+           (fun blevel _bhash ->
+             if blevel <= level then Lwt.return_none
+             else Lwt.return_some (Int32.pred blevel));
+       })
+
+let gc_messages messages l2_blocks ~(head : Sc_rollup_block.t) ~level =
+  Messages.gc
+    messages
+    (Indexed_store.Iterator
+       {
+         first = head.header.inbox_witness;
+         next =
+           (fun _witness (_msgs, block_hash) ->
+             let open Lwt_syntax in
+             let* pred_inbox_witness =
+               let open Lwt_result_syntax in
+               let* header = L2_blocks.header l2_blocks block_hash in
+               match header with
+               | None -> return_none
+               | Some {level = blevel; _} when blevel <= level -> return_none
+               | Some {predecessor; _} ->
+                   let+ pred = L2_blocks.header l2_blocks predecessor in
+                   Option.map (fun b -> b.Sc_rollup_block.inbox_witness) pred
+             in
+             match pred_inbox_witness with
+             | Error e ->
+                 Fmt.failwith
+                   "Could not compute messages witness for GC: %a"
+                   pp_print_trace
+                   e
+             | Ok witness -> return witness);
+       })
+
+let gc_commitments_published_at_level commitments_published_at_level commitments
+    ~last_commitment ~level =
+  Commitments_published_at_level.gc
+    commitments_published_at_level
+    (Indexed_store.Iterator
+       {
+         first = last_commitment;
+         next =
+           (fun commitment_hash _ ->
+             let open Lwt_syntax in
+             let* commitment = Commitments.read commitments commitment_hash in
+             match commitment with
+             | Error e ->
+                 Fmt.failwith
+                   "Could not compute commitment published at level for GC: %a"
+                   pp_print_trace
+                   e
+             | Ok None -> return_none
+             | Ok (Some (commitment, ())) ->
+                 if commitment.Commitment.inbox_level <= level then return_none
+                 else return_some commitment.predecessor);
+       })
+
+let gc_inboxes inboxes ~(head : Sc_rollup_block.t) ~level =
+  Inboxes.gc
+    inboxes
+    (Indexed_store.Iterator
+       {
+         first = head.header.inbox_hash;
+         next =
+           (fun _inbox_hash (inbox, ()) ->
+             let open Lwt_syntax in
+             if inbox.level <= level then return_none
+             else
+               return (Inbox.Skip_list.back_pointer inbox.old_levels_messages 0));
+       })
+
+let gc
+    ({
+       l2_blocks;
+       messages;
+       inboxes;
+       commitments;
+       commitments_published_at_level;
+       l2_head;
+       last_finalized_level = _;
+       levels_to_hashes;
+       irmin_store = _;
+       protocols = _;
+       gc_levels = _;
+     } :
+      _ t) ~level =
+  let open Lwt_result_syntax in
+  let* head = L2_head.read l2_head in
+  match head with
+  | None -> return_unit
+  | Some head ->
+      let last_commitment =
+        Sc_rollup_block.most_recent_commitment head.header
+      in
+      let* () =
+        tzjoin
+          [
+            gc_l2_blocks l2_blocks ~head ~level;
+            gc_commitments commitments ~last_commitment ~level;
+            gc_levels_to_hashes levels_to_hashes ~head ~level;
+            gc_messages messages l2_blocks ~head ~level;
+            gc_commitments_published_at_level
+              commitments_published_at_level
+              commitments
+              ~last_commitment
+              ~level;
+            gc_inboxes inboxes ~head ~level;
+          ]
+      in
+      return_unit

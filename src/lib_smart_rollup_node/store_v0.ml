@@ -511,3 +511,5 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
             loop header.predecessor
       in
       loop head.header.block_hash
+
+let gc (_ : _ t) ~level:_ = failwith "GC is not implemented for store V0"
