@@ -1788,6 +1788,35 @@ let parse_sapling_transaction ctxt ~memo_size :
                (loc, strip_locations expr, "a valid Sapling transaction")))
   | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
+let parse_sapling_transaction_deprecated ctxt ~memo_size :
+    Script.node -> (Sapling.Legacy.transaction * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bytes) as expr -> (
+      match
+        Data_encoding.Binary.of_bytes_opt
+          Sapling.Legacy.transaction_encoding
+          bytes
+      with
+      | Some transaction -> (
+          match Sapling.Legacy.transaction_get_memo_size transaction with
+          | None -> return (transaction, ctxt)
+          | Some transac_memo_size ->
+              let* () =
+                memo_size_eq
+                  ~error_details:(Informative ())
+                  memo_size
+                  transac_memo_size
+              in
+              return (transaction, ctxt))
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               ( loc,
+                 strip_locations expr,
+                 "a valid Sapling transaction (deprecated format)" )))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
 (* -- parse data of complex types -- *)
 
 let parse_pair (type r) parse_l parse_r ctxt ~legacy
@@ -2406,35 +2435,9 @@ let rec parse_data :
   | Sapling_transaction_t memo_size, expr ->
       Lwt.return @@ traced_no_lwt
       @@ parse_sapling_transaction ctxt ~memo_size expr
-  | Sapling_transaction_deprecated_t memo_size, expr -> (
+  | Sapling_transaction_deprecated_t memo_size, expr ->
       Lwt.return @@ traced_no_lwt
-      @@
-      let open Result_syntax in
-      match expr with
-      | Bytes (loc, bytes) as expr -> (
-          match
-            Data_encoding.Binary.of_bytes_opt
-              Sapling.Legacy.transaction_encoding
-              bytes
-          with
-          | Some transaction -> (
-              match Sapling.Legacy.transaction_get_memo_size transaction with
-              | None -> return (transaction, ctxt)
-              | Some transac_memo_size ->
-                  let* () =
-                    memo_size_eq
-                      ~error_details:(Informative ())
-                      memo_size
-                      transac_memo_size
-                  in
-                  return (transaction, ctxt))
-          | None ->
-              tzfail
-                (Invalid_syntactic_constant
-                   ( loc,
-                     strip_locations expr,
-                     "a valid Sapling transaction (deprecated format)" )))
-      | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
+      @@ parse_sapling_transaction_deprecated ctxt ~memo_size expr
   | Sapling_state_t memo_size, Int (loc, id) ->
       if allow_forged then
         let id = Sapling.Id.parse_z id in
