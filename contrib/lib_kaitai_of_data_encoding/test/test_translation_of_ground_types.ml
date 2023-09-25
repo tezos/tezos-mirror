@@ -192,20 +192,21 @@ let%expect_test "test fixed size bytes translation" =
       Data_encoding.bytes
   in
   print_endline (Kaitai.Print.print s) ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6258
-           Consider adding support for user defined types,
-           and using this feature to write a more kaitai
-           idiomatic spec file for [ground_bytes]. *)
   [%expect
     {|
     meta:
       id: ground_bytes
       endian: be
+    types:
+      fixed_bytes:
+        seq:
+        - id: size
+          type: u4
+        - id: value
+          size: size
     seq:
-    - id: size
-      type: u4
     - id: fixed size (uint30) bytes
-      size: size
+      type: fixed_bytes
   |}]
 
 let%expect_test "test fixed size string translation" =
@@ -220,9 +221,14 @@ let%expect_test "test fixed size string translation" =
     meta:
       id: ground_string
       endian: be
+    types:
+      fixed_bytes:
+        seq:
+        - id: size
+          type: u4
+        - id: value
+          size: size
     seq:
-    - id: size
-      type: u4
     - id: fixed size (uint30) bytes
-      size: size
+      type: fixed_bytes
   |}]

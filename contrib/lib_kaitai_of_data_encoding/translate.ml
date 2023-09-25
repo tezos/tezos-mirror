@@ -31,36 +31,6 @@ open Kaitai.Types
    than the public module [Data_encoding.Encoding]. *)
 open Data_encoding__Encoding
 
-let default_meta_spec ~encoding_name =
-  MetaSpec.
-    {
-      path = [];
-      isOpaque = false;
-      id = Some encoding_name;
-      endian = Some `BE;
-      bitEndian = None;
-      encoding = None;
-      forceDebug = false;
-      opaqueTypes = None;
-      zeroCopySubstream = None;
-      imports = [];
-    }
-
-let default_class_spec ~encoding_name =
-  ClassSpec.
-    {
-      fileName = None;
-      path = [];
-      meta = default_meta_spec ~encoding_name;
-      doc = Ground.default_doc_spec;
-      toStringExpr = None;
-      params = [];
-      seq = [];
-      types = [];
-      instances = [];
-      enums = [];
-    }
-
 let rec seq_field_of_data_encoding :
     type a.
     (string * EnumSpec.t) list ->
@@ -72,7 +42,7 @@ let rec seq_field_of_data_encoding :
   | Empty -> (enums, [])
   | Ignore -> (enums, [])
   | Constant _ -> (enums, [])
-  | Bool -> (Ground.Enum.add enums Ground.Enum.bool, [Ground.Attr.bool])
+  | Bool -> (Helpers.add_uniq_assoc enums Ground.Enum.bool, [Ground.Attr.bool])
   | Uint8 -> (enums, [Ground.Attr.u1])
   | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding
   | Tup e ->
@@ -95,21 +65,18 @@ let rec seq_field_of_data_encoding :
 let rec from_data_encoding :
     type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
  fun ~encoding_name {encoding; json_encoding = _} ->
-  let class_spec_of_ground ?(enums = []) ground =
-    {(default_class_spec ~encoding_name) with seq = [ground]; enums}
-  in
   match encoding with
-  | Bool -> class_spec_of_ground ~enums:[Ground.Enum.bool] Ground.Attr.bool
-  | Uint8 -> class_spec_of_ground Ground.Attr.u1
-  | Int8 -> class_spec_of_ground Ground.Attr.s1
-  | Uint16 -> class_spec_of_ground Ground.Attr.u2
-  | Int16 -> class_spec_of_ground Ground.Attr.s2
-  | Int32 -> class_spec_of_ground Ground.Attr.s4
-  | Int64 -> class_spec_of_ground Ground.Attr.s8
-  | Int31 -> class_spec_of_ground Ground.Attr.int31
-  | Float -> class_spec_of_ground Ground.Attr.f8
-  | Bytes (_kind_length, _) -> class_spec_of_ground Ground.Attr.bytes
-  | String (_kind_length, _) -> class_spec_of_ground Ground.Attr.string
+  | Bool -> Ground.Class.bool ~encoding_name
+  | Uint8 -> Ground.Class.uint8 ~encoding_name
+  | Int8 -> Ground.Class.int8 ~encoding_name
+  | Uint16 -> Ground.Class.uint16 ~encoding_name
+  | Int16 -> Ground.Class.int16 ~encoding_name
+  | Int32 -> Ground.Class.int32 ~encoding_name
+  | Int64 -> Ground.Class.int64 ~encoding_name
+  | Int31 -> Ground.Class.int31 ~encoding_name
+  | Float -> Ground.Class.float ~encoding_name
+  | Bytes (_kind_length, _) -> Ground.Class.bytes ~encoding_name
+  | String (_kind_length, _) -> Ground.Class.string ~encoding_name
   | Tup e ->
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e
@@ -122,7 +89,7 @@ let rec from_data_encoding :
           (fun i attr -> AttrSpec.{attr with id = Printf.sprintf "field_%d" i})
           seq
       in
-      {(default_class_spec ~encoding_name) with seq; enums}
+      {(Helpers.default_class_spec ~encoding_name) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
   | Describe {encoding; _} ->
       (* TODO: patch the documentation to include available information *)

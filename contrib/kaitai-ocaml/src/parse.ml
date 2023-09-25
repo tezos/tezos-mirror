@@ -57,7 +57,7 @@ let keys m f =
     m.m_members
 
 let parse ?file ?(path = []) s =
-  let rec classSpec yaml =
+  let rec classSpec ?(isTopLevel = false) yaml =
     let m = mapping yaml in
     let meta =
       let content = find_key m "meta" in
@@ -174,6 +174,7 @@ let parse ?file ?(path = []) s =
     ClassSpec.
       {
         fileName = file;
+        isTopLevel;
         path;
         meta;
         doc;
@@ -207,4 +208,4 @@ let parse ?file ?(path = []) s =
     | Ok x -> x
     | Error (`Msg msg) -> failwith msg
   in
-  classSpec yaml
+  classSpec ~isTopLevel:true yaml

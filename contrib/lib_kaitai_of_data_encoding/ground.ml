@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 open Kaitai.Types
+open Helpers
 
 let default_doc_spec = DocSpec.{summary = None; refs = []}
 
@@ -45,20 +46,6 @@ let default_attr_spec =
 
 module Enum = struct
   type map = (string * Kaitai.Types.EnumSpec.t) list
-
-  let add enums ((k, e) as enum) =
-    let rec add = function
-      | [] -> enum :: enums
-      | ee :: _ when enum = ee ->
-          (* [enum] is already present in [enums] *)
-          enums
-      | (kk, ee) :: _ when String.equal kk k && not (ee = e) ->
-          (* [enum] key is already present in [enums], but for a different
-             [enum]. *)
-          raise (Invalid_argument "Enum.add: duplicate keys")
-      | _ :: enums -> add enums
-    in
-    add enums
 
   let bool =
     ( "bool",
@@ -140,6 +127,9 @@ module Attr = struct
 
   let s2 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
 
+  let u4 ?(id = "uint32") () =
+    int_multi_type_atrr_spec ~id ~signed:false DataType.W4
+
   let s4 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
 
   let s8 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
@@ -152,16 +142,49 @@ module Attr = struct
 
   let f8 = float_multi_type_attr_spec ~id:"float"
 
+  let fixed_size_header_class_spec =
+    {
+      (default_class_spec ~encoding_name:"fixed_bytes") with
+      seq = u4 ~id:"size" () :: [bytes_limit_type_attr_spec ~id:"value"];
+      isTopLevel = false;
+    }
+
   let bytes =
     (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
               We fix size header to [`Uint30] for now. This corresponds to
               size header of ground bytes encoding. Later on we want to add
               support for [`Uint16], [`Uint8] and [`N]. *)
-    bytes_limit_type_attr_spec ~id:"fixed size (uint30) bytes"
+    {
+      default_attr_spec with
+      id = "fixed size (uint30) bytes";
+      dataType =
+        DataType.(ComplexDataType (UserType fixed_size_header_class_spec));
+    }
 
-  let string =
-    (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
-              Same as with [Bytes] above, i.e. we need to add support for [`Uint16],
-              [`Uint8] and [`N] size header as well. *)
-    bytes_limit_type_attr_spec ~id:"fixed size (uint30) bytes"
+  let string = bytes
+end
+
+module Class = struct
+  let bool ~encoding_name =
+    class_spec_of_attr ~encoding_name ~enums:[Enum.bool] Attr.bool
+
+  let uint8 ~encoding_name = class_spec_of_attr ~encoding_name Attr.u1
+
+  let int8 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s1
+
+  let uint16 ~encoding_name = class_spec_of_attr ~encoding_name Attr.u2
+
+  let int16 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s2
+
+  let int32 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s4
+
+  let int64 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s8
+
+  let int31 ~encoding_name = class_spec_of_attr ~encoding_name Attr.int31
+
+  let float ~encoding_name = class_spec_of_attr ~encoding_name Attr.f8
+
+  let bytes ~encoding_name = class_spec_of_attr ~encoding_name Attr.bytes
+
+  let string ~encoding_name = class_spec_of_attr ~encoding_name Attr.string
 end

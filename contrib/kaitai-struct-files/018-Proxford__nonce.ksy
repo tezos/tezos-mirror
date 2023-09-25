@@ -1,8 +1,13 @@
 meta:
   id: 018-Proxford__nonce
   endian: be
+types:
+  fixed_bytes:
+    seq:
+    - id: size
+      type: u4
+    - id: value
+      size: size
 seq:
-- id: size
-  type: u4
 - id: fixed size (uint30) bytes
-  size: size
+  type: fixed_bytes

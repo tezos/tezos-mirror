@@ -60,12 +60,7 @@ let metaSpec (t : MetaSpec.t) =
        t.endian
   @? []
 
-let classSpec _ = mapping [("test", scalar "test")]
-
 let instanceSpec _ = mapping [("test", scalar "test")]
-
-let types_spec types =
-  mapping (types |> List.map (fun (k, v) -> (k, classSpec v)))
 
 let instances_spec instances =
   mapping (instances |> List.map (fun (k, v) -> (k, instanceSpec v)))
@@ -85,19 +80,16 @@ let attr_type_if_not_any attr =
   if attr.AttrSpec.dataType = AnyType then None
   else Some ("type", scalar (DataType.to_string attr.AttrSpec.dataType))
 
-let size_header_mapping = mapping [("id", scalar "size"); ("type", scalar "u4")]
-
 let attr_spec attr =
   match attr.AttrSpec.dataType with
   (* [BytesType] attr require size header. *)
   | BytesType (BytesLimitType {size; _}) ->
-      size_header_mapping
-      :: [
-           mapping
-             (Some ("id", scalar attr.AttrSpec.id)
-             @? Some ("size", scalar (Ast.to_string size))
-             @? []);
-         ]
+      [
+        mapping
+          (Some ("id", scalar attr.AttrSpec.id)
+          @? Some ("size", scalar (Ast.to_string size))
+          @? []);
+      ]
   | _ ->
       [
         mapping
@@ -114,14 +106,16 @@ let not_empty = function [] -> false | _ -> true
 let spec_if_non_empty name args f =
   if not_empty args then Some (name, f args) else None
 
-let to_yaml (t : ClassSpec.t) =
+let rec to_yaml (t : ClassSpec.t) =
   mapping
-  @@ Some ("meta", metaSpec t.meta)
+  @@ (if t.isTopLevel then Some ("meta", metaSpec t.meta) else None)
   @? spec_if_non_empty "types" t.types types_spec
   @? spec_if_non_empty "instances" t.instances instances_spec
   @? spec_if_non_empty "enums" t.enums enums_spec
   @? spec_if_non_empty "seq" t.seq seq_spec
   @? []
+
+and types_spec types = mapping (types |> List.map (fun (k, v) -> (k, to_yaml v)))
 
 let print t =
   let y = to_yaml t in
