@@ -40,6 +40,34 @@ function push_match(output, array, regexp) {
     }
 }
 
+/// Parses the data from the `Section` output. See
+/// `evm_execution/src/handler.rs` for the format.
+function parse_data(opcode, gas_and_result) {
+    if (opcode.length != 4 && gas_and_result.length != 18) { return undefined };
+
+    let gas_data = gas_and_result.substring(0, 16);
+    let step_result = parseInt('0x' + gas_and_result.substring(16));
+    // parse little endian integers
+    let gas = parseInt('0x' + gas_data.match(/../g).reverse().join(''));
+    return { opcode, gas, step_result }
+}
+
+/// Parses the section and push the sample into the set of opcodes.
+function push_profiler_sections(output, opcodes) {
+    const section_regex = /\__wasm_debugger__::Section{ticks:(\d+);data:\((0x[0-9a-fA-F]*),0x([0-9a-fA-F]*)\)}/g;
+    for (const match of output.matchAll(section_regex)) {
+        let { opcode, gas, step_result } = parse_data(match[2], match[3]);
+        let ticks = parseInt(match[1]);
+        let result = { ticks, gas, step_result };
+        if (opcodes[opcode] == undefined) {
+            opcodes[opcode] = [result]
+        } else {
+            opcodes[opcode].push(result)
+        }
+    }
+    return opcodes;
+}
+
 function run_profiler(path) {
 
     profiler_result = new Promise((resolve, _) => {
@@ -59,6 +87,8 @@ function run_profiler(path) {
         const args = ["--kernel", EVM_INSTALLER_KERNEL_PATH, "--inputs", path, "--preimage-dir", PREIMAGE_DIR];
 
         const childProcess = spawn(RUN_DEBUGGER_COMMAND, args, {});
+
+        let opcodes = {};
 
         childProcess.stdin.write("load inputs\n");
 
@@ -87,7 +117,7 @@ function run_profiler(path) {
             push_match(output, bip_store, /\bStoring Block in Progress of size\s*(\d+)/g)
             push_match(output, bip_read, /\bReading Block in Progress of size\s*(\d+)/g)
             push_match(output, receipt_size, /\bStoring receipt of size \s*(\d+)/g)
-
+            push_profiler_sections(output, opcodes);
         });
         childProcess.on('close', _ => {
             if (profiler_output_path == "") {
@@ -117,7 +147,8 @@ function run_profiler(path) {
                 tx_size,
                 bip_store,
                 bip_read,
-                receipt_size
+                receipt_size,
+                opcodes,
             });
         });
     })
@@ -322,8 +353,25 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
 }
 
 
-function output_filename() {
-    return path.format({ dir: OUTPUT_DIRECTORY, base: `benchmark_result_${timestamp()}.csv` })
+function output_filename(time) {
+    return path.format({ dir: OUTPUT_DIRECTORY, base: `benchmark_result_${time}.csv` })
+}
+
+function opcodes_dump_filename(time) {
+    return path.format({ dir: OUTPUT_DIRECTORY, base: `dump_opcodes_${time}.json` })
+}
+
+function dump_opcodes(filename, opcodes) {
+    fs.appendFileSync(filename, "{");
+    let opcodes_entries = Object.entries(opcodes);
+    opcodes_entries.forEach((benchmarks, index) => {
+        let [benchmark_name, benchmark_opcodes] = benchmarks;
+        fs.appendFileSync(filename, `"${benchmark_name}":${JSON.stringify(benchmark_opcodes)}`);
+        if (index < opcodes_entries.length - 1) {
+            fs.appendFileSync(filename, ",")
+        }
+    });
+    fs.appendFileSync(filename, "}");
 }
 
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
@@ -352,10 +400,14 @@ async function run_all_benchmarks(benchmark_scripts) {
         "kernel_run_ticks",
         "unaccounted_ticks",
     ];
-    let output = output_filename();
+    let time = timestamp();
+    let output = output_filename(time);
+    let opcodes_dump = opcodes_dump_filename(time);
     console.log(`Output in ${output}`);
+    console.log(`Dumped opcodes in ${opcodes_dump}`);
     const csv_config = { columns: fields };
     fs.writeFileSync(output, csv.stringify([], { header: true, ...csv_config }));
+    let opcodes = {};
     for (var i = 0; i < benchmark_scripts.length; i++) {
         var benchmark_script = benchmark_scripts[i];
         var parts = benchmark_script.split("/");
@@ -364,8 +416,10 @@ async function run_all_benchmarks(benchmark_scripts) {
         build_benchmark_scenario(benchmark_script);
         run_benchmark_result = await run_benchmark("transactions.json");
         benchmark_log = log_benchmark_result(benchmark_name, run_benchmark_result);
+        opcodes[benchmark_name] = run_benchmark_result.opcodes;
         fs.appendFileSync(output, csv.stringify(benchmark_log, csv_config));
     }
+    dump_opcodes(opcodes_dump, opcodes);
     console.log("Benchmarking complete");
     execSync("rm transactions.json");
 }
