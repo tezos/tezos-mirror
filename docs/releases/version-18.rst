@@ -40,7 +40,7 @@ The Oxford protocol includes 3 features (all part of Adaptive Issuance and the n
 - the ability for *delegators* to become *stakers*; and,
 - the changes in weight for *staked* and *delegated* funds towards the computation of baking and voting rights.
 
-Instead, these are guarded behind a *single* per-block vote mechanism, where bakers signal their position **(Yes, No, Pass)**.
+Instead, these are guarded behind a *single* per-block vote mechanism, where bakers signal their position **(On, Off, Pass)**.
 
 Specifically, the Octez v18.0 Oxford baker executable introduces a dedicated option ``--adaptive-issuance-vote``, to allow bakers to manifest their choice.
 The use of this flag is *optional*, and defaults to **Pass** if not present.
