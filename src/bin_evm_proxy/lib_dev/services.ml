@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -102,9 +103,8 @@ let block_transaction_count block =
   | TxHash l -> List.length l
   | TxFull l -> List.length l
 
-let dispatch_input ~verbose
-    ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
-    =
+let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
+    (input, id) =
   let open Lwt_result_syntax in
   let dispatch_input_aux : type w. w input -> w output tzresult Lwt.t = function
     (* INTERNAL RPCs *)
@@ -228,15 +228,9 @@ let dispatch_input ~verbose
         (* A block cannot have uncles. *)
         return (Get_uncle_by_block_number_and_index.Output (Ok None))
     | Send_raw_transaction.Input (Some tx_raw) -> (
-        let* is_valid = Rollup_node_rpc.is_tx_valid tx_raw in
-        match is_valid with
-        | Ok () ->
-            let* tx_hash =
-              Rollup_node_rpc.inject_raw_transaction
-                ~smart_rollup_address
-                tx_raw
-            in
-            return (Send_raw_transaction.Output (Ok tx_hash))
+        let* tx_hash = Tx_pool.add tx_raw in
+        match tx_hash with
+        | Ok tx_hash -> return (Send_raw_transaction.Output (Ok tx_hash))
         | Error reason ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
             return

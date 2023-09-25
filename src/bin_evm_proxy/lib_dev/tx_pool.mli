@@ -12,3 +12,7 @@ val start : (module Rollup_node.S) * string -> unit tzresult Lwt.t
 (** [shutdown ()] stops the tx-pool, waiting for the ongoing request
     to be processed. *)
 val shutdown : unit -> unit Lwt.t
+
+(** [add raw_tx] adds a raw eth transaction to the tx-pool. *)
+val add :
+  Ethereum_types.hex -> (Ethereum_types.hash, string) result tzresult Lwt.t
