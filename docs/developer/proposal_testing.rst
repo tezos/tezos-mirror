@@ -488,14 +488,14 @@ We can also start the client::
 
 Instead of command ``octez-activate-alpha``, the sandboxed client script
 ``src/bin_client/octez-init-sandboxed-client.sh`` now accepts a command
-``tezos-activate-XXX-<short_hash>`` that activates the predecessor protocol with
+``octez-activate-XXX-<short_hash>`` that activates the predecessor protocol with
 version number ``XXX`` and short hash ``<short_hash>``. In our example, the
 predecessor protocol is ``011`` with short hash ``PtHangz2``. (Check the folder
 ``src`` for the version number and short hash of the predecessor protocol for
 migrations to versions different from ``012``.) We can activate this protocol by
 invoking::
 
-  $ tezos-activate-011-PtHangz2
+  $ octez-activate-011-PtHangz2
 
 Activation of the predecessor protocol produces one block and increases the
 level by one. This unavoidable increase of the level has to be taken into
@@ -640,7 +640,7 @@ Run sandboxed node and client::
 
 Activate predecessor of the Alpha protocol and move chain one level forward::
 
-  $ tezos-activate-011-PtHangz2
+  $ octez-activate-011-PtHangz2
 
 Bake two more blocks::
 
@@ -659,7 +659,7 @@ To test again, restart the sandboxed node and client::
 
 Activate predecessor of the Alpha protocol::
 
-  $ tezos-activate-011-PtHangz2
+  $ octez-activate-011-PtHangz2
 
 Bake two blocks::
 
