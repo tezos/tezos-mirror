@@ -69,8 +69,10 @@ type tx_log = {
   transactionIndex : int32;
   blockHash : string;
   logIndex : int32;
-  removed : string;
+  removed : bool;
 }
+
+let extract_log_body (x : tx_log) = (x.address, x.topics, x.data)
 
 let logs_of_json json =
   let open JSON in
@@ -83,7 +85,7 @@ let logs_of_json json =
     transactionIndex = json |-> "transactionIndex" |> as_int32;
     blockHash = json |-> "blockHash" |> as_string;
     logIndex = json |-> "logIndex" |> as_int32;
-    removed = json |-> "removed" |> as_string;
+    removed = json |-> "removed" |> as_bool;
   }
 
 (* as per https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionreceipt *)

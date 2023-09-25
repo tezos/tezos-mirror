@@ -14,6 +14,8 @@ license = "MIT"
 thiserror.workspace = true
 
 primitive-types.workspace = true
+ethereum.workspace = true
+ethbloom.workspace = true
 
 rlp.workspace = true
 hex.workspace = true

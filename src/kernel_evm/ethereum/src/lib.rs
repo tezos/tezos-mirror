@@ -11,3 +11,6 @@ pub mod tx_common;
 pub mod tx_signature;
 pub mod wei;
 pub mod withdrawal;
+
+pub use ethbloom::{Bloom, Input};
+pub use ethereum::Log;

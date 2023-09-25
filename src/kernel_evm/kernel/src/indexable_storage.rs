@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::StorageError;
+use tezos_evm_logging::log;
+use tezos_evm_logging::Level::Error;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
@@ -52,7 +54,7 @@ impl IndexableStorage {
     }
 
     fn store_index<Host: Runtime>(
-        &mut self,
+        &self,
         host: &mut Host,
         index: u64,
         value_repr: &[u8],
@@ -72,30 +74,10 @@ impl IndexableStorage {
         Ok(length)
     }
 
-    /// Push a value at index `length`, and increments the length.
-    pub fn push_value<Host: Runtime>(
-        &mut self,
-        host: &mut Host,
-        value: &[u8],
-    ) -> Result<(), StorageError> {
-        let new_index = self.get_length_and_increment(host)?;
-        self.store_index(host, new_index, value)
-    }
-}
-
-#[cfg(test)]
-pub mod internal_for_tests {
-    use super::*;
-
-    use tezos_evm_logging::{log, Level::Error};
-
     /// `length` returns the number of keys in the storage. If `/length` does
     /// not exists, the storage is considered as empty and returns '0'.
-    pub fn length<Host: Runtime>(
-        host: &Host,
-        storage: &IndexableStorage,
-    ) -> Result<u64, StorageError> {
-        let path = concat(&storage.path, &LENGTH)?;
+    pub fn length<Host: Runtime>(&self, host: &Host) -> Result<u64, StorageError> {
+        let path = concat(&self.path, &LENGTH)?;
         match read_u64(host, &path) {
             Ok(l) => Ok(l),
             Err(
@@ -114,33 +96,43 @@ pub mod internal_for_tests {
     }
 
     /// Same as `get_value`, but doesn't check for bounds.
-    fn unsafe_get_value<Host: Runtime>(
+    pub fn unsafe_get_value<Host: Runtime>(
+        &self,
         host: &Host,
-        storage: &IndexableStorage,
         index: u64,
     ) -> Result<Vec<u8>, StorageError> {
-        let key_path = storage.value_path(index)?;
+        let key_path = self.value_path(index)?;
         host.store_read_all(&key_path).map_err(StorageError::from)
     }
 
     /// Returns the value a the given index. Fails if the index is greater or
     /// equal to the length.
+    #[cfg(test)]
     pub fn get_value<Host: Runtime>(
+        &self,
         host: &Host,
-        storage: &IndexableStorage,
         index: u64,
     ) -> Result<Vec<u8>, StorageError> {
-        let length = length(host, storage)?;
+        let length = self.length(host)?;
         if index >= length {
             return Err(StorageError::IndexOutOfBounds);
         };
-        unsafe_get_value(host, storage, index)
+        self.unsafe_get_value(host, index)
+    }
+
+    /// Push a value at index `length`, and increments the length.
+    pub fn push_value<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        value: &[u8],
+    ) -> Result<(), StorageError> {
+        let new_index = self.get_length_and_increment(host)?;
+        self.store_index(host, new_index, value)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::internal_for_tests::{get_value, length};
     use super::*;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
@@ -151,7 +143,7 @@ mod tests {
         let values = RefPath::assert_from(b"/values");
         let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 
-        assert_eq!(length(&host, &storage), Ok(0));
+        assert_eq!(storage.length(&host), Ok(0));
     }
 
     #[test]
@@ -167,9 +159,9 @@ mod tests {
             .push_value(&mut host, value)
             .expect("Value could not be indexed");
 
-        assert_eq!(length(&host, &storage), Ok(1));
+        assert_eq!(storage.length(&host), Ok(1));
 
-        assert_eq!(get_value(&host, &storage, 0), Ok(value.to_vec()))
+        assert_eq!(storage.get_value(&host, 0), Ok(value.to_vec()))
     }
 
     #[test]
@@ -185,10 +177,10 @@ mod tests {
             .push_value(&mut host, value)
             .expect("Value could not be indexed");
 
-        assert_eq!(length(&host, &storage), Ok(1));
+        assert_eq!(storage.length(&host), Ok(1));
 
         assert_eq!(
-            get_value(&host, &storage, 1),
+            storage.get_value(&host, 1),
             Err(StorageError::IndexOutOfBounds)
         )
     }

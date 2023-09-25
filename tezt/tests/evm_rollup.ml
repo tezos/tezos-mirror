@@ -64,6 +64,14 @@ type full_evm_setup = {
 
 let hex_256_of n = Printf.sprintf "%064x" n
 
+let hex_256_of_address acc =
+  let s = acc.Eth_account.address in
+  (* strip 0x and convert to lowercase *)
+  let n = String.length s in
+  let s = String.lowercase_ascii @@ String.sub s 2 (n - 2) in
+  (* prepend 24 leading zeros *)
+  String.("0x" ^ make 24 '0' ^ s)
+
 let evm_proxy_server_version proxy_server =
   let endpoint = Evm_proxy_server.endpoint proxy_server in
   let get_version_url = endpoint ^ "/version" in
@@ -72,7 +80,8 @@ let evm_proxy_server_version proxy_server =
 let get_transaction_status ~endpoint ~tx =
   let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
   match receipt with
-  | None -> failwith "no transaction receipt, it probably isn't mined yet."
+  | None ->
+      failwith "no transaction receipt, probably it hasn't been mined yet."
   | Some r -> return r.status
 
 let check_tx_succeeded ~endpoint ~tx =
@@ -84,6 +93,25 @@ let check_tx_failed ~endpoint ~tx =
   let* status = get_transaction_status ~endpoint ~tx in
   Check.(is_false status) ~error_msg:"Expected transaction to fail." ;
   unit
+
+let check_status_n_logs ~endpoint ~status ~logs ~tx =
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
+  match receipt with
+  | None ->
+      failwith "no transaction receipt, probably it hasn't been mined yet."
+  | Some r ->
+      Check.(
+        (r.status = status)
+          bool
+          ~__LOC__
+          ~error_msg:"Unexpected transaction status, expected: %R but got: %L") ;
+      let received_logs = List.map Transaction.extract_log_body r.logs in
+      Check.(
+        (received_logs = logs)
+          (list (tuple3 string (list string) string))
+          ~__LOC__
+          ~error_msg:"Unexpected transaction logs, expected:\n%R but got:\n%L") ;
+      unit
 
 (** [get_value_in_storage client addr nth] fetch the [nth] value in the storage
     of account [addr]  *)
@@ -1014,12 +1042,35 @@ let test_l2_deploy_erc20 =
       ~address
       ~method_call:(Printf.sprintf "burn(%d)" n)
   in
-
+  let transfer_event_topic =
+    let h =
+      Tezos_crypto.Hacl.Hash.Keccak_256.digest
+        (Bytes.of_string "Transfer(address,address,uint256)")
+    in
+    "0x" ^ Hex.show (Hex.of_bytes h)
+  in
+  let zero_address = "0x" ^ String.make 64 '0' in
+  let mint_logs sender amount =
+    [
+      ( address,
+        [transfer_event_topic; zero_address; hex_256_of_address sender],
+        "0x" ^ hex_256_of amount );
+    ]
+  in
+  let burn_logs sender amount =
+    [
+      ( address,
+        [transfer_event_topic; hex_256_of_address sender; zero_address],
+        "0x" ^ hex_256_of amount );
+    ]
+  in
   (* sender mints 42 *)
   let* tx =
     wait_for_application ~sc_rollup_node ~node ~client (call_mint sender 42) ()
   in
-  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* () =
+    check_status_n_logs ~endpoint ~status:true ~logs:(mint_logs sender 42) ~tx
+  in
 
   (* totalSupply is the first value in storage *)
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:42 in
@@ -1028,7 +1079,9 @@ let test_l2_deploy_erc20 =
   let* tx =
     wait_for_application ~sc_rollup_node ~node ~client (call_mint player 100) ()
   in
-  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* () =
+    check_status_n_logs ~endpoint ~status:true ~logs:(mint_logs player 100) ~tx
+  in
   (* totalSupply is the first value in storage *)
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:142 in
 
@@ -1047,7 +1100,9 @@ let test_l2_deploy_erc20 =
   let* tx =
     wait_for_application ~sc_rollup_node ~node ~client (call_burn sender 42) ()
   in
-  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* () =
+    check_status_n_logs ~endpoint ~status:true ~logs:(burn_logs sender 42) ~tx
+  in
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
 

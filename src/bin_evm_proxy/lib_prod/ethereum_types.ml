@@ -282,7 +282,7 @@ let transaction_receipt_from_rlp bytes =
         effectiveGasPrice = effective_gas_price;
         gasUsed = gas_used;
         logs = [];
-        logsBloom = Hash (String.make 256 'a');
+        logsBloom = Hash (String.make 512 '0');
         type_;
         status;
         contractAddress = contract_address;
