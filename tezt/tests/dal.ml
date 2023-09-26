@@ -500,11 +500,7 @@ let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
   let attestation = Array.make nb_slots false in
   List.iter (fun i -> attestation.(i) <- true) availability ;
   let* level =
-    match level with
-    | Some level -> return level
-    | None ->
-        let* level = Client.level client in
-        return @@ (level + 1)
+    match level with Some level -> return level | None -> Client.level client
   in
   Operation.Consensus.inject
     ~force
@@ -781,10 +777,10 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   let* (`OpHash h2) = attest ~level:(now - 1) in
   let outdated = [h1; h2] in
   let* () = mempool_is ~__LOC__ Mempool.{empty with outdated} in
-  let* (`OpHash h3) = attest ~level:(now + 1) in
+  let* (`OpHash h3) = attest ~level:now in
   let validated = [h3] in
   let* () = mempool_is ~__LOC__ Mempool.{empty with outdated; validated} in
-  let* (`OpHash h4) = attest ~level:(now + 2) in
+  let* (`OpHash h4) = attest ~level:(now + 1) in
   let branch_delayed = [h4] in
   let* () =
     mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
@@ -847,7 +843,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
 (* Tests that DAL attestations are only included in the block
    if the attestation is from a DAL-committee member. *)
 let test_slots_attestation_operation_dal_committee_membership_check _protocol
-    parameters _cryptobox node client _bootstrap_key =
+    parameters _cryptobox _node client _bootstrap_key =
   let* new_account =
     (* Set up a new account that holds some tez and is revealed. *)
     let* new_account = Client.gen_and_show_keys client in
@@ -865,7 +861,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
     return new_account
   in
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
-  let* level = next_level node in
+  let* level = Client.level client in
   let* (`OpHash _oph) =
     (* The attestation from the new account should fail as
        the new account is not an attester and cannot be on the DAL committee. *)

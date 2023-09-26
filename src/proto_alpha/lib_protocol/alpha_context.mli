@@ -2769,6 +2769,7 @@ module Dal_errors : sig
         given : Raw_level.t;
       }
     | Dal_cryptobox_error of {explanation : string}
+    | Dal_unexpected_attestation_at_root_level
 end
 
 (** This module re-exports definitions from {!Sc_rollup_storage} and

@@ -51,10 +51,19 @@ type operation = {
   attestation : t;
       (** The bitset of slots that are attested to be available. *)
   level : Raw_level_repr.t;
-      (** The level at which the operation is valid. It should be equal to the
-          attested slot's published level plus the DAL attestation lag. *)
+      (** Similar to {!Operation_repr.consensus_content.level}. It is the level
+          at which the operation is valid in the mempool. It is the predecessor
+          at the level of the block that contains it. It should be equal to the
+          attested slot's published level plus the DAL attestation lag minus
+          one. *)
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4672
-         consider renaming to [attested_level] *)
+         consider renaming to [attestation_level].
+         Maybe not a great idea, but we could try this:
+         - attestation level: this level ^, the one inside the op;
+         - attested level: its successor, the level of the block
+         - That is, we have:
+             [attestation_level + 1 = attested_level]
+             [published_level + attestation_lag = attested_level] *)
 }
 
 val encoding : t Data_encoding.t

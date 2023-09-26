@@ -64,7 +64,12 @@ let validate_attestation ctxt op =
       Compare.Int.(size <= maximum_size)
       (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
-  let expected = Level.(current ctxt).level in
+  let current = Level.(current ctxt).level in
+  let* expected =
+    match Raw_level.pred current with
+    | None -> error Dal_unexpected_attestation_at_root_level
+    | Some level -> return level
+  in
   let delta_levels = Raw_level.diff expected given in
   let* () =
     error_when

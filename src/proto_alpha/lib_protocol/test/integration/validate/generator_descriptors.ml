@@ -642,9 +642,9 @@ let dal_attestation ctxt current_level delegate =
   | Some _interval ->
       (* The content of the attestation does not matter for covalidity. *)
       let attestation = Dal.Attestation.empty in
-      let next_level = Raw_level.succ current_level in
       return_some
-        (Dal_attestation {attestor = delegate; attestation; level = next_level})
+        (Dal_attestation
+           {attestor = delegate; attestation; level = current_level})
 
 let dal_attestation_descriptor =
   let open Lwt_result_syntax in

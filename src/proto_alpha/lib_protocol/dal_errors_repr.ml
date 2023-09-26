@@ -57,6 +57,7 @@ type error +=
       length : int;
       slot_header : Dal_slot_repr.Header.t;
     }
+  | Dal_unexpected_attestation_at_root_level
 
 let () =
   let open Data_encoding in
@@ -305,4 +306,14 @@ let () =
           Some (length, slot_header)
       | _ -> None)
     (fun (length, slot_header) ->
-      Dal_register_invalid_slot_header {length; slot_header})
+      Dal_register_invalid_slot_header {length; slot_header}) ;
+  let description = "DAL attestations are not expected at root level" in
+  register_error_kind
+    `Temporary
+    ~id:"dal_unexpected_attestation_at_root_level"
+    ~title:"DAL unexpected attestation at root level"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    empty
+    (function Dal_unexpected_attestation_at_root_level -> Some () | _ -> None)
+    (fun () -> Dal_unexpected_attestation_at_root_level)
