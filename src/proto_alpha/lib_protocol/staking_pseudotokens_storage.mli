@@ -74,4 +74,19 @@ module For_RPC : sig
     contract:Contract_repr.t ->
     delegate:Signature.Public_key_hash.t ->
     Tez_repr.t tzresult Lwt.t
+
+  val staking_pseudotokens_balance :
+    Raw_context.t ->
+    delegator:Contract_repr.t ->
+    Staking_pseudotoken_repr.t tzresult Lwt.t
+
+  val get_frozen_deposits_pseudotokens :
+    Raw_context.t ->
+    delegate:Signature.public_key_hash ->
+    Staking_pseudotoken_repr.t tzresult Lwt.t
+
+  val get_frozen_deposits_staked_tez :
+    Raw_context.t ->
+    delegate:Signature.public_key_hash ->
+    Tez_repr.t tzresult Lwt.t
 end

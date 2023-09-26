@@ -5095,11 +5095,24 @@ module Staking_pseudotokens : sig
     (context * Tez.t) tzresult Lwt.t
 
   module For_RPC : sig
+    type t
+
+    val encoding : t Data_encoding.encoding
+
     val staked_balance :
       context ->
       contract:Contract.t ->
       delegate:public_key_hash ->
       Tez.t tzresult Lwt.t
+
+    val staking_pseudotokens_balance :
+      context -> delegator:Contract.t -> t tzresult Lwt.t
+
+    val get_frozen_deposits_pseudotokens :
+      context -> delegate:Signature.public_key_hash -> t tzresult Lwt.t
+
+    val get_frozen_deposits_staked_tez :
+      context -> delegate:Signature.public_key_hash -> Tez.t tzresult Lwt.t
   end
 end
 

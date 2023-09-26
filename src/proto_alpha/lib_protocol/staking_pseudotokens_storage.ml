@@ -493,4 +493,10 @@ module For_RPC = struct
     if Contract_repr.(contract = Implicit delegate) then
       get_own_frozen_deposits ctxt ~delegate
     else staked_balance ctxt ~delegator:contract ~delegate
+
+  let staking_pseudotokens_balance = staking_pseudotokens_balance
+
+  let get_frozen_deposits_pseudotokens = get_frozen_deposits_pseudotokens
+
+  let get_frozen_deposits_staked_tez = get_frozen_deposits_staked_tez
 end
