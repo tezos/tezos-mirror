@@ -161,11 +161,13 @@ let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
       | Error `Not_found -> return false
       | Error (#decoding as e) -> fail (e :> [Errors.decoding | Errors.other])
       | Ok commitment ->
-          Store.Shards.are_shards_available
-            store.shard_store
-            commitment
-            shard_indices
-          |> Errors.other_lwt_result
+          let*! b =
+            Store.Shards.are_shards_available
+              store.shard_store
+              commitment
+              shard_indices
+          in
+          return b
     in
     let all_slot_indexes =
       Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
