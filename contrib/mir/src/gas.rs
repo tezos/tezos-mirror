@@ -61,15 +61,15 @@ pub mod tc_cost {
 
     pub const VALUE_STEP: u32 = 100;
 
-    fn variadic(depth: usize) -> Result<u32, OutOfGas> {
-        Ok(depth.checked_mul(50).ok_or(OutOfGas)?.try_into()?)
+    fn variadic(depth: u16) -> Result<u32, OutOfGas> {
+        (depth as u32).checked_mul(50).ok_or(OutOfGas)
     }
 
-    pub fn drop_n(depth: &Option<usize>) -> Result<u32, OutOfGas> {
+    pub fn drop_n(depth: &Option<u16>) -> Result<u32, OutOfGas> {
         depth.map_or(Ok(0), variadic)
     }
 
-    pub fn dip_n(depth: &Option<usize>) -> Result<u32, OutOfGas> {
+    pub fn dip_n(depth: &Option<u16>) -> Result<u32, OutOfGas> {
         depth.map_or(Ok(0), variadic)
     }
 
@@ -100,47 +100,47 @@ pub mod interpret_cost {
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;
 
-    fn dropn(n: usize) -> Result<u32, OutOfGas> {
+    fn dropn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 30 + 2.713108*n, copied from the Tezos protocol
-        let go = |n: usize| {
+        let go = |n: u32| {
             n.checked_mul(2)?
                 .checked_add(30)?
                 .checked_add(n >> 1)?
                 .checked_add(n >> 3)
         };
-        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
+        go(n as u32).ok_or(OutOfGas)
     }
 
-    pub fn drop(mb_n: Option<usize>) -> Result<u32, OutOfGas> {
+    pub fn drop(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
         mb_n.map_or(Ok(DROP), dropn)
     }
 
-    fn dipn(n: usize) -> Result<u32, OutOfGas> {
+    fn dipn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
-        let go = |n: usize| n.checked_mul(4)?.checked_add(15);
-        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
+        let go = |n: u32| n.checked_mul(4)?.checked_add(15);
+        go(n as u32).ok_or(OutOfGas)
     }
 
-    pub fn dip(mb_n: Option<usize>) -> Result<u32, OutOfGas> {
+    pub fn dip(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
         mb_n.map_or(Ok(DIP), dipn)
     }
 
-    pub fn undip(n: usize) -> Result<u32, OutOfGas> {
+    pub fn undip(n: u16) -> Result<u32, OutOfGas> {
         // this is derived by observing gas costs as of Nairobi, as charged by
         // the Tezos protocol. It seems undip cost is charged as
         // cost_N_KUndip * n + cost_N_KCons,
         // where cost_N_KUndip = cost_N_KCons = 10
-        let go = |n: usize| n.checked_add(1)?.checked_mul(10);
-        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
+        let go = |n: u32| n.checked_add(1)?.checked_mul(10);
+        go(n as u32).ok_or(OutOfGas)
     }
 
-    fn dupn(n: usize) -> Result<u32, OutOfGas> {
+    fn dupn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 20 + 1.222263*n, copied from the Tezos protocol
-        let go = |n: usize| n.checked_add(20)?.checked_add(n >> 2);
-        Ok(go(n).ok_or(OutOfGas)?.try_into()?)
+        let go = |n: u32| n.checked_add(20)?.checked_add(n >> 2);
+        go(n as u32).ok_or(OutOfGas)
     }
 
-    pub fn dup(mb_n: Option<usize>) -> Result<u32, OutOfGas> {
+    pub fn dup(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
         mb_n.map_or(Ok(DUP), dupn)
     }
 
@@ -182,17 +182,8 @@ mod test {
 
     #[test]
     fn overflow_to_out_of_gas() {
-        fn check<F: Fn(usize) -> Result<u32, OutOfGas>>(f: F) -> () {
-            assert_eq!(f(usize::MAX), Err(OutOfGas));
-            assert_eq!(f(usize::MAX / 2), Err(OutOfGas));
-            assert_eq!(f(usize::MAX / 4), Err(OutOfGas));
+        for n in [usize::MAX, usize::MAX / 2, usize::MAX / 4] {
+            assert_eq!(super::tc_cost::ty_eq(n, n), Err(OutOfGas));
         }
-        check(|n| super::tc_cost::dip_n(&Some(n)));
-        check(|n| super::tc_cost::drop_n(&Some(n)));
-        check(|n| super::tc_cost::ty_eq(n, n));
-        check(|n| super::interpret_cost::dip(Some(n)));
-        check(|n| super::interpret_cost::drop(Some(n)));
-        check(|n| super::interpret_cost::dup(Some(n)));
-        check(|n| super::interpret_cost::undip(n));
     }
 }

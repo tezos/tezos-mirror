@@ -63,20 +63,20 @@ fn interpret_one(
         },
         Dip(opt_height, nested) => {
             gas.consume(interpret_cost::dip(*opt_height)?)?;
-            let protected_height: usize = opt_height.unwrap_or(1);
-            let mut protected = stack.split_off(protected_height);
+            let protected_height: u16 = opt_height.unwrap_or(1);
+            let mut protected = stack.split_off(protected_height as usize);
             interpret(nested, gas, stack)?;
             gas.consume(interpret_cost::undip(protected_height)?)?;
             stack.append(&mut protected);
         }
         Drop(opt_height) => {
             gas.consume(interpret_cost::drop(*opt_height)?)?;
-            let drop_height: usize = opt_height.unwrap_or(1);
+            let drop_height: usize = opt_height.unwrap_or(1) as usize;
             stack.drop_top(drop_height);
         }
         Dup(opt_height) => {
             gas.consume(interpret_cost::dup(*opt_height)?)?;
-            let dup_height: usize = opt_height.unwrap_or(1);
+            let dup_height: usize = opt_height.unwrap_or(1) as usize;
             stack.push(stack[dup_height - 1].clone());
         }
         Gt => {

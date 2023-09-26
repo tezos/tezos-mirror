@@ -59,7 +59,7 @@ fn typecheck_instruction(
             _ => unimplemented!(),
         },
         I::Dip(opt_height, nested) => {
-            let protected_height: usize = opt_height.unwrap_or(1);
+            let protected_height = opt_height.unwrap_or(1) as usize;
 
             gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
@@ -72,7 +72,7 @@ fn typecheck_instruction(
             I::Dip(opt_height, nested)
         }
         I::Drop(opt_height) => {
-            let drop_height: usize = opt_height.unwrap_or(1);
+            let drop_height: usize = opt_height.unwrap_or(1) as usize;
             gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len(&stack, drop_height)?;
             stack.drop_top(drop_height);
@@ -83,7 +83,7 @@ fn typecheck_instruction(
             return Err(TcError::GenericTcError);
         }
         I::Dup(opt_height) => {
-            let dup_height: usize = opt_height.unwrap_or(1);
+            let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(stack, dup_height)?;
             stack.push(stack[dup_height - 1].clone());
             I::Dup(opt_height)

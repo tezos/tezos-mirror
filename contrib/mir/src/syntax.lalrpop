@@ -21,10 +21,16 @@ match {
 number: i128 = <s:r"([+-]?)[0-9]+"> =>? i128::from_str(s)
   .map_err(|_| ParseError::User { error : "parsing of numeric literal failed." } );
 
-usize: usize = {
-  <n:number> =>? usize::try_from(n)
-    .map_err(|_| ParseError::User { error : "argument is out of range." } )
-}
+u10: u16 = <s:r"([+-]?)[0-9]+"> =>? {
+    let res = u16::from_str(s)
+      .map_err(|_| ParseError::User { error : "Expected a natural from 0 to 1023 inclusive" } )?;
+    if res >= 1024 {
+      return Err(ParseError::User {
+        error: "Expected a natural from 0 to 1023 inclusive"
+      });
+    }
+    Ok(res)
+  };
 
 type_: Type = {
   "int"  => Type::Int,
@@ -49,12 +55,12 @@ instruction: ParsedInstruction = {
   "INT" => Int,
   "GT" => Gt,
   "LOOP" <ib: instructionBlock> => Loop(ib),
-  "DIP" <n:usize?> <ib: instructionBlock> => Dip(n, ib),
+  "DIP" <n:u10?> <ib: instructionBlock> => Dip(n, ib),
   "ADD" => Add(()),
-  "DROP" <n:usize?> => Drop(n),
+  "DROP" <n:u10?> => Drop(n),
   "SWAP" => Swap,
   "IF" <t: instructionBlock> <f: instructionBlock> => If(t, f),
-  "DUP" <n:usize?> => Dup(n),
+  "DUP" <n:u10?> => Dup(n),
 }
 
 instructionSeq: Vec<ParsedInstruction> = {

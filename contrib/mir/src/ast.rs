@@ -45,9 +45,9 @@ pub trait Stage {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction<T: Stage> {
     Add(T::AddMeta),
-    Dip(Option<usize>, Vec<Instruction<T>>),
-    Drop(Option<usize>),
-    Dup(Option<usize>),
+    Dip(Option<u16>, Vec<Instruction<T>>),
+    Drop(Option<u16>),
+    Dup(Option<u16>),
     Gt,
     If(Vec<Instruction<T>>, Vec<Instruction<T>>),
     Int,

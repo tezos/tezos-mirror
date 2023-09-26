@@ -123,6 +123,41 @@ mod tests {
         );
     }
 
+    #[test]
+    fn parser_test_dip_dup_drop_args() {
+        use Instruction::{Dip, Drop, Dup};
+
+        assert_eq!(parser::parse("{ DROP 1023 }"), Ok(vec![Drop(Some(1023))]));
+        assert_eq!(
+            parser::parse("{ DIP 1023 {} }"),
+            Ok(vec![Dip(Some(1023), vec![])])
+        );
+        assert_eq!(parser::parse("{ DUP 1023 }"), Ok(vec![Dup(Some(1023))]));
+
+        // failures
+        assert_eq!(
+            parser::parse("{ DROP 1025 }")
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected a natural from 0 to 1023 inclusive"
+        );
+        assert_eq!(
+            parser::parse("{ DIP 1024 {} }")
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected a natural from 0 to 1023 inclusive"
+        );
+        assert_eq!(
+            parser::parse("{ DUP 65536 }")
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected a natural from 0 to 1023 inclusive"
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
