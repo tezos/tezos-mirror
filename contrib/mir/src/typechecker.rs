@@ -26,7 +26,11 @@ impl From<OutOfGas> for TcError {
 }
 
 #[allow(dead_code)]
-pub fn typecheck(ast: AST, gas: &mut Gas, stack: &mut TypeStack) -> Result<AST, TcError> {
+pub fn typecheck(
+    ast: AST,
+    gas: &mut Gas,
+    stack: &mut TypeStack,
+) -> Result<TypecheckedAST, TcError> {
     ast.into_iter()
         .map(|i| typecheck_instruction(i, gas, stack))
         .collect()
@@ -36,7 +40,7 @@ fn typecheck_instruction(
     i: ParsedInstruction,
     gas: &mut Gas,
     stack: &mut TypeStack,
-) -> Result<ParsedInstruction, TcError> {
+) -> Result<TypecheckedInstruction, TcError> {
     use Instruction as I;
     use Type as T;
 
