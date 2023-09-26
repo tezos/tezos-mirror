@@ -36,6 +36,12 @@ tezos-smart-rollup-mock.workspace = true
 
 [features]
 default = ["tx-kernel"]
+dal     = [
+  "tezos-smart-rollup-core/proto-alpha",
+  "tezos-smart-rollup-host/proto-alpha",
+  "tezos-smart-rollup-mock/proto-alpha"
+]
+debug   = []
 testing = [
   "rand",
   "proptest",
