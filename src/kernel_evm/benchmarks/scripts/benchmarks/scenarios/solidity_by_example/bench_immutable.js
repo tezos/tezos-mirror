@@ -9,9 +9,11 @@ let contract = compile_contract_file(path.join(contracts_directory, scenario_typ
 let create_data = contract.bytecode;
 let player1 = require('../../players/player1.json');
 
+const encodedParameters = contract.interface.encodeDeploy([0]).slice(2);
+
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000))
-let create = utils.create(player1, 0, create_data)
+let create = utils.create(player1, 0, create_data + encodedParameters)
 txs.push(create.tx)
 
 
