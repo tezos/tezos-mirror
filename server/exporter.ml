@@ -93,9 +93,10 @@ let parse_block_reception_row
 
 let select_single_cycle_info db_pool level =
   let cycle_request =
-    Caqti_request.Infix.(Caqti_type.int32 ->? Caqti_type.(tup2 int32 int32))
-      "SELECT id, size FROM cycles WHERE level = (SELECT MAX (level) FROM \
-       cycles WHERE level <= $1)"
+    Caqti_request.Infix.(
+      Caqti_type.int32 ->? Caqti_type.(tup3 int32 int32 int32))
+      "SELECT id, level, size FROM cycles WHERE level = (SELECT MAX (level) \
+       FROM cycles WHERE level <= $1)"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt cycle_request level)
@@ -104,19 +105,15 @@ let select_single_cycle_info db_pool level =
 let select_cycles db_pool boundaries =
   let cycle_request =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
-      ->* Caqti_type.(tup2 (option int32) (option int32)))
-      "SELECT level, size FROM cycles WHERE level >= (SELECT MAX(level) WHERE \
-       level <= $1) AND level <= $2"
+      Caqti_type.(tup2 int32 int32) ->* Caqti_type.(tup3 int32 int32 int32))
+      "SELECT id, level, size FROM cycles WHERE level >= (SELECT MAX(level) \
+       FROM cycles WHERE level <= $1) AND level <= $2"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       Db.fold
         cycle_request
-        (fun r acc ->
-          match r with
-          | Some level, Some size -> (level, size) :: acc
-          | _ -> acc)
+        (fun (id, level, size) acc -> (id, level, size) :: acc)
         boundaries
         [])
     db_pool
@@ -398,7 +395,8 @@ let data_at_level_range db_pool boundaries =
     if high = low then
       Lwt_result.map
         (function
-          | Some (cycle_level, cycle_size) -> [(cycle_level, cycle_size)]
+          | Some (cycle_id, cycle_level, cycle_size) ->
+              [(cycle_id, cycle_level, cycle_size)]
           | None -> [])
         (select_single_cycle_info db_pool high)
     else Lwt_result.map (List.sort compare) (select_cycles db_pool boundaries)
@@ -429,14 +427,18 @@ let data_at_level_range db_pool boundaries =
         let cycle_info =
           match
             List.find_opt
-              (fun (cycle_level, cycle_size) ->
+              (fun (_, cycle_level, cycle_size) ->
                 cycle_level <= level && Int32.add cycle_level cycle_size > level)
               cycles
           with
-          | Some (cycle, cycle_size) ->
+          | Some (cycle_id, cycle_level, cycle_size) ->
               Some
                 Teztale_lib.Data.
-                  {cycle; cycle_position = Int32.sub level cycle; cycle_size}
+                  {
+                    cycle = cycle_id;
+                    cycle_position = Int32.sub level cycle_level;
+                    cycle_size;
+                  }
           | None -> None
         in
         Teztale_lib.Data.
