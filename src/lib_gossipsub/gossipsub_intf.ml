@@ -603,6 +603,8 @@ module type AUTOMATON = sig
         (** The messages ids we want to request from the peer which sent us an
             IHave message. The implementation honors the
             [max_sent_iwant_per_heartbeat] limit. *)
+    | Invalid_message_id : [`IHave] output
+        (** A message id received via IHave message is invalid. *)
     | Iwant_from_peer_with_low_score : {
         score : Score.t;
         threshold : float;

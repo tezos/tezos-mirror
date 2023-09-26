@@ -111,6 +111,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
     | Message_topic_not_tracked : [`IHave] output
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
+    | Invalid_message_id : [`IHave] output
     | Iwant_from_peer_with_low_score : {
         score : Score.t;
         threshold : float;
@@ -2302,6 +2303,7 @@ module Make (C : AUTOMATON_CONFIG) :
           count
           max
     | Message_topic_not_tracked -> fprintf fmtr "Message_topic_not_tracked"
+    | Invalid_message_id -> fprintf fmtr "Invalid_message_id"
     | Message_requested_message_ids ids ->
         fprintf
           fmtr

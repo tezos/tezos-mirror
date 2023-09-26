@@ -321,7 +321,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         state
     | ( state,
         ( GS.Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
-        | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ) ) ->
+        | Too_many_sent_iwant_messages _ | Message_topic_not_tracked
+        | Invalid_message_id ) ) ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5424
 
            Penalize peers with negative score or non expected behaviour
