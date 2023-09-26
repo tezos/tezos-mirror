@@ -14,6 +14,7 @@
 extern crate alloc;
 extern crate tezos_crypto_rs as crypto;
 
+#[cfg(feature = "dal")]
 pub mod dal;
 pub mod inbox;
 pub mod storage;
@@ -39,11 +40,14 @@ use transactions::external_inbox::ProcessExtMsgError;
 use transactions::process::execute_one_operation;
 use transactions::store::{CACHED_MESSAGES_STORE_PREFIX, DAL_PAYLOAD_PATH};
 
+use crate::inbox::v1::ParsedBatch;
 use crate::inbox::InboxDeposit;
 use crate::storage::{
     deposit_ticket_to_storage, init_account_storage, AccountStorage, AccountStorageError,
 };
+use crate::transactions::external_inbox::process_batch_message;
 use crate::transactions::store::cached_message_path;
+use crate::transactions::withdrawal::process_withdrawals;
 
 impl TryFrom<MichelsonPair<MichelsonString, StringTicket>> for InboxDeposit {
     type Error = DepositFromInternalPayloadError;
@@ -87,6 +91,36 @@ where
         if let Err(_err) = execute_one_operation(host, &mut account_storage) {
             #[cfg(feature = "debug")]
             debug_msg!(host, "Error enumerating cached header payload {}", _err);
+        }
+        return;
+    } else if let Ok(data) = host.store_read_all(&DAL_PAYLOAD_PATH) {
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6393
+        // Enable processing DAL payload incrementally with reboots.
+        #[cfg(feature = "debug")]
+        debug_msg!(host, "Found cached DAL payload, processing\n");
+        match ParsedBatch::parse(&data) {
+            Ok((_, batch)) => {
+                #[cfg(feature = "debug")]
+                debug_msg!(host, "Process parsed batch {:?}\n", batch);
+                for withdrawals in process_batch_message(host, &mut account_storage, batch) {
+                    process_withdrawals(host, withdrawals)
+                }
+            }
+            Err(_e) => {
+                #[cfg(feature = "debug")]
+                debug_msg!(host, "Failed to parse DAL payload. Error: {:?}\n", _e);
+            }
+        }
+        match host.store_delete(&DAL_PAYLOAD_PATH) {
+            Ok(()) => {}
+            Err(_e) => {
+                #[cfg(feature = "debug")]
+                debug_msg!(
+                    host,
+                    "Failed to delete processed DAL payload. Error: {:?}\n",
+                    _e
+                );
+            }
         }
         return;
     }
