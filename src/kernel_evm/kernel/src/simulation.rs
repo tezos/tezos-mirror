@@ -10,7 +10,10 @@
 use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
-use crate::{current_timestamp, parsable, parsing, retrieve_chain_id, CONFIG};
+use crate::{
+    current_timestamp, parsable, parsing, retrieve_base_fee_per_gas, retrieve_chain_id,
+    CONFIG,
+};
 
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use primitive_types::{H160, U256};
@@ -89,7 +92,9 @@ impl Evaluation {
         let timestamp = current_timestamp(host);
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host)?;
-        let block_constants = BlockConstants::first_block(timestamp, chain_id);
+        let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
+        let block_constants =
+            BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas);
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
         let precompiles = precompiles::precompile_set::<Host>();
@@ -402,7 +407,7 @@ mod tests {
     };
     use tezos_smart_rollup_mock::MockHost;
 
-    use crate::{current_timestamp, retrieve_chain_id};
+    use crate::{current_timestamp, retrieve_base_fee_per_gas, retrieve_chain_id};
 
     use super::*;
 
@@ -486,7 +491,17 @@ mod tests {
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
-        let block = BlockConstants::first_block(timestamp, chain_id.unwrap());
+        let base_fee_per_gas = retrieve_base_fee_per_gas(host);
+        assert!(chain_id.is_ok(), "chain_id should be defined");
+        assert!(
+            base_fee_per_gas.is_ok(),
+            "base_fee_per_gas should be defined"
+        );
+        let block = BlockConstants::first_block(
+            timestamp,
+            chain_id.unwrap(),
+            base_fee_per_gas.unwrap(),
+        );
         let precompiles = precompiles::precompile_set::<Host>();
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
 

@@ -114,15 +114,20 @@ pub fn produce<Host: Runtime>(
     host: &mut Host,
     queue: Queue,
     chain_id: U256,
+    base_fee_per_gas: U256,
 ) -> Result<(), anyhow::Error> {
     let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
-            Ok(block) => (block.constants(chain_id), block.number + 1, block.hash),
+            Ok(block) => (
+                block.constants(chain_id, base_fee_per_gas),
+                block.number + 1,
+                block.hash,
+            ),
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
                 (
-                    BlockConstants::first_block(timestamp, chain_id),
+                    BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas),
                     U256::zero(),
                     H256::zero(),
                 )
@@ -172,7 +177,7 @@ pub fn produce<Host: Runtime>(
                     .context("Failed to finalize the block in progress")?;
                 current_block_number = new_block.number + 1;
                 current_block_parent_hash = new_block.hash;
-                current_constants = new_block.constants(chain_id);
+                current_constants = new_block.constants(chain_id, base_fee_per_gas);
                 storage::delete_block_in_progress(host)?;
             }
         }
@@ -188,12 +193,12 @@ mod tests {
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
-    use crate::retrieve_chain_id;
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
     use crate::storage::{init_blocks_index, init_transaction_hashes_index};
     use crate::tick_model;
+    use crate::{retrieve_base_fee_per_gas, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
     };
@@ -255,6 +260,7 @@ mod tests {
     }
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
+    const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
 
     fn dummy_eth_gen_transaction(
         nonce: U256,
@@ -382,7 +388,8 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(host, queue, DUMMY_CHAIN_ID).expect("The block production failed.")
+        produce(host, queue, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.")
     }
 
     fn assert_current_block_reading_validity(host: &mut MockHost) {
@@ -420,7 +427,13 @@ mod tests {
             &sender,
             U256::from(30000u64),
         );
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let status = read_transaction_receipt_status(&mut host, &tx_hash)
             .expect("Should have found receipt");
@@ -454,7 +467,13 @@ mod tests {
             U256::from(5000000000000000u64),
         );
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let status = read_transaction_receipt_status(&mut host, &tx_hash)
             .expect("Should have found receipt");
@@ -492,7 +511,13 @@ mod tests {
             U256::from(5000000000000000u64),
         );
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
             .expect("should have found receipt");
@@ -555,7 +580,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -599,7 +630,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
         let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
             .expect("should have found receipt");
         let receipt1 = read_transaction_receipt(&mut host, &tx_hash_1)
@@ -650,7 +687,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -690,7 +733,13 @@ mod tests {
             &sender,
             U256::from(5000000000000000u64),
         );
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let indexed_accounts_after_produce = accounts_index.length(&host).unwrap();
 
@@ -721,7 +770,13 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let indexed_accounts = accounts_index.length(&host).unwrap();
 
@@ -730,8 +785,13 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        produce(&mut host, next_queue, DUMMY_CHAIN_ID)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            next_queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let indexed_accounts_after_second_produce = accounts_index.length(&host).unwrap();
 
@@ -774,7 +834,13 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
         let new_number_of_transactions_indexed =
@@ -810,8 +876,17 @@ mod tests {
         let timestamp = current_timestamp(host);
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host);
+        let base_fee_per_gas = retrieve_base_fee_per_gas(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
-        BlockConstants::first_block(timestamp, chain_id.unwrap())
+        assert!(
+            base_fee_per_gas.is_ok(),
+            "base_fee_per_gas should be defined"
+        );
+        BlockConstants::first_block(
+            timestamp,
+            chain_id.unwrap(),
+            base_fee_per_gas.unwrap(),
+        )
     }
 
     fn compute_block<MockHost: Runtime>(
@@ -1000,7 +1075,12 @@ mod tests {
         // Ensures the caller has enough balance to pay for the fees, but not
         // the transaction itself, otherwise the transaction will not even be
         // taken into account.
-        let fees = BlockConstants::first_block(U256::from(0), DUMMY_CHAIN_ID).gas_price
+        let fees = BlockConstants::first_block(
+            U256::from(0),
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .gas_price
             * tx.gas_limit;
         set_balance(&mut host, &mut evm_account_storage, &caller, fees);
 
@@ -1016,7 +1096,13 @@ mod tests {
         };
 
         // Apply the transaction
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("The block production failed.");
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
             .expect("should have found receipt");
         assert_eq!(
@@ -1059,18 +1145,33 @@ mod tests {
         let mut host = MockHost::default();
 
         // first block should be 0
-        produce(&mut host, almost_empty_queue(), DUMMY_CHAIN_ID)
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            almost_empty_queue(),
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 0);
 
         // second block
-        produce(&mut host, almost_empty_queue(), DUMMY_CHAIN_ID)
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            almost_empty_queue(),
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
 
         // third block
-        produce(&mut host, almost_empty_queue(), DUMMY_CHAIN_ID)
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            almost_empty_queue(),
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 2);
     }
 
@@ -1151,7 +1252,13 @@ mod tests {
 
         host.reboot_left().expect("should be some reboot left");
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("Should have produced");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1202,7 +1309,13 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        produce(&mut host, queue, DUMMY_CHAIN_ID).expect("Should have produced");
+        produce(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("Should have produced");
 
         // test no new block
         assert!(

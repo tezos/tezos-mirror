@@ -10,10 +10,10 @@ use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
-    read_admin, read_chain_id, read_kernel_version, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, read_ticketer, store_chain_id,
-    store_kernel_upgrade_nonce, store_kernel_version, store_storage_version,
-    STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_admin, read_base_fee_per_gas, read_chain_id, read_kernel_version,
+    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
+    read_ticketer, store_base_fee_per_gas, store_chain_id, store_kernel_upgrade_nonce,
+    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -52,6 +52,9 @@ mod upgrade;
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
 pub const CHAIN_ID: u32 = 1337;
+
+// Minimal base fee per gas
+pub const BASE_FEE_PER_GAS: u32 = 21_000;
 
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::london();
@@ -125,11 +128,12 @@ fn produce_and_upgrade<Host: Runtime>(
     queue: Queue,
     kernel_upgrade: KernelUpgrade,
     chain_id: U256,
+    base_fee_per_gas: U256,
 ) -> Result<(), anyhow::Error> {
     // Since a kernel upgrade was detected, in case an error is thrown
     // by the block production, we exceptionally "recover" from it and
     // still process the kernel upgrade.
-    if let Err(e) = block::produce(host, queue, chain_id) {
+    if let Err(e) = block::produce(host, queue, chain_id, base_fee_per_gas) {
         log!(
             host,
             Error,
@@ -151,13 +155,14 @@ pub fn stage_two<Host: Runtime>(
     host: &mut Host,
     queue: Queue,
     chain_id: U256,
+    base_fee_per_gas: U256,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage two.");
     let kernel_upgrade = queue.kernel_upgrade.clone();
     if let Some(kernel_upgrade) = kernel_upgrade {
-        produce_and_upgrade(host, queue, kernel_upgrade, chain_id)
+        produce_and_upgrade(host, queue, kernel_upgrade, chain_id, base_fee_per_gas)
     } else {
-        block::produce(host, queue, chain_id)
+        block::produce(host, queue, chain_id, base_fee_per_gas)
     }
 }
 
@@ -204,6 +209,16 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
         }
     }
 }
+fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+    match read_base_fee_per_gas(host) {
+        Ok(base_fee_per_gas) => Ok(base_fee_per_gas),
+        Err(_) => {
+            let base_fee_per_gas = U256::from(BASE_FEE_PER_GAS);
+            store_base_fee_per_gas(host, base_fee_per_gas)?;
+            Ok(base_fee_per_gas)
+        }
+    }
+}
 
 fn fetch_queue_left<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error> {
     let mut queue = Queue::new();
@@ -247,8 +262,8 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             MigrationStatus::InProgress => return Ok(()),
         }
     };
-
-    stage_two(host, queue, chain_id).context("Failed during stage 2")
+    let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
+    stage_two(host, queue, chain_id, base_fee_per_gas).context("Failed during stage 2")
 }
 
 const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
