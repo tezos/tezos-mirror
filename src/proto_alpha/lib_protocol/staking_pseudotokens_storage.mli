@@ -29,12 +29,12 @@
 
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
     staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
-    an amount of pseudotokens corresponding to [amount] using [delegate]'s 
+    an amount of pseudotokens corresponding to [amount] using [delegate]'s
     staked frozen deposits pseudotokens/tez rate.
-    
+
     This function must be called on "stake" **before** transferring tez to
-    [delegate]'s frozen deposits. 
-    
+    [delegate]'s frozen deposits.
+
     [delegate] must be [contract]'s delegate. *)
 val stake :
   Raw_context.t ->
@@ -66,7 +66,7 @@ module For_RPC : sig
     For delegate, it is their own frozen deposits.
     For delegators, their staking balance in pseudotokens is converted into tez
     using [delegate]'s staked frozen deposits tez/pseudotokens rate.
-    
+
     The given [delegate] should be [contract]'s delegate. Otherwise the given
     [Tez.t] amount will not make sense. *)
   val staked_balance :
