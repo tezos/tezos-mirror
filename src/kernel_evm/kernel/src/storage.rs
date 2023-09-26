@@ -806,7 +806,14 @@ pub fn store_block_in_progress<Host: Runtime>(
     host: &mut Host,
     block: &BlockInProgress,
 ) -> Result<(), anyhow::Error> {
-    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, &block.rlp_bytes())
+    let bytes: &[u8] = &block.rlp_bytes();
+    log!(
+        host,
+        Debug,
+        "Storing Block in Progress of size {}",
+        bytes.len()
+    );
+    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, bytes)
         .context("Failed to store BlockInProgress")
 }
 
@@ -816,6 +823,12 @@ pub fn read_block_in_progress<Host: Runtime>(
     let bytes = host
         .store_read_all(&EVM_BLOCK_IN_PROGRESS)
         .context("Failed to read stored BlockInProgress")?;
+    log!(
+        host,
+        Debug,
+        "Reading Block in Progress of size {}",
+        bytes.len()
+    );
     let decoder = Rlp::new(bytes.as_slice());
     BlockInProgress::decode(&decoder).context("Failed to decode stored BlockInProgress")
 }

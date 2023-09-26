@@ -50,6 +50,8 @@ function run_profiler(path) {
         var estimated_ticks = [];
         var estimated_ticks_per_tx = [];
         var tx_size = [];
+        var bip_store = [];
+        var bip_read = [];
 
         var profiler_output_path = "";
 
@@ -80,6 +82,8 @@ function run_profiler(path) {
             push_match(output, estimated_ticks, /\bEstimated ticks:\s*(\d+)/g)
             push_match(output, estimated_ticks_per_tx, /\bEstimated ticks after tx:\s*(\d+)/g)
             push_match(output, tx_size, /\bStoring transaction object of size\s*(\d+)/g)
+            push_match(output, bip_store, /\bStoring Block in Progress of size\s*(\d+)/g)
+            push_match(output, bip_read, /\bReading Block in Progress of size\s*(\d+)/g)
 
         });
         childProcess.on('close', _ => {
@@ -98,7 +102,16 @@ function run_profiler(path) {
             if (tx_status.length != tx_size.length) {
                 console.log(new Error("Missing transaction size data (expected: " + tx_status.length + ", actual: " + tx_size.length + ")"));
             }
-            resolve({ profiler_output_path, gas_costs: gas_used, tx_status, estimated_ticks, estimated_ticks_per_tx, tx_size });
+            resolve({
+                profiler_output_path,
+                gas_costs: gas_used,
+                tx_status,
+                estimated_ticks,
+                estimated_ticks_per_tx,
+                tx_size,
+                bip_store,
+                bip_read
+            });
         });
     })
     return profiler_result;
@@ -196,6 +209,8 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     estimated_ticks = run_benchmark_result.estimated_ticks;
     estimated_ticks_per_tx = run_benchmark_result.estimated_ticks_per_tx;
     tx_size = run_benchmark_result.tx_size;
+    bip_read = run_benchmark_result.bip_read;
+    bip_store = run_benchmark_result.bip_store;
 
     console.log(`Number of transactions: ${tx_status.length}`)
     run_time_index = 0;
@@ -255,7 +270,8 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         kernel_run_ticks: kernel_run_ticks[0],
         estimated_ticks: estimated_ticks[0],
         inbox_size: run_benchmark_result.inbox_size,
-        nb_tx: tx_status.length
+        nb_tx: tx_status.length,
+        bip_store: bip_store[0] ? bip_store[0] : 0
     });
 
     //reboots
@@ -266,7 +282,9 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             interpreter_decode_ticks: interpreter_decode_ticks[j],
             fetch_blueprint_ticks: fetch_blueprint_ticks[j],
             kernel_run_ticks: kernel_run_ticks[j],
-            estimated_ticks: estimated_ticks[j]
+            estimated_ticks: estimated_ticks[j],
+            bip_store: bip_store[j] ? bip_store[j] : 0,
+            bip_read: bip_read[j - 1] // the first read correspond to second run
         });
     }
     // row conserning all runs
@@ -302,7 +320,9 @@ async function run_all_benchmarks(benchmark_scripts) {
         "estimated_ticks",
         "inbox_size",
         "nb_tx",
-        "tx_size"
+        "tx_size",
+        "bip_read",
+        "bip_store"
     ];
     let output = output_filename();
     console.log(`Output in ${output}`);
