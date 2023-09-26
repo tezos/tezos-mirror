@@ -346,19 +346,13 @@ in a terminal where ``${NETWORK}`` is of the
 form ``https://teztnets.xyz/dailynet-YYYY-MM-DD``
 and ``${ONODE_DIR}`` is a path for the Octez node store, by default ``~/.tezos-node``.
 
-The commands will only work when ``proto_oxford`` is activated.
+The commands will only work when the node is completely boostrapped, and therefore the current protocol on the target network is activated.
 This can be checked by:
 
 .. code:: sh
 
+   octez-client bootstrapped
    octez-client rpc get /chains/main/blocks/head/protocols
-
-that must return:
-
-::
-
-   { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
-     "next_protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 
 In case you do not already have an implicit account, you can generate one with:
 
@@ -601,11 +595,11 @@ representation of the message payload, one can do:
 
 .. code:: sh
 
-    octez-client -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+    octez-client -d "${OCLIENT_DIR}" -p ${PROTO_HASH} \
      send smart rollup message "hex:[ \"${EMESSAGE}\" ]" \
      from "${OPERATOR_ADDR}"
 
-to inject such an external message.
+to inject such an external message, where ``${PROTO_HASH}`` is the hash of your protocol (e.g. ``ProtoALphaAL`` for Alpha; see :ref:`how to obtain it <octez_client_protocol>`).
 So let us focus now on producing a viable contents for ``${EMESSAGE}``.
 
 The kernel used previously in our running example is a simple "echo"
@@ -616,7 +610,7 @@ originated a Layer 1 smart contract as follows:
 
 .. code:: sh
 
-   octez-client -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+   octez-client -d "${OCLIENT_DIR}" -p ${PROTO_HASH} \
      originate contract go transferring 1 from "${OPERATOR_ADDR}" \
      running 'parameter string; storage string; code {CAR; NIL operation; PAIR};' \
      --init '""' --burn-cap 0.4
@@ -633,7 +627,7 @@ outbox transaction using the Octez rollup client as follows:
       "entrypoint" : "%default" } ]'
 
 
-    EMESSAGE=$(octez-smart-rollup-client-alpha encode outbox message "${MESSAGE}")
+    EMESSAGE=$(octez-smart-rollup-client-Proxford encode outbox message "${MESSAGE}")
 
 
 .. _triggering_execution_outbox_message_oxford:
@@ -652,7 +646,7 @@ populated as follows:
 
 .. code:: sh
 
-   octez-smart-rollup-client-alpha rpc get \
+   octez-smart-rollup-client-Proxford rpc get \
      /global/block/cemented/outbox/${L}/messages
 
 Here is the output for this command:
@@ -674,7 +668,7 @@ proof is retrieved as follows:
 
 .. code:: sh
 
-   PROOF=$(octez-smart-rollup-client-alpha get proof for message 0 \
+   PROOF=$(octez-smart-rollup-client-Proxford get proof for message 0 \
      of outbox at level "${L}" \
      transferring "${MESSAGE}")
 
@@ -682,7 +676,7 @@ Finally, the execution of the outbox message is done as follows:
 
 .. code:: sh
 
-   "${TEZOS_PATH}/octez-client" -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+   "${TEZOS_PATH}/octez-client" -d "${OCLIENT_DIR}" -p ${PROTO_HASH} \
            execute outbox message of smart rollup "${SOR_ALIAS_OR_ADDR}" \
            from "${OPERATOR_ADDR}" for commitment hash "${LCC}" \
            and output proof "${PROOF}"

@@ -348,19 +348,13 @@ in a terminal where ``${NETWORK}`` is of the
 form ``https://teztnets.xyz/dailynet-YYYY-MM-DD``
 and ``${ONODE_DIR}`` is a path for the Octez node store.
 
-The commands will only work when ``proto_nairobi`` is activated.
+The commands will only work when the node is completely boostrapped, and therefore the current protocol on the target network is activated.
 This can be checked by:
 
 .. code:: sh
 
+   octez-client bootstrapped
    octez-client rpc get /chains/main/blocks/head/protocols
-
-that must return:
-
-::
-
-   { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
-     "next_protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 
 Finally, you need to check that your balance is greater than 10,000
 tez to make sure that staking is possible. In case your balance is not
@@ -594,11 +588,11 @@ representation of the message payload, one can do:
 
 .. code:: sh
 
-    octez-client" -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+    octez-client" -d "${OCLIENT_DIR}" -p ${PROTO_HASH} \
      send smart rollup message "hex:[ \"${EMESSAGE}\" ]" \
      from "${OPERATOR_ADDR}"
 
-to inject such an external message.
+to inject such an external message, where ``${PROTO_HASH}`` is the hash of your protocol (e.g. ``ProtoALphaAL`` for Alpha; see :ref:`how to obtain it <octez_client_protocol>`).
 So let us focus now on producing a viable contents for ``${EMESSAGE}``.
 
 The kernel used previously in our running example is a simple "echo"
@@ -609,7 +603,7 @@ originated a Layer 1 smart contract as follows:
 
 .. code:: sh
 
-   octez-client -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+   octez-client -d "${OCLIENT_DIR}" -p ${PROTO_HASH} \
      originate contract go transferring 1 from "${OPERATOR_ADDR}" \
      running 'parameter string; storage string; code {CAR; NIL operation; PAIR};' \
      --init '""' --burn-cap 0.4
@@ -675,7 +669,7 @@ Finally, the execution of the outbox message is done as follows:
 
 .. code:: sh
 
-   "${TEZOS_PATH}/octez-client" -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+   "${TEZOS_PATH}/octez-client" -d "${OCLIENT_DIR}" -p ${PROTO_HASH} \
            execute outbox message of smart rollup "${SOR_ALIAS_OR_ADDR}" \
            from "${OPERATOR_ADDR}" for commitment hash "${LCC}" \
            and output proof "${PROOF}"
