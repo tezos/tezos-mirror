@@ -126,7 +126,7 @@ module type S = sig
 
   val let_ : name:string -> 'a repr -> ('a repr -> 'b repr) -> 'b repr
 
-  val if_ : bool repr -> 'a repr -> 'a repr -> 'a repr
+  val if_ : bool repr -> size repr -> size repr -> size repr
 end
 
 (* ------------------------------------------------------------------------- *)

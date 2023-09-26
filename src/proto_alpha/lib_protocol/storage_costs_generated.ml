@@ -13,12 +13,10 @@ open S.Syntax
 (* fun size -> 470. + (117. * size) *)
 let cost_List_key_values size =
   let size = S.safe_int size in
-  let v0 = size in
-  S.safe_int 470 + (v0 * S.safe_int 118)
+  (size * S.safe_int 118) + S.safe_int 470
 
 (* model storage/List_key_values/intercept *)
 (* fun size -> 470. + (117. * size) *)
 let cost_intercept size =
   let size = S.safe_int size in
-  let v0 = size in
-  S.safe_int 470 + (v0 * S.safe_int 118)
+  (size * S.safe_int 118) + S.safe_int 470

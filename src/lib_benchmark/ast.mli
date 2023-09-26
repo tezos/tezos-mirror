@@ -49,8 +49,10 @@ module type S = sig
     | Lam : string * 'a Ty.t * 'b t -> ('a -> 'b) t
     | App : ('a -> 'b) t * 'a t -> 'b t
     | Let : string * 'a t * 'b t -> 'b t
-    | If : bool t * 'a t * 'a t -> 'a t
+    | If : bool t * size t * size t -> size t
     | Variable : string * 'a Ty.t -> 'a t
+
+  val term_size : 'a. 'a t -> int
 
   val type_of : 'a t -> 'a Ty.t
 
@@ -66,6 +68,21 @@ module type S = sig
   val pack : 'a t -> packed
 
   val unpack : 'a Ty.t -> packed -> 'a t option
+
+  (** Optimizations *)
+
+  (* Charge at least 10 milli-gas. For example,
+     [fun size1 size2 -> size1 + size2]
+     => [fun size1 size2 -> max 10 (size1 + size2)]
+  *)
+  val at_least_10 : 'a t -> 'a t
+
+  (* [let x = e1 in e2] => [e2[e1/x]] *)
+  val subst_let : 'a t -> 'a t
+
+  val optimize_affine : 'a t -> 'a t
+
+  val cse : 'a t -> 'a t
 end
 
 module Make (Size : sig
@@ -84,3 +101,7 @@ module To_ast (Ast : S) :
 module Transform (F : functor (Ast : S) -> sig
   val transform : 'a Ast.t -> 'a Ast.t
 end) : Costlang.Transform
+
+(** A Costlang transformer taking the max with 10,
+    then perform various code optimizations *)
+module Optimize : Transform

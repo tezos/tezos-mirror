@@ -13,5 +13,4 @@ open S.Syntax
 (* fun size -> 600. + (43. * (log2 (1 + size))) *)
 let cost_CACHE_UPDATE size =
   let size = S.safe_int size in
-  let v0 = log2 (S.safe_int 1 + size) in
-  S.safe_int 600 + (v0 * S.safe_int 43)
+  (log2 (size + S.safe_int 1) * S.safe_int 43) + S.safe_int 600

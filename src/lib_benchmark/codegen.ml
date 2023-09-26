@@ -437,7 +437,8 @@ let codegen (Model.Model model) (sol : solution)
     let open Costlang in
     let ( ++ ) = compose in
     let ((module Transform) : transform) =
-      (module Let_lift)
+      (module Ast.Optimize)
+      ++ (module Let_lift)
       ++ transform
       ++ (module Subst (struct
            let subst = subst
