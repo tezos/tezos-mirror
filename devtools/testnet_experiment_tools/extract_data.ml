@@ -192,7 +192,7 @@ let find_and_process_profiling_file dir search_block =
       ())
     profiling_files
 
-let commands () =
+let commands =
   [
     command
       ~group:
@@ -218,6 +218,38 @@ let commands () =
         | _, None -> tzfail No_block_hashes);
   ]
 
-let select_commands _ _ = return (commands ())
+module Custom_client_config : Client_main_run.M = struct
+  type t = unit
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+  let default_base_dir = "/tmp"
+
+  let global_options () = args1 @@ constant ()
+
+  let parse_config_args ctx argv =
+    let open Lwt_result_syntax in
+    let* (), remaining =
+      Tezos_clic.parse_global_options (global_options ()) ctx argv
+    in
+    let open Client_config in
+    return (default_parsed_config_args, remaining)
+
+  let default_chain = `Main
+
+  let default_block = `Head 0
+
+  let default_daily_logs_path = None
+
+  let default_media_type = Tezos_rpc_http.Media_type.Command_line.Binary
+
+  let other_registrations = None
+
+  let clic_commands ~base_dir:_ ~config_commands:_ ~builtin_commands:_
+      ~other_commands:_ ~require_auth:_ =
+    commands
+
+  let logger = None
+end
+
+let () =
+  let select_commands _ _ = return commands in
+  Client_main_run.run (module Custom_client_config) ~select_commands
