@@ -37,24 +37,24 @@ fn typecheck_instruction(
     gas: &mut Gas,
     stack: &mut TypeStack,
 ) -> Result<Instruction, TcError> {
-    use Instruction::*;
-    use Type::*;
+    use Instruction as I;
+    use Type as T;
 
     gas.consume(gas::tc_cost::INSTR_STEP)?;
 
     Ok(match i {
-        Add => match stack.as_slice() {
-            [.., Type::Nat, Type::Nat] => {
+        I::Add => match stack.as_slice() {
+            [.., T::Nat, T::Nat] => {
                 stack.pop();
-                Add
+                I::Add
             }
-            [.., Type::Int, Type::Int] => {
+            [.., T::Int, T::Int] => {
                 stack.pop();
-                Add
+                I::Add
             }
             _ => unimplemented!(),
         },
-        Dip(opt_height, nested) => {
+        I::Dip(opt_height, nested) => {
             let protected_height: usize = opt_height.unwrap_or(1);
 
             gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
@@ -65,35 +65,35 @@ fn typecheck_instruction(
             let mut protected = stack.split_off(protected_height);
             let nested = typecheck(nested, gas, stack)?;
             stack.append(&mut protected);
-            Dip(opt_height, nested)
+            I::Dip(opt_height, nested)
         }
-        Drop(opt_height) => {
+        I::Drop(opt_height) => {
             let drop_height: usize = opt_height.unwrap_or(1);
             gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len(&stack, drop_height)?;
             stack.drop_top(drop_height);
-            Drop(opt_height)
+            I::Drop(opt_height)
         }
-        Dup(Some(0)) => {
+        I::Dup(Some(0)) => {
             // DUP instruction requires an argument that is > 0.
             return Err(TcError::GenericTcError);
         }
-        Dup(opt_height) => {
+        I::Dup(opt_height) => {
             let dup_height: usize = opt_height.unwrap_or(1);
             ensure_stack_len(stack, dup_height)?;
             stack.push(stack[dup_height - 1].clone());
-            Dup(opt_height)
+            I::Dup(opt_height)
         }
-        Gt => match stack.pop() {
-            Some(Type::Int) => {
-                stack.push(Type::Bool);
-                Gt
+        I::Gt => match stack.pop() {
+            Some(T::Int) => {
+                stack.push(T::Bool);
+                I::Gt
             }
             _ => return Err(TcError::GenericTcError),
         },
-        If(nested_t, nested_f) => match stack.pop() {
+        I::If(nested_t, nested_f) => match stack.pop() {
             // Check if top is bool
-            Some(Type::Bool) => {
+            Some(T::Bool) => {
                 // Clone the stack so that we have a copy to run one branch on.
                 // We can run the other branch on the live stack.
                 let mut t_stack: TypeStack = stack.clone();
@@ -101,20 +101,20 @@ fn typecheck_instruction(
                 let nested_f = typecheck(nested_f, gas, stack)?;
                 // If both stacks are same after typecheck, all is good.
                 ensure_stacks_eq(gas, t_stack.as_slice(), stack.as_slice())?;
-                If(nested_t, nested_f)
+                I::If(nested_t, nested_f)
             }
             _ => return Err(TcError::GenericTcError),
         },
-        Instruction::Int => match stack.pop() {
-            Some(Type::Nat) => {
+        I::Int => match stack.pop() {
+            Some(T::Nat) => {
                 stack.push(Type::Int);
-                Instruction::Int
+                I::Int
             }
             _ => return Err(TcError::GenericTcError),
         },
-        Loop(nested) => match stack.as_slice() {
+        I::Loop(nested) => match stack.as_slice() {
             // Check if top is bool and bind the tail to `t`.
-            [t @ .., Bool] => {
+            [t @ .., T::Bool] => {
                 let mut live: TypeStack = TopIsLast::from(t).0;
                 // Clone the tail and typecheck the nested body using it.
                 let nested = typecheck(nested, gas, &mut live)?;
@@ -123,19 +123,19 @@ fn typecheck_instruction(
                 // off the original stack to form the final result.
                 ensure_stacks_eq(gas, live.as_slice(), stack.as_slice())?;
                 stack.pop();
-                Loop(nested)
+                I::Loop(nested)
             }
             _ => return Err(TcError::GenericTcError),
         },
-        Push(t, v) => {
+        I::Push(t, v) => {
             typecheck_value(gas, &t, &v)?;
             stack.push(t.to_owned());
-            Push(t, v)
+            I::Push(t, v)
         }
-        Swap => {
+        I::Swap => {
             ensure_stack_len(stack, 2)?;
             stack.swap(0, 1);
-            Swap
+            I::Swap
         }
     })
 }
