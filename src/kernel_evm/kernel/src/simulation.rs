@@ -7,7 +7,9 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
-use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
+use crate::tick_model::constants::{
+    MAX_ALLOWED_TICKS, MAX_TRANSACTION_GAS_LIMIT, TRANSACTION_OVERHEAD,
+};
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
@@ -37,6 +39,8 @@ pub const MAX_EVALUATION_GAS: u64 = MAX_TRANSACTION_GAS_LIMIT;
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
 pub const VALIDATION_TAG: u8 = 0x01;
+/// Maximum number of ticks allocated for a single transaction
+pub const MAX_TICKS_ALLOCATED: u64 = MAX_ALLOWED_TICKS - TRANSACTION_OVERHEAD;
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
@@ -113,6 +117,7 @@ impl Evaluation {
                 .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
             self.value,
             false,
+            MAX_TICKS_ALLOCATED,
         )
         .map_err(Error::Simulation)?;
         Ok(outcome)
@@ -492,6 +497,8 @@ mod tests {
     // call: get (public view)
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
+    const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000_000;
+
     fn create_contract<Host>(host: &mut Host) -> H160
     where
         Host: Runtime,
@@ -532,6 +539,7 @@ mod tests {
             Some(31000),
             Some(transaction_value),
             false,
+            DUMMY_ALLOCATED_TICKS,
         );
         assert!(outcome.is_ok(), "contract should have been created");
         let outcome = outcome.unwrap();

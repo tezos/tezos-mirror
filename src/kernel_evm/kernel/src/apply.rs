@@ -251,13 +251,21 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     Ok(Some(caller))
 }
 
+pub struct TransactionResult {
+    caller: H160,
+    execution_outcome: Option<ExecutionOutcome>,
+    gas_used: U256,
+    estimated_ticks_used: u64,
+}
+
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
-) -> Result<Option<(H160, Option<ExecutionOutcome>, U256)>, Error> {
+    allocated_ticks: u64,
+) -> Result<Option<TransactionResult>, Error> {
     let caller = match is_valid_ethereum_transaction_common(
         host,
         evm_account_storage,
@@ -284,6 +292,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         Some(gas_limit),
         Some(value),
         true,
+        allocated_ticks,
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
@@ -295,7 +304,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let gas_used = match &execution_outcome {
+    let (gas_used, estimated_ticks_used) = match &execution_outcome {
         Some(execution_outcome) => {
             log!(
                 host,
@@ -303,22 +312,30 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
                 "Transaction status: OK_{}.",
                 execution_outcome.is_success
             );
-            execution_outcome.gas_used.into()
+            (
+                execution_outcome.gas_used.into(),
+                execution_outcome.estimated_ticks_used,
+            )
         }
         None => {
             log!(host, Debug, "Transaction status: OK_UNKNOWN.");
-            U256::zero()
+            (U256::zero(), 0)
         }
     };
 
-    Ok(Some((caller, execution_outcome, gas_used)))
+    Ok(Some(TransactionResult {
+        caller,
+        execution_outcome,
+        gas_used,
+        estimated_ticks_used,
+    }))
 }
 
 fn apply_deposit<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &Deposit,
-) -> Result<Option<(H160, Option<ExecutionOutcome>, U256)>, Error> {
+) -> Result<Option<TransactionResult>, Error> {
     // TODO: https://gitlab.com/tezos/tezos/-/issues/5939
     // The maximum gas price is ignored for now as the rollup's gas price
     // never change.
@@ -354,7 +371,12 @@ fn apply_deposit<Host: Runtime>(
 
     let caller = H160::zero();
 
-    Ok(Some((caller, Some(execution_outcome), gas_used.into())))
+    Ok(Some(TransactionResult {
+        caller,
+        execution_outcome: Some(execution_outcome),
+        gas_used: gas_used.into(),
+        estimated_ticks_used,
+    }))
 }
 
 fn post_withdrawals<Host: Runtime>(
@@ -413,6 +435,13 @@ fn post_withdrawals<Host: Runtime>(
     Ok(())
 }
 
+pub struct ExecutionInfo {
+    pub receipt_info: TransactionReceiptInfo,
+    pub object_info: TransactionObjectInfo,
+    pub estimated_ticks_used: u64,
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
@@ -421,7 +450,8 @@ pub fn apply_transaction<Host: Runtime>(
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
-) -> Result<Option<(TransactionReceiptInfo, TransactionObjectInfo)>, anyhow::Error> {
+    allocated_ticks: u64,
+) -> Result<Option<ExecutionInfo>, anyhow::Error> {
     let to = transaction.to();
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
@@ -430,6 +460,7 @@ pub fn apply_transaction<Host: Runtime>(
             precompiles,
             evm_account_storage,
             tx,
+            allocated_ticks,
         ),
         TransactionContent::Deposit(deposit) => {
             apply_deposit(host, evm_account_storage, deposit)
@@ -437,7 +468,12 @@ pub fn apply_transaction<Host: Runtime>(
     }?;
 
     match apply_result {
-        Some((caller, execution_outcome, gas_used)) => {
+        Some(TransactionResult {
+            caller,
+            execution_outcome,
+            gas_used,
+            estimated_ticks_used: ticks_used,
+        }) => {
             if let Some(outcome) = &execution_outcome {
                 log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
             }
@@ -463,7 +499,11 @@ pub fn apply_transaction<Host: Runtime>(
             )?;
 
             index_new_accounts(host, accounts_index, &receipt_info)?;
-            Ok(Some((receipt_info, object_info)))
+            Ok(Some(ExecutionInfo {
+                receipt_info,
+                object_info,
+                estimated_ticks_used: ticks_used,
+            }))
         }
         None => Ok(None),
     }

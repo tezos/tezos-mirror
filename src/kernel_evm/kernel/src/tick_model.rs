@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{apply::TransactionReceiptInfo, inbox::Transaction};
-use tezos_ethereum::tx_common::EthereumTransactionCommon;
+use crate::inbox::Transaction;
 
 /// Tick model constants
 ///
@@ -88,16 +87,26 @@ pub mod constants {
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
     match &transaction.content {
-        crate::inbox::TransactionContent::Deposit(_) => ticks_of_deposit(),
-        crate::inbox::TransactionContent::Ethereum(eth) => ticks_of_gas(eth.gas_limit),
+        crate::inbox::TransactionContent::Deposit(_) => {
+            ticks_of_deposit(constants::TICKS_FOR_DEPOSIT)
+        }
+        crate::inbox::TransactionContent::Ethereum(eth) => {
+            average_ticks_of_gas(eth.gas_limit)
+        }
     }
 }
 
-fn ticks_of_deposit() -> u64 {
-    constants::TICKS_FOR_DEPOSIT + constants::TRANSACTION_OVERHEAD
+pub fn estimate_remaining_ticks_for_transaction_execution(ticks: u64) -> u64 {
+    constants::MAX_ALLOWED_TICKS
+        .saturating_sub(constants::TRANSACTION_OVERHEAD)
+        .saturating_sub(ticks)
 }
 
-pub fn ticks_of_gas(gas: u64) -> u64 {
+fn ticks_of_deposit(resulting_ticks: u64) -> u64 {
+    resulting_ticks.saturating_add(constants::TRANSACTION_OVERHEAD)
+}
+
+pub fn average_ticks_of_gas(gas: u64) -> u64 {
     gas.saturating_mul(constants::TICKS_PER_GAS)
         .saturating_add(constants::TRANSACTION_OVERHEAD)
 }
@@ -117,29 +126,30 @@ pub fn ticks_of_invalid_transaction() -> u64 {
         .saturating_add(constants::TRANSACTION_OVERHEAD)
 }
 
+/// Adds the possible overhead this is not accounted during the validation of
+/// the transaction. Transaction evaluation (the interpreter) accounts for the
+/// ticks itself.
 pub fn ticks_of_valid_transaction(
     transaction: &Transaction,
-    receipt_info: &TransactionReceiptInfo,
+    resulting_ticks: u64,
 ) -> u64 {
     match &transaction.content {
-        crate::inbox::TransactionContent::Ethereum(eth) => {
-            ticks_of_valid_transaction_ethereum(eth, receipt_info)
+        crate::inbox::TransactionContent::Ethereum(_) => {
+            ticks_of_valid_transaction_ethereum(resulting_ticks)
         }
-        crate::inbox::TransactionContent::Deposit(_) => ticks_of_deposit(),
+        // Ticks are already spent during the validation of the transaction (see
+        // apply.rs).
+        crate::inbox::TransactionContent::Deposit(_) => ticks_of_deposit(resulting_ticks),
     }
 }
 
 /// A valid transaction is a transaction that could be transmitted to
 /// evm_execution. It can succeed (with or without effect on the state)
 /// or fail (if the VM encountered an error).
-pub fn ticks_of_valid_transaction_ethereum(
-    transaction: &EthereumTransactionCommon,
-    receipt_info: &TransactionReceiptInfo,
-) -> u64 {
-    match &receipt_info.execution_outcome {
-        Some(outcome) => ticks_of_gas(outcome.gas_used),
-        None => ticks_of_gas(transaction.gas_limit),
-    }
+pub fn ticks_of_valid_transaction_ethereum(resulting_ticks: u64) -> u64 {
+    resulting_ticks
+        .saturating_add(constants::TICKS_FOR_CRYPTO)
+        .saturating_add(constants::TRANSACTION_OVERHEAD)
 }
 
 pub fn bloom_size(logs: &[tezos_ethereum::Log]) -> usize {

@@ -196,22 +196,28 @@ impl BlockInProgress {
         }
     }
 
+    fn add_gas(&mut self, gas: U256) -> Result<(), Error> {
+        self.cumulative_gas = self
+            .cumulative_gas
+            .checked_add(gas)
+            .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?;
+        Ok(())
+    }
+
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
         transaction: &Transaction,
         object_info: TransactionObjectInfo,
         receipt_info: TransactionReceiptInfo,
+        ticks_used: u64,
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
         // account for gas
-        self.cumulative_gas = self
-            .cumulative_gas
-            .checked_add(object_info.gas_used)
-            .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?;
+        self.add_gas(object_info.gas_used)?;
 
         // account for transaction ticks
         self.estimated_ticks +=
-            tick_model::ticks_of_valid_transaction(transaction, &receipt_info);
+            tick_model::ticks_of_valid_transaction(transaction, ticks_used);
 
         // register transaction as done
         self.valid_txs.push(transaction.tx_hash);
