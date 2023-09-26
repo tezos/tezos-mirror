@@ -400,8 +400,24 @@ mod migration_receipts_helpers {
             let tx_hash = H256::from_slice(&tx_hash_raw).to_fixed_bytes();
             let receipt_path = receipt_path(&tx_hash)?;
             let bytes = host.store_read_all(&receipt_path)?;
-            let receipt = rlp_decode_txreceipt_deprecated(&bytes)?;
-            host.store_write_all(&receipt_path, &receipt.rlp_bytes())?;
+
+            match rlp_decode_txreceipt_deprecated(&bytes) {
+                Ok(receipt) => {
+                    host.store_write_all(&receipt_path, &receipt.rlp_bytes())?
+                }
+                Err(_) =>
+                // This is a dumb corner case but we might have multiple indexes
+                // for the same transaction. So in the ghostnet's migration we
+                // might try to migrate twice the same transaction.
+                {
+                    log!(
+                        host,
+                        Debug,
+                        "{:?} has potentially multiple indexes",
+                        tx_hash
+                    );
+                }
+            }
         }
 
         log!(
