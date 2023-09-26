@@ -356,6 +356,8 @@ Smart Rollup node
   kernel logs should be written (this file is in
   ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
 
+- Added the rollup node command inside the docker entrypoint (MR :gl:`!10253`)
+
 Smart Rollup client
 -------------------
 
