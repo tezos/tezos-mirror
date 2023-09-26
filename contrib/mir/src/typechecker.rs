@@ -17,6 +17,7 @@ pub enum TcError {
     StackTooShort,
     StacksNotEqual,
     OutOfGas,
+    FailNotInTail,
 }
 
 impl From<OutOfGas> for TcError {
@@ -43,6 +44,10 @@ fn typecheck_instruction(
 ) -> Result<TypecheckedInstruction, TcError> {
     use Instruction as I;
     use Type as T;
+
+    if stack.is_failed() {
+        return Err(TcError::FailNotInTail);
+    }
 
     gas.consume(gas::tc_cost::INSTR_STEP)?;
 
@@ -72,6 +77,9 @@ fn typecheck_instruction(
             // remaining unprotected part, then append the protected portion back on top.
             let mut protected = stack.split_off(protected_height);
             let nested = typecheck(nested, gas, stack)?;
+            if stack.is_failed() {
+                return Err(TcError::FailNotInTail);
+            }
             stack.append(&mut protected);
             I::Dip(opt_height, nested)
         }
@@ -109,6 +117,11 @@ fn typecheck_instruction(
                 let nested_f = typecheck(nested_f, gas, stack)?;
                 // If both stacks are same after typecheck, all is good.
                 ensure_stacks_eq(gas, &t_stack, &stack)?;
+                // Replace stack with other branche's stack if it's failed, as
+                // one branch might've been successful.
+                if stack.is_failed() {
+                    *stack = t_stack;
+                }
                 I::If(nested_t, nested_f)
             }
             _ => return Err(TcError::GenericTcError),
