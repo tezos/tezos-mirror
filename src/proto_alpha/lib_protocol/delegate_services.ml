@@ -363,6 +363,23 @@ module S = struct
       ~output:(list Contract.encoding)
       RPC_path.(path / "delegated_contracts")
 
+  let total_delegated_stake =
+    RPC_service.get_service
+      ~description:
+        "Returns the sum (in mutez) of all tokens staked by the delegators of \
+         a given delegate. This excludes the delegate's own staked tokens."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "total_delegated_stake")
+
+  let staking_denominator =
+    RPC_service.get_service
+      ~description:
+        "Returns an abstract representation of the total delegated stake."
+      ~query:RPC_query.empty
+      ~output:Staking_pseudotokens.For_RPC.encoding
+      RPC_path.(path / "staking_denominator")
+
   let delegated_balance =
     RPC_service.get_service
       ~description:
@@ -621,6 +638,16 @@ let register () =
   register1 ~chunked:false S.delegated_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.delegated_balance ctxt pkh) ;
+  register1 ~chunked:false S.total_delegated_stake (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+        ctxt
+        ~delegate:pkh) ;
+  register1 ~chunked:false S.staking_denominator (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+        ctxt
+        ~delegate:pkh) ;
   register1 ~chunked:false S.deactivated (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.deactivated ctxt pkh) ;
@@ -694,6 +721,12 @@ let delegated_contracts ctxt block pkh =
 
 let delegated_balance ctxt block pkh =
   RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
+
+let total_delegated_stake ctxt block pkh =
+  RPC_context.make_call1 S.total_delegated_stake ctxt block pkh () ()
+
+let staking_denominator ctxt block pkh =
+  RPC_context.make_call1 S.staking_denominator ctxt block pkh () ()
 
 let deactivated ctxt block pkh =
   RPC_context.make_call1 S.deactivated ctxt block pkh () ()

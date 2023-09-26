@@ -123,6 +123,15 @@ val delegated_balance :
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
 
+val total_delegated_stake :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
+
+val staking_denominator :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  Staking_pseudotokens.For_RPC.t shell_tzresult Lwt.t
+
 val deactivated :
   'a #RPC_context.simple ->
   'a ->
