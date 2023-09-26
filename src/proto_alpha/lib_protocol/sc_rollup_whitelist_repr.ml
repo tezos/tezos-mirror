@@ -25,7 +25,16 @@
 
 type t = Signature.Public_key_hash.t list
 
-let encoding = Data_encoding.(list Signature.Public_key_hash.encoding)
+let encoding =
+  let open Data_encoding in
+  (* The whitelist size is checked to forbid the origination of a
+     whitelist that is bigger than any subsequent whitelist
+     update. This check is valid because the binary outbox message
+     encoding size is only two bytes longer than the maximum whitelist
+     update size (encoded in binary), where the encoding of a key is
+     20 bytes long. *)
+  check_size (Constants_repr.sc_rollup_message_size_limit - 2)
+  @@ list Signature.Public_key_hash.encoding
 
 let pp =
   Format.pp_print_list

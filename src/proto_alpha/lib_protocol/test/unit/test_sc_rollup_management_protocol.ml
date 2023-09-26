@@ -336,6 +336,54 @@ let test_encode_decode_outbox_message () =
   let* () = check_encode_decode_outbox_message_untyped ctxt outbox_message in
   check_encode_decode_outbox_message_typed ctxt outbox_message
 
+let test_whitelist_encoding_size () =
+  let open Lwt_result_syntax in
+  let gen_pkh () =
+    let account = Account.new_account () in
+    account.pkh
+  in
+  (* 6 is for the rest of encoding: size, tag, ... *)
+  let max_msg_size = Constants_repr.sc_rollup_message_size_limit - 6 in
+  let encoding_size =
+    Data_encoding.Binary.length Signature.Public_key_hash.encoding (gen_pkh ())
+  in
+  let max_allowed_whitelist_size = max_msg_size / encoding_size in
+  let check_encoding ~valid encoding msg =
+    let res = Data_encoding.Binary.to_bytes encoding msg in
+    match res with
+    | Error _ when valid -> fail @@ [error_of_fmt "valid encoding is invalid"]
+    | Ok _ when not valid -> fail @@ [error_of_fmt "invalid encoding is valid"]
+    | _ -> return_unit
+  in
+  let*? max_whitelist =
+    List.init
+      ~when_negative_length:[error_of_fmt "invalid size"]
+      max_allowed_whitelist_size
+      (fun _i -> gen_pkh ())
+  in
+  let* () =
+    let* () =
+      check_encoding ~valid:true Sc_rollup.Whitelist.encoding max_whitelist
+    in
+    Sc_rollup.Outbox.Message.(
+      check_encoding
+        ~valid:true
+        encoding
+        (Whitelist_update (Some max_whitelist)))
+  in
+  let* () =
+    let too_big_whitelist = gen_pkh () :: max_whitelist in
+    let* () =
+      check_encoding ~valid:false Sc_rollup.Whitelist.encoding too_big_whitelist
+    in
+    Sc_rollup.Outbox.Message.(
+      check_encoding
+        ~valid:false
+        encoding
+        (Whitelist_update (Some too_big_whitelist)))
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -358,6 +406,10 @@ let tests =
       "Encode/decode outbox message"
       `Quick
       test_encode_decode_outbox_message;
+    Tztest.tztest
+      "Whitelist size is borned by max_msg_size"
+      `Quick
+      test_whitelist_encoding_size;
   ]
 
 let () =

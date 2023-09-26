@@ -3227,6 +3227,8 @@ module Sc_rollup : sig
 
       val pp : Format.formatter -> t -> unit
 
+      val encoding : t Data_encoding.t
+
       type serialized
 
       val unsafe_of_string : string -> serialized
