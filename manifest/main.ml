@@ -6490,6 +6490,10 @@ let hash = Protocol.hash
         (sf "octez_smart_rollup_node_%s" short_hash)
         ~path:(path // "lib_sc_rollup_node")
         ~opam:(sf "octez-smart-rollup-node-%s" short_hash)
+        ~synopsis:
+          (sf
+             "Protocol specific (for %s) library for smart rollup node"
+             name_dash)
         ~linkall:true
         ~deps:
           [
@@ -6594,30 +6598,6 @@ let hash = Protocol.hash
             main |> open_;
             octez_sc_rollup_client |> if_some |> open_;
             octez_version_value;
-          ]
-    in
-    let _sc_rollup_node =
-      only_if (active && N.(number >= 016)) @@ fun () ->
-      public_exe
-        (sf "octez-smart-rollup-node-%s" short_hash)
-        ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
-        ~path:(path // "bin_sc_rollup_node")
-        ~synopsis:"Tezos/Protocol: protocol specific Smart rollup node"
-        ~release_status:executable_release_status
-        ~with_macos_security_framework:true
-        ~deps:
-          [
-            octez_base |> open_ |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            octez_clic;
-            main |> open_;
-            octez_shell_services |> open_;
-            octez_client_base |> open_;
-            octez_client_base_unix |> open_;
-            octez_client_commands |> open_;
-            client |> if_some |> open_;
-            octez_smart_rollup_node_lib |> open_;
-            octez_sc_rollup_node |> if_some |> open_;
           ]
     in
     let tx_rollup =
