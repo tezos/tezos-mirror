@@ -115,6 +115,8 @@ type info = {
   staking_balance : Tez.t;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
+  total_delegated_stake : Tez.t;
+  staking_denominator : Staking_pseudotokens.For_RPC.t;
   deactivated : bool;
   grace_period : Cycle.t;
   voting_info : Vote.delegate_info;
@@ -132,6 +134,8 @@ let info_encoding =
            staking_balance;
            delegated_contracts;
            delegated_balance;
+           total_delegated_stake;
+           staking_denominator;
            deactivated;
            grace_period;
            voting_info;
@@ -144,6 +148,8 @@ let info_encoding =
           staking_balance,
           delegated_contracts,
           delegated_balance,
+          total_delegated_stake,
+          staking_denominator,
           deactivated,
           grace_period ),
         (voting_info, (active_consensus_key, pending_consensus_keys)) ))
@@ -153,6 +159,8 @@ let info_encoding =
              staking_balance,
              delegated_contracts,
              delegated_balance,
+             total_delegated_stake,
+             staking_denominator,
              deactivated,
              grace_period ),
            (voting_info, (active_consensus_key, pending_consensus_keys)) ) ->
@@ -163,6 +171,8 @@ let info_encoding =
         staking_balance;
         delegated_contracts;
         delegated_balance;
+        total_delegated_stake;
+        staking_denominator;
         deactivated;
         grace_period;
         voting_info;
@@ -170,13 +180,15 @@ let info_encoding =
         pending_consensus_keys;
       })
     (merge_objs
-       (obj8
+       (obj10
           (req "full_balance" Tez.encoding)
           (req "current_frozen_deposits" Tez.encoding)
           (req "frozen_deposits" Tez.encoding)
           (req "staking_balance" Tez.encoding)
           (req "delegated_contracts" (list Contract.encoding))
           (req "delegated_balance" Tez.encoding)
+          (req "total_delegated_stake" Tez.encoding)
+          (req "staking_denominator" Staking_pseudotokens.For_RPC.encoding)
           (req "deactivated" bool)
           (req "grace_period" Cycle.encoding))
        (merge_objs
@@ -523,6 +535,16 @@ let register () =
       let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
       let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
       let* delegated_balance = Delegate.For_RPC.delegated_balance ctxt pkh in
+      let* total_delegated_stake =
+        Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+          ctxt
+          ~delegate:pkh
+      in
+      let* staking_denominator =
+        Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+          ctxt
+          ~delegate:pkh
+      in
       let* deactivated = Delegate.deactivated ctxt pkh in
       let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
       let* voting_info = Vote.get_delegate_info ctxt pkh in
@@ -538,6 +560,8 @@ let register () =
         staking_balance;
         delegated_contracts;
         delegated_balance;
+        total_delegated_stake;
+        staking_denominator;
         deactivated;
         grace_period;
         voting_info;

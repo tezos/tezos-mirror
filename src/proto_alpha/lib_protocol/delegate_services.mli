@@ -60,6 +60,8 @@ type info = {
   staking_balance : Tez.t;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
+  total_delegated_stake : Tez.t;
+  staking_denominator : Staking_pseudotokens.For_RPC.t;
   deactivated : bool;
   grace_period : Cycle.t;
   voting_info : Vote.delegate_info;
