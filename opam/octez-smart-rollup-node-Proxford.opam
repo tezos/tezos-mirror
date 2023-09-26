@@ -37,4 +37,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol specific Smart rollup node"
+synopsis: "Protocol specific (for 018-Proxford) library for smart rollup node"
