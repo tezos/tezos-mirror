@@ -45,8 +45,6 @@ open Kzg.Utils
 module type Cq_sig = sig
   exception Entry_not_in_table
 
-  type transcript = bytes
-
   type prover_public_parameters
 
   type verifier_public_parameters
@@ -61,12 +59,12 @@ module type Cq_sig = sig
 
   val prove :
     prover_public_parameters ->
-    transcript ->
+    Transcript.t ->
     S.t array SMap.t list ->
-    proof * transcript
+    proof * Transcript.t
 
   val verify :
-    verifier_public_parameters -> transcript -> proof -> bool * transcript
+    verifier_public_parameters -> Transcript.t -> proof -> bool * Transcript.t
 end
 
 module Internal = struct
@@ -290,11 +288,9 @@ module Internal = struct
               n)) ;
     let domain = Domain.build n in
     let table_polys = List.map (Evaluations.interpolation_fft2 domain) table in
-    let pc = PC.Public_parameters.setup 0 (srs, srs) in
-    let prv =
-      setup_prover (n, domain) wire_size (table, table_polys) (fst pc)
-    in
-    let vrf = setup_verifier srs n wire_size table_polys (snd pc) in
+    let pc_prv, pc_vrf, _ = PC.Public_parameters.setup 0 (srs, srs) in
+    let prv = setup_prover (n, domain) wire_size (table, table_polys) pc_prv in
+    let vrf = setup_verifier srs n wire_size table_polys pc_vrf in
     (prv, vrf)
 
   let compute_m_and_t_sparse pp f_arrays f_agg =

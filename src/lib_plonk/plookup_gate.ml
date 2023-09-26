@@ -564,7 +564,7 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
     let final_size = size_domain - 1 in
     (* /!\ We remove here the last value of each wire, this is ok as it always corresponds to padding. *)
     let padded_f_list =
-      SMap.map (fun w -> Array.resize w final_size) wires_to_agg
+      SMap.map (fun w -> resize_array w final_size) wires_to_agg
     in
     let f_agg =
       Plookup_poly.compute_f_aggregation gates padded_f_list alpha final_size

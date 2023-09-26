@@ -37,21 +37,21 @@ module type S = sig
 
   val prove_super_aggregation :
     Public_parameters.prover ->
-    transcript ->
+    Transcript.t ->
     Poly.t SMap.t list ->
     Commitment.prover_aux list ->
     query list ->
     Scalar.t SMap.t SMap.t list ->
-    (proof * prover_aux) * transcript
+    (proof * prover_aux) * Transcript.t
 
   val verify_super_aggregation :
     Public_parameters.verifier ->
-    transcript ->
+    Transcript.t ->
     Commitment.t list ->
     query list ->
     Scalar.t SMap.t list ->
     proof ->
-    bool * Scalar.t * transcript
+    bool * Scalar.t * Transcript.t
 end
 
 module Make_impl
@@ -63,8 +63,6 @@ struct
   type query = PC.query [@@deriving repr]
 
   type answer = PC.answer [@@deriving repr]
-
-  type transcript = PC.transcript
 
   module Commitment = struct
     type public_parameters = {
@@ -146,7 +144,7 @@ struct
     type setup_params = int
 
     let setup setup_params srs =
-      let pp_pc_prover, pp_pc_verifier =
+      let pp_pc_prover, pp_pc_verifier, transcript =
         PC.Public_parameters.setup setup_params srs
       in
       let pp_pack_prover, pp_pack_verifier =
@@ -154,14 +152,7 @@ struct
       in
       let pp_prover = {pp_pc_prover; pp_pack_prover} in
       let pp_verifier = {pp_pc_verifier; pp_pack_verifier} in
-      (pp_prover, pp_verifier)
-
-    let to_bytes d ({pp_pc_prover; pp_pack_prover} : prover) =
-      Hash.hash_bytes
-        [
-          PC.Public_parameters.to_bytes d pp_pc_prover;
-          Pack.public_parameters_to_bytes pp_pack_prover;
-        ]
+      (pp_prover, pp_verifier, transcript)
 
     let get_commit_parameters {pp_pc_prover; pp_pack_prover} =
       Commitment.

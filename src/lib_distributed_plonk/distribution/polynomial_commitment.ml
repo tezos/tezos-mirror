@@ -46,11 +46,11 @@ module type PC_for_distribution_sig = sig
   type partial_prover_aux
 
   val distributed_expand_transcript :
-    transcript -> query list -> answer list -> transcript
+    Transcript.t -> query list -> answer list -> Transcript.t
 
   val distributed_prove_main1 :
     Public_parameters.prover ->
-    transcript ->
+    Transcript.t ->
     query list ->
     answer list ->
     secret list ->
@@ -64,7 +64,7 @@ module type PC_for_distribution_sig = sig
   val distributed_prove_main2 :
     main_prover_state ->
     main_prover_msg list ->
-    proof * transcript * partial_prover_aux
+    proof * Transcript.t * partial_prover_aux
 end
 
 (** Extension of the KZG implementation with additional types and functions
@@ -80,7 +80,7 @@ module Kzg_impl = struct
 
   type main_prover_state = {
     srs : Public_parameters.prover;
-    transcript : transcript;
+    transcript : Transcript.t;
     query : query;
     batched_answer : Scalar.t SMap.t;
     main_msg : main_prover_msg;

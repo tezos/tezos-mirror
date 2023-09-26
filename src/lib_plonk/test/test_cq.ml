@@ -25,6 +25,7 @@
 
 open Kzg.Bls
 module PC = Kzg.Polynomial_commitment
+module Transcript = Kzg.Utils.Transcript
 
 let ( !! ) = Plonk_test.Cases.( !! )
 
@@ -60,15 +61,15 @@ let f_map_not_in_table =
 
 let test_correctness () =
   let prv, vrf = Plonk.Cq.setup ~srs ~wire_size ~table in
-  let transcript = Bytes.empty in
+  let transcript = Transcript.empty in
   let proof, prv_transcript = Plonk.Cq.prove prv transcript f_map in
   let vrf, vrf_transcript = Plonk.Cq.verify vrf transcript proof in
-  assert (Bytes.equal prv_transcript vrf_transcript) ;
+  assert (Transcript.equal prv_transcript vrf_transcript) ;
   assert vrf
 
 let test_not_in_table () =
   let prv, _ = Plonk.Cq.setup ~srs ~wire_size ~table in
-  let transcript = Bytes.empty in
+  let transcript = Transcript.empty in
   try
     let _ = Plonk.Cq.prove prv transcript f_map_not_in_table in
     failwith
@@ -78,7 +79,7 @@ let test_not_in_table () =
 let test_wrong_proof () =
   let module Cq = Plonk.Cq.Internal in
   let prv, vrf = Cq.setup ~srs ~wire_size ~table in
-  let transcript = Bytes.empty in
+  let transcript = Transcript.empty in
   let proof_f, _ = Cq.prove prv transcript [List.hd f_map] in
   let wrong_proof =
     let cm_f, _ =

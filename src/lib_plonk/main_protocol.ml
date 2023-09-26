@@ -169,22 +169,6 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
            List.combine (wire_names n) (Array.to_list array) |> SMap.of_list))
       wires_array
 
-  let hash_verifier_inputs verifier_inputs =
-    let open Hash in
-    let bytes_of_com c = Plompiler.Utils.to_bytes Input_commitment.public_t c in
-    let st = init () in
-    SMap.iter
-      (fun key (public_inputs_list, input_commitments_list) ->
-        update st (Bytes.of_string key) ;
-        List.iter
-          (fun pi -> Array.iter (fun s -> update st (Scalar.to_bytes s)) pi)
-          public_inputs_list ;
-        List.iter
-          (List.iter (fun c -> update st (bytes_of_com c)))
-          input_commitments_list)
-      verifier_inputs ;
-    finish st
-
   type gate_randomness = {beta : scalar; gamma : scalar; delta : scalar}
 
   let build_gates_randomness transcript =
@@ -284,7 +268,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     type public_parameters = {
       common_pp : common_prover_pp;
       circuits_map : circuit_prover_pp SMap.t;
-      transcript : PP.transcript;
+      transcript : Kzg.Utils.Transcript.t;
     }
     [@@deriving repr]
 
@@ -961,14 +945,14 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
   type prover_public_parameters = Prover.public_parameters = {
     common_pp : Prover.common_prover_pp;
     circuits_map : Prover.circuit_prover_pp SMap.t;
-    transcript : PP.transcript;
+    transcript : Transcript.t;
   }
   [@@deriving repr]
 
   type verifier_public_parameters = {
     common_pp : Verifier.common_verifier_pp;
     circuits_map : Verifier.circuit_verifier_pp SMap.t;
-    transcript : PP.transcript;
+    transcript : Transcript.t;
   }
   [@@deriving repr]
 
@@ -1064,7 +1048,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let extended_wires =
         let li_array = Array.init l (fun i -> i) in
         (* Adding public inputs and resizing *)
-        Array.map (fun w -> Array.pad (Array.append li_array w) n) c.wires
+        Array.map (fun w -> pad_array (Array.append li_array w) n) c.wires
       in
       let adapted_range_checks =
         SMap.map (List.map (fun (i, n) -> (l + i, n))) c.range_checks
@@ -1296,13 +1280,10 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         preprocess_map domain domain_evals n circuits_map
       in
       (* Generating public parameters *)
-      let pp_prover, pp_verifier = PP.setup ~setup_params:pack_size ~srs in
-      let cm_g, g_prover_aux = PP.PC.commit pp_prover g_map in
-      (* Generating transcript *)
-      let transcript =
-        PP.PC.Public_parameters.to_bytes n pp_prover
-        |> Transcript.expand Commitment.t cm_g
+      let pp_prover, pp_verifier, transcript =
+        PP.setup ~setup_params:pack_size ~srs
       in
+      let cm_g, g_prover_aux = PP.PC.commit pp_prover g_map in
       let eval_points = eval_points pp_prv in
       let common_prv =
         Prover.
@@ -1355,12 +1336,6 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     in
     SMap.mapi extract
 
-  let expand_transcript_with_verifier_inputs transcript verifier_inputs =
-    Transcript.expand
-      Repr.bytes
-      (hash_verifier_inputs verifier_inputs)
-      transcript
-
   let input_commit ?size ?shift (pp : prover_public_parameters) secret =
     Input_commitment.commit
       ?size
@@ -1370,11 +1345,12 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       pp.common_pp.n
       secret
 
-  let update_prover_public_parameters x (pp : prover_public_parameters) =
-    {pp with transcript = Transcript.expand Repr.bytes x pp.transcript}
+  let update_prover_public_parameters repr x (pp : prover_public_parameters) =
+    {pp with transcript = Transcript.expand repr x pp.transcript}
 
-  let update_verifier_public_parameters x (pp : verifier_public_parameters) =
-    {pp with transcript = Transcript.expand Repr.bytes x pp.transcript}
+  let update_verifier_public_parameters repr x (pp : verifier_public_parameters)
+      =
+    {pp with transcript = Transcript.expand repr x pp.transcript}
 
   (* [filter_pp_circuits pp inputs_map] returns [pp]
      without the circuits that don’t appear in [inputs_map]’s keys
@@ -1399,9 +1375,10 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       {
         pp with
         transcript =
-          expand_transcript_with_verifier_inputs
-            pp.transcript
-            (to_verifier_inputs pp inputs);
+          Transcript.expand
+            verifier_inputs_t
+            (to_verifier_inputs pp inputs)
+            pp.transcript;
       }
     in
     let pp_proof, (perm_and_plook, wires_cm, _) =
@@ -1416,9 +1393,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     check_circuit_name pp.circuits_map ;
     let circuits_map = SMap.sub_map inputs pp.circuits_map in
     (* add the verifier inputs to the transcript *)
-    let transcript =
-      expand_transcript_with_verifier_inputs pp.transcript inputs
-    in
+    let transcript = Transcript.expand verifier_inputs_t inputs pp.transcript in
     let transcript, identities, _, commitments, eval_points =
       Verifier.verify_parameters
         ((pp.common_pp, circuits_map), transcript)

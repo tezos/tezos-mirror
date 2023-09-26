@@ -12,15 +12,6 @@ module Public_parameters = struct
   type prover = {srs1 : Srs_g1.t; encoding_1 : G2.t; encoding_x : G2.t}
   [@@deriving repr]
 
-  let to_bytes len srs =
-    let open Utils.Hash in
-    let st = init () in
-    update st (G2.to_bytes srs.encoding_1) ;
-    update st (G2.to_bytes srs.encoding_x) ;
-    let srs1 = Srs_g1.to_array ~len srs.srs1 in
-    Array.iter (fun key -> update st (G1.to_bytes key)) srs1 ;
-    finish st
-
   type verifier = {encoding_1 : G2.t; encoding_x : G2.t} [@@deriving repr]
 
   type commitment = Commitment.public_parameters
@@ -39,7 +30,9 @@ module Public_parameters = struct
   let setup _ (srs, _) =
     let prv = setup_prover srs in
     let vrf = setup_verifier (snd srs) in
-    (prv, vrf)
+    (* TODO change the lens ? *)
+    let transcript = Transcript.of_srs ~len1:5 ~len2:5 srs in
+    (prv, vrf, transcript)
 
   let get_commit_parameters {srs1; _} = srs1
 end
@@ -54,8 +47,6 @@ type query = Scalar.t SMap.t [@@deriving repr]
 
 (* maps evaluation point names to (map from polynomial names to evaluations) *)
 type answer = Scalar.t SMap.t SMap.t [@@deriving repr]
-
-type transcript = Bytes.t
 
 type proof = G1.t SMap.t [@@deriving repr]
 

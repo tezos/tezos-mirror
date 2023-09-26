@@ -40,13 +40,13 @@ module type S = sig
      they can be sorted back by the master. *)
   type ctw_payload = {index : int; content : MP.worker_inputs Kzg.SMap.t}
 
-  type ctpap_payload = {index : int; content : MP.PP.transcript}
+  type ctpap_payload = {index : int; content : Kzg.Utils.Transcript.t}
 
-  type pppi_payload = {index : int; content : MP.PP.transcript}
+  type pppi_payload = {index : int; content : Kzg.Utils.Transcript.t}
 
   type ppctt_payload = {index : int; content : string list * Kzg.Bls.Scalar.t}
 
-  type ppkeax_payload = {index : int; content : MP.PP.transcript}
+  type ppkeax_payload = {index : int; content : Kzg.Utils.Transcript.t}
 
   type pcd_payload = {index : int; content : MP.PP.PC.worker_msg}
 
@@ -119,16 +119,16 @@ functor
     type ctw_payload = {index : int; content : MP.worker_inputs Kzg.SMap.t}
     [@@deriving repr]
 
-    type ctpap_payload = {index : int; content : MP.PP.transcript}
+    type ctpap_payload = {index : int; content : Kzg.Utils.Transcript.t}
     [@@deriving repr]
 
-    type pppi_payload = {index : int; content : MP.PP.transcript}
+    type pppi_payload = {index : int; content : Kzg.Utils.Transcript.t}
     [@@deriving repr]
 
     type ppctt_payload = {index : int; content : string list * Kzg.Bls.Scalar.t}
     [@@deriving repr]
 
-    type ppkeax_payload = {index : int; content : MP.PP.transcript}
+    type ppkeax_payload = {index : int; content : Kzg.Utils.Transcript.t}
     [@@deriving repr]
 
     type pcd_payload = {index : int; content : MP.PP.PC.worker_msg}
