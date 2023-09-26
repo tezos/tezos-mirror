@@ -75,9 +75,9 @@ To see the usage of one specific command, you may also type the command without 
 
 .. _octez_client_protocol:
 
-To get the manual of a client command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
+To make the client command behave as for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol`` (or ``-p``), e.g.::
 
-    octez-client --protocol ProtoALphaALph man transfer
+    octez-client --protocol ProtoALphaAL man transfer
 
 Note that you can get the list of protocols known to the client with::
 
