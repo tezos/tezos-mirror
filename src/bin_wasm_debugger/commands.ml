@@ -294,13 +294,13 @@ let read_data_from_stdin retries =
   let rec input_data retries : string Lwt.t =
     if retries <= 0 then Stdlib.failwith "Too many tries, aborting."
     else
-      let* () = Lwt_io.printf "> " in
+      let* () = Lwt_fmt.printf "> " in
       let* input = Option.catch_s (fun () -> Lwt_io.read_line Lwt_io.stdin) in
       match Option.bind input (fun bytes -> Hex.to_string (`Hex bytes)) with
       | Some data -> Lwt.return data
       | None ->
           let* () =
-            Lwt_io.printf
+            Lwt_fmt.printf
               "Error: the data is not a valid hexadecimal value.\n%!"
           in
           input_data (pred retries)
@@ -316,7 +316,7 @@ let read_data ~kind ~directory ~filename retries =
     (fun _ ->
       let open Lwt_syntax in
       let* () =
-        Lwt_io.printf
+        Lwt_fmt.printf
           "%s %s not found in %s, or there was a reading error. Please provide \
            it manually.\n\
            %!"
@@ -363,7 +363,7 @@ let reveals config request =
 
 let write_debug config =
   if config.Config.kernel_debug then
-    Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_io.printf "%s%!" msg)
+    Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_fmt.printf "%s%!" msg)
   else Tezos_scoru_wasm.Builtins.Noop
 
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
@@ -536,14 +536,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
                 tree)
         in
         let*! () =
-          Lwt_io.printf
+          Lwt_fmt.printf
             "Loaded %d inputs at level %ld\n%!"
             (List.length inputs)
             level
         in
         return (tree, inboxes, Int32.succ level)
     | None ->
-        let*! () = Lwt_io.printf "No more inputs at level %ld\n%!" level in
+        let*! () = Lwt_fmt.printf "No more inputs at level %ld\n%!" level in
         return (tree, inboxes, level)
 
   let load_inputs inboxes level tree =
@@ -617,7 +617,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         return (tree, inboxes, level)
     | _ ->
         let*! () =
-          Lwt_io.printf
+          Lwt_fmt.printf
             "Profiling can only be done from a snapshotable state or when \
              waiting for input. You can use `step kernel_run` to go to the \
              next snapshotable state.\n\
@@ -638,7 +638,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let open Lwt_syntax in
     let* state = Wasm.Internal_for_tests.get_tick_state tree in
     let* info = Wasm.get_info tree in
-    Lwt_io.printf
+    Lwt_fmt.printf
       "%s\n%!"
       (Format.asprintf
          "Status: %a\nInternal_status: %a"
@@ -652,7 +652,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let step level inboxes config kind tree =
     let open Lwt_result_syntax in
     let* tree, ticks, inboxes, level = eval level inboxes config kind tree in
-    let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
+    let*! () = Lwt_fmt.printf "Evaluation took %Ld ticks so far\n" ticks in
     let*! () = show_status tree in
     return_some (tree, inboxes, level)
 
@@ -694,7 +694,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       Tezos_lazy_containers.Lazy_vector.Mutable.ZVector.num_elements
         input_buffer
     in
-    Lwt_io.printf
+    Lwt_fmt.printf
       "Inbox has %s messages:\n%s\n%!"
       (Z.to_string size)
       (pp_messages ())
@@ -720,7 +720,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let size =
       Tezos_lazy_containers.Lazy_vector.ZVector.num_elements level_vector
     in
-    Lwt_io.printf
+    Lwt_fmt.printf
       "Outbox has %s messages:\n%s\n%!"
       (Z.to_string size)
       (pp_messages ())
@@ -729,7 +729,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let show_outbox tree level =
     Lwt.catch
       (fun () -> show_outbox_gen tree level)
-      (fun _ -> Lwt_io.printf "No outbox found at level %ld\n%!" level)
+      (fun _ -> Lwt_fmt.printf "No outbox found at level %ld\n%!" level)
 
   (* [find_key_in_durable] retrieves the given [key] from the durable storage in
      the tree. Returns `None` if the key does not exists. *)
@@ -825,13 +825,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         show_key_gen tree key kind)
       (function
         | Tezos_scoru_wasm.Durable.Invalid_key _ ->
-            Lwt_io.printf "Invalid key\n%!"
+            Lwt_fmt.printf "Invalid key\n%!"
         | Tezos_scoru_wasm.Durable.Value_not_found ->
-            Lwt_io.printf "No value found for key\n%!"
+            Lwt_fmt.printf "No value found for key\n%!"
         | Tezos_scoru_wasm.Durable.Tree_not_found ->
-            Lwt_io.printf "No tree found for key\n%!"
+            Lwt_fmt.printf "No tree found for key\n%!"
         | exn ->
-            Lwt_io.printf "Unknown exception: %s\n%!" (Printexc.to_string exn))
+            Lwt_fmt.printf "Unknown exception: %s\n%!" (Printexc.to_string exn))
 
   exception Cannot_inspect_memory of string
 
@@ -863,13 +863,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let* value =
           Tezos_webassembly_interpreter.Memory.load_bytes memory address length
         in
-        Lwt_io.printf "%s\n%!" @@ show_value kind value)
+        Lwt_fmt.printf "%s\n%!" @@ show_value kind value)
       (function
         | Cannot_inspect_memory state ->
-            Lwt_io.printf
+            Lwt_fmt.printf
               "Error: Cannot inspect memory during internal state %s\n%!"
               state
-        | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
+        | exn -> Lwt_fmt.printf "Error: %s\n%!" (Printexc.to_string exn))
 
   let dump_function_symbols function_symbols =
     let functions =
@@ -878,7 +878,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         Custom_section.pp_function_subsection
         function_symbols
     in
-    Lwt_io.printf "Functions:\n%s\n" functions
+    Lwt_fmt.printf "Functions:\n%s\n" functions
 
   (* [reveal_preimage config hex tree] checks the current state is waiting for a
      preimage, parses [hex] as an hexadecimal representation of the data or use
@@ -902,10 +902,12 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
                 Wasm.reveal_step (String.to_bytes preimage) tree)
               (fun _ -> return tree)
         | _ ->
-            let+ () = Lwt_io.print "Error: not the expected reveal step\n%!" in
+            let+ () =
+              Lwt_fmt.printf "Error: not the expected reveal step\n%!"
+            in
             tree)
     | _ ->
-        let+ () = Lwt_io.print "Error: not a reveal step\n%!" in
+        let+ () = Lwt_fmt.printf "Error: not a reveal step\n%!" in
         tree
 
   let reveal_metadata config tree =
@@ -922,10 +924,12 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             let data = build_metadata config in
             Wasm.reveal_step (Bytes.of_string data) tree
         | _ ->
-            let+ () = Lwt_io.print "Error: Not the expected reveal step\n%!" in
+            let+ () =
+              Lwt_fmt.printf "Error: Not the expected reveal step\n%!"
+            in
             tree)
     | _ ->
-        let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
+        let+ () = Lwt_fmt.printf "Error: Not in a reveal step\n%!" in
         tree
 
   let get_function_symbols tree =
@@ -958,7 +962,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           let* res = go cmd in
           let t' = Time.System.now () in
           let*! () =
-            Lwt_io.printf
+            Lwt_fmt.printf
               "took %s\n%!"
               (Format.asprintf "%a" Ptime.Span.pp (Ptime.diff t' t))
           in
@@ -1013,13 +1017,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           in
           return_some (tree, inboxes, level)
       | Unknown s ->
-          let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
+          let*! () = Lwt_fmt.eprintf "Unknown command `%s`\n%!" s in
           return ()
       | Help ->
           let*! () =
             List.iter_s
               (fun command_docs ->
-                Lwt_io.printl ("  " ^ command_docs.documentation))
+                Lwt_fmt.printf "  %s\n" command_docs.documentation)
               commands_docs
           in
           return ()
