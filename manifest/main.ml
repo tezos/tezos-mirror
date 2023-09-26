@@ -7464,6 +7464,22 @@ let _simdal =
     ~static:false
     ~bisect_ppx:No
 
+let tezt_tx_kernel =
+  private_lib
+    "tezt_tx_kernel"
+    ~path:"tezt/lib_tx_kernel"
+    ~opam:"tezt-tx-kernel"
+    ~synopsis:"Tx kernel test framework based on Tezt"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        Protocol.(main alpha);
+        octez_crypto;
+      ]
+    ~release_status:Unreleased
+
 let _ppinclude =
   private_exe
     "ppinclude"
@@ -8437,6 +8453,7 @@ let () =
         bls12_381;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_ethereum |> open_;
+        tezt_tx_kernel;
         data_encoding;
         octez_base;
         octez_base_unix;
