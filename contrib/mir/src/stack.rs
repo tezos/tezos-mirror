@@ -131,6 +131,11 @@ impl<T> Stack<T> {
         let i2v = self.vec_index(i2);
         self.data_mut().swap(i1v, i2v)
     }
+
+    /// Iterator over the stack content, starting from the top.
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.data().iter().rev()
+    }
 }
 
 /// Newtype for specifying the order of elements in a `Stack` vs elements in

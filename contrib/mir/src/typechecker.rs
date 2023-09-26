@@ -108,7 +108,7 @@ fn typecheck_instruction(
                 let nested_t = typecheck(nested_t, gas, &mut t_stack)?;
                 let nested_f = typecheck(nested_f, gas, stack)?;
                 // If both stacks are same after typecheck, all is good.
-                ensure_stacks_eq(gas, t_stack.as_slice(), stack.as_slice())?;
+                ensure_stacks_eq(gas, &t_stack, &stack)?;
                 I::If(nested_t, nested_f)
             }
             _ => return Err(TcError::GenericTcError),
@@ -129,7 +129,7 @@ fn typecheck_instruction(
                 // If the starting stack and result stack match
                 // then the typecheck is complete. pop the bool
                 // off the original stack to form the final result.
-                ensure_stacks_eq(gas, live.as_slice(), stack.as_slice())?;
+                ensure_stacks_eq(gas, &live, &stack)?;
                 stack.pop();
                 I::Loop(nested)
             }
@@ -175,7 +175,12 @@ fn ensure_stack_len(stack: &TypeStack, l: usize) -> Result<(), TcError> {
 
 /// Ensures two type stacks compare equal, otherwise returns
 /// `Err(StacksNotEqual)`. If runs out of gas, returns `Err(OutOfGas)` instead.
-fn ensure_stacks_eq(gas: &mut Gas, stack1: &[Type], stack2: &[Type]) -> Result<(), TcError> {
+///
+/// Failed stacks compare equal with anything.
+fn ensure_stacks_eq(gas: &mut Gas, stack1: &TypeStack, stack2: &TypeStack) -> Result<(), TcError> {
+    if stack1.is_failed() || stack2.is_failed() {
+        return Ok(());
+    }
     if stack1.len() != stack2.len() {
         return Err(TcError::StacksNotEqual);
     }
