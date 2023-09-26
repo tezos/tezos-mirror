@@ -32,7 +32,7 @@ impl Type {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Value {
-    NumberValue(i32),
+    NumberValue(i128),
     BooleanValue(bool),
 }
 

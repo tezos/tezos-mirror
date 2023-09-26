@@ -47,7 +47,7 @@ mod tests {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let ast = typechecker::typecheck(ast, &mut Gas::default(), &mut stk![Type::Nat]).unwrap();
         let mut istack = stk![Value::NumberValue(5)];
-        let mut gas = Gas::new(1305);
+        let mut gas = Gas::new(1359);
         report_gas(&mut gas, |gas| {
             assert!(interpreter::interpret(&ast, gas, &mut istack).is_ok());
         });

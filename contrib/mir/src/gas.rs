@@ -144,7 +144,7 @@ pub mod interpret_cost {
         mb_n.map_or(Ok(DUP), dupn)
     }
 
-    pub fn add_int(i1: i32, i2: i32) -> Result<u32, OutOfGas> {
+    pub fn add_int(i1: i128, i2: i128) -> Result<u32, OutOfGas> {
         // NB: eventually when using BigInts, use BigInt::bits() &c
         use std::mem::size_of_val;
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on

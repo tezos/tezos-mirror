@@ -18,7 +18,7 @@ match {
   _
 }
 
-number: i32 = <s:r"([+-]?)[0-9]+"> =>? i32::from_str(s)
+number: i128 = <s:r"([+-]?)[0-9]+"> =>? i128::from_str(s)
   .map_err(|_| ParseError::User { error : "parsing of numeric literal failed." } );
 
 usize: usize = {
