@@ -24,10 +24,12 @@ export baker="$BIN_DIR/octez-baker-$PROTOCOL"
 export endorser="$BIN_DIR/octez-endorser-$PROTOCOL"
 export accuser="$BIN_DIR/octez-accuser-$PROTOCOL"
 export signer="$BIN_DIR/octez-signer"
+export smart_rollup_node="$BIN_DIR/octez-smart-rollup-node"
 
 export client_dir="$DATA_DIR/client"
 export node_dir="$DATA_DIR/node"
 export node_data_dir="$node_dir/data"
+export smart_rollup_node_data_dir="$DATA_DIR/smart-rollup-node"
 
 # shellcheck source=./scripts/docker/entrypoint.inc.sh
 . "$bin_dir/entrypoint.inc.sh"
@@ -74,6 +76,9 @@ case $command in
     octez-signer)
         exec "$signer" "$@"
         ;;
+    octez-smart-rollup-node)
+        launch_smart_rollup_node "$@"
+        ;;
     *)
         cat <<EOF
 Available commands:
@@ -90,6 +95,9 @@ You can specify the network with argument --network, for instance:
 Daemons:
 - octez-node [args]
   Initialize a new identity and run the octez node.
+
+- octez-smart-rollup-node [args]
+  Run the octez smart rollup node.
 
 - octez-baker [keys]
 - octez-baker-test [keys]
