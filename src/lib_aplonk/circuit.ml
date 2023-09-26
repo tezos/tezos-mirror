@@ -25,8 +25,8 @@
 
 (* This files contains all tools that can be used to create the verification circuit of aPlonK. *)
 
-module SMap = Plonk.SMap
-open Plonk.Bls
+module SMap = Kzg.SMap
+open Kzg.Bls
 
 let nb_wires = Plompiler.Csir.nb_wires_arch
 
@@ -555,6 +555,32 @@ module V (Main : Aggregation.Main_protocol.S) = struct
     in
     (switches, S.of_int nb_proofs)
 
+  (* Applies the function [f] to the last element of the list [l] ; if [l] is empty, it returns the empty list. *)
+  let map_end f l =
+    let rec aux acc = function
+      | [] -> []
+      | [x] -> List.rev (f x :: acc)
+      | x :: tl -> aux (x :: acc) tl
+    in
+    aux [] l
+
+  (* This function converts answers to a list of scalars. If [nb_proofs] < [nb_max_proofs], the missing answers will be added as zero, in an order that is suitable for aPlonK’s switches *)
+  let pad_answers nb_max_proofs nb_rc_wires nb_proofs
+      (answers : S.t SMap.t SMap.t list) =
+    let answers = List.map (SMap.map SMap.values) answers in
+    (* We want to work on the 'a map list because it’s the only way to find the wires in the answers without knowing if there is ultra or next wire *)
+    let answers_padded =
+      map_end
+        (SMap.map (fun w_list ->
+             w_list
+             @ List.init
+                 ((nb_max_proofs - nb_proofs)
+                 * (Plompiler.Csir.nb_wires_arch + nb_rc_wires))
+                 (Fun.const S.zero)))
+        answers
+    in
+    answers_padded |> List.concat_map SMap.values |> List.flatten
+
   let pad_inputs nb_max_proofs nb_rc_wires inner_pi answers =
     let nb_proofs = List.length inner_pi in
     let padded_inner_pi =
@@ -564,7 +590,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       @ List.(init (to_pad * nb_inner_pi) (Fun.const S.zero))
     in
     let padded_answers =
-      Plonk.Utils.pad_answers nb_max_proofs nb_rc_wires nb_proofs answers
+      pad_answers nb_max_proofs nb_rc_wires nb_proofs answers
     in
     (padded_inner_pi, padded_answers)
 
@@ -600,7 +626,7 @@ module V (Main : Aggregation.Main_protocol.S) = struct
       raise e
 
   let get_batches inputs answers r =
-    let batch_map r map = Plonk.Utils.Fr_generation.batch r (SMap.values map) in
+    let batch_map r map = Kzg.Utils.Fr_generation.batch r (SMap.values map) in
     (* we map over [inputs] just because it contains the circuit_names *)
     SMap.mapi
       (fun circuit_name _ ->

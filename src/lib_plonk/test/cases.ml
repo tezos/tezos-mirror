@@ -1,5 +1,6 @@
 open Plonk
-module Scalar = Bls.Scalar
+module Scalar = Kzg.Bls.Scalar
+module SMap = Kzg.SMap
 
 let ( ! ) = List.map Scalar.of_int
 

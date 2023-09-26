@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
-open Utils
+open Kzg.Bls
+open Kzg.Utils
 open Identities
 open Communication
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module type S = sig
   module MP : Plonk.Main_protocol.S
@@ -135,7 +135,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     let t =
       compute_t ~n ~alpha ~nb_of_t_chunks (SMap.singleton "batched" batched_ids)
     in
-    let cm_t, t_prover_aux = PC.Commitment.commit pc_public_parameters t in
+    let cm_t, t_prover_aux = PC.commit pc_public_parameters t in
     let transcript = Transcript.expand PC.Commitment.t cm_t transcript in
     let* pc_answers_worker =
       dmap
@@ -302,7 +302,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     return {perm_and_plook; wires_cm; pp_proof}
 end
 
-module PC_Kzg = Distribution.Kzg.Kzg_impl
+module PC_Kzg = Distribution.Polynomial_commitment.Kzg_impl
 module PP_Kzg = Distribution.Polynomial_protocol.Make (PC_Kzg)
 module Main_Kzg = Distribution.Main_protocol.Make (PP_Kzg)
 module PC_Pack = Distribution.Kzg_pack.Kzg_pack_impl

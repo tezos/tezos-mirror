@@ -286,15 +286,15 @@ module Make (Main : Plonk.Main_protocol.S) = struct
     include Main
 
     let setup ~zero_knowledge circuit ~srs =
-      let circuits_map = Plonk.SMap.singleton "" (circuit, 1) in
+      let circuits_map = Kzg.SMap.singleton "" (circuit, 1) in
       Main.setup ~zero_knowledge circuits_map ~srs
 
     let prove pp ~(inputs : circuit_prover_input list) =
-      let inputs = Plonk.SMap.singleton "" inputs in
+      let inputs = Kzg.SMap.singleton "" inputs in
       Main.prove pp ~inputs
 
     let verify pp ~inputs proof =
-      let inputs = Plonk.SMap.singleton "" inputs in
+      let inputs = Kzg.SMap.singleton "" inputs in
       Main.verify pp ~inputs proof
   end
 
@@ -342,7 +342,7 @@ module Make (Main : Plonk.Main_protocol.S) = struct
       if verbose then Time.time description f else f ()
     in
     if verbose then
-      Plonk.SMap.iter
+      Kzg.SMap.iter
         (fun cname (circuit, _n) ->
           Format.printf
             "circuit '%s' has %d constraints\n"
@@ -354,9 +354,9 @@ module Make (Main : Plonk.Main_protocol.S) = struct
           Main.setup ~zero_knowledge circuit_map ~srs)
     in
     let prover_inputs =
-      Plonk.SMap.mapi
+      Kzg.SMap.mapi
         (fun c_name ->
-          let c = fst (Plonk.SMap.find c_name circuit_map) in
+          let c = fst (Kzg.SMap.find c_name circuit_map) in
           List.map (make_secret pp_prover c.input_com_sizes))
         private_inputs
     in
@@ -405,8 +405,8 @@ module Make (Main : Plonk.Main_protocol.S) = struct
   *)
   let test_circuit ~name ?zero_knowledge ?outcome ?verbose circuit
       private_inputs =
-    let circuit_map = Plonk.SMap.singleton name (circuit, 1) in
-    let inputs = Plonk.SMap.singleton name [private_inputs] in
+    let circuit_map = Kzg.SMap.singleton name (circuit, 1) in
+    let inputs = Kzg.SMap.singleton name [private_inputs] in
     test_circuits ~name ?zero_knowledge ?outcome ?verbose circuit_map inputs
 
   let run_test_case ~zero_knowledge ?verbose

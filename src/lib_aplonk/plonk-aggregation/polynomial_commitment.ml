@@ -24,11 +24,12 @@
 (*****************************************************************************)
 
 open Plonk
-open Bls
-open Utils
+open Kzg.Bls
+open Kzg.Utils
+module SMap = Kzg.SMap
 
 module type S = sig
-  include Polynomial_commitment.S
+  include Kzg.Interfaces.Polynomial_commitment
 
   (** Auxiliary information needed by the prover for the meta-verification in
       aPlonK *)
@@ -54,7 +55,8 @@ module type S = sig
 end
 
 module Make_impl
-    (PC : Polynomial_commitment.S with type Commitment.t = Bls.G1.t SMap.t) =
+    (PC : Kzg.Interfaces.Polynomial_commitment
+            with type Commitment.t = Kzg.Bls.G1.t SMap.t) =
 struct
   type secret = PC.secret
 
@@ -64,42 +66,11 @@ struct
 
   type transcript = PC.transcript
 
-  module Public_parameters = struct
-    type prover = {
-      pp_pc_prover : PC.Public_parameters.prover;
-      pp_pack_prover : Pack.prover_public_parameters;
-    }
-    [@@deriving repr]
-
-    type verifier = {
-      pp_pc_verifier : PC.Public_parameters.verifier;
-      pp_pack_verifier : Pack.verifier_public_parameters;
-    }
-    [@@deriving repr]
-
-    type setup_params = int
-
-    let setup setup_params srs =
-      let pp_pc_prover, pp_pc_verifier =
-        PC.Public_parameters.setup setup_params srs
-      in
-      let pp_pack_prover, pp_pack_verifier =
-        Pack.setup setup_params (snd srs)
-      in
-      let pp_prover = {pp_pc_prover; pp_pack_prover} in
-      let pp_verifier = {pp_pc_verifier; pp_pack_verifier} in
-      (pp_prover, pp_verifier)
-
-    let to_bytes d ({pp_pc_prover; pp_pack_prover} : prover) =
-      Utils.Hash.hash_bytes
-        [
-          PC.Public_parameters.to_bytes d pp_pc_prover;
-          Pack.public_parameters_to_bytes pp_pack_prover;
-        ]
-  end
-
   module Commitment = struct
-    type prover_public_parameters = Public_parameters.prover
+    type public_parameters = {
+      pc : PC.Commitment.public_parameters;
+      pack : Pack.prover_public_parameters;
+    }
 
     type secret = Poly.t SMap.t
 
@@ -110,7 +81,7 @@ struct
     type prover_aux = PC.Commitment.t * PC.Commitment.prover_aux
     [@@deriving repr]
 
-    let commit ?all_keys (pp : Public_parameters.prover) f_map =
+    let commit ?all_keys (pp : public_parameters) f_map =
       (* Relevant_positions is the list of the indexes of f_map’s elements in the all_keys list.  *)
       let relevant_positions =
         match all_keys with
@@ -124,13 +95,10 @@ struct
             |> List.filter_map (fun (i, x) ->
                    Option.map (Fun.const i) (SMap.find_opt x f_map))
       in
-      let prover_aux = PC.Commitment.commit pp.pp_pc_prover f_map in
+      let prover_aux = PC.Commitment.commit pp.pc f_map in
       let cm_list = SMap.values (fst prover_aux) in
       let pack_cmt =
-        Pack.partial_commit
-          ~relevant_positions
-          pp.pp_pack_prover
-          (Array.of_list cm_list)
+        Pack.partial_commit ~relevant_positions pp.pack (Array.of_list cm_list)
       in
       (pack_cmt, prover_aux)
 
@@ -138,8 +106,7 @@ struct
 
     let rename _f cmt = cmt
 
-    let commit_single pp =
-      PC.Commitment.commit_single Public_parameters.(pp.pp_pc_prover)
+    let commit_single pp = PC.Commitment.commit_single pp.pc
 
     let empty = Pack.empty_commitment
 
@@ -155,14 +122,57 @@ struct
       (cm, p_a)
 
     let of_list pp ~name l =
-      let pc_cm =
-        PC.Commitment.(of_list Public_parameters.(pp.pp_pc_prover) ~name l)
-      in
-      ( Pack.commit Public_parameters.(pp.pp_pack_prover) (Array.of_list l),
-        pc_cm )
+      let pc_cm = PC.Commitment.(of_list pp.pc ~name l) in
+      (Pack.commit pp.pack (Array.of_list l), pc_cm)
 
     let to_map _ = failwith "Not implemented & should not be used in verifier"
   end
+
+  module Public_parameters = struct
+    type prover = {
+      pp_pc_prover : PC.Public_parameters.prover;
+      pp_pack_prover : Pack.prover_public_parameters;
+    }
+    [@@deriving repr]
+
+    type verifier = {
+      pp_pc_verifier : PC.Public_parameters.verifier;
+      pp_pack_verifier : Pack.verifier_public_parameters;
+    }
+    [@@deriving repr]
+
+    type commitment = Commitment.public_parameters
+
+    type setup_params = int
+
+    let setup setup_params srs =
+      let pp_pc_prover, pp_pc_verifier =
+        PC.Public_parameters.setup setup_params srs
+      in
+      let pp_pack_prover, pp_pack_verifier =
+        Pack.setup setup_params (snd srs)
+      in
+      let pp_prover = {pp_pc_prover; pp_pack_prover} in
+      let pp_verifier = {pp_pc_verifier; pp_pack_verifier} in
+      (pp_prover, pp_verifier)
+
+    let to_bytes d ({pp_pc_prover; pp_pack_prover} : prover) =
+      Hash.hash_bytes
+        [
+          PC.Public_parameters.to_bytes d pp_pc_prover;
+          Pack.public_parameters_to_bytes pp_pack_prover;
+        ]
+
+    let get_commit_parameters {pp_pc_prover; pp_pack_prover} =
+      Commitment.
+        {
+          pc = PC.Public_parameters.get_commit_parameters pp_pc_prover;
+          pack = pp_pack_prover;
+        }
+  end
+
+  let commit ?all_keys pp =
+    Commitment.commit ?all_keys (Public_parameters.get_commit_parameters pp)
 
   type proof = {
     pc_proof : PC.proof;
@@ -307,8 +317,9 @@ struct
 end
 
 module Make : functor
-  (PC : Polynomial_commitment.S with type Commitment.t = Bls.G1.t SMap.t)
+  (PC : Kzg.Interfaces.Polynomial_commitment
+          with type Commitment.t = Kzg.Bls.G1.t SMap.t)
   -> S =
   Make_impl
 
-include Make (Polynomial_commitment.Kzg_impl)
+include Make (Kzg.Polynomial_commitment)

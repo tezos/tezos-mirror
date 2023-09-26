@@ -23,11 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
+open Kzg.Bls
+open Kzg.Utils
 
-module External (PC : Distribution.Kzg.PC_for_distribution_sig) = struct
-  module SMap = Plonk.SMap
+module External
+    (PC : Distribution.Polynomial_commitment.PC_for_distribution_sig) =
+struct
+  module SMap = Kzg.SMap
 
   let generate_random_poly degree =
     Poly.of_coefficients (List.init degree (fun i -> (Scalar.random (), i)))
@@ -59,7 +61,7 @@ module External (PC : Distribution.Kzg.PC_for_distribution_sig) = struct
           generate_f_map ~prefix:(string_of_int i) max_degree nb_polys_per_batch)
     in
     let cmt_list, prover_aux_list =
-      List.map (PC.Commitment.commit pp_prover) f_map_list |> List.split
+      List.map (PC.commit pp_prover) f_map_list |> List.split
     in
     let transcript =
       Transcript.list_expand PC.Commitment.t cmt_list Bytes.empty
@@ -179,7 +181,7 @@ module External (PC : Distribution.Kzg.PC_for_distribution_sig) = struct
     assert (not @@ prove_and_verify_instance ~wrong_transcript:true instance)
 end
 
-module KZG_Tests = External (Distribution.Kzg.Kzg_impl)
+module KZG_Tests = External (Distribution.Polynomial_commitment.Kzg_impl)
 module KZG_Pack_Tests = External (Distribution.Kzg_pack.Kzg_pack_impl)
 
 let tests =

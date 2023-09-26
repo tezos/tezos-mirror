@@ -70,8 +70,8 @@ let benchmark () =
   let plonk_circuit = Plonk.Circuit.to_plonk cs in
   let cname = "" in
   let replicate x = List.init nb_proofs (Fun.const x) in
-  let circuits_map = Plonk.SMap.singleton cname (plonk_circuit, nb_proofs) in
-  let inputs_map = Plonk.SMap.singleton cname (replicate inputs) in
+  let circuits_map = Kzg.SMap.singleton cname (plonk_circuit, nb_proofs) in
+  let inputs_map = Kzg.SMap.singleton cname (replicate inputs) in
 
   let zero_knowledge = false in
   Printf.printf

@@ -23,15 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
-module SMap = Plonk.SMap
+open Kzg.Bls
+open Kzg.Utils
+module SMap = Kzg.SMap
 
 (** Extension of the PC signature with additional types and functions used
     in by Distributed_prover  *)
 
 module type PC_for_distribution_sig = sig
-  module BasePC : Plonk.Polynomial_commitment.S
+  module BasePC : Kzg.Interfaces.Polynomial_commitment
 
   include module type of BasePC
 
@@ -70,7 +70,7 @@ end
 (** Extension of the KZG implementation with additional types and functions
     used in by Distributed_prover  *)
 module Kzg_impl = struct
-  module BasePC = Plonk.Polynomial_commitment.Kzg_impl
+  module BasePC = Kzg.Polynomial_commitment
   include BasePC
 
   type worker_msg = Scalar.t SMap.t SMap.t [@@deriving repr]

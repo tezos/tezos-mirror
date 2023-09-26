@@ -84,7 +84,12 @@ module Transcript = struct
     let open Hash in
     let st = init () in
     update st transcript ;
-    List.iter (fun a -> update st (Plompiler.Utils.to_bytes repr a)) list ;
+    List.iter
+      (fun a ->
+        update
+          st
+          (Bytes.unsafe_of_string @@ Repr.(unstage @@ to_bin_string repr) a))
+      list ;
     finish st
 
   let expand : 'a Repr.t -> 'a -> bytes -> bytes =
@@ -115,23 +120,6 @@ module Array = struct
         i)
 end
 
-(* This function converts answers to a list of scalars. If [nb_proofs] < [nb_max_proofs], the missing answers will be added as zero, in an order that is suitable for aPlonK’s switches *)
-let pad_answers nb_max_proofs nb_rc_wires nb_proofs
-    (answers : S.t SMap.t SMap.t list) =
-  let answers = List.map (SMap.map SMap.values) answers in
-  (* We want to work on the 'a map list because it’s the only way to find the wires in the answers without knowing if there is ultra or next wire *)
-  let answers_padded =
-    List.map_end
-      (SMap.map (fun w_list ->
-           w_list
-           @ List.init
-               ((nb_max_proofs - nb_proofs)
-               * (Plompiler.Csir.nb_wires_arch + nb_rc_wires))
-               (Fun.const S.zero)))
-      answers
-  in
-  answers_padded |> List.concat_map SMap.values |> List.flatten
-
 module Fr_generation : sig
   (* computes [| 1; x; x²; x³; ...; xᵈ⁻¹ |] *)
   val powers : int -> Bls.Scalar.t -> Bls.Scalar.t array
@@ -147,17 +135,6 @@ module Fr_generation : sig
 
   (* generate a single scalars based on seed transcript *)
   val random_fr : Bytes.t -> Bls.Scalar.t * Bytes.t
-
-  (* Evaluates L1 on x, where L1 is the minimal (monic) polynomial that
-     satisfies L1(generator) = 1 and L1(generator^i) = 0
-     for all i = 2, ..., domain_size. *)
-  val evaluate_l1 :
-    domain_size:int -> generator:Bls.Scalar.t -> Bls.Scalar.t -> Bls.Scalar.t
-
-  (* Evaluates Ln_p_1 on x, where Ln_p_1 is the minimal (monic) polynomial that
-     satisfies Ln_p_1(1) = 1 and Ln_p_1(generator^i) = 0
-     for all i = 1, ..., domain_size. *)
-  val evaluate_l0 : domain_size:int -> Bls.Scalar.t -> Bls.Scalar.t
 end = struct
   open Bls
 
@@ -212,47 +189,107 @@ end = struct
   let random_fr transcript =
     let l, hashed_transcript = random_fr_list transcript 1 in
     (List.hd l, hashed_transcript)
-
-  let evaluate_l1 ~domain_size ~generator x =
-    let n = Z.of_int domain_size in
-    let l1_num = Scalar.(generator * sub (pow x n) one) in
-    let l1_den = Scalar.(of_z n * sub x generator) in
-    Scalar.div_exn l1_num l1_den
-
-  let evaluate_l0 ~domain_size x =
-    let n = Z.of_int domain_size in
-    let l0_num = Scalar.(sub (pow x n) one) in
-    let l0_den = Scalar.(of_z n * sub x one) in
-    Scalar.div_exn l0_num l0_den
 end
 
-exception SRS_too_short of string
+let diff_next_power_of_two x = (1 lsl Z.log2up (Z.of_int x)) - x
 
-open Bls
+(* The input is expected to be a positive integer. *)
+let is_power_of_two n =
+  assert (n >= 0) ;
+  n <> 0 && n land (n - 1) = 0
 
-(* This function is used to raise a more helpful error message *)
-let pippenger pippenger ps ss =
-  try pippenger ?start:None ?len:None ps ss
-  with Invalid_argument s ->
-    raise (Invalid_argument ("Utils.pippenger : " ^ s))
+module FFT : sig
+  val select_fft_domain : int -> int * int * int
 
-let pippenger1_with_affine_array g =
-  pippenger G1.pippenger_with_affine_array (G1.to_affine_array g)
+  val fft : Domain.t -> Bls.Poly.t -> Evaluations.t
 
-let commit_single pippenger zero srs_size srs p =
-  let p_size = 1 + Poly.degree p in
-  if p_size = 0 then zero
-  else if p_size > srs_size then
-    raise
-      (SRS_too_short
-         (Printf.sprintf
-            "commit : Polynomial degree, %i, exceeds srs length, %i."
-            p_size
-            srs_size))
-  else pippenger srs p
+  val ifft_inplace : Domain.t -> Evaluations.t -> Bls.Poly.t
+end = struct
+  (* Return the powerset of {3,11,19}. *)
+  let combinations_factors =
+    let rec powerset = function
+      | [] -> [[]]
+      | x :: xs ->
+          let ps = powerset xs in
+          List.concat [ps; List.map (fun ss -> x :: ss) ps]
+    in
+    powerset [3; 11; 19]
 
-let commit1 srs p =
-  commit_single Srs_g1.pippenger G1.zero (Srs_g1.size srs) srs p
+  (* [select_fft_domain domain_size] selects a suitable domain for the FFT.
 
-let commit2 srs p =
-  commit_single Srs_g2.pippenger G2.zero (Srs_g2.size srs) srs p
+     The domain size [domain_size] is expected to be strictly positive.
+     Return [(size, power_of_two, remainder)] such that:
+     * If [domain_size > 1], then [size] is the smallest integer greater or
+     equal to [domain_size] and is of the form 2^a * 3^b * 11^c * 19^d,
+     where a ∈ ⟦0, 32⟧, b ∈ {0, 1}, c ∈ {0, 1}, d ∈ {0, 1}.
+     * If [domain_size = 1], then [size = 2].
+     * [size = power_of_two * remainder], [power_of_two] is a power of two,
+     and [remainder] is not divisible by 2.
+
+     The function works as follows: each product of elements from
+     an element of the powerset of {3,11,19} is multiplied by 2
+     until the product is greater than [domain_size]. *)
+  let select_fft_domain domain_size =
+    assert (domain_size > 0) ;
+    (* {3,11,19} are small prime factors dividing [Scalar.order - 1],
+       the order of the multiplicative group Fr\{0}. *)
+    let order_multiplicative_group = Z.pred Bls.Scalar.order in
+    assert (
+      List.for_all
+        (fun x -> Z.(divisible order_multiplicative_group (of_int x)))
+        [3; 11; 19]) ;
+    (* This case is needed because the code in the else clause will return
+       (1, 1, 1) and 1 is not a valid domain size. *)
+    if domain_size = 1 then (2, 2, 1)
+    else
+      (* [domain_from_factors] computes the power of two to be used in the
+         decomposition N = 2^k * factors >= domain_size where [factors] is an
+         element of [combinations_factors]. *)
+      let domain_from_factors (factors : int list) : int * int list =
+        let prod_factors = List.fold_left ( * ) 1 factors in
+        let rec get_next_power_of_two k =
+          if prod_factors lsl k >= domain_size then 1 lsl k
+          else get_next_power_of_two (k + 1)
+        in
+        let next_power_of_two = get_next_power_of_two 0 in
+        let size = prod_factors * next_power_of_two in
+        (size, next_power_of_two :: factors)
+      in
+      let candidate_domains =
+        List.map domain_from_factors combinations_factors
+      in
+      (* The list contains at least an element: the next power of 2 of domain_size *)
+      let domain_length, prime_factor_decomposition =
+        List.fold_left
+          min
+          (List.hd candidate_domains)
+          (List.tl candidate_domains)
+      in
+      let power_of_two = List.hd prime_factor_decomposition in
+      let remainder_product =
+        List.fold_left ( * ) 1 (List.tl prime_factor_decomposition)
+      in
+      (domain_length, power_of_two, remainder_product)
+
+  let fft_aux ~dft ~fft ~fft_pfa domain coefficients =
+    let size = Domain.length domain in
+    let _, power_of_two, remainder_product = select_fft_domain size in
+    if size = power_of_two || size = remainder_product then
+      (if is_power_of_two size then fft else dft) domain coefficients
+    else
+      let domain1 = Domain.build power_of_two in
+      let domain2 = Domain.build remainder_product in
+      fft_pfa ~domain1 ~domain2 coefficients
+
+  let fft =
+    fft_aux
+      ~dft:Evaluations.dft
+      ~fft:Evaluations.evaluation_fft
+      ~fft_pfa:Evaluations.evaluation_fft_prime_factor_algorithm
+
+  let ifft_inplace =
+    fft_aux
+      ~dft:Evaluations.idft
+      ~fft:Evaluations.interpolation_fft
+      ~fft_pfa:Evaluations.interpolation_fft_prime_factor_algorithm
+end

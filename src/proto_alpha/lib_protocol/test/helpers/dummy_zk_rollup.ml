@@ -339,7 +339,7 @@ end) : sig
   val init_state : Zk_rollup.State.t
 
   (** Map associating every circuit identifier to its kind *)
-  val circuits : [`Public | `Private | `Fee] Plonk.SMap.t
+  val circuits : [`Public | `Private | `Fee] Kzg.SMap.t
 
   (** Commitment to the circuits  *)
   val lazy_pp :
@@ -372,7 +372,7 @@ end) : sig
   end
 end = struct
   open Protocol.Alpha_context
-  module SMap = Plonk.SMap
+  module SMap = Kzg.SMap
   module Dummy = Types.P.Dummy
   module T = Types.P
   module VC = V (LibCircuit)

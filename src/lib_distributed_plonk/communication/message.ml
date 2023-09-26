@@ -38,13 +38,13 @@ module type S = sig
 
   (* All message payloads need to have an index, so that
      they can be sorted back by the master. *)
-  type ctw_payload = {index : int; content : MP.worker_inputs Plonk.SMap.t}
+  type ctw_payload = {index : int; content : MP.worker_inputs Kzg.SMap.t}
 
   type ctpap_payload = {index : int; content : MP.PP.transcript}
 
   type pppi_payload = {index : int; content : MP.PP.transcript}
 
-  type ppctt_payload = {index : int; content : string list * Plonk.Bls.Scalar.t}
+  type ppctt_payload = {index : int; content : string list * Kzg.Bls.Scalar.t}
 
   type ppkeax_payload = {index : int; content : MP.PP.transcript}
 
@@ -64,7 +64,10 @@ module type S = sig
 
   type pppi_res_payload = {index : int; content : string list}
 
-  type ppctt_res_payload = {index : int; content : Plonk.Bls.Evaluations.t}
+  type ppctt_res_payload = {
+    index : int;
+    content : Plonk.Identities.Evaluations.t;
+  }
 
   type ppkeax_res_payload = {index : int; content : MP.PP.PC.answer list}
 
@@ -113,7 +116,7 @@ functor
 
     (* All message payloads need to have an index, so that
        they can be sorted back by the master. *)
-    type ctw_payload = {index : int; content : MP.worker_inputs Plonk.SMap.t}
+    type ctw_payload = {index : int; content : MP.worker_inputs Kzg.SMap.t}
     [@@deriving repr]
 
     type ctpap_payload = {index : int; content : MP.PP.transcript}
@@ -122,10 +125,7 @@ functor
     type pppi_payload = {index : int; content : MP.PP.transcript}
     [@@deriving repr]
 
-    type ppctt_payload = {
-      index : int;
-      content : string list * Plonk.Bls.Scalar.t;
-    }
+    type ppctt_payload = {index : int; content : string list * Kzg.Bls.Scalar.t}
     [@@deriving repr]
 
     type ppkeax_payload = {index : int; content : MP.PP.transcript}
@@ -154,7 +154,10 @@ functor
     type pppi_res_payload = {index : int; content : string list}
     [@@deriving repr]
 
-    type ppctt_res_payload = {index : int; content : Plonk.Bls.Evaluations.t}
+    type ppctt_res_payload = {
+      index : int;
+      content : Plonk.Identities.Evaluations.t;
+    }
     [@@deriving repr]
 
     type ppkeax_res_payload = {index : int; content : MP.PP.PC.answer list}

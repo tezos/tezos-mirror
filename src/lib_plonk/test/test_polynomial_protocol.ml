@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
 open Plonk.Identities
 
 module External (PP : Plonk.Polynomial_protocol.S) = struct
-  module SMap = Plonk.SMap
+  module SMap = Kzg.SMap
 
   let pow5_mod_zh ~n p =
     let domain = Domain.build_power_of_two (Z.log2 @@ Z.of_int (8 * n)) in
@@ -151,7 +151,7 @@ module External (PP : Plonk.Polynomial_protocol.S) = struct
         ~srs:Plonk_test.Helpers.srs
     in
     (* prover *)
-    let cm, prover_aux = PP.PC.Commitment.commit prover_pp poly_map in
+    let cm, prover_aux = PP.PC.commit prover_pp poly_map in
     let secrets = [(poly_map, prover_aux)] in
     let eval_points = [[X]] in
     (* The generator is not needed since we evaluate only at X *)

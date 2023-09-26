@@ -1,5 +1,5 @@
 open Plonk
-open Bls
+open Kzg.Bls
 
 let one = Scalar.one
 
@@ -17,7 +17,7 @@ module Internal = struct
     assert (Scalar.(eq last one || eq last zero))
 end
 
-module External (PC : Polynomial_commitment.S) = struct
+module External (PC : Kzg.Interfaces.Polynomial_commitment) = struct
   module MP = Main_protocol.Make (Polynomial_protocol.Make (PC))
   module H = Plonk_test.Helpers.Make (MP)
   open Plonk_test.Cases
@@ -32,7 +32,7 @@ module External (PC : Polynomial_commitment.S) = struct
         Range_Checks.[[valid; valid; basic; basic]]
 end
 
-module External_Kzg = External (Polynomial_commitment)
+module External_Kzg = External (Kzg.Polynomial_commitment)
 module External_Kzg_pack = External (Aggregation.Polynomial_commitment)
 
 (* TODO zk tests *)

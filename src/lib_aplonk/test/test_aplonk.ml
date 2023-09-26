@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 open Plompiler
-open Plonk.Bls
+open Kzg.Bls
+open Plonk.Identities
 module L = LibCircuit
 module PP = Plonk.Polynomial_protocol.Make (Aggregation.Polynomial_commitment)
 module Main = Plonk.Main_protocol.Make (PP)
@@ -176,8 +177,8 @@ module External = struct
     end in
     let circuit, solver = cs_of_repr circuit in
     let witness = get_witness (solver, witness) nb_proofs in
-    let circuit_map = Plonk.SMap.singleton "" (circuit, nb_proofs) in
-    let inputs = Plonk.SMap.singleton "" witness in
+    let circuit_map = Kzg.SMap.singleton "" (circuit, nb_proofs) in
+    let inputs = Kzg.SMap.singleton "" witness in
     Printf.printf "\n\n*** SUPER ***" ;
     let module Helpers = Plonk_test.Helpers.Make (Aplonk.Main_protocol.Make (PIs)) in
     Helpers.test_circuits ~name:"compare_protos : aplonk" circuit_map inputs ;
@@ -232,8 +233,8 @@ module External = struct
       ([|x0; x1; x2; x3; x4; x5; x6; x7; x8; x9; x10; x11; x12|], x1)
     in
     let witness = get_witness (None, witness) nb_proofs in
-    let circuit_map = Plonk.SMap.singleton "" (circuit, nb_proofs) in
-    let inputs = Plonk.SMap.singleton "" witness in
+    let circuit_map = Kzg.SMap.singleton "" (circuit, nb_proofs) in
+    let inputs = Kzg.SMap.singleton "" witness in
     Helpers.test_circuits ~name:"first_test_proto_rollup" circuit_map inputs
 
   let compare_protos_dummy_circuit =

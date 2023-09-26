@@ -25,7 +25,7 @@
 
 module External = struct
   module Cases = Plonk_test.Cases
-  module SMap = Plonk.SMap
+  module SMap = Kzg.SMap
   open Aplonk.Pi_parameters
 
   let no_pi_cases =

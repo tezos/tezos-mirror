@@ -2106,7 +2106,7 @@ module PI_parameters_predicate_private_batch = struct
       List.fold_left
         (fun (_, acc_fees) pi ->
           let _, _, new_root, _, fees, _ = inner_elt pi in
-          let acc_fees = Plonk.Bls.Scalar.(acc_fees + fees) in
+          let acc_fees = Kzg.Bls.Scalar.(acc_fees + fees) in
           (new_root, acc_fees))
         (old_root, first_fees)
         (List.tl inner)

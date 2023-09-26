@@ -29,13 +29,13 @@ module Internal = struct
   let test_verifier_srs () =
     let n = 2 in
     let pp_prv, pp_vrf = setup n (snd Plonk_test.Helpers.srs) in
-    assert (Plonk.Bls.G1.eq pp_prv.g1_t pp_vrf)
+    assert (Kzg.Bls.G1.eq pp_prv.g1_t pp_vrf)
 end
 
 module External = struct
   open Aggregation.Pack
-  open Plonk.Bls
-  open Plonk.Utils
+  open Kzg.Bls
+  open Kzg.Utils
 
   let with_time f =
     let start_time = Sys.time () in

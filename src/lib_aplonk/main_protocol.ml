@@ -29,8 +29,8 @@
    part of verification checks on scalar values to the prover, who will produce
    a PlonK proof that the checks pass correctly. *)
 
-open Plonk.Bls
-module SMap = Plonk.SMap
+open Kzg.Bls
+module SMap = Kzg.SMap
 
 module Make_impl
     (Main_KZG : Plonk.Main_protocol.S
@@ -220,7 +220,7 @@ struct
             answers =
               (fun answers ->
                 let answers =
-                  Plonk.Utils.pad_answers
+                  Aggreg_circuit.pad_answers
                     pp.nb_proofs
                     pp.nb_rc_wires
                     nb_proofs

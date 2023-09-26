@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
-module SMap = Plonk.SMap
+open Kzg.Bls
+open Kzg.Utils
+module SMap = Kzg.SMap
 
 module type S = sig
   module PP : Polynomial_protocol.S

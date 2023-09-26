@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Plompiler.Csir
+module SMap = Kzg.SMap
 
 (* We assert here that all modules/selectors have been used.
    The "+2" is to take into account lookup selectors which are not defined in
