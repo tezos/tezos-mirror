@@ -1509,6 +1509,7 @@ let apply_manager_operation :
         let+ ( {
                  Sc_rollup_operations.paid_storage_size_diff;
                  ticket_receipt;
+                 whitelist_update;
                  operations;
                },
                ctxt ) =
@@ -1524,6 +1525,7 @@ let apply_manager_operation :
             {
               paid_storage_size_diff;
               ticket_receipt;
+              whitelist_update;
               balance_updates = [];
               consumed_gas;
             }

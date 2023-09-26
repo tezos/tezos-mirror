@@ -2850,6 +2850,10 @@ module Sc_rollup : sig
       Sc_rollup_repr.t ->
       last_whitelist_update ->
       (context * Z.t) tzresult Lwt.t
+
+    type update = Public | Private of t
+
+    val update_encoding : update Data_encoding.t
   end
 
   module Staker : sig

@@ -81,6 +81,7 @@ type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
   ticket_receipt : Ticket_receipt.t;
   operations : Script_typed_ir.packed_internal_operation list;
+  whitelist_update : Sc_rollup.Whitelist.update option;
 }
 
 let () =
@@ -536,7 +537,14 @@ let execute_outbox_message_transaction ctxt ~transactions ~rollup =
       ctxt
       ticket_token_diffs
   in
-  return ({paid_storage_size_diff; ticket_receipt; operations}, ctxt)
+  return
+    ( {
+        paid_storage_size_diff;
+        ticket_receipt;
+        operations;
+        whitelist_update = None;
+      },
+      ctxt )
 
 let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
     ~outbox_level ~message_index =
@@ -594,6 +602,7 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
               paid_storage_size_diff = Z.add paid_storage_size_diff size_diff;
               ticket_receipt = [];
               operations = [];
+              whitelist_update = Some (Private whitelist);
             },
             ctxt )
     | None ->
@@ -603,6 +612,7 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
               paid_storage_size_diff = Z.zero;
               ticket_receipt = [];
               operations = [];
+              whitelist_update = Some Public;
             },
             ctxt )
   else tzfail Sc_rollup_errors.Sc_rollup_is_public

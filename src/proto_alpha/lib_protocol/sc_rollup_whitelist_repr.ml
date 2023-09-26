@@ -36,10 +36,14 @@ let encoding =
   check_size (Constants_repr.sc_rollup_message_size_limit - 2)
   @@ list Signature.Public_key_hash.encoding
 
-let pp =
-  Format.pp_print_list
-    ~pp_sep:Format.pp_print_space
-    Signature.Public_key_hash.pp_short
+let pp ppf =
+  let open Format in
+  fprintf
+    ppf
+    "@[<hv>@[<hv 2>[@,%a@]@,]@]"
+    (pp_print_list
+       ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+       Signature.Public_key_hash.pp_short)
 
 type last_whitelist_update = {
   message_index : Z.t;
@@ -54,3 +58,23 @@ let last_whitelist_update_encoding =
       (obj2
          (req "message_index" n)
          (req "outbox_level" Raw_level_repr.encoding)))
+
+type update = Public | Private of t
+
+let update_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Public"
+        (obj1 (req "kind" (constant "public")))
+        (function Public -> Some () | _ -> None)
+        (fun () -> Public);
+      case
+        (Tag 1)
+        ~title:"Private"
+        (obj2 (req "kind" (constant "update")) (req "whitelist" encoding))
+        (function Private whitelist -> Some ((), whitelist) | _ -> None)
+        (fun ((), whitelist) -> Private whitelist);
+    ]
