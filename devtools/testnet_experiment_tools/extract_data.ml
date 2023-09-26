@@ -32,6 +32,66 @@
 *)
 
 open Tezos_clic
+open Lwt_result_syntax
+
+type error +=
+  | No_profiling_reports_directory
+  | No_block_hashes
+  | Invalid_block_hashes of string
+  | Cannot_get_profiling_file_name of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"extract_data.no_profiling_reports_directory"
+    ~title:"Reports directory is not provided"
+    ~description:"Argument must be a valid path to existing directory."
+    ~pp:(fun ppf _profiling_dir ->
+      Format.fprintf
+        ppf
+        "Expected a valid path to profiling directory, nothing provided.")
+    Data_encoding.empty
+    (function No_profiling_reports_directory -> Some () | _ -> None)
+    (fun () -> No_profiling_reports_directory) ;
+  register_error_kind
+    `Permanent
+    ~id:"extract_data.no_block_hashes"
+    ~title:"Block hashes list is not provided"
+    ~description:"Argument must be a list of block hashes separated by space."
+    ~pp:(fun ppf _ ->
+      Format.fprintf ppf "Expected list of block hashes, nothing provided.")
+    Data_encoding.empty
+    (function No_block_hashes -> Some () | _ -> None)
+    (fun () -> No_block_hashes) ;
+  register_error_kind
+    `Permanent
+    ~id:"extract_data.invalid_block_hashes"
+    ~title:"Invalid list of block hashes."
+    ~description:"Argument must be a list of block hashes separated by space."
+    ~pp:(fun ppf blocks ->
+      Format.fprintf
+        ppf
+        "Expected a list of block hashes separated by space, %s was provided \
+         instead"
+        blocks)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Invalid_block_hashes s -> Some s | _ -> None)
+    (fun s -> Invalid_block_hashes s) ;
+  register_error_kind
+    `Permanent
+    ~id:"extract_data.cannot_get_profiling_file_name"
+    ~title:"Cannot find type of profiling report."
+    ~description:"Cannot find type of profiling report."
+    ~pp:(fun ppf input_file ->
+      Format.fprintf ppf "Cannot get profiling file name of %s" input_file)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Cannot_get_profiling_file_name s -> Some s | _ -> None)
+    (fun s -> Cannot_get_profiling_file_name s)
+
+let profiling_reports_directory_parameter =
+  parameter @@ fun _ctxt data_dir ->
+  if Sys.file_exists data_dir && Sys.is_directory data_dir then return data_dir
+  else tzfail No_profiling_reports_directory
 
 let profiling_reports_directory_arg =
   arg
@@ -39,10 +99,14 @@ let profiling_reports_directory_arg =
     ~short:'D'
     ~long:"profiling-dir"
     ~placeholder:"profiling-dir-path"
-    ( parameter @@ fun _ data_dir ->
-      if Sys.file_exists data_dir && Sys.is_directory data_dir then
-        Lwt_result_syntax.return data_dir
-      else failwith "%s does not exists or is not a directory" data_dir )
+    profiling_reports_directory_parameter
+
+let searched_blocks_parameter =
+  parameter @@ fun _ p ->
+  let searched_blocks = String.split_on_char ' ' p in
+  match searched_blocks with
+  | [] -> tzfail @@ Invalid_block_hashes p
+  | searched_blocks -> return searched_blocks
 
 let searched_blocks_arg =
   arg
@@ -54,9 +118,7 @@ let searched_blocks_arg =
     ~short:'B'
     ~long:"blocks"
     ~placeholder:"blocks"
-    ( parameter @@ fun _ searched_blocks ->
-      let searched_blocks = String.split_on_char ' ' searched_blocks in
-      Lwt_result_syntax.return searched_blocks )
+    searched_blocks_parameter
 
 let split_lines_starting_with_b input_str =
   let regexp = Str.regexp "\nB" in
@@ -75,8 +137,7 @@ let create_files_from_lines input_file searched_block =
   (* Get only the part before file extension. *)
   let output_file_prefix = List.hd output_file_prefix in
   match output_file_prefix with
-  | None ->
-      Stdlib.failwith @@ "Cannot get profiling file name of: " ^ input_file
+  | None -> tzfail @@ Cannot_get_profiling_file_name input_file
   | Some output_file_prefix ->
       let in_channel = open_in input_file in
       let input_string =
@@ -85,25 +146,26 @@ let create_files_from_lines input_file searched_block =
       close_in in_channel ;
       let lines = split_lines_starting_with_b input_string in
       let extract_block_name = function [] -> "" | hd :: _ -> hd in
-      List.iter
-        (fun line ->
-          (* The searched block name is always the first line. *)
-          let first_line =
-            extract_block_name (String.split_on_char '\n' line)
-          in
-          (* Luckily, its length is fixed! *)
-          let block_name = String.sub first_line 0 51 in
-          if
-            String.starts_with ~prefix:"B" first_line
-            && String.equal block_name searched_block
-          then (
-            let file_name =
-              Printf.sprintf "%s_%s.txt" output_file_prefix block_name
-            in
-            let out_channel = open_out file_name in
-            output_string out_channel line ;
-            close_out out_channel))
-        lines
+      return
+      @@ List.iter
+           (fun line ->
+             (* The searched block name is always the first line. *)
+             let first_line =
+               extract_block_name (String.split_on_char '\n' line)
+             in
+             (* Luckily, its length is fixed! *)
+             let block_name = String.sub first_line 0 51 in
+             if
+               String.starts_with ~prefix:"B" first_line
+               && String.equal block_name searched_block
+             then (
+               let file_name =
+                 Printf.sprintf "%s_%s.txt" output_file_prefix block_name
+               in
+               let out_channel = open_out file_name in
+               output_string out_channel line ;
+               close_out out_channel))
+           lines
 
 (* Map the whole directory to find corresponding filenames. *)
 let rec find_files_with_suffix dir suffix =
@@ -126,7 +188,8 @@ let find_and_process_profiling_file dir search_block =
   List.iter
     (fun profiling_file ->
       Printf.printf "Found profiling file: %s\n" profiling_file ;
-      create_files_from_lines profiling_file search_block)
+      let _ = create_files_from_lines profiling_file search_block in
+      ())
     profiling_files
 
 let commands () =
@@ -144,23 +207,17 @@ let commands () =
       (fun (profiling_reports_directory, search_blocks) _cctxt ->
         match (profiling_reports_directory, search_blocks) with
         | Some profiling_reports_directory, Some search_blocks ->
-            Lwt_result_syntax.return
+            return
             @@ List.iter
                  (fun search_block ->
                    find_and_process_profiling_file
                      profiling_reports_directory
                      search_block)
                  search_blocks
-        | Some _, _ ->
-            failwith
-              "No profiling reports directory specified, it is mandatory."
-        | _, Some _ -> failwith "No block hash specified, it is mandatory."
-        | _ ->
-            failwith
-              "No profiling reports directory specified and no block hash \
-               specified, both are mandatory.");
+        | None, _ -> tzfail No_profiling_reports_directory
+        | _, None -> tzfail No_block_hashes);
   ]
 
-let select_commands _ _ = Lwt_result_syntax.return (commands ())
+let select_commands _ _ = return (commands ())
 
 let () = Client_main_run.run (module Client_config) ~select_commands
