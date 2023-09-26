@@ -486,6 +486,7 @@ pub fn storage_migration<Host: Runtime>(
         // The following **CAN NOT** fail. We can not recover from it if
         // an error occurs.
         let _ = migration_block_helpers::commit_block_migration_changes(host, false);
+        let _ = migration_receipts_helpers::commit_tx_receipts_changes(host, false);
 
         Error::UpgradeError(Fallback)
     })
