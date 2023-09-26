@@ -2758,14 +2758,14 @@ module Dal_errors : sig
       }
     | Dal_data_availibility_attestor_not_in_committee of {
         attestor : Signature.Public_key_hash.t;
-        level : Level.t;
+        level : Raw_level.t;
       }
     | Dal_operation_for_old_level of {
-        current : Raw_level.t;
+        expected : Raw_level.t;
         given : Raw_level.t;
       }
     | Dal_operation_for_future_level of {
-        current : Raw_level.t;
+        expected : Raw_level.t;
         given : Raw_level.t;
       }
     | Dal_cryptobox_error of {explanation : string}

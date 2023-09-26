@@ -64,22 +64,22 @@ let validate_attestation ctxt op =
       Compare.Int.(size <= maximum_size)
       (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
-  let current = Level.(current ctxt).level in
-  let delta_levels = Raw_level.diff current given in
+  let expected = Level.(current ctxt).level in
+  let delta_levels = Raw_level.diff expected given in
   let* () =
     error_when
       Compare.Int32.(delta_levels > 0l)
-      (Dal_operation_for_old_level {current; given})
+      (Dal_operation_for_old_level {expected; given})
   in
   let* () =
     error_when
       Compare.Int32.(delta_levels < 0l)
-      (Dal_operation_for_future_level {current; given})
+      (Dal_operation_for_future_level {expected; given})
   in
   error_when
     (Option.is_none @@ Dal.Attestation.shards_of_attestor ctxt ~attestor)
     (Dal_data_availibility_attestor_not_in_committee
-       {attestor; level = Level.current ctxt})
+       {attestor; level = expected})
 
 let apply_attestation ctxt op =
   let open Result_syntax in
@@ -88,7 +88,7 @@ let apply_attestation ctxt op =
   match Dal.Attestation.shards_of_attestor ctxt ~attestor with
   | None ->
       (* This should not happen: operation validation should have failed. *)
-      let level = Level.current ctxt in
+      let level = (Level.current ctxt).level in
       tzfail (Dal_data_availibility_attestor_not_in_committee {attestor; level})
   | Some shards ->
       Ok (Dal.Attestation.record_attested_shards ctxt attestation shards)
