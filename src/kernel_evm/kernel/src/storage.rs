@@ -348,7 +348,14 @@ pub fn store_transaction_object<Host: Runtime>(
     object: &TransactionObject,
 ) -> Result<(), Error> {
     let object_path = object_path(&object.hash)?;
-    host.store_write_all(&object_path, &object.rlp_bytes())?;
+    let encoded: &[u8] = &object.rlp_bytes();
+    log!(
+        host,
+        Debug,
+        "Storing transaction object of size {}",
+        encoded.len()
+    );
+    host.store_write_all(&object_path, encoded)?;
     Ok(())
 }
 

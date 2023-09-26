@@ -49,6 +49,7 @@ function run_profiler(path) {
         var tx_status = [];
         var estimated_ticks = [];
         var estimated_ticks_per_tx = [];
+        var tx_size = [];
 
         var profiler_output_path = "";
 
@@ -78,6 +79,8 @@ function run_profiler(path) {
             push_match(output, tx_status, /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
             push_match(output, estimated_ticks, /\bEstimated ticks:\s*(\d+)/g)
             push_match(output, estimated_ticks_per_tx, /\bEstimated ticks after tx:\s*(\d+)/g)
+            push_match(output, tx_size, /\bStoring transaction object of size\s*(\d+)/g)
+
         });
         childProcess.on('close', _ => {
             if (profiler_output_path == "") {
@@ -92,7 +95,10 @@ function run_profiler(path) {
             if (tx_status.length != estimated_ticks_per_tx.length) {
                 console.log(new Error("Tx status array length (" + tx_status.length + ") != estimated ticks per tx array length (" + estimated_ticks_per_tx.length + ")"));
             }
-            resolve({ profiler_output_path, gas_costs: gas_used, tx_status, estimated_ticks, estimated_ticks_per_tx });
+            if (tx_status.length != tx_size.length) {
+                console.log(new Error("Missing transaction size data (expected: " + tx_status.length + ", actual: " + tx_size.length + ")"));
+            }
+            resolve({ profiler_output_path, gas_costs: gas_used, tx_status, estimated_ticks, estimated_ticks_per_tx, tx_size });
         });
     })
     return profiler_result;
@@ -189,6 +195,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     tx_status = run_benchmark_result.tx_status;
     estimated_ticks = run_benchmark_result.estimated_ticks;
     estimated_ticks_per_tx = run_benchmark_result.estimated_ticks_per_tx;
+    tx_size = run_benchmark_result.tx_size;
 
     console.log(`Number of transactions: ${tx_status.length}`)
     run_time_index = 0;
@@ -222,6 +229,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
                     run_transaction_ticks: run_transaction_ticks[j],
                     sputnik_runtime_ticks: sputnik_runtime_tick,
                     store_transaction_object_ticks: store_transaction_object_ticks[j],
+                    tx_size: tx_size[j],
                     ...basic_info_row
                 });
             gas_cost_index += 1;
@@ -293,7 +301,8 @@ async function run_all_benchmarks(benchmark_scripts) {
         "status",
         "estimated_ticks",
         "inbox_size",
-        "nb_tx"
+        "nb_tx",
+        "tx_size"
     ];
     let output = output_filename();
     console.log(`Output in ${output}`);
