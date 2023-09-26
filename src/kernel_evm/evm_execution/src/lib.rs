@@ -99,6 +99,10 @@ pub enum EthereumError {
     /// result of a bug in the EvmHandler.
     #[error("Inconsistent EvmHandler state: {0}")]
     InconsistentState(Cow<'static, str>),
+    /// The execution failed because it spent more ticks than the one currently
+    /// available for the current run.
+    #[error("The transaction took more ticks than expected")]
+    OutOfTicks,
 }
 
 /// Execute an Ethereum Transaction
@@ -137,6 +141,8 @@ where
         block,
         &config,
         precompiles,
+        8_000_000_000, // This value is temporary and to be replaced in a
+                       // follow-up commit, it should be updated after each transaction.
     );
 
     if (!pay_for_gas) || handler.pre_pay_transactions(caller, gas_limit)? {

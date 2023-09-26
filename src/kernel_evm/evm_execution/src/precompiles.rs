@@ -572,6 +572,8 @@ mod tests {
             logs: vec![],
             result: None,
             withdrawals: vec![],
+            // TODO (#6426): estimate the ticks consumption of precompiled contracts
+            estimated_ticks_used: 0,
         };
 
         let result = execute_precompiled(target, input, transfer, Some(21000));

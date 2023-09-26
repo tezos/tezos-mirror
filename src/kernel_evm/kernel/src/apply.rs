@@ -35,7 +35,7 @@ use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::{index_account, read_ticketer};
-use crate::CONFIG;
+use crate::{tick_model, CONFIG};
 
 // This implementation of `Transaction` is used to share the logic of
 // transaction receipt and transaction object making. The functions
@@ -339,6 +339,9 @@ fn apply_deposit<Host: Runtime>(
 
     let gas_used = CONFIG.gas_transaction_call;
 
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/6551
+    let estimated_ticks_used = tick_model::constants::TICKS_FOR_DEPOSIT;
+
     let execution_outcome = ExecutionOutcome {
         gas_used,
         is_success,
@@ -346,6 +349,7 @@ fn apply_deposit<Host: Runtime>(
         logs: vec![],
         result: None,
         withdrawals: vec![],
+        estimated_ticks_used,
     };
 
     let caller = H160::zero();
