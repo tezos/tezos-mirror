@@ -43,6 +43,16 @@ mod tests {
     }
 
     #[test]
+    fn interpret_mutez_push_add() {
+        let ast = parser::parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
+        let mut gas = Gas::default();
+        let ast = typechecker::typecheck(ast, &mut gas, &mut stk![]).unwrap();
+        let mut istack = stk![];
+        assert!(interpreter::interpret(&ast, &mut gas, &mut istack).is_ok());
+        assert_eq!(istack, stk![Value::NumberValue(600)]);
+    }
+
+    #[test]
     fn interpret_test_gas_consumption() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let ast = typechecker::typecheck(ast, &mut Gas::default(), &mut stk![Type::Nat]).unwrap();

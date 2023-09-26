@@ -36,6 +36,7 @@ type_: Type = {
   "int"  => Type::Int,
   "nat"  => Type::Nat,
   "bool" => Type::Bool,
+  "mutez" => Type::Mutez,
 }
 
 boolean: bool = {

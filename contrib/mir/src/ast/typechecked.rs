@@ -21,5 +21,6 @@ pub mod overloads {
     pub enum Add {
         IntInt,
         NatNat,
+        MutezMutez,
     }
 }

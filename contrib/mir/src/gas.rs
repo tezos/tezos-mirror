@@ -95,6 +95,7 @@ pub mod interpret_cost {
     pub const SWAP: u32 = 10;
     pub const INT_NAT: u32 = 10;
     pub const PUSH: u32 = 10;
+    pub const ADD_TEZ: u32 = 20;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol

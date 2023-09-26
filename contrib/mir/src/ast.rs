@@ -16,6 +16,7 @@ pub enum Type {
     Nat,
     Int,
     Bool,
+    Mutez,
 }
 
 impl Type {
@@ -26,6 +27,7 @@ impl Type {
             Type::Nat => 1,
             Type::Int => 1,
             Type::Bool => 1,
+            Type::Mutez => 1,
         }
     }
 }

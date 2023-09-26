@@ -12,6 +12,7 @@ use crate::stack::*;
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterpretError {
     OutOfGas,
+    MutezOverflow,
 }
 
 impl From<OutOfGas> for InterpretError {
@@ -55,6 +56,23 @@ fn interpret_one(
                 [.., NumberValue(o2), NumberValue(o1)] => {
                     gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
                     let sum = *o1 + *o2;
+                    stack.drop_top(2);
+                    stack.push(NumberValue(sum));
+                }
+                _ => unreachable_state(),
+            },
+            overloads::Add::MutezMutez => match stack.as_slice() {
+                [.., NumberValue(o2), NumberValue(o1)] => {
+                    use crate::typechecker::MAX_TEZ;
+
+                    gas.consume(interpret_cost::ADD_TEZ)?;
+                    if (*o1 > MAX_TEZ) || (*o2 > MAX_TEZ) {
+                        return Err(InterpretError::MutezOverflow);
+                    }
+                    let sum = *o1 + *o2;
+                    if sum > MAX_TEZ {
+                        return Err(InterpretError::MutezOverflow);
+                    }
                     stack.drop_top(2);
                     stack.push(NumberValue(sum));
                 }
@@ -147,6 +165,39 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret_one(&Add(overloads::Add::NatNat), &mut gas, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_add_mutez() {
+        let mut stack = stk![NumberValue(2i128.pow(62)), NumberValue(20)];
+        let mut gas = Gas::default();
+        assert!(interpret_one(&Add(overloads::Add::MutezMutez), &mut gas, &mut stack).is_ok());
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 20);
+        assert_eq!(stack, stk![NumberValue(2i128.pow(62) + 20)]);
+        assert_eq!(
+            interpret_one(
+                &Add(overloads::Add::MutezMutez),
+                &mut gas,
+                &mut stk![NumberValue(2i128.pow(62)), NumberValue(2i128.pow(62))]
+            ),
+            Err(InterpretError::MutezOverflow)
+        );
+        assert_eq!(
+            interpret_one(
+                &Add(overloads::Add::MutezMutez),
+                &mut gas,
+                &mut stk![NumberValue(2i128.pow(63) - 1), NumberValue(1)]
+            ),
+            Err(InterpretError::MutezOverflow)
+        );
+        assert_eq!(
+            interpret_one(
+                &Add(overloads::Add::MutezMutez),
+                &mut gas,
+                &mut stk![NumberValue(1), NumberValue(2i128.pow(63) - 1)]
+            ),
+            Err(InterpretError::MutezOverflow)
+        );
     }
 
     #[test]
