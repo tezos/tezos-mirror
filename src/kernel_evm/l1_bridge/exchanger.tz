@@ -1,4 +1,4 @@
-{ parameter (or (pair %burn (contract unit) (ticket unit)) (contract %mint (ticket unit))) ;
+{ parameter (or (pair %burn address (ticket unit)) (address %mint)) ;
   storage unit ;
   code { CAR ;
          IF_LEFT
@@ -20,8 +20,11 @@
                   COMPARE ;
                   NEQ ;
                   IF { DROP 2 ; PUSH string "Burn only accepts tez tickets." ; FAILWITH }
-                     { PUSH mutez 1 ;
-                       SWAP ;
+                     { SWAP ;
+                       CONTRACT unit ;
+                       IF_NONE { PUSH string "Invalid callback" ; FAILWITH } {} ;
+                       PUSH mutez 1 ;
+                       DIG 2 ;
                        MUL ;
                        UNIT ;
                        NIL operation ;
@@ -31,7 +34,9 @@
                        TRANSFER_TOKENS ;
                        CONS ;
                        PAIR } } }
-           { PUSH mutez 1 ;
+           { CONTRACT (ticket unit) ;
+             IF_NONE { PUSH string "Invalid callback" ; FAILWITH } {} ;
+             PUSH mutez 1 ;
              AMOUNT ;
              EDIV ;
              IF_NONE { PUSH string "DIV by 0" ; FAILWITH } {} ;
