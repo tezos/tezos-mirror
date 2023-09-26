@@ -21,7 +21,11 @@ impl From<OutOfGas> for InterpretError {
 }
 
 #[allow(dead_code)]
-pub fn interpret(ast: &AST, gas: &mut Gas, stack: &mut IStack) -> Result<(), InterpretError> {
+pub fn interpret(
+    ast: &TypecheckedAST,
+    gas: &mut Gas,
+    stack: &mut IStack,
+) -> Result<(), InterpretError> {
     for i in ast {
         interpret_one(&i, gas, stack)?;
     }
@@ -36,7 +40,7 @@ fn unreachable_state() -> ! {
 }
 
 fn interpret_one(
-    i: &ParsedInstruction,
+    i: &TypecheckedInstruction,
     gas: &mut Gas,
     stack: &mut IStack,
 ) -> Result<(), InterpretError> {
