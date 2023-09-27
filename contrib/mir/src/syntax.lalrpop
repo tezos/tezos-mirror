@@ -65,16 +65,21 @@ boolean: bool = {
 }
 
 use Value::*;
-value: Value = {
+atomic_value: Value = {
   <n:number> => NumberValue(n),
   <b:boolean> => BooleanValue(b),
   <string> => StringValue(<>),
   "Unit" => UnitValue,
 }
 
+value_expr: Value = {
+  atomic_value => <>,
+  "(" <value_expr> ")" => <>,
+}
+
 use Instruction::*;
 instruction: ParsedInstruction = {
-  "PUSH" <type_expr> <value> => Push(<>),
+  "PUSH" <type_expr> <value_expr> => Push(<>),
   "INT" => Int,
   "GT" => Gt,
   "LOOP" <ib: instructionBlock> => Loop(ib),

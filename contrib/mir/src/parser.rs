@@ -114,4 +114,12 @@ mod tests {
             )]
         );
     }
+
+    #[test]
+    fn value_parens() {
+        assert_eq!(
+            parse("{ PUSH unit (Unit) }").unwrap(),
+            vec![Instruction::Push(Type::Unit, Value::UnitValue)]
+        );
+    }
 }
