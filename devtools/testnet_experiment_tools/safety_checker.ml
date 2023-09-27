@@ -29,6 +29,39 @@
 open Filename.Infix
 open Tezos_clic
 
+type error +=
+  | Invalid_positive_int_parameter of string
+  | Invalid_protocol_parameter of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"safety_checker.invalid_positive_int_parameter"
+    ~title:"Argument is not a positive integer"
+    ~description:"Argument must be a positive integer"
+    ~pp:(fun ppf reveal_data_path ->
+      Format.fprintf
+        ppf
+        "Expected a valid positive integer, provided %s instead"
+        reveal_data_path)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Invalid_positive_int_parameter s -> Some s | _ -> None)
+    (fun s -> Invalid_positive_int_parameter s) ;
+  register_error_kind
+    `Permanent
+    ~id:"safety_checker.invalid_protocol_parameter"
+    ~title:"Argument is not a valid protocol name"
+    ~description:"Argument must be either \"oxford\", \"nairobi\", or \"alpha\""
+    ~pp:(fun ppf reveal_data_path ->
+      Format.fprintf
+        ppf
+        "Expected one of these protocol names: \"oxford\", \"nairobi\", \
+         \"alpha\". %s was provided instead"
+        reveal_data_path)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Invalid_protocol_parameter s -> Some s | _ -> None)
+    (fun s -> Invalid_protocol_parameter s)
+
 let data_dir_arg =
   let open Lwt_result_syntax in
   default_arg
@@ -37,62 +70,87 @@ let data_dir_arg =
     ~long:"data-dir"
     ~placeholder:"data-dir-path"
     ~default:Config_file.default_data_dir
-    ( parameter @@ fun _ data_dir ->
-      if Sys.file_exists data_dir && Sys.is_directory data_dir then
-        return data_dir
-      else failwith "%s does not exists or is not a directory" data_dir )
+    (parameter @@ fun _ data_dir -> return data_dir)
 
-let get_protocol_hash protocol_name =
-  match String.lowercase_ascii protocol_name with
-  | "nairobi" -> "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
-  | "oxford" -> "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef"
-  | "alpha" -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | _ ->
-      raise
-        (Invalid_argument "Please specify a valid PROTOCOL name (e.g. Nairobi).")
+let positive_int_parameter =
+  parameter (fun _cctxt p ->
+      let open Lwt_result_syntax in
+      let* i =
+        try return (int_of_string p)
+        with _ -> tzfail @@ Invalid_positive_int_parameter p
+      in
+      if i <= 0 then tzfail @@ Invalid_positive_int_parameter p else return i)
+
+let protocol_hash_parameter =
+  parameter (fun _cctxt p ->
+      let open Lwt_result_syntax in
+      match String.lowercase_ascii p with
+      | "nairobi" ->
+          return
+          @@ Protocol_hash.of_b58check_exn
+               "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+      | "oxford" ->
+          return
+          @@ Protocol_hash.of_b58check_exn
+               "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef"
+      | "alpha" ->
+          return
+          @@ Protocol_hash.of_b58check_exn
+               "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+      | _ -> tzfail @@ Invalid_protocol_parameter p)
 
 let protocol_hash_arg =
-  let open Lwt_result_syntax in
-  default_arg
-    ~doc:"Protocol for the network"
+  arg
+    ~doc:
+      "Protocol for the network. Once a block from a different protocol is \
+       encountered, the safety-checker ends. Options available are: oxford, \
+       nairobi, alpha. If this argument is not provided, the protocol will not \
+       be checked."
     ~long:"protocol"
     ~placeholder:"protocol"
-    ~default:"Alpha"
-    ( parameter @@ fun _ protocol_name ->
-      return @@ get_protocol_hash protocol_name )
+    protocol_hash_parameter
 
 let min_unsafe_round_arg =
-  let open Lwt_result_syntax in
   default_arg
-    ~doc:"Min unsafe round value where we declare the network unsafe"
+    ~doc:"Min unsafe round value where we declare the network unsafe."
     ~long:"min-unsafe-round"
     ~placeholder:"min-unsafe-round"
     ~default:"2"
-    (parameter @@ fun _ round_str -> return @@ int_of_string round_str)
+    positive_int_parameter
 
 let max_maybe_unsafe_ratio_arg =
-  let open Lwt_result_syntax in
   default_arg
-    ~doc:"Max percentage of \"maybe unsafe\" blocks that we allow"
+    ~doc:"Max percentage of \"maybe unsafe\" blocks that we allow."
     ~long:"max-maybe-unsafe-ratio"
     ~placeholder:"max-maybe-unsafe-ratio"
     ~default:"1"
-    (parameter @@ fun _ ratio_str -> return @@ int_of_string ratio_str)
+    positive_int_parameter
 
 let min_maybe_unsafe_round_arg =
-  let open Lwt_result_syntax in
   default_arg
     ~doc:
-      "If we find more than [max_maybe_unsafe_ratio]%% of blocks with at least \
-       this round value, the network is unsafe"
+      "If we find more than [max_maybe_unsafe_ratio]% of blocks with at least \
+       this round value, the network is unsafe."
     ~long:"min-maybe-unsafe-round"
     ~placeholder:"min-maybe-unsafe-round"
     ~default:"1"
-    (parameter @@ fun _ round_str -> return @@ int_of_string round_str)
+    positive_int_parameter
 
-let run_safety_check_experiment chain_store current_head protocol_hash
-    min_unsafe_round max_maybe_unsafe_ratio min_maybe_unsafe_round =
+let min_block_level_arg =
+  arg
+    ~doc:
+      "The minimum level for blocks to be considered in the safety check. When \
+       a block with a lower level is found, the safety checker stops."
+    ~long:"min-block-level"
+    ~placeholder:"min-block-level"
+    positive_int_parameter
+
+let run_safety_check_experiment chain_store current_head protocol_hash_opt
+    min_unsafe_round max_maybe_unsafe_ratio min_maybe_unsafe_round
+    min_block_level_opt =
   let open Lwt_result_syntax in
+  let unsafe_blocks = ref 0 in
+  let is_network_safe = ref true in
   let current_head_level = Int32.to_int @@ Store.Block.level current_head in
 
   (* [check_safety] block maybe_unsafe_blocks - check whether [block] has safe
@@ -103,11 +161,22 @@ let run_safety_check_experiment chain_store current_head protocol_hash
     in
     let level = Int32.to_int @@ Store.Block.level block in
 
-    if
-      String.equal
-        (Protocol_hash.to_b58check current_protocol_hash)
-        protocol_hash
-    then (
+    let protocol_should_check_block =
+      match protocol_hash_opt with
+      | None -> true
+      | Some protocol_hash ->
+          Protocol_hash.equal current_protocol_hash protocol_hash
+    in
+    let level_should_check_block =
+      match min_block_level_opt with
+      | None -> true
+      | Some min_block_level -> level >= min_block_level
+    in
+    let should_check_block =
+      protocol_should_check_block && level_should_check_block
+    in
+
+    if should_check_block then (
       let fitness = Store.Block.fitness block in
       (* Fitness = [consensus_number, block_level, opt(locked_round), pred_round, round] *)
       let round_idx = 4 in
@@ -120,50 +189,88 @@ let run_safety_check_experiment chain_store current_head protocol_hash
             raise
               (Invalid_argument
                  ("No valid round was found for block at level: "
-                ^ string_of_int level ^ "\n"))
+                ^ string_of_int level))
       in
 
       if round_int >= min_unsafe_round then (
+        unsafe_blocks := !unsafe_blocks + 1 ;
+        is_network_safe := false ;
         Format.printf
-          "Experiment found that block at level %d has round %d, so we stop.\n"
+          "Block %s at level %d has round %d, greater or equal to \
+           min_unsafe_round = %d.@."
+          (Block_hash.to_b58check (Store.Block.hash block))
           level
-          round_int ;
-        return (maybe_unsafe_blocks, level))
-      else
-        let maybe_unsafe_blocks =
-          if round_int >= min_maybe_unsafe_round then maybe_unsafe_blocks + 1
-          else maybe_unsafe_blocks
-        in
-        let*! predecessor_block =
-          Store.Block.read_predecessor chain_store block
-        in
-        match predecessor_block with
-        | Ok predecessor_block ->
-            check_safety predecessor_block maybe_unsafe_blocks
-        | Error _ ->
-            Format.printf "No predecessor for block at level: %d\n" level ;
-            Lwt_exit.exit_and_raise 1)
+          round_int
+          min_unsafe_round) ;
+
+      let maybe_unsafe_blocks =
+        if round_int >= min_maybe_unsafe_round then maybe_unsafe_blocks + 1
+        else maybe_unsafe_blocks
+      in
+
+      let*! predecessor_block =
+        Store.Block.read_predecessor chain_store block
+      in
+      match predecessor_block with
+      | Ok predecessor_block ->
+          check_safety predecessor_block maybe_unsafe_blocks
+      | Error _ ->
+          Format.printf "No predecessor for block at level: %d@." level ;
+          return (maybe_unsafe_blocks, level))
     else (
-      Format.printf
-        "Found protocol hash: %s\n"
-        (Protocol_hash.to_b58check current_protocol_hash) ;
-      Format.printf "So we stopped.\n" ;
+      if not protocol_should_check_block then
+        Format.printf
+          "Found different protocol hash: %a@."
+          Protocol_hash.pp
+          current_protocol_hash ;
+
+      if not level_should_check_block then
+        Format.printf "Found block level: %d@." level ;
+      Format.printf "So we stopped.@." ;
+
       return (maybe_unsafe_blocks, level))
   in
-  Format.printf "Start safety checking:\n" ;
+
+  Format.printf "Start safety checking:@." ;
   let* maybe_unsafe_blocks, last_block_level = check_safety current_head 0 in
   let total_number_of_blocks = current_head_level - last_block_level + 1 in
+  Format.printf "Total number of blocks checked: %d.@." total_number_of_blocks ;
 
   (* Check that there are no more than [max_maybe_unsafe_ratio]% of blocks where
      consensus was reached at round = [min_maybe_unsafe_round] *)
   if maybe_unsafe_blocks * 100 > total_number_of_blocks * max_maybe_unsafe_ratio
-  then
+  then (
+    is_network_safe := false ;
     Format.printf
-      "Experiment found that more than %d%% blocks have round = %d.\n"
+      "More than %d%% blocks have round = %d.@."
       max_maybe_unsafe_ratio
+      min_maybe_unsafe_round ;
+    Format.printf
+      "Number of blocks with round %d : %d.@."
       min_maybe_unsafe_round
-  else Format.printf "Experiment finished: Network is safe!\n" ;
-  Format.printf "Done!\n" ;
+      maybe_unsafe_blocks ;
+    Format.printf
+      "Percentage of blocks with round %d : %f%% @."
+      min_maybe_unsafe_round
+      (Int.to_float maybe_unsafe_blocks
+      *. 100.
+      /. Int.to_float total_number_of_blocks)) ;
+
+  if !is_network_safe then
+    Format.printf "Experiment finished: Network safety result = TRUE.@."
+  else (
+    Format.printf
+      "Number of blocks with round at least %d : %d.@."
+      min_unsafe_round
+      !unsafe_blocks ;
+    Format.printf
+      "Percentage of blocks with round at least %d : %f%% @."
+      min_unsafe_round
+      (Int.to_float !unsafe_blocks
+      *. 100.
+      /. Int.to_float total_number_of_blocks) ;
+    Format.printf "Experiment finished: Network safety result = FALSE.@.") ;
+
   return_unit
 
 let commands =
@@ -176,21 +283,28 @@ let commands =
           title = "Command for checking the safety of the network";
         }
       ~desc:"Safety checking of the network."
-      (args5
+      (args6
          data_dir_arg
          protocol_hash_arg
          min_unsafe_round_arg
          max_maybe_unsafe_ratio_arg
-         min_maybe_unsafe_round_arg)
+         min_maybe_unsafe_round_arg
+         min_block_level_arg)
       (fixed ["check"])
       (fun
         ( data_dir,
-          protocol_hash,
+          protocol_hash_opt,
           min_unsafe_round,
           max_maybe_unsafe_ratio,
-          min_maybe_unsafe_round )
+          min_maybe_unsafe_round,
+          min_block_level_opt )
         _cctxt
       ->
+        let* () =
+          if Sys.file_exists data_dir && Sys.is_directory data_dir then
+            return_unit
+          else failwith "%s does not exists or is not a directory" data_dir
+        in
         let* _, config =
           Shared_arg.resolve_data_dir_and_config_file ~data_dir ()
         in
@@ -207,17 +321,46 @@ let commands =
         run_safety_check_experiment
           chain_store
           current_head
-          protocol_hash
+          protocol_hash_opt
           min_unsafe_round
           max_maybe_unsafe_ratio
-          min_maybe_unsafe_round);
+          min_maybe_unsafe_round
+          min_block_level_opt);
   ]
 
-let run () =
-  let argv = Sys.argv |> Array.to_list |> List.tl |> Option.value ~default:[] in
-  Tezos_clic.dispatch commands () argv
+module Custom_client_config : Client_main_run.M = struct
+  type t = unit
+
+  let default_base_dir = "/tmp"
+
+  let global_options () = args1 @@ constant ()
+
+  let parse_config_args ctx argv =
+    let open Lwt_result_syntax in
+    let* (), remaining =
+      Tezos_clic.parse_global_options (global_options ()) ctx argv
+    in
+    let open Client_config in
+    return (default_parsed_config_args, remaining)
+
+  let default_chain = `Main
+
+  let default_block = `Head 0
+
+  let default_daily_logs_path = None
+
+  let default_media_type = Tezos_rpc_http.Media_type.Command_line.Binary
+
+  let other_registrations = None
+
+  let clic_commands ~base_dir:_ ~config_commands:_ ~builtin_commands:_
+      ~other_commands:_ ~require_auth:_ =
+    commands
+
+  let logger = None
+end
 
 let () =
-  match Lwt_main.run (run ()) with
-  | Ok () -> ()
-  | Error trace -> Format.printf "ERROR: %a%!" Error_monad.pp_print_trace trace
+  let open Lwt_result_syntax in
+  let select_commands _ctx _ = return commands in
+  Client_main_run.run (module Custom_client_config) ~select_commands
