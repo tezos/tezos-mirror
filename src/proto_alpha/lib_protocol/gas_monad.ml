@@ -151,8 +151,4 @@ module Syntax = struct
   let ( let*? ) = bind_result
 
   let ( let+? ) m f = map_result f m
-
-  let ( let*$ ) cost f = bind (consume_gas cost) f
-
-  let ( let+$ ) cost f = map f (consume_gas cost)
 end
