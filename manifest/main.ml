@@ -7437,6 +7437,8 @@ let _safety_checker =
         octez_store |> open_;
         octez_clic;
         octez_node_config |> open_;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
       ]
     ~modules:["safety_checker"]
     ~bisect_ppx:No
