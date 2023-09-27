@@ -48,6 +48,13 @@ pub enum Value {
     BooleanValue(bool),
     StringValue(String),
     UnitValue,
+    PairValue(Box<Value>, Box<Value>),
+}
+
+impl Value {
+    pub fn new_pair(l: Self, r: Self) -> Self {
+        Self::PairValue(Box::new(l), Box::new(r))
+    }
 }
 
 pub type ParsedInstructionBlock = Vec<ParsedInstruction>;

@@ -72,8 +72,18 @@ atomic_value: Value = {
   "Unit" => UnitValue,
 }
 
+pair_val_args: Value = {
+  value_expr => <>,
+  value_expr pair_val_args => Value::new_pair(<>)
+}
+
+composite_value: Value = {
+  "Pair" <value_expr> <pair_val_args> => Value::new_pair(<>),
+}
+
 value_expr: Value = {
   atomic_value => <>,
+  "(" <composite_value> ")" => <>,
   "(" <value_expr> ")" => <>,
 }
 

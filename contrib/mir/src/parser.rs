@@ -116,6 +116,37 @@ mod tests {
     }
 
     #[test]
+    fn pair_value() {
+        assert_eq!(
+            parse("{ PUSH unit (Pair 3 4) }").unwrap(),
+            vec![Instruction::Push(
+                Type::Unit,
+                Value::new_pair(Value::NumberValue(3), Value::NumberValue(4)),
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH unit (Pair 3 4 5) }").unwrap(),
+            vec![Instruction::Push(
+                Type::Unit,
+                Value::new_pair(
+                    Value::NumberValue(3),
+                    Value::new_pair(Value::NumberValue(4), Value::NumberValue(5)),
+                ),
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH unit (Pair (Pair 3 4) 5) }").unwrap(),
+            vec![Instruction::Push(
+                Type::Unit,
+                Value::new_pair(
+                    Value::new_pair(Value::NumberValue(3), Value::NumberValue(4)),
+                    Value::NumberValue(5),
+                ),
+            )]
+        );
+    }
+
+    #[test]
     fn value_parens() {
         assert_eq!(
             parse("{ PUSH unit (Unit) }").unwrap(),
