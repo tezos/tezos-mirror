@@ -73,5 +73,3 @@ Internal
 - Register an error's encoding: ``WASM_proof_verification_failed``. It was
   previously not registered, making the error message a bit obscure. (MR :gl:`!9603`)
 
-- Move some Michelson elaboration and erasure functions to the gas
-  monad. (MR :gl:`!10071`)
