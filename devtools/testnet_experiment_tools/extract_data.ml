@@ -5,19 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Extract profiling result for provided block hash
+(* Extract profiling result for provided block hash(es)
    ------------------------
    Invocation:
      ./_build/default/devtools/testnet_experiment_tools/extract_data.exe extract \
-     --profiling-dir <profiling-dir> --blocks <blocks>
+     --profiling-dir <profiling-dir> --blocks <blocks> --output-dir <output-dir>
    Requirements:
      <profiling-dir>  - directory where the profiling reports are stored
      <blocks>         - a list of block hashes to be searched, separated by a space
+     <output-dir>     - Output directory to store results
    Description:
      This file contains the script to extract all the results
      of profiling reports related to the given block hash.
      It produces one file per profiling report, for example,
-     for the blocks BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw and BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY
+     for the blocks BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw
+     and BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY
      the following reports will be generated:
         - chain_validator_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
         - chain_validator_profiling_BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY.txt
@@ -27,8 +29,7 @@
         - requester_profiling_BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY.txt
         - rpc_server_profiling_BKtvd3iZm1P4JDcr25XpQLE7nHbyTBYD3dfU9c62hwUueHVSZMw.txt
         - rpc_server_profiling_BLGTW18zuGn7yc1SMp9DHTAVfSUYnmmWgyybEFHksGVJ6eMYNgY.txt
-     all these files are generated inside the folder where
-     the profiler reports are stored.
+     all these files are generated inside the specified <output-dir> folder.
 *)
 
 open Tezos_clic
