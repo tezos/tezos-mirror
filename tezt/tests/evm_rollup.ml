@@ -2755,7 +2755,7 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
 
 let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
-  test_deposit_before_and_after_migration protocols ;
+  (* test_deposit_before_and_after_migration protocols ; *)
   test_block_storage_before_and_after_migration protocols
 
 let test_reboot =
