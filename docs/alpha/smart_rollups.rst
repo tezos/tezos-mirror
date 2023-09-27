@@ -45,11 +45,9 @@ use case though: they are fully programmable, hence their names, smart
 optimistic rollups, as they are very close to smart contracts in terms
 of expressiveness.
 
-The purpose of this documentation is to give:
-
-#. an overview of the terminology and basic principles of smart rollups;
-#. a complete tour of smart rollups related workflows;
-#. a reference documentation for the development of a WASM kernel.
+The purpose of this documentation is to provide an overview of the terminology and basic principles of smart rollups.
+In the :doc:`../shell/smart_rollup_node`, we provide a complete tour 
+of smart rollups related workflows and reference documentation for the development of a WASM kernel.
 
 Overview
 --------
@@ -111,7 +109,7 @@ There are two ways for end-users to push an external message to the
 rollups inbox: first, they can inject the dedicated Layer 1 operation
 using the Octez client (see command ``send smart rollup message
 <messages> from <src>``); second, they can use the batcher
-of a smart rollup node. More details can be found in :ref:`sending_external_inbox_message_alpha`.
+of a smart rollup node. More details can be found in the :ref:`sending_external_inbox_message`.
 
 Internal messages
 '''''''''''''''''
@@ -153,8 +151,7 @@ A rollup can do the following requests through the reveal data channel:
 
 #. **preimage requests**: The rollup can request arbitrary data of at
    most 4kBytes, provided that it knows its (blake2b) hash. The
-   request is fulfilled by the rollup node
-   :ref:`populating_the_reveal_channel_alpha`.
+   request is fulfilled by the rollup node, see :ref:`populating_the_reveal_channel`.
 
 #. **metadata requests** The rollup can request information from the
    protocol, namely the address and the origination level of the
@@ -247,7 +244,7 @@ removal of the invalid commitment. If no one posts such a concurrent
 commitment during the refutation period, the commitment can be
 cemented with a dedicated operation injected in Layer 1, and the
 outbox messages can be executed by the Layer 1 by an explicit Layer 1
-operation (see :ref:`triggering_execution_outbox_message_alpha`), typically
+operation (see :doc:`../shell/smart_rollup_node`), typically
 to transfer assets from the rollup to the Layer 1.
 
 The outbox messages can follow three different formats. Firstly, the
@@ -338,8 +335,7 @@ own access control list logic to add and remove addresses.
 
 Also, it is important to remember that because of the refutation
 logic, an outbox message can only be executed when the associated
-commitment has been cemented (see
-:ref:`triggering_execution_outbox_message_alpha`).
+commitment has been cemented (see :doc:`../shell/smart_rollup_node`).
 
 Glossary
 --------

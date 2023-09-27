@@ -1,14 +1,10 @@
 Smart rollup node
 =================
 
-Workflows
----------
-
-Tools
-^^^^^
-
 :doc:`../active/smart_rollups` come with two executable programs: the Octez
 rollup node and the Octez rollup client.
+
+This page describes the rollup node, but also uses the rollup client when needed to interact with the rollup node.
 
 The Octez rollup node is used by a rollup operator to deploy a
 rollup. The rollup node is responsible for making the rollup progress
@@ -19,8 +15,12 @@ interface<../api/openapi>`. The services of this interface can be
 called directly with HTTP requests or indirectly using the Octez
 rollup client.
 
+We first cover the operation of the rollup node and the corresponding workflow,
+using some predefined rollup logic (called kernel), and then we explain how the
+logic of a rollup can be defined by developing a custom rollup kernel.
+
 Prerequisites
-^^^^^^^^^^^^^
+-------------
 
 To experiment with the commands described in this section, we use
 the `Dailynet <https://teztnets.xyz/dailynet-about>`_.
@@ -73,7 +73,7 @@ after your node gets synchronized with Dailynet.
    octez-client get balance for "${OPERATOR_ADDR}"
 
 Origination
-^^^^^^^^^^^
+-----------
 
 Anyone can originate a smart rollup with the following invocation of
 the Octez client:
@@ -151,7 +151,7 @@ The address ``sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf`` is the smart rollup address
 Let's write it ``${SOR_ADDR}`` from now on.
 
 Deploying a rollup node
-^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------
 
 Now that the rollup is originated, anyone can make it progress by deploying a
 rollup node.
@@ -210,11 +210,12 @@ In addition, a rollup node can run under different modes:
    staker) is detected will the "accuser node" publish a commitment and
    participate in the subsequent refutation game.
 
-#. ``bailout`` mode is designed to assist stakers in recovering their bonds. It functions as a slightly modified version of "Accuser", differing in that it does not post any new 
-commitments but instead focuses on defending the ones that have been previously 
-submitted. When operating in bailout mode, the expectation is to initiate a recover bond 
-operation when the operator is no longer staked on any commitment. If the node detects that this 
-operation has been successful, it can gratefully exit.
+#. ``bailout`` mode is designed to assist stakers in recovering their bonds. 
+   It functions as a slightly modified version of "Accuser", differing in that it does not post any new 
+   commitments but instead focuses on defending the ones that have been previously 
+   submitted. When operating in bailout mode, the expectation is to initiate a recover bond 
+   operation when the operator is no longer staked on any commitment. If the node detects that this 
+   operation has been successful, it can gratefully exit.
 
 #. ``custom`` mode refers to a mode where the users individually selects which
    kinds of operations the rollup node injects. It provides tailored control and
@@ -299,10 +300,13 @@ Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-i
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 
+Workflows
+---------
+
 .. _sending_external_inbox_message:
 
 Sending an external inbox message
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""""""
 
 The Octez client can be used to send an external message into the
 rollup inbox. Assuming that ``${EMESSAGE}`` is the hexadecimal
@@ -351,7 +355,7 @@ where ``${PROTO}`` is the suffix of the executables corresponding to your protoc
 .. _triggering_execution_outbox_message:
 
 Triggering the execution of an outbox message
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""""""""""""""""""
 
 Once an outbox message has been pushed to the outbox by the kernel at
 some level ``${L}``, the user needs to wait for the commitment that
@@ -411,7 +415,7 @@ the entrypoint of the destination smart contract.
 .. _sending_internal_inbox_message:
 
 Sending an internal inbox message
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""""""
 
 A smart contract can push an internal message in the rollup inbox
 using the Michelson ``TRANSFER_TOKENS`` instruction targeting a
@@ -462,7 +466,7 @@ to the rollup.
 .. _populating_the_reveal_channel:
 
 Populating the reveal channel
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""
 
 It is the responsibility of rollup node operators to get the data
 passed through the reveal data channel when the rollup requested it.
@@ -481,7 +485,7 @@ actual payloads.
 .. _configure_fast_exec:
 
 Configure WebAssembly fast execution
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------------------
 
 When the rollup node advances its internal rollup state under normal
 operation, it does so using the fast execution engine.
@@ -516,6 +520,9 @@ When the environment variable is undefined, Cranelift is used by default.
 
 Developing WASM Kernels
 -----------------------
+
+This page provides a first overview on writing a Wasm kernel for a smart rollup. 
+(See :doc:`smart optimistic rollup <../alpha/smart_rollups>`)
 
 A rollup is primarily characterized by the semantics it gives to the
 input messages it processes. This semantics is provided at origination
@@ -599,7 +606,7 @@ mainstream languages such as Go are also good candidates for
 implementing WASM kernels.
 
 Execution Environment
-^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""
 In a nutshell, the life cycle of a smart rollup is a never-ending
 loop of fetching inputs from the Layer 1, and executing the
 ``kernel_run`` function exposed by the WASM kernel.
