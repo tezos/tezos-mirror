@@ -156,12 +156,12 @@ let unparse_ty_uncarbonated ~loc ty =
 
 let unparse_ty ~loc ty =
   let open Gas_monad.Syntax in
-  let+$ () = Unparse_costs.unparse_type ty in
+  let+ () = Gas_monad.consume_gas (Unparse_costs.unparse_type ty) in
   unparse_ty_uncarbonated ~loc ty
 
 let unparse_parameter_ty ~loc ty ~entrypoints =
   let open Gas_monad.Syntax in
-  let+$ () = Unparse_costs.unparse_type ty in
+  let+ () = Gas_monad.consume_gas (Unparse_costs.unparse_type ty) in
   unparse_ty_and_entrypoints_uncarbonated ~loc ty entrypoints.root
 
 let serialize_ty_for_error ty =
@@ -207,7 +207,7 @@ let unparse_timestamp ~loc mode t =
   | Optimized | Optimized_legacy ->
       return (Int (loc, Script_timestamp.to_zint t))
   | Readable -> (
-      let+$ () = Unparse_costs.timestamp_readable in
+      let+ () = Gas_monad.consume_gas Unparse_costs.timestamp_readable in
       match Script_timestamp.to_notation t with
       | None -> Int (loc, Script_timestamp.to_zint t)
       | Some s -> String (loc, s))
@@ -216,7 +216,7 @@ let unparse_address ~loc mode {destination; entrypoint} =
   let open Gas_monad.Syntax in
   match mode with
   | Optimized | Optimized_legacy ->
-      let+$ () = Unparse_costs.contract_optimized in
+      let+ () = Gas_monad.consume_gas Unparse_costs.contract_optimized in
       let bytes =
         Data_encoding.Binary.to_bytes_exn
           Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
@@ -224,7 +224,7 @@ let unparse_address ~loc mode {destination; entrypoint} =
       in
       Bytes (loc, bytes)
   | Readable ->
-      let+$ () = Unparse_costs.contract_readable in
+      let+ () = Gas_monad.consume_gas Unparse_costs.contract_readable in
       let notation =
         Destination.to_b58check destination
         ^ Entrypoint.to_address_suffix entrypoint
@@ -242,11 +242,11 @@ let unparse_signature ~loc mode s =
   let s = Script_signature.get s in
   match mode with
   | Optimized | Optimized_legacy ->
-      let+$ () = Unparse_costs.signature_optimized in
+      let+ () = Gas_monad.consume_gas Unparse_costs.signature_optimized in
       let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
       Bytes (loc, bytes)
   | Readable ->
-      let+$ () = Unparse_costs.signature_readable in
+      let+ () = Gas_monad.consume_gas Unparse_costs.signature_readable in
       String (loc, Signature.to_b58check s)
 
 let unparse_mutez ~loc v =
@@ -256,26 +256,26 @@ let unparse_key ~loc mode k =
   let open Gas_monad.Syntax in
   match mode with
   | Optimized | Optimized_legacy ->
-      let+$ () = Unparse_costs.public_key_optimized in
+      let+ () = Gas_monad.consume_gas Unparse_costs.public_key_optimized in
       let bytes =
         Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
       in
       Bytes (loc, bytes)
   | Readable ->
-      let+$ () = Unparse_costs.public_key_readable in
+      let+ () = Gas_monad.consume_gas Unparse_costs.public_key_readable in
       String (loc, Signature.Public_key.to_b58check k)
 
 let unparse_key_hash ~loc mode k =
   let open Gas_monad.Syntax in
   match mode with
   | Optimized | Optimized_legacy ->
-      let+$ () = Unparse_costs.key_hash_optimized in
+      let+ () = Gas_monad.consume_gas Unparse_costs.key_hash_optimized in
       let bytes =
         Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding k
       in
       Bytes (loc, bytes)
   | Readable ->
-      let+$ () = Unparse_costs.key_hash_readable in
+      let+ () = Gas_monad.consume_gas Unparse_costs.key_hash_readable in
       String (loc, Signature.Public_key_hash.to_b58check k)
 
 (* Operations are only unparsed during the production of execution traces of
@@ -288,43 +288,43 @@ let unparse_operation ~loc {piop; lazy_storage_diff = _} =
       Apply_internal_results.internal_operation_encoding
       iop
   in
-  let+$ () = Unparse_costs.operation bytes in
+  let+ () = Gas_monad.consume_gas (Unparse_costs.operation bytes) in
   Bytes (loc, bytes)
 
 let unparse_chain_id ~loc mode chain_id =
   let open Gas_monad.Syntax in
   match mode with
   | Optimized | Optimized_legacy ->
-      let+$ () = Unparse_costs.chain_id_optimized in
+      let+ () = Gas_monad.consume_gas Unparse_costs.chain_id_optimized in
       let bytes =
         Data_encoding.Binary.to_bytes_exn Script_chain_id.encoding chain_id
       in
       Bytes (loc, bytes)
   | Readable ->
-      let+$ () = Unparse_costs.chain_id_readable in
+      let+ () = Gas_monad.consume_gas Unparse_costs.chain_id_readable in
       String (loc, Script_chain_id.to_b58check chain_id)
 
 let unparse_bls12_381_g1 ~loc x =
   let open Gas_monad.Syntax in
-  let+$ () = Unparse_costs.bls12_381_g1 in
+  let+ () = Gas_monad.consume_gas Unparse_costs.bls12_381_g1 in
   let bytes = Script_bls.G1.to_bytes x in
   Bytes (loc, bytes)
 
 let unparse_bls12_381_g2 ~loc x =
   let open Gas_monad.Syntax in
-  let+$ () = Unparse_costs.bls12_381_g2 in
+  let+ () = Gas_monad.consume_gas Unparse_costs.bls12_381_g2 in
   let bytes = Script_bls.G2.to_bytes x in
   Bytes (loc, bytes)
 
 let unparse_bls12_381_fr ~loc x =
   let open Gas_monad.Syntax in
-  let+$ () = Unparse_costs.bls12_381_fr in
+  let+ () = Gas_monad.consume_gas Unparse_costs.bls12_381_fr in
   let bytes = Script_bls.Fr.to_bytes x in
   Bytes (loc, bytes)
 
 let unparse_with_data_encoding ~loc s unparse_cost encoding =
   let open Gas_monad.Syntax in
-  let+$ () = unparse_cost in
+  let+ () = Gas_monad.consume_gas unparse_cost in
   let bytes = Data_encoding.Binary.to_bytes_exn encoding s in
   Bytes (loc, bytes)
 
