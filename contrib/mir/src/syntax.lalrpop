@@ -44,8 +44,18 @@ atomic_type: Type = {
   "unit" => Type::Unit,
 }
 
+pair_args: Type = {
+    type_expr => <>,
+    type_expr pair_args => Type::new_pair(<>)
+}
+
+composite_type: Type = {
+    r"pair" <type_expr> <pair_args> => Type::new_pair(<>),
+}
+
 type_expr: Type = {
     atomic_type => <>,
+    "(" <composite_type> ")" => <>,
     "(" <type_expr> ")" => <>,
 }
 

@@ -89,4 +89,29 @@ mod tests {
         assert_parse!(r#"""#, Err("Invalid token at 0".to_owned()));
         assert_parse!(r#""\""#, Err("Invalid token at 0".to_owned()));
     }
+
+    #[test]
+    fn pair_type() {
+        assert_eq!(
+            parse("{ PUSH (pair int nat) Unit }").unwrap(),
+            vec![Instruction::Push(
+                Type::new_pair(Type::Int, Type::Nat),
+                Value::UnitValue
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH (pair int nat unit) Unit }").unwrap(),
+            vec![Instruction::Push(
+                Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Unit)),
+                Value::UnitValue
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH (pair (pair int nat) unit) Unit }").unwrap(),
+            vec![Instruction::Push(
+                Type::new_pair(Type::new_pair(Type::Int, Type::Nat), Type::Unit),
+                Value::UnitValue
+            )]
+        );
+    }
 }
