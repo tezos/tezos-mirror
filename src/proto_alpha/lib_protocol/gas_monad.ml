@@ -60,8 +60,6 @@ let map f m gas =
 
 let bind_result m f = bind (of_result m) f [@@ocaml.inline always]
 
-let map_result f m = map f (of_result m) [@@ocaml.inline always]
-
 let bind_recover m f gas = m gas >>?? fun (x, gas) -> f x gas
   [@@ocaml.inline always]
 
@@ -137,6 +135,4 @@ module Syntax = struct
   let ( let+ ) m f = map f m
 
   let ( let*? ) = bind_result
-
-  let ( let+? ) m f = map_result f m
 end

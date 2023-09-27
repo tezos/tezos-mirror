@@ -132,8 +132,4 @@ module Syntax : sig
       gas-monad. *)
   val ( let*? ) :
     ('a, 'trace) result -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
-
-  (** [let+?] is for mapping the value from result-only expressions into the
-      gas-monad. *)
-  val ( let+? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) t
 end
