@@ -414,4 +414,18 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![Value::StringValue("foo".to_owned())]);
     }
+
+    #[test]
+    fn push_unit_value() {
+        let mut stack = stk![];
+        assert_eq!(
+            interpret(
+                &vec![Push(Type::Unit, Value::UnitValue)],
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![Value::UnitValue]);
+    }
 }

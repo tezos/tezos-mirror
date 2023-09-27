@@ -41,6 +41,7 @@ type_: Type = {
   "bool" => Type::Bool,
   "mutez" => Type::Mutez,
   "string" => Type::String,
+  "unit" => Type::Unit,
 }
 
 boolean: bool = {
@@ -53,6 +54,7 @@ value: Value = {
   <n:number> => NumberValue(n),
   <b:boolean> => BooleanValue(b),
   <string> => StringValue(<>),
+  "Unit" => UnitValue,
 }
 
 use Instruction::*;

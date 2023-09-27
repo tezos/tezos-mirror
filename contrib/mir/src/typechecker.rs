@@ -179,6 +179,7 @@ fn typecheck_value(gas: &mut Gas, t: &Type, v: &Value) -> Result<(), TcError> {
         (Bool, BooleanValue(_)) => Ok(()),
         (Mutez, NumberValue(n)) if *n >= 0 && *n <= MAX_TEZ => Ok(()),
         (String, StringValue(_)) => Ok(()),
+        (Unit, UnitValue) => Ok(()),
         _ => Err(TcError::GenericTcError),
     }
 }
@@ -482,5 +483,19 @@ mod typecheck_tests {
             )])
         );
         assert_eq!(stack, stk![Type::String]);
+    }
+
+    #[test]
+    fn push_unit_value() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH unit Unit; }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(Type::Unit, Value::UnitValue)])
+        );
+        assert_eq!(stack, stk![Type::Unit]);
     }
 }
