@@ -36,6 +36,7 @@ open Lwt_result_syntax
 
 type error +=
   | No_profiling_reports_directory
+  | No_output_directory
   | No_block_hashes
   | Invalid_block_hashes of string
   | Cannot_get_profiling_file_name of string
@@ -65,6 +66,18 @@ let () =
     (fun () -> No_block_hashes) ;
   register_error_kind
     `Permanent
+    ~id:"extract_data.no_output_directory"
+    ~title:"Output directory must be provided"
+    ~description:"Argument must be a valid path to existing directory."
+    ~pp:(fun ppf _ ->
+      Format.fprintf
+        ppf
+        "Expected a valid path to profiling directory, nothing provided.")
+    Data_encoding.empty
+    (function No_output_directory -> Some () | _ -> None)
+    (fun () -> No_output_directory) ;
+  register_error_kind
+    `Permanent
     ~id:"extract_data.invalid_block_hashes"
     ~title:"Invalid list of block hashes."
     ~description:"Argument must be a list of block hashes separated by space."
@@ -87,6 +100,19 @@ let () =
     Data_encoding.(obj1 (req "arg" string))
     (function Cannot_get_profiling_file_name s -> Some s | _ -> None)
     (fun s -> Cannot_get_profiling_file_name s)
+
+let output_directory_parameter =
+  parameter @@ fun _ctxt data_dir ->
+  if Sys.file_exists data_dir && Sys.is_directory data_dir then return data_dir
+  else tzfail No_output_directory
+
+let output_directory_arg =
+  arg
+    ~doc:"Output directory to store results."
+    ~short:'O'
+    ~long:"output-dir"
+    ~placeholder:"output-dir-path"
+    output_directory_parameter
 
 let profiling_reports_directory_parameter =
   parameter @@ fun _ctxt data_dir ->
@@ -127,7 +153,7 @@ let split_lines_starting_with_b input_str =
   let lines = List.map (fun line -> "B" ^ line) lines in
   lines
 
-let create_files_from_lines input_file searched_block =
+let create_files_from_lines input_file searched_block output_directory =
   (* Get only file name. *)
   let output_file_prefix = String.split_on_char '/' input_file in
   (* Remove .txt. *)
@@ -162,7 +188,9 @@ let create_files_from_lines input_file searched_block =
                let file_name =
                  Printf.sprintf "%s_%s.txt" output_file_prefix block_name
                in
-               let out_channel = open_out file_name in
+               let out_channel =
+                 open_out (output_directory ^ "/" ^ file_name)
+               in
                output_string out_channel line ;
                close_out out_channel))
            lines
@@ -183,12 +211,14 @@ let rec find_files_with_suffix dir suffix =
   !matching_files
 
 (* Find all files with [_profiling.txt] suffix in provided directory. *)
-let find_and_process_profiling_file dir search_block =
+let find_and_process_profiling_file dir search_block output_directory =
   let profiling_files = find_files_with_suffix dir "_profiling.txt" in
   List.iter
     (fun profiling_file ->
       Printf.printf "Found profiling file: %s\n" profiling_file ;
-      let _ = create_files_from_lines profiling_file search_block in
+      let _ =
+        create_files_from_lines profiling_file search_block output_directory
+      in
       ())
     profiling_files
 
@@ -202,20 +232,30 @@ let commands =
             "Command for extracting profiling reports of specified block hash";
         }
       ~desc:"Extract block profiling info."
-      (args2 profiling_reports_directory_arg searched_blocks_arg)
+      (args3
+         profiling_reports_directory_arg
+         searched_blocks_arg
+         output_directory_arg)
       (fixed ["extract"])
-      (fun (profiling_reports_directory, search_blocks) _cctxt ->
-        match (profiling_reports_directory, search_blocks) with
-        | Some profiling_reports_directory, Some search_blocks ->
+      (fun (profiling_reports_directory, search_blocks, output_directory) _cctxt
+      ->
+        match
+          (profiling_reports_directory, search_blocks, output_directory)
+        with
+        | ( Some profiling_reports_directory,
+            Some search_blocks,
+            Some output_directory ) ->
             return
             @@ List.iter
                  (fun search_block ->
                    find_and_process_profiling_file
                      profiling_reports_directory
-                     search_block)
+                     search_block
+                     output_directory)
                  search_blocks
-        | None, _ -> tzfail No_profiling_reports_directory
-        | _, None -> tzfail No_block_hashes);
+        | None, _, _ -> tzfail No_profiling_reports_directory
+        | _, None, _ -> tzfail No_block_hashes
+        | _, _, None -> tzfail No_output_directory);
   ]
 
 module Custom_client_config : Client_main_run.M = struct
