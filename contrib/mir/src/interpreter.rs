@@ -171,6 +171,13 @@ fn interpret_one(
                 _ => unreachable_state(),
             }
         }
+        Pair => {
+            gas.consume(interpret_cost::PAIR)?;
+            match (stack.pop(), stack.pop()) {
+                (Some(l), Some(r)) => stack.push(Value::new_pair(l, r)),
+                _ => unreachable_state(),
+            }
+        }
     }
     Ok(())
 }
@@ -544,5 +551,31 @@ mod interpreter_tests {
                 - interpret_cost::CDR
                 - interpret_cost::INTERPRET_RET
         );
+    }
+
+    fn pair() {
+        let mut stack = stk![Value::NumberValue(42), Value::BooleanValue(false)]; // NB: bool is top
+        assert!(interpret(&vec![Pair], &mut Gas::default(), &mut stack).is_ok());
+        assert_eq!(
+            stack,
+            stk![Value::new_pair(
+                Value::BooleanValue(false),
+                Value::NumberValue(42),
+            )]
+        );
+    }
+
+    #[test]
+    fn pair_car() {
+        let mut stack = stk![Value::NumberValue(42), Value::BooleanValue(false)]; // NB: bool is top
+        assert!(interpret(&vec![Pair, Car], &mut Gas::default(), &mut stack).is_ok());
+        assert_eq!(stack, stk![Value::BooleanValue(false)]);
+    }
+
+    #[test]
+    fn pair_cdr() {
+        let mut stack = stk![Value::NumberValue(42), Value::BooleanValue(false)]; // NB: bool is top
+        assert!(interpret(&vec![Pair, Cdr], &mut Gas::default(), &mut stack).is_ok());
+        assert_eq!(stack, stk![Value::NumberValue(42)]);
     }
 }

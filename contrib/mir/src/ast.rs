@@ -79,6 +79,7 @@ pub enum Instruction<T: Stage> {
     Unit,
     Car,
     Cdr,
+    Pair,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

@@ -103,6 +103,7 @@ instruction: ParsedInstruction = {
   "UNIT" => Unit,
   "CAR" => Car,
   "CDR" => Cdr,
+  "PAIR" => Pair,
 }
 
 instructionSeq: Vec<ParsedInstruction> = {

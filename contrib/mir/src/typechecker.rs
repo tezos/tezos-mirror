@@ -182,6 +182,16 @@ fn typecheck_instruction(
             }
             I::Cdr
         }
+        I::Pair => {
+            ensure_stack_len(stack, 2)?;
+            match (stack.pop(), stack.pop()) {
+                (Some(l), Some(r)) => {
+                    stack.push(Type::new_pair(l, r));
+                    I::Pair
+                }
+                _ => return Err(TcError::GenericTcError),
+            }
+        }
     })
 }
 
@@ -602,5 +612,43 @@ mod typecheck_tests {
             ])
         );
         assert_eq!(stack, stk![Type::new_pair(Type::Nat, Type::Bool)]);
+    }
+
+    #[test]
+    fn pair() {
+        let mut stack = stk![Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck(parse("{ PAIR }").unwrap(), &mut Gas::default(), &mut stack),
+            Ok(vec![Pair])
+        );
+        assert_eq!(stack, stk![Type::new_pair(Type::Nat, Type::Int)]);
+    }
+
+    #[test]
+    fn pair_car() {
+        let mut stack = stk![Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck(
+                parse("{ PAIR; CAR }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![Pair, Car])
+        );
+        assert_eq!(stack, stk![Type::Nat]);
+    }
+
+    #[test]
+    fn pair_cdr() {
+        let mut stack = stk![Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck(
+                parse("{ PAIR; CDR }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![Pair, Cdr])
+        );
+        assert_eq!(stack, stk![Type::Int]);
     }
 }
