@@ -950,6 +950,26 @@ let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
   in
   return commitment
 
+let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client
+    dal_node source ~index ~content ~attestation_lag ~number_of_slots =
+  let* _commitment =
+    publish_and_store_slot
+      ?with_proof
+      ?counter
+      ?force
+      ?fee
+      client
+      dal_node
+      source
+      ~index
+      content
+  in
+  let* () =
+    repeat attestation_lag (fun () -> Client.bake_for_and_wait client)
+  in
+  let* _op_hashes = dal_attestations ~nb_slots:number_of_slots [index] client in
+  Client.bake_for_and_wait client
+
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
     (fun (slot_index, commitment') ->
