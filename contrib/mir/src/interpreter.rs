@@ -153,6 +153,10 @@ fn interpret_one(
             Some(x) => return Err(InterpretError::FailedWith(x)),
             None => unreachable_state(),
         },
+        Unit => {
+            gas.consume(interpret_cost::UNIT)?;
+            stack.push(Value::UnitValue);
+        }
     }
     Ok(())
 }
@@ -427,5 +431,17 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![Value::UnitValue]);
+    }
+
+    #[test]
+    fn unit_instruction() {
+        let mut stack = stk![];
+        let mut gas = Gas::default();
+        assert!(interpret(&vec![Unit], &mut gas, &mut stack).is_ok());
+        assert_eq!(stack, stk![Value::UnitValue]);
+        assert_eq!(
+            gas.milligas(),
+            Gas::default().milligas() - interpret_cost::UNIT - interpret_cost::INTERPRET_RET
+        );
     }
 }

@@ -70,6 +70,7 @@ instruction: ParsedInstruction = {
   "IF" <t: instructionBlock> <f: instructionBlock> => If(t, f),
   "DUP" <n:u10?> => Dup(n),
   "FAILWITH" => Failwith,
+  "UNIT" => Unit,
 }
 
 instructionSeq: Vec<ParsedInstruction> = {

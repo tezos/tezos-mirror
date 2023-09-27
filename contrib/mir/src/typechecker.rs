@@ -164,6 +164,10 @@ fn typecheck_instruction(
             stack.fail();
             I::Failwith
         }
+        I::Unit => {
+            stack.push(T::Unit);
+            I::Unit
+        }
     })
 }
 
@@ -495,6 +499,16 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(vec![Push(Type::Unit, Value::UnitValue)])
+        );
+        assert_eq!(stack, stk![Type::Unit]);
+    }
+
+    #[test]
+    fn unit_instruction() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(parse("{ UNIT }").unwrap(), &mut Gas::default(), &mut stack),
+            Ok(vec![Unit])
         );
         assert_eq!(stack, stk![Type::Unit]);
     }

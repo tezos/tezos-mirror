@@ -63,6 +63,7 @@ pub enum Instruction<T: Stage> {
     Push(Type, Value),
     Swap,
     Failwith,
+    Unit,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
