@@ -1284,8 +1284,14 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn block_hash(&self, number: U256) -> H256 {
+        // return 0 when block number not in valid range
+        // Ref. https://www.evm.codes/#40?fork=shanghai (opcode 0x40)
+
+        if self.block.number - number > U256::from(256) {
+            return H256::zero();
+        }
         storage::blocks::get_block_hash(self.host, number)
-            .unwrap_or_else(|_| panic!("Block with number {} doesn't exist", number))
+            .unwrap_or_else(|_| H256::zero())
     }
 
     fn block_number(&self) -> U256 {
@@ -2290,5 +2296,28 @@ mod test {
                 panic!("Unexpected error: {:?}", err);
             }
         }
+    }
+
+    #[test]
+    fn return_hash_of_zero_for_unavailable_block() {
+        let mut mock_runtime = MockHost::default();
+        let block =
+            BlockConstants::first_block(U256::zero(), U256::one(), U256::from(21000));
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::london();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+        );
+
+        let hash_of_unavailable_block = handler.block_hash(U256::zero());
+        assert_eq!(H256::zero(), hash_of_unavailable_block)
     }
 }
