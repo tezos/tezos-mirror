@@ -114,21 +114,21 @@ instruction: ParsedInstruction = {
   "AMOUNT" => Amount,
 }
 
-instructionSeq: Vec<ParsedInstruction> = {
-  <mut ib:(<instruction>";")*><i:instruction?> => {
-    // A sequence of instruction-followed-by-a-semicolon matched by
-    // `(<instruction>";")*` resulting in `Vec<instruction>` and bound to `ib`,
-    // which can be optionally followed by a single trailing instruction,
-    // matched by `<i:instruction?>.
+instructionSeq = semicolonSepSeq<instruction>;
+
+semicolonSepSeq<T>: Vec<T> = {
+  <mut tseq:(<T>";")*><i:T?> => {
+    // A sequence of T-followed-by-a-semicolon matched by
+    // `(<T>";")*` resulting in `Vec<T>` and bound to `ib`,
+    // which can be optionally followed by a single trailing T,
+    // matched by `<i:T?>.
 
     match i {
-      Some(instr) => {
-        ib.push(instr);
-        ib
+      Some(t) => {
+        tseq.push(t);
+        tseq
       },
-      None => {
-        ib
-      }
+      None => tseq
     }
   }
 }
