@@ -38,6 +38,7 @@ impl Type {
 pub enum Value {
     NumberValue(i128),
     BooleanValue(bool),
+    StringValue(String),
 }
 
 pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
