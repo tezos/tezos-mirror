@@ -14,6 +14,7 @@ let player2 = require('../../players/player2.json');
 
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000))
+txs.push(utils.transfer(faucet, player2, 100000000))
 let create_counter_v1 = utils.create(player1, 0, counter_v1.bytecode)
 txs.push(create_counter_v1.tx)
 
@@ -27,17 +28,17 @@ let create_proxy_admin = utils.create(player1, 0, proxy_admin.bytecode)
 txs.push(create_proxy_admin.tx)
 
 let changeAdmin = proxy.interface.encodeFunctionData("changeAdmin", [create_proxy_admin.addr]);
-let upgrade_1 = proxy.interface.encodeFunctionData("upgradeTo", [create_counter_v1.addr]);
+let upgrade_1 = proxy_admin.interface.encodeFunctionData("upgrade", [create_proxy.addr, create_counter_v1.addr]);
 let inc = counter_v1.interface.encodeFunctionData("inc", []);
 let dec = counter_v2.interface.encodeFunctionData("dec", []);
-let upgrade_2 = proxy.interface.encodeFunctionData("upgradeTo", [create_counter_v2.addr]);
+let upgrade_2 = proxy_admin.interface.encodeFunctionData("upgrade", [create_proxy.addr, create_counter_v2.addr]);
 
-// txs.push(utils.send(player1, create_proxy.addr, 0, changeAdmin))
-txs.push(utils.send(player1, create_proxy.addr, 0, upgrade_1))
-// txs.push(utils.send(player2, create_proxy.addr, 0, inc))
+txs.push(utils.send(player1, create_proxy.addr, 0, changeAdmin))
+txs.push(utils.send(player1, create_proxy_admin.addr, 0, upgrade_1))
+txs.push(utils.send(player2, create_proxy.addr, 0, inc))
 txs.push(utils.send(player2, create_proxy.addr, 0, dec))
-txs.push(utils.send(player1, create_proxy.addr, 0, upgrade_2))
-// txs.push(utils.send(player2, create_proxy.addr, 0, inc))
+txs.push(utils.send(player1, create_proxy_admin.addr, 0, upgrade_2))
+txs.push(utils.send(player2, create_proxy.addr, 0, inc))
 txs.push(utils.send(player2, create_proxy.addr, 0, dec))
 
 utils.print_bench([txs])

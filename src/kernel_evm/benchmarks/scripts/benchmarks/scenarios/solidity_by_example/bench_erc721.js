@@ -18,6 +18,7 @@ let burn = contract.interface.encodeFunctionData("burn", [10]);
 
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000))
+txs.push(utils.transfer(faucet, player2, 100000000))
 let create = utils.create(player1, 0, create_data)
 txs.push(create.tx)
 
