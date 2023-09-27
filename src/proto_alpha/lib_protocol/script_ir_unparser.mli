@@ -65,14 +65,15 @@ val unparse_comparable_ty_uncarbonated :
     of [stack_ty]. Does not consume gas. *)
 val unparse_stack_uncarbonated : ('a, 's) stack_ty -> Script.expr list
 
-(** [unparse_parameter_ty ~loc ty ~entrypoints] is a specialised version of
+(** [unparse_parameter_ty ~loc ctxt ty ~entrypoints] is a specialised version of
     [unparse_ty], which also analyses [entrypoints] in order to annotate
     the returned type with adequate annotations. *)
 val unparse_parameter_ty :
   loc:'loc ->
+  context ->
   ('a, 'c) ty ->
   entrypoints:'a entrypoints ->
-  ('loc Script.michelson_node, 'trace) Gas_monad.t
+  ('loc Script.michelson_node * context, error trace) result
 
 (** [unparse_bls12_381_g1 ~loc ctxt bls] returns the Micheline representation
     of [bls] and consumes gas from [ctxt]. *)
