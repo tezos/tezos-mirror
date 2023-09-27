@@ -82,7 +82,9 @@ let run ctxt m =
   match Gas.level ctxt with
   | Gas.Unaccounted ->
       let+ res, _new_gas_counter =
-        run_on_gas_counter Local_gas_counter.max_gas_counter m
+        run_on_gas_counter
+          (Local_gas_counter (Saturation_repr.saturated :> int))
+          m
       in
       (res, ctxt)
   | Limited {remaining = _} ->

@@ -30,11 +30,6 @@
 (** A [local_gas_counter] is a wrapped [int]. *)
 type local_gas_counter = Local_gas_counter of int [@@ocaml.unboxed]
 
-(** Maximum value that the gas counter can take. This is orders of
-    magnitude larger than block gas limit so it should only be used in
-    unaccounted gas mode. *)
-val max_gas_counter : local_gas_counter
-
 (** A type for describing a context that is not up to date with respect to gas
     consumption. *)
 type outdated_context
