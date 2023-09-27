@@ -17,6 +17,7 @@ pub enum Type {
     Int,
     Bool,
     Mutez,
+    String,
 }
 
 impl Type {
@@ -28,6 +29,7 @@ impl Type {
             Type::Int => 1,
             Type::Bool => 1,
             Type::Mutez => 1,
+            Type::String => 1,
         }
     }
 }
