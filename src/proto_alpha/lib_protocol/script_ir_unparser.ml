@@ -489,10 +489,11 @@ module type MICHELSON_PARSER = sig
     tzresult
 
   val parse_packable_ty :
+    context ->
     stack_depth:int ->
     legacy:bool ->
     Script.node ->
-    (ex_ty, error trace) Gas_monad.t
+    (ex_ty * context) tzresult
 
   val parse_data :
     unparse_code_rec:unparse_code_rec ->
@@ -786,14 +787,13 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     in
     match code with
     | Prim (loc, I_PUSH, [ty; data], annot) ->
-        let*? res, ctxt =
-          Gas_monad.run ctxt
-          @@ P.parse_packable_ty
-               ~stack_depth:(stack_depth + 1)
-               ~legacy:elab_conf.legacy
-               ty
+        let*? Ex_ty t, ctxt =
+          P.parse_packable_ty
+            ctxt
+            ~stack_depth:(stack_depth + 1)
+            ~legacy:elab_conf.legacy
+            ty
         in
-        let*? (Ex_ty t) = res in
         let allow_forged =
           false
           (* Forgeable in PUSH data are already forbidden at parsing,

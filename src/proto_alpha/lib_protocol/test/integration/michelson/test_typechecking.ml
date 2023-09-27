@@ -209,35 +209,28 @@ let location = function
 
 let test_parse_ty (type exp expc) ctxt node
     (expected : (exp, expc) Script_typed_ir.ty) =
-  let open Result_syntax in
   let legacy = false in
   let allow_lazy_storage = true in
   let allow_operation = true in
   let allow_contract = true in
   let allow_ticket = true in
-  let* res, ctxt =
-    Environment.wrap_tzresult @@ Gas_monad.run ctxt
-    @@
-    let open Gas_monad.Syntax in
-    let* (Script_typed_ir.Ex_ty actual) =
-      Script_ir_translator.parse_ty
+  Environment.wrap_tzresult
+    ( Script_ir_translator.parse_ty
+        ctxt
         ~legacy
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
         ~allow_ticket
         node
-    in
-    let* Eq =
-      Script_ir_translator.ty_eq
-        ~error_details:(Informative (location node))
-        actual
-        expected
-    in
-    return_unit
-  in
-  let* () = Environment.wrap_tzresult @@ res in
-  return ctxt
+    >>? fun (Script_typed_ir.Ex_ty actual, ctxt) ->
+      Gas_monad.run ctxt
+      @@ Script_ir_translator.ty_eq
+           ~error_details:(Informative (location node))
+           actual
+           expected
+      >>? fun (eq, ctxt) ->
+      eq >|? fun Eq -> ctxt )
 
 let test_parse_comb_type () =
   let open Lwt_result_wrap_syntax in
@@ -796,12 +789,6 @@ let test_optimal_comb () =
   let* (_ : context) = check_optimal_comb __LOC__ ctxt comb5_ty comb5_v 5 in
   return_unit
 
-let gas_monad_run ctxt m =
-  let open Result_syntax in
-  let* res, ctxt = Gas_monad.run ctxt m in
-  let+ res in
-  (res, ctxt)
-
 (* Check that UNPACK on contract is forbidden.
    See https://gitlab.com/tezos/tezos/-/issues/301 for the motivation
    behind this restriction.
@@ -816,8 +803,7 @@ let test_contract_not_packable () =
   (* Test that [contract_unit] is parsable *)
   let* () =
     match
-      gas_monad_run ctxt
-      @@ Script_ir_translator.parse_any_ty ~legacy:false contract_unit
+      Script_ir_translator.parse_any_ty ctxt ~legacy:false contract_unit
     with
     | Ok _ -> Lwt_result_syntax.return_unit
     | Error _ -> Alcotest.failf "Could not parse (contract unit)"
@@ -825,8 +811,7 @@ let test_contract_not_packable () =
   (* Test that [contract_unit] is not packable *)
   let* () =
     match
-      gas_monad_run ctxt
-      @@ Script_ir_translator.parse_packable_ty ~legacy:false contract_unit
+      Script_ir_translator.parse_packable_ty ctxt ~legacy:false contract_unit
     with
     | Ok _ ->
         Alcotest.failf

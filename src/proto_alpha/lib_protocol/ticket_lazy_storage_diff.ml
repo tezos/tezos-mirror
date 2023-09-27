@@ -68,8 +68,9 @@ let neg_token_and_amount ctxt ex_ticket =
   let+ ctxt = Gas.consume ctxt (Ticket_costs.negate_cost amount) in
   ((token, Z.neg amount), ctxt)
 
-let parse_value_type value_type =
+let parse_value_type ctxt value_type =
   Script_ir_translator.parse_big_map_value_ty
+    ctxt
     ~legacy:true
     (Micheline.root value_type)
 
@@ -188,8 +189,9 @@ let collect_token_diffs_of_big_map_updates ctxt big_map_id ~value_type updates
      We should have the non-serialized version of the value type.
   *)
   let open Lwt_result_syntax in
-  let*? res, ctxt = Gas_monad.run ctxt @@ parse_value_type value_type in
-  let*? (Script_typed_ir.Ex_ty value_type) = res in
+  let*? Script_typed_ir.Ex_ty value_type, ctxt =
+    parse_value_type ctxt value_type
+  in
   let*? has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt value_type in
   let+ acc, _already_updated, ctxt =
     List.fold_left_es
@@ -221,8 +223,9 @@ let collect_token_diffs_of_big_map ctxt ~get_token_and_amount big_map_id acc =
          In order to find tickets from the value, we need to parse the value
          type. It would be more efficient if the value preserved.
       *)
-      let*? res, ctxt = Gas_monad.run ctxt @@ parse_value_type value_ty in
-      let*? (Script_typed_ir.Ex_ty value_type) = res in
+      let*? Script_typed_ir.Ex_ty value_type, ctxt =
+        parse_value_type ctxt value_ty
+      in
       let*? has_tickets, ctxt =
         Ticket_scanner.type_has_tickets ctxt value_type
       in

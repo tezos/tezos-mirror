@@ -32,19 +32,19 @@ exception Type_helpers_error of string
 let helpers_error msg = raise (Type_helpers_error msg)
 
 (* Convert a Micheline-encoded type to its internal GADT format. *)
-let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr) =
-  let res =
-    Environment.wrap_tzresult @@ Gas_monad.run_unaccounted
-    @@ Script_ir_translator.parse_ty
-         ~legacy:false
-         ~allow_lazy_storage:false
-         ~allow_operation:false
-         ~allow_contract:false
-         ~allow_ticket:false
-         (Micheline.root typ)
-  in
-  match res with
-  | Ok ex_ty -> ex_ty
+let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
+    (ctxt : Alpha_context.t) =
+  Script_ir_translator.parse_ty
+    ctxt
+    ~legacy:false
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:false
+    ~allow_ticket:false
+    (Micheline.root typ)
+  |> Environment.wrap_tzresult
+  |> function
+  | Ok (ex_ty, _ctxt) -> ex_ty
   | Error errs ->
       let msg =
         Format.asprintf
@@ -57,16 +57,16 @@ let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr) =
 (* Convert a list of Micheline-encoded Michelson types to the
    internal GADT format. *)
 let rec michelson_type_list_to_ex_stack_ty
-    (stack_ty : Alpha_context.Script.expr list) =
+    (stack_ty : Alpha_context.Script.expr list) ctxt =
   let open Script_ir_translator in
   let open Script_typed_ir in
   match stack_ty with
   | [] -> Ex_stack_ty Bot_t
   | hd :: tl -> (
-      let ex_ty = michelson_type_to_ex_ty hd in
+      let ex_ty = michelson_type_to_ex_ty hd ctxt in
       match ex_ty with
       | Ex_ty ty -> (
-          let ex_stack_ty = michelson_type_list_to_ex_stack_ty tl in
+          let ex_stack_ty = michelson_type_list_to_ex_stack_ty tl ctxt in
           match ex_stack_ty with
           | Ex_stack_ty tl -> Ex_stack_ty (Item_t (ty, tl))))
 

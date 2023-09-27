@@ -691,15 +691,14 @@ module Scripts = struct
       context tzresult Lwt.t =
     let open Lwt_result_syntax in
     fun ~legacy ctxt (data, exp_ty) ->
-      let*? res, ctxt =
+      let*? Ex_ty exp_ty, ctxt =
         record_trace
           (Script_tc_errors.Ill_formed_type (None, exp_ty, 0))
-          (Gas_monad.run ctxt
-          @@ Script_ir_translator.parse_passable_ty
-               ~legacy
-               (Micheline.root exp_ty))
+          (Script_ir_translator.parse_passable_ty
+             ctxt
+             ~legacy
+             (Micheline.root exp_ty))
       in
-      let*? (Ex_ty exp_ty) = res in
       let+ _, ctxt =
         trace_eval
           (fun () ->
@@ -819,17 +818,16 @@ module Scripts = struct
         match l with
         | [] -> return (Ex_stack (Bot_t, EmptyCell, EmptyCell), ctxt)
         | (ty_node, data_node) :: l ->
-            let*? res, ctxt =
-              Gas_monad.run ctxt
-              @@ Script_ir_translator.parse_ty
-                   ~legacy
-                   ~allow_lazy_storage:true
-                   ~allow_operation:true
-                   ~allow_contract:true
-                   ~allow_ticket:true
-                   ty_node
+            let*? Ex_ty ty, ctxt =
+              Script_ir_translator.parse_ty
+                ctxt
+                ~legacy
+                ~allow_lazy_storage:true
+                ~allow_operation:true
+                ~allow_contract:true
+                ~allow_ticket:true
+                ty_node
             in
-            let*? (Ex_ty ty) = res in
             let elab_conf = elab_conf ~legacy () in
             let* x, ctxt =
               Script_ir_translator.parse_data
@@ -1211,23 +1209,19 @@ module Scripts = struct
       let ctxt = Gas.set_unlimited ctxt in
       let legacy = false in
       let open Script_ir_translator in
-      let* {arg_type; _}, (_ctxt : context) = parse_toplevel ctxt expr in
-      let*? original_type_expr =
-        Gas_monad.run_unaccounted
-        @@
-        let open Gas_monad.Syntax in
-        let* (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
-          parse_parameter_ty_and_entrypoints ~legacy arg_type
-        in
-        let+ (Ex_ty_cstr {original_type_expr; _}) =
-          Script_ir_translator.find_entrypoint
-            ~error_details:(Informative ())
-            arg_type
-            entrypoints
-            entrypoint
-        in
-        original_type_expr
+      let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
+      let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+        parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
       in
+      let*? r, _ctxt =
+        Gas_monad.run ctxt
+        @@ Script_ir_translator.find_entrypoint
+             ~error_details:(Informative ())
+             arg_type
+             entrypoints
+             entrypoint
+      in
+      let*? (Ex_ty_cstr {original_type_expr; _}) = r in
       return @@ Micheline.strip_locations original_type_expr
     in
     let script_view_type ctxt contract expr view =
@@ -1676,11 +1670,9 @@ module Scripts = struct
           | None -> Gas.set_unlimited ctxt
           | Some gas -> Gas.set_limit ctxt gas
         in
-        let*? res, ctxt =
-          Gas_monad.run ctxt
-          @@ parse_packable_ty ~legacy:true (Micheline.root typ)
+        let*? Ex_ty typ, ctxt =
+          parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
         in
-        let*? (Ex_ty typ) = res in
         let* data, ctxt =
           parse_data
             ctxt
@@ -1698,9 +1690,8 @@ module Scripts = struct
         let open Script_ir_translator in
         let legacy = Option.value ~default:false legacy in
         let ctxt = Gas.set_unlimited ctxt in
-        let*? (Ex_ty typ) =
-          Gas_monad.run_unaccounted
-          @@ Script_ir_translator.parse_any_ty ~legacy (Micheline.root typ)
+        let*? Ex_ty typ, ctxt =
+          Script_ir_translator.parse_any_ty ctxt ~legacy (Micheline.root typ)
         in
         let* data, ctxt =
           parse_data
@@ -1742,11 +1733,19 @@ module Scripts = struct
             (Micheline.root script)
         in
         normalized) ;
-    Registration.register0 ~chunked:true S.normalize_type (fun _ctxt () typ ->
+    Registration.register0 ~chunked:true S.normalize_type (fun ctxt () typ ->
         let open Script_typed_ir in
-        let*? (Ex_ty typ) =
-          Gas_monad.run_unaccounted
-          @@ Script_ir_translator.parse_any_ty ~legacy:true (Micheline.root typ)
+        let ctxt = Gas.set_unlimited ctxt in
+        (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
+        let*? Ex_ty typ, _ctxt =
+          Script_ir_translator.parse_ty
+            ctxt
+            ~legacy:true
+            ~allow_lazy_storage:true
+            ~allow_operation:true
+            ~allow_contract:true
+            ~allow_ticket:true
+            (Micheline.root typ)
         in
         let normalized = Unparse_types.unparse_ty ~loc:() typ in
         return @@ Micheline.strip_locations normalized) ;
@@ -1770,10 +1769,9 @@ module Scripts = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        let* {arg_type; _}, (_ctxt : context) = parse_toplevel ctxt expr in
-        let*? (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
-          Gas_monad.run_unaccounted
-          @@ parse_parameter_ty_and_entrypoints ~legacy arg_type
+        let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
+        let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+          parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
         in
         return
         @@
@@ -2231,9 +2229,11 @@ module Big_map = struct
         match types with
         | None -> raise Not_found
         | Some (_, value_type) -> (
-            let*? (Ex_ty value_type) =
-              Gas_monad.run_unaccounted
-              @@ parse_big_map_value_ty ~legacy:true (Micheline.root value_type)
+            let*? Ex_ty value_type, ctxt =
+              parse_big_map_value_ty
+                ctxt
+                ~legacy:true
+                (Micheline.root value_type)
             in
             let* _ctxt, value = Big_map.get_opt ctxt id key in
             match value with

@@ -120,13 +120,12 @@ let internal_typed_transaction ctxt
       Sc_rollup.Outbox.Message.typed_transaction) =
   let open Lwt_result_syntax in
   (* Parse the parameters type according to the type. *)
-  let*? res, ctxt =
-    Gas_monad.run ctxt
-    @@ Script_ir_translator.parse_any_ty
-         ~legacy:false
-         (Micheline.root unparsed_ty)
+  let*? Ex_ty parameters_ty, ctxt =
+    Script_ir_translator.parse_any_ty
+      ctxt
+      ~legacy:false
+      (Micheline.root unparsed_ty)
   in
-  let*? (Ex_ty parameters_ty) = res in
   make_transaction
     ctxt
     ~parameters_ty

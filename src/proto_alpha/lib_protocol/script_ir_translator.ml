@@ -556,6 +556,7 @@ type ('ret, 'name) parse_ty_ret =
 
 let rec parse_ty :
     type ret name.
+    context ->
     stack_depth:int ->
     legacy:bool ->
     allow_lazy_storage:bool ->
@@ -564,9 +565,10 @@ let rec parse_ty :
     allow_ticket:bool ->
     ret:(ret, name) parse_ty_ret ->
     Script.node ->
-    (ret, error trace) Gas_monad.t =
-  let open Gas_monad.Syntax in
-  fun ~stack_depth
+    (ret * context) tzresult =
+  let open Result_syntax in
+  fun ctxt
+      ~stack_depth
       ~legacy
       ~allow_lazy_storage
       ~allow_operation
@@ -574,110 +576,112 @@ let rec parse_ty :
       ~allow_ticket
       ~ret
       node ->
-    let* () = Gas_monad.consume_gas Typecheck_costs.parse_type_cycle in
+    let* ctxt = Gas.consume ctxt Typecheck_costs.parse_type_cycle in
     if Compare.Int.(stack_depth > 10000) then
       tzfail Typechecking_too_many_recursive_calls
     else
       let* node, name =
         match ret with
         | Don't_parse_entrypoints -> return (node, (() : name))
-        | Parse_entrypoints ->
-            Gas_monad.of_result @@ extract_entrypoint_annot node
+        | Parse_entrypoints -> extract_entrypoint_annot node
       in
-      let return ty : ret =
+      let return ctxt ty : ret * context =
         match ret with
-        | Don't_parse_entrypoints -> Ex_ty ty
+        | Don't_parse_entrypoints -> (Ex_ty ty, ctxt)
         | Parse_entrypoints ->
             let at_node =
               Option.map (fun name -> {name; original_type_expr = node}) name
             in
-            Ex_parameter_ty_and_entrypoints_node
-              {
-                arg_type = ty;
-                entrypoints = {at_node; nested = Entrypoints_None};
-              }
+            ( Ex_parameter_ty_and_entrypoints_node
+                {
+                  arg_type = ty;
+                  entrypoints = {at_node; nested = Entrypoints_None};
+                },
+              ctxt )
       in
       match node with
       | Prim (loc, T_unit, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return unit_t
+          let+ () = check_type_annot loc annot in
+          return ctxt unit_t
       | Prim (loc, T_int, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return int_t
+          let+ () = check_type_annot loc annot in
+          return ctxt int_t
       | Prim (loc, T_nat, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return nat_t
+          let+ () = check_type_annot loc annot in
+          return ctxt nat_t
       | Prim (loc, T_string, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return string_t
+          let+ () = check_type_annot loc annot in
+          return ctxt string_t
       | Prim (loc, T_bytes, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return bytes_t
+          let+ () = check_type_annot loc annot in
+          return ctxt bytes_t
       | Prim (loc, T_mutez, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return mutez_t
+          let+ () = check_type_annot loc annot in
+          return ctxt mutez_t
       | Prim (loc, T_bool, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return bool_t
+          let+ () = check_type_annot loc annot in
+          return ctxt bool_t
       | Prim (loc, T_key, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return key_t
+          let+ () = check_type_annot loc annot in
+          return ctxt key_t
       | Prim (loc, T_key_hash, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return key_hash_t
+          let+ () = check_type_annot loc annot in
+          return ctxt key_hash_t
       | Prim (loc, T_chest_key, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return chest_key_t
+          let+ () = check_type_annot loc annot in
+          return ctxt chest_key_t
       | Prim (loc, T_chest, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return chest_t
+          let+ () = check_type_annot loc annot in
+          return ctxt chest_t
       | Prim (loc, T_timestamp, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return timestamp_t
+          let+ () = check_type_annot loc annot in
+          return ctxt timestamp_t
       | Prim (loc, T_address, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return address_t
+          let+ () = check_type_annot loc annot in
+          return ctxt address_t
       | Prim (loc, T_signature, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return signature_t
+          let+ () = check_type_annot loc annot in
+          return ctxt signature_t
       | Prim (loc, T_operation, [], annot) ->
           if allow_operation then
-            let+? () = check_type_annot loc annot in
-            return operation_t
+            let+ () = check_type_annot loc annot in
+            return ctxt operation_t
           else tzfail (Unexpected_operation loc)
       | Prim (loc, T_chain_id, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return chain_id_t
+          let+ () = check_type_annot loc annot in
+          return ctxt chain_id_t
       | Prim (loc, T_never, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return never_t
+          let+ () = check_type_annot loc annot in
+          return ctxt never_t
       | Prim (loc, T_bls12_381_g1, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return bls12_381_g1_t
+          let+ () = check_type_annot loc annot in
+          return ctxt bls12_381_g1_t
       | Prim (loc, T_bls12_381_g2, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return bls12_381_g2_t
+          let+ () = check_type_annot loc annot in
+          return ctxt bls12_381_g2_t
       | Prim (loc, T_bls12_381_fr, [], annot) ->
-          let+? () = check_type_annot loc annot in
-          return bls12_381_fr_t
+          let+ () = check_type_annot loc annot in
+          return ctxt bls12_381_fr_t
       | Prim (loc, T_contract, [utl], annot) ->
           if allow_contract then
-            let*? () = check_type_annot loc annot in
-            let* (Ex_ty tl) =
+            let* () = check_type_annot loc annot in
+            let* Ex_ty tl, ctxt =
               parse_passable_ty
+                ctxt
                 ~stack_depth:(stack_depth + 1)
                 ~legacy
                 utl
                 ~ret:Don't_parse_entrypoints
             in
-            let+? ty = contract_t loc tl in
-            return ty
+            let+ ty = contract_t loc tl in
+            return ctxt ty
           else tzfail (Unexpected_contract loc)
       | Prim (loc, T_pair, utl :: utr, annot) ->
-          let*? () = check_type_annot loc annot in
-          let*? utl = remove_field_annot utl in
-          let* (Ex_ty tl) =
+          let* () = check_type_annot loc annot in
+          let* utl = remove_field_annot utl in
+          let* Ex_ty tl, ctxt =
             parse_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               ~allow_lazy_storage
@@ -687,15 +691,16 @@ let rec parse_ty :
               ~ret:Don't_parse_entrypoints
               utl
           in
-          let*? utr =
+          let* utr =
             match utr with
             | [utr] -> remove_field_annot utr
             | utr ->
                 (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
                 Ok (Prim (loc, T_pair, utr, []))
           in
-          let* (Ex_ty tr) =
+          let* Ex_ty tr, ctxt =
             parse_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               ~allow_lazy_storage
@@ -705,21 +710,21 @@ let rec parse_ty :
               ~ret:Don't_parse_entrypoints
               utr
           in
-          let+? (Ty_ex_c ty) = pair_t loc tl tr in
-          return ty
+          let+ (Ty_ex_c ty) = pair_t loc tl tr in
+          return ctxt ty
       | Prim (loc, T_or, [utl; utr], annot) -> (
-          let*? () = check_type_annot loc annot in
-          let*? utl, utr =
-            let open Result_syntax in
+          let* () = check_type_annot loc annot in
+          let* utl, utr =
             match ret with
             | Don't_parse_entrypoints ->
                 let* utl = remove_field_annot utl in
                 let+ utr = remove_field_annot utr in
                 (utl, utr)
-            | Parse_entrypoints -> return (utl, utr)
+            | Parse_entrypoints -> Ok (utl, utr)
           in
-          let* parsed_l =
+          let* parsed_l, ctxt =
             parse_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               ~allow_lazy_storage
@@ -729,8 +734,9 @@ let rec parse_ty :
               ~ret
               utl
           in
-          let* parsed_r =
+          let* parsed_r, ctxt =
             parse_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               ~allow_lazy_storage
@@ -744,8 +750,8 @@ let rec parse_ty :
           | Don't_parse_entrypoints ->
               let (Ex_ty tl) = parsed_l in
               let (Ex_ty tr) = parsed_r in
-              let+? (Ty_ex_c ty) = or_t loc tl tr in
-              (Ex_ty ty : ret)
+              let+ (Ty_ex_c ty) = or_t loc tl tr in
+              ((Ex_ty ty : ret), ctxt)
           | Parse_entrypoints ->
               let (Ex_parameter_ty_and_entrypoints_node
                     {arg_type = tl; entrypoints = left}) =
@@ -755,7 +761,7 @@ let rec parse_ty :
                     {arg_type = tr; entrypoints = right}) =
                 parsed_r
               in
-              let+? (Ty_ex_c arg_type) = or_t loc tl tr in
+              let+ (Ty_ex_c arg_type) = or_t loc tl tr in
               let entrypoints =
                 let at_node =
                   Option.map
@@ -764,21 +770,23 @@ let rec parse_ty :
                 in
                 {at_node; nested = Entrypoints_Or {left; right}}
               in
-              Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints})
+              ( Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints},
+                ctxt ))
       | Prim (loc, T_lambda, [uta; utr], annot) ->
-          let*? () = check_type_annot loc annot in
-          let* (Ex_ty ta) =
-            parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy uta
+          let* () = check_type_annot loc annot in
+          let* Ex_ty ta, ctxt =
+            parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
           in
-          let* (Ex_ty tr) =
-            parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy utr
+          let* Ex_ty tr, ctxt =
+            parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utr
           in
-          let+? ty = lambda_t loc ta tr in
-          return ty
+          let+ ty = lambda_t loc ta tr in
+          return ctxt ty
       | Prim (loc, T_option, [ut], annot) ->
-          let*? () = check_type_annot loc annot in
-          let* (Ex_ty t) =
+          let* () = check_type_annot loc annot in
+          let* Ex_ty t, ctxt =
             parse_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               ~allow_lazy_storage
@@ -788,12 +796,13 @@ let rec parse_ty :
               ~ret:Don't_parse_entrypoints
               ut
           in
-          let+? ty = option_t loc t in
-          return ty
+          let+ ty = option_t loc t in
+          return ctxt ty
       | Prim (loc, T_list, [ut], annot) ->
-          let*? () = check_type_annot loc annot in
-          let* (Ex_ty t) =
+          let* () = check_type_annot loc annot in
+          let* Ex_ty t, ctxt =
             parse_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               ~allow_lazy_storage
@@ -803,31 +812,32 @@ let rec parse_ty :
               ~ret:Don't_parse_entrypoints
               ut
           in
-          let+? ty = list_t loc t in
-          return ty
+          let+ ty = list_t loc t in
+          return ctxt ty
       | Prim (loc, T_ticket, [ut], annot) ->
           if allow_ticket then
-            let*? () = check_type_annot loc annot in
-            let* (Ex_comparable_ty t) =
-              parse_comparable_ty ~stack_depth:(stack_depth + 1) ut
+            let* () = check_type_annot loc annot in
+            let* Ex_comparable_ty t, ctxt =
+              parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
             in
-            let+? ty = ticket_t loc t in
-            return ty
+            let+ ty = ticket_t loc t in
+            return ctxt ty
           else tzfail (Unexpected_ticket loc)
       | Prim (loc, T_set, [ut], annot) ->
-          let*? () = check_type_annot loc annot in
-          let* (Ex_comparable_ty t) =
-            parse_comparable_ty ~stack_depth:(stack_depth + 1) ut
+          let* () = check_type_annot loc annot in
+          let* Ex_comparable_ty t, ctxt =
+            parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
           in
-          let+? ty = set_t loc t in
-          return ty
+          let+ ty = set_t loc t in
+          return ctxt ty
       | Prim (loc, T_map, [uta; utr], annot) ->
-          let*? () = check_type_annot loc annot in
-          let* (Ex_comparable_ty ta) =
-            parse_comparable_ty ~stack_depth:(stack_depth + 1) uta
+          let* () = check_type_annot loc annot in
+          let* Ex_comparable_ty ta, ctxt =
+            parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt uta
           in
-          let* (Ex_ty tr) =
+          let* Ex_ty tr, ctxt =
             parse_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               ~allow_lazy_storage
@@ -837,17 +847,17 @@ let rec parse_ty :
               ~ret:Don't_parse_entrypoints
               utr
           in
-          let+? ty = map_t loc ta tr in
-          return ty
+          let+ ty = map_t loc ta tr in
+          return ctxt ty
       | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
-          let*? () = check_type_annot loc annot in
-          let+? memo_size = parse_memo_size memo_size in
-          return (sapling_transaction_t ~memo_size)
+          let* () = check_type_annot loc annot in
+          let+ memo_size = parse_memo_size memo_size in
+          return ctxt (sapling_transaction_t ~memo_size)
       | Prim (loc, T_sapling_transaction_deprecated, [memo_size], annot) ->
           if legacy (* Legacy check introduced in Jakarta. *) then
-            let*? () = check_type_annot loc annot in
-            let+? memo_size = parse_memo_size memo_size in
-            return (sapling_transaction_deprecated_t ~memo_size)
+            let* () = check_type_annot loc annot in
+            let+ memo_size = parse_memo_size memo_size in
+            return ctxt (sapling_transaction_deprecated_t ~memo_size)
           else tzfail (Deprecated_instruction T_sapling_transaction_deprecated)
       (*
     /!\ When adding new lazy storage kinds, be careful to use
@@ -856,20 +866,21 @@ let rec parse_ty :
     from another contract with `PUSH t id` or `UNPACK`.
   *)
       | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
-          let+ (Ex_ty ty) =
+          let+ Ex_ty ty, ctxt =
             parse_big_map_ty
+              ctxt
               ~stack_depth:(stack_depth + 1)
               ~legacy
               loc
               args
               annot
           in
-          return ty
+          return ctxt ty
       | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage
         ->
-          let*? () = check_type_annot loc annot in
-          let+? memo_size = parse_memo_size memo_size in
-          return (sapling_state_t ~memo_size)
+          let* () = check_type_annot loc annot in
+          let+ memo_size = parse_memo_size memo_size in
+          return ctxt (sapling_state_t ~memo_size)
       | Prim (loc, (T_big_map | T_sapling_state), _, _) ->
           tzfail (Unexpected_lazy_storage loc)
       | Prim
@@ -926,14 +937,16 @@ let rec parse_ty :
                ]
 
 and parse_comparable_ty :
+    context ->
     stack_depth:int ->
     Script.node ->
-    (ex_comparable_ty, error trace) Gas_monad.t =
-  let open Gas_monad.Syntax in
-  fun ~stack_depth node ->
-    let* (Ex_ty t) =
+    (ex_comparable_ty * context) tzresult =
+  let open Result_syntax in
+  fun ctxt ~stack_depth node ->
+    let* Ex_ty t, ctxt =
       parse_ty
         ~ret:Don't_parse_entrypoints
+        ctxt
         ~stack_depth:(stack_depth + 1)
         ~legacy:false
         ~allow_lazy_storage:false
@@ -943,7 +956,7 @@ and parse_comparable_ty :
         node
     in
     match is_comparable t with
-    | Yes -> return (Ex_comparable_ty t)
+    | Yes -> return (Ex_comparable_ty t, ctxt)
     | No ->
         tzfail
           (Comparable_type_expected
@@ -951,13 +964,15 @@ and parse_comparable_ty :
 
 and parse_passable_ty :
     type ret name.
+    context ->
     stack_depth:int ->
     legacy:bool ->
     ret:(ret, name) parse_ty_ret ->
     Script.node ->
-    (ret, error trace) Gas_monad.t =
- fun ~stack_depth ~legacy ->
+    (ret * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
   (parse_ty [@tailcall])
+    ctxt
     ~stack_depth
     ~legacy
     ~allow_lazy_storage:true
@@ -966,12 +981,14 @@ and parse_passable_ty :
     ~allow_ticket:true
 
 and parse_any_ty :
+    context ->
     stack_depth:int ->
     legacy:bool ->
     Script.node ->
-    (ex_ty, error trace) Gas_monad.t =
- fun ~stack_depth ~legacy ->
+    (ex_ty * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
   (parse_ty [@tailcall])
+    ctxt
     ~stack_depth
     ~legacy
     ~allow_lazy_storage:true
@@ -980,24 +997,29 @@ and parse_any_ty :
     ~allow_ticket:true
     ~ret:Don't_parse_entrypoints
 
-and parse_big_map_ty ~stack_depth ~legacy big_map_loc args map_annot =
-  let open Gas_monad.Syntax in
-  let* () = Gas_monad.consume_gas Typecheck_costs.parse_type_cycle in
+and parse_big_map_ty ctxt ~stack_depth ~legacy big_map_loc args map_annot =
+  let open Result_syntax in
+  let* ctxt = Gas.consume ctxt Typecheck_costs.parse_type_cycle in
   match args with
   | [key_ty; value_ty] ->
-      let*? () = check_type_annot big_map_loc map_annot in
-      let* (Ex_comparable_ty key_ty) =
-        parse_comparable_ty ~stack_depth:(stack_depth + 1) key_ty
+      let* () = check_type_annot big_map_loc map_annot in
+      let* Ex_comparable_ty key_ty, ctxt =
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt key_ty
       in
-      let* (Ex_ty value_ty) =
-        parse_big_map_value_ty ~stack_depth:(stack_depth + 1) ~legacy value_ty
+      let* Ex_ty value_ty, ctxt =
+        parse_big_map_value_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          value_ty
       in
-      let+? big_map_ty = big_map_t big_map_loc key_ty value_ty in
-      Ex_ty big_map_ty
+      let+ big_map_ty = big_map_t big_map_loc key_ty value_ty in
+      (Ex_ty big_map_ty, ctxt)
   | args -> tzfail @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
 
-and parse_big_map_value_ty ~stack_depth ~legacy value_ty =
+and parse_big_map_value_ty ctxt ~stack_depth ~legacy value_ty =
   (parse_ty [@tailcall])
+    ctxt
     ~stack_depth
     ~legacy
     ~allow_lazy_storage:false
@@ -1007,8 +1029,9 @@ and parse_big_map_value_ty ~stack_depth ~legacy value_ty =
     ~ret:Don't_parse_entrypoints
     value_ty
 
-let parse_packable_ty ~stack_depth ~legacy node =
+let parse_packable_ty ctxt ~stack_depth ~legacy node =
   (parse_ty [@tailcall])
+    ctxt
     ~stack_depth
     ~legacy
     ~allow_lazy_storage:false
@@ -1020,8 +1043,9 @@ let parse_packable_ty ~stack_depth ~legacy node =
     ~ret:Don't_parse_entrypoints
     node
 
-let parse_view_input_ty ~stack_depth ~legacy node =
+let parse_view_input_ty ctxt ~stack_depth ~legacy node =
   (parse_ty [@tailcall])
+    ctxt
     ~stack_depth
     ~legacy
     ~allow_lazy_storage:false
@@ -1031,8 +1055,9 @@ let parse_view_input_ty ~stack_depth ~legacy node =
     ~ret:Don't_parse_entrypoints
     node
 
-let parse_view_output_ty ~stack_depth ~legacy node =
+let parse_view_output_ty ctxt ~stack_depth ~legacy node =
   (parse_ty [@tailcall])
+    ctxt
     ~stack_depth
     ~legacy
     ~allow_lazy_storage:false
@@ -1042,8 +1067,9 @@ let parse_view_output_ty ~stack_depth ~legacy node =
     ~ret:Don't_parse_entrypoints
     node
 
-let parse_storage_ty ~stack_depth ~legacy node =
+let parse_storage_ty ctxt ~stack_depth ~legacy node =
   (parse_ty [@tailcall])
+    ctxt
     ~stack_depth
     ~legacy
     ~allow_lazy_storage:true
@@ -1386,26 +1412,27 @@ type ex_parameter_ty_and_entrypoints =
       -> ex_parameter_ty_and_entrypoints
 
 let parse_parameter_ty_and_entrypoints :
+    context ->
     stack_depth:int ->
     legacy:bool ->
     Script.node ->
-    (ex_parameter_ty_and_entrypoints, error trace) Gas_monad.t =
-  let open Gas_monad.Syntax in
-  fun ~stack_depth ~legacy node ->
-    let* (Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}) =
+    (ex_parameter_ty_and_entrypoints * context) tzresult =
+  let open Result_syntax in
+  fun ctxt ~stack_depth ~legacy node ->
+    let* Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}, ctxt =
       parse_passable_ty
+        ctxt
         ~stack_depth:(stack_depth + 1)
         ~legacy
         node
         ~ret:Parse_entrypoints
     in
-    let+? () =
-      if legacy (* Legacy check introduced before Ithaca. *) then
-        Result.return_unit
+    let+ () =
+      if legacy (* Legacy check introduced before Ithaca. *) then return_unit
       else well_formed_entrypoints arg_type entrypoints
     in
     let entrypoints = {root = entrypoints; original_type_expr = node} in
-    Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}
+    (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt)
 
 let parse_passable_ty = parse_passable_ty ~ret:Don't_parse_entrypoints
 
@@ -2269,30 +2296,29 @@ let rec parse_data :
               match tys_opt with
               | None -> traced_fail (Invalid_big_map (loc, id))
               | Some (btk, btv) ->
-                  let*? res, ctxt =
+                  let*? Ex_comparable_ty btk, ctxt =
+                    parse_comparable_ty
+                      ~stack_depth:(stack_depth + 1)
+                      ctxt
+                      (Micheline.root btk)
+                  in
+                  let*? Ex_ty btv, ctxt =
+                    parse_big_map_value_ty
+                      ctxt
+                      ~stack_depth:(stack_depth + 1)
+                      ~legacy
+                      (Micheline.root btv)
+                  in
+                  let*? eq, ctxt =
                     Gas_monad.run ctxt
                     @@
                     let open Gas_monad.Syntax in
-                    let* (Ex_comparable_ty btk) =
-                      parse_comparable_ty
-                        ~stack_depth:(stack_depth + 1)
-                        (Micheline.root btk)
-                    in
-                    let* (Ex_ty btv) =
-                      parse_big_map_value_ty
-                        ~stack_depth:(stack_depth + 1)
-                        ~legacy
-                        (Micheline.root btv)
-                    in
-                    let+ Eq =
-                      let error_details = Informative loc in
-                      let* Eq = ty_eq ~error_details tk btk in
-                      ty_eq ~error_details tv btv
-                    in
-                    Some id
+                    let error_details = Informative loc in
+                    let* Eq = ty_eq ~error_details tk btk in
+                    ty_eq ~error_details tv btv
                   in
-                  let*? res in
-                  return (res, ctxt)
+                  let*? Eq = eq in
+                  return (Some id, ctxt)
             else traced_fail (Unexpected_forged_value loc)
       in
       (Big_map {id; diff; key_type = tk; value_type = tv}, ctxt)
@@ -2425,27 +2451,20 @@ and parse_view :
       {input_ty; output_ty; view_code} ->
     let legacy = elab_conf.legacy in
     let input_ty_loc = location input_ty in
-    let*? res, ctxt =
-      Gas_monad.run ctxt @@ parse_view_input_ty ~stack_depth:0 ~legacy input_ty
-    in
-    let*? (Ex_ty input_ty) =
+    let*? Ex_ty input_ty, ctxt =
       record_trace_eval
         (fun () ->
           Ill_formed_type
             (Some "arg of view", strip_locations input_ty, input_ty_loc))
-        res
+        (parse_view_input_ty ctxt ~stack_depth:0 ~legacy input_ty)
     in
     let output_ty_loc = location output_ty in
-    let*? res, ctxt =
-      Gas_monad.run ctxt
-      @@ parse_view_output_ty ~stack_depth:0 ~legacy output_ty
-    in
-    let*? (Ex_ty output_ty) =
+    let*? Ex_ty output_ty, ctxt =
       record_trace_eval
         (fun () ->
           Ill_formed_type
             (Some "return of view", strip_locations output_ty, output_ty_loc))
-        res
+        (parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty)
     in
     let*? (Ty_ex_c pair_ty) = pair_t input_ty_loc input_ty storage_type in
     let* judgement, ctxt =
@@ -2844,11 +2863,9 @@ and parse_instr :
       typed ctxt loc swap stack_ty
   | Prim (loc, I_PUSH, [t; d], annot), stack ->
       let*? () = check_var_annot loc annot in
-      let*? t, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_packable_ty ~stack_depth:(stack_depth + 1) ~legacy t
+      let*? Ex_ty t, ctxt =
+        parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       in
-      let*? (Ex_ty t) = t in
       let* v, ctxt =
         parse_data
           ~unparse_code_rec
@@ -2872,11 +2889,9 @@ and parse_instr :
       let*? ty = option_t loc t in
       typed ctxt loc cons_some (Item_t (ty, rest))
   | Prim (loc, I_NONE, [t], annot), stack ->
-      let*? t, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy t
+      let*? Ex_ty t, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       in
-      let*? (Ex_ty t) = t in
       let*? () = check_var_type_annot loc annot in
       let cons_none = {apply = (fun k -> ICons_none (loc, t, k))} in
       let*? ty = option_t loc t in
@@ -3030,22 +3045,18 @@ and parse_instr :
       typed ctxt loc cdr (Item_t (b, rest))
   (* ors *)
   | Prim (loc, I_LEFT, [tr], annot), Item_t (tl, rest) ->
-      let*? tr, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy tr
+      let*? Ex_ty tr, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tr
       in
-      let*? (Ex_ty tr) = tr in
       let*? () = check_constr_annot loc annot in
       let cons_left = {apply = (fun k -> ICons_left (loc, tr, k))} in
       let*? (Ty_ex_c ty) = or_t loc tl tr in
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_left stack_ty
   | Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest) ->
-      let*? tl, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy tl
+      let*? Ex_ty tl, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tl
       in
-      let*? (Ex_ty tl) = tl in
       let*? () = check_constr_annot loc annot in
       let cons_right = {apply = (fun k -> ICons_right (loc, tl, k))} in
       let*? (Ty_ex_c ty) = or_t loc tl tr in
@@ -3078,11 +3089,9 @@ and parse_instr :
       Lwt.return @@ merge_branches ctxt loc btr bfr {branch}
   (* lists *)
   | Prim (loc, I_NIL, [t], annot), stack ->
-      let*? t, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy t
+      let*? Ex_ty t, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       in
-      let*? (Ex_ty t) = t in
       let*? () = check_var_type_annot loc annot in
       let nil = {apply = (fun k -> INil (loc, t, k))} in
       let*? ty = list_t loc t in
@@ -3192,11 +3201,9 @@ and parse_instr :
       )
   (* sets *)
   | Prim (loc, I_EMPTY_SET, [t], annot), rest ->
-      let*? t, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_comparable_ty ~stack_depth:(stack_depth + 1) t
+      let*? Ex_comparable_ty t, ctxt =
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
       in
-      let*? (Ex_comparable_ty t) = t in
       let*? () = check_var_type_annot loc annot in
       let instr = {apply = (fun k -> IEmpty_set (loc, t, k))} in
       let*? ty = set_t loc t in
@@ -3250,16 +3257,12 @@ and parse_instr :
       typed ctxt loc instr (Item_t (nat_t, rest))
   (* maps *)
   | Prim (loc, I_EMPTY_MAP, [tk; tv], annot), stack ->
-      let*? tk, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_comparable_ty ~stack_depth:(stack_depth + 1) tk
+      let*? Ex_comparable_ty tk, ctxt =
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt tk
       in
-      let*? (Ex_comparable_ty tk) = tk in
-      let*? tv, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy tv
+      let*? Ex_ty tv, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       in
-      let*? (Ex_ty tv) = tv in
       let*? () = check_var_type_annot loc annot in
       let instr =
         {apply = (fun k -> IEmpty_map (loc, tk, for_logging_only tv, k))}
@@ -3374,16 +3377,12 @@ and parse_instr :
       typed ctxt loc instr (Item_t (nat_t, rest))
   (* big_map *)
   | Prim (loc, I_EMPTY_BIG_MAP, [tk; tv], annot), stack ->
-      let*? tk, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_comparable_ty ~stack_depth:(stack_depth + 1) tk
+      let*? Ex_comparable_ty tk, ctxt =
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt tk
       in
-      let*? (Ex_comparable_ty tk) = tk in
-      let*? tv, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_big_map_value_ty ~stack_depth:(stack_depth + 1) ~legacy tv
+      let*? Ex_ty tv, ctxt =
+        parse_big_map_value_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       in
-      let*? (Ex_ty tv) = tv in
       let*? () = check_var_type_annot loc annot in
       let instr = {apply = (fun k -> IEmpty_big_map (loc, tk, tv, k))} in
       let*? ty = big_map_t loc tk tv in
@@ -3601,16 +3600,12 @@ and parse_instr :
           let stack = Item_t (tr, rest) in
           typed_no_lwt ctxt loc instr stack)
   | Prim (loc, I_LAMBDA, [arg; ret; code], annot), stack ->
-      let*? arg, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy arg
+      let*? Ex_ty arg, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg
       in
-      let*? (Ex_ty arg) = arg in
-      let*? ret, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy ret
+      let*? Ex_ty ret, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret
       in
-      let*? (Ex_ty ret) = ret in
       let*? () = check_kind [Seq_kind] code in
       let*? () = check_var_annot loc annot in
       let* kdescr, ctxt =
@@ -3632,16 +3627,12 @@ and parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_LAMBDA_REC, [arg_ty_expr; ret_ty_expr; lambda_expr], annot),
       stack ) ->
-      let*? arg, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy arg_ty_expr
+      let*? Ex_ty arg, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg_ty_expr
       in
-      let*? (Ex_ty arg) = arg in
-      let*? ret, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy ret_ty_expr
+      let*? Ex_ty ret, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret_ty_expr
       in
-      let*? (Ex_ty ret) = ret in
       let*? () = check_kind [Seq_kind] lambda_expr in
       let*? () = check_var_annot loc annot in
       let*? lambda_rec_ty = lambda_t loc arg ret in
@@ -4115,11 +4106,9 @@ and parse_instr :
   (* annotations *)
   | Prim (loc, I_CAST, [cast_t], annot), (Item_t (t, _) as stack) ->
       let*? () = check_var_annot loc annot in
-      let*? cast_t, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy cast_t
+      let*? Ex_ty cast_t, ctxt =
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy cast_t
       in
-      let*? (Ex_ty cast_t) = cast_t in
       let*? eq, ctxt =
         Gas_monad.run ctxt @@ ty_eq ~error_details:(Informative loc) cast_t t
       in
@@ -4145,11 +4134,9 @@ and parse_instr :
       let stack = Item_t (bytes_t, rest) in
       typed ctxt loc instr stack
   | Prim (loc, I_UNPACK, [ty], annot), Item_t (Bytes_t, rest) ->
-      let*? t, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_packable_ty ~stack_depth:(stack_depth + 1) ~legacy ty
+      let*? Ex_ty t, ctxt =
+        parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
       in
-      let*? (Ex_ty t) = t in
       let*? () = check_var_type_annot loc annot in
       let*? res_ty = option_t loc t in
       let instr = {apply = (fun k -> IUnpack (loc, t, k))} in
@@ -4162,11 +4149,9 @@ and parse_instr :
       let stack = Item_t (address_t, rest) in
       typed ctxt loc instr stack
   | Prim (loc, I_CONTRACT, [ty], annot), Item_t (Address_t, rest) ->
-      let*? t, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_passable_ty ~stack_depth:(stack_depth + 1) ~legacy ty
+      let*? Ex_ty t, ctxt =
+        parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
       in
-      let*? (Ex_ty t) = t in
       let*? contract_ty = contract_t loc t in
       let*? res_ty = option_t loc contract_ty in
       let*? entrypoint = parse_entrypoint_annot_strict loc annot in
@@ -4177,11 +4162,9 @@ and parse_instr :
       Item_t (input_ty, Item_t (Address_t, rest)) ) ->
       let output_ty_loc = location output_ty in
       let*? name, ctxt = parse_view_name ctxt name in
-      let*? output_ty, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_view_output_ty ~stack_depth:0 ~legacy output_ty
+      let*? Ex_ty output_ty, ctxt =
+        parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty
       in
-      let*? (Ex_ty output_ty) = output_ty in
       let*? res_ty = option_t output_ty_loc output_ty in
       let*? () = check_var_annot loc annot in
       let instr =
@@ -4232,27 +4215,24 @@ and parse_instr :
       let*? {arg_type; storage_type; code_field; views}, ctxt =
         parse_toplevel ctxt canonical_code
       in
-      let*? arg_type_with_entrypoints, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_parameter_ty_and_entrypoints
-             ~stack_depth:(stack_depth + 1)
-             ~legacy
-             arg_type
-      in
-      let*? (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
+      let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt =
         record_trace
           (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
-          arg_type_with_entrypoints
+          (parse_parameter_ty_and_entrypoints
+             ctxt
+             ~stack_depth:(stack_depth + 1)
+             ~legacy
+             arg_type)
       in
-      let*? res, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_storage_ty ~stack_depth:(stack_depth + 1) ~legacy storage_type
-      in
-      let*? (Ex_ty storage_type) =
+      let*? Ex_ty storage_type, ctxt =
         record_trace
           (Ill_formed_type
              (Some "storage", canonical_code, location storage_type))
-          res
+          (parse_storage_ty
+             ctxt
+             ~stack_depth:(stack_depth + 1)
+             ~legacy
+             storage_type)
       in
       let*? (Ty_ex_c arg_type_full) = pair_t loc arg_type storage_type in
       let*? (Ty_ex_c ret_type_full) =
@@ -4577,11 +4557,9 @@ and parse_instr :
       in
       typed ctxt loc instr (Item_t (Operation_t, rest))
   | Prim (loc, I_EMIT, [ty_node], annot), Item_t (data, rest) ->
-      let*? ty, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_packable_ty ~stack_depth:(stack_depth + 1) ~legacy ty_node
+      let*? Ex_ty ty, ctxt =
+        parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty_node
       in
-      let*? (Ex_ty ty) = ty in
       let*? Eq, ctxt = check_item_ty ctxt ty data loc I_EMIT 1 2 in
       let*? tag = parse_entrypoint_annot_strict loc annot in
       let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost ty_node) in
@@ -4890,16 +4868,14 @@ and parse_contract :
                    in
                    (* can only fail because of gas *)
                    let*? {arg_type; _}, ctxt = parse_toplevel ctxt code in
-                   let*? targ, ctxt =
-                     Gas_monad.run ctxt
-                     @@ parse_parameter_ty_and_entrypoints
-                          ~stack_depth:(stack_depth + 1)
-                          ~legacy:true
-                          arg_type
-                   in
-                   let*? (Ex_parameter_ty_and_entrypoints
-                           {arg_type = targ; entrypoints}) =
-                     targ
+                   let*? ( Ex_parameter_ty_and_entrypoints
+                             {arg_type = targ; entrypoints},
+                           ctxt ) =
+                     parse_parameter_ty_and_entrypoints
+                       ctxt
+                       ~stack_depth:(stack_depth + 1)
+                       ~legacy:true
+                       arg_type
                    in
                    let*? entrypoint_arg, ctxt =
                      Gas_monad.run ctxt
@@ -4944,16 +4920,14 @@ and parse_contract :
                 ctxt
                 parameters_type
             in
-            let*? full, ctxt =
-              Gas_monad.run ctxt
-              @@ parse_parameter_ty_and_entrypoints
-                   ~stack_depth:(stack_depth + 1)
-                   ~legacy:true
-                   (root parameters_type)
-            in
-            let*? (Ex_parameter_ty_and_entrypoints
-                    {arg_type = full; entrypoints}) =
-              full
+            let*? ( Ex_parameter_ty_and_entrypoints
+                      {arg_type = full; entrypoints},
+                    ctxt ) =
+              parse_parameter_ty_and_entrypoints
+                ctxt
+                ~stack_depth:(stack_depth + 1)
+                ~legacy:true
+                (root parameters_type)
             in
             let*? entrypoint_arg, ctxt =
               Gas_monad.run ctxt
@@ -5039,21 +5013,20 @@ let parse_code :
       parse_toplevel ctxt code
     in
     let arg_type_loc = location arg_type in
-    let*? res, ctxt =
-      Gas_monad.run ctxt
-      @@ parse_parameter_ty_and_entrypoints ~stack_depth:0 ~legacy arg_type
-    in
-    let*? (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
-      record_trace (Ill_formed_type (Some "parameter", code, arg_type_loc)) res
+    let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt =
+      record_trace
+        (Ill_formed_type (Some "parameter", code, arg_type_loc))
+        (parse_parameter_ty_and_entrypoints
+           ctxt
+           ~stack_depth:0
+           ~legacy
+           arg_type)
     in
     let storage_type_loc = location storage_type in
-    let*? storage_type, ctxt =
-      Gas_monad.run ctxt @@ parse_storage_ty ~stack_depth:0 ~legacy storage_type
-    in
-    let*? (Ex_ty storage_type) =
+    let*? Ex_ty storage_type, ctxt =
       record_trace
         (Ill_formed_type (Some "storage", code, storage_type_loc))
-        storage_type
+        (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
     in
     let*? (Ty_ex_c arg_type_full) =
       pair_t storage_type_loc arg_type storage_type
@@ -5173,24 +5146,22 @@ let typecheck_code :
     let {arg_type; storage_type; code_field; views} = toplevel in
     let type_map = ref [] in
     let arg_type_loc = location arg_type in
-    let*? arg_type, ctxt =
-      Gas_monad.run ctxt
-      @@ parse_parameter_ty_and_entrypoints ~stack_depth:0 ~legacy arg_type
-    in
-    let*? (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
+    let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt =
       record_trace
         (Ill_formed_type (Some "parameter", code, arg_type_loc))
-        arg_type
+        (parse_parameter_ty_and_entrypoints
+           ctxt
+           ~stack_depth:0
+           ~legacy
+           arg_type)
     in
     let storage_type_loc = location storage_type in
     let*? ex_storage_type, ctxt =
-      Gas_monad.run ctxt @@ parse_storage_ty ~stack_depth:0 ~legacy storage_type
-    in
-    let*? (Ex_ty storage_type) =
       record_trace
         (Ill_formed_type (Some "storage", code, storage_type_loc))
-        ex_storage_type
+        (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
     in
+    let (Ex_ty storage_type) = ex_storage_type in
     let*? (Ty_ex_c arg_type_full) =
       pair_t storage_type_loc arg_type storage_type
     in

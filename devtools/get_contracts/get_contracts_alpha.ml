@@ -110,18 +110,14 @@ module Proto = struct
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ Script_typed_ir.Ex_ty ty, updated_ctxt =
         wrap_tzresult
-        @@ let* res, ctxt =
-             Gas_monad.run ctxt
-             @@ Script_ir_translator.parse_ty
-                  ~legacy:true
-                  ~allow_lazy_storage
-                  ~allow_operation
-                  ~allow_contract
-                  ~allow_ticket
-                  script
-           in
-           let+ res in
-           (res, ctxt)
+        @@ Script_ir_translator.parse_ty
+             ctxt
+             ~legacy:true
+             ~allow_lazy_storage
+             ~allow_operation
+             ~allow_contract
+             ~allow_ticket
+             script
       in
       let consumed =
         (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)

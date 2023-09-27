@@ -213,7 +213,7 @@ module Typechecking_data : Benchmark.S = struct
     let open Lwt_result_syntax in
     Lwt_main.run
       (let* ctxt, _ = Execution_context.make ~rng_state () in
-       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type in
+       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
        let workload =
          match
            Translator_workload.data_typechecker_workload
@@ -293,7 +293,7 @@ module Unparsing_data : Benchmark.S = struct
     let open Lwt_result_syntax in
     Lwt_main.run
       (let* ctxt, _ = Execution_context.make ~rng_state () in
-       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type in
+       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
        let workload =
          match
            Translator_workload.data_typechecker_workload
@@ -384,7 +384,7 @@ module Typechecking_code : Benchmark.S = struct
     Lwt_main.run
       (let* ctxt, _ = Execution_context.make ~rng_state () in
        let ex_stack_ty =
-         Type_helpers.michelson_type_list_to_ex_stack_ty stack
+         Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
        in
        let workload =
          match
@@ -468,7 +468,7 @@ module Unparsing_code : Benchmark.S = struct
     Lwt_main.run
       (let* ctxt, _ = Execution_context.make ~rng_state () in
        let ex_stack_ty =
-         Type_helpers.michelson_type_list_to_ex_stack_ty stack
+         Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
        in
        let workload =
          match
@@ -724,8 +724,9 @@ module Parse_type_shared = struct
   let tags = [Tags.translator]
 end
 
-let parse_ty node =
+let parse_ty ctxt node =
   Script_ir_translator.parse_ty
+    ctxt
     ~legacy:true
     ~allow_lazy_storage:true
     ~allow_operation:true
@@ -758,9 +759,7 @@ module Parse_type_benchmark : Benchmark.S = struct
      match ty with
      | Ex_ty ty ->
          let* unparsed, _ = Environment.wrap_tzresult @@ unparse_ty ctxt ty in
-         let* _, ctxt' =
-           Environment.wrap_tzresult @@ Gas_monad.run ctxt @@ parse_ty unparsed
-         in
+         let* _, ctxt' = Environment.wrap_tzresult @@ parse_ty ctxt unparsed in
          let consumed =
            Z.to_int
              (Gas_helpers.fp_to_z
@@ -771,7 +770,7 @@ module Parse_type_benchmark : Benchmark.S = struct
            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
          in
          let workload = Type_workload {nodes; consumed} in
-         let closure () = ignore (Gas_monad.run ctxt @@ parse_ty unparsed) in
+         let closure () = ignore (parse_ty ctxt unparsed) in
          return (Generator.Plain {workload; closure}))
     |> function
     | Ok closure -> closure

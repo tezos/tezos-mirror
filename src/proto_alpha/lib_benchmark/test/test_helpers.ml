@@ -78,7 +78,7 @@ let typecheck_by_tezos =
       (Lwt_main.run
          ( context_init_memory ~rng_state >>=? fun ctxt ->
            let (Protocol.Script_ir_translator.Ex_stack_ty bef) =
-             Type_helpers.michelson_type_list_to_ex_stack_ty bef
+             Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
            in
            Protocol.Script_ir_translator.parse_instr
              Protocol.Script_tc_context.data
