@@ -66,15 +66,6 @@ val run :
   ('a, 'trace) t ->
   (('a, 'trace) result * Alpha_context.context) tzresult
 
-type no_error
-
-(** [run_pure ctxt m] is a variant of [run ctxt m] expecting [m] to
-    always succeed. *)
-val run_pure :
-  Alpha_context.context ->
-  ('a, no_error) t ->
-  ('a * Alpha_context.context) tzresult
-
 (** [record_trace_level ~error_details f m] returns a new gas-monad value that
      when run, records trace levels using [f]. This function has no effect in
     the case of a gas-exhaustion error or if [error_details] is [Fast]. *)
