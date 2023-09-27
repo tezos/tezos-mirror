@@ -1910,34 +1910,16 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;
   let slot_content = generate_dummy_slot slot_size in
-  let* _commitment =
-    publish_and_store_slot
+  let* () =
+    publish_store_and_attest_slot
       client
       dal_node
       Constant.bootstrap1
       ~index:0
-      (Helpers.make_slot ~slot_size slot_content)
+      ~content:(Helpers.make_slot ~slot_size slot_content)
+      ~attestation_lag:parameters.attestation_lag
+      ~number_of_slots:parameters.number_of_slots
   in
-  Log.info "Bake attestation_lag blocks and attest slot 0." ;
-  let* () =
-    repeat parameters.attestation_lag (fun () ->
-        Client.bake_for_and_wait client)
-  in
-  let* _ =
-    dal_attestations
-      ~nb_slots:parameters.number_of_slots
-      ~signers:
-        [
-          Constant.bootstrap1;
-          Constant.bootstrap2;
-          Constant.bootstrap3;
-          Constant.bootstrap4;
-          Constant.bootstrap5;
-        ]
-      [0]
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   Log.info "Assert that the slot was attested." ;
   let* {dal_attestation; _} = RPC.(call node @@ get_chain_block_metadata ()) in
