@@ -28,7 +28,6 @@
 open Protocol
 open Environment
 open Alpha_context
-open Environment.Error_monad
 
 type version = Version_0 | Version_1
 
@@ -616,7 +615,7 @@ module Scripts = struct
       let rec unparse_stack :
           type a s.
           (a, s) Script_typed_ir.stack_ty * (a * s) ->
-          Script.expr list tzresult Lwt.t = function
+          Script.expr list Environment.Error_monad.tzresult Lwt.t = function
         | Bot_t, (EmptyCell, EmptyCell) -> return_nil
         | Item_t (ty, rest_ty), (v, rest) ->
             let* data, _ctxt =
@@ -653,7 +652,7 @@ module Scripts = struct
                 (fun (old_ctxt, l) (Log (ctxt, loc, stack, stack_ty)) ->
                   let consumed_gas = Gas.consumed ~since:old_ctxt ~until:ctxt in
                   let* stack =
-                    trace
+                    Environment.Error_monad.trace
                       Plugin_errors.Cannot_serialize_log
                       (unparse_stack ctxt (stack, stack_ty))
                   in
@@ -688,11 +687,11 @@ module Scripts = struct
       legacy:bool ->
       context ->
       Script.expr * Script.expr ->
-      context tzresult Lwt.t =
+      context Environment.Error_monad.tzresult Lwt.t =
     let open Lwt_result_syntax in
     fun ~legacy ctxt (data, exp_ty) ->
       let*? Ex_ty exp_ty, ctxt =
-        record_trace
+        Environment.Error_monad.record_trace
           (Script_tc_errors.Ill_formed_type (None, exp_ty, 0))
           (Script_ir_translator.parse_passable_ty
              ctxt
@@ -700,7 +699,7 @@ module Scripts = struct
              (Micheline.root exp_ty))
       in
       let+ _, ctxt =
-        trace_eval
+        Environment.Error_monad.trace_eval
           (fun () ->
             let exp_ty = Script_ir_unparser.serialize_ty_for_error exp_ty in
             Script_tc_errors.Ill_typed_data (None, data, exp_ty))
@@ -812,7 +811,7 @@ module Scripts = struct
         context ->
         legacy:bool ->
         (Script.node * Script.node) list ->
-        (ex_stack * context) tzresult Lwt.t =
+        (ex_stack * context) Environment.Error_monad.tzresult Lwt.t =
       let open Lwt_result_syntax in
       fun ctxt ~legacy l ->
         match l with
@@ -847,7 +846,9 @@ module Scripts = struct
         (a, s) Script_typed_ir.stack_ty ->
         a ->
         s ->
-        ((Script.expr * Script.expr) list * context) tzresult Lwt.t =
+        ((Script.expr * Script.expr) list * context)
+        Environment.Error_monad.tzresult
+        Lwt.t =
       let open Lwt_result_syntax in
       let loc = Micheline.dummy_location in
       fun ctxt unparsing_mode sty x st ->
@@ -1032,13 +1033,14 @@ module Scripts = struct
       | ILog (_, _, _, _, instr) ->
           Format.fprintf fmt "log/%a" pp_instr_name instr
 
-  type error += Run_operation_does_not_support_consensus_operations
+  type Environment.Error_monad.error +=
+    | Run_operation_does_not_support_consensus_operations
 
   let () =
     let description =
       "The run_operation RPC does not support consensus operations."
     in
-    register_error_kind
+    Environment.Error_monad.register_error_kind
       `Permanent
       ~id:"run_operation_does_not_support_consensus_operations"
       ~title:"Run operation does not support consensus operations"
@@ -1064,7 +1066,7 @@ module Scripts = struct
       | Operation_data {contents = Single (Preattestation _); _}
       | Operation_data {contents = Single (Attestation _); _}
       | Operation_data {contents = Single (Dal_attestation _); _} ->
-          Result_syntax.tzfail
+          Environment.Error_monad.Result_syntax.tzfail
             Run_operation_does_not_support_consensus_operations
       | _ -> Result_syntax.return_unit
     in
@@ -1228,7 +1230,9 @@ module Scripts = struct
       let* {views; _}, _ = parse_toplevel ctxt expr in
       let*? view_name = Script_string.of_string view in
       match Script_map.get view_name views with
-      | None -> tzfail (View_helpers.View_not_found (contract, view))
+      | None ->
+          Environment.Error_monad.tzfail
+            (View_helpers.View_not_found (contract, view))
       | Some Script_typed_ir.{input_ty; output_ty; _} ->
           return (input_ty, output_ty)
     in
@@ -1405,7 +1409,8 @@ module Scripts = struct
           Option.fold
             ~some:Result_syntax.return
             ~none:
-              (Result_syntax.tzfail View_helpers.Viewed_contract_has_no_script)
+              (Environment.Error_monad.Result_syntax.tzfail
+                 View_helpers.Viewed_contract_has_no_script)
             script_opt
         in
         let*? decoded_script = Script_repr.(force_decode script.code) in
@@ -3205,7 +3210,7 @@ module Parse = struct
         op.proto
     with
     | Some protocol_data -> return {shell = op.shell; protocol_data}
-    | None -> tzfail Plugin_errors.Cannot_parse_operation
+    | None -> Environment.Error_monad.error Plugin_errors.Cannot_parse_operation
 
   let register () =
     let open Lwt_result_syntax in
@@ -3829,7 +3834,8 @@ module Staking = struct
   let check_delegate_registered ctxt pkh =
     Delegate.registered ctxt pkh >>= function
     | true -> return_unit
-    | false -> tzfail (Delegate_services.Not_registered pkh)
+    | false ->
+        Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
 
   let register () =
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
@@ -3912,7 +3918,7 @@ let register () =
   Dal.register () ;
   Staking.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
-      if q.offset < 0l then tzfail Negative_level_offset
+      if q.offset < 0l then Environment.Error_monad.tzfail Negative_level_offset
       else
         Lwt.return
           (Level.from_raw_with_offset
