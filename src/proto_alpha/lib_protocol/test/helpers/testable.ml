@@ -34,5 +34,4 @@ let script_expr : Protocol.Alpha_context.Script.expr Alcotest.testable =
 let trace : tztrace Alcotest.testable = Alcotest.testable pp_print_trace ( = )
 
 let protocol_error : Environment.Error_monad.error Alcotest.testable =
-  let open Environment.Error_monad in
-  Alcotest.testable pp ( = )
+  Alcotest.testable Environment.Error_monad.pp ( = )
