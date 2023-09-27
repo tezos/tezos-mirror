@@ -1,7 +1,7 @@
 .. _octez:
 
-Octez & Tezos Protocol
-----------------------
+Octez & Protocol overview
+-------------------------
 
 Octez, bundled with the Tezos protocol, are a complete implementation of the `Tezos blockchain <https://tezos.com>`__.
 

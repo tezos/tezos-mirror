@@ -1,7 +1,7 @@
-Versions
-========
+Octez & Protocol versioning
+===========================
 
-Versioning concerns several components of Octez. This page explains the various corresponding versioning schemes, which are mostly independent of each other. Though, some relations do exist (e.g. when a new protocol is proposed, a new Octez release is usually delivered embedding the new proposal, for convenience); this is explained in some versioning schemes.
+Due to the fact that the Tezos blockchain is self-amending, versioning concerns both the Tezos protocol and several components of Octez. This page explains the various corresponding versioning schemes, which are mostly independent of each other. Though, some relations do exist (e.g. when a new protocol is proposed, a new Octez release is usually delivered embedding the new proposal, for convenience); this is explained in some versioning schemes below.
 
 Octez versions
 --------------

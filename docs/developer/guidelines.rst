@@ -596,7 +596,7 @@ RPC Versioning
 --------------
 
 General information about RPC versioning can be found in
-:doc:`../user/versioning`.
+:doc:`../introduction/versioning`.
 
 How to Version an RPC
 ~~~~~~~~~~~~~~~~~~~~~

@@ -139,13 +139,14 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Introduction
+   :caption: Octez & the Tezos protocol
    :hidden:
 
    introduction/tezos
    introduction/howtoget
    introduction/howtouse
    introduction/howtorun
+   introduction/versioning
    BREAKING CHANGES <introduction/breaking_changes>
 
 .. toctree::
@@ -153,7 +154,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :caption: User doc
    :hidden:
 
-   user/versioning
    user/setup-client
    user/setup-node
    user/multisig
