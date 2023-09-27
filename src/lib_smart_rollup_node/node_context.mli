@@ -146,10 +146,10 @@ val is_loser : _ t -> bool
 val can_inject : _ t -> Configuration.operation_kind -> bool
 
 (** [check_op_in_whitelist_or_bailout_mode node_ctxt whitelist] Checks
-    when the rollup node is operating if the operator is in the
-    whitelist or if the rollup node is in bailout mode.  Bailout mode
-    does not publish any commitment but still defends previously
-    commited one. *)
+    when the rollup node is operating to determine if the operator is in the
+    whitelist or if the rollup node is in bailout mode. Bailout mode
+    does not publish any commitments but still defends previously
+    committed one. *)
 val check_op_in_whitelist_or_bailout_mode :
   _ t -> Signature.Public_key_hash.t list -> unit tzresult
 
