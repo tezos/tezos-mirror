@@ -48,6 +48,9 @@ val current_yearly_rate :
 val current_yearly_rate_exact :
   'a #RPC_context.simple -> 'a -> Q.t shell_tzresult Lwt.t
 
+val current_yearly_rate_details :
+  'a #RPC_context.simple -> 'a -> (Q.t * Q.t) shell_tzresult Lwt.t
+
 val current_issuance_per_minute :
   'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 

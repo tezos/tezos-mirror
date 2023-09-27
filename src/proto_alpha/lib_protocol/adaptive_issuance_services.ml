@@ -123,6 +123,15 @@ module S = struct
       ~output:q_encoding
       RPC_path.(path / "current_yearly_rate_exact")
 
+  let current_yearly_rate_details =
+    RPC_service.get_service
+      ~description:
+        "Returns the static and dynamic parts of the current expected maximum \
+         yearly issuance rate."
+      ~query:RPC_query.empty
+      ~output:(obj2 (req "static" q_encoding) (req "dynamic" q_encoding))
+      RPC_path.(path / "current_yearly_rate_details")
+
   let current_issuance_per_minute =
     RPC_service.get_service
       ~description:
@@ -258,6 +267,13 @@ let register () =
       current_yearly_rate_value ~formatter:q_to_float_string ctxt) ;
   register0 ~chunked:false S.current_yearly_rate_exact (fun ctxt () () ->
       current_yearly_rate_value ~formatter:(fun x -> x) ctxt) ;
+  register0 ~chunked:false S.current_yearly_rate_details (fun ctxt () () ->
+      let* total = current_yearly_rate_value ~formatter:(fun x -> x) ctxt in
+      let cycle = Some (Level.current ctxt).cycle in
+      let* bonus = Delegate.Rewards.For_RPC.get_reward_bonus ctxt ~cycle in
+      let dynamic = (bonus :> Q.t) in
+      let static = Q.(total - dynamic) in
+      return (static, dynamic)) ;
   register0 ~chunked:false S.current_issuance_per_minute (fun ctxt () () ->
       let* f = current_rewards_per_minute ctxt in
       return (Tez.of_mutez_exn (Q.to_int64 f))) ;
@@ -277,6 +293,9 @@ let current_yearly_rate ctxt block =
 
 let current_yearly_rate_exact ctxt block =
   RPC_context.make_call0 S.current_yearly_rate_exact ctxt block () ()
+
+let current_yearly_rate_details ctxt block =
+  RPC_context.make_call0 S.current_yearly_rate_details ctxt block () ()
 
 let current_issuance_per_minute ctxt block =
   RPC_context.make_call0 S.current_issuance_per_minute ctxt block () ()
