@@ -135,6 +135,7 @@ $(ALL_EXECUTABLES):
 kaitai-struct-files:
 	@dune build contrib/bin_codec_kaitai/codec.exe
 	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
+	@$(MAKE) -C contrib/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
 check-kaitai-struct-files:
