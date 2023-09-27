@@ -78,6 +78,7 @@ pub enum Instruction<T: Stage> {
     Failwith,
     Unit,
     Car,
+    Cdr,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

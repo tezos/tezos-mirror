@@ -102,6 +102,7 @@ instruction: ParsedInstruction = {
   "FAILWITH" => Failwith,
   "UNIT" => Unit,
   "CAR" => Car,
+  "CDR" => Cdr,
 }
 
 instructionSeq: Vec<ParsedInstruction> = {
