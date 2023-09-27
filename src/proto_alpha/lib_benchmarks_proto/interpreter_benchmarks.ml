@@ -2521,11 +2521,19 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_time_alloc_benchmark
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IEdiv_int
         ~intercept_stack:(zero, (zero, eos))
         ~stack_type:(int @$ int @$ bot)
         ~kinstr:(IEdiv_int (dummy_loc, halt))
+        ~stack_sampler:(fun cfg rng_state ->
+          let _, (module Samplers) = make_default_samplers cfg.sampler in
+          fun () ->
+            (* When x > 0 and size(x) < size(y), EDIV x y evaluates to (0,x) and nothing is allocated.
+               The following sampler avoids such cases that lead to underestimation. *)
+            let x = Script_int.neg @@ Samplers.Michelson_base.nat rng_state in
+            let y = Samplers.Michelson_base.int rng_state in
+            (x, (y, eos)))
         ()
 
     let () =
@@ -2587,11 +2595,18 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_time_alloc_benchmark
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IAnd_int_nat
         ~intercept_stack:(zero, (zero_n, eos))
         ~stack_type:(int @$ nat @$ bot)
         ~kinstr:(IAnd_int_nat (dummy_loc, halt))
+        ~stack_sampler:(fun cfg rng_state ->
+          let _, (module Samplers) = make_default_samplers cfg.sampler in
+          fun () ->
+            (* The worst case is size(and(x,y)) = size(y) when x < 0. *)
+            let x = Script_int.neg @@ Samplers.Michelson_base.nat rng_state in
+            let y = Samplers.Michelson_base.nat rng_state in
+            (x, (y, eos)))
         ()
 
     let () =
