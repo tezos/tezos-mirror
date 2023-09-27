@@ -444,4 +444,33 @@ mod interpreter_tests {
             Gas::default().milligas() - interpret_cost::UNIT - interpret_cost::INTERPRET_RET
         );
     }
+
+    #[test]
+    fn push_pair() {
+        let mut stack = stk![];
+        let mut gas = Gas::default();
+        assert!(interpret(
+            &vec![Push(
+                Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
+                Value::new_pair(
+                    Value::NumberValue(-5),
+                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                )
+            )],
+            &mut gas,
+            &mut stack
+        )
+        .is_ok());
+        assert_eq!(
+            stack,
+            stk![Value::new_pair(
+                Value::NumberValue(-5),
+                Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+            )]
+        );
+        assert_eq!(
+            gas.milligas(),
+            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+        );
+    }
 }
