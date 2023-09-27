@@ -157,6 +157,13 @@ fn interpret_one(
             gas.consume(interpret_cost::UNIT)?;
             stack.push(Value::UnitValue);
         }
+        Car => {
+            gas.consume(interpret_cost::CAR)?;
+            match stack.pop() {
+                Some(Value::PairValue(l, _)) => stack.push(*l),
+                _ => unreachable_state(),
+            }
+        }
     }
     Ok(())
 }
@@ -471,6 +478,35 @@ mod interpreter_tests {
         assert_eq!(
             gas.milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn car() {
+        let mut stack = stk![];
+        let mut gas = Gas::default();
+        assert!(interpret(
+            &vec![
+                Push(
+                    Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
+                    Value::new_pair(
+                        Value::NumberValue(-5),
+                        Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                    )
+                ),
+                Car
+            ],
+            &mut gas,
+            &mut stack
+        )
+        .is_ok());
+        assert_eq!(stack, stk![Value::NumberValue(-5)]);
+        assert_eq!(
+            gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::PUSH
+                - interpret_cost::CAR
+                - interpret_cost::INTERPRET_RET
         );
     }
 }
