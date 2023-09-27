@@ -4547,9 +4547,7 @@ and parse_instr :
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
       let*? () = check_packable ~allow_contract:false loc data in
       let*? tag = parse_entrypoint_annot_strict loc annot in
-      let*? unparsed_ty, ctxt =
-        Gas_monad.run_pure ctxt @@ unparse_ty ~loc:() data
-      in
+      let*? unparsed_ty, ctxt = unparse_ty ~loc:() ctxt data in
       let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost unparsed_ty) in
       let unparsed_ty = Micheline.strip_locations unparsed_ty in
       let instr =
@@ -5309,26 +5307,17 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
   let* arg_type, storage_type, views, ctxt =
     if normalize_types then
       let*? arg_type, ctxt =
-        Gas_monad.run_pure ctxt
-        @@ unparse_parameter_ty ~loc arg_type ~entrypoints
+        unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
       in
-      let*? storage_type, ctxt =
-        Gas_monad.run_pure ctxt @@ unparse_ty ~loc storage_type
-      in
+      let*? storage_type, ctxt = unparse_ty ~loc ctxt storage_type in
       let+ views, ctxt =
         Script_map.map_es_in_context
           (fun ctxt
                _name
                (Typed_view
                  {input_ty; output_ty; kinstr = _; original_code_expr}) ->
-            let*? (input_ty, output_ty), ctxt =
-              Gas_monad.run_pure
-                ctxt
-                (let open Gas_monad.Syntax in
-                let* input_ty = unparse_ty ~loc input_ty in
-                let+ output_ty = unparse_ty ~loc output_ty in
-                (input_ty, output_ty))
-            in
+            let*? input_ty, ctxt = unparse_ty ~loc ctxt input_ty in
+            let*? output_ty, ctxt = unparse_ty ~loc ctxt output_ty in
             return ({input_ty; output_ty; view_code = original_code_expr}, ctxt))
           ctxt
           typed_views
@@ -5418,9 +5407,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
         let* ctxt, id = Big_map.fresh ~temporary ctxt in
         let kt = unparse_comparable_ty_uncarbonated ~loc:() key_type in
         let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost kt) in
-        let*? kv, ctxt =
-          Gas_monad.run_pure ctxt @@ unparse_ty ~loc:() value_type
-        in
+        let*? kv, ctxt = unparse_ty ~loc:() ctxt value_type in
         let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost kv) in
         let key_type = Micheline.strip_locations kt in
         let value_type = Micheline.strip_locations kv in

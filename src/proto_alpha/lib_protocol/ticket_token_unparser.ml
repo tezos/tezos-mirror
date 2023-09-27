@@ -41,8 +41,7 @@ let unparse ctxt (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
     unparse_comparable_data ctxt Optimized_legacy contents_type contents
   in
   let*? ty_unstripped, ctxt =
-    Gas_monad.run_pure ctxt
-    @@ unparse_ty ~loc:Micheline.dummy_location contents_type
+    unparse_ty ~loc:Micheline.dummy_location ctxt contents_type
   in
   let*? ctxt = Gas.consume ctxt (Script.strip_annotations_cost ty_unstripped) in
   let ty = Script.strip_annotations ty_unstripped in
