@@ -36,7 +36,7 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 
 ./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for smart rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 12 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
-Estimated gas: 6368.924 units (will add 100 for safety)
+Estimated gas: 6588.924 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -47,13 +47,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000967
+    Fee to the baker: ꜩ0.000989
     Expected counter: 2
-    Gas limit: 6469
+    Gas limit: 6689
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000967
-      payload fees(the block proposer) ....... +ꜩ0.000967
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000989
+      payload fees(the block proposer) ....... +ꜩ0.000989
     Smart rollup commitment publishing:
       Address: [SMART_ROLLUP_HASH]
       Commitment:
@@ -62,7 +62,7 @@ This sequence of operations was run:
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1
       This smart rollup commitment publishing was successfully applied
-      Consumed gas: 6368.858
+      Consumed gas: 6588.858
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 14
       Balance updates:
@@ -72,7 +72,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for smart rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 12 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
-Estimated gas: 6590.852 units (will add 100 for safety)
+Estimated gas: 6810.852 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -83,13 +83,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.00099
+    Fee to the baker: ꜩ0.001012
     Expected counter: 1
-    Gas limit: 6691
+    Gas limit: 6911
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.00099
-      payload fees(the block proposer) ....... +ꜩ0.00099
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001012
+      payload fees(the block proposer) ....... +ꜩ0.001012
     Smart rollup commitment publishing:
       Address: [SMART_ROLLUP_HASH]
       Commitment:
@@ -98,7 +98,7 @@ This sequence of operations was run:
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1
       This smart rollup commitment publishing was successfully applied
-      Consumed gas: 6590.786
+      Consumed gas: 6810.786
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 14
       Balance updates:
