@@ -142,7 +142,7 @@ end
 let bench_opts =
   let open Measure in
   {
-    seed = Some 1337;
+    seed = 1337;
     nsamples = 30;
     bench_number = 10;
     minor_heap_size = `words (256 * 1024);
