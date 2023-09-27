@@ -327,6 +327,12 @@ module Models = struct
       ~coeff1:(fv (sf "%s_coeff1" name))
       ~coeff2:(fv (sf "%s_coeff2" name))
 
+  let affine_skip1_model name =
+    Model.affine_skip1
+      ~name:(ns name)
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff:(fv (sf "%s_coeff" name))
+
   let linear_sum_model name =
     Model.linear_sum
       ~name:(ns name)

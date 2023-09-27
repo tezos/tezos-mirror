@@ -675,6 +675,29 @@ let bilinear_affine ~name ~intercept ~coeff1 ~coeff2 =
   end in
   (module M : Model_impl with type arg_type = int * (int * unit))
 
+let affine_skip1 ~name ~intercept ~coeff =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun (_size1 : size repr) ->
+        lam ~name:"size2" @@ fun size2 ->
+        free ~name:intercept + (free ~name:coeff * size2)
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
 let nlogm ~name ~intercept ~coeff =
   let module M = struct
     type arg_type = int * (int * unit)
