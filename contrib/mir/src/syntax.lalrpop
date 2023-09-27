@@ -35,13 +35,18 @@ u10: u16 = <s:r"([+-]?)[0-9]+"> =>? {
 
 pub string: String = <r#""(?:\\.|[^\\"])*""#> =>? validate_unescape_string(<>);
 
-type_: Type = {
+atomic_type: Type = {
   "int"  => Type::Int,
   "nat"  => Type::Nat,
   "bool" => Type::Bool,
   "mutez" => Type::Mutez,
   "string" => Type::String,
   "unit" => Type::Unit,
+}
+
+type_expr: Type = {
+    atomic_type => <>,
+    "(" <type_expr> ")" => <>,
 }
 
 boolean: bool = {
@@ -59,7 +64,7 @@ value: Value = {
 
 use Instruction::*;
 instruction: ParsedInstruction = {
-  "PUSH" <t:type_> <v:value> => Push(t, v),
+  "PUSH" <type_expr> <value> => Push(<>),
   "INT" => Int,
   "GT" => Gt,
   "LOOP" <ib: instructionBlock> => Loop(ib),
