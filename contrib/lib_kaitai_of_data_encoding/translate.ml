@@ -77,6 +77,8 @@ let rec from_data_encoding :
   | Float -> Ground.Class.float ~encoding_name
   | Bytes (_kind_length, _) -> Ground.Class.bytes ~encoding_name
   | String (_kind_length, _) -> Ground.Class.string ~encoding_name
+  | N -> Ground.Class.n ~encoding_name
+  | Z -> Ground.Class.z ~encoding_name
   | Tup e ->
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e

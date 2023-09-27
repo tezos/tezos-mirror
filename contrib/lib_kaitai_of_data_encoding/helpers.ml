@@ -77,6 +77,21 @@ let types_field_from_attr_seq attributes =
   in
   List.fold_left add_uniq_assoc [] types
 
-let class_spec_of_attr ~encoding_name ?(enums = []) attr =
+let class_spec_of_attr ~encoding_name ?(enums = []) ?(instances = []) attr =
   let types = types_field_from_attr_seq [attr] in
-  {(default_class_spec ~encoding_name) with seq = [attr]; enums; types}
+  {
+    (default_class_spec ~encoding_name) with
+    seq = [attr];
+    enums;
+    types;
+    instances;
+  }
+
+let default_instance_spec ~id value =
+  InstanceSpec.
+    {
+      doc = default_doc_spec;
+      descr =
+        InstanceSpec.ValueInstanceSpec
+          {id; path = []; value; ifExpr = None; dataTypeOpt = None};
+    }

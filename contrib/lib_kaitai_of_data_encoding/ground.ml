@@ -187,4 +187,85 @@ module Class = struct
   let bytes ~encoding_name = class_spec_of_attr ~encoding_name Attr.bytes
 
   let string ~encoding_name = class_spec_of_attr ~encoding_name Attr.string
+
+  let byte_group =
+    {
+      (default_class_spec ~encoding_name:"group") with
+      seq = [{Attr.u1 with id = "b"}];
+      instances =
+        [
+          ( "has_next",
+            default_instance_spec
+              ~id:"has_next"
+              Ast.(
+                Compare
+                  {
+                    left =
+                      BinOp {left = Name "b"; op = BitAnd; right = IntNum 128};
+                    ops = NotEq;
+                    right = IntNum 0;
+                  }) );
+          ( "value",
+            default_instance_spec
+              ~id:"value"
+              (BinOp {left = Name "b"; op = BitAnd; right = IntNum 127}) );
+        ];
+      isTopLevel = false;
+    }
+
+  let repeat_until_end_bytes_group_attr =
+    {
+      default_attr_spec with
+      id = "groups";
+      dataType = DataType.(ComplexDataType (UserType byte_group));
+      cond =
+        AttrSpec.ConditionalSpec.
+          {
+            ifExpr = None;
+            repeat =
+              RepeatSpec.RepeatUntil
+                Ast.(
+                  UnaryOp
+                    {
+                      op = Not;
+                      operand = Attribute {value = Name "_"; attr = "has_next"};
+                    });
+          };
+    }
+
+  let n ~encoding_name =
+    class_spec_of_attr ~encoding_name repeat_until_end_bytes_group_attr
+
+  let z ~encoding_name =
+    let instances =
+      [
+        ( "is_negative",
+          default_instance_spec
+            ~id:"is_negative"
+            Ast.(
+              Compare
+                {
+                  left =
+                    BinOp
+                      {
+                        left =
+                          Attribute
+                            {
+                              value =
+                                Subscript
+                                  {value = Name "groups"; idx = IntNum 0};
+                              attr = "value";
+                            };
+                        op = RShift;
+                        right = IntNum 6;
+                      };
+                  ops = Eq;
+                  right = IntNum 1;
+                }) );
+      ]
+    in
+    class_spec_of_attr
+      ~encoding_name
+      repeat_until_end_bytes_group_attr
+      ~instances
 end

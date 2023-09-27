@@ -105,3 +105,46 @@ ground.string test
   seq:
   - id: fixed size (uint30) bytes
     type: fixed_bytes
+ground.N test
+  $ ./codec.exe dump kaitai for ground.N
+  meta:
+    id: ground__N
+    endian: be
+  types:
+    group:
+      instances:
+        has_next:
+          value: ((b & 128) != 0)
+        value:
+          value: (b & 127)
+      seq:
+      - id: b
+        type: u1
+  seq:
+  - id: groups
+    type: group
+    repeat: until
+    repeat-until: not (_.has_next)
+ground.Z test
+  $ ./codec.exe dump kaitai for ground.Z
+  meta:
+    id: ground__Z
+    endian: be
+  types:
+    group:
+      instances:
+        has_next:
+          value: ((b & 128) != 0)
+        value:
+          value: (b & 127)
+      seq:
+      - id: b
+        type: u1
+  instances:
+    is_negative:
+      value: (((groups[0].value) >> 6) == 1)
+  seq:
+  - id: groups
+    type: group
+    repeat: until
+    repeat-until: not (_.has_next)
