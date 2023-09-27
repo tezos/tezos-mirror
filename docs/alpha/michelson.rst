@@ -911,34 +911,34 @@ removed. The Michelson type-checker will reject any contract using them.
 -  ``CREATE_CONTRACT { parameter 'p ; storage 'g ; code ... }``:
    Forge a new contract from a literal.
 
-::
+   ::
 
-    Γ ⊢ CREATE_CONTRACT { parameter 'p ; storage 'g ; code ... }
-    :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
-    ⇒ operation : address : 'S
+      Γ ⊢ CREATE_CONTRACT { parameter 'p ; storage 'g ; code ... }
+      :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
+      ⇒ operation : address : 'S
 
-There is a new version of this instruction, see its `documentation <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__.
+   There is a new version of this instruction, see its `documentation <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__.
 
 -  ``CREATE_ACCOUNT``: Forge an account creation operation.
 
-::
+   ::
 
-    Γ ⊢ CREATE_ACCOUNT :: key_hash : option key_hash : bool : mutez : 'S
-    ⇒ operation : address : 'S
+      Γ ⊢ CREATE_ACCOUNT :: key_hash : option key_hash : bool : mutez : 'S
+      ⇒ operation : address : 'S
 
-Takes as argument the manager, optional delegate, the delegatable flag
-and finally the initial amount taken from the currently executed
-contract. This instruction originates a contract with two entrypoints;
-``%default`` of type ``unit`` that does nothing and ``%do`` of type
-``lambda unit (list operation)`` that executes and returns the
-parameter if the sender is the contract's manager.
+   Takes as argument the manager, optional delegate, the delegatable flag
+   and finally the initial amount taken from the currently executed
+   contract. This instruction originates a contract with two entrypoints;
+   ``%default`` of type ``unit`` that does nothing and ``%do`` of type
+   ``lambda unit (list operation)`` that executes and returns the
+   parameter if the sender is the contract's manager.
 
 -  ``STEPS_TO_QUOTA``: Push the remaining steps before the contract
    execution must terminate.
 
-::
+   ::
 
-    Γ ⊢ STEPS_TO_QUOTA :: 'S ⇒ nat : 'S
+      Γ ⊢ STEPS_TO_QUOTA :: 'S ⇒ nat : 'S
 
 :doc:`../protocols/016_mumbai` deprecated the following
 type. Because no smart contract used it on Mainnet before it got
