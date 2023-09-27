@@ -178,6 +178,7 @@ fn typecheck_value(gas: &mut Gas, t: &Type, v: &Value) -> Result<(), TcError> {
         (Int, NumberValue(_)) => Ok(()),
         (Bool, BooleanValue(_)) => Ok(()),
         (Mutez, NumberValue(n)) if *n >= 0 && *n <= MAX_TEZ => Ok(()),
+        (String, StringValue(_)) => Ok(()),
         _ => Err(TcError::GenericTcError),
     }
 }
@@ -452,5 +453,34 @@ mod typecheck_tests {
         test_ok!("{ PUSH bool True; IF { PUSH int 1 } { PUSH int 1; FAILWITH }; GT }");
         test_ok!("{ PUSH bool True; IF { PUSH int 1; FAILWITH } { PUSH int 1; FAILWITH } }");
         test_ok!("{ PUSH bool True; LOOP { PUSH int 1; FAILWITH }; PUSH int 1 }");
+    }
+
+    #[test]
+    fn string_values() {
+        assert_eq!(
+            typecheck_value(
+                &mut Gas::default(),
+                &Type::String,
+                &Value::StringValue("foo".to_owned())
+            ),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn push_string_value() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH string "foo"; }"#).unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(
+                Type::String,
+                Value::StringValue("foo".to_owned())
+            )])
+        );
+        assert_eq!(stack, stk![Type::String]);
     }
 }
