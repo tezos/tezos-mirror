@@ -155,9 +155,10 @@ let finalize_application application_state _shell_header =
       () )
 
 let init _chain_id context block_header =
+  let open Lwt_result_syntax in
   let open Block_header in
   let fitness = block_header.fitness in
-  Context.Cache.set_cache_layout context [] >>= fun context ->
+  let*! context = Context.Cache.set_cache_layout context [] in
   return
     {
       Updater.message = None;
