@@ -36,6 +36,11 @@ type t =
   | Timeout of {rollup : Address.t; stakers : Game.index}
   | Recover_bond of {rollup : Address.t; staker : Signature.Public_key_hash.t}
       (** Encoding for L1 operations (used by injector for on-disk persistence). *)
+  | Execute_outbox_message of {
+      rollup : Address.t;
+      cemented_commitment : Commitment.Hash.t;
+      output_proof : string;
+    }
 
 val encoding : t Data_encoding.t
 

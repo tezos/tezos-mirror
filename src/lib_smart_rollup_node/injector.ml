@@ -72,6 +72,7 @@ module Parameters :
     | Timeout -> 1
     | Refute -> 1
     | Recover -> 1
+    | Execute_outbox_message -> 1
 
   let operation_tag : Operation.t -> Tag.t = function
     | Add_messages _ -> Add_messages
@@ -80,6 +81,7 @@ module Parameters :
     | Timeout _ -> Timeout
     | Refute _ -> Refute
     | Recover_bond _ -> Recover
+    | Execute_outbox_message _ -> Execute_outbox_message
 
   let fee_parameter {fee_parameters; _} operation =
     let operation_kind = operation_tag operation in

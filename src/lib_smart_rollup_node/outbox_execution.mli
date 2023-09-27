@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +25,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Protocol agnostic representation for protocol constants. *)
-
-type dal_constants = {
-  feature_enable : bool;
-  attestation_lag : int;
-  number_of_slots : int;
-  cryptobox_parameters : Tezos_crypto_dal.Cryptobox.parameters;
-}
-
-type reveal_activation_level = {
-  blake2B : int32;
-  metadata : int32;
-  dal_page : int32;
-}
-
-type sc_rollup_constants = {
-  challenge_window_in_blocks : int;
-  commitment_period_in_blocks : int;
-  reveal_activation_level : reveal_activation_level option;
-  max_number_of_stored_cemented_commitments : int;
-}
-
-type protocol_constants = {
-  minimal_block_delay : int64;
-  delay_increment_per_round : int64;
-  sc_rollup : sc_rollup_constants;
-  dal : dal_constants;
-}
+(** [publish_execute_whitelist_update_message node_ctxt] checks,
+    starting from the lcc, for the presence of the whitelist update
+    message to execute. It publishes and executes the most
+    recent/closest one. *)
+val publish_execute_whitelist_update_message :
+  Node_context.rw -> unit tzresult Lwt.t

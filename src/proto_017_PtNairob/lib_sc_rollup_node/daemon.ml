@@ -571,7 +571,12 @@ let run
          cctxt
          configuration.sc_rollup_address)
       publisher
-  and* kind = Layer1_helpers.get_kind cctxt configuration.sc_rollup_address in
+  and* kind = Layer1_helpers.get_kind cctxt configuration.sc_rollup_address
+  and* last_whitelist_update =
+    Layer1_helpers.find_last_whitelist_update
+      cctxt
+      configuration.sc_rollup_address
+  in
   let current_protocol =
     {
       Node_context.hash = Protocol.hash;
@@ -586,6 +591,7 @@ let run
       ~irmin_cache_size
       ~index_buffer_size
       ?log_kernel_debug_file
+      ?last_whitelist_update
       Read_write
       l1_ctxt
       genesis_info

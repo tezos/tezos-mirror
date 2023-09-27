@@ -766,7 +766,7 @@ let test_rollup_get_genesis_info ~kind =
       ~error_msg:"expected value %L, got %R") ;
   unit
 
-(* Wait for the [injecting_pending] event from the injector. *)
+(** Wait for the [injecting_pending] event from the injector. *)
 let wait_for_injecting_event ?(tags = []) ?count node =
   Sc_rollup_node.wait_for node "injecting_pending.v0" @@ fun json ->
   let event_tags = JSON.(json |-> "tags" |> as_list |> List.map as_string) in
@@ -778,13 +778,35 @@ let wait_for_injecting_event ?(tags = []) ?count node =
         Some event_count
       else None
 
-(* Wait for the [sc_rollup_node_publish_commitment] event from the rollup node. *)
+(** Wait for the [sc_rollup_node_publish_commitment] event from the
+    rollup node. *)
 let wait_for_publish_commitment node =
   Sc_rollup_node.wait_for node "sc_rollup_node_publish_commitment.v0"
   @@ fun json ->
   let hash = JSON.(json |-> "hash" |> as_string) in
   let level = JSON.(json |-> "level" |> as_int) in
   Some (hash, level)
+
+(** Wait for the [sc_rollup_node_publish_execute_whitelist_update]
+    event from the rollup node. *)
+let wait_for_publish_execute_whitelist_update node =
+  Sc_rollup_node.wait_for
+    node
+    "sc_rollup_node_publish_execute_whitelist_update.v0"
+  @@ fun json ->
+  let hash = JSON.(json |-> "hash" |> as_string) in
+  let outbox_level = JSON.(json |-> "outbox_level" |> as_int) in
+  let index = JSON.(json |-> "message_index" |> as_int) in
+  Some (hash, outbox_level, index)
+
+(** Wait for the [sc_rollup_node_publish_execute_whitelist_update]
+    event from the rollup node. *)
+let wait_for_included_successful_operation node ~operation_kind =
+  Sc_rollup_node.wait_for
+    node
+    "sc_rollup_daemon_included_successful_operation.v0"
+  @@ fun json ->
+  if JSON.(json |-> "kind" |> as_string) = operation_kind then Some () else None
 
 let forged_commitment ?(compressed_state = Constant.sc_rollup_compressed_state)
     ?(number_of_ticks = 1) ~inbox_level ~predecessor () :
@@ -1136,25 +1158,22 @@ let bake_levels ?hook n client =
   Client.bake_for_and_wait client
 
 (** Bake [at_least] levels.
-    Then continues baking until the rollup node updates the lpc,
+    Then continues baking until an event happens.
     waiting for the rollup node to catch up to the client's level.
-    Returns the level at which the lpc was updated. *)
-let bake_until_lpc_updated ?hook ?(at_least = 0) ?(timeout = 15.) client
-    sc_rollup_node =
-  let event_level = ref None in
+    Returns the event value. *)
+let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client
+    sc_rollup_node event =
+  let event_value = ref None in
   let _ =
-    let* lvl =
-      Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_node_lpc_updated.v0"
-      @@ fun json -> JSON.(json |-> "level" |> as_int_opt)
-    in
-    event_level := Some lvl ;
+    let* return_value = event in
+    event_value := Some return_value ;
     unit
   in
   let rec bake_loop i =
     let* () = match hook with None -> unit | Some hook -> hook i in
     let* () = Client.bake_for_and_wait client in
-    match !event_level with
-    | Some level -> return level
+    match !event_value with
+    | Some value -> return value
     | None -> bake_loop (i + 1)
   in
   let* () = bake_levels ?hook at_least client in
@@ -1164,13 +1183,42 @@ let bake_until_lpc_updated ?hook ?(at_least = 0) ?(timeout = 15.) client
       (function
         | Lwt_unix.Timeout ->
             Test.fail
-              "Timeout of %f seconds reached when waiting for LPC to be updated"
+              "Timeout of %f seconds reached when waiting for event to happens."
               timeout
         | e -> raise e)
   in
   (* Let the sc rollup node catch up *)
   let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
   return updated_level
+
+(** Bake [at_least] levels.
+    Then continues baking until the rollup node updates the lpc,
+    waiting for the rollup node to catch up to the client's level.
+    Returns the level at which the lpc was updated. *)
+let bake_until_lpc_updated ?hook ?at_least ?timeout client sc_rollup_node =
+  let event =
+    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_node_lpc_updated.v0"
+    @@ fun json -> JSON.(json |-> "level" |> as_int_opt)
+  in
+  bake_until_event ?hook ?at_least ?timeout client sc_rollup_node event
+
+(** helpers that send a message then bake until the rollup node
+    executes an output message (whitelist_update) *)
+let send_messages_then_bake_until_rollup_node_execute_output_message
+    ~commitment_period ~challenge_window client rollup_node msg_list =
+  let* () = send_text_messages ~hooks ~format:`Hex client msg_list in
+  let* () =
+    bake_until_event
+      ~timeout:5.0
+      ~at_least:(commitment_period + challenge_window + 1)
+      client
+      rollup_node
+    @@ wait_for_included_successful_operation
+         rollup_node
+         ~operation_kind:"execute_outbox_message"
+  and* res = wait_for_publish_execute_whitelist_update rollup_node in
+
+  return res
 
 let check_batcher_message_status response status =
   Check.((JSON.(response |-> "status" |> as_string) = status) string)
@@ -5995,7 +6043,7 @@ let test_private_rollup_node_publish_in_whitelist =
     ->
   let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node sc_rollup [] in
   let levels = commitment_period in
-  Log.info "Baking %d blocks for commitment of first message" levels ;
+  Log.info "Baking at least %d blocks for commitment of first message" levels ;
   let* _new_level =
     bake_until_lpc_updated ~at_least:levels ~timeout:5. tezos_client rollup_node
   in
@@ -6039,7 +6087,11 @@ let test_rollup_whitelist_update ~kind =
   let commitment_period = 2 and challenge_window = 5 in
   let whitelist = [Constant.bootstrap1.public_key_hash] in
   test_full_scenario
-    {variant = None; tags = ["whitelist"]; description = "whitelist"}
+    {
+      variant = None;
+      tags = ["private"; "whitelist"; "update"];
+      description = "kernel update whitelist";
+    }
     ~kind
     ~whitelist_enable:true
     ~whitelist
@@ -6047,113 +6099,106 @@ let test_rollup_whitelist_update ~kind =
     ~commitment_period
     ~challenge_window
     ~operator:Constant.bootstrap1.public_key_hash
-  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
-  let* () = Sc_rollup_node.run rollup_node rollup_addr [] in
-  let*! payload_index0 =
+  @@ fun _protocol rollup_node rollup_client rollup_addr _node client ->
+  let encode_whitelist_msg whitelist =
     Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O
-         [
-           ( "whitelist",
-             `A
-               [
-                 `String Constant.bootstrap1.public_key_hash;
-                 `String Constant.bootstrap2.public_key_hash;
-               ] );
-         ]
+    @@ `O [("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist))]
   in
-  let*! payload_index1 =
-    Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O [("whitelist", `Null)]
+  let send_whitelist_then_bake_until_exec encoded_whitelist_msgs =
+    let* _res =
+      send_messages_then_bake_until_rollup_node_execute_output_message
+        ~commitment_period
+        ~challenge_window
+        client
+        rollup_node
+        encoded_whitelist_msgs
+    in
+    unit
+  in
+  let last_published_commitment_hash rollup_client =
+    let*! commitment =
+      Sc_rollup_client.last_published_commitment rollup_client
+    in
+    let Sc_rollup_client.{commitment_and_hash = {commitment; _}; _} =
+      Option.get commitment
+    in
+    return commitment
+  in
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
+  (* bake until the first commitment is published. *)
+  let* _level =
+    bake_until_lpc_updated ~at_least:commitment_period client rollup_node
   in
   let* () =
-    send_text_messages
-      ~hooks
-      ~format:`Hex
-      client
-      [payload_index0; payload_index1]
+    let* commitment = last_published_commitment_hash rollup_client in
+    (* Bootstrap2 attempts to publish a commitments while not present in the whitelist. *)
+    let*? process =
+      publish_commitment
+        ~src:Constant.bootstrap2.alias
+        ~commitment
+        client
+        rollup_addr
+    in
+    let* output_err =
+      Process.check_and_read_stderr ~expect_failure:true process
+    in
+    (* The attempt at publishing a commitment fails. *)
+    Check.(
+      (output_err
+      =~ rex
+           ".*The rollup is private and the submitter of the commitment is not \
+            present in the whitelist.*")
+        ~error_msg:"Expected output \"%L\" to match expression \"%R\".") ;
+    unit
   in
-  let* outbox_level = Node.get_level node in
-  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
   let* () =
-    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
+    let*! encoded_whitelist_update =
+      encode_whitelist_msg
+        [
+          Constant.bootstrap1.public_key_hash;
+          Constant.bootstrap2.public_key_hash;
+        ]
+    in
+    send_whitelist_then_bake_until_exec [encoded_whitelist_update]
   in
-  let* outbox =
-    Runnable.run @@ Sc_rollup_client.outbox ~outbox_level rollup_client
+  let* () =
+    (* Bootstrap2 now can publish a commitments as it's present in the whitelist. *)
+    let* commitment = last_published_commitment_hash rollup_client in
+    let*! () =
+      publish_commitment
+        ~src:Constant.bootstrap2.alias
+        ~commitment
+        client
+        rollup_addr
+    in
+    let* () = Client.bake_for_and_wait client in
+    unit
   in
-  let*! commitment = Sc_rollup_client.last_published_commitment rollup_client in
-  let Sc_rollup_client.{commitment_and_hash = {commitment; _}; _} =
-    Option.get commitment
+  Log.info
+    "submits two whitelist update in one inbox level. Only the second update \
+     is executed by the rollup node." ;
+  let* () =
+    let*! encoded_whitelist_update1 =
+      encode_whitelist_msg [Constant.bootstrap3.public_key_hash]
+    in
+    let*! encoded_whitelist_update2 =
+      Sc_rollup_client.encode_json_outbox_msg rollup_client
+      @@ `O [("whitelist", `Null)]
+    in
+    send_whitelist_then_bake_until_exec
+      [encoded_whitelist_update1; encoded_whitelist_update2]
   in
-  (* Bootstrap2 attempts to publish a commitments while not present in the whitelist. *)
-  let*? process =
+  let* commitment = last_published_commitment_hash rollup_client in
+  (* now an adress that was not previously in the whitelist can
+     publish a commitment *)
+  let*! () =
     publish_commitment
-      ~src:Constant.bootstrap2.alias
+      ~src:Constant.bootstrap4.alias
       ~commitment
       client
       rollup_addr
-  in
-  let* output_err =
-    Process.check_and_read_stderr ~expect_failure:true process
-  in
-  (* The attempt at publishing a commitment fails. *)
-  Check.(
-    (output_err
-    =~ rex
-         ".*The rollup is private and the submitter of the commitment is not \
-          present in the whitelist.*")
-      ~error_msg:"Expected output \"%L\" to match expression \"%R\".") ;
-  Log.info "Outbox is %s" (JSON.encode outbox) ;
-  (* Execute the first outbox message that updates the whitelist [payload_index0]
-     to add Bootstrap2. *)
-  let* {commitment_hash; proof} =
-    get_outbox_proof rollup_client ~__LOC__ ~message_index:0 ~outbox_level
-  in
-  let*! () =
-    Client.Sc_rollup.execute_outbox_message
-      ~hooks
-      ~burn_cap:(Tez.of_int 10)
-      ~rollup:rollup_addr
-      ~src:Constant.bootstrap3.alias
-      ~commitment_hash
-      ~proof
-      client
   in
   let* () = Client.bake_for_and_wait client in
-  (* Bootstrap2 attempts to publish a commitments while not present in the whitelist,
-     once again. *)
-  let*! () =
-    publish_commitment
-      ~src:Constant.bootstrap2.alias
-      ~commitment
-      client
-      rollup_addr
-  in
-  (* The above operation succeeds. *)
-  (* Execute the second outbox message that updates the whitelist [payload_index1]
-     and set it to [None]. *)
-  let* {commitment_hash; proof} =
-    get_outbox_proof rollup_client ~__LOC__ ~message_index:1 ~outbox_level
-  in
-  let*! () =
-    Client.Sc_rollup.execute_outbox_message
-      ~hooks
-      ~burn_cap:(Tez.of_int 10)
-      ~rollup:rollup_addr
-      ~src:Constant.bootstrap3.alias
-      ~commitment_hash
-      ~proof
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
-  let*! () =
-    publish_commitment
-      ~src:Constant.bootstrap3.alias
-      ~commitment
-      client
-      rollup_addr
-  in
-  (* The rollup being public anyone can publish a commitment so the above operation
-     succeeds. *)
   unit
 
 let test_rollup_whitelist_outdated_update ~kind =
@@ -6173,8 +6218,8 @@ let test_rollup_whitelist_outdated_update ~kind =
     ~supports:(From_protocol 019)
     ~commitment_period
     ~challenge_window
-  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
-  let* () = Sc_rollup_node.run rollup_node rollup_addr [] in
+  @@ fun _protocol rollup_node rollup_client rollup_addr _node client ->
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
   let*! payload =
     Sc_rollup_client.encode_json_outbox_msg rollup_client
     @@ `O [("whitelist", `A [`String Constant.bootstrap1.public_key_hash])]
@@ -6192,28 +6237,16 @@ let test_rollup_whitelist_outdated_update ~kind =
          ]
   in
   (* Execute whitelist update with outdated message index. *)
-  let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
-  let* outbox_level = Node.get_level node in
-  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
-  let* () =
-    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
-  in
-  let* {commitment_hash; proof} =
-    get_outbox_proof rollup_client ~__LOC__ ~message_index:1 ~outbox_level
-  in
-  let*! () =
-    Client.Sc_rollup.execute_outbox_message
-      ~hooks
-      ~burn_cap:(Tez.of_int 10)
-      ~fee:(Tez.of_mutez_int 1358)
-      ~rollup:rollup_addr
-      ~src:Constant.bootstrap3.alias
-      ~commitment_hash
-      ~proof
+  let* _hash, outbox_level, message_index =
+    send_messages_then_bake_until_rollup_node_execute_output_message
+      ~commitment_period
+      ~challenge_window
       client
+      rollup_node
+      [payload; payload2]
   in
-  let* () = Client.bake_for_and_wait client in
-  (* Outdated message index. *)
+  Check.((message_index = 1) int)
+    ~error_msg:"Executed output message of index %L expected %R." ;
   let* {commitment_hash; proof} =
     get_outbox_proof rollup_client ~__LOC__ ~message_index:0 ~outbox_level
   in
@@ -6230,39 +6263,19 @@ let test_rollup_whitelist_outdated_update ~kind =
   in
   let* () =
     Process.check_error
-      ~msg:(rex ".*Outdated whitelist update: got message index")
+      ~msg:(rex ".*Outdated whitelist update: got message index.*")
       process
   in
 
   (* Execute whitelist update with outdated outbox level. *)
-  let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
-  let* outbox_level = Node.get_level node in
-  let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
-  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
-  let* () =
-    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
-  in
-  let message_index = 0 in
-  let* {commitment_hash; proof} =
-    get_outbox_proof
-      rollup_client
-      ~__LOC__
-      ~message_index
-      ~outbox_level:(outbox_level + 1)
-  in
-  let*! () =
-    Client.Sc_rollup.execute_outbox_message
-      ~hooks
-      ~burn_cap:(Tez.of_int 10)
-      ~fee:(Tez.of_mutez_int 1391)
-      ~rollup:rollup_addr
-      ~src:Constant.bootstrap3.alias
-      ~commitment_hash
-      ~proof
+  let* _hash, _outbox_level, _message_index =
+    send_messages_then_bake_until_rollup_node_execute_output_message
+      ~commitment_period
+      ~challenge_window
       client
+      rollup_node
+      [payload; payload2]
   in
-  let* () = Client.bake_for_and_wait client in
-
   let* {commitment_hash; proof} =
     get_outbox_proof rollup_client ~__LOC__ ~message_index ~outbox_level
   in
@@ -6278,7 +6291,7 @@ let test_rollup_whitelist_outdated_update ~kind =
       client
   in
   Process.check_error
-    ~msg:(rex ".*Outdated whitelist update: got outbox level")
+    ~msg:(rex ".*Outdated whitelist update: got outbox level.*")
     process
 
 (** This test uses the rollup node, first it is running in an Operator

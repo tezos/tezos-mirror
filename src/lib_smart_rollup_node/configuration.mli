@@ -32,6 +32,7 @@ type operation_kind =
   | Timeout
   | Refute
   | Recover
+  | Execute_outbox_message
 
 (** Mode for the rollup node *)
 type mode =
@@ -48,7 +49,12 @@ type mode =
 
 (** Purposes for operators, indicating their role and thus the kinds of
     operations that they sign. *)
-type purpose = Operating | Batching | Cementing | Recovering
+type purpose =
+  | Operating
+  | Batching
+  | Cementing
+  | Recovering
+  | Executing_outbox
 
 module Operation_kind_map : Map.S with type key = operation_kind
 

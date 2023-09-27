@@ -584,6 +584,10 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       publisher
   and* kind =
     Plugin.Layer1_helpers.get_kind cctxt configuration.sc_rollup_address
+  and* last_whitelist_update =
+    Plugin.Layer1_helpers.find_last_whitelist_update
+      cctxt
+      configuration.sc_rollup_address
   in
   let current_protocol =
     {
@@ -604,6 +608,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       genesis_info
       ~lcc
       ~lpc
+      ?last_whitelist_update
       kind
       current_protocol
       configuration

@@ -109,6 +109,18 @@ module Simple = struct
       ~level:Notice
       ("staker", Signature.Public_key_hash.encoding)
 
+  let publish_execute_whitelist_update =
+    declare_3
+      ~section
+      ~name:"sc_rollup_node_publish_execute_whitelist_update"
+      ~msg:
+        "Publishing execute whitelist update for cemented commitment {hash}, \
+         outbox level {outbox_level} and index {message_index}"
+      ~level:Notice
+      ("hash", Commitment.Hash.encoding)
+      ("outbox_level", Data_encoding.int32)
+      ("message_index", Data_encoding.int31)
+
   let commitment_parent_is_not_lcc =
     declare_3
       ~section
@@ -206,6 +218,9 @@ let publish_commitment head level =
   Simple.(emit publish_commitment (head, level))
 
 let recover_bond staker = Simple.(emit recover_bond staker)
+
+let publish_execute_whitelist_update hash level index =
+  Simple.(emit publish_execute_whitelist_update (hash, level, index))
 
 let commitment_parent_is_not_lcc level predecessor_hash lcc_hash =
   Simple.(emit commitment_parent_is_not_lcc (level, predecessor_hash, lcc_hash))

@@ -133,6 +133,7 @@ let constants_of_parametric
             challenge_window_in_blocks;
             commitment_period_in_blocks;
             reveal_activation_level;
+            max_number_of_stored_cemented_commitments;
             _;
           };
         dal =
@@ -158,6 +159,7 @@ let constants_of_parametric
             Some
               (Sc_rollup_proto_types.Constants.reveal_activation_level_to_octez
                  reveal_activation_level);
+          max_number_of_stored_cemented_commitments;
         };
       dal =
         {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
