@@ -27,6 +27,7 @@ module type PROTO_TOOL = sig
   val start_injector :
     Client_context.full ->
     op_per_mempool:int ->
+    min_manager_queues:int ->
     operations_file_path:string ->
     unit tzresult Lwt.t
 

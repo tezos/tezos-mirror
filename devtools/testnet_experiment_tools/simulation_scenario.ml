@@ -81,8 +81,14 @@ let operations_file_param =
       if Sys.file_exists dn then return dn
       else failwith "File %s does not exists" dn )
 
-let round_duration_arg =
+let positive_int_parameter =
+  parameter @@ fun _ s ->
   let open Lwt_result_syntax in
+  match int_of_string_opt s with
+  | Some i when i > 0 -> return i
+  | _ -> failwith "Parameter should be a positive integer literal"
+
+let round_duration_arg =
   arg
     ~doc:
       "Maximal round duration (in seconds) that the synchronisation heuristic \
@@ -90,13 +96,9 @@ let round_duration_arg =
     ~short:'r'
     ~long:"round-duration"
     ~placeholder:"seconds"
-    ( parameter @@ fun _ s ->
-      match int_of_string_opt s with
-      | Some i when i > 0 -> return i
-      | _ -> failwith "Parameter should be a positive integer literal" )
+    positive_int_parameter
 
 let op_per_mempool_arg =
-  let open Lwt_result_syntax in
   default_arg
     ~doc:
       "Number of operations that the injector will try to maintain in the \
@@ -105,20 +107,24 @@ let op_per_mempool_arg =
     ~long:"op-per-mempool"
     ~default:"2500"
     ~placeholder:"integer"
-    ( parameter @@ fun _ s ->
-      match int_of_string_opt s with
-      | Some i when i > 0 -> return i
-      | _ -> failwith "Parameter should be a positive integer literal" )
+    positive_int_parameter
 
 let block_time_param =
-  let open Lwt_result_syntax in
   param
     ~name:"block-time-target"
     ~desc:"Block time target (in seconds)"
-    ( parameter @@ fun _ s ->
-      match int_of_string_opt s with
-      | Some i when i > 0 -> return i
-      | _ -> failwith "Parameter should be a positive integer literal" )
+    positive_int_parameter
+
+let min_manager_queues_arg =
+  default_arg
+    ~doc:
+      "Number of minimum manager queues. When the number of manager queues \
+       falls below this number, the experiment ends."
+    ~short:'q'
+    ~long:"min-manager-queues"
+    ~default:"1"
+    ~placeholder:"integer"
+    positive_int_parameter
 
 let pp_spaced_int ppf i =
   let s = Format.sprintf "%d" i |> String.to_seq |> List.of_seq |> List.rev in
@@ -273,13 +279,17 @@ let sync_node (cctxt : Client_context.full) round_duration_target =
   Tool.sync_node cctxt ?round_duration_target ()
 
 let run_injector (cctxt : Client_context.full) ~op_per_mempool
-    ~operations_file_path =
+    ~min_manager_queues ~operations_file_path =
   let open Lwt_result_syntax in
   let* {current_protocol; _} =
     Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
   in
   let* (module Tool) = find_proto_tool current_protocol in
-  Tool.start_injector cctxt ~op_per_mempool ~operations_file_path
+  Tool.start_injector
+    cctxt
+    ~op_per_mempool
+    ~min_manager_queues
+    ~operations_file_path
 
 let patch_block_time ~data_dir ~block_time_target =
   let open Lwt_result_syntax in
@@ -396,10 +406,18 @@ let commands =
          target 2500 manager operations present in the mempool at all time. \
          Terminates whenever there are not enough operations to reach the \
          threshold target."
-      (args1 op_per_mempool_arg)
+      (args2 op_per_mempool_arg min_manager_queues_arg)
       (prefixes ["run"; "simulation"] @@ operations_file_param @@ stop)
-      (fun op_per_mempool operations_file_path (cctxt : Client_context.full) ->
-        let* () = run_injector cctxt ~op_per_mempool ~operations_file_path in
+      (fun (op_per_mempool, min_manager_queues)
+           operations_file_path
+           (cctxt : Client_context.full) ->
+        let* () =
+          run_injector
+            cctxt
+            ~op_per_mempool
+            ~operations_file_path
+            ~min_manager_queues
+        in
         return_unit);
     command
       ~group
