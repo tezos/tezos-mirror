@@ -52,6 +52,7 @@ function run_profiler(path) {
         var tx_size = [];
         var bip_store = [];
         var bip_read = [];
+        var receipt_size = [];
 
         var profiler_output_path = "";
 
@@ -85,6 +86,7 @@ function run_profiler(path) {
             push_match(output, tx_size, /\bStoring transaction object of size\s*(\d+)/g)
             push_match(output, bip_store, /\bStoring Block in Progress of size\s*(\d+)/g)
             push_match(output, bip_read, /\bReading Block in Progress of size\s*(\d+)/g)
+            push_match(output, receipt_size, /\bStoring receipt of size \s*(\d+)/g)
 
         });
         childProcess.on('close', _ => {
@@ -103,6 +105,9 @@ function run_profiler(path) {
             if (tx_status.length != tx_size.length) {
                 console.log(new Error("Missing transaction size data (expected: " + tx_status.length + ", actual: " + tx_size.length + ")"));
             }
+            if (tx_status.length != receipt_size.length) {
+                console.log(new Error("Missing receipt size value (expected: " + tx_status.length + ", actual: " + receipt_size.length + ")"));
+            }
             resolve({
                 profiler_output_path,
                 gas_costs: gas_used,
@@ -111,7 +116,8 @@ function run_profiler(path) {
                 estimated_ticks_per_tx,
                 tx_size,
                 bip_store,
-                bip_read
+                bip_read,
+                receipt_size
             });
         });
     })
@@ -158,10 +164,11 @@ async function analyze_profiler_output(path) {
     signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
     sputnik_runtime_ticks = await get_ticks(path, "11evm_runtime7Runtime3run");
     store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
+    store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
     interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
     fetch_blueprint_ticks = await get_ticks(path, "blueprint5fetch");
-    block_finalize = await get_ticks(path, "BlockInProgress18finalize_and_store");
+    block_finalize = await get_ticks(path, "store_current_block");
     return {
         kernel_run_ticks: kernel_run_ticks,
         run_transaction_ticks: run_transaction_ticks,
@@ -171,6 +178,7 @@ async function analyze_profiler_output(path) {
         interpreter_decode_ticks: interpreter_decode_ticks,
         fetch_blueprint_ticks: fetch_blueprint_ticks,
         sputnik_runtime_ticks: sputnik_runtime_ticks,
+        store_receipt_ticks,
         block_finalize
     };
 }
@@ -247,6 +255,8 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
                     run_transaction_ticks: run_transaction_ticks[j],
                     sputnik_runtime_ticks: sputnik_runtime_tick,
                     store_transaction_object_ticks: store_transaction_object_ticks[j],
+                    store_receipt_ticks: run_benchmark_result.store_receipt_ticks[j],
+                    receipt_size: run_benchmark_result.receipt_size[j],
                     tx_size: tx_size[j],
                     ...basic_info_row
                 });
@@ -327,7 +337,9 @@ async function run_all_benchmarks(benchmark_scripts) {
         "tx_size",
         "bip_read",
         "bip_store",
-        "block_finalize"
+        "block_finalize",
+        "store_receipt_ticks",
+        "receipt_size"
     ];
     let output = output_filename();
     console.log(`Output in ${output}`);

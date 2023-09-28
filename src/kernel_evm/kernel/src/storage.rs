@@ -339,7 +339,9 @@ pub fn store_transaction_receipt<Host: Runtime>(
     let mut transaction_hashes_index = init_transaction_hashes_index()?;
     index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
     let receipt_path = receipt_path(&receipt.hash)?;
-    host.store_write_all(&receipt_path, &receipt.rlp_bytes())?;
+    let src: &[u8] = &receipt.rlp_bytes();
+    log!(host, Debug, "Storing receipt of size {}", src.len());
+    host.store_write_all(&receipt_path, src)?;
     Ok(())
 }
 
