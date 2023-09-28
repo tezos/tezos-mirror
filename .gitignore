@@ -105,6 +105,7 @@ sequenced_kernel.wasm
 smart-rollup-installer
 _evm_installer_preimages/
 tx_kernel.wasm
+tx_kernel_dal.wasm
 tx-demo-collector
 
 # Terraform

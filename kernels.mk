@@ -1,4 +1,4 @@
-KERNELS = evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm
+KERNELS = evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm
 SDK_DIR=src/kernel_sdk
 EVM_DIR=src/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
@@ -56,7 +56,16 @@ tx_demo_collector:
 	@cp src/kernel_tx_demo/target/$(NATIVE_TARGET)/release/tx-demo-collector .
 
 tx_kernel.wasm: tx_demo_collector
+	# TODO: https://gitlab.com/tezos/tezos/-/issues/6407
+	# There is an issue where `wasm-strip` fails for `tx_kernel.wasm`.
+	# Use `wasm-strip` once this issue is solved.
 	@cp src/kernel_tx_demo/target/wasm32-unknown-unknown/release/tx_kernel.wasm $@
+
+tx_kernel_dal.wasm: tx_demo_collector
+	# TODO: https://gitlab.com/tezos/tezos/-/issues/6407
+	# There is an issue where `wasm-strip` fails for `tx_kernel.wasm`.
+	# Use `wasm-strip` once this issue is solved.
+	@cp src/kernel_tx_demo/target/wasm32-unknown-unknown/release/tx_kernel_dal.wasm $@
 
 .PHONY: build
 build: ${KERNELS} kernel_sdk

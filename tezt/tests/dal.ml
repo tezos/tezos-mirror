@@ -26,6 +26,15 @@
 (* Testing
    -------
    Component:    Data-availability layer
+   Requirement:  make -f kernels.mk build
+
+                 For dev-purpose you can also run the follwing to enable debug outputs and faster build time:
+
+                 cd src/kernel_tx_demo/kernel
+                 cargo build --release --target wasm32-unknown-unknown --features debug --features dal
+                 wasm-strip ../target/wasm32-unknown-unknown/release/tx_kernel.wasm
+                 cp ../target/wasm32-unknown-unknown/release/tx_kernel.wasm ../../../tx_kernel_dal.wasm
+
    Invocation:   dune exec tezt/tests/main.exe -- --file dal.ml
    Subject: Integration tests related to the data-availability layer
 *)
@@ -940,6 +949,26 @@ let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
       client
   in
   return commitment
+
+let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client
+    dal_node source ~index ~content ~attestation_lag ~number_of_slots =
+  let* _commitment =
+    publish_and_store_slot
+      ?with_proof
+      ?counter
+      ?force
+      ?fee
+      client
+      dal_node
+      source
+      ~index
+      content
+  in
+  let* () =
+    repeat attestation_lag (fun () -> Client.bake_for_and_wait client)
+  in
+  let* _op_hashes = dal_attestations ~nb_slots:number_of_slots [index] client in
+  Client.bake_for_and_wait client
 
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
@@ -1881,34 +1910,16 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;
   let slot_content = generate_dummy_slot slot_size in
-  let* _commitment =
-    publish_and_store_slot
+  let* () =
+    publish_store_and_attest_slot
       client
       dal_node
       Constant.bootstrap1
       ~index:0
-      (Helpers.make_slot ~slot_size slot_content)
+      ~content:(Helpers.make_slot ~slot_size slot_content)
+      ~attestation_lag:parameters.attestation_lag
+      ~number_of_slots:parameters.number_of_slots
   in
-  Log.info "Bake attestation_lag blocks and attest slot 0." ;
-  let* () =
-    repeat parameters.attestation_lag (fun () ->
-        Client.bake_for_and_wait client)
-  in
-  let* _ =
-    dal_attestations
-      ~nb_slots:parameters.number_of_slots
-      ~signers:
-        [
-          Constant.bootstrap1;
-          Constant.bootstrap2;
-          Constant.bootstrap3;
-          Constant.bootstrap4;
-          Constant.bootstrap5;
-        ]
-      [0]
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   Log.info "Assert that the slot was attested." ;
   let* {dal_attestation; _} = RPC.(call node @@ get_chain_block_metadata ()) in
@@ -3589,6 +3600,247 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     ~description
     ()
 
+module Tx_kernel_e2e = struct
+  open Tezos_protocol_alpha.Protocol
+  open Tezt_tx_kernel
+
+  (** [keys_of_account account] returns a triplet of pk, pkh, sk of [account]  *)
+  let keys_of_account (account : Account.key) =
+    let pk =
+      account.public_key
+      |> Tezos_crypto.Signature.Ed25519.Public_key.of_b58check_exn
+    in
+    let pkh =
+      account.public_key_hash
+      |> Tezos_crypto.Signature.Ed25519.Public_key_hash.of_b58check_exn
+    in
+    let sk =
+      account.secret_key
+      |> Account.require_unencrypted_secret_key ~__LOC__
+      |> Tezos_crypto.Signature.Ed25519.Secret_key.of_b58check_exn
+    in
+    (pk, pkh, sk)
+
+  (** [bake_until cond client sc_rollup_node] bakes until [cond client] retuns [true].
+      After baking each block we wait for the [sc_rollup_node] to catch up to L1. *)
+  let rec bake_until cond client sc_rollup_node =
+    let* stop = cond client in
+    if stop then unit
+    else
+      let* () = Client.bake_for_and_wait client in
+      let* current_level = Client.level client in
+      let* _ =
+        Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node current_level
+      in
+      bake_until cond client sc_rollup_node
+
+  (** [get_ticket_balance sc_rollup_client ~pvm_name ~pkh ~ticket_index] returns
+      the L2 balance of the account with [pkh] for the ticket with [ticket_index] *)
+  let get_ticket_balance sc_rollup_client ~pvm_name ~pkh ~ticket_index =
+    Sc_rollup_client.inspect_durable_state_value
+      sc_rollup_client
+      ~pvm_kind:pvm_name
+      ~operation:Sc_rollup_client.Value
+      ~key:
+        (sf
+           "/accounts/%s/%d"
+           (Tezos_crypto.Signature.Ed25519.Public_key_hash.to_b58check pkh)
+           ticket_index)
+
+  (** E2E test using the tx-kernel. Scenario:
+      1. Deposit [450] tickets to the L2 [pk1] using the deposit contract.
+      2. Construct two batches of L2 transactions to achieve the following:
+          1. Transfer [60] tickets from [pk1] to [pk2].
+          2. Withdraw [60] tickets from [pk2].
+          3. Transfer [90] tickets from [pk1] to [pk2].
+          3. Withdraw [40] tickets from [pk2].
+      3. Publish the transaction batch to DAL at slot [0].
+      4. Bake [attestation_lag] blocks and attest slot [0].
+      5. Check that the L2 [pk1] has [300] tickets and [pk2] has [50] tickets.
+   *)
+  let test_tx_kernel_e2e protocol parameters dal_node sc_rollup_node
+      _sc_rollup_address node client pvm_name =
+    Log.info "Originate the tx kernel." ;
+    let* boot_sector =
+      Sc_rollup_helpers.prepare_installer_kernel
+        ~base_installee:"./"
+        ~preimages_dir:
+          (Filename.concat
+             (Sc_rollup_node.data_dir sc_rollup_node)
+             "wasm_2_0_0")
+        "tx_kernel_dal"
+    in
+    let* sc_rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:Tez.(of_int 9999999)
+        ~alias:"tx_kernel_dal"
+        ~src:Constant.bootstrap1.public_key_hash
+        ~kind:"wasm_2_0_0"
+        ~boot_sector
+        ~parameters_ty:"pair string (ticket string)"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    Log.info "Run the rollup node and ensure origination succeeds." ;
+    let* genesis_info =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+           sc_rollup_address
+    in
+    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+    let* () =
+      Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+    in
+    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+    let* level =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
+    in
+    Check.(level = init_level)
+      Check.int
+      ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+    Log.info "Create key pairs used for the test." ;
+    let pk1, pkh1, sk1 = keys_of_account Constant.bootstrap1 in
+    let pk2, pkh2, sk2 = keys_of_account Constant.bootstrap2 in
+    Log.info "Prepare contract for minting and depositing." ;
+    let* mint_and_deposit_contract =
+      Contracts.prepare_mint_and_deposit_contract client protocol
+    in
+    Log.info "Deposit [450] tickets to the L2 [pk1] using deposit contract." ;
+    let ticket_content = "Hello, Ticket!" in
+    let* () =
+      Contracts.deposit_string_tickets
+        client
+        ~mint_and_deposit_contract:
+          (Contract_hash.to_b58check mint_and_deposit_contract)
+        ~sc_rollup_address
+        ~destination_l2_addr:
+          (Tezos_crypto.Signature.Ed25519.Public_key_hash.to_b58check pkh1)
+        ~ticket_content
+        ~amount:450
+    in
+    Log.info "Prepare contract for receiving withdrawn tickets." ;
+    let* receive_withdrawn_tickets_contract =
+      Contracts.prepare_receive_withdrawn_tickets_contract client protocol
+    in
+    (* We have slot index [0] hard-coded in the kernel.
+
+       TODO: https://gitlab.com/tezos/tezos/-/issues/6390
+       Make it possible to dynamically change tracked slot indexes. *)
+    let slot_index = 0 in
+    Log.info
+      "Construct a batch of L2 transactions that:\n\
+       1. Transfers [60] tickets from [pk1] to [pk2].\n\
+       3. Withdraw [60] tickets from [pk2] to \
+       [receive_withdrawn_tickets_contract]." ;
+    let payload1 =
+      Transaction_batch.(
+        empty
+        |> add_transfer
+             ~counter:0
+             ~signer:(Public_key pk1)
+             ~signer_secret_key:sk1
+             ~destination:pkh2
+             ~ticketer:(Contract_hash.to_b58check mint_and_deposit_contract)
+             ~ticket_content
+             ~amount:60
+        |> add_withdraw
+             ~counter:0
+             ~signer:(Public_key pk2)
+             ~signer_secret_key:sk2
+             ~destination:receive_withdrawn_tickets_contract
+             ~entrypoint:"receive_tickets"
+             ~ticketer:(Contract_hash.to_b58check mint_and_deposit_contract)
+             ~ticket_content
+             ~amount:60
+        |> make_encoded_batch)
+    in
+    Log.info
+      "Construct a batch of L2 transactions that:\n\
+       1. Transfers [90] tickets from [pk1] to [pk2].\n\
+       3. Withdraw [50] tickets from [pk2] to \
+       [receive_withdrawn_tickets_contract]." ;
+    let payload2 =
+      Transaction_batch.(
+        empty
+        |> add_transfer
+             ~counter:1
+             ~signer:(Public_key pk1)
+             ~signer_secret_key:sk1
+             ~destination:pkh2
+             ~ticketer:(Contract_hash.to_b58check mint_and_deposit_contract)
+             ~ticket_content
+             ~amount:90
+        |> add_withdraw
+             ~counter:1
+             ~signer:(Public_key pk2)
+             ~signer_secret_key:sk2
+             ~destination:receive_withdrawn_tickets_contract
+             ~entrypoint:"receive_tickets"
+             ~ticketer:(Contract_hash.to_b58check mint_and_deposit_contract)
+             ~ticket_content
+             ~amount:40
+        |> make_encoded_batch)
+    in
+    Log.info
+      "Publish the [payload1] of size %d to DAL at slot [0]."
+      (String.length payload1) ;
+    let* () =
+      publish_store_and_attest_slot
+        client
+        dal_node
+        Constant.bootstrap1
+        ~index:slot_index
+        ~content:
+          (Helpers.make_slot
+             ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
+             payload1)
+        ~attestation_lag:parameters.attestation_lag
+        ~number_of_slots:parameters.number_of_slots
+    in
+    Log.info
+      "Publish the [payload2] of size %d to DAL at slot [0]."
+      (String.length payload2) ;
+    let* () =
+      publish_store_and_attest_slot
+        client
+        dal_node
+        Constant.bootstrap1
+        ~index:slot_index
+        ~content:
+          (Helpers.make_slot
+             ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
+             payload2)
+        ~attestation_lag:parameters.attestation_lag
+        ~number_of_slots:parameters.number_of_slots
+    in
+    Log.info "Wait for the rollup node to catch up." ;
+    let* current_level = Node.get_level node in
+    let* _level =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node current_level
+    in
+    Log.info "Check that [pk1] has [300] tickets." ;
+    let*! balance =
+      get_ticket_balance sc_rollup_client ~pvm_name ~ticket_index:0 ~pkh:pkh1
+    in
+    Check.(
+      (* [2c01000000000000] is [300] when interpreted as little-endian u64. *)
+      (balance = Some "2c01000000000000")
+        ~__LOC__
+        (option string)
+        ~error_msg:"Expected %R, got %L") ;
+    Log.info "Check that [pk2] has [50] tickets." ;
+    let*! balance =
+      get_ticket_balance sc_rollup_client ~pvm_name ~ticket_index:0 ~pkh:pkh2
+    in
+    Check.(
+      (* [3200000000000000] is [50] when interpreted as little-endian u64. *)
+      (balance = Some "3200000000000000")
+        (option string)
+        ~__LOC__
+        ~error_msg:"Expected %R, got %L") ;
+    unit
+end
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -3734,6 +3986,13 @@ let register ~protocols =
     "test reveal_dal_page in fast exec wasm pvm"
     ~pvm_name:"wasm_2_0_0"
     test_reveal_dal_page_in_fast_exec_wasm_pvm
+    protocols ;
+  scenario_with_all_nodes
+    "test tx_kernel"
+    ~pvm_name:"wasm_2_0_0"
+    ~commitment_period:10
+    ~challenge_window:10
+    Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
 
   (* Register end-to-end tests *)
