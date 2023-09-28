@@ -115,7 +115,7 @@ pub fn produce<Host: Runtime>(
     queue: Queue,
     chain_id: U256,
     base_fee_per_gas: U256,
-) -> Result<(), anyhow::Error> {
+) -> Result<ComputationResult, anyhow::Error> {
     let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
             Ok(block) => (
@@ -172,7 +172,7 @@ pub fn produce<Host: Runtime>(
                 storage::store_queue(host, &remaining_queue)?;
                 storage::add_reboot_flag(host)?;
                 host.mark_for_reboot()?;
-                return Ok(());
+                return Ok(ComputationResult::RebootNeeded);
             }
             ComputationResult::Finished => {
                 tick_counter = TickCounter::new(block_in_progress.estimated_ticks);
@@ -186,7 +186,7 @@ pub fn produce<Host: Runtime>(
         }
     }
     log!(host, Debug, "Estimated ticks: {}", tick_counter.c);
-    Ok(())
+    Ok(ComputationResult::Finished)
 }
 
 fn remaining_proposals(
@@ -402,7 +402,7 @@ mod tests {
         );
 
         produce(host, queue, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.")
+            .expect("The block production failed.");
     }
 
     fn assert_current_block_reading_validity(host: &mut MockHost) {
@@ -493,6 +493,17 @@ mod tests {
         assert_eq!(TransactionStatus::Success, status);
     }
 
+    #[test]
+    fn playground() {
+        let v = vec![1, 2, 3, 4];
+        let l1 = v.len();
+        let mut iter = v.into_iter();
+        println!("{:?}", iter.next());
+        let mut rest = vec![];
+        rest.extend(iter);
+        println!("{:?}", rest);
+        assert!(l1 > rest.len());
+    }
     #[test]
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
@@ -1310,13 +1321,14 @@ mod tests {
 
         let mut transactions = vec![];
         let mut proposals = vec![];
-        for n in 1..TOO_MANY_TRANSACTIONS {
+        for n in 0..TOO_MANY_TRANSACTIONS {
             transactions.push(dummy_transaction(n));
             if n.rem(80) == 0 {
                 proposals.push(blueprint(transactions));
                 transactions = vec![];
             }
         }
+        let initial_number_of_proposals = proposals.len();
         let queue = Queue {
             proposals,
             kernel_upgrade: None,
@@ -1342,6 +1354,27 @@ mod tests {
         assert!(
             storage::was_rebooted(&mut host).expect("Should have found flag"),
             "Flag should be set"
+        );
+
+        let queue =
+            storage::read_queue(&mut host).expect("There should be a queue in storage");
+        let (first, rest) = queue
+            .proposals
+            .split_first()
+            .expect("Queue should be non empty");
+        match first {
+            QueueElement::Blueprint(_) => {
+                panic!("first element should be a bip")
+            }
+            QueueElement::BlockInProgress(bip) => assert!(
+                bip.queue_length() > 0,
+                "There should be some transactions left"
+            ),
+        }
+        assert!(!rest.is_empty(), "There should proposals left");
+        assert!(
+            initial_number_of_proposals > rest.len(),
+            "There should be less proposals left than originally present in the queue."
         );
     }
 }
