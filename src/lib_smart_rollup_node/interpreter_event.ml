@@ -35,7 +35,7 @@ module Simple = struct
       ~msg:
         "Transitioned PVM at inbox level {inbox_level} to {state_hash} at tick \
          {ticks} with {num_messages} messages"
-      ~level:Notice
+      ~level:Info
       ("inbox_level", Data_encoding.int32)
       ("state_hash", State_hash.encoding)
       ("ticks", Data_encoding.z)

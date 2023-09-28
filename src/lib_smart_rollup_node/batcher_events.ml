@@ -36,7 +36,7 @@ struct
       ~section
       ~name:"queue"
       ~msg:"Adding {nb_messages} to queue"
-      ~level:Notice
+      ~level:Info
       ("nb_messages", Data_encoding.int31)
 
   let batched =

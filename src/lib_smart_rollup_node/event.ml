@@ -60,7 +60,7 @@ module Simple = struct
       ~name:"smart_rollup_node_knows_its_rollup"
       ~msg:
         "The smart rollup node is interacting with rollup {addr} of kind {kind}"
-      ~level:Notice
+      ~level:Info
       ("addr", Octez_smart_rollup.Address.encoding)
       ("kind", Data_encoding.string)
 
@@ -113,7 +113,7 @@ module Simple = struct
     declare_1
       ~section
       ~name:"waiting_first_block"
-      ~level:Notice
+      ~level:Info
       ~msg:"Waiting for first block of protocol {protocol} to appear"
       ("protocol", Protocol_hash.encoding)
 
@@ -121,7 +121,7 @@ module Simple = struct
     declare_2
       ~section
       ~name:"received_first_block"
-      ~level:Notice
+      ~level:Info
       ~msg:"First block of protocol {protocol} received: {block}"
       ("block", Block_hash.encoding)
       ("protocol", Protocol_hash.encoding)
@@ -138,7 +138,7 @@ module Simple = struct
     declare_0
       ~section
       ~name:"acquiring_lock"
-      ~level:Notice
+      ~level:Info
       ~msg:"Acquiring lock on data directory."
       ()
 

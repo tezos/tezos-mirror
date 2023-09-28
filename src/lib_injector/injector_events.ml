@@ -212,7 +212,7 @@ module Make
         declare_2
           ~name:"injected"
           ~msg:"Injected {nb} operations in {oph}"
-          ~level:Notice
+          ~level:Info
           ("nb", Data_encoding.int31)
           ("oph", Operation_hash.encoding)
 
@@ -220,7 +220,7 @@ module Make
         declare_1
           ~name:"injected_ops"
           ~msg:"Injected operations: {operations}"
-          ~level:Notice
+          ~level:Info
           ("operations", Data_encoding.list Operation.encoding)
           ~pp1:pp_operations_list
 
@@ -244,7 +244,7 @@ module Make
         declare_3
           ~name:"included"
           ~msg:"Included operations of {block} at level {level}: {operations}"
-          ~level:Notice
+          ~level:Info
           ("block", Block_hash.encoding)
           ("level", Data_encoding.int32)
           ("operations", Data_encoding.list Inj_operation.Hash.encoding)
@@ -254,7 +254,7 @@ module Make
         declare_1
           ~name:"revert_operations"
           ~msg:"Reverting operations: {operations}"
-          ~level:Notice
+          ~level:Info
           ("operations", Data_encoding.list Inj_operation.Hash.encoding)
           ~pp1:pp_operations_hash_list
 
@@ -262,14 +262,14 @@ module Make
         declare_1
           ~name:"confirmed_level"
           ~msg:"Confirmed Tezos level {level}"
-          ~level:Notice
+          ~level:Info
           ("level", Data_encoding.int32)
 
       let loaded_from_disk =
         declare_2
           ~name:"loaded_from_disk"
           ~msg:"Loaded {nb} elements in {kind} from disk"
-          ~level:Notice
+          ~level:Info
           ("nb", Data_encoding.int31)
           ("kind", Data_encoding.string)
 
@@ -287,7 +287,7 @@ module Make
         declare_1
           ~name:"inject_wait"
           ~msg:"Waiting {delay} seconds to trigger injection"
-          ~level:Notice
+          ~level:Info
           ("delay", Data_encoding.float)
 
       let never_included =

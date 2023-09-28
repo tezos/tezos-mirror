@@ -35,7 +35,7 @@ module Simple = struct
       ~section
       ~name:"sc_rollup_commitment_publisher_starting"
       ~msg:"Starting commitment publisher for the smart rollup node"
-      ~level:Notice
+      ~level:Info
       ()
 
   let stopping =
@@ -43,7 +43,7 @@ module Simple = struct
       ~section
       ~name:"sc_rollup_node_commitment_publisher_stopping"
       ~msg:"Stopping commitment publisher for the smart rollup node"
-      ~level:Notice
+      ~level:Info
       ()
 
   let last_cemented_commitment_updated =
@@ -73,7 +73,7 @@ module Simple = struct
       ~section
       ~name:"sc_rollup_node_commitment_process_head"
       ~msg:"Computing and storing new commitment for level {level}"
-      ~level:Notice
+      ~level:Info
       ("level", Data_encoding.int32)
 
   let publish_commitment =
@@ -81,7 +81,7 @@ module Simple = struct
       ~section
       ~name:"sc_rollup_node_publish_commitment"
       ~msg:"Publishing commitment {hash} for inbox level {level}"
-      ~level:Notice
+      ~level:Info
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -90,7 +90,7 @@ module Simple = struct
       ~section
       ~name:"sc_rollup_node_recover_bond"
       ~msg:"Recover bond for {staker}"
-      ~level:Notice
+      ~level:Info
       ("staker", Signature.Public_key_hash.encoding)
 
   let publish_execute_whitelist_update =
@@ -100,7 +100,7 @@ module Simple = struct
       ~msg:
         "Publishing execute whitelist update for cemented commitment {hash}, \
          outbox level {outbox_level} and index {message_index}"
-      ~level:Notice
+      ~level:Info
       ("hash", Commitment.Hash.encoding)
       ("outbox_level", Data_encoding.int32)
       ("message_index", Data_encoding.int31)
