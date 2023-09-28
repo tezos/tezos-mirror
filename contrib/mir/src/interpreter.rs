@@ -193,6 +193,13 @@ fn interpret_one(
                 _ => unreachable_state(),
             }
         }
+        I::ISome => {
+            gas.consume(interpret_cost::SOME)?;
+            match stack.pop() {
+                v @ Some(..) => stack.push(V::new_option(v)),
+                _ => unreachable_state(),
+            }
+        }
     }
     Ok(())
 }
@@ -617,6 +624,18 @@ mod interpreter_tests {
                 - interpret_cost::IF_NONE
                 - interpret_cost::PUSH
                 - interpret_cost::INTERPRET_RET * 2
+        );
+    }
+
+    #[test]
+    fn some() {
+        let mut stack = stk![V::Int(5)];
+        let mut gas = Gas::default();
+        assert!(interpret(&vec![ISome], &mut gas, &mut stack).is_ok());
+        assert_eq!(stack, stk![V::new_option(Some(V::Int(5)))]);
+        assert_eq!(
+            gas.milligas(),
+            Gas::default().milligas() - interpret_cost::SOME - interpret_cost::INTERPRET_RET
         );
     }
 }
