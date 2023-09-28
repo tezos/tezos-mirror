@@ -57,8 +57,8 @@ fn interpret_one(
                 [.., NumberValue(o2), NumberValue(o1)] => {
                     gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
                     let sum = *o1 + *o2;
-                    stack.drop_top(2);
-                    stack.push(NumberValue(sum));
+                    stack.pop();
+                    stack[0] = NumberValue(sum);
                 }
                 _ => unreachable_state(),
             },
@@ -74,8 +74,8 @@ fn interpret_one(
                     if sum > MAX_TEZ {
                         return Err(InterpretError::MutezOverflow);
                     }
-                    stack.drop_top(2);
-                    stack.push(NumberValue(sum));
+                    stack.pop();
+                    stack[0] = NumberValue(sum);
                 }
                 _ => unreachable_state(),
             },
