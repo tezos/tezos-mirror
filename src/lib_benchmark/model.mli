@@ -270,6 +270,13 @@ val bilinear_affine :
   coeff2:Free_variable.t ->
   (int * (int * unit)) model
 
+(** [fun a b -> intercept + coeff × b] *)
+val affine_skip1 :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  (int * (int * unit)) model
+
 (** [fun n m -> intercept + coeff × n×log(m)] *)
 val nlogm :
   name:Namespace.t ->

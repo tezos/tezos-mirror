@@ -327,6 +327,12 @@ module Models = struct
       ~coeff1:(fv (sf "%s_coeff1" name))
       ~coeff2:(fv (sf "%s_coeff2" name))
 
+  let affine_skip1_model name =
+    Model.affine_skip1
+      ~name:(ns name)
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff:(fv (sf "%s_coeff" name))
+
   let linear_sum_model name =
     Model.linear_sum
       ~name:(ns name)
@@ -686,7 +692,7 @@ let ir_model instr_or_cont =
       | N_ILsr_nat -> (affine_model, affine_model) |> m2 name
       | N_IOr_nat -> (linear_max_model, linear_max_model) |> m2 name
       | N_IAnd_nat -> (linear_min_model, linear_min_model) |> m2 name
-      | N_IAnd_int_nat -> (linear_min_model, bilinear_affine_model) |> m2 name
+      | N_IAnd_int_nat -> (linear_min_model, affine_skip1_model) |> m2 name
       | N_IXor_nat -> (linear_max_model, linear_max_model) |> m2 name
       | N_INot_int -> (affine_model, affine_model) |> m2 name
       | N_ICompare ->
