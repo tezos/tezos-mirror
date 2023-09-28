@@ -76,6 +76,15 @@ module Simple = struct
       ~level:Info
       ("level", Data_encoding.int32)
 
+  let new_commitment =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_new_commitment"
+      ~msg:"New commitment {hash} for inbox level {level}"
+      ~level:Notice
+      ("hash", Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
+
   let publish_commitment =
     declare_2
       ~section
@@ -147,6 +156,8 @@ let last_published_commitment_updated head level =
   Simple.(emit last_published_commitment_updated (head, level))
 
 let compute_commitment level = Simple.(emit compute_commitment level)
+
+let new_commitment head level = Simple.(emit new_commitment (head, level))
 
 let publish_commitment head level =
   Simple.(emit publish_commitment (head, level))
