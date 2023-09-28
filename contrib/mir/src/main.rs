@@ -28,7 +28,7 @@ mod tests {
         let initial_milligas = gas.milligas();
         let r = f(gas);
         let gas_diff = initial_milligas - gas.milligas();
-        println!("Gas consumed: {}.{:0>3}", gas_diff / 1000, gas_diff % 1000,);
+        println!("Gas consumed: {}.{:0>3}", gas_diff / 1000, gas_diff % 1000);
         r
     }
 
@@ -118,9 +118,38 @@ mod tests {
 
     #[test]
     fn parser_test_expect_success() {
+        use Instruction::*;
+        use Value::*;
+
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         // use built in pretty printer to validate the expected AST.
-        assert_eq!(format!("{:#?}", ast), AST_PRETTY_EXPECTATION);
+        assert_eq!(
+            ast,
+            vec![
+                Int,
+                Push(Type::Int, NumberValue(0)),
+                Dup(Some(2)),
+                Gt,
+                If(
+                    vec![
+                        Dip(None, vec![Push(Type::Int, NumberValue(-1)), Add(())]),
+                        Push(Type::Int, NumberValue(1)),
+                        Dup(Some(3)),
+                        Gt,
+                        Loop(vec![
+                            Swap,
+                            Dup(Some(2)),
+                            Add(()),
+                            Dip(Some(2), vec![Push(Type::Int, NumberValue(-1)), Add(())]),
+                            Dup(Some(3)),
+                            Gt,
+                        ]),
+                        Dip(None, vec![Drop(Some(2))]),
+                    ],
+                    vec![Dip(None, vec![Drop(None)])],
+                ),
+            ]
+        );
     }
 
     #[test]
@@ -194,105 +223,4 @@ mod tests {
             LOOP { SWAP ; DUP 2 ; ADD ; DIP 2 { PUSH int -1 ; ADD } ; DUP 3 ; GT } ;
             DIP { DROP 2 } }
           { DIP { DROP } } }";
-
-    const AST_PRETTY_EXPECTATION: &str = "[
-    Int,
-    Push(
-        Int,
-        NumberValue(
-            0,
-        ),
-    ),
-    Dup(
-        Some(
-            2,
-        ),
-    ),
-    Gt,
-    If(
-        [
-            Dip(
-                None,
-                [
-                    Push(
-                        Int,
-                        NumberValue(
-                            -1,
-                        ),
-                    ),
-                    Add(
-                        (),
-                    ),
-                ],
-            ),
-            Push(
-                Int,
-                NumberValue(
-                    1,
-                ),
-            ),
-            Dup(
-                Some(
-                    3,
-                ),
-            ),
-            Gt,
-            Loop(
-                [
-                    Swap,
-                    Dup(
-                        Some(
-                            2,
-                        ),
-                    ),
-                    Add(
-                        (),
-                    ),
-                    Dip(
-                        Some(
-                            2,
-                        ),
-                        [
-                            Push(
-                                Int,
-                                NumberValue(
-                                    -1,
-                                ),
-                            ),
-                            Add(
-                                (),
-                            ),
-                        ],
-                    ),
-                    Dup(
-                        Some(
-                            3,
-                        ),
-                    ),
-                    Gt,
-                ],
-            ),
-            Dip(
-                None,
-                [
-                    Drop(
-                        Some(
-                            2,
-                        ),
-                    ),
-                ],
-            ),
-        ],
-        [
-            Dip(
-                None,
-                [
-                    Drop(
-                        None,
-                    ),
-                ],
-            ),
-        ],
-    ),
-]";
 }
