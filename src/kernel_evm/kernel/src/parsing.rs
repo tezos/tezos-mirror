@@ -7,9 +7,11 @@
 
 use crate::inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent};
 use primitive_types::{H160, U256};
+use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::{
-    transaction::TransactionHash, tx_common::EthereumTransactionCommon,
+    transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
+    tx_common::EthereumTransactionCommon,
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::*};
@@ -103,8 +105,16 @@ pub type RollupType = MichelsonPair<
 impl InputResult {
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = parsable!(split_at(bytes, 32));
-        let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok()); // Remaining bytes is the rlp encoded transaction.
+        // Remaining bytes is the rlp encoded transaction.
+        let (tx_hash, remaining) = parsable!(split_at(bytes, TRANSACTION_HASH_SIZE));
+        let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
+        let produced_hash: [u8; TRANSACTION_HASH_SIZE] =
+            Keccak256::digest(remaining).into();
+        if tx_hash != produced_hash {
+            // The produced hash from the transaction data is not the same as the
+            // one sent, the message is ignored.
+            return InputResult::Unparsable;
+        }
         let tx: EthereumTransactionCommon = parsable!(remaining.try_into().ok());
         InputResult::Input(Input::SimpleTransaction(Box::new(Transaction {
             tx_hash,
