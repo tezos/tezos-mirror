@@ -202,11 +202,7 @@ let maths s =
   Inline_math_blob s
 
 let benchmark_options_table (bench_opts : Measure.options) =
-  let seed =
-    match bench_opts.seed with
-    | None -> normal_text "self-init"
-    | Some seed -> normal_text (string_of_int seed)
-  in
+  let seed = normal_text (string_of_int bench_opts.seed) in
   let nsamples =
     let s = string_of_int bench_opts.nsamples in
     normal_text s

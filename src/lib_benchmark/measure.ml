@@ -27,7 +27,7 @@
 open Stats
 
 type options = {
-  seed : int option;
+  seed : int;
   nsamples : int;
   bench_number : int;
   minor_heap_size : [`words of int];
@@ -83,7 +83,7 @@ let options_encoding =
        (fun (seed, nsamples, bench_number, minor_heap_size, config_file) ->
          {seed; nsamples; bench_number; minor_heap_size; config_file})
        (obj5
-          (req "seed" (option Benchmark_helpers.int_encoding))
+          (req "seed" Benchmark_helpers.int_encoding)
           (req "samples_per_bench" Benchmark_helpers.int_encoding)
           (req "bench_number" Benchmark_helpers.int_encoding)
           (req "minor_heap_size" heap_size_encoding)
@@ -151,11 +151,7 @@ let serialized_workload_encoding =
 (* Pp *)
 
 let pp_options fmtr (options : options) =
-  let seed =
-    match options.seed with
-    | None -> "self-init"
-    | Some seed -> string_of_int seed
-  in
+  let seed = match options.seed with seed -> string_of_int seed in
   let nsamples = string_of_int options.nsamples in
   let config_file = Option.value options.config_file ~default:"None" in
   let bench_number = string_of_int options.bench_number in
@@ -420,9 +416,7 @@ let compute_empirical_timing_distribution :
  [@@ocaml.inline]
 
 let seed_init_from_options (options : options) =
-  match options.seed with
-  | None -> Random.State.make_self_init ()
-  | Some seed -> Random.State.make [|seed|]
+  Random.State.make [|options.seed|]
 
 let gc_init_from_options (options : options) =
   match options.minor_heap_size with

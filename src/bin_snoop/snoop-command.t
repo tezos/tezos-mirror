@@ -1,7 +1,7 @@
 Missing config file prints
-  $ ./main_snoop.exe benchmark interpreter/N_IBlake2b and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
+  $ ./main_snoop.exe benchmark interpreter/N_IBlake2b and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed -E "s/seed=[0-9]+;/seed=SEED;/g" | sed s'/stats over all benchmarks:.*/stats <hidden>/'
   Benchmarking interpreter/N_IBlake2b with the following options:
-    { options = { seed=self-init;
+    { options = { seed=SEED;
                   bench #=1;
                   nsamples/bench=500;
                   minor_heap_size=262144 words;
@@ -23,6 +23,7 @@ Missing config file prints
     "compare": { "type_size": { "min": 1, "max": 15 } } }
   benchmarking 1/1
   stats <hidden>
+benchmarking 1/1
 benchmarking 1/1
 
 Generate empty config

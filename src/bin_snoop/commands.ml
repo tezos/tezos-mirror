@@ -53,7 +53,7 @@ module Benchmark_cmd = struct
   (* Handling the options of the benchmarker *)
   open Measure
 
-  let set_seed seed (options : options) = {options with seed = Some seed}
+  let set_seed seed (options : options) = {options with seed}
 
   let set_nsamples nsamples options = {options with nsamples}
 
@@ -74,7 +74,9 @@ module Benchmark_cmd = struct
   let default_benchmark_options =
     let options =
       {
-        seed = None;
+        seed =
+          (Random.self_init () ;
+           Random.bits ());
         nsamples = 500;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);

@@ -7,7 +7,7 @@ Dump workload json to file
   Measure.packed_measurement_save_json: saved to data.json
 
 Echo data.json file.
-  $ cat data.json | jq  '(.measurement_data.date |= "DATE") | (.measurement_data.workload_data |= map((.measures |= map("TIME")) | (.workload[0][1][0][1] |= "SIZE")))'
+  $ cat data.json | jq  '(.measurement_data.date |= "DATE") | (.measurement_data.workload_data |= map((.measures |= map("TIME")) | (.workload[0][1][0][1] |= "SIZE"))) | (.measurement_data.benchmark_options.seed |= "SEED")'
   {
     "benchmark_namespace": [
       "interpreter",
@@ -15,7 +15,7 @@ Echo data.json file.
     ],
     "measurement_data": {
       "benchmark_options": {
-        "seed": null,
+        "seed": "SEED",
         "samples_per_bench": "3",
         "bench_number": "2",
         "minor_heap_size": "262144",

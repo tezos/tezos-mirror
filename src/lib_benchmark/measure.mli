@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 type options = {
-  seed : int option;
+  seed : int;
   nsamples : int;
   bench_number : int;
   minor_heap_size : [`words of int];
