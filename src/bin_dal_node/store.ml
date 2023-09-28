@@ -89,15 +89,7 @@ module Shards = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
   let are_shards_available store commitment shard_indexes =
-    let open Lwt_result_syntax in
-    List.for_all_es
-      (fun index ->
-        let*! value = read_value store commitment index in
-        match value with
-        | Ok _ -> return true
-        | Error [Missing_stored_kvs_data _] -> return false
-        | Error e -> fail e)
-      shard_indexes
+    List.for_all_s (value_exists store commitment) shard_indexes
 
   let save_and_notify shards_store shards_watcher commitment shards =
     let open Lwt_result_syntax in
