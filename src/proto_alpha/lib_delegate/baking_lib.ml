@@ -546,10 +546,7 @@ let rec baking_minimal_timestamp ~count state
       current_mempool
       (List.map (fun (_, x, _, _) -> x) signed_attestations)
   in
-  let attestation_level = Int32.succ latest_proposal.block.shell.level in
-  let* own_dal_attestations =
-    Baking_actions.get_dal_attestations state ~attestation_level
-  in
+  let* own_dal_attestations = Baking_actions.get_dal_attestations state in
   let* signed_dal_attestations =
     Baking_actions.sign_dal_attestations state own_dal_attestations
   in
@@ -583,6 +580,7 @@ let rec baking_minimal_timestamp ~count state
   if count <= 1 then return_unit
   else
     let*! () =
+      let attestation_level = Int32.succ latest_proposal.block.shell.level in
       Lwt_stream.junk_while_s
         (fun proposal ->
           Lwt.return

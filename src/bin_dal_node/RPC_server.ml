@@ -157,12 +157,16 @@ module Profile_handlers = struct
 
   let get_attestable_slots ctxt pkh attested_level () () =
     call_handler2 ctxt (fun store {proto_parameters; _} ->
+        (* For retrieving the assigned shard indexes, we consider the committee
+           at [attested_level - 1], because the (DAL) attestations in the blocks
+           at level [attested_level] refer to the predecessor level. *)
+        let attestation_level = Int32.pred attested_level in
         (let open Lwt_result_syntax in
         let* shard_indices =
           Node_context.fetch_assigned_shard_indices
             ctxt
             ~pkh
-            ~level:attested_level
+            ~level:attestation_level
           |> Errors.other_lwt_result
         in
         Profile_manager.get_attestable_slots

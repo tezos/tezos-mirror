@@ -660,7 +660,7 @@ let inject_attestations state ~attestations =
           return_unit))
     signed_operations
 
-let inject_dal_attestations state attestations ~attestation_level =
+let inject_dal_attestations state attestations =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -680,6 +680,7 @@ let inject_dal_attestations state attestations ~attestation_level =
           encoded_op
       in
       let bitset_int = Bitset.to_z (attestation :> Bitset.t) in
+      let attestation_level = state.level_state.current_level in
       let*! () =
         Events.(
           emit
@@ -710,9 +711,11 @@ let only_if_dal_feature_enabled state ~default_value f =
     | Some ctxt -> f ctxt
   else return default_value
 
-let get_dal_attestations state ~attestation_level =
+let get_dal_attestations state =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
+      let attestation_level = state.level_state.current_level in
+      let attested_level = Int32.succ attestation_level in
       let delegates =
         List.map
           (fun delegate_slot -> delegate_slot.consensus_key_and_delegate)
@@ -726,7 +729,7 @@ let get_dal_attestations state ~attestation_level =
               Node_rpc.get_attestable_slots
                 dal_node_rpc_ctxt
                 (signing_key delegate)
-                ~level:attestation_level
+                ~attested_level
             in
             match tz_res with
             | Error errs ->
@@ -781,9 +784,8 @@ let get_dal_attestations state ~attestation_level =
 
 let get_and_inject_dal_attestations state =
   let open Lwt_result_syntax in
-  let attestation_level = Int32.succ state.level_state.current_level in
-  let* attestations = get_dal_attestations state ~attestation_level in
-  inject_dal_attestations state attestations ~attestation_level
+  let* attestations = get_dal_attestations state in
+  inject_dal_attestations state attestations
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
