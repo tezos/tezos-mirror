@@ -141,7 +141,7 @@ fn interpret_one(
                 }
             }
         }
-        I::Push(_, v) => {
+        I::Push(v) => {
             gas.consume(interpret_cost::PUSH)?;
             stack.push(v.clone());
         }
@@ -350,7 +350,7 @@ mod interpreter_tests {
         let mut stack = stk![NumberValue(20), NumberValue(10)];
         let expected_stack = stk![NumberValue(20), NumberValue(10), NumberValue(0)];
         let mut gas = Gas::default();
-        assert!(interpret_one(&Push(Type::Nat, NumberValue(0)), &mut gas, &mut stack).is_ok());
+        assert!(interpret_one(&Push(NumberValue(0)), &mut gas, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -361,9 +361,9 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(Type::Nat, NumberValue(1)),
+                Push(NumberValue(1)),
                 Add(overloads::Add::NatNat),
-                Push(Type::Bool, BooleanValue(false))
+                Push(BooleanValue(false))
             ]),
             &mut gas,
             &mut stack,
@@ -379,9 +379,9 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(Type::Nat, NumberValue(1)),
+                Push(NumberValue(1)),
                 Add(overloads::Add::NatNat),
-                Push(Type::Bool, BooleanValue(false))
+                Push(BooleanValue(false))
             ]),
             &mut gas,
             &mut stack,
@@ -397,7 +397,7 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(Type::Int, NumberValue(-1)),
+                Push(NumberValue(-1)),
                 Add(overloads::Add::IntInt),
                 Dup(None),
                 Gt
@@ -431,7 +431,7 @@ mod interpreter_tests {
         let mut stack = stk![];
         assert_eq!(
             interpret(
-                &vec![Push(Type::String, Value::StringValue("foo".to_owned()))],
+                &vec![Push(Value::StringValue("foo".to_owned()))],
                 &mut Gas::default(),
                 &mut stack
             ),
@@ -445,7 +445,7 @@ mod interpreter_tests {
         let mut stack = stk![];
         assert_eq!(
             interpret(
-                &vec![Push(Type::Unit, Value::UnitValue)],
+                &vec![Push(Value::UnitValue)],
                 &mut Gas::default(),
                 &mut stack
             ),
@@ -471,13 +471,10 @@ mod interpreter_tests {
         let mut stack = stk![];
         let mut gas = Gas::default();
         assert!(interpret(
-            &vec![Push(
-                Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
-                Value::new_pair(
-                    Value::NumberValue(-5),
-                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
-                )
-            )],
+            &vec![Push(Value::new_pair(
+                Value::NumberValue(-5),
+                Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+            ))],
             &mut gas,
             &mut stack
         )
@@ -501,13 +498,10 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret(
             &vec![
-                Push(
-                    Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
-                    Value::new_pair(
-                        Value::NumberValue(-5),
-                        Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
-                    )
-                ),
+                Push(Value::new_pair(
+                    Value::NumberValue(-5),
+                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                )),
                 Car
             ],
             &mut gas,
@@ -530,13 +524,10 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret(
             &vec![
-                Push(
-                    Type::new_pair(Type::new_pair(Type::Nat, Type::Bool), Type::Int),
-                    Value::new_pair(
-                        Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false)),
-                        Value::NumberValue(-5),
-                    )
-                ),
+                Push(Value::new_pair(
+                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false)),
+                    Value::NumberValue(-5),
+                )),
                 Cdr
             ],
             &mut gas,
@@ -553,6 +544,7 @@ mod interpreter_tests {
         );
     }
 
+    #[test]
     fn pair() {
         let mut stack = stk![Value::NumberValue(42), Value::BooleanValue(false)]; // NB: bool is top
         assert!(interpret(&vec![Pair], &mut Gas::default(), &mut stack).is_ok());

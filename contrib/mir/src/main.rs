@@ -127,20 +127,20 @@ mod tests {
             ast,
             vec![
                 Int,
-                Push(Type::Int, NumberValue(0)),
+                Push((Type::Int, NumberValue(0))),
                 Dup(Some(2)),
                 Gt,
                 If(
                     vec![
-                        Dip(None, vec![Push(Type::Int, NumberValue(-1)), Add(())]),
-                        Push(Type::Int, NumberValue(1)),
+                        Dip(None, vec![Push((Type::Int, NumberValue(-1))), Add(())]),
+                        Push((Type::Int, NumberValue(1))),
                         Dup(Some(3)),
                         Gt,
                         Loop(vec![
                             Swap,
                             Dup(Some(2)),
                             Add(()),
-                            Dip(Some(2), vec![Push(Type::Int, NumberValue(-1)), Add(())]),
+                            Dip(Some(2), vec![Push((Type::Int, NumberValue(-1))), Add(())]),
                             Dup(Some(3)),
                             Gt,
                         ]),

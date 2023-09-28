@@ -5,13 +5,14 @@
 /*                                                                            */
 /******************************************************************************/
 
-use super::{Instruction, Stage};
+use super::{Instruction, Stage, Value};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TypecheckedStage {}
 
 impl Stage for TypecheckedStage {
     type AddMeta = overloads::Add;
+    type PushValue = Value;
 }
 
 pub type TypecheckedInstruction = Instruction<TypecheckedStage>;
