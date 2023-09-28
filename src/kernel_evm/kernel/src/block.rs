@@ -6,7 +6,7 @@
 
 use crate::apply::apply_transaction;
 use crate::block_in_progress;
-use crate::blueprint::Queue;
+use crate::blueprint::{Queue, QueueElement};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
@@ -139,7 +139,9 @@ pub fn produce<Host: Runtime>(
     let precompiles = precompiles::precompile_set::<Host>();
     let mut tick_counter = TickCounter::new(0u64);
 
-    for proposal in queue.proposals {
+    let mut iter = queue.proposals.into_iter();
+    while let Some(proposal) = iter.next() {
+        // proposal is turned into a ring to allow popping from the front
         let mut block_in_progress = BlockInProgress::from_queue_element(
             proposal,
             current_block_number,
@@ -163,11 +165,13 @@ pub fn produce<Host: Runtime>(
                     "Ask for reboot. Estimated ticks: {}",
                     &block_in_progress.estimated_ticks
                 );
-                storage::store_block_in_progress(host, &block_in_progress)?;
+                let remaining_queue = Queue {
+                    proposals: remaining_proposals(block_in_progress, iter),
+                    ..queue
+                };
+                storage::store_queue(host, &remaining_queue)?;
                 storage::add_reboot_flag(host)?;
                 host.mark_for_reboot()?;
-                // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-                // store the queue
                 return Ok(());
             }
             ComputationResult::Finished => {
@@ -178,12 +182,21 @@ pub fn produce<Host: Runtime>(
                 current_block_number = new_block.number + 1;
                 current_block_parent_hash = new_block.hash;
                 current_constants = new_block.constants(chain_id, base_fee_per_gas);
-                storage::delete_block_in_progress(host)?;
             }
         }
     }
     log!(host, Debug, "Estimated ticks: {}", tick_counter.c);
     Ok(())
+}
+
+fn remaining_proposals(
+    bip: BlockInProgress,
+    iter: std::vec::IntoIter<QueueElement>,
+) -> Vec<QueueElement> {
+    let mut proposals = Vec::new();
+    proposals.push(QueueElement::BlockInProgress(Box::new(bip)));
+    proposals.extend(iter);
+    proposals
 }
 
 #[cfg(test)]

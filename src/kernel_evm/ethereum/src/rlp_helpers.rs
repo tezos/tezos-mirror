@@ -69,6 +69,19 @@ pub fn decode_list<T: Decodable>(
     decoder.as_list().map_err(custom_err)
 }
 
+pub fn decode_array(
+    item: rlp::Rlp<'_>,
+    size: usize,
+    vec: &mut [u8],
+) -> Result<(), DecoderError> {
+    let list = item.data()?;
+    if list.len() != size {
+        return Err(DecoderError::RlpIncorrectListLen);
+    }
+    vec.copy_from_slice(list);
+    Ok(())
+}
+
 pub fn append_option<T: Encodable>(
     stream: &mut RlpStream,
     data: Option<T>,

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
+use crate::blueprint::Queue;
 use crate::indexable_storage::IndexableStorage;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
@@ -98,6 +99,9 @@ const TRANSACTION_RECEIPT_STATUS_SIZE: usize = 1;
 const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
+
+// Path to the queue left at end of previous reboot
+const QUEUE_IN_PROGRESS: RefPath = RefPath::assert_from(b"/queue");
 
 // This function should be used when it makes sense that the value
 // stored under [path] can be empty.
@@ -857,6 +861,24 @@ pub fn delete_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::
 
 pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
     Ok(host.store_read(&REBOOTED, 0, 0).is_ok())
+}
+
+pub fn store_queue<Host: Runtime>(
+    host: &mut Host,
+    queue: &Queue,
+) -> Result<(), anyhow::Error> {
+    let queue_path = OwnedPath::from(QUEUE_IN_PROGRESS);
+    host.store_write_all(&queue_path, &queue.rlp_bytes())
+        .context("Failed to store current queue")
+}
+
+pub fn read_queue<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error> {
+    let queue_path = OwnedPath::from(QUEUE_IN_PROGRESS);
+    let bytes = host
+        .store_read_all(&queue_path)
+        .context("Failed to read current queue")?;
+    let decoder = Rlp::new(bytes.as_slice());
+    Queue::decode(&decoder).context("Failed to decode current queue")
 }
 
 pub(crate) mod internal_for_tests {

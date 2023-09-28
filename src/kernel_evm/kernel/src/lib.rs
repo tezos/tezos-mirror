@@ -220,18 +220,6 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
     }
 }
 
-fn fetch_queue_left<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error> {
-    let mut queue = Queue::new();
-    // fetch rest of queue
-    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-    // reload the queue
-
-    // fetch Bip
-    let bip = storage::read_block_in_progress(host)?;
-    queue.proposals = vec![blueprint::QueueElement::BlockInProgress(Box::new(bip))];
-    Ok(queue)
-}
-
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
     let queue = if storage::was_rebooted(host)? {
@@ -244,7 +232,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         );
         storage::delete_reboot_flag(host)?;
         log!(host, Info, "Read queue.");
-        fetch_queue_left(host)?
+        storage::read_queue(host)?
     } else {
         // first kernel run of the level
         match stage_zero(host)? {
