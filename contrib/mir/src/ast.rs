@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
+pub mod comparable;
 pub mod parsed;
 pub mod typechecked;
 
