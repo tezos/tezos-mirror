@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use std::num::TryFromIntError;
+
 use crate::ast::*;
 use crate::gas;
 use crate::gas::{Gas, OutOfGas};
@@ -23,6 +25,12 @@ pub enum TcError {
 impl From<OutOfGas> for TcError {
     fn from(_: OutOfGas) -> Self {
         TcError::OutOfGas
+    }
+}
+
+impl From<TryFromIntError> for TcError {
+    fn from(_: TryFromIntError) -> Self {
+        TcError::GenericTcError
     }
 }
 
@@ -149,7 +157,7 @@ fn typecheck_instruction(
             _ => return Err(TcError::GenericTcError),
         },
         I::Push((t, v)) => {
-            typecheck_value(gas, &t, &v)?;
+            let v = typecheck_value(gas, &t, v)?;
             stack.push(t.to_owned());
             I::Push(v)
         }
@@ -195,26 +203,25 @@ fn typecheck_instruction(
     })
 }
 
-pub const MAX_TEZ: i128 = 2i128.pow(63) - 1;
-
-fn typecheck_value(gas: &mut Gas, t: &Type, v: &Value) -> Result<(), TcError> {
+fn typecheck_value(gas: &mut Gas, t: &Type, v: Value) -> Result<TypedValue, TcError> {
     use Type::*;
+    use TypedValue as TV;
     use Value::*;
     gas.consume(gas::tc_cost::VALUE_STEP)?;
-    match (t, v) {
-        (Nat, NumberValue(n)) if *n >= 0 => Ok(()),
-        (Int, NumberValue(_)) => Ok(()),
-        (Bool, BooleanValue(_)) => Ok(()),
-        (Mutez, NumberValue(n)) if *n >= 0 && *n <= MAX_TEZ => Ok(()),
-        (String, StringValue(_)) => Ok(()),
-        (Unit, UnitValue) => Ok(()),
+    Ok(match (t, v) {
+        (Nat, NumberValue(n)) => TV::Nat(n.try_into()?),
+        (Int, NumberValue(n)) => TV::Int(n),
+        (Bool, BooleanValue(b)) => TV::Bool(b),
+        (Mutez, NumberValue(n)) if n >= 0 => TV::Mutez(n.try_into()?),
+        (String, StringValue(s)) => TV::String(s),
+        (Unit, UnitValue) => TV::Unit,
         (Pair(tl, tr), PairValue(vl, vr)) => {
-            typecheck_value(gas, tl, vl)?;
-            typecheck_value(gas, tr, vr)?;
-            Ok(())
+            let l = typecheck_value(gas, tl, *vl)?;
+            let r = typecheck_value(gas, tr, *vr)?;
+            TV::new_pair(l, r)
         }
-        _ => Err(TcError::GenericTcError),
-    }
+        _ => return Err(TcError::GenericTcError),
+    })
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -342,7 +349,7 @@ mod typecheck_tests {
                 &mut gas,
                 &mut stack
             ),
-            Ok(Push(Value::NumberValue(1)))
+            Ok(Push(TypedValue::Int(1)))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440 - 100);
@@ -369,7 +376,7 @@ mod typecheck_tests {
                 &mut gas,
                 &mut stack,
             ),
-            Ok(Dip(Some(1), vec![Push(Value::NumberValue(6))]))
+            Ok(Dip(Some(1), vec![Push(TypedValue::Nat(6))]))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440 - 440 - 100 - 50);
@@ -425,7 +432,7 @@ mod typecheck_tests {
                 &mut gas,
                 &mut stack
             ),
-            Ok(Loop(vec![Push(Value::BooleanValue(true))]))
+            Ok(Loop(vec![Push(TypedValue::Bool(true))]))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440 - 440 - 100 - 60 * 2);
@@ -499,9 +506,9 @@ mod typecheck_tests {
             typecheck_value(
                 &mut Gas::default(),
                 &Type::String,
-                &Value::StringValue("foo".to_owned())
+                Value::StringValue("foo".to_owned())
             ),
-            Ok(())
+            Ok(TypedValue::String("foo".to_owned()))
         )
     }
 
@@ -514,7 +521,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(vec![Push(Value::StringValue("foo".to_owned()))])
+            Ok(vec![Push(TypedValue::String("foo".to_owned()))])
         );
         assert_eq!(stack, stk![Type::String]);
     }
@@ -528,7 +535,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(vec![Push(Value::UnitValue)])
+            Ok(vec![Push(TypedValue::Unit)])
         );
         assert_eq!(stack, stk![Type::Unit]);
     }
@@ -552,9 +559,9 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(vec![Push(Value::new_pair(
-                Value::NumberValue(-5),
-                Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+            Ok(vec![Push(TypedValue::new_pair(
+                TypedValue::Int(-5),
+                TypedValue::new_pair(TypedValue::Nat(3), TypedValue::Bool(false))
             ))])
         );
         assert_eq!(
@@ -576,9 +583,9 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(vec![
-                Push(Value::new_pair(
-                    Value::NumberValue(-5),
-                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                Push(TypedValue::new_pair(
+                    TypedValue::Int(-5),
+                    TypedValue::new_pair(TypedValue::Nat(3), TypedValue::Bool(false))
                 )),
                 Car
             ])
@@ -596,9 +603,9 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(vec![
-                Push(Value::new_pair(
-                    Value::NumberValue(-5),
-                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                Push(TypedValue::new_pair(
+                    TypedValue::Int(-5),
+                    TypedValue::new_pair(TypedValue::Nat(3), TypedValue::Bool(false))
                 )),
                 Cdr
             ])
