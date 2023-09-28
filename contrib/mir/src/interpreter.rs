@@ -118,6 +118,19 @@ fn interpret_one(
                 unreachable_state();
             }
         }
+        I::IfNone(when_none, when_some) => {
+            gas.consume(interpret_cost::IF_NONE)?;
+            match stack.pop() {
+                Some(V::Option(x)) => match x {
+                    Some(x) => {
+                        stack.push(*x);
+                        interpret(when_some, gas, stack)?
+                    }
+                    None => interpret(when_none, gas, stack)?,
+                },
+                _ => unreachable_state(),
+            }
+        }
         I::Int => match stack.as_slice() {
             [.., V::Nat(i)] => {
                 gas.consume(interpret_cost::INT_NAT)?;
@@ -574,5 +587,36 @@ mod interpreter_tests {
         let mut stack = stk![V::Nat(42), V::Bool(false)]; // NB: bool is top
         assert!(interpret(&vec![Pair, Cdr], &mut Gas::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![V::Nat(42)]);
+    }
+
+    #[test]
+    fn if_none_1() {
+        let code = vec![IfNone(vec![Push(TypedValue::Int(5))], vec![])];
+        // with Some
+        let mut stack = stk![V::new_option(Some(V::Int(42)))];
+        let mut gas = Gas::default();
+        assert_eq!(interpret(&code, &mut gas, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Int(42)]);
+        assert_eq!(
+            gas.milligas(),
+            Gas::default().milligas() - interpret_cost::IF_NONE - interpret_cost::INTERPRET_RET * 2
+        );
+    }
+
+    #[test]
+    fn if_none_2() {
+        let code = vec![IfNone(vec![Push(TypedValue::Int(5))], vec![])];
+        // with None
+        let mut stack = stk![V::new_option(None)];
+        let mut gas = Gas::default();
+        assert_eq!(interpret(&code, &mut gas, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Int(5)]);
+        assert_eq!(
+            gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::IF_NONE
+                - interpret_cost::PUSH
+                - interpret_cost::INTERPRET_RET * 2
+        );
     }
 }

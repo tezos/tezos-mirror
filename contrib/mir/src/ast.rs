@@ -105,6 +105,7 @@ pub enum Instruction<T: Stage> {
     Dup(Option<u16>),
     Gt,
     If(Vec<Instruction<T>>, Vec<Instruction<T>>),
+    IfNone(Vec<Instruction<T>>, Vec<Instruction<T>>),
     Int,
     Loop(Vec<Instruction<T>>),
     Push(T::PushValue),
