@@ -51,9 +51,16 @@ fn interpret_one(
 
     match i {
         I::Add(overload) => match overload {
-            // NB: branches are temporarily unified because representation is
-            // the same, this is subject to change.
-            overloads::Add::IntInt | overloads::Add::NatNat => match stack.as_slice() {
+            overloads::Add::IntInt => match stack.as_slice() {
+                [.., V::NumberValue(o2), V::NumberValue(o1)] => {
+                    gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
+                    let sum = *o1 + *o2;
+                    stack.pop();
+                    stack[0] = V::NumberValue(sum);
+                }
+                _ => unreachable_state(),
+            },
+            overloads::Add::NatNat => match stack.as_slice() {
                 [.., V::NumberValue(o2), V::NumberValue(o1)] => {
                     gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
                     let sum = *o1 + *o2;
