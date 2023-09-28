@@ -487,6 +487,23 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn push_option() {
+        let mut stack = stk![];
+        let mut gas = Gas::default();
+        assert!(interpret(
+            &vec![Push(V::new_option(Some(V::Int(-5))))],
+            &mut gas,
+            &mut stack
+        )
+        .is_ok());
+        assert_eq!(stack, stk![V::new_option(Some(V::Int(-5)))]);
+        assert_eq!(
+            gas.milligas(),
+            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
     fn car() {
         let mut stack = stk![];
         let mut gas = Gas::default();

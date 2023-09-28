@@ -50,7 +50,8 @@ pair_args: Type = {
 }
 
 composite_type: Type = {
-    r"pair" <type_expr> <pair_args> => Type::new_pair(<>),
+    "pair" <type_expr> <pair_args> => Type::new_pair(<>),
+    "option" <type_expr> => Type::new_option(<>),
 }
 
 type_expr: Type = {
@@ -70,6 +71,7 @@ atomic_value: Value = {
   <b:boolean> => BooleanValue(b),
   <string> => StringValue(<>),
   "Unit" => UnitValue,
+  "None" => OptionValue(None),
 }
 
 pair_val_args: Value = {
@@ -79,6 +81,7 @@ pair_val_args: Value = {
 
 composite_value: Value = {
   "Pair" <value_expr> <pair_val_args> => Value::new_pair(<>),
+  "Some" <value_expr> => Value::new_option(Some(<>)),
 }
 
 value_expr: Value = {
