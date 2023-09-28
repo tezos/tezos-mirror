@@ -51,9 +51,6 @@ val process_head :
   tzresult
   Lwt.t
 
-(** [start ()] initializes the inbox to track the messages being published. *)
-val start : unit -> unit Lwt.t
-
 (** [add_messages ~is_first_block ~predecessor_timestamp
     ~predecessor inbox messages] adds [messages] to the [inbox] using
     {!Sc_rollup.Inbox.add_all_messages}. *)

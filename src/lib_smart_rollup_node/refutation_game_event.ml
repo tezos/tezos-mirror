@@ -31,28 +31,6 @@ let section = ["sc_rollup_node"; "refutation_game"]
 module Simple = struct
   include Internal_event.Simple
 
-  let timeout =
-    declare_1
-      ~section
-      ~name:"sc_rollup_node_timeout"
-      ~msg:
-        "The rollup node has been slashed because of a timeout issued by \
-         {address}"
-      ~level:Notice
-      ("address", Signature.Public_key_hash.encoding)
-
-  let invalid_move =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_invalid_move"
-      ~msg:
-        "The rollup node is about to make an invalid move in the refutation \
-         game! It is stopped to avoid being slashed. The problem should be \
-         reported immediately or the rollup node should be upgraded to have a \
-         chance to be back before the timeout is reached."
-      ~level:Notice
-      ()
-
   let conflict_detected =
     declare_5
       ~section
@@ -185,10 +163,6 @@ module Simple = struct
         ()
   end
 end
-
-let timeout address = Simple.(emit timeout address)
-
-let invalid_move () = Simple.(emit invalid_move ())
 
 let conflict_detected (conflict : Octez_smart_rollup.Game.conflict) =
   let our_commitment_hash =

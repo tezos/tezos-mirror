@@ -344,7 +344,6 @@ let run node_ctxt configuration
     install_finalizer daemon_components node_ctxt rpc_server
   in
   let start () =
-    let*! () = Inbox.start () in
     let signers =
       Configuration.Operator_purpose_map.bindings
         node_ctxt.config.sc_rollup_node_operators

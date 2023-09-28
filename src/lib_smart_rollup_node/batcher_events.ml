@@ -66,17 +66,6 @@ struct
         ("errors", Error_monad.trace_encoding)
         ~pp3:Error_monad.pp_print_trace
 
-    let request_completed_notice =
-      declare_2
-        ~section
-        ~name:"request_completed_notice"
-        ~msg:"{view} {worker_status}"
-        ~level:Notice
-        ("view", Request.encoding)
-        ("worker_status", Worker_types.request_status_encoding)
-        ~pp1:Request.pp
-        ~pp2:Worker_types.pp_status
-
     let request_completed_debug =
       declare_2
         ~section

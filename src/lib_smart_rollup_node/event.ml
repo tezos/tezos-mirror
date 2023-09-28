@@ -64,32 +64,6 @@ module Simple = struct
       ("addr", Octez_smart_rollup.Address.encoding)
       ("kind", Data_encoding.string)
 
-  let connection_lost =
-    declare_0
-      ~section
-      ~name:"smart_rollup_daemon_connection_lost"
-      ~msg:"connection to the node has been lost"
-      ~level:Warning
-      ()
-
-  let cannot_connect =
-    declare_2
-      ~section
-      ~name:"smart_rollup_daemon_cannot_connect"
-      ~msg:"cannot connect to Tezos node ({count}) {error}"
-      ~level:Warning
-      ("count", Data_encoding.int31)
-      ("error", trace_encoding)
-      ~pp2:pp_print_trace
-
-  let wait_reconnect =
-    declare_1
-      ~section
-      ~name:"smart_rollup_daemon_wait_reconnect"
-      ~msg:"Retrying to connect in {delay}s"
-      ~level:Warning
-      ("delay", Data_encoding.float)
-
   let starting_metrics_server =
     declare_2
       ~section
@@ -235,12 +209,6 @@ let node_is_ready ~rpc_addr ~rpc_port =
 let rollup_exists ~addr ~kind =
   let kind = Octez_smart_rollup.Kind.to_string kind in
   Simple.(emit rollup_exists (addr, kind))
-
-let connection_lost () = Simple.(emit connection_lost) ()
-
-let cannot_connect ~count error = Simple.(emit cannot_connect) (count, error)
-
-let wait_reconnect delay = Simple.(emit wait_reconnect) delay
 
 let starting_metrics_server ~host ~port =
   Simple.(emit starting_metrics_server) (host, port)
