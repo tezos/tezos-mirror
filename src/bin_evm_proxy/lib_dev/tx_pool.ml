@@ -32,6 +32,23 @@ module Pool = struct
   }
 
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
+
+  (** Add a transacion to the pool.*)
+  let add t pkey (raw_tx : Ethereum_types.hex) =
+    let {transactions; global_index} = t in
+    let nonce = Ethereum_types.transaction_nonce raw_tx in
+    let txs = Pkey_map.find pkey transactions |> Option.value ~default:[] in
+    let txs = {index = global_index; nonce; raw_tx} :: txs in
+    (* Sort txs by nonce*)
+    let txs =
+      List.sort
+        (fun {nonce = Qty nonce_a; _} {nonce = Qty nonce_b; _} ->
+          Z.compare nonce_a nonce_b)
+        txs
+    in
+    (* Update the pool for the given pkey *)
+    let transactions = Pkey_map.add pkey txs transactions in
+    {transactions; global_index = Int64.(add global_index one)}
 end
 
 module Types = struct
@@ -40,7 +57,7 @@ module Types = struct
     smart_rollup_address : string;
     mutable level : Ethereum_types.block_height;
     messages : Message_queue.t;
-    pool : Pool.t;
+    mutable pool : Pool.t;
   }
 
   type parameters = (module Rollup_node.S) * string
@@ -110,19 +127,20 @@ type worker = Worker.infinite Worker.queue Worker.t
 let on_transaction state tx_raw =
   let open Lwt_result_syntax in
   let open Types in
-  let {rollup_node = (module Rollup_node); _} = state in
+  let {rollup_node = (module Rollup_node); pool; _} = state in
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
   match is_valid with
   | Error err -> return (Error err)
-  | Ok _ ->
-      let (Ethereum_types.Hex raw_tx) = tx_raw in
-      Message_queue.replace state.messages raw_tx raw_tx ;
+  | Ok pkey ->
+      (* Add the tx to the pool*)
+      let pool = Pool.add pool pkey tx_raw in
       (* compute the hash *)
       let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
       let hash =
         Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
       in
+      state.pool <- pool ;
       return (Ok hash)
 
 let on_head state block_height =
