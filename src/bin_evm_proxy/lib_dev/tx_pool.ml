@@ -15,6 +15,23 @@ end
 
 module Message_queue = Hash_queue.Make (Tx) (String)
 
+module Pool = struct
+  module Pkey_map = Map.Make (Ethereum_types.Address)
+
+  (** Transaction stored in the pool. *)
+  type transaction = {
+    index : int64; (* Global index of the transaction. *)
+    nonce : Ethereum_types.quantity; (* The nonce of the transaction.*)
+    raw_tx : Ethereum_types.hex; (* Current transaction. *)
+  }
+
+  type t = {
+    transactions :
+      transaction list Pkey_map.t (* Transactions are stored by public key. *);
+    global_index : int64; (* Index to order the transactions. *)
+  }
+end
+
 module Types = struct
   type state = {
     rollup_node : (module Rollup_node.S);
