@@ -173,7 +173,9 @@ enum TransactionError<'a> {
     #[error("Invalid internal inbox message, expected deposit: {0}")]
     InvalidInternalInbox(#[from] DepositFromInternalPayloadError),
     #[error("Error storing ticket on rollup")]
-    StorageError(#[from] AccountStorageError),
+    AccountStorageError(#[from] AccountStorageError),
+    #[error("Error storing DAL related parameters")]
+    DalStorageError(#[from] storage::dal::StorageError),
     #[error("Failed to process external message: {0}")]
     ProcessExternalMsgError(#[from] ProcessExtMsgError),
     #[error("Failed to construct path: {0:?}")]
@@ -208,11 +210,9 @@ fn filter_inbox_message<'a, Host: Runtime>(
                 let page_size = 128;
                 let num_pages = slot_size / page_size;
                 let published_level = (_inbox_level - attestation_lag) as i32;
-                // TODO: https://gitlab.com/tezos/tezos/-/issues/6390
-                // Make it possible to dynamically change tracked slot indexes.
                 // TODO: https://gitlab.com/tezos/tezos/-/issues/6400
                 // Make it possible to track multiple slot indexes.
-                let slot_index = 0;
+                let slot_index = storage::dal::get_or_set_slot_index(host, 0 as u8)?;
                 dal::store_dal_slot(
                     host,
                     published_level,
