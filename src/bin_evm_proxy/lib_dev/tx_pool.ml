@@ -30,6 +30,8 @@ module Pool = struct
       transaction list Pkey_map.t (* Transactions are stored by public key. *);
     global_index : int64; (* Index to order the transactions. *)
   }
+
+  let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 end
 
 module Types = struct
@@ -38,6 +40,7 @@ module Types = struct
     smart_rollup_address : string;
     mutable level : Ethereum_types.block_height;
     messages : Message_queue.t;
+    pool : Pool.t;
   }
 
   type parameters = (module Rollup_node.S) * string
@@ -172,6 +175,7 @@ module Handlers = struct
           smart_rollup_address;
           level = Block_height Z.zero;
           messages = Message_queue.create 100_000 (* ~ 400MB *);
+          pool = Pool.empty;
         }
     in
     Lwt_result_syntax.return state
