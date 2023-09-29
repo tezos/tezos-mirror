@@ -52,7 +52,9 @@ let start_workers (configuration : Configuration.t)
   let* () = Publisher.init node_ctxt in
   let* () =
     match
-      Configuration.Operator_purpose_map.find Batching node_ctxt.operators
+      Configuration.Operator_purpose_map.find
+        Batching
+        node_ctxt.config.sc_rollup_node_operators
     with
     | None -> return_unit
     | Some signer -> Batcher.init plugin configuration.batcher ~signer node_ctxt
@@ -334,7 +336,8 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let start () =
     let signers =
-      Configuration.Operator_purpose_map.bindings node_ctxt.operators
+      Configuration.Operator_purpose_map.bindings
+        node_ctxt.config.sc_rollup_node_operators
       |> List.fold_left
            (fun acc (purpose, operator) ->
              let operation_kinds =

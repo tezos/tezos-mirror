@@ -277,7 +277,8 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
     (commitment : Octez_smart_rollup.Commitment.t) =
   let open Lwt_result_syntax in
   let publish_operation =
-    L1_operation.Publish {rollup = node_ctxt.rollup_address; commitment}
+    L1_operation.Publish
+      {rollup = node_ctxt.config.sc_rollup_address; commitment}
   in
   let*! () =
     Commitment_event.publish_commitment
@@ -286,7 +287,7 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
   in
   let* _hash =
     Injector.check_and_add_pending_operation
-      node_ctxt.mode
+      node_ctxt.config.mode
       ~source
       publish_operation
   in
@@ -296,7 +297,8 @@ let inject_recover_bond (node_ctxt : _ Node_context.t) ~source
     (staker : Signature.Public_key_hash.t) =
   let open Lwt_result_syntax in
   let recover_operation =
-    L1_operation.Recover_bond {rollup = node_ctxt.rollup_address; staker}
+    L1_operation.Recover_bond
+      {rollup = node_ctxt.config.sc_rollup_address; staker}
   in
   let*! () = Commitment_event.recover_bond staker in
   let* _hash = Injector.add_pending_operation ~source recover_operation in
@@ -424,11 +426,12 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
 let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment =
   let open Lwt_result_syntax in
   let cement_operation =
-    L1_operation.Cement {rollup = node_ctxt.rollup_address; commitment}
+    L1_operation.Cement
+      {rollup = node_ctxt.config.sc_rollup_address; commitment}
   in
   let* _hash =
     Injector.check_and_add_pending_operation
-      node_ctxt.mode
+      node_ctxt.config.mode
       ~source
       cement_operation
   in

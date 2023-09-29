@@ -118,7 +118,7 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
   | _ -> return_none
 
 let metadata (node_ctxt : _ Node_context.t) =
-  let address = node_ctxt.rollup_address in
+  let address = node_ctxt.config.sc_rollup_address in
   let origination_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level in
   Sc_rollup.Metadata.{address; origination_level}
 
@@ -334,12 +334,12 @@ let make_dissection plugin (node_ctxt : _ Node_context.t) ~start_state
 
 let timeout_reached node_ctxt ~self ~opponent =
   let open Lwt_result_syntax in
-  let Node_context.{rollup_address; cctxt; _} = node_ctxt in
+  let Node_context.{config; cctxt; _} = node_ctxt in
   let+ game_result =
     Plugin.RPC.Sc_rollup.timeout_reached
       (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, `Head 0)
-      rollup_address
+      config.sc_rollup_address
       self
       opponent
   in

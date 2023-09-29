@@ -213,7 +213,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
         match (operation, result) with
         | ( Sc_rollup_originate {boot_sector; _},
             Sc_rollup_originate_result {address; _} )
-          when node_ctxt.rollup_address = address ->
+          when node_ctxt.config.sc_rollup_address = address ->
             raise (Found_boot_sector boot_sector)
         | _ -> accu
       in

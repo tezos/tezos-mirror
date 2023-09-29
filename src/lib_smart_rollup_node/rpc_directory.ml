@@ -69,7 +69,7 @@ end)
 
 let () =
   Global_directory.register0 Rollup_node_services.Global.sc_rollup_address
-  @@ fun node_ctxt () () -> Lwt_result.return node_ctxt.rollup_address
+  @@ fun node_ctxt () () -> Lwt_result.return node_ctxt.config.sc_rollup_address
 
 let () =
   Global_directory.register0 Rollup_node_services.Global.current_tezos_head

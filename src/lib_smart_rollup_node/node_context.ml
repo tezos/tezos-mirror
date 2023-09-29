@@ -53,16 +53,10 @@ type 'a t = {
   dac_client : Dac_observer_client.t option;
   data_dir : string;
   l1_ctxt : Layer1.t;
-  rollup_address : Address.t;
-  boot_sector_file : string option;
-  mode : Configuration.mode;
-  operators : Configuration.operators;
   genesis_info : genesis_info;
   injector_retention_period : int;
   block_finality_time : int;
   kind : Kind.t;
-  fee_parameters : Configuration.fee_parameters;
-  loser_mode : Loser_mode.t;
   lockfile : Lwt_unix.file_descr;
   store : 'a store;
   context : 'a Context.index;
@@ -80,21 +74,23 @@ type rw = [`Read | `Write] t
 type ro = [`Read] t
 
 let get_operator node_ctxt purpose =
-  Configuration.Operator_purpose_map.find purpose node_ctxt.operators
+  Configuration.Operator_purpose_map.find
+    purpose
+    node_ctxt.config.sc_rollup_node_operators
 
 let is_operator node_ctxt pkh =
   Configuration.Operator_purpose_map.exists
     (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
-    node_ctxt.operators
+    node_ctxt.config.sc_rollup_node_operators
 
-let is_accuser {mode; _} = mode = Accuser
+let is_accuser node_ctxt = node_ctxt.config.mode = Accuser
 
-let is_bailout {mode; _} = mode = Bailout
+let is_bailout node_ctxt = node_ctxt.config.mode = Bailout
 
-let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
+let is_loser node_ctxt = node_ctxt.config.loser_mode <> Loser_mode.no_failures
 
-let can_inject {mode; _} (op_kind : Configuration.operation_kind) =
-  Configuration.can_inject mode op_kind
+let can_inject node_ctxt (op_kind : Configuration.operation_kind) =
+  Configuration.can_inject node_ctxt.config.mode op_kind
 
 let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
   let operator = get_operator node_ctxt Configuration.Operating in
@@ -107,7 +103,9 @@ let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
   | None -> Result_syntax.return_unit
 
 let get_fee_parameter node_ctxt operation_kind =
-  Configuration.Operation_kind_map.find operation_kind node_ctxt.fee_parameters
+  Configuration.Operation_kind_map.find
+    operation_kind
+    node_ctxt.config.fee_parameters
   |> Option.value
        ~default:(Configuration.default_fee_parameter ~operation_kind ())
 
@@ -172,11 +170,6 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     Configuration.(
       {
         sc_rollup_address = rollup_address;
-        sc_rollup_node_operators = operators;
-        boot_sector_file;
-        mode = operating_mode;
-        fee_parameters;
-        loser_mode;
         l2_blocks_cache_size;
         dal_node_endpoint;
         _;
@@ -247,10 +240,6 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       dac_client;
       data_dir;
       l1_ctxt;
-      rollup_address;
-      boot_sector_file;
-      mode = operating_mode;
-      operators;
       genesis_info;
       lcc = Reference.new_ lcc;
       lpc = Reference.new_ lpc;
@@ -258,8 +247,6 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       kind;
       injector_retention_period = 0;
       block_finality_time = 2;
-      fee_parameters;
-      loser_mode;
       lockfile;
       store;
       context;
@@ -1075,10 +1062,6 @@ module Internal_for_tests = struct
         dac_client = None;
         data_dir;
         l1_ctxt;
-        rollup_address;
-        boot_sector_file = None;
-        mode = Observer;
-        operators;
         genesis_info;
         lcc;
         lpc;
@@ -1086,9 +1069,7 @@ module Internal_for_tests = struct
         kind;
         injector_retention_period = 0;
         block_finality_time = 2;
-        fee_parameters = Configuration.default_fee_parameters;
         current_protocol;
-        loser_mode;
         lockfile;
         store;
         context;

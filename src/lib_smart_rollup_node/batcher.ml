@@ -58,7 +58,7 @@ let inject_batch state (l2_messages : L2_message.t list) =
   let operation = L1_operation.Add_messages {messages} in
   let* l1_hash =
     Injector.check_and_add_pending_operation
-      state.node_ctxt.mode
+      state.node_ctxt.config.mode
       ~source:state.signer
       operation
   in

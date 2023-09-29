@@ -29,14 +29,14 @@ open Protocol
 open Alpha_context
 open Apply_results
 
-let check_pvm_initial_state_hash {Node_context.cctxt; rollup_address; kind; _} =
+let check_pvm_initial_state_hash {Node_context.cctxt; config; kind; _} =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind kind) in
   let* l1_reference_initial_state_hash =
     RPC.Sc_rollup.initial_pvm_state_hash
       (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, cctxt#block)
-      rollup_address
+      config.sc_rollup_address
   in
   let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
   let*! l2_initial_state_hash = PVM.state_hash s in
@@ -102,7 +102,7 @@ let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
           ~level:(Raw_level.to_int32 their_commitment.inbox_level)
           ~other
       in
-      assert (Sc_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
+      assert (Sc_rollup.Address.(node_ctxt.config.sc_rollup_address = rollup)) ;
       Publisher.publish_single_commitment node_ctxt our_commitment
 
 (** If in bailout mode and when the operator is not staked on any
@@ -118,7 +118,7 @@ let maybe_recover_bond node_ctxt =
           RPC.Sc_rollup.staked_on_commitment
             (new Protocol_client_context.wrap_full node_ctxt.cctxt)
             (node_ctxt.cctxt#chain, `Head 0)
-            node_ctxt.rollup_address
+            node_ctxt.config.sc_rollup_address
             operating_pkh
         in
         match staked_on_commitment with
@@ -298,7 +298,8 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
     | Sc_rollup_timeout {rollup; _}
     | Sc_rollup_execute_outbox_message {rollup; _}
     | Sc_rollup_recover_bond {sc_rollup = rollup; staker = _} ->
-        Sc_rollup.Address.(rollup = node_ctxt.Node_context.rollup_address)
+        Sc_rollup.Address.(
+          rollup = node_ctxt.Node_context.config.sc_rollup_address)
     | Dal_publish_slot_header _ -> true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
     | Update_consensus_key _ | Register_global_constant _

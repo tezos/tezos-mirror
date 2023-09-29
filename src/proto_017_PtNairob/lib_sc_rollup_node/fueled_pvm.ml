@@ -59,7 +59,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
 
   let metadata (node_ctxt : _ Node_context.t) =
     let address =
-      Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
+      Sc_rollup_proto_types.Address.of_octez node_ctxt.config.sc_rollup_address
     in
     let origination_level =
       Raw_level.of_int32_exn node_ctxt.genesis_info.level
@@ -332,7 +332,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           in
           let failing_ticks =
             Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
+              node_ctxt.Node_context.config.loser_mode
               ~level
               ~message_index
           in
@@ -421,7 +421,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           let message_index = message_counter_offset - 1 in
           let failing_ticks =
             Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
+              node_ctxt.Node_context.config.loser_mode
               ~level
               ~message_index
           in

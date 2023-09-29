@@ -147,7 +147,11 @@ let execute_whitelist_update_message_aux (node_ctxt : _ Node_context.t) ~source
   let open Lwt_result_syntax in
   let outbox_message =
     L1_operation.Execute_outbox_message
-      {rollup = node_ctxt.rollup_address; cemented_commitment; output_proof}
+      {
+        rollup = node_ctxt.config.sc_rollup_address;
+        cemented_commitment;
+        output_proof;
+      }
   in
   let* _hash = Injector.add_pending_operation ~source outbox_message in
   return_unit

@@ -334,7 +334,8 @@ let run node_ctxt configuration
   let start () =
     let*! () = Inbox.start () in
     let signers =
-      Configuration.Operator_purpose_map.bindings node_ctxt.operators
+      Configuration.Operator_purpose_map.bindings
+        node_ctxt.config.sc_rollup_node_operators
       |> List.fold_left
            (fun acc (operation_kind, operator) ->
              let operation_kinds =
@@ -377,7 +378,9 @@ let run node_ctxt configuration
     in
     let* () =
       match
-        Configuration.Operator_purpose_map.find Batching node_ctxt.operators
+        Configuration.Operator_purpose_map.find
+          Batching
+          node_ctxt.config.sc_rollup_node_operators
       with
       | None -> return_unit
       | Some signer ->

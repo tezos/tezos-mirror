@@ -26,7 +26,7 @@
 let get_boot_sector (module Plugin : Protocol_plugin_sig.PARTIAL) block_hash
     (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
-  match node_ctxt.boot_sector_file with
+  match node_ctxt.config.boot_sector_file with
   | None -> Plugin.Layer1_helpers.get_boot_sector block_hash node_ctxt
   | Some boot_sector_file ->
       let*! boot_sector = Lwt_utils_unix.read_file boot_sector_file in
