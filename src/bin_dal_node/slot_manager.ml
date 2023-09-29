@@ -197,9 +197,10 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
   | Some shard_proofs ->
       let attestation_level =
         Int32.(
-          add
-            published_level
-            (of_int proto_parameters.Dal_plugin.attestation_lag))
+          pred
+          @@ add
+               published_level
+               (of_int proto_parameters.Dal_plugin.attestation_lag))
       in
       let* committee = level_committee ~level:attestation_level in
       let attester_of_shard = shards_to_attesters committee in
