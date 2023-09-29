@@ -36,6 +36,7 @@ open Alpha_context
 
 (** [baker] bakes and [attester] attests *)
 let bake_and_attest_once (_b_pred, b_cur) baker attester =
+  let open Lwt_result_wrap_syntax in
   let open Context in
   Context.get_attesters (B b_cur) >>=? fun attesters_list ->
   List.find_map
@@ -48,7 +49,7 @@ let bake_and_attest_once (_b_pred, b_cur) baker attester =
   |> function
   | None -> assert false
   | Some (delegate, _slots) ->
-      Block.get_round b_cur >>?= fun round ->
+      let*?@ round = Block.get_round b_cur in
       Op.attestation ~round ~delegate b_cur >>=? fun attestation ->
       Block.bake ~policy:(By_account baker) ~operation:attestation b_cur
 

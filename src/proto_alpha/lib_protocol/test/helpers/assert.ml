@@ -223,7 +223,9 @@ open Context
 (* Some asserts for account operations *)
 
 let contract_property_is property ~loc b contract expected =
-  property b contract >>=? fun balance -> equal_tez ~loc balance expected
+  let open Lwt_result_syntax in
+  let* balance = property b contract in
+  equal_tez ~loc balance expected
 
 (** [balance_is b c amount] checks that the current balance [b] of contract [c]
     is [amount].
@@ -237,7 +239,8 @@ let frozen_bonds_is = contract_property_is Contract.frozen_bonds
 
 let balance_or_frozen_bonds_was_operated ~is_balance ~operand ~loc b contract
     old_balance amount =
-  operand old_balance amount |> Environment.wrap_tzresult >>?= fun expected ->
+  let open Lwt_result_wrap_syntax in
+  let*?@ expected = operand old_balance amount in
   let f = if is_balance then balance_is else frozen_bonds_is in
   f ~loc b contract expected
 
