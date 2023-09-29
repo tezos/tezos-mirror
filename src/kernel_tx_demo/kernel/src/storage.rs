@@ -610,12 +610,12 @@ pub mod dal {
     }
 
     /// Set slot index
-    pub fn set_slot_index(host: &mut impl Runtime, slot_index: u16) -> Result<(), StorageError> {
+    pub fn set_slot_index(host: &mut impl Runtime, slot_index: u8) -> Result<(), StorageError> {
         set(host, &slot_index_path(), slot_index)
     }
 
     /// Get slot index
-    pub fn get_slot_index(host: &mut impl Runtime) -> Result<u16, StorageError> {
+    pub fn get_slot_index(host: &mut impl Runtime) -> Result<u8, StorageError> {
         get(host, &slot_index_path())
     }
 
