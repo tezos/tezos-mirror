@@ -300,12 +300,23 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             bip_read: bip_read[j - 1] // the first read correspond to second run
         });
     }
-    // row conserning all runs
-    unaccounted_ticks = sumArray(kernel_run_ticks) - sumArray(run_transaction_ticks) - sumArray(signature_verification_ticks) - sumArray(store_transaction_object_ticks) - sumArray(fetch_blueprint_ticks)
+
+    // ticks that are not covered by identified area of interest
+    finalize_ticks = sumArray(run_benchmark_result.block_finalize)
+    unaccounted_ticks =
+        sumArray(kernel_run_ticks)
+        - sumArray(fetch_blueprint_ticks)
+        - sumArray(run_transaction_ticks)
+        - sumArray(signature_verification_ticks)
+        - sumArray(store_transaction_object_ticks)
+        - sumArray(run_benchmark_result.store_receipt_ticks)
+        - finalize_ticks
+
+    // row concerning all runs
     rows.push({
         benchmark_name: benchmark_name + "(all)",
         unaccounted_ticks,
-        block_finalize: run_benchmark_result.block_finalize[0]
+        block_finalize: finalize_ticks
     });
     return rows;
 }
