@@ -62,7 +62,7 @@ type accounts = {
 }
 
 (** Feature flags requirements for a context setting for a test. *)
-type feature_flags = {dal : bool; scoru : bool; toru : bool; zkru : bool}
+type feature_flags = {dal : bool; scoru_arith : bool; zkru : bool}
 
 (** Infos describes the information of the setting for a test: the
    context and used accounts. *)
@@ -130,13 +130,11 @@ type ctxt_req = {
 type mode = Construction | Mempool | Application
 
 (** {2 Default values} *)
-let all_enabled = {dal = true; scoru = true; toru = true; zkru = true}
+let all_enabled = {dal = true; scoru_arith = true; zkru = true}
 
 let disabled_dal = {all_enabled with dal = false}
 
-let disabled_scoru = {all_enabled with scoru = false}
-
-let disabled_toru = {all_enabled with toru = false}
+let disabled_scoru_arith = {all_enabled with scoru_arith = false}
 
 let disabled_zkru = {all_enabled with zkru = false}
 
@@ -254,8 +252,7 @@ let pp_ctxt_req pp
      fund_sc: %a tz@,\
      fund_zk: %a tz@,\
      dal_flag: %a@,\
-     scoru_flag: %a@,\
-     toru_flag: %a@,\
+     scoru_arith_flag: %a@,\
      zkru_flag: %a@,\
      @]"
     (pp_opt Gas.Arith.pp_integral)
@@ -274,9 +271,7 @@ let pp_ctxt_req pp
     Format.pp_print_bool
     flags.dal
     Format.pp_print_bool
-    flags.scoru
-    Format.pp_print_bool
-    flags.toru
+    flags.scoru_arith
     Format.pp_print_bool
     flags.zkru
 
@@ -410,7 +405,7 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
   in
   let dal = {params.constants.dal with feature_enable = flags.dal} in
   let sc_rollup =
-    {params.constants.sc_rollup with arith_pvm_enable = flags.scoru}
+    {params.constants.sc_rollup with arith_pvm_enable = flags.scoru_arith}
   in
   let zk_rollup = {params.constants.zk_rollup with enable = flags.zkru} in
   let constants =
@@ -494,7 +489,7 @@ let init_infos :
     create_and_fund block (get_bootstrap bootstraps 2) fund_del
   in
   let* block, sc, sc_rollup =
-    if flags.scoru then
+    if flags.scoru_arith then
       create_and_fund
         ~originate_rollup:originate_sc_rollup
         block
@@ -1403,7 +1398,7 @@ let is_disabled flags = function
   | K_Sc_rollup_origination | K_Sc_rollup_publish | K_Sc_rollup_cement
   | K_Sc_rollup_add_messages | K_Sc_rollup_refute | K_Sc_rollup_timeout
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond ->
-      flags.scoru = false
+      flags.scoru_arith = false
   | K_Dal_publish_slot_header -> flags.dal = false
   | K_Zk_rollup_origination | K_Zk_rollup_publish | K_Zk_rollup_update ->
       flags.zkru = false
