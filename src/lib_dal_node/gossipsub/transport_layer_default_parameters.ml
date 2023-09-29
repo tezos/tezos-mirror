@@ -108,7 +108,7 @@ module P2p_config = struct
 
   let listening_port = 11732
 
-  let listening_addr = P2p_addr.of_string_exn "127.0.0.1"
+  let listening_addr = P2p_addr.of_string_exn "0.0.0.0"
 
   let discovery_port = None
 
