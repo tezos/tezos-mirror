@@ -39,6 +39,8 @@ pub enum ParsedExternalInboxMessage<'a> {
     DAC(Certificate),
     /// Operation list
     OpList(v1::ParsedBatch<'a>),
+    /// Change the DAL slot that the kernel downloads and processes.
+    ChangeDalSlot(u8),
 }
 
 impl<'a> ParsedExternalInboxMessage<'a> {
