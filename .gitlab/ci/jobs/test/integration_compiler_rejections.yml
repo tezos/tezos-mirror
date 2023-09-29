@@ -1,7 +1,3 @@
-# integration:compiler-rejections does not
-# require access to the binaries like the "true" integration tests
-# below. Therefore, it does not extend the .integration_template.
-
 integration:compiler-rejections:
   extends: .test_template
   script:

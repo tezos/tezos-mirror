@@ -66,7 +66,8 @@ include: .gitlab/ci/jobs/test/common.yml
 
 tezt:
   extends:
-    - .integration_template
+    - .test_template
+    - .image_template__runtime_build_e2etest_dependencies_template
     - .template__coverage_files
     - .tezt_template
   variables:

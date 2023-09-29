@@ -4,5 +4,9 @@ tezt:build-long:
   extends:
     - .build_template
   stage: test
+  # Artificial needs for ordering.
+  needs:
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
   script:
     - dune build @tezt/long_tests/check
