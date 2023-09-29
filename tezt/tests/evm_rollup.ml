@@ -3258,6 +3258,79 @@ let test_cover_fees =
   in
   check_for_receipt 6
 
+let test_rpc_sendRawTransaction_with_consecutive_nonce =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "tx_nonce"]
+    ~title:"Can submit many transactions."
+  @@ fun protocol ->
+  let* {evm_proxy_server; node; client; sc_rollup_node; _} =
+    setup_past_genesis ~admin:None protocol
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
+  (* Nonce: 0*)
+  let tx_1 =
+    "0xf86480825208831e84809400000000000000000000000000000000000000008080820a96a0718d24970c6d2fc794e972f4319caf24a939ff3d822959c7e6b022813d16c8c4a04535ad83a67307759569b1e2087b0b79f80d4502027b6d1d52e3c072634b3f8b"
+  in
+  let* result = send_raw_transaction evm_proxy_server tx_1 in
+  let hash_1 = Result.get_ok result in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
+  (* Nonce: 1*)
+  let tx_2 =
+    "0xf86401825208831e84809400000000000000000000000000000000000000008080820a95a01f47f2ec950d998bd99f7ff656a7f13a385603373f0e96130290ba2869f56515a018bd20697ab1f3cd82891663c62f514de7b2deeee2ed569e85b3aa351e1b1c3b"
+  in
+  let* result = send_raw_transaction evm_proxy_server tx_2 in
+  let hash_2 = Result.get_ok result in
+  let* _ =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash:hash_1)
+      ()
+  in
+  let* _ =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash:hash_2)
+      ()
+  in
+  unit
+
+let test_rpc_sendRawTransaction_not_included =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "tx_nonce"]
+    ~title:
+      "Tx with nonce too high are not included without previous transactions."
+  @@ fun protocol ->
+  let* {evm_proxy_server; node; client; sc_rollup_node; endpoint; _} =
+    setup_past_genesis ~admin:None protocol
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
+  (* Nonce: 1 *)
+  let tx =
+    "0xf86401825208831e84809400000000000000000000000000000000000000008080820a96a05709a6fbce9cf391d0530f4b4d4c9fd57fa160dd20fead5bd5c49c3ec78efcc9a06e4fcb1d5596e00bc34fa5d97ccafce8fa1f44534b36920d7db0a3ad29ca03f8"
+  in
+  let* result =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (fun () -> send_raw_transaction evm_proxy_server tx)
+      ()
+  in
+  let tx_hash = Result.get_ok result in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  (* Check if txs is not included *)
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx:tx_hash in
+  Check.((Option.is_none receipt = true) bool)
+    ~error_msg:"Receipt should not be present" ;
+
+  unit
+
 let test_rpc_gasPrice =
   Protocol.register_test
     ~__FILE__
@@ -3561,7 +3634,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getStorageAt protocols ;
   test_accounts_double_indexing protocols ;
   test_validation_result protocols ;
-  test_originate_evm_kernel_and_dump_pvm_state protocols
+  test_rpc_sendRawTransaction_with_consecutive_nonce protocols ;
+  test_rpc_sendRawTransaction_not_included protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
