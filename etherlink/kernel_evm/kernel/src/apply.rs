@@ -5,7 +5,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+use alloc::borrow::Cow;
 use anyhow::anyhow;
+use evm::{ExitError, ExitReason, ExitSucceed};
 use evm_execution::account_storage::{
     account_path, EthereumAccount, EthereumAccountStorage,
 };
@@ -377,6 +379,12 @@ fn apply_deposit<Host: Runtime>(
 
     let is_success = do_deposit(()).is_some();
 
+    let reason = if is_success {
+        ExitReason::Succeed(ExitSucceed::Returned)
+    } else {
+        ExitReason::Error(ExitError::Other(Cow::from("Deposit failed")))
+    };
+
     let gas_used = CONFIG.gas_transaction_call;
 
     // TODO: https://gitlab.com/tezos/tezos/-/issues/6551
@@ -385,6 +393,7 @@ fn apply_deposit<Host: Runtime>(
     let execution_outcome = ExecutionOutcome {
         gas_used,
         is_success,
+        reason,
         new_address: None,
         logs: vec![],
         result: None,

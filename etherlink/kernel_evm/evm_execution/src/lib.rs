@@ -191,7 +191,7 @@ mod test {
         EthereumAccountStorage,
     };
     use evm::executor::stack::Log;
-    use evm::Opcode;
+    use evm::{ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed, Opcode};
     use handler::ExecutionOutcome;
     use host::runtime::Runtime;
     use primitive_types::{H160, H256};
@@ -318,6 +318,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
             is_success: false,
+            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::OutOfFund)),
             new_address: None,
             logs: vec![],
             result: None,
@@ -380,6 +381,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -436,9 +438,10 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Revert(ExitRevert::Reverted),
             new_address: None,
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 55427,
         }));
@@ -668,6 +671,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Error(ExitError::DesignatedInvalid),
             new_address: None,
             logs: vec![],
             result: None,
@@ -720,6 +724,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21000,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -862,6 +867,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21006,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -919,6 +925,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 6,
             is_success: false,
+            reason: ExitReason::Error(ExitError::OutOfGas),
             new_address: None,
             logs: vec![],
             result: None,
@@ -970,6 +977,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Error(ExitError::DesignatedInvalid),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1024,6 +1032,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Error(ExitError::DesignatedInvalid),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1080,6 +1089,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21018,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(vec![1u8; 32]),
@@ -1135,6 +1145,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 24000,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(hex::decode(expected_address).unwrap()),
@@ -1320,6 +1331,9 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 86653,
             is_success: false,
+            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                ExitError::InvalidCode(Opcode::SSTORE),
+            )),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1406,6 +1420,9 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 86653,
             is_success: false,
+            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                ExitError::InvalidCode(Opcode::LOG0),
+            )),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1523,6 +1540,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 22348,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![log_record1, log_record2],
             result: Some(vec![]),
@@ -1624,6 +1642,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21911,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![log_record1],
             result: Some(vec![]),
@@ -1714,6 +1733,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 51124,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -1829,6 +1849,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: all_the_gas,
             is_success: false,
+            reason: ExitReason::Error(ExitError::InvalidCode(Opcode::INVALID)),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1914,6 +1935,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21017,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(chain_id_bytes.into()),
@@ -1978,6 +2000,7 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21017,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             is_success: true,
             new_address: None,
             logs: vec![],

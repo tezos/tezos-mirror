@@ -568,6 +568,7 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: 21072,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(expected_hash),
@@ -594,6 +595,7 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: 21720,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(expected_hash),
@@ -640,6 +642,7 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: 21000,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -691,6 +694,7 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: 21000,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -727,10 +731,11 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: 21000,
+            reason: ExitReason::Revert(ExitRevert::Reverted),
             is_success: false,
             new_address: None,
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 1_000_000,
         };
@@ -750,10 +755,11 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: 21000,
+            reason: ExitReason::Revert(ExitRevert::Reverted),
             is_success: false,
             new_address: None,
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 1_000_000,
         };
