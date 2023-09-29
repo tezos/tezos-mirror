@@ -44,7 +44,7 @@
 type t = Bitset.t
 
 type operation = {
-  attestor : Signature.Public_key_hash.t;
+  attester : Signature.Public_key_hash.t;
       (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4165
          Compute the attester from the attested slots in [slot_attestation] below,
          or provide a field `min_attester_slot : int / int32` *)

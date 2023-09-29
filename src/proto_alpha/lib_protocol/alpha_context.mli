@@ -2560,7 +2560,7 @@ module Dal : sig
     type t = private Bitset.t
 
     type operation = {
-      attestor : public_key_hash;
+      attester : public_key_hash;
       attestation : t;
       level : Raw_level.t;
     }
@@ -2581,8 +2581,8 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
-    val shards_of_attestor :
-      context -> attestor:public_key_hash -> shard_index list option
+    val shards_of_attester :
+      context -> attester:public_key_hash -> shard_index list option
 
     val record_attested_shards : context -> t -> int list -> context
 
@@ -2756,8 +2756,8 @@ module Dal_errors : sig
         commitment : Dal.Slot.Commitment.t;
         commitment_proof : Dal.Slot.Commitment_proof.t;
       }
-    | Dal_data_availibility_attestor_not_in_committee of {
-        attestor : Signature.Public_key_hash.t;
+    | Dal_data_availibility_attester_not_in_committee of {
+        attester : Signature.Public_key_hash.t;
         level : Raw_level.t;
       }
     | Dal_operation_for_old_level of {

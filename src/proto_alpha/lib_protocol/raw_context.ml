@@ -1819,7 +1819,7 @@ module Dal = struct
   let init_committee ctxt committee =
     {ctxt with back = {ctxt.back with dal_committee = committee}}
 
-  let shards_of_attestor ctxt ~attestor:pkh =
+  let shards_of_attester ctxt ~attester:pkh =
     let rec make acc (initial_shard_index, power) =
       if Compare.Int.(power <= 0) then List.rev acc
       else make (initial_shard_index :: acc) (initial_shard_index + 1, power - 1)

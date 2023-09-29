@@ -35,7 +35,7 @@ open Alpha_context
 val validate_attestation : t -> Dal.Attestation.operation -> unit tzresult
 
 (** [apply_attestation ctxt op] applies [op.attestation] into the
-   [ctxt] assuming [op.attestor] issued those attestations. *)
+   [ctxt] assuming [op.attester] issued those attestations. *)
 val apply_attestation : t -> Dal.Attestation.operation -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is

@@ -206,8 +206,8 @@ stages:
           bootstrap_profile: true
 
 
-  ## Stage 5: Start attestors's L1 and DAL nodes
-  - name: Start attestors's L1 and DAL nodes
+  ## Stage 5: Start attesters's L1 and DAL nodes
+  - name: Start attesters's L1 and DAL nodes
     with_agents: '(delegate_)'
     run_agents: concurrent
     jobs:
@@ -244,8 +244,8 @@ stages:
           peers:
             - '{{ vars.boot_nodes_address }}:{{ vars.dal_node_net_port }}'
           bootstrap_profile: false
-          attestor_profiles:
-             # we run one DAL node per attestor
+          attester_profiles:
+             # we run one DAL node per attester
              - '{{ agent.name }}'
           path_client: '{{ vars.path_prefix }}/octez-client'
           base_dir: 'self://__{{ agent.name }}__wallet__/{{ vars.keys_base_dir }}'
@@ -295,8 +295,8 @@ stages:
           path_client: '{{ vars.path_prefix }}/octez-client'
           base_dir: 'self://__{{ agent.name }}__wallet__/{{ vars.keys_base_dir }}'
 
-  # Stage 7: Start attestors' bakers
-  - name: Start attestors' bakers
+  # Stage 7: Start attesters' bakers
+  - name: Start attesters' bakers
     with_agents: '(delegate_)'
     run_agents: concurrent
     jobs:

@@ -2377,7 +2377,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
          refined. *)
       let*? ctxt = Dal_apply.apply_attestation ctxt op in
       return
-        (ctxt, Single_result (Dal_attestation_result {delegate = op.attestor}))
+        (ctxt, Single_result (Dal_attestation_result {delegate = op.attester}))
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in

@@ -33,7 +33,7 @@ type topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
    Refine the GS message_id to save bandwidth.
 
    With the defintion below: commitment * level * slot_index * shard_index *
-   attestor => BW = About 48 + 4 + 2 + 2 + 20 (non bls pkh) = 76 bytes.
+   attester => BW = About 48 + 4 + 2 + 2 + 20 (non bls pkh) = 76 bytes.
 
    However,
 

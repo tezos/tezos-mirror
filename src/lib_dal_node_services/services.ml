@@ -170,7 +170,7 @@ module Types = struct
           ~title:"Attestor with pkh"
           (Tag 0)
           (obj2
-             (req "kind" (constant "attestor"))
+             (req "kind" (constant "attester"))
              (req
                 "public_key_hash"
                 Tezos_crypto.Signature.Public_key_hash.encoding))

@@ -29,12 +29,12 @@
 
     For the data-availability layer, the layer 1 provides a list of
    slots at every level (see {!Dal_slot_repr}). Slots are not posted
-   directly onto L1 blocks. Stakeholders, called attestors in this
+   directly onto L1 blocks. Stakeholders, called attesters in this
    context, can commit on the availability of the data (via
    attestation operations, see
    https://gitlab.com/tezos/tezos/-/issues/3115).
 
-    The slot is uniformly split into shards. Each attestor commits,
+    The slot is uniformly split into shards. Each attester commits,
    for every slot, on the availability of all shards they are assigned
    to.
 
@@ -46,7 +46,7 @@ type t = private Bitset.t
 
 (** The shape of Dal attestation operations injected by delegates. *)
 type operation = {
-  attestor : Signature.Public_key_hash.t;
+  attester : Signature.Public_key_hash.t;
       (** The account who attests the availability of the slots. *)
   attestation : t;
       (** The bitset of slots that are attested to be available. *)
@@ -96,7 +96,7 @@ module Shard_map : Map.S with type key = shard_index
 
 (** This module is used to record the shard attestations.
 
-   For each attestor, a list of shards is associated. For each
+   For each attester, a list of shards is associated. For each
    attested slot (see {!type:t}) we record that those shards were
    deemed available.
 

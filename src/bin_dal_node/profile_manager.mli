@@ -35,7 +35,7 @@ val empty : t
 val bootstrap_profile : t
 
 (** [add_operator_profiles t proto_parameters gs_worker operator_profiles]
-    registers operator profiles (attestor or producer).
+    registers operator profiles (attester or producer).
     If the current profile is a bootstrap profile, it will return [None] as bootstrap
     profiles are incompatible with operator profiles. *)
 val add_operator_profiles :

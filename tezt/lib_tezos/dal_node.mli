@@ -117,7 +117,7 @@ val wait : t -> Unix.process_status Lwt.t
 val init_config :
   ?expected_pow:float ->
   ?peers:string list ->
-  ?attestor_profiles:string list ->
+  ?attester_profiles:string list ->
   ?producer_profiles:int list ->
   ?bootstrap_profile:bool ->
   t ->

@@ -290,7 +290,7 @@ module Consensus = struct
         `O
           [
             ("kind", Ezjsonm.string "dal_attestation");
-            ("attestor", Ezjsonm.string signer.Account.public_key_hash);
+            ("attester", Ezjsonm.string signer.Account.public_key_hash);
             ("attestation", Ezjsonm.string (string_of_bool_vector attestation));
             ("level", Ezjsonm.int level);
           ]

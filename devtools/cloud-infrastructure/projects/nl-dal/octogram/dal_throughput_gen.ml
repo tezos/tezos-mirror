@@ -119,18 +119,18 @@ module Process = struct
     let* () = sed "DELEGATES_PREFIX" !delegates_prefix in
     loop sed (MS.bindings parameters)
 
-  let subst_agents number_of_attestors number_of_slots_producers =
+  let subst_agents number_of_attesters number_of_slots_producers =
     let open Options in
     let open Sys_command in
     let ip_address_from = !preallocated_ip_addresses + 1 in
     let attestots_agents =
       gen_agents
-        ~kind:"attestors"
+        ~kind:"attesters"
         ~prefix:!delegates_prefix
-        ~count:number_of_attestors
+        ~count:number_of_attesters
         ~ip_address_from
     in
-    let ip_address_from = ip_address_from + number_of_attestors in
+    let ip_address_from = ip_address_from + number_of_attesters in
     let slots_producers_agents =
       gen_agents
         ~kind:"slots_producers"
@@ -141,11 +141,11 @@ module Process = struct
     let* () = sed_file !output_file "ATTESTORS_AGENTS" attestots_agents in
     sed_file !output_file "SLOTS_PRODUCERS_AGENTS" slots_producers_agents
 
-  let subst_ip_addresses number_of_attestors number_of_slots_producers =
+  let subst_ip_addresses number_of_attesters number_of_slots_producers =
     let open Options in
     let open Sys_command in
     let num_addresses =
-      !preallocated_ip_addresses + number_of_attestors
+      !preallocated_ip_addresses + number_of_attesters
       + number_of_slots_producers
     in
     match !ip_addresses with
@@ -183,7 +183,7 @@ module Process = struct
         loop (sed !output_file)
         @@ List.init num_addresses (fun i -> (sf "ADDR_%d" (i + 1), data.(i)))
 
-  let subst_balance_updates number_of_attestors =
+  let subst_balance_updates number_of_attesters =
     let open Options in
     match !balance_updates with
     | "" -> sed !output_file "BALANCE_UPDATES" ""
@@ -210,37 +210,37 @@ module Process = struct
               |> Array.of_list
         in
         let len = Array.length data in
-        if len < number_of_attestors then
+        if len < number_of_attesters then
           failwith
             (sf
                "Too few balances: expected: %d, given: %d"
-               number_of_attestors
+               number_of_attesters
                len) ;
-        let gap = len / number_of_attestors in
+        let gap = len / number_of_attesters in
         assert (gap >= 1) ;
         let balances_file, cout = Filename.open_temp_file "balances_" "" in
-        (* If more balances than attestors, select balances uniformely. *)
+        (* If more balances than attesters, select balances uniformely. *)
         List.iter (fun i ->
             let ii = i * gap in
             output_string cout @@ sf "  ['delegate_%d', '%s']" i data.(ii) ;
-            if i < number_of_attestors - 1 then output_string cout ",\n")
-        @@ List.init number_of_attestors (fun i -> i) ;
+            if i < number_of_attesters - 1 then output_string cout ",\n")
+        @@ List.init number_of_attesters (fun i -> i) ;
         close_out cout ;
         sed_file !output_file "BALANCE_UPDATES" balances_file
 
   let main parameters =
     let open Sys_command in
     let int_of_string_key key = int_of_string @@ MS.find key parameters in
-    let number_of_attestors = int_of_string_key "NUMBER_OF_ATTESTORS" in
+    let number_of_attesters = int_of_string_key "NUMBER_OF_ATTESTORS" in
     let number_of_slots_producers =
       int_of_string_key "NUMBER_OF_SLOTS_PRODUCERS"
     in
     let* () = subst_simple_occurences parameters in
-    let* () = subst_agents number_of_attestors number_of_slots_producers in
+    let* () = subst_agents number_of_attesters number_of_slots_producers in
     let* () =
-      subst_ip_addresses number_of_attestors number_of_slots_producers
+      subst_ip_addresses number_of_attesters number_of_slots_producers
     in
-    let* () = subst_balance_updates number_of_attestors in
+    let* () = subst_balance_updates number_of_attesters in
     return ()
 end
 
@@ -364,7 +364,7 @@ module Cli = struct
            sf
              " Indicate the number of IP addresses' place holders reserved for \
               agents. Default value is %d (address %%%%ADDR_1%%%%). This is \
-              useful to correctly number attestors and slots producers' IP \
+              useful to correctly number attesters and slots producers' IP \
               place holders."
              !Options.preallocated_ip_addresses );
          ( "--auto",

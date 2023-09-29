@@ -72,7 +72,7 @@ module Parameters = struct
 end
 
 module Committee = struct
-  type member = {attestor : string; first_shard_index : int; power : int}
+  type member = {attester : string; first_shard_index : int; power : int}
 
   type t = member list
 
@@ -80,8 +80,8 @@ module Committee = struct
     let open Check in
     list
     @@ convert
-         (fun {attestor; first_shard_index; power} ->
-           (attestor, first_shard_index, power))
+         (fun {attester; first_shard_index; power} ->
+           (attester, first_shard_index, power))
          (tuple3 string int int)
 
   let at_level node ~level =
@@ -94,7 +94,7 @@ module Committee = struct
            let pkh = JSON.(json |=> 0 |> as_string) in
            let first_shard_index = JSON.(json |=> 1 |=> 0 |> as_int) in
            let power = JSON.(json |=> 1 |=> 1 |> as_int) in
-           {attestor = pkh; first_shard_index; power})
+           {attester = pkh; first_shard_index; power})
          (JSON.as_list json)
 end
 
@@ -231,7 +231,7 @@ module Dal_RPC = struct
 
   let json_of_operator_profile = function
     | Attestor pkh ->
-        `O [("kind", `String "attestor"); ("public_key_hash", `String pkh)]
+        `O [("kind", `String "attester"); ("public_key_hash", `String pkh)]
     | Producer slot_index ->
         `O
           [
@@ -242,7 +242,7 @@ module Dal_RPC = struct
   let operator_profile_of_json json =
     let open JSON in
     match json |-> "kind" |> as_string with
-    | "attestor" -> Attestor (json |-> "public_key_hash" |> as_string)
+    | "attester" -> Attestor (json |-> "public_key_hash" |> as_string)
     | "producer" -> Producer (json |-> "slot_index" |> as_int)
     | _ -> failwith "invalid case"
 
@@ -305,12 +305,12 @@ module Dal_RPC = struct
 
   type attestable_slots = Not_in_committee | Attestable_slots of slot_set
 
-  let get_attestable_slots ~attestor ~attested_level =
+  let get_attestable_slots ~attester ~attested_level =
     make
       GET
       [
         "profiles";
-        attestor.Account.public_key_hash;
+        attester.Account.public_key_hash;
         "attested_levels";
         string_of_int attested_level;
         "attestable_slots";

@@ -77,7 +77,7 @@ let spawn_command dal_node =
   Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
-    ?(attestor_profiles = []) ?(producer_profiles = [])
+    ?(attester_profiles = []) ?(producer_profiles = [])
     ?(bootstrap_profile = false) dal_node =
   spawn_command dal_node
   @@ List.filter_map
@@ -97,8 +97,8 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          Some (string_of_float expected_pow);
          Some "--peers";
          Some (String.concat "," peers);
-         Some "--attestor-profiles";
-         Some (String.concat "," attestor_profiles);
+         Some "--attester-profiles";
+         Some (String.concat "," attester_profiles);
          Some "--producer-profiles";
          Some (String.concat "," (List.map string_of_int producer_profiles));
          (if bootstrap_profile then Some "--bootstrap-profile" else None);
@@ -114,13 +114,13 @@ module Config_file = struct
   let update dal_node update = read dal_node |> update |> write dal_node
 end
 
-let init_config ?expected_pow ?peers ?attestor_profiles ?producer_profiles
+let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
     ?bootstrap_profile dal_node =
   let process =
     spawn_config_init
       ?expected_pow
       ?peers
-      ?attestor_profiles
+      ?attester_profiles
       ?producer_profiles
       ?bootstrap_profile
       dal_node

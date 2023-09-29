@@ -220,10 +220,10 @@ module RPC : sig
         given attested level. The result is either a [Not_in_committee] or a
         [Attestable_slots flags], where [flags] is a boolean list of length
         [num_slots]. A slot is attestable if it is published at level [level -
-        attestation_lag]) and all the shards assigned to the given attestor at
+        attestation_lag]) and all the shards assigned to the given attester at
         level [level] are available in the DAL node's store. *)
   val get_attestable_slots :
-    attestor:Account.key ->
+    attester:Account.key ->
     attested_level:int ->
     (default_uri_provider, attestable_slots) RPC_core.t
 
@@ -286,7 +286,7 @@ module Commitment : sig
 end
 
 module Committee : sig
-  type member = {attestor : string; first_shard_index : int; power : int}
+  type member = {attester : string; first_shard_index : int; power : int}
 
   type t = member list
 

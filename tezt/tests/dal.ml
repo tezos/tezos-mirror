@@ -212,13 +212,13 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   let* () = Client.bake_for_and_wait tezos_client ~keys:[] in
   f rollup_address sc_rollup_node
 
-let make_dal_node ?peers ?attestor_profiles ?producer_profiles
+let make_dal_node ?peers ?attester_profiles ?producer_profiles
     ?bootstrap_profile tezos_node =
   let dal_node = Dal_node.create ~node:tezos_node () in
   let* () =
     Dal_node.init_config
       ?peers
-      ?attestor_profiles
+      ?attester_profiles
       ?producer_profiles
       ?bootstrap_profile
       dal_node
@@ -226,12 +226,12 @@ let make_dal_node ?peers ?attestor_profiles ?producer_profiles
   let* () = Dal_node.run dal_node ~wait_ready:true in
   return dal_node
 
-let with_dal_node ?peers ?attestor_profiles ?producer_profiles
+let with_dal_node ?peers ?attester_profiles ?producer_profiles
     ?bootstrap_profile tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
-      ?attestor_profiles
+      ?attester_profiles
       ?producer_profiles
       ?bootstrap_profile
       tezos_node
@@ -1957,7 +1957,7 @@ let check_profiles ~__LOC__ dal_node ~expected =
 
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
-  let check_bad_attestor_pkh_encoding profile =
+  let check_bad_attester_pkh_encoding profile =
     let* response = Dal_RPC.(call_raw dal_node @@ patch_profiles [profile]) in
     return @@ RPC.check_string_response ~code:400 response
   in
@@ -1970,7 +1970,7 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator []) in
   (* Adding [Attestor] profile with pkh that is not encoded as
      [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
-  let* () = check_bad_attestor_pkh_encoding (Attestor "This is invalid PKH") in
+  let* () = check_bad_attester_pkh_encoding (Attestor "This is invalid PKH") in
   (* Test adding duplicate profiles stores profile only once *)
   let* () = patch_profile_rpc profile1 in
   let* () = patch_profile_rpc profile1 in
@@ -2002,7 +2002,7 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
   match
     committee_from_l1
     |> List.find_opt (fun member ->
-           String.equal member.Dal.Committee.attestor pkh)
+           String.equal member.Dal.Committee.attester pkh)
   with
   | None -> Test.fail ~__LOC__ "pkh %S not found in committee from L1." pkh
   | Some member ->
@@ -2051,15 +2051,15 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   let rec iter i =
     if i < 0 then unit
     else
-      let attestor = Account.Bootstrap.keys.(i) in
+      let attester = Account.Bootstrap.keys.(i) in
       (* Note: we assume that the key has at least an assigned shard index. *)
       let* res =
         Dal_RPC.(
-          call dal_node @@ get_attestable_slots ~attestor ~attested_level)
+          call dal_node @@ get_attestable_slots ~attester ~attested_level)
       in
       match res with
       | Not_in_committee ->
-          Test.fail "attestor %s not in committee" attestor.alias
+          Test.fail "attester %s not in committee" attester.alias
       | Attestable_slots slots ->
           Check.(
             (number_of_slots = List.length slots)
@@ -2080,14 +2080,14 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   let* res =
     Dal_RPC.(
       call dal_node
-      @@ get_attestable_slots ~attestor:new_account ~attested_level)
+      @@ get_attestable_slots ~attester:new_account ~attested_level)
   in
   match res with
   | Not_in_committee -> return ()
   | Attestable_slots _ ->
-      Test.fail "attestor %s is in committee!" new_account.alias
+      Test.fail "attester %s is in committee!" new_account.alias
 
-(* This test checks that the attestor correctly emits attestations, by
+(* This test checks that the attester correctly emits attestations, by
    publishing a slot per level for a few levels, then checking that the slots
    are attested or not, depending on whether or not all delegates attested the
    slots. We use [attestation_threshold = 100] to this end; with a smaller
@@ -2102,7 +2102,7 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
    when running the baker daemon, it is harder to control the time of publishing
    of a slot. See the end-to-end tests for a version without `bake for`.
 *)
-let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
+let test_attester_with_daemon protocol parameters cryptobox node client dal_node
     =
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
@@ -2256,9 +2256,9 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
   in
   check_attestations first_level
 
-(* This is the version of [test_attestor_with_daemon] that does not use the
+(* This is the version of [test_attester_with_daemon] that does not use the
    baker daemon, only `bake for`. *)
-let test_attestor_with_bake_for _protocol parameters cryptobox node client
+let test_attester_with_bake_for _protocol parameters cryptobox node client
     dal_node =
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
@@ -3024,7 +3024,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
   conn_ev_in_node1
 
 (** This helper function makes the nodes [dal_node1] and [dal_node2] join the
-    topics of the attestor [pkh], by calling the RPC for tracking the corresponding profile.
+    topics of the attester [pkh], by calling the RPC for tracking the corresponding profile.
     The second node calls the RPC only after receiving the Subscribe messages
     from the first node, so that when it joins the topics, it also sends Graft messages
     in addition to sending Subscribe messages. *)
@@ -3076,7 +3076,7 @@ let waiters_publish_shards l1_committee dal_node commitment ~publish_level
     ~slot_index =
   let open Dal.Committee in
   List.map
-    (fun {attestor; first_shard_index; power} ->
+    (fun {attester; first_shard_index; power} ->
       check_events_with_message
         ~event_with_message:Publish_message
         dal_node
@@ -3084,12 +3084,12 @@ let waiters_publish_shards l1_committee dal_node commitment ~publish_level
         ~to_shard:(first_shard_index + power - 1)
         ~expected_commitment:commitment
         ~expected_level:publish_level
-        ~expected_pkh:attestor
+        ~expected_pkh:attester
         ~expected_slot:slot_index)
     l1_committee
 
 (** This helper returns the promise that allows to wait for the reception of
-    messages of [slot_index] published at level [publish_level] by the attestor
+    messages of [slot_index] published at level [publish_level] by the attester
     [pkh].
 
     The [l1_committee] used to determine the topic of published messages is the
@@ -3097,8 +3097,8 @@ let waiters_publish_shards l1_committee dal_node commitment ~publish_level
 let waiter_receive_shards l1_committee dal_node commitment ~publish_level
     ~slot_index ~pkh ~from_peer =
   let open Dal.Committee in
-  match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
-  | {attestor; first_shard_index; power} ->
+  match List.find (fun {attester; _} -> attester = pkh) l1_committee with
+  | {attester; first_shard_index; power} ->
       check_events_with_message
         ~event_with_message:(Message_with_header from_peer)
         dal_node
@@ -3106,29 +3106,29 @@ let waiter_receive_shards l1_committee dal_node commitment ~publish_level
         ~to_shard:(first_shard_index + power - 1)
         ~expected_commitment:commitment
         ~expected_level:publish_level
-        ~expected_pkh:attestor
+        ~expected_pkh:attester
         ~expected_slot:slot_index
   | exception Not_found ->
       Test.fail "Should not happen as %s is part of the committee" pkh
 
 (** This helper returns the promise that allows to wait for the successful
     notification of messages of [slot_index] published at level [publish_level]
-    to the app layer of the attestor [pkh].
+    to the app layer of the attester [pkh].
 
     The [l1_committee] used to determine the topic of published messages is the
     one at the attesattion level corresponding to [publish_level]. *)
 let waiter_successful_shards_app_notification l1_committee dal_node commitment
     ~publish_level ~slot_index ~pkh =
   let open Dal.Committee in
-  match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
-  | {attestor; first_shard_index; power} ->
+  match List.find (fun {attester; _} -> attester = pkh) l1_committee with
+  | {attester; first_shard_index; power} ->
       check_message_notified_to_app_event
         dal_node
         ~from_shard:first_shard_index
         ~to_shard:(first_shard_index + power - 1)
         ~expected_commitment:commitment
         ~expected_level:publish_level
-        ~expected_pkh:attestor
+        ~expected_pkh:attester
         ~expected_slot:slot_index
   | exception Not_found ->
       Test.fail "Should not happen as %s is part of the committee" pkh
@@ -3171,7 +3171,7 @@ let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
 
    The [is_first_slot_attestable] flag is used to tell whether the first slot
    (that has been injected by this function) can be attested by the considered
-   attestor or not. In particular, it should be set to [false] if the
+   attester or not. In particular, it should be set to [false] if the
    application layer of the second DAL node was not notified about the messages
    sent by the first DAL node.
 *)
@@ -3251,14 +3251,14 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   and* () = waiter_receive_shards
   and* () = waiter_app_notifs in
 
-  (* Check that dal_node2 has the shards needed by attestor account1/pkh1 to
+  (* Check that dal_node2 has the shards needed by attester account1/pkh1 to
      attest the slot with index 0. *)
   let* res =
     Dal_RPC.(
-      call dal_node2 @@ get_attestable_slots ~attestor:account1 ~attested_level)
+      call dal_node2 @@ get_attestable_slots ~attester:account1 ~attested_level)
   in
   match res with
-  | Not_in_committee -> Test.fail "attestor %s not in committee" account1.alias
+  | Not_in_committee -> Test.fail "attester %s not in committee" account1.alias
   | Attestable_slots slots ->
       (* only slot 0 is attestable. Others are set to false. *)
       let expected =
@@ -3306,7 +3306,7 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
   (* Messages are invalid, so the app layer is not notified. *)
   let expect_app_notification = false in
   (* The first slot published by [generic_gs_messages_exchange] is not
-     attestable by the considered attestor pk1 = bootstrap1, because the shards
+     attestable by the considered attester pk1 = bootstrap1, because the shards
      received by the Gossipsub layer are classified as 'Invalid'. *)
   let is_first_slot_attestable = false in
   generic_gs_messages_exchange
@@ -3408,12 +3408,12 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   let attested_level = publish_level + parameters.attestation_lag in
   let* committee = Dal.Committee.at_level node ~level:attested_level in
 
-  let Dal.Committee.{attestor; first_shard_index; power} =
+  let Dal.Committee.{attester; first_shard_index; power} =
     match
-      List.find (fun Dal.Committee.{attestor; _} -> attestor = pkh1) committee
+      List.find (fun Dal.Committee.{attester; _} -> attester = pkh1) committee
     with
-    | {attestor; first_shard_index; power} ->
-        {attestor; first_shard_index; power}
+    | {attester; first_shard_index; power} ->
+        {attester; first_shard_index; power}
     | exception Not_found ->
         Test.fail "Should not happen as %s is part of the committee" pkh1
   in
@@ -3425,7 +3425,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       ~to_shard:(first_shard_index + power - 1)
       ~expected_commitment:commitment
       ~expected_level:publish_level
-      ~expected_pkh:attestor
+      ~expected_pkh:attester
       ~expected_slot:slot_index
       ~expected_peer:peer_id2
   in
@@ -3437,7 +3437,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       ~to_shard:(first_shard_index + power - 1)
       ~expected_commitment:commitment
       ~expected_level:publish_level
-      ~expected_pkh:attestor
+      ~expected_pkh:attester
       ~expected_slot:slot_index
       ~expected_peer:peer_id1
   in
@@ -3485,7 +3485,7 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
 
     There are three nodes in the test:
     - dal_node1: The bootstrap node.
-    - dal_node2: An attestor for pkh of boostrap1.
+    - dal_node2: An attester for pkh of boostrap1.
     - dal_node3: A slot producer for slot index 0.
 
     [dal_node2] should connect to [dal_node1] at startup.
@@ -3496,7 +3496,7 @@ let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
   let* dal_node2 =
     make_dal_node
       ~peers:[Dal_node.listen_addr dal_node1]
-      ~attestor_profiles:[Constant.bootstrap1.public_key_hash]
+      ~attester_profiles:[Constant.bootstrap1.public_key_hash]
       node
   in
   let* dal_node3 =
@@ -3920,15 +3920,15 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:100
-    "dal attestor with bake for"
-    test_attestor_with_bake_for
+    "dal attester with bake for"
+    test_attester_with_bake_for
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:100
     ~attestation_lag:8
     ~activation_timestamp:Now
-    "dal attestor with baker daemon"
-    test_attestor_with_daemon
+    "dal attester with baker daemon"
+    test_attester_with_daemon
     protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)

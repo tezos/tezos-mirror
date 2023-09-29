@@ -1161,7 +1161,7 @@ module Encoding = struct
 
   let dal_attestation_encoding =
     obj3
-      (req "attestor" Signature.Public_key_hash.encoding)
+      (req "attester" Signature.Public_key_hash.encoding)
       (req "attestation" Dal_attestation_repr.encoding)
       (req "level" Raw_level_repr.encoding)
 
@@ -1175,11 +1175,11 @@ module Encoding = struct
           (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
           (fun (Dal_attestation
-                 Dal_attestation_repr.{attestor; attestation; level}) ->
-            (attestor, attestation, level));
+                 Dal_attestation_repr.{attester; attestation; level}) ->
+            (attester, attestation, level));
         inj =
-          (fun (attestor, attestation, level) ->
-            Dal_attestation Dal_attestation_repr.{attestor; attestation; level});
+          (fun (attester, attestation, level) ->
+            Dal_attestation Dal_attestation_repr.{attester; attestation; level});
       }
 
   let seed_nonce_revelation_case =
@@ -2198,7 +2198,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 
     The [weight] of a {!Dal_attestation} depends on the pair of
    the size of its bitset, {!Dal_attestation_repr.t}, and the
-   signature of its attestor {! Signature.Public_key_hash.t}.
+   signature of its attester {! Signature.Public_key_hash.t}.
 
    The [weight] of a voting operation depends on the pair of its
    [period] and [source].
@@ -2229,7 +2229,7 @@ type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
   | Weight_preattestation : attestation_infos -> consensus_pass_type weight
   | Weight_dal_attestation :
-      (* attestor * num_attestations * level *)
+      (* attester * num_attestations * level *)
       (Signature.Public_key_hash.t * int * int32)
       -> consensus_pass_type weight
   | Weight_proposals :
@@ -2330,12 +2330,12 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Dal_attestation Dal_attestation_repr.{attestor; attestation; level})
+  | Single (Dal_attestation Dal_attestation_repr.{attester; attestation; level})
     ->
       W
         ( Consensus,
           Weight_dal_attestation
-            ( attestor,
+            ( attester,
               Dal_attestation_repr.occupied_size_in_bits attestation,
               Raw_level_repr.to_int32 level ) )
   | Single (Proposals {period; source; _}) ->
@@ -2465,18 +2465,18 @@ let compare_baking_infos infos1 infos2 =
     (infos2.round, infos2.bh_hash)
 
 (** Two valid {!Dal_attestation} are compared in the
-   lexicographic order of their pairs of bitsets size and attestor
+   lexicographic order of their pairs of bitsets size and attester
    hash. *)
-let compare_dal_attestation (attestor1, attestations1, level1)
-    (attestor2, attestations2, level2) =
+let compare_dal_attestation (attester1, attestations1, level1)
+    (attester2, attestations2, level2) =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
          ~cmp_fst:Compare.Int32.compare
          ~cmp_snd:Compare.Int.compare)
     ~cmp_snd:Signature.Public_key_hash.compare
-    ((level1, attestations1), attestor1)
-    ((level2, attestations2), attestor2)
+    ((level1, attestations1), attester1)
+    ((level2, attestations2), attester2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
@@ -2499,9 +2499,9 @@ let compare_consensus_weight w1 w2 =
       compare_attestation_infos ~prioritized_position:Fstpos infos1 infos2
   | Weight_preattestation infos1, Weight_attestation infos2 ->
       compare_attestation_infos ~prioritized_position:Sndpos infos1 infos2
-  | ( Weight_dal_attestation (attestor1, size1, lvl1),
-      Weight_dal_attestation (attestor2, size2, lvl2) ) ->
-      compare_dal_attestation (attestor1, size1, lvl1) (attestor2, size2, lvl2)
+  | ( Weight_dal_attestation (attester1, size1, lvl1),
+      Weight_dal_attestation (attester2, size2, lvl2) ) ->
+      compare_dal_attestation (attester1, size1, lvl1) (attester2, size2, lvl2)
   | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
     ->
       -1

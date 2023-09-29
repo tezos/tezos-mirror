@@ -428,10 +428,10 @@ let resolve peers =
        ~default_port:(Configuration_file.default.listen_addr |> snd))
     peers
 
-(* This function ensures the persistence of attestor profiles
+(* This function ensures the persistence of attester profiles
    to the configuration file at shutdown.
 
-   This is especially important for attestors as the pkh they track
+   This is especially important for attesters as the pkh they track
    is supplied by the baker through `PATCH /profile` API calls.
    As these profiles are added dynamically at run time, they do not exist
    in the initial configuration file. Therefore, in order to retain these

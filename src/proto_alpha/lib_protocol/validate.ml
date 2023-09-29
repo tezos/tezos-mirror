@@ -834,12 +834,12 @@ module Consensus = struct
 
   let check_dal_attestation_conflict vs oph
       (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
+    let (Single (Dal_attestation {attester; attestation = _; level = _})) =
       operation.protocol_data.contents
     in
     match
       Signature.Public_key_hash.Map.find_opt
-        attestor
+        attester
         vs.consensus_state.dal_attestation_seen
     with
     | None -> ok_unit
@@ -854,7 +854,7 @@ module Consensus = struct
             Conflicting_consensus_operation {kind = Dal_attestation; conflict})
 
   let add_dal_attestation vs oph (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
+    let (Single (Dal_attestation {attester; attestation = _; level = _})) =
       operation.protocol_data.contents
     in
     {
@@ -864,19 +864,19 @@ module Consensus = struct
           vs.consensus_state with
           dal_attestation_seen =
             Signature.Public_key_hash.Map.add
-              attestor
+              attester
               oph
               vs.consensus_state.dal_attestation_seen;
         };
     }
 
   let remove_dal_attestation vs (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
+    let (Single (Dal_attestation {attester; attestation = _; level = _})) =
       operation.protocol_data.contents
     in
     let dal_attestation_seen =
       Signature.Public_key_hash.Map.remove
-        attestor
+        attester
         vs.consensus_state.dal_attestation_seen
     in
     {vs with consensus_state = {vs.consensus_state with dal_attestation_seen}}
