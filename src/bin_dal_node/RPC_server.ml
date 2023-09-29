@@ -250,6 +250,11 @@ let start configuration ctxt =
   let open Lwt_syntax in
   let Configuration_file.{rpc_addr; _} = configuration in
   let dir = register ctxt in
+  let dir =
+    Tezos_rpc.Directory.register_describe_directory_service
+      dir
+      Tezos_rpc.Service.description_service
+  in
   let rpc_port = snd rpc_addr in
   let rpc_addr = fst rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
