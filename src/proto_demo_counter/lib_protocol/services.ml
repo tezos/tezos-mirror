@@ -42,16 +42,19 @@ module S = struct
 end
 
 let rpc_services : Updater.rpc_context RPC_directory.t =
+  let open Lwt_result_syntax in
   let dir = RPC_directory.empty in
   let dir =
     RPC_directory.register ~chunked:false dir S.service_counter_a (fun ctxt () () ->
         let context = ctxt.Updater.context in
-        State.get_state context >>= fun state -> return state.State.a)
+        let*! state = State.get_state context in
+        return state.State.a)
   in
   let dir =
     RPC_directory.register ~chunked:false dir S.service_counter_b (fun ctxt () () ->
         let context = ctxt.Updater.context in
-        State.get_state context >>= fun state -> return state.State.b)
+        let*! state = State.get_state context in
+        return state.State.b)
   in
   dir
 
