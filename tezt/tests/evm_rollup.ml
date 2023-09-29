@@ -445,12 +445,13 @@ let setup_evm_kernel ?config ?kernel_installee
     }
 
 let setup_past_genesis ?with_administrator ?kernel_installee ?originator_key
-    ?rollup_operator_key ~admin ?legacy_dictator ?ghostnet_storage_version
-    protocol =
+    ?bootstrap_accounts ?rollup_operator_key ~admin ?legacy_dictator
+    ?ghostnet_storage_version protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
       ?kernel_installee
       ?originator_key
+      ?bootstrap_accounts
       ?rollup_operator_key
       ?with_administrator
       ?legacy_dictator
@@ -3005,6 +3006,42 @@ let test_simulation_eip2200 =
   let* _tx = wait_for_application ~sc_rollup_node ~node ~client call () in
   unit
 
+let test_cover_fees =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "validity"]
+    ~title:"Transaction is invalid if sender cannot cover the fees"
+  @@ fun protocol ->
+  (* No bootstrap accounts, so no one has funds. *)
+  let* {evm_proxy_server; endpoint; sc_rollup_node; node; client; _} =
+    setup_past_genesis ~bootstrap_accounts:[||] ~admin:None protocol
+  in
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1).  We do not use eth-cli in
+     this test because we want the results of the simulation. *)
+  let raw_transfer =
+    "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  (* This should fail when the tx-pool check this. *)
+  let* hash_result = send_raw_transaction evm_proxy_server raw_transfer in
+  let hash =
+    match hash_result with
+    | Ok hash -> hash
+    | Error _ -> Test.fail "The proxy did not accept the transaction."
+  in
+  (* No receipt should be produced for an invalid transaction. *)
+  let rec check_for_receipt blocks_left =
+    if blocks_left = 0 then unit
+    else
+      let* receipt = Eth_cli.get_receipt ~endpoint ~tx:hash in
+      match receipt with
+      | Some _ -> Test.fail "An invalid transaction should not have a receipt."
+      | None ->
+          let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+          check_for_receipt (blocks_left - 1)
+  in
+  check_for_receipt 6
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -3057,7 +3094,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getBlockTransactionCountBy protocols ;
   test_rpc_getUncleCountByBlock protocols ;
   test_rpc_getUncleByBlockArgAndIndex protocols ;
-  test_simulation_eip2200 protocols
+  test_simulation_eip2200 protocols ;
+  test_cover_fees protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
