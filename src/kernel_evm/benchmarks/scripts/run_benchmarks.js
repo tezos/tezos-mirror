@@ -75,7 +75,7 @@ function run_profiler(path) {
                 profiler_output_path = profiler_output_path_result;
             }
             push_match(output, gas_used, /\bgas_used:\s*(\d+)/g)
-            push_match(output, tx_status, /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z]+)\b/g)
+            push_match(output, tx_status, /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
             push_match(output, estimated_ticks, /\bEstimated ticks:\s*(\d+)/g)
             push_match(output, estimated_ticks_per_tx, /\bEstimated ticks after tx:\s*(\d+)/g)
         });
@@ -191,6 +191,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     unaccounted_ticks = sumArray(kernel_run_ticks) - sumArray(run_transaction_ticks) - sumArray(signature_verification_ticks) - sumArray(store_transaction_object_ticks) - sumArray(fetch_blueprint_ticks)
     console.log(`Number of transactions: ${tx_status.length}`)
     run_time_index = 0;
+    gas_cost_index = 0;
     for (var j = 0; j < tx_status.length; j++) {
         let basic_info_row = {
             benchmark_name,
@@ -198,19 +199,34 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             status: tx_status[j],
             estimated_ticks: estimated_ticks_per_tx[j],
         }
-        if (tx_status[j].includes("OK")) {
-            sputnik_runtime_tick = (gas_costs[j] > 21000) ? sputnik_runtime_ticks[run_time_index++] : 0
+        if (tx_status[j].includes("OK_UNKNOWN")) {
+            // no outcome should mean never invoking sputnik
             rows.push(
                 {
-                    gas_cost: gas_costs[j],
+                    gas_cost: 21000,
+                    run_transaction_ticks: run_transaction_ticks[j],
+                    sputnik_runtime_ticks: 0,
+                    store_transaction_object_ticks: store_transaction_object_ticks[j],
+                    ...basic_info_row
+                });
+
+        }
+        else if (tx_status[j].includes("OK")) {
+            // sputnik runtime called only if not a transfer
+            sputnik_runtime_tick = (gas_costs[gas_cost_index] > 21000) ? sputnik_runtime_ticks[run_time_index++] : 0
+
+            rows.push(
+                {
+                    gas_cost: gas_costs[gas_cost_index],
                     run_transaction_ticks: run_transaction_ticks[j],
                     sputnik_runtime_ticks: sputnik_runtime_tick,
                     store_transaction_object_ticks: store_transaction_object_ticks[j],
                     ...basic_info_row
                 });
+            gas_cost_index += 1;
         } else {
             // we can expect no gas cost, no storage of the tx object, and no run transaction, but there will be signature verification
-            // invalide transaction detected: ERROR_NONCE and ERROR_SIGNATURE, in both case `caller` is called.
+            // invalide transaction detected: ERROR_NONCE, ERROR_PRE_PAY and ERROR_SIGNATURE, in all cases `caller` is called.
             rows.push(basic_info_row);
 
         }
