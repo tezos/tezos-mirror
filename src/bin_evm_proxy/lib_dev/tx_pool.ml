@@ -49,6 +49,29 @@ module Pool = struct
     (* Update the pool for the given pkey *)
     let transactions = Pkey_map.add pkey txs transactions in
     {transactions; global_index = Int64.(add global_index one)}
+
+  (** Returns all the addresses of the pool *)
+  let addresses {transactions; _} =
+    Pkey_map.bindings transactions |> List.map fst
+
+  (** Returns the transaction matching the predicate.
+      And remove them from the pool. *)
+  let partition pkey predicate {transactions; global_index} =
+    let selected, remaining =
+      transactions |> Pkey_map.find pkey |> Option.value ~default:[]
+      |> List.partition predicate
+    in
+    let transactions =
+      if List.is_empty remaining then Pkey_map.remove pkey transactions
+      else Pkey_map.add pkey remaining transactions
+    in
+    (selected, {transactions; global_index})
+
+  (** Removes from the pool the transactions matching the predicate 
+      for the given pkey. *)
+  let remove pkey predicate t =
+    let _txs, t = partition pkey predicate t in
+    t
 end
 
 module Types = struct
@@ -146,26 +169,75 @@ let on_transaction state tx_raw =
 let on_head state block_height =
   let open Lwt_result_syntax in
   let open Types in
-  let (module Rollup_node) = state.rollup_node in
-  let smart_rollup_address = state.smart_rollup_address in
-  state.level <- block_height ;
-  (* Sends all transactions to the batcher *)
-  let* () =
-    Message_queue.fold_es
-      (fun tx_hash raw_tx _ ->
-        let raw_tx = Ethereum_types.Hex raw_tx in
-        let*! result =
+  let {rollup_node = (module Rollup_node); smart_rollup_address; pool; _} =
+    state
+  in
+  (* Get all the addresses in the tx-pool. *)
+  let addresses = Pool.addresses pool in
+  (* Get the nonce related to each address. *)
+  let*! addr_with_nonces =
+    Lwt_list.map_p
+      (fun address ->
+        let* nonce = Rollup_node.nonce address in
+        Lwt.return_ok (address, nonce))
+      addresses
+  in
+  let addr_with_nonces = List.filter_ok addr_with_nonces in
+  (* Remove transactions with too low nonce. *)
+  let pool =
+    addr_with_nonces
+    |> List.fold_left
+         (fun pool (pkey, current_nonce) ->
+           Pool.remove
+             pkey
+             (fun {nonce; _} ->
+               let (Ethereum_types.Qty nonce) = nonce in
+               let (Ethereum_types.Qty current_nonce) = current_nonce in
+               Z.lt nonce current_nonce)
+             pool)
+         pool
+  in
+  (* Select transaction with nonce equal to user's nonce.
+     Also removes the transactions from the pool. *)
+  let txs, pool =
+    addr_with_nonces
+    |> List.fold_left
+         (fun (txs, pool) (pkey, current_nonce) ->
+           let selected, pool =
+             Pool.partition
+               pkey
+               (fun {nonce; _} ->
+                 let (Ethereum_types.Qty nonce) = nonce in
+                 let (Ethereum_types.Qty current_nonce) = current_nonce in
+                 Z.equal nonce current_nonce)
+               pool
+           in
+           let txs = List.append txs selected in
+           (txs, pool))
+         ([], pool)
+  in
+  (* Sorting transactions by index.
+     First tx in the pool is the first tx to be sent to the batcher. *)
+  let txs =
+    txs
+    |> List.sort (fun Pool.{index = index_a; _} {index = index_b; _} ->
+           Int64.compare index_a index_b)
+    |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
+  in
+  (* Send the txs to the rollup *)
+  let*! () =
+    Lwt_list.iter_s
+      (fun raw_tx ->
+        let open Lwt_syntax in
+        let* _hash =
           Rollup_node.inject_raw_transaction ~smart_rollup_address raw_tx
         in
-        match result with
-        | Ok _hash ->
-            (* Removes successfull transaction from the pool *)
-            Message_queue.remove state.messages tx_hash ;
-            return_unit
-        | Error _ -> return_unit)
-      state.messages
-      ()
+        return_unit)
+      txs
   in
+  (* update the pool *)
+  state.level <- block_height ;
+  state.pool <- pool ;
   return_unit
 
 module Handlers = struct
