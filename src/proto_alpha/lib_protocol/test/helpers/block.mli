@@ -69,7 +69,7 @@ val get_next_baker :
   t ->
   (public_key_hash * public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
-val get_round : block -> Round.t tzresult
+val get_round : block -> Round.t Environment.Error_monad.tzresult
 
 module Forge : sig
   val contents :

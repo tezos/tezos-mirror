@@ -56,7 +56,7 @@ let mk_block_payload_hash payload_round (b : Block.t) =
 
 let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
     ?block_payload_hash ?branch attested_block =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let branch =
     match branch with
     | None -> attested_block.Block.header.shell.predecessor
@@ -84,7 +84,7 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
   let* round =
     match round with
     | None ->
-        let*? round = Block.get_round attested_block in
+        let*?@ round = Block.get_round attested_block in
         return round
     | Some round -> return round
   in

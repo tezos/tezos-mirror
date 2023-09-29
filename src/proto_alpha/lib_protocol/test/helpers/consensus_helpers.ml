@@ -84,9 +84,13 @@ let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
   in
   match mode with
   | Application ->
-      Block.bake ~baking_mode:Application ~operation predecessor >>= check_error
+      let*! result =
+        Block.bake ~baking_mode:Application ~operation predecessor
+      in
+      check_error result
   | Construction ->
-      Block.bake ~baking_mode:Baking ~operation predecessor >>= check_error
+      let*! result = Block.bake ~baking_mode:Baking ~operation predecessor in
+      check_error result
   | Mempool ->
       let*! res =
         let* inc =
@@ -141,14 +145,17 @@ let test_consensus_operation_all_modes ?delegate ?slot ?level ?round
     kind
 
 let delegate_of_first_slot b =
+  let open Lwt_result_syntax in
   let module V = Plugin.RPC.Validators in
-  Context.get_attesters b >|=? function
+  let+ attesters = Context.get_attesters b in
+  match attesters with
   | {V.consensus_key; slots = s :: _; _} :: _ -> (consensus_key, s)
   | _ -> assert false
 
 let delegate_of_slot ?(different_slot = false) slot b =
+  let open Lwt_result_syntax in
   let module V = Plugin.RPC.Validators in
-  Context.get_attesters b >|=? fun attesters ->
+  let+ attesters = Context.get_attesters b in
   List.find_map
     (function
       | {V.consensus_key; slots = s :: _; _}
@@ -162,21 +169,23 @@ let delegate_of_slot ?(different_slot = false) slot b =
   | Some d -> d
 
 let test_consensus_op_for_next ~genesis ~kind ~next =
+  let open Lwt_result_syntax in
   let dorsement ~attested_block ~delegate =
     match kind with
     | `Preattestation -> Op.preattestation ~delegate attested_block
     | `Attestation -> Op.attestation ~delegate attested_block
   in
-  Block.bake genesis >>=? fun b1 ->
-  (match next with
-  | `Level -> Block.bake b1
-  | `Round -> Block.bake ~policy:(By_round 1) genesis)
-  >>=? fun b2 ->
-  Incremental.begin_construction ~mempool_mode:true b1 >>=? fun inc ->
-  delegate_of_first_slot (B b1) >>=? fun (delegate, slot) ->
-  dorsement ~attested_block:b1 ~delegate >>=? fun operation ->
-  Incremental.add_operation inc operation >>=? fun inc ->
-  delegate_of_slot ~different_slot:true slot (B b2) >>=? fun delegate ->
-  dorsement ~attested_block:b2 ~delegate >>=? fun operation ->
-  Incremental.add_operation inc operation >>=? fun (_ : Incremental.t) ->
+  let* b1 = Block.bake genesis in
+  let* b2 =
+    match next with
+    | `Level -> Block.bake b1
+    | `Round -> Block.bake ~policy:(By_round 1) genesis
+  in
+  let* inc = Incremental.begin_construction ~mempool_mode:true b1 in
+  let* delegate, slot = delegate_of_first_slot (B b1) in
+  let* operation = dorsement ~attested_block:b1 ~delegate in
+  let* inc = Incremental.add_operation inc operation in
+  let* delegate = delegate_of_slot ~different_slot:true slot (B b2) in
+  let* operation = dorsement ~attested_block:b2 ~delegate in
+  let* (_ : Incremental.t) = Incremental.add_operation inc operation in
   return_unit

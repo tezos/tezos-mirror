@@ -612,7 +612,7 @@ let test_no_conflict_various_levels_and_rounds () =
     - a block with not enough attestation cannot be baked;
     - a block with enough attestation is baked. *)
 let test_attestation_threshold ~sufficient_threshold () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   (* We choose a relative large number of accounts so that the probability that
      any delegate has [consensus_threshold] slots is low and most delegates have
      about 1 slot so we can get closer to the limit of [consensus_threshold]: we
@@ -624,7 +624,7 @@ let test_attestation_threshold ~sufficient_threshold () =
     Context.get_constants (B b)
   in
   let* attesters_list = Context.get_attesters (B b) in
-  let*? round = Block.get_round b in
+  let*?@ round = Block.get_round b in
   let* _, attestations =
     List.fold_left_es
       (fun (counter, attestations) {Plugin.RPC.Validators.delegate; slots; _} ->

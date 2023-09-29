@@ -124,15 +124,19 @@ let rpc_ctxt =
 let get_attesters ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
 
 let get_first_different_attesters ctxt =
-  get_attesters ctxt >|=? function x :: y :: _ -> (x, y) | _ -> assert false
+  let open Lwt_result_syntax in
+  let+ attesters = get_attesters ctxt in
+  match attesters with x :: y :: _ -> (x, y) | _ -> assert false
 
 let get_attester ctxt =
-  get_attesters ctxt >|=? fun attesters ->
+  let open Lwt_result_syntax in
+  let+ attesters = get_attesters ctxt in
   let attester = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd attesters in
   (attester.consensus_key, attester.slots)
 
 let get_attester_slot ctxt pkh =
-  get_attesters ctxt >|=? fun attesters ->
+  let open Lwt_result_syntax in
+  let+ attesters = get_attesters ctxt in
   List.find_map
     (function
       | {Plugin.RPC.Validators.consensus_key; slots; _} ->
@@ -141,15 +145,17 @@ let get_attester_slot ctxt pkh =
     attesters
 
 let get_attester_n ctxt n =
-  Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun attesters ->
+  let open Lwt_result_syntax in
+  let+ attesters = Plugin.RPC.Validators.get rpc_ctxt ctxt in
   let attester =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth attesters n
   in
   (attester.consensus_key, attester.slots)
 
 let get_attesting_power_for_delegate ctxt ?level pkh =
+  let open Lwt_result_syntax in
   let levels = Option.map (fun level -> [level]) level in
-  Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun attesters ->
+  let* attesters = Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt in
   let rec find_slots_for_delegate = function
     | [] -> return 0
     | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
@@ -177,12 +183,14 @@ let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
 let get_current_baking_power = Delegate_services.current_baking_power rpc_ctxt
 
 let get_bakers ?filter ?cycle ctxt =
-  Plugin.RPC.Baking_rights.get rpc_ctxt ?cycle ctxt >|=? fun bakers ->
+  let open Lwt_result_syntax in
+  let+ bakers = Plugin.RPC.Baking_rights.get rpc_ctxt ?cycle ctxt in
   (match filter with None -> bakers | Some f -> List.filter f bakers)
   |> List.map (fun p -> p.Plugin.RPC.Baking_rights.delegate)
 
 let get_baker ctxt ~round =
-  get_bakers ~filter:(fun x -> x.round = round) ctxt >>=? fun bakers ->
+  let open Lwt_result_syntax in
+  let* bakers = get_bakers ~filter:(fun x -> x.round = round) ctxt in
   (* there is only one baker for a given round *)
   match bakers with [baker] -> return baker | _ -> assert false
 
@@ -193,7 +201,9 @@ let get_first_different_baker baker bakers =
        bakers
 
 let get_first_different_bakers ctxt =
-  get_bakers ctxt >|=? function
+  let open Lwt_result_syntax in
+  let+ bakers = get_bakers ctxt in
+  match bakers with
   | [] -> assert false
   | baker_1 :: other_bakers ->
       (baker_1, get_first_different_baker baker_1 other_bakers)
@@ -220,15 +230,18 @@ let get_issuance_per_minute ctxt =
   Adaptive_issuance_services.current_issuance_per_minute rpc_ctxt ctxt
 
 let get_baking_reward_fixed_portion ctxt =
-  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  let open Lwt_result_syntax in
+  let* {Constants.parametric = csts; _} = get_constants ctxt in
   return
     (Delegate.Rewards.For_RPC.reward_from_constants
        csts
        ~reward_kind:Baking_reward_fixed_portion)
 
 let get_bonus_reward ctxt ~attesting_power =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {consensus_threshold; _} as csts; _} ->
+  let open Lwt_result_syntax in
+  let* {Constants.parametric = {consensus_threshold; _} as csts; _} =
+    get_constants ctxt
+  in
   let baking_reward_bonus_per_slot =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
@@ -238,7 +251,8 @@ let get_bonus_reward ctxt ~attesting_power =
   return Test_tez.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
 let get_attesting_reward ctxt ~expected_attesting_power =
-  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  let open Lwt_result_wrap_syntax in
+  let* {Constants.parametric = csts; _} = get_constants ctxt in
   let attesting_reward_per_slot =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
@@ -249,7 +263,8 @@ let get_attesting_reward ctxt ~expected_attesting_power =
        Tez.(attesting_reward_per_slot *? Int64.of_int expected_attesting_power))
 
 let get_liquidity_baking_subsidy ctxt =
-  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  let open Lwt_result_syntax in
+  let* {Constants.parametric = csts; _} = get_constants ctxt in
   return
     (Delegate.Rewards.For_RPC.reward_from_constants
        csts
@@ -268,14 +283,16 @@ let get_total_supply ctxt =
   Adaptive_issuance_services.total_supply rpc_ctxt ctxt
 
 let get_seed_nonce_revelation_tip ctxt =
-  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  let open Lwt_result_syntax in
+  let* {Constants.parametric = csts; _} = get_constants ctxt in
   return
     (Delegate.Rewards.For_RPC.reward_from_constants
        csts
        ~reward_kind:Seed_nonce_revelation_tip)
 
 let get_vdf_revelation_tip ctxt =
-  get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
+  let open Lwt_result_syntax in
+  let* {Constants.parametric = csts; _} = get_constants ctxt in
   return
     (Delegate.Rewards.For_RPC.reward_from_constants
        csts
@@ -317,16 +334,22 @@ module Vote = struct
     Alpha_services.Voting.delegate_proposal_count rpc_ctxt ctxt pkh
 
   let get_participation_ema (b : Block.t) =
-    Environment.Context.find b.context ["votes"; "participation_ema"]
-    >|= function
+    let open Lwt_syntax in
+    let+ bytes_opt =
+      Environment.Context.find b.context ["votes"; "participation_ema"]
+    in
+    match bytes_opt with
     | None -> assert false
-    | Some bytes -> ok (TzEndian.get_int32 bytes 0)
+    | Some bytes -> Ok (TzEndian.get_int32 bytes 0)
 
   let set_participation_ema (b : Block.t) ema =
+    let open Lwt_syntax in
     let bytes = Bytes.make 4 '\000' in
     TzEndian.set_int32 bytes 0 ema ;
-    Environment.Context.add b.context ["votes"; "participation_ema"] bytes
-    >|= fun context -> {b with context}
+    let+ context =
+      Environment.Context.add b.context ["votes"; "participation_ema"] bytes
+    in
+    {b with context}
 
   type delegate_info = Alpha_context.Vote.delegate_info = {
     voting_power : Int64.t option;
@@ -377,10 +400,11 @@ module Contract = struct
     | Implicit pkh -> Account.find pkh
 
   let is_manager_key_revealed ctxt (contract : Contract.t) =
+    let open Lwt_result_syntax in
     match contract with
     | Originated _ -> invalid_arg "Helpers.Context.is_manager_key_revealed"
     | Implicit mgr ->
-        Alpha_services.Contract.manager_key rpc_ctxt ctxt mgr >|=? fun res ->
+        let+ res = Alpha_services.Contract.manager_key rpc_ctxt ctxt mgr in
         res <> None
 
   let delegate ctxt contract =
@@ -393,14 +417,17 @@ module Contract = struct
     Alpha_services.Contract.storage rpc_ctxt ctxt contract
 
   let script ctxt contract =
-    Alpha_services.Contract.script rpc_ctxt ctxt contract
-    >>=? fun {code; storage = _} ->
+    let open Lwt_result_syntax in
+    let* {code; storage = _} =
+      Alpha_services.Contract.script rpc_ctxt ctxt contract
+    in
     match Data_encoding.force_decode code with
     | Some v -> return v
     | None -> invalid_arg "Cannot force lazy script"
 
   let script_hash ctxt contract =
-    script ctxt contract >>=? fun script ->
+    let open Lwt_result_syntax in
+    let* script = script ctxt contract in
     let bytes = Data_encoding.Binary.to_bytes_exn Script.expr_encoding script in
     return @@ Script_expr_hash.hash_bytes [bytes]
 end
@@ -538,8 +565,9 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?dal_enable ?zk_rollup_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal () =
+  let open Lwt_result_syntax in
   let n = tup_n tup in
-  Account.generate_accounts ?rng_state n >>?= fun accounts ->
+  let*? accounts = Account.generate_accounts ?rng_state n in
   let contracts =
     List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
   in
@@ -550,27 +578,29 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
       ?bootstrap_consensus_keys
       accounts
   in
-  Block.genesis
-    ?commitments
-    ?consensus_threshold
-    ?min_proposal_quorum
-    ?bootstrap_contracts
-    ?level
-    ?cost_per_byte
-    ?issuance_weights
-    ?origination_size
-    ?blocks_per_cycle
-    ?cycles_per_voting_period
-    ?sc_rollup_enable
-    ?sc_rollup_arith_pvm_enable
-    ?sc_rollup_private_enable
-    ?dal_enable
-    ?zk_rollup_enable
-    ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold
-    ?dal
-    bootstrap_accounts
-  >|=? fun blk -> (blk, tup_get tup contracts)
+  let+ blk =
+    Block.genesis
+      ?commitments
+      ?consensus_threshold
+      ?min_proposal_quorum
+      ?bootstrap_contracts
+      ?level
+      ?cost_per_byte
+      ?issuance_weights
+      ?origination_size
+      ?blocks_per_cycle
+      ?cycles_per_voting_period
+      ?sc_rollup_enable
+      ?sc_rollup_arith_pvm_enable
+      ?sc_rollup_private_enable
+      ?dal_enable
+      ?zk_rollup_enable
+      ?hard_gas_limit_per_block
+      ?nonce_revelation_threshold
+      ?dal
+      bootstrap_accounts
+  in
+  (blk, tup_get tup contracts)
 
 let init_n n = init_gen (TList n)
 
@@ -623,6 +653,7 @@ let init_with_parameters1 = init_with_parameters_gen T1
 let init_with_parameters2 = init_with_parameters_gen T2
 
 let default_raw_context () =
+  let open Lwt_result_wrap_syntax in
   let open Tezos_protocol_alpha_parameters in
   let initial_account = Account.new_account () in
   let bootstrap_accounts =
@@ -630,7 +661,7 @@ let default_raw_context () =
       ~balance:(Tez.of_mutez_exn 100_000_000_000L)
       initial_account
   in
-  Block.prepare_initial_context_params () >>=? fun (constants, _, _) ->
+  let* constants, _, _ = Block.prepare_initial_context_params () in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts:[bootstrap_accounts]
@@ -642,21 +673,24 @@ let default_raw_context () =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   let protocol_param_key = ["protocol_parameters"] in
-  Tezos_protocol_environment.Context.(
-    let empty = Tezos_protocol_environment.Memory_context.empty in
-    add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
-    add ctxt protocol_param_key proto_params)
-  >>= fun context ->
+  let*! context =
+    Tezos_protocol_environment.Context.(
+      let empty = Tezos_protocol_environment.Memory_context.empty in
+      let*! ctxt = add empty ["version"] (Bytes.of_string "genesis") in
+      add ctxt protocol_param_key proto_params)
+  in
   let typecheck_smart_contract ctxt script_repr =
     return ((script_repr, None), ctxt)
   in
-  let typecheck_smart_rollup ctxt _script_repr = Result_syntax.return ctxt in
-  Init_storage.prepare_first_block
-    Chain_id.zero
-    context
-    ~level:0l
-    ~timestamp:(Time.Protocol.of_seconds 1643125688L)
-    ~predecessor:Block_hash.zero
-    ~typecheck_smart_contract
-    ~typecheck_smart_rollup
-  >>= fun e -> Lwt.return @@ Environment.wrap_tzresult e
+  let typecheck_smart_rollup ctxt _script_repr = Ok ctxt in
+  let*@ e =
+    Init_storage.prepare_first_block
+      Chain_id.zero
+      context
+      ~level:0l
+      ~timestamp:(Time.Protocol.of_seconds 1643125688L)
+      ~predecessor:Block_hash.zero
+      ~typecheck_smart_contract
+      ~typecheck_smart_rollup
+  in
+  return e
