@@ -7490,6 +7490,19 @@ let _ppinclude =
     ~bisect_ppx:No
     ~deps:[compiler_libs_common]
 
+let _dal_throughput =
+  private_exe
+    "dal_throughput_gen"
+    ~path:
+      ("devtools" // "cloud-infrastructure" // "projects" // "nl-dal"
+     // "octogram")
+    ~synopsis:"DAL Throughput scenarii generator"
+    ~release_status:Unreleased
+    ~opam:""
+    ~deps:[ezjsonm]
+    ~static:false
+    ~bisect_ppx:No
+
 let _octez_node =
   let protocol_deps =
     let deps_for_protocol protocol =
