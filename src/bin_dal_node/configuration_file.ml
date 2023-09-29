@@ -42,8 +42,7 @@ let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
 
 let store_path {data_dir; _} = Filename.concat data_dir "store"
 
-let default_rpc_addr =
-  P2p_point.Id.of_string_exn ~default_port:10732 "127.0.0.1"
+let default_rpc_addr = P2p_point.Id.of_string_exn ~default_port:10732 "0.0.0.0"
 
 let default_listen_addr =
   let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
@@ -66,7 +65,7 @@ let default_metrics_port =
   Gossipsub.Transport_layer.Default_parameters.P2p_config.listening_port + 1
 
 let default_metrics_addr =
-  P2p_point.Id.of_string_exn ~default_port:default_metrics_port "127.0.0.1"
+  P2p_point.Id.of_string_exn ~default_port:default_metrics_port "0.0.0.0"
 
 let default =
   {
