@@ -5,16 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Tx = struct
-  type t = string
-
-  let equal a b = a = b
-
-  let hash t = Ethereum_types.hash_raw_tx t |> Hashtbl.hash
-end
-
-module Message_queue = Hash_queue.Make (Tx) (String)
-
 module Pool = struct
   module Pkey_map = Map.Make (Ethereum_types.Address)
 
@@ -79,7 +69,6 @@ module Types = struct
     rollup_node : (module Rollup_node.S);
     smart_rollup_address : string;
     mutable level : Ethereum_types.block_height;
-    messages : Message_queue.t;
     mutable pool : Pool.t;
   }
 
@@ -264,7 +253,6 @@ module Handlers = struct
           rollup_node;
           smart_rollup_address;
           level = Block_height Z.zero;
-          messages = Message_queue.create 100_000 (* ~ 400MB *);
           pool = Pool.empty;
         }
     in
