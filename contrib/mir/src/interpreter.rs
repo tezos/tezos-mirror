@@ -200,6 +200,19 @@ fn interpret_one(
                 _ => unreachable_state(),
             }
         }
+        I::Compare => match stack.as_slice() {
+            [.., r, l] => {
+                gas.consume(interpret_cost::compare(l, r)?)?;
+                let cmp = l.partial_cmp(&r);
+                let val = match cmp {
+                    Some(v) => v as i8,
+                    _ => unreachable_state(),
+                };
+                stack.pop();
+                stack[0] = V::Int(val.into());
+            }
+            _ => unreachable_state(),
+        },
     }
     Ok(())
 }
@@ -636,6 +649,37 @@ mod interpreter_tests {
         assert_eq!(
             gas.milligas(),
             Gas::default().milligas() - interpret_cost::SOME - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn compare() {
+        macro_rules! test {
+            ($expr:tt, $res:tt) => {
+                let mut stack = stk!$expr;
+                let expected_cost = interpret_cost::compare(&stack[0], &stack[1]).unwrap()
+                    + interpret_cost::INTERPRET_RET;
+                let mut gas = Gas::default();
+                assert!(interpret(&vec![Compare], &mut gas, &mut stack).is_ok());
+                assert_eq!(stack, stk!$res);
+                assert_eq!(gas.milligas(), Gas::default().milligas() - expected_cost);
+            };
+        }
+        test!([V::Int(5), V::Int(6)], [V::Int(1)]);
+        test!([V::Int(5), V::Int(5)], [V::Int(0)]);
+        test!([V::Int(6), V::Int(5)], [V::Int(-1)]);
+        test!([V::Bool(true), V::Bool(false)], [V::Int(-1)]);
+        test!([V::Bool(true), V::Bool(true)], [V::Int(0)]);
+        test!([V::Bool(false), V::Bool(true)], [V::Int(1)]);
+        test!([V::Bool(false), V::Bool(false)], [V::Int(0)]);
+        test!(
+            [V::String("foo".to_owned()), V::String("bar".to_owned())],
+            [V::Int(-1)]
+        );
+        test!([V::Unit, V::Unit], [V::Int(0)]);
+        test!(
+            [V::new_option(Some(V::Int(5))), V::Option(None)],
+            [V::Int(-1)]
         );
     }
 }
