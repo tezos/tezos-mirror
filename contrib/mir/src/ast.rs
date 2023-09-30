@@ -25,6 +25,13 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn is_comparable(&self) -> bool {
+        // all types are currently comparable
+        return true;
+    }
+}
+
+impl Type {
     /// Returns abstract size of the type representation. Used for gas cost
     /// estimation.
     pub fn size_for_gas(&self) -> usize {
