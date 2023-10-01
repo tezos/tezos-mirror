@@ -108,13 +108,15 @@ mod tests {
 
     #[test]
     fn typecheck_test_expect_fail() {
+        use typechecker::{NoMatchingOverloadReason, TcError};
         let ast = parser::parse(&FIBONACCI_ILLTYPED_SRC).unwrap();
         let mut stack = stk![Type::Nat];
         assert_eq!(
             typechecker::typecheck(ast, &mut Gas::default(), &mut stack),
-            Err(typechecker::TcError::StackTooShort {
-                expected: 4,
-                got: 3
+            Err(TcError::NoMatchingOverload {
+                instr: "DUP",
+                stack: stk![Type::Int, Type::Int, Type::Int],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 4 })
             })
         );
     }
