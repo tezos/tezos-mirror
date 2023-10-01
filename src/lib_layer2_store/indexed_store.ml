@@ -377,6 +377,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
   let initiate_gc store =
     let open Lwt_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let* () = Store_events.starting_gc N.name in
     let tmp_index_path = tmp_path store.path in
     let new_stale_path = stale_path store.path (List.length store.stales + 1) in
     let* new_index_stale = mv_internal_index store store.fresh new_stale_path in
@@ -417,7 +418,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
       [tmp_index]. *)
   let unsafe_retain_one_item store tmp_index filter k =
     match unsafe_find ~only_stale:true store k with
-    | None -> Lwt.return_unit
+    | None -> Store_events.missing_value_gc N.name (K.encode k)
     | Some v ->
         if filter v then I.replace tmp_index.index k v ;
         Lwt.return_unit
@@ -434,6 +435,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     let*! index_stale = mv_internal_index store tmp_index stale_path in
     store.stales <- [index_stale] ;
     store.gc_status <- No_gc ;
+    let*! () = Store_events.finished_gc N.name in
     return_unit
 
   (** The background task for a gc operation consists in copying all items in
@@ -457,7 +459,9 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
         let* () =
           match res with
           | Ok () -> return_unit
-          | Error _error -> revert_failed_gc store
+          | Error error ->
+              let* () = Store_events.failed_gc N.name error in
+              revert_failed_gc store
         in
         Lwt.wakeup_later resolve () ;
         return_unit)
@@ -471,7 +475,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
   let gc_internal ~async store retain filter =
     let open Lwt_syntax in
     match store.gc_status with
-    | Ongoing _ -> return_unit
+    | Ongoing _ -> Store_events.ignore_gc N.name
     | No_gc ->
         let* tmp_index, promise, resolve = initiate_gc store in
         gc_background_task store tmp_index retain filter resolve ;
@@ -956,6 +960,7 @@ struct
   let initiate_gc store =
     let open Lwt_result_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let*! () = Store_events.starting_gc N.name in
     let tmp_store_path = tmp_path store.path in
     let new_stale_path = stale_path store.path (List.length store.stales + 1) in
     let* new_store_stale = mv_internal_store store store.fresh new_stale_path in
@@ -1001,7 +1006,9 @@ struct
     let open Lwt_result_syntax in
     let* v = unsafe_read_from_disk_opt ~only_stale:true store key in
     match v with
-    | None -> return_unit
+    | None ->
+        let*! () = Store_events.missing_value_gc N.name (K.encode key) in
+        return_unit
     | Some (value, header) ->
         unsafe_append_internal tmp_store ~key ~header ~value
 
@@ -1018,6 +1025,7 @@ struct
     store.stales <- [store_stale] ;
     store.gc_status <- No_gc ;
     Cache.clear store.cache ;
+    let*! () = Store_events.finished_gc N.name in
     return_unit
 
   let gc_background_task store tmp retain resolve =
@@ -1031,9 +1039,12 @@ struct
           finalize_gc store tmp
         in
         let*! () =
+          let open Lwt_syntax in
           match res with
-          | Ok () -> Lwt.return_unit
-          | Error _error -> revert_failed_gc store
+          | Ok () -> return_unit
+          | Error error ->
+              let* () = Store_events.failed_gc N.name error in
+              revert_failed_gc store
         in
         Lwt.wakeup_later resolve () ;
         Lwt.return_unit)
@@ -1046,7 +1057,9 @@ struct
   let gc_internal ~async store retain =
     let open Lwt_result_syntax in
     match store.gc_status with
-    | Ongoing _ -> return_unit
+    | Ongoing _ ->
+        let*! () = Store_events.ignore_gc N.name in
+        return_unit
     | No_gc ->
         let* tmp_store, promise, resolve = initiate_gc store in
         gc_background_task store tmp_store retain resolve ;
