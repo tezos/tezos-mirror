@@ -13,13 +13,6 @@ pub struct Gas {
 #[derive(Debug, PartialEq, Eq)]
 pub struct OutOfGas;
 
-/// Overflow errors can be treated as out-of-gas errors
-impl From<std::num::TryFromIntError> for OutOfGas {
-    fn from(_: std::num::TryFromIntError) -> Self {
-        OutOfGas
-    }
-}
-
 // Default gas limit per transaction, according to
 // https://opentezos.com/tezos-basics/economics-and-rewards/#transaction-cost
 const DEFAULT_GAS_AMOUNT: u32 = 1_040_000;
@@ -52,10 +45,28 @@ impl Gas {
     }
 }
 
+trait AsGasCost {
+    /// Try to convert a checked numeric type to gas cost; return `OutOfGas` on
+    /// overflow.
+    fn as_gas_cost(&self) -> Result<u32, OutOfGas>;
+}
+
+impl AsGasCost for checked::Checked<u32> {
+    fn as_gas_cost(&self) -> Result<u32, OutOfGas> {
+        self.ok_or(OutOfGas)
+    }
+}
+
+impl AsGasCost for checked::Checked<usize> {
+    fn as_gas_cost(&self) -> Result<u32, OutOfGas> {
+        self.ok_or(OutOfGas)?.try_into().map_err(|_| OutOfGas)
+    }
+}
+
 pub mod tc_cost {
     use checked::Checked;
 
-    use super::OutOfGas;
+    use super::{AsGasCost, OutOfGas};
 
     // Due to the quirk of the Tezos protocol implementation, step gas is
     // charged twice as often as in MIR.
@@ -65,7 +76,7 @@ pub mod tc_cost {
 
     fn variadic(depth: u16) -> Result<u32, OutOfGas> {
         let depth = Checked::from(depth as u32);
-        (depth * 50).ok_or(OutOfGas)
+        (depth * 50).as_gas_cost()
     }
 
     pub fn drop_n(depth: &Option<u16>) -> Result<u32, OutOfGas> {
@@ -80,14 +91,14 @@ pub mod tc_cost {
         // complexity of comparing types T and U is O(min(|T|, |U|)), as
         // comparison short-circuits at the first mismatch
         let sz = Checked::from(std::cmp::min(sz1, sz2));
-        Ok((sz * 60).ok_or(OutOfGas)?.try_into()?)
+        (sz * 60).as_gas_cost()
     }
 }
 
 pub mod interpret_cost {
     use checked::Checked;
 
-    use super::OutOfGas;
+    use super::{AsGasCost, OutOfGas};
     use crate::ast::TypedValue;
 
     pub const DIP: u32 = 10;
@@ -114,7 +125,7 @@ pub mod interpret_cost {
     fn dropn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 30 + 2.713108*n, copied from the Tezos protocol
         let n = Checked::from(n as u32);
-        (30 + n * 2 + (n >> 1) + (n >> 3)).ok_or(OutOfGas)
+        (30 + n * 2 + (n >> 1) + (n >> 3)).as_gas_cost()
     }
 
     pub fn drop(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
@@ -124,7 +135,7 @@ pub mod interpret_cost {
     fn dipn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
         let n = Checked::from(n as u32);
-        (15 + n * 4).ok_or(OutOfGas)
+        (15 + n * 4).as_gas_cost()
     }
 
     pub fn dip(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
@@ -137,13 +148,13 @@ pub mod interpret_cost {
         // cost_N_KUndip * n + cost_N_KCons,
         // where cost_N_KUndip = cost_N_KCons = 10
         let n = Checked::from(n as u32);
-        ((n + 1) * 10).ok_or(OutOfGas)
+        ((n + 1) * 10).as_gas_cost()
     }
 
     fn dupn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 20 + 1.222263*n, copied from the Tezos protocol
         let n = Checked::from(n as u32);
-        (20 + n + (n >> 2)).ok_or(OutOfGas)
+        (20 + n + (n >> 2)).as_gas_cost()
     }
 
     pub fn dup(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
@@ -156,19 +167,19 @@ pub mod interpret_cost {
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
         let sz = Checked::from(std::cmp::max(size_of_val(&i1), size_of_val(&i2)));
-        Ok((35 + (sz >> 1)).ok_or(OutOfGas)?.try_into()?)
+        (35 + (sz >> 1)).as_gas_cost()
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
         use TypedValue as V;
-        let cmp_bytes = |s1: usize, s2: usize| -> Result<u32, OutOfGas> {
+        let cmp_bytes = |s1: usize, s2: usize| {
             // Approximating 35 + 0.024413 x term
             let v = Checked::from(std::cmp::min(s1, s2));
-            Ok((35 + (v >> 6) + (v >> 7)).ok_or(OutOfGas)?.try_into()?)
+            (35 + (v >> 6) + (v >> 7)).as_gas_cost()
         };
-        let cmp_pair = |l1, r1, l2, r2| -> Result<u32, OutOfGas> {
+        let cmp_pair = |l1, r1, l2, r2| {
             let c = Checked::from(10u32);
-            (c + compare(l1, r1)? + compare(l2, r2)?).ok_or(OutOfGas)
+            (c + compare(l1, r1)? + compare(l2, r2)?).as_gas_cost()
         };
         let cmp_option = Checked::from(10u32);
         Ok(match (v1, v2) {
@@ -191,7 +202,7 @@ pub mod interpret_cost {
                 (Some(_), None) => cmp_option,
                 (Some(l), Some(r)) => cmp_option + compare(l, r)?,
             }
-            .ok_or(OutOfGas)?,
+            .as_gas_cost()?,
             _ => unreachable!("Comparison of incomparable values"),
         })
     }
