@@ -72,7 +72,7 @@ mod tests {
         let mut gas = Gas::new(1);
         assert_eq!(
             interpreter::interpret(&ast, &mut gas, &mut istack),
-            Err(interpreter::InterpretError::OutOfGas),
+            Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
         );
     }
 
@@ -102,7 +102,7 @@ mod tests {
         let mut gas = Gas::new(1000);
         assert_eq!(
             typechecker::typecheck(ast, &mut gas, &mut stack),
-            Err(typechecker::TcError::OutOfGas)
+            Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
 
@@ -112,7 +112,10 @@ mod tests {
         let mut stack = stk![Type::Nat];
         assert_eq!(
             typechecker::typecheck(ast, &mut Gas::default(), &mut stack),
-            Err(typechecker::TcError::StackTooShort)
+            Err(typechecker::TcError::StackTooShort {
+                expected: 4,
+                got: 3
+            })
         );
     }
 
@@ -179,21 +182,21 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "Expected a natural from 0 to 1023 inclusive"
+            "expected a natural from 0 to 1023 inclusive, but got 1025"
         );
         assert_eq!(
             parser::parse("{ DIP 1024 {} }")
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "Expected a natural from 0 to 1023 inclusive"
+            "expected a natural from 0 to 1023 inclusive, but got 1024"
         );
         assert_eq!(
             parser::parse("{ DUP 65536 }")
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "Expected a natural from 0 to 1023 inclusive"
+            "expected a natural from 0 to 1023 inclusive, but got 65536"
         );
     }
 

@@ -284,6 +284,7 @@ dependencies = [
  "checked",
  "lalrpop",
  "lalrpop-util",
+ "thiserror",
 ]
 
 [[package]]

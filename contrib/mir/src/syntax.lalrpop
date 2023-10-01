@@ -7,12 +7,15 @@
 
 #![allow(dead_code)]
 use std::str::FromStr;
-use lalrpop_util::ParseError;
 
 use crate::ast::*;
-use crate::parser::validate_unescape_string;
+use crate::parser::{validate_unescape_string, ParserError};
 
 grammar;
+
+extern {
+    type Error = ParserError;
+}
 
 match {
   r"(?-u:\s)+" => {}, // more or less same as default, but required to build w/o unicode
@@ -20,15 +23,13 @@ match {
 }
 
 number: i128 = <s:r"([+-]?)[0-9]+"> =>? i128::from_str(s)
-  .map_err(|_| ParseError::User { error : "parsing of numeric literal failed." } );
+  .map_err(|_| ParserError::NumericLiteral(s.to_owned()).into() );
 
 u10: u16 = <s:r"([+-]?)[0-9]+"> =>? {
     let res = u16::from_str(s)
-      .map_err(|_| ParseError::User { error : "Expected a natural from 0 to 1023 inclusive" } )?;
+      .map_err(|_| ParserError::ExpectedU10(s.to_owned()) )?;
     if res >= 1024 {
-      return Err(ParseError::User {
-        error: "Expected a natural from 0 to 1023 inclusive"
-      });
+      return Err(ParserError::ExpectedU10(s.to_owned()).into());
     }
     Ok(res)
   };

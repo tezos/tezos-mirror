@@ -10,7 +10,8 @@ pub struct Gas {
     milligas_amount: Option<u32>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("out of gas")]
 pub struct OutOfGas;
 
 // Default gas limit per transaction, according to

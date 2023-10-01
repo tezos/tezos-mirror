@@ -13,25 +13,22 @@ use crate::gas::{Gas, OutOfGas};
 use crate::stack::*;
 
 /// Typechecker error type.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum TcError {
+    #[error("generic error")]
     GenericTcError,
-    StackTooShort,
-    StacksNotEqual,
-    OutOfGas,
+    #[error("stack too short; expected {expected}, but got {got}")]
+    StackTooShort { expected: usize, got: usize },
+    #[error("type stacks not equal: {0:?} != {1:?}")]
+    StacksNotEqual(TypeStack, TypeStack),
+    #[error(transparent)]
+    OutOfGas(#[from] OutOfGas),
+    #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
-}
-
-impl From<OutOfGas> for TcError {
-    fn from(_: OutOfGas) -> Self {
-        TcError::OutOfGas
-    }
-}
-
-impl From<TryFromIntError> for TcError {
-    fn from(_: TryFromIntError) -> Self {
-        TcError::GenericTcError
-    }
+    #[error("numeric conversion failed: {0}")]
+    NumericConversion(#[from] TryFromIntError),
+    #[error("types not equal: {0:?} != {1:?}")]
+    TypesNotEqual(Type, Type),
 }
 
 #[allow(dead_code)]
@@ -224,7 +221,12 @@ fn typecheck_instruction(
                 stack.push(T::new_option(ty));
                 I::ISome
             }
-            _ => return Err(TcError::StackTooShort),
+            _ => {
+                return Err(TcError::StackTooShort {
+                    expected: 1,
+                    got: 0,
+                })
+            }
         },
         I::Compare => match stack.as_slice() {
             [.., t, u] => {
@@ -275,7 +277,10 @@ fn ensure_stack_len(stack: &TypeStack, l: usize) -> Result<(), TcError> {
     if stack.len() >= l {
         Ok(())
     } else {
-        Err(TcError::StackTooShort)
+        Err(TcError::StackTooShort {
+            expected: l,
+            got: stack.len(),
+        })
     }
 }
 
@@ -288,10 +293,11 @@ fn ensure_stacks_eq(gas: &mut Gas, stack1: &TypeStack, stack2: &TypeStack) -> Re
         return Ok(());
     }
     if stack1.len() != stack2.len() {
-        return Err(TcError::StacksNotEqual);
+        return Err(TcError::StacksNotEqual(stack1.clone(), stack2.clone()));
     }
     for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
-        ensure_ty_eq(gas, ty1, ty2)?;
+        ensure_ty_eq(gas, ty1, ty2)
+            .map_err(|_| TcError::StacksNotEqual(stack1.clone(), stack2.clone()))?;
     }
     Ok(())
 }
@@ -299,7 +305,7 @@ fn ensure_stacks_eq(gas: &mut Gas, stack1: &TypeStack, stack2: &TypeStack) -> Re
 fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
     gas.consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
     if ty1 != ty2 {
-        Err(TcError::StacksNotEqual)
+        Err(TcError::TypesNotEqual(ty1.clone(), ty2.clone()))
     } else {
         Ok(())
     }
@@ -494,7 +500,10 @@ mod typecheck_tests {
                 &mut stack
             )
             .unwrap_err(),
-            TcError::StacksNotEqual
+            TcError::StacksNotEqual(
+                stk![Type::Int, Type::Int, Type::Bool],
+                stk![Type::Int, Type::Bool]
+            )
         );
     }
 
@@ -509,7 +518,7 @@ mod typecheck_tests {
                 &mut stack
             )
             .unwrap_err(),
-            TcError::StacksNotEqual
+            TcError::StacksNotEqual(stk![Type::Bool, Type::Bool], stk![Type::Int, Type::Bool])
         );
     }
 
@@ -757,7 +766,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Err(TcError::StacksNotEqual)
+            Err(TcError::TypesNotEqual(Type::Int, Type::Nat))
         );
     }
 }
