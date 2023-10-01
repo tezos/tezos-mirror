@@ -53,6 +53,8 @@ impl Gas {
 }
 
 pub mod tc_cost {
+    use checked::Checked;
+
     use super::OutOfGas;
 
     // Due to the quirk of the Tezos protocol implementation, step gas is
@@ -62,7 +64,8 @@ pub mod tc_cost {
     pub const VALUE_STEP: u32 = 100;
 
     fn variadic(depth: u16) -> Result<u32, OutOfGas> {
-        (depth as u32).checked_mul(50).ok_or(OutOfGas)
+        let depth = Checked::from(depth as u32);
+        (depth * 50).ok_or(OutOfGas)
     }
 
     pub fn drop_n(depth: &Option<u16>) -> Result<u32, OutOfGas> {
@@ -76,14 +79,14 @@ pub mod tc_cost {
     pub fn ty_eq(sz1: usize, sz2: usize) -> Result<u32, OutOfGas> {
         // complexity of comparing types T and U is O(min(|T|, |U|)), as
         // comparison short-circuits at the first mismatch
-        Ok(std::cmp::min(sz1, sz2)
-            .checked_mul(60) // according to Nairobi
-            .ok_or(OutOfGas)?
-            .try_into()?)
+        let sz = Checked::from(std::cmp::min(sz1, sz2));
+        Ok((sz * 60).ok_or(OutOfGas)?.try_into()?)
     }
 }
 
 pub mod interpret_cost {
+    use checked::Checked;
+
     use super::OutOfGas;
     use crate::ast::TypedValue;
 
@@ -110,13 +113,8 @@ pub mod interpret_cost {
 
     fn dropn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 30 + 2.713108*n, copied from the Tezos protocol
-        let go = |n: u32| {
-            n.checked_mul(2)?
-                .checked_add(30)?
-                .checked_add(n >> 1)?
-                .checked_add(n >> 3)
-        };
-        go(n as u32).ok_or(OutOfGas)
+        let n = Checked::from(n as u32);
+        (30 + n * 2 + (n >> 1) + (n >> 3)).ok_or(OutOfGas)
     }
 
     pub fn drop(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
@@ -125,8 +123,8 @@ pub mod interpret_cost {
 
     fn dipn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
-        let go = |n: u32| n.checked_mul(4)?.checked_add(15);
-        go(n as u32).ok_or(OutOfGas)
+        let n = Checked::from(n as u32);
+        (15 + n * 4).ok_or(OutOfGas)
     }
 
     pub fn dip(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
@@ -138,14 +136,14 @@ pub mod interpret_cost {
         // the Tezos protocol. It seems undip cost is charged as
         // cost_N_KUndip * n + cost_N_KCons,
         // where cost_N_KUndip = cost_N_KCons = 10
-        let go = |n: u32| n.checked_add(1)?.checked_mul(10);
-        go(n as u32).ok_or(OutOfGas)
+        let n = Checked::from(n as u32);
+        ((n + 1) * 10).ok_or(OutOfGas)
     }
 
     fn dupn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 20 + 1.222263*n, copied from the Tezos protocol
-        let go = |n: u32| n.checked_add(20)?.checked_add(n >> 2);
-        go(n as u32).ok_or(OutOfGas)
+        let n = Checked::from(n as u32);
+        (20 + n + (n >> 2)).ok_or(OutOfGas)
     }
 
     pub fn dup(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
@@ -157,23 +155,22 @@ pub mod interpret_cost {
         use std::mem::size_of_val;
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
-        let sz = std::cmp::max(size_of_val(&i1), size_of_val(&i2));
-        Ok((sz >> 1).checked_add(35).ok_or(OutOfGas)?.try_into()?)
+        let sz = Checked::from(std::cmp::max(size_of_val(&i1), size_of_val(&i2)));
+        Ok((35 + (sz >> 1)).ok_or(OutOfGas)?.try_into()?)
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
         use TypedValue as V;
         let cmp_bytes = |s1: usize, s2: usize| -> Result<u32, OutOfGas> {
             // Approximating 35 + 0.024413 x term
-            let v = std::cmp::min(s1, s2);
-            let go = |v| (35 as usize).checked_add(v >> 6)?.checked_add(v >> 7);
-            Ok(go(v).ok_or(OutOfGas)?.try_into()?)
+            let v = Checked::from(std::cmp::min(s1, s2));
+            Ok((35 + (v >> 6) + (v >> 7)).ok_or(OutOfGas)?.try_into()?)
         };
         let cmp_pair = |l1, r1, l2, r2| -> Result<u32, OutOfGas> {
-            let go = |a, b| (10 as u32).checked_add(a)?.checked_add(b);
-            Ok(go(compare(l1, r1)?, compare(l2, r2)?).ok_or(OutOfGas)?)
+            let c = Checked::from(10u32);
+            (c + compare(l1, r1)? + compare(l2, r2)?).ok_or(OutOfGas)
         };
-        let cmp_option: u32 = 10;
+        let cmp_option = Checked::from(10u32);
         Ok(match (v1, v2) {
             (V::Nat(l), V::Nat(r)) => {
                 // NB: eventually when using BigInts, use BigInt::bits() &c
@@ -192,8 +189,9 @@ pub mod interpret_cost {
                 (None, None) => cmp_option,
                 (None, Some(_)) => cmp_option,
                 (Some(_), None) => cmp_option,
-                (Some(l), Some(r)) => cmp_option.checked_add(compare(l, r)?).ok_or(OutOfGas)?,
-            },
+                (Some(l), Some(r)) => cmp_option + compare(l, r)?,
+            }
+            .ok_or(OutOfGas)?,
             _ => unreachable!("Comparison of incomparable values"),
         })
     }
