@@ -27,9 +27,43 @@ open Jingoo.Jg_types
 
 type item = Global_variables.var
 
+type items = item list
+
+type with_items = Seq of items | Prod of items list
+
+let items_encoding =
+  let c = Helpers.make_mk_case () in
+  Data_encoding.(
+    union
+      [
+        c.mk_case
+          "singleton"
+          Global_variables.var_encoding
+          (function [x] -> Some x | _ -> None)
+          (fun x -> [x]);
+        c.mk_case "list" (list Global_variables.var_encoding) Option.some Fun.id;
+      ])
+
+let with_items_encoding =
+  let c = Helpers.make_mk_case () in
+  Data_encoding.(
+    union
+      [
+        c.mk_case
+          "seq"
+          items_encoding
+          (function Seq l -> Some l | _ -> None)
+          (fun l -> Seq l);
+        c.mk_case
+          "prod"
+          (obj1 (req "product" (list items_encoding)))
+          (function Prod p -> Some p | _ -> None)
+          (fun p -> Prod p);
+      ])
+
 type header = {
   name : string;
-  with_items : item list option;
+  with_items : with_items option;
   mode : Execution_params.mode;
   vars_updates : Global_variables.update list;
 }
@@ -49,7 +83,7 @@ let header_encoding =
         {name; with_items; mode; vars_updates})
       (obj4
          (req "name" string)
-         (opt "with_items" (list Global_variables.var_encoding))
+         (opt "with_items" with_items_encoding)
          (dft "run_items" Execution_params.mode_encoding Sequential)
          (dft "vars_updates" Global_variables.updates_encoding [])))
 

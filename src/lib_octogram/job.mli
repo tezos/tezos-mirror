@@ -33,12 +33,16 @@ open Jingoo.Jg_types
 
 type item = Global_variables.var
 
+type items = item list
+
+type with_items = Seq of items | Prod of items list
+
 val expand_item :
   vars:Global_variables.t -> agent:tvalue -> re:tvalue -> item -> tvalue Seq.t
 
 type header = {
   name : string;
-  with_items : item list option;
+  with_items : with_items option;
       (** The job’ body will be executed once for every item listed in the
           [with_items] field, where each execution has its [{{ item }}]
           variable customized for the current value.

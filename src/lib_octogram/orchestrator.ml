@@ -27,12 +27,20 @@ open Jingoo.Jg_types
 
 let color = Log.Color.FG.cyan
 
-let tvalue_to_string_opt tvalue =
+let rec tvalue_to_string_opt tvalue =
   let open Jingoo.Jg_types in
   match tvalue with
   | Tstr s -> Some s
   | Tint i -> Some (string_of_int i)
   | Tbool b -> Some (string_of_bool b)
+  | Tlist l -> (
+      try
+        Some
+          (Format.sprintf
+             "[%s]"
+             (List.map (fun x -> Option.get (tvalue_to_string_opt x)) l
+             |> String.concat ", "))
+      with _ -> None)
   | _ -> None
 
 let run_templates_and_update_vars ~vars ~agent ~res ~re ~item
@@ -111,17 +119,33 @@ let run_job_body ~state ~agent ~re ~item ~vars_updates job_name
 
   unit
 
+let enumerate_seq_items ~vars ~agent ~re item_defs =
+  Seq.concat
+    (List.to_seq (List.map (Job.expand_item ~vars ~agent ~re) item_defs))
+
+let rec seq_prod = function
+  | x :: rst ->
+      Seq.concat_map
+        (fun x ->
+          let y = seq_prod rst in
+          Seq.map (function Tlist r -> Tlist (x :: r) | _ -> assert false) y)
+        x
+  | [] -> Seq.return (Tlist [])
+
+let enumerate_items ~vars ~agent ~re with_items =
+  match with_items with
+  | Job.(Seq item_defs) -> enumerate_seq_items ~vars ~agent ~re item_defs
+  | Prod with_items_defs ->
+      List.map (enumerate_seq_items ~vars ~agent ~re) with_items_defs
+      |> seq_prod
+
 let run_job ~state ~agent ~re (job : string Job.t) =
   let vars = Orchestrator_state.get_global_variables state in
   let agent_tvalue = Remote_agent.to_tvalue agent in
   let items =
     match job.header.with_items with
-    | Some item_defs ->
-        Seq.concat
-          (List.to_seq
-             (List.map
-                (Job.expand_item ~vars ~agent:agent_tvalue ~re)
-                item_defs))
+    | Some with_items ->
+        enumerate_items ~vars ~agent:agent_tvalue ~re with_items
     | None -> Seq.return Tnull
   in
   Execution_params.traverse
