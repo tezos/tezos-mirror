@@ -100,6 +100,12 @@ module type INDEXABLE_STORE = sig
 
   (** [readonly t] returns a read only version of the store [t]. *)
   val readonly : [> `Read] t -> [`Read] t
+
+  (** [gc ?async t ~retain] garbage collects data stored in the index [t] by
+      keeping only the ones associated to the list of keys [retain]. This call
+      runs the GC asynchronously unless [async] is [false]. If a GC is already
+      ongoing this new request is ignored and this call is a no-op. *)
+  val gc : ?async:bool -> rw t -> retain:key list -> unit tzresult Lwt.t
 end
 
 (** An index store mapping keys to values. Keys are associated to optional

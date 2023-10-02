@@ -97,6 +97,8 @@ module type INDEXABLE_STORE = sig
   val close : _ t -> unit tzresult Lwt.t
 
   val readonly : [> `Read] t -> [`Read] t
+
+  val gc : ?async:bool -> rw t -> retain:key list -> unit tzresult Lwt.t
 end
 
 module type INDEXABLE_REMOVABLE_STORE = sig
@@ -217,6 +219,24 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
 
   type internal_index = {index : I.t; index_path : string}
 
+  type gc_status =
+    | No_gc
+    | Ongoing of {tmp_index : internal_index; promise : unit Lwt.t}
+
+  (** In order to periodically clean up the store with the {!gc} function, each
+      pure index store is split in multiple indexes: one fresh index and
+      multiple stale indexes (zero if no GC has ever occurred, one if the last
+      GC was successful, two if the GC is ongoing, and more in case some GC
+      failed).
+
+      Adding new information to the store is always done on the fresh index
+      whereas queries are done on both the fresh and stale indexes.
+
+      A gc operation starts by moving the fresh index to the stale list and
+      creates a new fresh index. The rest of the gc operation consists in,
+      asynchronously, merging the stale indexes while removing data. See {!gc}
+      for more details.
+  *)
   type _ t = {
     mutable fresh : internal_index;
     mutable stales : internal_index list;
@@ -224,6 +244,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     readonly : bool;
     index_buffer_size : int;
     path : string;
+    mutable gc_status : gc_status;
   }
 
   let internal_indexes ?(only_stale = false) store =
@@ -304,19 +325,164 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     in
     let*! stales = load_stales [] 1 in
     let scheduler = Lwt_idle_waiter.create () in
-    return {fresh; stales; scheduler; readonly; index_buffer_size; path}
+    return
+      {
+        fresh;
+        stales;
+        scheduler;
+        readonly;
+        index_buffer_size;
+        path;
+        gc_status = No_gc;
+      }
 
   let close_internal_index i = try I.close i.index with Index.Closed -> ()
+
+  let mv_internal_index store index dest =
+    let open Lwt_syntax in
+    close_internal_index index ;
+    let+ () = Lwt_unix.rename index.index_path dest in
+    load_internal_index
+      ~index_buffer_size:store.index_buffer_size
+      ~readonly:store.readonly
+      dest
+
+  let rm_internal_index index =
+    close_internal_index index ;
+    Lwt_utils_unix.remove_dir index.index_path
 
   let close store =
     protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     let open Lwt_result_syntax in
+    (match store.gc_status with
+    | Ongoing {promise; _} -> Lwt.cancel promise
+    | No_gc -> ()) ;
     close_internal_index store.fresh ;
     List.iter close_internal_index store.stales ;
+    let*! () =
+      match store.gc_status with
+      | No_gc -> Lwt.return_unit
+      | Ongoing {tmp_index; _} -> rm_internal_index tmp_index
+    in
     return_unit
 
   let readonly x = (x :> [`Read] t)
+
+  (** A gc is initiated by moving the fresh index to the stale list and creating
+      a new fresh index, as well as creating a temporary index for the result of
+      the gc. *)
+  let initiate_gc store =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let tmp_index_path = tmp_path store.path in
+    let new_stale_path = stale_path store.path (List.length store.stales + 1) in
+    let* new_index_stale = mv_internal_index store store.fresh new_stale_path in
+    let new_index_fresh =
+      load_internal_index
+        ~index_buffer_size:store.index_buffer_size
+        ~readonly:store.readonly
+        store.path
+    in
+    let tmp_index =
+      load_internal_index
+        ~index_buffer_size:store.index_buffer_size
+        ~readonly:false
+        tmp_index_path
+    in
+    (* Clear temporary index in case there are leftovers from a dirtily aborted
+       previous gc. *)
+    I.clear tmp_index.index ;
+    store.fresh <- new_index_fresh ;
+    store.stales <- new_index_stale :: store.stales ;
+    let promise, resolve = Lwt.task () in
+    store.gc_status <- Ongoing {tmp_index; promise} ;
+    return (tmp_index, promise, resolve)
+
+  (** If a gc operation fails, reverting simply consists in removing the
+      temporary index. We keep the two stale indexes as is, they will be merged
+      by the next successful gc.  *)
+  let revert_failed_gc store =
+    let open Lwt_syntax in
+    match store.gc_status with
+    | No_gc -> return_unit
+    | Ongoing {tmp_index; promise} ->
+        Lwt.cancel promise ;
+        store.gc_status <- No_gc ;
+        rm_internal_index tmp_index
+
+  (** Copy item associated to [k] from the [store] stale indexes to
+      [tmp_index]. *)
+  let unsafe_retain_one_item store tmp_index filter k =
+    match unsafe_find ~only_stale:true store k with
+    | None -> Lwt.return_unit
+    | Some v ->
+        if filter v then I.replace tmp_index.index k v ;
+        Lwt.return_unit
+
+  (** When the gc operation finishes, i.e. we have copied all elements to retain
+      to the temporary index, we can replace all the stale indexes by the
+      temporary one. *)
+  let finalize_gc store tmp_index =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let*! () = List.iter_s rm_internal_index store.stales in
+    let stale_path = stale_path store.path 1 in
+    let*! index_stale = mv_internal_index store tmp_index stale_path in
+    store.stales <- [index_stale] ;
+    store.gc_status <- No_gc ;
+    return_unit
+
+  (** The background task for a gc operation consists in copying all items in
+      [retain] from the stale indexes to the temporary one. While this is
+      happening, the stale indexes can still be queried and new bindings can
+      still be added to the store because only the fresh index is modified. *)
+  let gc_background_task store tmp_index retain filter resolve =
+    let open Lwt_syntax in
+    Lwt.dont_wait
+      (fun () ->
+        let* res =
+          let open Lwt_result_syntax in
+          protect @@ fun () ->
+          let*! () =
+            (* Copy items from the stale indexes to the temporary one. *)
+            List.iter_s (unsafe_retain_one_item store tmp_index filter) retain
+          in
+          finalize_gc store tmp_index
+        in
+        let* () =
+          match res with
+          | Ok () -> return_unit
+          | Error _error -> revert_failed_gc store
+        in
+        Lwt.wakeup_later resolve () ;
+        return_unit)
+      (fun exn ->
+        Format.eprintf
+          "Reverting GC for store %s failed because %s@."
+          N.name
+          (Printexc.to_string exn))
+
+  (** This function is called every time a gc operation starts. *)
+  let gc_internal ~async store retain filter =
+    let open Lwt_syntax in
+    match store.gc_status with
+    | Ongoing _ -> return_unit
+    | No_gc ->
+        let* tmp_index, promise, resolve = initiate_gc store in
+        gc_background_task store tmp_index retain filter resolve ;
+        if async then return_unit
+        else
+          Lwt.catch
+            (fun () -> promise)
+            (function Lwt.Canceled -> return_unit | e -> raise e)
+
+  let gc ?(async = true) store ~retain =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    let*! () = gc_internal ~async store retain (fun _ -> true) in
+    return_unit
 end
 
 module Make_indexable_removable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) =
@@ -380,6 +546,12 @@ struct
       I.replace store.fresh.index k None ;
       if flush then I.flush store.fresh.index ;
       return_unit)
+
+  let gc ?(async = true) store ~retain =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    let*! () = gc_internal ~async store retain Option.is_some in
+    return_unit
 end
 
 module Make_singleton (S : sig
