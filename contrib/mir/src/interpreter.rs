@@ -213,6 +213,10 @@ fn interpret_one(
             }
             _ => unreachable_state(),
         },
+        I::Amount => {
+            gas.consume(interpret_cost::AMOUNT)?;
+            stack.push(V::Mutez(ctx.amount));
+        }
     }
     Ok(())
 }
@@ -682,5 +686,18 @@ mod interpreter_tests {
             [V::new_option(Some(V::Int(5))), V::Option(None)],
             [V::Int(-1)]
         );
+    }
+
+    #[test]
+    fn amount() {
+        let mut stack = stk![];
+        let mut ctx = &mut Ctx::default();
+        ctx.amount = 100500;
+        assert_eq!(interpret(&vec![Amount], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![TypedValue::Mutez(100500)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::INTERPRET_RET - interpret_cost::AMOUNT,
+        )
     }
 }
