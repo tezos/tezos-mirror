@@ -368,6 +368,15 @@ impl EthereumAccount {
             .map_err(AccountStorageError::from)
     }
 
+    // Return a boolean denoting whether the account has a code or not.
+    pub fn code_exists(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Option<ValueType>, AccountStorageError> {
+        let path = concat(&self.path, &CODE_PATH)?;
+        host.store_has(&path).map_err(AccountStorageError::from)
+    }
+
     /// Get the contract code associated with a contract. A contract can have zero length
     /// contract code associated with it - this is the same for "external" and un-used
     /// accounts.

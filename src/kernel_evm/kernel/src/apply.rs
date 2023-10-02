@@ -190,9 +190,13 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
     let account = account(host, caller, evm_account_storage)?;
 
-    let (nonce, balance): (U256, U256) = match account {
-        None => (U256::zero(), U256::zero()),
-        Some(account) => (account.nonce(host)?, account.balance(host)?),
+    let (nonce, balance, code_exists): (U256, U256, bool) = match account {
+        None => (U256::zero(), U256::zero(), false),
+        Some(account) => (
+            account.nonce(host)?,
+            account.balance(host)?,
+            account.code_exists(host)?.is_some(),
+        ),
     };
 
     // The transaction nonce is valid.
@@ -205,6 +209,12 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let cost = U256::from(transaction.gas_limit) * gas_price;
     if balance < cost {
         log!(host, Debug, "Transaction status: ERROR_PRE_PAY.");
+        return Ok(None);
+    }
+
+    // The sender does not have code, see EIP3607.
+    if code_exists {
+        log!(host, Debug, "Transaction status: ERROR_CODE.");
         return Ok(None);
     }
 
