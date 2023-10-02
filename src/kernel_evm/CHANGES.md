@@ -17,6 +17,7 @@
 - Unused gas is refunded after succesful transactions. (!9915)
 - Impose a maximum gas limit per transaction based on the tick model. (!10094)
 - Transaction logs and bloom filter are returned in a transaction receipt. (!10019)
+- Support EIP-3607: reject transactions from senders with deployed code. (!10292)
 
 ### EVM Node
 
