@@ -23,6 +23,7 @@ pub enum Type {
     Pair(Box<Type>, Box<Type>),
     Option(Box<Type>),
     List(Box<Type>),
+    Operation,
 }
 
 impl Type {
@@ -30,6 +31,7 @@ impl Type {
         use Type::*;
         match &self {
             List(..) => false,
+            Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
             Pair(l, r) => l.is_comparable() && r.is_comparable(),
             Option(x) => x.is_comparable(),
@@ -48,6 +50,7 @@ impl Type {
             Type::Mutez => 1,
             Type::String => 1,
             Type::Unit => 1,
+            Type::Operation => 1,
             Type::Pair(l, r) => 1 + l.size_for_gas() + r.size_for_gas(),
             Type::Option(x) => 1 + x.size_for_gas(),
             Type::List(x) => 1 + x.size_for_gas(),

@@ -989,4 +989,18 @@ mod typecheck_tests {
         );
         assert_eq!(stack, stk![Type::new_list(Type::Int)]);
     }
+
+    #[test]
+    fn nil_operation() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ NIL operation }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Nil(())])
+        );
+        assert_eq!(stack, stk![Type::new_list(Type::Operation)]);
+    }
 }

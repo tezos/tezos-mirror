@@ -43,6 +43,7 @@ atomic_type: Type = {
   "mutez" => Type::Mutez,
   "string" => Type::String,
   "unit" => Type::Unit,
+  "operation" => Type::Operation,
 }
 
 pair_args: Type = {
