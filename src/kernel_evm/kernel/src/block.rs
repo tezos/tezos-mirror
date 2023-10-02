@@ -283,6 +283,10 @@ mod tests {
         }
     }
 
+    fn dummy_eth_caller() -> H160 {
+        H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap()
+    }
+
     fn dummy_eth_transaction_zero() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
@@ -370,7 +374,7 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let sender = dummy_eth_caller();
         set_balance(
             host,
             evm_account_storage,
@@ -408,6 +412,14 @@ mod tests {
             kernel_upgrade: None,
         };
 
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let sender = dummy_eth_caller();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(30000u64),
+        );
         produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
 
         let status = read_transaction_receipt_status(&mut host, &tx_hash)
@@ -433,7 +445,7 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
@@ -534,7 +546,7 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
@@ -578,7 +590,7 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
@@ -629,7 +641,7 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
@@ -670,6 +682,14 @@ mod tests {
 
         let indexed_accounts = accounts_index.length(&host).unwrap();
 
+        let sender = dummy_eth_caller();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(5000000000000000u64),
+        );
         produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
 
         let indexed_accounts_after_produce = accounts_index.length(&host).unwrap();
@@ -746,7 +766,7 @@ mod tests {
         let number_of_transactions_indexed =
             transaction_hashes_index.length(&host).unwrap();
 
-        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,

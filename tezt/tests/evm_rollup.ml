@@ -339,11 +339,13 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?legacy_dictator ()
 
 type kernel_installee = {base_installee : string; installee : string}
 
-let set_storage_version_in_config (`Config instrs) =
-  `Config
-    (Installer_kernel_config.Set
-       {value = "0000000000000000"; to_ = "/evm/storage_version"}
-    :: instrs)
+let set_storage_version_in_config = function
+  | `Config instrs ->
+      `Config
+        (Installer_kernel_config.Set
+           {value = "0000000000000000"; to_ = "/evm/storage_version"}
+        :: instrs)
+  | _ -> assert false
 
 let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
@@ -444,11 +446,12 @@ let setup_evm_kernel ?config ?kernel_installee
       l1_contracts;
     }
 
-let setup_past_genesis ?with_administrator ?kernel_installee ?originator_key
-    ?bootstrap_accounts ?rollup_operator_key ~admin ?legacy_dictator
-    ?ghostnet_storage_version protocol =
+let setup_past_genesis ?config ?with_administrator ?kernel_installee
+    ?originator_key ?bootstrap_accounts ?rollup_operator_key ~admin
+    ?legacy_dictator ?ghostnet_storage_version protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
+      ?config
       ?kernel_installee
       ?originator_key
       ?bootstrap_accounts
@@ -1418,8 +1421,11 @@ let test_full_blocks =
       "Check `evm_getBlockByNumber` with full blocks returns the correct \
        informations"
   @@ fun protocol ->
+  let config =
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
+  in
   let* {evm_proxy_server; sc_rollup_node; node; client; _} =
-    setup_past_genesis ~admin:None protocol
+    setup_past_genesis ~config ~admin:None protocol
   in
   let txs =
     read_tx_from_file ()
@@ -1520,8 +1526,11 @@ let test_inject_100_transactions =
     ~tags:["evm"; "bigger_blocks"]
     ~title:"Check blocks can contain more than 64 transactions"
   @@ fun protocol ->
+  let config =
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
+  in
   let* {evm_proxy_server; sc_rollup_node; node; client; _} =
-    setup_past_genesis ~admin:None protocol
+    setup_past_genesis ~config ~admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
@@ -2341,8 +2350,11 @@ let get_transaction_by_block_arg_and_index ~by proxy_server block_hash index =
       transaction_object |-> "result" |> Transaction.transaction_object_of_json)
 
 let test_rpc_getTransactionByBlockArgAndIndex ~by protocol =
+  let config =
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
+  in
   let* {evm_proxy_server; sc_rollup_node; node; client; _} =
-    setup_past_genesis ~admin:None protocol
+    setup_past_genesis ~config ~admin:None protocol
   in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
   let* _, _, hashes =
@@ -2843,8 +2855,11 @@ let test_rpc_getBlockTransactionCountBy =
       "RPC methods eth_getBlockTransactionCountByHash and \
        eth_getBlockTransactionCountByNumber"
   @@ fun protocol ->
+  let config =
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
+  in
   let* {evm_proxy_server; sc_rollup_node; node; client; _} =
-    setup_past_genesis ~admin:None protocol
+    setup_past_genesis ~config ~admin:None protocol
   in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
