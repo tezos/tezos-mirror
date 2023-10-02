@@ -114,7 +114,7 @@ let scenario network =
           [network_arg; Expected_pow 26; Synchronisation_threshold 2]
       in
       Log.info "Initializing DAL node..." ;
-      let attestor_profiles =
+      let attester_profiles =
         match network with
         | Dailynet ->
             [
@@ -126,7 +126,7 @@ let scenario network =
       Dal_node.init_config
         ~expected_pow:26.
         ~producer_profiles:key_indices
-        ~attestor_profiles
+        ~attester_profiles
         dal_node)
   in
   let* () = load () in

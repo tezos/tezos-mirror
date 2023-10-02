@@ -131,7 +131,7 @@ val fetch_assigned_shard_indices :
   int list tzresult Lwt.t
 
 (** [fetch_committee ctxt ~level] fetches from L1 the shard indices assigned
-    to all attestors at [level].  It internally caches the DAL committee with
+    to all attesters at [level].  It internally caches the DAL committee with
     [level] as the key with FIFO strategy. *)
 val fetch_committee :
   t -> level:int32 -> Committee_cache.committee tzresult Lwt.t

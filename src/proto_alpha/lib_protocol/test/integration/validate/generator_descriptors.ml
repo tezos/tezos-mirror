@@ -644,7 +644,7 @@ let dal_attestation ctxt current_level delegate =
       let attestation = Dal.Attestation.empty in
       return_some
         (Dal_attestation
-           {attestor = delegate; attestation; level = current_level})
+           {attester = delegate; attestation; level = current_level})
 
 let dal_attestation_descriptor =
   let open Lwt_result_syntax in

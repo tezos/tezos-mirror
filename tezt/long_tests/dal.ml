@@ -115,11 +115,11 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
   let* () = Node.wait_for_ready node in
   return (node, client)
 
-let start_dal_node l1_node ?(producer_profiles = []) ?(attestor_profiles = [])
+let start_dal_node l1_node ?(producer_profiles = []) ?(attester_profiles = [])
     () =
   let dal_node = Dal_node.create ~node:l1_node () in
   let* _dir =
-    Dal_node.init_config dal_node ~producer_profiles ~attestor_profiles
+    Dal_node.init_config dal_node ~producer_profiles ~attester_profiles
   in
   let* () = Dal_node.run dal_node ~wait_ready:true in
   return dal_node
@@ -207,7 +207,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
   let* dal_node1 =
     start_dal_node
       node1
-      ~attestor_profiles:[Constant.bootstrap1.public_key_hash]
+      ~attester_profiles:[Constant.bootstrap1.public_key_hash]
       ()
   in
   Log.info "Set up [node2], the slot producer." ;

@@ -2618,7 +2618,7 @@ type start_dal_node_r = {
   net_port : int;
 }
 
-type dal_attestor_profile = string (* a public key hash or an alias *)
+type dal_attester_profile = string (* a public key hash or an alias *)
 
 type dal_producer_profile =
   string (* slot index, as a string to be able to expand it. *)
@@ -2632,10 +2632,10 @@ type 'uri start_dal_node = {
   l1_node_uri : 'uri;
   peers : string list;
   bootstrap_profile : bool;
-  attestor_profiles : dal_attestor_profile list;
+  attester_profiles : dal_attester_profile list;
   producer_profiles : dal_producer_profile list;
-  path_client : 'uri option; (* Needed if some attestor profiles are aliases. *)
-  base_dir : 'uri option; (* Needed if some attestor profiles are aliases. *)
+  path_client : 'uri option; (* Needed if some attester profiles are aliases. *)
+  base_dir : 'uri option; (* Needed if some attester profiles are aliases. *)
 }
 
 type (_, _) Remote_procedure.t +=
@@ -2674,7 +2674,7 @@ module Start_octez_dal_node = struct
              l1_node_uri;
              peers;
              bootstrap_profile;
-             attestor_profiles;
+             attester_profiles;
              producer_profiles;
              path_client;
              base_dir;
@@ -2687,7 +2687,7 @@ module Start_octez_dal_node = struct
             l1_node_uri,
             peers,
             bootstrap_profile,
-            attestor_profiles,
+            attester_profiles,
             producer_profiles ),
           (path_client, base_dir) ))
       (fun ( ( name,
@@ -2698,7 +2698,7 @@ module Start_octez_dal_node = struct
                l1_node_uri,
                peers,
                bootstrap_profile,
-               attestor_profiles,
+               attester_profiles,
                producer_profiles ),
              (path_client, base_dir) ) ->
         {
@@ -2710,7 +2710,7 @@ module Start_octez_dal_node = struct
           l1_node_uri;
           peers;
           bootstrap_profile;
-          attestor_profiles;
+          attester_profiles;
           producer_profiles;
           path_client;
           base_dir;
@@ -2725,7 +2725,7 @@ module Start_octez_dal_node = struct
             (req "l1_node_uri" uri_encoding)
             (dft "peers" (list string) [])
             (dft "bootstrap_profile" bool false)
-            (dft "attestor_profiles" (list string) [])
+            (dft "attester_profiles" (list string) [])
             (dft "producer_profiles" (list string) []))
          (obj2 (opt "path_client" uri_encoding) (opt "base_dir" uri_encoding)))
 
@@ -2761,7 +2761,7 @@ module Start_octez_dal_node = struct
         l1_node_uri;
         peers;
         bootstrap_profile;
-        attestor_profiles;
+        attester_profiles;
         producer_profiles;
         path_client;
         base_dir;
@@ -2776,7 +2776,7 @@ module Start_octez_dal_node = struct
       l1_node_uri = uri_run l1_node_uri;
       peers = List.map run peers;
       bootstrap_profile;
-      attestor_profiles = List.map run attestor_profiles;
+      attester_profiles = List.map run attester_profiles;
       producer_profiles = List.map run producer_profiles;
       path_client = Option.map uri_run path_client;
       base_dir = Option.map uri_run base_dir;
@@ -2792,7 +2792,7 @@ module Start_octez_dal_node = struct
         l1_node_uri;
         peers;
         bootstrap_profile;
-        attestor_profiles;
+        attester_profiles;
         producer_profiles;
         path_client;
         base_dir;
@@ -2807,7 +2807,7 @@ module Start_octez_dal_node = struct
       l1_node_uri = resolve_octez_rpc_global_uri ~self ~resolver l1_node_uri;
       peers;
       bootstrap_profile;
-      attestor_profiles;
+      attester_profiles;
       producer_profiles;
       path_client = Option.map file_agent_uri path_client;
       base_dir = Option.map file_agent_uri base_dir;
@@ -2823,7 +2823,7 @@ module Start_octez_dal_node = struct
         l1_node_uri;
         peers;
         bootstrap_profile;
-        attestor_profiles;
+        attester_profiles;
         producer_profiles;
         path_client;
         base_dir;
@@ -2855,24 +2855,24 @@ module Start_octez_dal_node = struct
           Client.create ~path:path_client ~base_dir () |> Option.some |> return
       | _ -> return None
     in
-    let* attestor_profiles =
+    let* attester_profiles =
       Lwt_list.map_s
-        (fun attestor ->
+        (fun attester ->
           match
-            ( Tezos_crypto.Signature.Public_key_hash.of_b58check_opt attestor,
+            ( Tezos_crypto.Signature.Public_key_hash.of_b58check_opt attester,
               client_opt )
           with
-          | Some _, _ -> return attestor (* a valid tz address is given *)
+          | Some _, _ -> return attester (* a valid tz address is given *)
           | None, Some client ->
               (* not a valid tz address. Probably an alias. *)
-              let* account = Client.show_address ~alias:attestor client in
+              let* account = Client.show_address ~alias:attester client in
               return account.Account.public_key_hash
           | None, None ->
               Test.fail
                 "A client_path and a base_dir are needed to retrieve the pkh \
-                 of the attestor profile with alias %s"
-                attestor)
-        attestor_profiles
+                 of the attester profile with alias %s"
+                attester)
+        attester_profiles
     in
     let rpc_port = get_port_or_fresh rpc_port in
     let metrics_port = get_port_or_fresh metrics_port in
@@ -2894,7 +2894,7 @@ module Start_octez_dal_node = struct
       Dal_node.init_config
         ~expected_pow:0.
         ~peers
-        ~attestor_profiles
+        ~attester_profiles
         ~producer_profiles
         ~bootstrap_profile
         dal_node

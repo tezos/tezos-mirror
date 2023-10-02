@@ -17,7 +17,7 @@ with few agents to debug it).
 
 The scenario templates assume that the Octez node binaries are provided via some
 Google Cloud bucket (this could be easily adapted if needed). Agents can be
-categorized into an `http_server`, a `boot_` agent, attestors (named
+categorized into an `http_server`, a `boot_` agent, attesters (named
 `delegate_<i>` by default), and slots producers (called 0, 1, ... <max> for
 convenience).
 
@@ -28,7 +28,7 @@ convenience).
 
 - Attestors: each agent of this kind (agent = VM in our scenario) is dedicated
   to a particular delegate taken from the set of generated keys. On the agent,
-  we will run an L1 node, a DAL node with an attestor profile and a baker for
+  we will run an L1 node, a DAL node with an attester profile and a baker for
   that delegate;
 
 - Slots producers: each agent of this kind (agent = VM in our scenario) is
@@ -48,11 +48,11 @@ is started to be able to download the generated artifacts.
 The third stage just downloads and uncompresses the generated keys. Then, in the
 fourth stage, we start a bootstrap Octez and DAL node and activate the alpha
 protocol with previously generated custom protocol parameters. Once the Octez
-node is bootstrapped, we start the Octez and DAL nodes for attestors (bakers)
+node is bootstrapped, we start the Octez and DAL nodes for attesters (bakers)
 and slot producers in the next stages, respectively.
 
 
-Finally, once the Octez nodes of the attestors and slots producers are
+Finally, once the Octez nodes of the attesters and slots producers are
 bootstrapped, we start the bakers' binaries in the seventh stage and the slots
 producers' jobs in the last one. The slots producers are configured to publish a
 DAL slot for every level between 10 and 109. Depending on the value of the
@@ -75,7 +75,7 @@ Then, inside `devtools/cloud-infrastructure/projects/nl-dal/octogram/` directory
 ```
 
 This command will generate a file named `dal-throughput-scenario.yml` from `dal-throughput-scenario.yml.in`, where:
-- The attestors and slots producers agents sections are filled with one agent for each kind;
+- The attesters and slots producers agents sections are filled with one agent for each kind;
 - All the placeholders of the form %%VAR%% are replaced with some values.
 
 In fact, by default and when run in automatic mode (`--auto` option) without any
@@ -88,20 +88,20 @@ values. To see the set of available options, just run:
 
 Note that, when run without the `--auto` command, some values related to the L1 network parameters are read from stdin.
 
-A typical use of the script that allows to generate a scenario with 64 attestors and 32 slots producers is:
+A typical use of the script that allows to generate a scenario with 64 attesters and 32 slots producers is:
 
 ```shell
 `git rev-parse --show-toplevel`/_build/default/devtools/cloud-infrastructure/projects/nl-dal/octogram/dal_throughput_gen.exe \
-    --output dal-throughput-scenario--64-attestors-32-injectors-.yml \
+    --output dal-throughput-scenario--64-attesters-32-injectors-.yml \
     --ip-addresses gcloud-addresses.json \
     --octogram-path "pull: https://storage.googleapis.com/iguer-tfstate/octogram" \
     --gcloud-binaries-bucket iguer-tfstate \
-    --number_of_attestors 64 \
+    --number_of_attesters 64 \
     --number_of_slots_producers 32 \
     --auto
 ```
 
-Assuming you spawned 97 VMs (64 for the attestors, 32 for the slot producers and
+Assuming you spawned 97 VMs (64 for the attesters, 32 for the slot producers and
 1 for the http server and bootstrap nodes) for the experiment on Google Cloud
 with terraform, the IP addresses could be obtained with
 
@@ -114,5 +114,5 @@ terraform output -json | jq '.ssh_addresses | .value' > gcloud-addresses.json
 At this point, you should be able to run the generated scenario instance with:
 
 ```shell
-`git rev-parse --show-toplevel`/octogram orchestrator -a recipe=dal-throughput-scenario--64-attestors-32-injectors-.yml -v -a remote_verbosity=verbose
+`git rev-parse --show-toplevel`/octogram orchestrator -a recipe=dal-throughput-scenario--64-attesters-32-injectors-.yml -v -a remote_verbosity=verbose
 ```

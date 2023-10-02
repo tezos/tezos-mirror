@@ -31,7 +31,7 @@ type t
 type shard_indices = {start_index : int; offset : int}
 
 (** Represents the committee for a given level, 
-    as a mapping from an attestor to its assigned shard indexes. *)
+    as a mapping from an attester to its assigned shard indexes. *)
 type committee = shard_indices Tezos_crypto.Signature.Public_key_hash.Map.t
 
 (** [create ~max_size] returns an empty cache. If the cache size exceeds [max_size],

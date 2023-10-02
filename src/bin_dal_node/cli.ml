@@ -104,7 +104,7 @@ module Term = struct
         Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
     | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
 
-  let attestor_profile_arg =
+  let attester_profile_arg =
     let open Cmdliner in
     let decoder string =
       match Signature.Public_key_hash.of_b58check_opt string with
@@ -130,15 +130,15 @@ module Term = struct
     in
     Arg.conv (decoder, operator_profile_printer)
 
-  let attestor_profile =
+  let attester_profile =
     let open Cmdliner in
     let doc =
-      "The Octez DAL node attestor profiles for given public key hashes."
+      "The Octez DAL node attester profiles for given public key hashes."
     in
     Arg.(
       value
-      & opt (list attestor_profile_arg) []
-      & info ~docs ~doc ~docv:"[PKH]" ["attestor-profiles"])
+      & opt (list attester_profile_arg) []
+      & info ~docs ~doc ~docv:"[PKH]" ["attester-profiles"])
 
   let producer_profile =
     let open Cmdliner in
@@ -152,7 +152,7 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
-       cannot also be an attestor/slot producer"
+       cannot also be an attester/slot producer"
     in
     Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"])
 
@@ -187,7 +187,7 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ endpoint $ metrics_addr $ attestor_profile $ producer_profile
+       $ endpoint $ metrics_addr $ attester_profile $ producer_profile
        $ bootstrap_profile $ peers))
 end
 
@@ -256,7 +256,7 @@ type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
-      metrics_addr attestors producers bootstrap_flag peers =
+      metrics_addr attesters producers bootstrap_flag peers =
     let run profiles =
       run
         subcommand
@@ -271,13 +271,13 @@ let make ~run =
           peers;
         }
     in
-    match (bootstrap_flag, attestors @ producers) with
+    match (bootstrap_flag, attesters @ producers) with
     | false, [] -> run None
     | true, [] -> run @@ Some Services.Types.Bootstrap
     | false, operator_profiles -> run @@ Some (Operator operator_profiles)
     | true, _ :: _ ->
         `Error
-          (false, "A bootstrap node cannot also be an attestor/slot producer.")
+          (false, "A bootstrap node cannot also be an attester/slot producer.")
   in
   let default =
     Cmdliner.Term.(

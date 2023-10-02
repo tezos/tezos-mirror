@@ -26,26 +26,26 @@
 module Slot_set = Set.Make (Int)
 module Pkh_set = Signature.Public_key_hash.Set
 
-(** The set of slots tracked by the slot producer profile and pkh tracked by the attestor.
+(** The set of slots tracked by the slot producer profile and pkh tracked by the attester.
     Uses a set to remove duplicates in the profiles provided by the user. *)
-type operator_sets = {producers : Slot_set.t; attestors : Pkh_set.t}
+type operator_sets = {producers : Slot_set.t; attesters : Pkh_set.t}
 
 (** A profile context stores profile-specific data used by the daemon.  *)
 type t = Bootstrap | Operator of operator_sets
 
-let empty = Operator {producers = Slot_set.empty; attestors = Pkh_set.empty}
+let empty = Operator {producers = Slot_set.empty; attesters = Pkh_set.empty}
 
 let bootstrap_profile = Bootstrap
 
-let init_attestor operator_sets number_of_slots gs_worker pkh =
-  if Pkh_set.mem pkh operator_sets.attestors then operator_sets
+let init_attester operator_sets number_of_slots gs_worker pkh =
+  if Pkh_set.mem pkh operator_sets.attesters then operator_sets
   else (
     List.iter
       (fun slot_index ->
         Join Gossipsub.{slot_index; pkh}
         |> Gossipsub.Worker.(app_input gs_worker))
       Utils.Infix.(0 -- (number_of_slots - 1)) ;
-    {operator_sets with attestors = Pkh_set.add pkh operator_sets.attestors})
+    {operator_sets with attesters = Pkh_set.add pkh operator_sets.attesters})
 
 let init_producer operator_sets slot_index =
   {
@@ -63,7 +63,7 @@ let add_operator_profiles t proto_parameters gs_worker
           (fun operator_sets operator ->
             match operator with
             | Services.Types.Attestor pkh ->
-                init_attestor
+                init_attester
                   operator_sets
                   proto_parameters.Dal_plugin.number_of_slots
                   gs_worker
@@ -116,26 +116,26 @@ let join_topics_for_bootstrap proto_parameters gs_worker committee =
 let on_new_head t proto_parameters gs_worker committee =
   match t with
   | Bootstrap -> join_topics_for_bootstrap proto_parameters gs_worker committee
-  | Operator {producers; attestors = _} ->
+  | Operator {producers; attesters = _} ->
       join_topics_for_producer gs_worker committee producers
 
 let get_profiles t =
   match t with
   | Bootstrap -> Services.Types.Bootstrap
-  | Operator {producers; attestors} ->
+  | Operator {producers; attesters} ->
       let producer_profiles =
         Slot_set.fold
           (fun slot_index acc -> Services.Types.Producer {slot_index} :: acc)
           producers
           []
       in
-      let attestor_profiles =
+      let attester_profiles =
         Pkh_set.fold
           (fun pkh acc -> Services.Types.Attestor pkh :: acc)
-          attestors
+          attesters
           producer_profiles
       in
-      Services.Types.Operator (attestor_profiles @ producer_profiles)
+      Services.Types.Operator (attester_profiles @ producer_profiles)
 
 let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in

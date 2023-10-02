@@ -40,8 +40,8 @@ type error +=
       commitment : Dal.commitment;
       commitment_proof : Dal.commitment_proof;
     }
-  | Dal_data_availibility_attestor_not_in_committee of {
-      attestor : Signature.Public_key_hash.t;
+  | Dal_data_availibility_attester_not_in_committee of {
+      attester : Signature.Public_key_hash.t;
       level : Raw_level_repr.t;
     }
   | Dal_operation_for_old_level of {
@@ -251,27 +251,27 @@ let () =
     (fun (expected, given) -> Dal_operation_for_future_level {expected; given}) ;
   register_error_kind
     `Permanent
-    ~id:"Dal_data_availibility_attestor_not_in_committee"
-    ~title:"The attestor is not part of the DAL committee for this level"
-    ~description:"The attestor is not part of the DAL committee for this level"
-    ~pp:(fun ppf (attestor, level) ->
+    ~id:"Dal_data_availibility_attester_not_in_committee"
+    ~title:"The attester is not part of the DAL committee for this level"
+    ~description:"The attester is not part of the DAL committee for this level"
+    ~pp:(fun ppf (attester, level) ->
       Format.fprintf
         ppf
-        "The attestor %a is not part of the DAL committee for the level %a"
+        "The attester %a is not part of the DAL committee for the level %a"
         Signature.Public_key_hash.pp
-        attestor
+        attester
         Raw_level_repr.pp
         level)
     Data_encoding.(
       obj2
-        (req "attestor" Signature.Public_key_hash.encoding)
+        (req "attester" Signature.Public_key_hash.encoding)
         (req "level" Raw_level_repr.encoding))
     (function
-      | Dal_data_availibility_attestor_not_in_committee {attestor; level} ->
-          Some (attestor, level)
+      | Dal_data_availibility_attester_not_in_committee {attester; level} ->
+          Some (attester, level)
       | _ -> None)
-    (fun (attestor, level) ->
-      Dal_data_availibility_attestor_not_in_committee {attestor; level}) ;
+    (fun (attester, level) ->
+      Dal_data_availibility_attester_not_in_committee {attester; level}) ;
   register_error_kind
     `Permanent
     ~id:"dal_cryptobox_error"

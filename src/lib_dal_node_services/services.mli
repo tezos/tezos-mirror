@@ -57,11 +57,11 @@ module Types : sig
 
   (** A set of slots, represented by a list of booleans (false for not in the
       set). It is used for instance to record which slots are deemed available
-      by an attestor. The level at which the slots have been published is also
+      by an attester. The level at which the slots have been published is also
       given. *)
   type slot_set = {slots : bool list; published_level : int32}
 
-  (** The set of attestable slots of an attestor (which may not necessarily be
+  (** The set of attestable slots of an attester (which may not necessarily be
       in the committee for a given level). *)
   type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
@@ -107,7 +107,7 @@ module Types : sig
   type profiles =
     | Bootstrap
         (** The bootstrap profile facilitates peer discovery in the DAL network.
-            Note that bootstrap nodes are incompatible with attestor/producer profiles
+            Note that bootstrap nodes are incompatible with attester/producer profiles
             as bootstrap nodes are expected to connect to all the meshes with degree 0. *)
     | Operator of operator_profiles
 
