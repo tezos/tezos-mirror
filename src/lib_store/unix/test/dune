@@ -23,6 +23,7 @@
   tezos-protocol-alpha.parameters
   octez-protocol-alpha-libs.plugin
   octez-alcotezt
+  tezt
   octez-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
@@ -58,6 +59,7 @@
   test_store
   test_testchain
   test_utils
+  tezt_sink
   assert_lib))
 
 (executable
