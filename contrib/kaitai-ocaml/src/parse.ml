@@ -149,8 +149,22 @@ let parse ?file ?(path = []) s =
                    | None -> None
                    | Some e -> Some (scalar e)
                  in
+                 let size =
+                   match find_key_opt m "size" with
+                   | None -> None
+                   | Some e -> Some (expression e)
+                 in
                  AttrSpec.
-                   {path = []; id; dataType; cond; valid; doc = empty_doc; enum})
+                   {
+                     path = [];
+                     id;
+                     dataType;
+                     cond;
+                     valid;
+                     doc = empty_doc;
+                     enum;
+                     size;
+                   })
     in
 
     let doc = empty_doc in
