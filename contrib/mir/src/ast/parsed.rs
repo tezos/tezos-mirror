@@ -13,6 +13,7 @@ pub enum ParsedStage {}
 impl Stage for ParsedStage {
     type AddMeta = ();
     type PushValue = (Type, Value);
+    type NilType = Type;
 }
 
 pub type ParsedInstruction = Instruction<ParsedStage>;

@@ -321,6 +321,10 @@ fn typecheck_instruction(
             stack.push(T::Mutez);
             I::Amount
         }
+        I::Nil(ty) => {
+            stack.push(T::new_list(ty));
+            I::Nil(())
+        }
     })
 }
 
@@ -970,5 +974,19 @@ mod typecheck_tests {
             ),
             Err(TcError::InvalidValueForType(Value::UnitValue, Type::Int))
         );
+    }
+
+    #[test]
+    fn nil() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ NIL int }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Nil(())])
+        );
+        assert_eq!(stack, stk![Type::new_list(Type::Int)]);
     }
 }

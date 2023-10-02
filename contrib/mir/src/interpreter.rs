@@ -217,6 +217,10 @@ fn interpret_one(
             gas.consume(interpret_cost::AMOUNT)?;
             stack.push(V::Mutez(ctx.amount));
         }
+        I::Nil(..) => {
+            gas.consume(interpret_cost::NIL)?;
+            stack.push(V::List(vec![]));
+        }
     }
     Ok(())
 }
@@ -729,5 +733,17 @@ mod interpreter_tests {
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn nil() {
+        let mut stack = stk![];
+        let mut ctx = Ctx::default();
+        assert_eq!(interpret(&vec![Nil(())], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![TypedValue::List(vec![])]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
+        )
     }
 }

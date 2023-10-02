@@ -13,6 +13,7 @@ pub enum TypecheckedStage {}
 impl Stage for TypecheckedStage {
     type AddMeta = overloads::Add;
     type PushValue = TypedValue;
+    type NilType = ();
 }
 
 pub type TypecheckedInstruction = Instruction<TypecheckedStage>;
