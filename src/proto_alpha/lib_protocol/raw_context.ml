@@ -946,7 +946,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp chain_id ctxt =
+let prepare_first_block ~level ~timestamp _chain_id ctxt =
   let open Lwt_result_syntax in
   let* previous_proto, ctxt = check_and_update_protocol_version ctxt in
   let* ctxt =
@@ -1041,12 +1041,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               max_number_of_parallel_games =
                 c.sc_rollup.max_number_of_parallel_games;
               reveal_activation_level;
-              private_enable =
-                (* Activate for testnets only. *)
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/6204
-                   Do not forget to activate private rollups on mainnet
-                   (prior to protocol P's snapshot). *)
-                not (Chain_id.equal Constants_repr.mainnet_id chain_id);
+              private_enable = true;
             }
         in
         let zk_rollup =

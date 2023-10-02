@@ -243,7 +243,7 @@ let constants_mainnet =
                    exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
                 Raw_level.of_int32_exn Int32.(pred max_int));
           };
-        private_enable = false;
+        private_enable = true;
       };
     zk_rollup =
       {
@@ -330,7 +330,6 @@ let constants_test =
   in
   {
     constants_mainnet with
-    sc_rollup = {constants_mainnet.sc_rollup with private_enable = true};
     dal =
       Constants.Parametric.
         {
