@@ -86,6 +86,7 @@ pair_val_args: Value = {
 composite_value: Value = {
   "Pair" <value_expr> <pair_val_args> => Value::new_pair(<>),
   "Some" <value_expr> => Value::new_option(Some(<>)),
+  "Elt" <value_expr> <value_expr> => Value::new_elt(<>),
 }
 
 value_expr: Value = {

@@ -9,6 +9,8 @@ pub mod comparable;
 pub mod parsed;
 pub mod typechecked;
 
+use std::collections::BTreeMap;
+
 pub use parsed::{ParsedInstruction, ParsedStage};
 pub use typechecked::{overloads, TypecheckedInstruction, TypecheckedStage};
 
@@ -93,6 +95,7 @@ pub enum Value {
     PairValue(Box<Value>, Box<Value>),
     OptionValue(Option<Box<Value>>),
     Seq(Vec<Value>),
+    Elt(Box<Value>, Box<Value>),
 }
 
 impl Value {
@@ -102,6 +105,10 @@ impl Value {
 
     pub fn new_option(x: Option<Self>) -> Self {
         Self::OptionValue(x.map(Box::new))
+    }
+
+    pub fn new_elt(k: Self, v: Self) -> Self {
+        Self::Elt(Box::new(k), Box::new(v))
     }
 }
 
@@ -116,6 +123,7 @@ pub enum TypedValue {
     Pair(Box<TypedValue>, Box<TypedValue>),
     Option(Option<Box<TypedValue>>),
     List(Vec<TypedValue>),
+    Map(BTreeMap<TypedValue, TypedValue>),
 }
 
 impl TypedValue {
