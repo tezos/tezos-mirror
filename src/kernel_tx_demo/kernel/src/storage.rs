@@ -524,6 +524,7 @@ pub mod dal {
     use super::OwnedPath;
     use super::RefPath;
     use super::Runtime;
+    use tezos_smart_rollup_host::runtime::ValueType;
 
     /// All errors that may happen as result of using this DAL storage
     /// interface.
@@ -610,13 +611,19 @@ pub mod dal {
     }
 
     /// Set slot index
-    pub fn set_slot_index(host: &mut impl Runtime, slot_index: u16) -> Result<(), StorageError> {
+    pub fn set_slot_index(host: &mut impl Runtime, slot_index: u8) -> Result<(), StorageError> {
         set(host, &slot_index_path(), slot_index)
     }
 
     /// Get slot index
-    pub fn get_slot_index(host: &mut impl Runtime) -> Result<u16, StorageError> {
-        get(host, &slot_index_path())
+    pub fn get_or_set_slot_index(host: &mut impl Runtime, default: u8) -> Result<u8, StorageError> {
+        let path = slot_index_path();
+        if let Ok(Some(ValueType::Value)) = host.store_has(&path) {
+            get(host, &path)
+        } else {
+            set(host, &path, default)?;
+            Ok(default)
+        }
     }
 
     /// Set number of slots
