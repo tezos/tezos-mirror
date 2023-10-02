@@ -1,3 +1,4 @@
+// The scenario contains transactions that fail due to issue: https://gitlab.com/tezos/tezos/-/issues/6430
 const utils = require('../../utils');
 const { contracts_directory, compile_contract_file } = require("../../../lib/contract");
 let faucet = require('../../players/faucet.json');
@@ -18,6 +19,7 @@ let burn = contract.interface.encodeFunctionData("burn", [10]);
 
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000))
+txs.push(utils.transfer(faucet, player2, 100000000))
 let create = utils.create(player1, 0, create_data)
 txs.push(create.tx)
 

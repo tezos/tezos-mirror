@@ -1,3 +1,4 @@
+// The scenario contains transactions that fail due to issue: https://gitlab.com/tezos/tezos/-/issues/6430
 const utils = require('../../utils');
 const { contracts_directory, compile_contract_file } = require("../../../lib/contract");
 
