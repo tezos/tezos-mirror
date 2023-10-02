@@ -2771,10 +2771,12 @@ let register_evm_migration ~protocols =
   (* test_deposit_before_and_after_migration protocols ; *)
   test_block_storage_before_and_after_migration protocols
 
+(* Flakyness: the rollup node batches the transactions before receiving all of them
+   issue for the fix: #6438 *)
 let test_reboot =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "reboot"; "loop"]
+    ~tags:["evm"; "reboot"; "loop"; Tag.flaky]
     ~title:"Check that the kernel can handle too many txs for a single run"
   @@ fun protocol ->
   let* {evm_proxy_server; sc_rollup_node; node; client; sc_rollup_client; _} =
