@@ -144,6 +144,14 @@ mod tests {
                 ),
             )]
         );
+        assert!(parse("{ PUSH pair unit unit Pair Unit Unit }")
+            .unwrap_err()
+            .to_string()
+            .starts_with("Unrecognized token `pair` found at 7:11"));
+        assert!(parse("{ PUSH (pair unit unit) Pair Unit Unit }")
+            .unwrap_err()
+            .to_string()
+            .starts_with("Unrecognized token `Pair` found at 24:28\n"));
     }
 
     #[test]
