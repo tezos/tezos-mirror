@@ -181,35 +181,48 @@ fn check_nonce<Host: Runtime>(
     }
 }
 
+fn is_valid_ethereum_transaction_common<Host: Runtime>(
+    host: &mut Host,
+    evm_account_storage: &mut EthereumAccountStorage,
+    transaction: &EthereumTransactionCommon,
+) -> Option<H160> {
+    // The transaction signature is valid.
+    let caller = match transaction.caller() {
+        Ok(caller) => caller,
+        Err(_err) => {
+            log!(host, Debug, "Transaction status: ERROR_SIGNATURE.");
+            // Transaction with undefined caller are ignored, i.e. the caller
+            // could not be derived from the signature.
+            return None;
+        }
+    };
+
+    // The transaction nonce is valid.
+    if !check_nonce(host, caller, transaction.nonce, evm_account_storage) {
+        // Transactions with invalid nonces are ignored.
+        log!(host, Debug, "Transaction status: ERROR_NONCE.");
+        return None;
+    };
+
+    return Some(caller);
+}
+
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
-    transaction_hash: TransactionHash,
 ) -> Result<Option<(H160, Option<ExecutionOutcome>, U256)>, Error> {
-    let caller = match transaction.caller() {
-        Ok(caller) => caller,
-        Err(err) => {
-            log!(
-                host,
-                Info,
-                "{} ignored because of {:?}",
-                hex::encode(transaction_hash),
-                err
-            );
-            log!(host, Debug, "Transaction status: ERROR_SIGNATURE.");
-            // Transaction with undefined caller are ignored, i.e. the caller
-            // could not be derived from the signature.
-            return Ok(None);
-        }
+    let caller = match is_valid_ethereum_transaction_common(
+        host,
+        evm_account_storage,
+        transaction,
+    ) {
+        Some(caller) => caller,
+        None => return Ok(None),
     };
-    if !check_nonce(host, caller, transaction.nonce, evm_account_storage) {
-        // Transactions with invalid nonces are ignored.
-        log!(host, Debug, "Transaction status: ERROR_NONCE.");
-        return Ok(None);
-    }
+
     let to = transaction.to;
     let call_data = transaction.data.clone();
     let gas_limit = transaction.gas_limit;
@@ -312,7 +325,6 @@ pub fn apply_transaction<Host: Runtime>(
             precompiles,
             evm_account_storage,
             tx,
-            transaction.tx_hash,
         ),
         TransactionContent::Deposit(deposit) => {
             apply_deposit(host, evm_account_storage, deposit)
