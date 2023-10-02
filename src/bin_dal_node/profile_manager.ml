@@ -35,6 +35,8 @@ type t = Bootstrap | Operator of operator_sets
 
 let empty = Operator {producers = Slot_set.empty; attesters = Pkh_set.empty}
 
+let is_bootstrap_profile = function Bootstrap -> true | Operator _ -> false
+
 let bootstrap_profile = Bootstrap
 
 let init_attester operator_sets number_of_slots gs_worker pkh =

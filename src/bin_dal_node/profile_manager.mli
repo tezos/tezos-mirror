@@ -28,6 +28,8 @@
 (** A profile manager context stores profile-specific data used by the daemon.  *)
 type t
 
+val is_bootstrap_profile : t -> bool
+
 (** The empty profile manager context. *)
 val empty : t
 
