@@ -152,7 +152,7 @@ In this formula:
    respectively, the **target staked funds ratio** and the **radius** of
    the interval centered on the target ratio.
 
--  :math:`\IL{\grf}` = 0.0001, controls the speed at which the dynamic
+-  :math:`\IL{\grf}` = 0.01, controls the speed at which the dynamic
    rate adjusts. The value is set so that a one percentage point
    deviation of the staked funds ratio changes the dynamic rate by 0.01
    percentage points per day.
