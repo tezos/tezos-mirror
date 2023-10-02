@@ -49,12 +49,12 @@ module Make
         declare_3
           ~section
           ~name
-          ~msg:("[{signer}: {tags}] " ^ msg)
+          ~msg:("[{signer}] " ^ msg)
           ~level
-          ("signer", Signature.Public_key_hash.encoding)
+          ("signer", Data_encoding.string)
           ("tags", Tags.encoding)
           enc1
-          ~pp1:Signature.Public_key_hash.pp_short
+          ~pp1:Format.pp_print_string
           ~pp2:Tags.pp
           ?pp3:pp1
 
@@ -62,13 +62,13 @@ module Make
         declare_4
           ~section
           ~name
-          ~msg:("[{signer}: {tags}] " ^ msg)
+          ~msg:("[{signer}] " ^ msg)
           ~level
-          ("signer", Signature.Public_key_hash.encoding)
+          ("signer", Data_encoding.string)
           ("tags", Tags.encoding)
           enc1
           enc2
-          ~pp1:Signature.Public_key_hash.pp_short
+          ~pp1:Format.pp_print_string
           ~pp2:Tags.pp
           ?pp3:pp1
           ?pp4:pp2
@@ -77,14 +77,14 @@ module Make
         declare_5
           ~section
           ~name
-          ~msg:("[{signer}: {tags}] " ^ msg)
+          ~msg:("[{signer}] " ^ msg)
           ~level
-          ("signer", Signature.Public_key_hash.encoding)
+          ("signer", Data_encoding.string)
           ("tags", Tags.encoding)
           enc1
           enc2
           enc3
-          ~pp1:Signature.Public_key_hash.pp_short
+          ~pp1:Format.pp_print_string
           ~pp2:Tags.pp
           ?pp3:pp1
           ?pp4:pp2
