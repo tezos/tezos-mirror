@@ -44,6 +44,11 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   views
+
+.. toctree::
+   :maxdepth: 2
+
    timelock
 
 .. toctree::
