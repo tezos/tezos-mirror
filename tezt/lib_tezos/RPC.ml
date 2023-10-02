@@ -1508,7 +1508,7 @@ let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
   let query_string =
     match level with
     | None -> []
-    | Some offset -> [("level", string_of_int offset)]
+    | Some level -> [("level", string_of_int level)]
   in
   make
     GET

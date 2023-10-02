@@ -147,12 +147,13 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   return (node, client, dal_parameters)
 
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
-    ?minimal_block_delay ?delay_increment_per_round ?attestation_lag
-    ?attestation_threshold ?commitment_period ?challenge_window ?dal_enable
-    ?event_sections_levels ?node_arguments ?activation_timestamp
-    ?dal_bootstrap_peers f ~protocol =
+    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
+    ?attestation_lag ?attestation_threshold ?number_of_shards ?commitment_period
+    ?challenge_window ?dal_enable ?event_sections_levels ?node_arguments
+    ?activation_timestamp ?dal_bootstrap_peers f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
@@ -166,6 +167,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
        hence the value from the protocol constants will be used. *)
     @ dal_enable_param dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
+    @ make_int_parameter ["consensus_committee_size"] consensus_committee_size
     @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
     @ make_string_parameter
         ["delay_increment_per_round"]
@@ -241,10 +243,11 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
 let scenario_with_layer1_node ?(tags = ["layer1"])
-    ?additional_bootstrap_accounts ?attestation_lag ?custom_constants
-    ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
+    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
     ?event_sections_levels ?node_arguments ?activation_timestamp
-    ?minimal_block_delay ?delay_increment_per_round variant scenario =
+    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
+    variant scenario =
   let description = "Testing DAL L1 integration" in
   test
     ~__FILE__
@@ -254,9 +257,11 @@ let scenario_with_layer1_node ?(tags = ["layer1"])
       with_layer1
         ~custom_constants
         ?additional_bootstrap_accounts
+        ?consensus_committee_size
         ?minimal_block_delay
         ?delay_increment_per_round
         ?attestation_lag
+        ?number_of_shards
         ?commitment_period
         ?challenge_window
         ?event_sections_levels
@@ -367,7 +372,7 @@ let wait_for_layer1_block_processing dal_node level =
   Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
-let inject_dal_attestation ?level ?(force = false) ~signer ~nb_slots
+let inject_dal_attestation ?level ?force ?error ?request ~signer ~nb_slots
     availability client =
   let attestation = Array.make nb_slots false in
   List.iter (fun i -> attestation.(i) <- true) availability ;
@@ -386,7 +391,9 @@ let inject_dal_attestation ?level ?(force = false) ~signer ~nb_slots
     |> List.hd |> JSON.as_int
   in
   Operation.Consensus.inject
-    ~force
+    ?force
+    ?error
+    ?request
     ~signer
     (Operation.Consensus.dal_attestation ~level ~attestation ~slot)
     client
@@ -865,59 +872,113 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   let* () = mempool_is ~__LOC__ Mempool.{empty with outdated} in
   check_slots_availability ~__LOC__ ~attested:[10]
 
-(* Tests that DAL attestations are only included in the block
-   if the attestation is from a DAL-committee member. *)
+(* Tests that DAL attestations are only included in a block if the attestation
+   is from a DAL-committee member. This test may be fail sometimes (with
+   [List.hd] on an empty list), though care was taken to avoid this as much as
+   possible, as it is a bit hard to make sure an attester is in the TB committee
+   but not in the DAL committee).*)
 let test_slots_attestation_operation_dal_committee_membership_check _protocol
-    parameters _cryptobox _node client _bootstrap_key =
-  let* new_account =
-    (* Set up a new account that holds some tez and is revealed. *)
-    let* new_account = Client.gen_and_show_keys client in
-    let* () =
-      Client.transfer
-        ~giver:Constant.bootstrap1.alias
-        ~receiver:new_account.alias
-        ~amount:(Tez.of_int 10)
-        ~burn_cap:Tez.one
-        client
-    in
-    let* () = Client.bake_for_and_wait client in
-    let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
-    let* () = Client.bake_for_and_wait client in
-    return new_account
-  in
+    parameters _cryptobox node client _bootstrap_key =
+  (* The attestation from the bootstrap account should succeed as the bootstrap
+     node has sufficient stake to be in the DAL committee. *)
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
   let* level = Client.level client in
-  (* The attestation from the new account should fail as
-     the new account is not an attester and cannot be on the DAL committee. *)
-  let* (`OpHash _oph) =
-    Operation.Consensus.(
-      inject
-        ~error:
-          (rex
-             (sf
-                "%s is not part of the DAL committee for the level %d"
-                new_account.public_key_hash
-                level))
-        ~request:`Notify
-        ~signer:new_account
-        (dal_attestation
-           ~level
-           ~attestation:(Array.make nb_slots false)
-           ~slot:0)
-        client)
-  in
-  (* The attestation from the bootstrap account should succeed as
-     the bootstrap node is an attester and is on the DAL committee by default. *)
   let* (`OpHash _oph) =
     inject_dal_attestation
-      ~force:true
       ~nb_slots
       ~level
       ~signer:Constant.bootstrap1
       []
       client
   in
-  unit
+  (* Set up a new account that holds the right amount of tez and make sure it
+     can be an attester. *)
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let preserved_cycles = JSON.(proto_params |-> "preserved_cycles" |> as_int) in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let blocks_per_epoch = parameters.Dal.Parameters.blocks_per_epoch in
+  (* With [consensus_committee_size = 1024] slots in total, the new baker should
+     get roughly n / 64 = 16 TB slots on average. So the probability that it is
+     on TB committee is high. With [number_of_shards = 16] (which is the minimum
+     possible without changing other parameters), the new baker should be
+     assigned roughly 16/64 = 1/4 shards on average. *)
+  let stake = Tez.of_mutez_int (Protocol.default_bootstrap_balance / 64) in
+  let* new_account = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:new_account.alias
+      ~amount:Tez.(stake + of_int 10)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
+  let* () = Client.bake_for_and_wait client in
+  let* () = Client.register_key new_account.alias client in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    Client.transfer
+      ~entrypoint:"stake"
+      ~burn_cap:Tez.one
+      ~amount:stake
+      ~giver:new_account.alias
+      ~receiver:new_account.alias
+      client
+  in
+  let num_cycles = 2 + preserved_cycles in
+  Log.info
+    "Bake for %d cycles for %s to be a baker"
+    num_cycles
+    new_account.alias ;
+  let* () =
+    Client.bake_for_and_wait ~count:(num_cycles * blocks_per_cycle) client
+  in
+  (* We iterate until we find a level for which the new account has no assigned
+     shard. Recall that the probability to not be assigned a shard is around
+     3/4, we so a level is found quickly. *)
+  let rec iter () =
+    let* level = Client.level client in
+    let* json =
+      Node.RPC.(call node @@ get_chain_block_context_dal_shards ~level ())
+    in
+    let committee =
+      JSON.as_list json
+      |> List.map (fun tuple ->
+             let pair = JSON.as_list tuple in
+             match pair with
+             | [pkh; _] -> JSON.as_string pkh
+             | _ ->
+                 Test.fail
+                   "could not parse result of \
+                    [get_chain_block_context_dal_shards] RPC")
+    in
+    if List.mem new_account.public_key_hash committee then (
+      Log.info
+        "Bake another %d blocks to change the DAL committee"
+        blocks_per_epoch ;
+      let* () = Client.bake_for_and_wait ~count:blocks_per_epoch client in
+      iter ())
+    else
+      let* (`OpHash _oph) =
+        inject_dal_attestation
+          ~error:
+            (rex
+               (sf
+                  "%s is not part of the DAL committee for the level %d"
+                  new_account.public_key_hash
+                  level))
+          ~nb_slots
+          ~level
+          ~signer:new_account
+          []
+          client
+      in
+      unit
+  in
+  iter ()
 
 let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
     dal_node =
@@ -3885,6 +3946,8 @@ let register ~protocols =
     (* We need to set the prevalidator's event level to [`Debug]
        in order to capture the errors thrown in the validation phase. *)
     ~event_sections_levels:[("prevalidator", `Debug)]
+    ~number_of_shards:16
+    ~consensus_committee_size:1024
     protocols ;
   scenario_with_layer1_node
     ~dal_enable:false

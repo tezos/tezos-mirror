@@ -273,7 +273,7 @@ module Consensus = struct
     | Preattestation -> Format.sprintf "pre%s" (name use_legacy_name)
     | Dal_attestation -> "dal_attestation"
 
-  let json signer = function
+  let json = function
     | Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
       ->
         `O
@@ -295,14 +295,13 @@ module Consensus = struct
         `O
           [
             ("kind", Ezjsonm.string "dal_attestation");
-            ("attester", Ezjsonm.string signer.Account.public_key_hash);
             ("attestation", Ezjsonm.string (string_of_bool_vector attestation));
             ("level", Ezjsonm.int level);
             ("slot", Ezjsonm.int slot);
           ]
 
   let operation ?branch ?chain_id ~signer consensus_operation client =
-    let json = `A [json signer consensus_operation] in
+    let json = `A [json consensus_operation] in
     let* branch =
       match branch with
       | None -> get_branch ~offset:0 client

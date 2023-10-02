@@ -1160,8 +1160,7 @@ module Encoding = struct
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
-    obj4
-      (req "attester" Signature.Public_key_hash.encoding)
+    obj3
       (req "attestation" Dal_attestation_repr.encoding)
       (req "level" Raw_level_repr.encoding)
       (req "slot" Slot_repr.encoding)
@@ -1175,13 +1174,11 @@ module Encoding = struct
         select =
           (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Dal_attestation
-                 Dal_attestation_repr.{attester; attestation; level; slot}) ->
-            (attester, attestation, level, slot));
+          (fun (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
+            (attestation, level, slot));
         inj =
-          (fun (attester, attestation, level, slot) ->
-            Dal_attestation
-              Dal_attestation_repr.{attester; attestation; level; slot});
+          (fun (attestation, level, slot) ->
+            Dal_attestation Dal_attestation_repr.{attestation; level; slot});
       }
 
   let seed_nonce_revelation_case =
@@ -2141,7 +2138,6 @@ type dal_attestation_infos = {
   level : int32;
   slot : int;
   number_of_attested_slots : int;
-  attester : Signature.Public_key_hash.t;
 }
 
 (** [double_baking_infos] is the pair of a {!round_infos} and a
@@ -2337,9 +2333,7 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single
-      (Dal_attestation
-        Dal_attestation_repr.{attester; attestation; level; slot}) ->
+  | Single (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
       W
         ( Consensus,
           Weight_dal_attestation
@@ -2348,7 +2342,6 @@ let weight_of : packed_operation -> operation_weight =
               slot = Slot_repr.to_int slot;
               number_of_attested_slots =
                 Dal_attestation_repr.number_of_attested_slots attestation;
-              attester;
             } )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
@@ -2479,29 +2472,16 @@ let compare_baking_infos infos1 infos2 =
 (** Two valid {!Dal_attestation} are compared in the lexicographic order of
     their level, slot, number of attested slots, and attester hash. *)
 let compare_dal_attestation_infos
-    {
-      level = level1;
-      slot = slot1;
-      number_of_attested_slots = n1;
-      attester = attester1;
-    }
-    {
-      level = level2;
-      slot = slot2;
-      number_of_attested_slots = n2;
-      attester = attester2;
-    } =
+    {level = level1; slot = slot1; number_of_attested_slots = n1}
+    {level = level2; slot = slot2; number_of_attested_slots = n2} =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
          ~cmp_fst:Compare.Int32.compare
          ~cmp_snd:(compare_reverse Compare.Int.compare))
-    ~cmp_snd:
-      (compare_pair_in_lexico_order
-         ~cmp_fst:(compare_reverse Compare.Int.compare)
-         ~cmp_snd:Signature.Public_key_hash.compare)
-    ((level1, slot1), (n1, attester1))
-    ((level2, slot2), (n2, attester2))
+    ~cmp_snd:(compare_reverse Compare.Int.compare)
+    ((level1, slot1), n1)
+    ((level2, slot2), n2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 

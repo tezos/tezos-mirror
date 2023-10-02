@@ -661,11 +661,7 @@ let dal_attestation ctxt delegate block =
               let attestation = Dal.Attestation.empty in
               let branch = block.Block.header.shell.predecessor in
               let* signer = Account.find delegate in
-              let op =
-                Single
-                  (Dal_attestation
-                     {attester = delegate; attestation; level; slot})
-              in
+              let op = Single (Dal_attestation {attestation; level; slot}) in
               Op.sign
                 ~watermark:
                   Operation.(to_watermark (Dal_attestation Chain_id.zero))

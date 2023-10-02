@@ -2161,12 +2161,12 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
-let find_in_slot_map consensus_content slot_map =
+let find_in_slot_map slot slot_map =
   let open Result_syntax in
   match slot_map with
   | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
   | Some slot_map -> (
-      match Slot.Map.find consensus_content.slot slot_map with
+      match Slot.Map.find slot slot_map with
       | None ->
           (* This should not happen: operation validation should have failed. *)
           tzfail Faulty_validation_wrong_slot
@@ -2197,7 +2197,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_preattestations ctxt)
+        find_in_slot_map content.slot (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
         Consensus.record_preattestation
@@ -2238,7 +2238,7 @@ let record_attestation ctxt (mode : mode) (content : consensus_content) :
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_attestations ctxt)
+        find_in_slot_map content.slot (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
         Consensus.record_attestation ctxt ~initial_slot:content.slot ~power
@@ -2371,9 +2371,22 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
          the attestation encoding and to use a committee that changes less
          often. However, once the DAL will be ready, this operation should be
          merged with an attestation or at least refined. *)
-      let*? ctxt = Dal_apply.apply_attestation ctxt op in
+      let* ctxt, consensus_key =
+        match mode with
+        | Application _ | Full_construction _ ->
+            let*? consensus_key, _power =
+              find_in_slot_map op.slot (Consensus.allowed_attestations ctxt)
+            in
+            return (ctxt, consensus_key)
+        | Partial_construction _ ->
+            let level = Level.from_raw ctxt op.level in
+            Stake_distribution.slot_owner ctxt level op.slot
+      in
+      let*? ctxt = Dal_apply.apply_attestation ctxt consensus_key op in
       return
-        (ctxt, Single_result (Dal_attestation_result {delegate = op.attester}))
+        ( ctxt,
+          Single_result
+            (Dal_attestation_result {delegate = consensus_key.delegate}) )
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in

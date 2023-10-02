@@ -46,8 +46,6 @@ type t = private Bitset.t
 
 (** The shape of Dal attestation operations injected by delegates. *)
 type operation = {
-  attester : Signature.Public_key_hash.t;
-      (** The account who attests the availability of the slots. *)
   attestation : t;
       (** The bitset of slots that are attested to be available. *)
   level : Raw_level_repr.t;
@@ -65,8 +63,8 @@ type operation = {
          [attestation_level + 1 = attested_level]
          [published_level + attestation_lag = attested_level] *)
   slot : Slot_repr.t;
-      (** Similar to {!Operation_repr.consensus_content.slot}. It is the first
-          consensus slot of [attestor] at [level]. *)
+      (** Similar to {!Operation_repr.consensus_content.slot}. It is the
+          attester's first consensus slot at [level]. *)
 }
 
 val encoding : t Data_encoding.t
