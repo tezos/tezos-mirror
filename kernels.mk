@@ -42,6 +42,13 @@ endif
 	--output $@ \
 	${CONFIG}
 
+evm_benchmark_installer.wasm::
+	@${MAKE} -f kernels.mk \
+	EVM_CONFIG=src/kernel_evm/config/benchmarking.yaml \
+	EVM_KERNEL_FEATURES=benchmark \
+	evm_unstripped_installer.wasm
+	cp evm_unstripped_installer.wasm $@
+
 evm_installer_dev.wasm::
 	@${MAKE} -f kernels.mk EVM_CONFIG=src/kernel_evm/config/dev.yaml evm_installer.wasm
 
