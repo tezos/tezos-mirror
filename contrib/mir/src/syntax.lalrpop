@@ -53,6 +53,7 @@ pair_args: Type = {
 composite_type: Type = {
     "pair" <type_expr> <pair_args> => Type::new_pair(<>),
     "option" <type_expr> => Type::new_option(<>),
+    "list" <type_expr> => Type::new_list(<>),
 }
 
 type_expr: Type = {
@@ -87,9 +88,16 @@ composite_value: Value = {
 
 value_expr: Value = {
   atomic_value => <>,
-  "(" <composite_value> ")" => <>,
-  "(" <value_expr> ")" => <>,
+  "(" <value_expr_naked> ")" => <>,
+  "{" <value_seq> "}" => Seq(<>),
 }
+
+value_expr_naked: Value = {
+  composite_value => <>,
+  value_expr => <>,
+}
+
+value_seq: Vec<Value> = semicolonSepSeq<value_expr_naked>;
 
 use Instruction::*;
 instruction: ParsedInstruction = {

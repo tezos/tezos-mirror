@@ -348,6 +348,13 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
             }
             None => TV::new_option(None),
         },
+        (List(ty), Seq(vs)) => {
+            let lst: Result<Vec<TypedValue>, TcError> = vs
+                .into_iter()
+                .map(|v| typecheck_value(ctx, ty, v))
+                .collect();
+            TV::List(lst?)
+        }
         (t, v) => return Err(TcError::InvalidValueForType(v, t.clone())),
     })
 }
@@ -932,5 +939,36 @@ mod typecheck_tests {
             Ok(vec![Amount])
         );
         assert_eq!(stack, stk![Type::Mutez]);
+    }
+
+    #[test]
+    fn push_int_list() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (list int) { 1; 2; 3 }}").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(TypedValue::List(vec![
+                TypedValue::Int(1),
+                TypedValue::Int(2),
+                TypedValue::Int(3),
+            ]))])
+        );
+        assert_eq!(stack, stk![Type::new_list(Type::Int)]);
+    }
+
+    #[test]
+    fn push_int_list_fail() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (list int) { 1; Unit; 3 }}").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(Value::UnitValue, Type::Int))
+        );
     }
 }

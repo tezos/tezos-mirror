@@ -700,4 +700,34 @@ mod interpreter_tests {
             Gas::default().milligas() - interpret_cost::INTERPRET_RET - interpret_cost::AMOUNT,
         )
     }
+
+    #[test]
+    fn push_int_list() {
+        let mut stack = stk![];
+        let mut ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret(
+                &vec![Push(TypedValue::List(vec![
+                    TypedValue::Int(1),
+                    TypedValue::Int(2),
+                    TypedValue::Int(3),
+                ]))],
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::List(vec![
+                TypedValue::Int(1),
+                TypedValue::Int(2),
+                TypedValue::Int(3),
+            ])]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+        );
+    }
 }
