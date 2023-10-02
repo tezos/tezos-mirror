@@ -612,8 +612,8 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    {!Attestation} is better.
 
    Two {!Dal_attestation} ops are compared in the lexicographic order of the
-   tuple of their level, their number of slots attested as available, their
-   attesters, and their slot.
+   tuple of their level, their slot, their number of slots attested as
+   available, and their attesters' hash.
 
    Two voting operations are compared in the lexicographic order of
    the pair of their [period] and [source]. A {!Proposals} is better
