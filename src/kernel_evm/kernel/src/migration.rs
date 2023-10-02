@@ -135,7 +135,7 @@ fn migrate_one_block<Host: Runtime>(
         number: old_block.number,
         hash: old_block.hash,
         parent_hash: old_block.parent_hash,
-        logs_bloom: old_block.logs_bloom,
+        logs_bloom: None,
         transactions_root: None,
         state_root: None,
         receipts_root: None,

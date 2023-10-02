@@ -10,6 +10,7 @@ use crate::rlp_helpers::{
     decode_transaction_hash_list, next,
 };
 use crate::transaction::TransactionHash;
+use ethbloom::Bloom;
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -66,7 +67,7 @@ pub struct L2Block {
     pub number: U256,
     pub hash: H256,
     pub parent_hash: H256,
-    pub logs_bloom: Option<OwnedHash>,
+    pub logs_bloom: Option<Bloom>,
     pub transactions_root: Option<OwnedHash>,
     pub state_root: Option<OwnedHash>,
     pub receipts_root: Option<OwnedHash>,
@@ -90,6 +91,7 @@ impl L2Block {
         transactions: Vec<TransactionHash>,
         timestamp: Timestamp,
         parent_hash: H256,
+        logs_bloom: Option<Bloom>,
     ) -> Self {
         L2Block {
             number,
@@ -97,6 +99,7 @@ impl L2Block {
             parent_hash,
             timestamp,
             transactions,
+            logs_bloom,
             ..Self::default()
         }
     }
@@ -165,7 +168,7 @@ impl Decodable for L2Block {
                 let hash: H256 = decode_field_h256(&next(&mut it)?, "hash")?;
                 let parent_hash: H256 =
                     decode_field_h256(&next(&mut it)?, "parent_hash")?;
-                let logs_bloom: Option<OwnedHash> =
+                let logs_bloom: Option<Bloom> =
                     decode_option_explicit(&next(&mut it)?, "logs_bloom", decode_field)?;
                 let transactions_root: Option<OwnedHash> = decode_option_explicit(
                     &next(&mut it)?,
