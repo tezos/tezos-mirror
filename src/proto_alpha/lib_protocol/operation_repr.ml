@@ -186,13 +186,9 @@ let to_watermark = function
   | Preattestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
-  | Dal_attestation chain_id
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4479
-
-     We reuse the watermark of an attestation. This is because this
-     operation is temporary and aims to be merged with an attestation
-     later on. Moreover, there is a leak of abstraction with the shell
-     which makes adding a new watermark a bit awkward. *)
+  | Dal_attestation chain_id ->
+      Signature.Custom
+        (Bytes.cat (Bytes.of_string "\x14") (Chain_id.to_bytes chain_id))
   | Attestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id))
@@ -208,6 +204,10 @@ let of_watermark = function
         | '\x13' ->
             Option.map
               (fun chain_id -> Attestation chain_id)
+              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
+        | '\x14' ->
+            Option.map
+              (fun chain_id -> Dal_attestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -1160,10 +1160,11 @@ module Encoding = struct
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
-    obj3
+    obj4
       (req "attester" Signature.Public_key_hash.encoding)
       (req "attestation" Dal_attestation_repr.encoding)
       (req "level" Raw_level_repr.encoding)
+      (req "slot" Slot_repr.encoding)
 
   let dal_attestation_case =
     Case
@@ -1175,11 +1176,12 @@ module Encoding = struct
           (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
           (fun (Dal_attestation
-                 Dal_attestation_repr.{attester; attestation; level}) ->
-            (attester, attestation, level));
+                 Dal_attestation_repr.{attester; attestation; level; slot}) ->
+            (attester, attestation, level, slot));
         inj =
-          (fun (attester, attestation, level) ->
-            Dal_attestation Dal_attestation_repr.{attester; attestation; level});
+          (fun (attester, attestation, level, slot) ->
+            Dal_attestation
+              Dal_attestation_repr.{attester; attestation; level; slot});
       }
 
   let seed_nonce_revelation_case =
@@ -2134,6 +2136,14 @@ type round_infos = {level : int32; round : int}
    convert into an {!int}. *)
 type attestation_infos = {round : round_infos; slot : int}
 
+(** [dal_attestation_infos] gives the weight of DAL attestation. *)
+type dal_attestation_infos = {
+  level : int32;
+  slot : int;
+  number_of_attested_slots : int;
+  attester : Signature.Public_key_hash.t;
+}
+
 (** [double_baking_infos] is the pair of a {!round_infos} and a
     {!block_header} hash. *)
 type double_baking_infos = {round : round_infos; bh_hash : Block_hash.t}
@@ -2228,10 +2238,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
   | Weight_preattestation : attestation_infos -> consensus_pass_type weight
-  | Weight_dal_attestation :
-      (* attester * num_attestations * level *)
-      (Signature.Public_key_hash.t * int * int32)
-      -> consensus_pass_type weight
+  | Weight_dal_attestation : dal_attestation_infos -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
       -> voting_pass_type weight
@@ -2330,14 +2337,19 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Dal_attestation Dal_attestation_repr.{attester; attestation; level})
-    ->
+  | Single
+      (Dal_attestation
+        Dal_attestation_repr.{attester; attestation; level; slot}) ->
       W
         ( Consensus,
           Weight_dal_attestation
-            ( attester,
-              Dal_attestation_repr.occupied_size_in_bits attestation,
-              Raw_level_repr.to_int32 level ) )
+            {
+              level = Raw_level_repr.to_int32 level;
+              slot = Slot_repr.to_int slot;
+              number_of_attested_slots =
+                Dal_attestation_repr.number_of_attested_slots attestation;
+              attester;
+            } )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2410,7 +2422,7 @@ let compare_reverse (cmp : 'a -> 'a -> int) a b = cmp b a
    parameter from valid operations and put (-1) to the [round] in the
    unreachable path where the original round fails to convert in
    {!int}. *)
-let compare_round_infos infos1 infos2 =
+let compare_round_infos (infos1 : round_infos) (infos2 : round_infos) =
   compare_pair_in_lexico_order
     ~cmp_fst:Compare.Int32.compare
     ~cmp_snd:Compare.Int.compare
@@ -2464,19 +2476,32 @@ let compare_baking_infos infos1 infos2 =
     (infos1.round, infos1.bh_hash)
     (infos2.round, infos2.bh_hash)
 
-(** Two valid {!Dal_attestation} are compared in the
-   lexicographic order of their pairs of bitsets size and attester
-   hash. *)
-let compare_dal_attestation (attester1, attestations1, level1)
-    (attester2, attestations2, level2) =
+(** Two valid {!Dal_attestation} are compared in the lexicographic order of
+    their level, slot, number of attested slots, and attester hash. *)
+let compare_dal_attestation_infos
+    {
+      level = level1;
+      slot = slot1;
+      number_of_attested_slots = n1;
+      attester = attester1;
+    }
+    {
+      level = level2;
+      slot = slot2;
+      number_of_attested_slots = n2;
+      attester = attester2;
+    } =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
          ~cmp_fst:Compare.Int32.compare
-         ~cmp_snd:Compare.Int.compare)
-    ~cmp_snd:Signature.Public_key_hash.compare
-    ((level1, attestations1), attester1)
-    ((level2, attestations2), attester2)
+         ~cmp_snd:(compare_reverse Compare.Int.compare))
+    ~cmp_snd:
+      (compare_pair_in_lexico_order
+         ~cmp_fst:(compare_reverse Compare.Int.compare)
+         ~cmp_snd:Signature.Public_key_hash.compare)
+    ((level1, slot1), (n1, attester1))
+    ((level2, slot2), (n2, attester2))
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
@@ -2499,9 +2524,8 @@ let compare_consensus_weight w1 w2 =
       compare_attestation_infos ~prioritized_position:Fstpos infos1 infos2
   | Weight_preattestation infos1, Weight_attestation infos2 ->
       compare_attestation_infos ~prioritized_position:Sndpos infos1 infos2
-  | ( Weight_dal_attestation (attester1, size1, lvl1),
-      Weight_dal_attestation (attester2, size2, lvl2) ) ->
-      compare_dal_attestation (attester1, size1, lvl1) (attester2, size2, lvl2)
+  | Weight_dal_attestation infos1, Weight_dal_attestation infos2 ->
+      compare_dal_attestation_infos infos1 infos2
   | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
     ->
       -1

@@ -65,4 +65,6 @@ let () =
 
 let occupied_size_in_bits = Z.numbits
 
+let hamming_weight = Z.popcount
+
 let to_z z = z

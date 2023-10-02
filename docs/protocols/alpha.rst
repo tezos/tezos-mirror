@@ -47,7 +47,8 @@ Gas improvements
 Breaking Changes
 ----------------
 
- The ``attestor`` field of a DAL attestation operation is renamed to ``attester`` (MR :gl:`!10294`).
+A DAL attestation operation now contains a new ``slot`` field, while the
+``attestor`` field is renamed to ``attester``. (MRs :gl:`!10183`, :gl:`!10294`)
 
 RPC Changes
 -----------

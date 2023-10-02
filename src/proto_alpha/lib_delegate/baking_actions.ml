@@ -718,13 +718,14 @@ let get_dal_attestations state =
       let attested_level = Int32.succ attestation_level in
       let delegates =
         List.map
-          (fun delegate_slot -> delegate_slot.consensus_key_and_delegate)
+          (fun delegate_slot ->
+            (delegate_slot.consensus_key_and_delegate, delegate_slot.first_slot))
           (Delegate_slots.own_delegates state.level_state.delegate_slots)
       in
       let signing_key delegate = (fst delegate).public_key_hash in
       let* attestations =
         List.fold_left_es
-          (fun acc delegate ->
+          (fun acc (delegate, first_slot) ->
             let*! tz_res =
               Node_rpc.get_attestable_slots
                 dal_node_rpc_ctxt
@@ -743,7 +744,9 @@ let get_dal_attestations state =
                     return acc
                 | Attestable_slots {slots = attestation; published_level} ->
                     if List.exists Fun.id attestation then
-                      return ((delegate, attestation, published_level) :: acc)
+                      return
+                        ((delegate, attestation, published_level, first_slot)
+                        :: acc)
                     else
                       (* No slot is attested, no need to send an attestation, at least
                          for now. *)
@@ -761,7 +764,7 @@ let get_dal_attestations state =
         state.global_state.constants.parametric.dal.number_of_slots
       in
       List.map
-        (fun (delegate, attestation_flags, published_level) ->
+        (fun (delegate, attestation_flags, published_level, first_slot) ->
           let attestation =
             List.fold_left_i
               (fun i acc flag ->
@@ -777,6 +780,7 @@ let get_dal_attestations state =
                 attester = signing_key delegate;
                 attestation;
                 level = Raw_level.of_int32_exn attestation_level;
+                slot = first_slot;
               },
             published_level ))
         attestations

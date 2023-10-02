@@ -70,5 +70,8 @@ val diff : t -> t -> t
    occupied by the [bitset]. *)
 val occupied_size_in_bits : t -> int
 
+(** [hamming_weight bitset] returns the Hamming weight of [bitset]. *)
+val hamming_weight : t -> int
+
 (** [to_z t] Returns the sum of powers of two of the given bitset. *)
 val to_z : t -> Z.t

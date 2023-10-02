@@ -2563,6 +2563,7 @@ module Dal : sig
       attester : public_key_hash;
       attestation : t;
       level : Raw_level.t;
+      slot : Slot.t;
     }
 
     type shard_index = int

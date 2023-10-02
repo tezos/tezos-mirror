@@ -2367,14 +2367,10 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Dal_attestation op) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
-         This is a temporary operation. We do no check for the
-         moment. In particular, this means we do not check the
-         signature. Consequently, it is really important to ensure this
-         operation cannot be included into a block when the feature flag
-         is not set. This is done in order to avoid modifying the
-         attestation encoding. However, once the DAL will be ready, this
-         operation should be merged with an attestation or at least
-         refined. *)
+         This is a temporary operation. This is done in order to avoid modifying
+         the attestation encoding and to use a committee that changes less
+         often. However, once the DAL will be ready, this operation should be
+         merged with an attestation or at least refined. *)
       let*? ctxt = Dal_apply.apply_attestation ctxt op in
       return
         (ctxt, Single_result (Dal_attestation_result {delegate = op.attester}))

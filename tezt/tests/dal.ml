@@ -367,6 +367,38 @@ let wait_for_layer1_block_processing dal_node level =
   Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
+let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
+    client =
+  let attestation = Array.make nb_slots false in
+  List.iter (fun i -> attestation.(i) <- true) availability ;
+  let* level =
+    match level with Some level -> return level | None -> Client.level client
+  in
+  let* slots =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_helper_validators
+         ~level
+         ~delegate:signer.Account.public_key_hash
+         ()
+  in
+  let slot =
+    JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
+    |> List.hd |> JSON.as_int
+  in
+  Operation.Consensus.inject
+    ~force
+    ~signer
+    (Operation.Consensus.dal_attestation ~level ~attestation ~slot)
+    client
+
+let dal_attestations ?level ?force
+    ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
+    client =
+  Lwt_list.map_s
+    (fun signer ->
+      dal_attestation ?level ?force ~signer ~nb_slots availability client)
+    signers
+
 let test_feature_flag _protocol _parameters _cryptobox node client
     _bootstrap_key =
   (* This test ensures the feature flag works:
@@ -393,14 +425,13 @@ let test_feature_flag _protocol _parameters _cryptobox node client
   in
   let* level = next_level node in
   let* (`OpHash oph1) =
-    Operation.Consensus.(
-      inject
-        ~force:true
-        ~signer:Constant.bootstrap1
-        (dal_attestation
-           ~level
-           ~attestation:(Array.make params.number_of_slots false))
-        client)
+    dal_attestation
+      ~force:true
+      ~nb_slots:params.number_of_slots
+      ~level
+      ~signer:Constant.bootstrap1
+      []
+      client
   in
   let* (`OpHash oph2) =
     Helpers.publish_slot_header ~force:true ~index:0 ~commitment ~proof client
@@ -503,27 +534,6 @@ let publish_slot_header ?counter ?force ~source ?(fee = 1200) ~index ~commitment
     ~commitment
     ~proof
     client
-
-let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
-    client =
-  let attestation = Array.make nb_slots false in
-  List.iter (fun i -> attestation.(i) <- true) availability ;
-  let* level =
-    match level with Some level -> return level | None -> Client.level client
-  in
-  Operation.Consensus.inject
-    ~force
-    ~signer
-    (Operation.Consensus.dal_attestation ~level ~attestation)
-    client
-
-let dal_attestations ?level ?force
-    ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
-    client =
-  Lwt_list.map_s
-    (fun signer ->
-      dal_attestation ?level ?force ~signer ~nb_slots availability client)
-    signers
 
 type status = Applied | Failed of {error_id : string}
 
@@ -875,9 +885,9 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   in
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
   let* level = Client.level client in
+  (* The attestation from the new account should fail as
+     the new account is not an attester and cannot be on the DAL committee. *)
   let* (`OpHash _oph) =
-    (* The attestation from the new account should fail as
-       the new account is not an attester and cannot be on the DAL committee. *)
     Operation.Consensus.(
       inject
         ~error:
@@ -888,17 +898,22 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
                 level))
         ~request:`Notify
         ~signer:new_account
-        (dal_attestation ~level ~attestation:(Array.make nb_slots false))
+        (dal_attestation
+           ~level
+           ~attestation:(Array.make nb_slots false)
+           ~slot:0)
         client)
   in
+  (* The attestation from the bootstrap account should succeed as
+     the bootstrap node is an attester and is on the DAL committee by default. *)
   let* (`OpHash _oph) =
-    (* The attestation from the bootstrap account should succeed as
-       the bootstrap node is an attester and is on the DAL committee by default. *)
-    Operation.Consensus.(
-      inject
-        ~signer:Constant.bootstrap1
-        (dal_attestation ~level ~attestation:(Array.make nb_slots false))
-        client)
+    dal_attestation
+      ~force:true
+      ~nb_slots
+      ~level
+      ~signer:Constant.bootstrap1
+      []
+      client
   in
   unit
 

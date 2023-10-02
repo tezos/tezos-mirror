@@ -814,27 +814,56 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with attestations_seen}}
 
-  let check_dal_attestation vi (operation : Kind.dal_attestation operation) =
-    (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
-       This is a temporary operation. Some checks are missing for the
-       moment. In particular, the signature is not
-       checked. Consequently, it is really important to ensure this
-       operation cannot be included into a block when the feature flag
-       is not set. This is done in order to avoid modifying the
-       attestation encoding. However, once the DAL is ready, this
-       operation should be merged with an attestation or at least
-       refined. *)
+  let check_dal_attestation vi ~check_signature
+      (operation : Kind.dal_attestation operation) =
+    (* DAL/TODO https://gitlab.com/tezos/tezos/-/issues/3115
+       This is a temporary operation to avoid modifying the attestation
+       encoding. At some point, this operation should be merged with an
+       attestation. *)
     let open Lwt_result_syntax in
     let (Single (Dal_attestation op)) = operation.protocol_data.contents in
     let*? () =
       (* Note that this function checks the dal feature flag. *)
       Dal_apply.validate_attestation vi.ctxt op
     in
+    let*? consensus_info =
+      Option.value_e
+        ~error:(trace_of_error Consensus_operation_not_allowed)
+        vi.consensus_info
+    in
+    let* consensus_key =
+      match vi.mode with
+      | Application _ | Partial_validation _ | Construction _ ->
+          let*? consensus_key, _voting_power =
+            get_delegate_details
+              consensus_info.attestation_slot_map
+              Dal_attestation
+              op.slot
+          in
+          return consensus_key
+      | Mempool ->
+          let* (_ctxt : t), consensus_key =
+            Stake_distribution.slot_owner
+              vi.ctxt
+              (Level.from_raw vi.ctxt op.level)
+              op.slot
+          in
+          return consensus_key
+    in
+    let*? () =
+      if check_signature then
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
+      else ok_unit
+    in
     return_unit
 
   let check_dal_attestation_conflict vs oph
       (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attester; attestation = _; level = _})) =
+    let (Single
+          (Dal_attestation {attester; attestation = _; level = _; slot = _})) =
       operation.protocol_data.contents
     in
     match
@@ -854,7 +883,8 @@ module Consensus = struct
             Conflicting_consensus_operation {kind = Dal_attestation; conflict})
 
   let add_dal_attestation vs oph (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attester; attestation = _; level = _})) =
+    let (Single
+          (Dal_attestation {attester; attestation = _; level = _; slot = _})) =
       operation.protocol_data.contents
     in
     {
@@ -871,7 +901,8 @@ module Consensus = struct
     }
 
   let remove_dal_attestation vs (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attester; attestation = _; level = _})) =
+    let (Single
+          (Dal_attestation {attester; attestation = _; level = _; slot = _})) =
       operation.protocol_data.contents
     in
     let dal_attestation_seen =
@@ -944,6 +975,17 @@ module Consensus = struct
     in
     let block_state = may_update_attestation_power info block_state power in
     let operation_state = add_attestation operation_state oph operation in
+    return {info; operation_state; block_state}
+
+  let validate_dal_attestation ~check_signature info operation_state block_state
+      oph operation =
+    let open Lwt_result_syntax in
+    let* () = check_dal_attestation info ~check_signature operation in
+    let*? () =
+      check_dal_attestation_conflict operation_state oph operation
+      |> wrap_dal_attestation_conflict
+    in
+    let operation_state = add_dal_attestation operation_state oph operation in
     return {info; operation_state; block_state}
 end
 
@@ -2483,7 +2525,8 @@ let check_operation ?(check_signature = true) info (type kind)
         Consensus.check_attestation info ~check_signature operation
       in
       return_unit
-  | Single (Dal_attestation _) -> Consensus.check_dal_attestation info operation
+  | Single (Dal_attestation _) ->
+      Consensus.check_dal_attestation info ~check_signature operation
   | Single (Proposals _) ->
       Voting.check_proposals info ~check_signature operation
   | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
@@ -2743,16 +2786,13 @@ let validate_operation ?(check_signature = true)
             oph
             operation
       | Single (Dal_attestation _) ->
-          let open Consensus in
-          let* () = check_dal_attestation info operation in
-          let*? () =
-            check_dal_attestation_conflict operation_state oph operation
-            |> wrap_dal_attestation_conflict
-          in
-          let operation_state =
-            add_dal_attestation operation_state oph operation
-          in
-          return {info; operation_state; block_state}
+          Consensus.validate_dal_attestation
+            ~check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
       | Single (Proposals _) ->
           let open Voting in
           let* () = check_proposals info ~check_signature operation in

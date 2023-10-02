@@ -50,6 +50,7 @@ type operation = {
          or provide a field `min_attester_slot : int / int32` *)
   attestation : t;
   level : Raw_level_repr.t;
+  slot : Slot_repr.t;
 }
 
 let encoding = Bitset.encoding
@@ -86,6 +87,8 @@ let expected_size_in_bits ~max_index =
   match add empty @@ to_int max_index with
   | Error _ -> (* Happens if max_index < 1 *) 0
   | Ok t -> occupied_size_in_bits t
+
+let number_of_attested_slots = Bitset.hamming_weight
 
 type shard_index = int
 
