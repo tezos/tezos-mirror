@@ -88,6 +88,8 @@ let expected_size_in_bits ~max_index =
   | Error _ -> (* Happens if max_index < 1 *) 0
   | Ok t -> occupied_size_in_bits t
 
+let number_of_attested_slots = Bitset.hamming_weight
+
 type shard_index = int
 
 module Shard_map = Map.Make (struct

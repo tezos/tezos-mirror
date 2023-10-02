@@ -92,6 +92,10 @@ val occupied_size_in_bits : t -> int
    [max_index]. *)
 val expected_size_in_bits : max_index:Dal_slot_index_repr.t -> int
 
+(** [number_of_attested_slots slot_attestation] returns the number of attested
+    slots in an attestation. *)
+val number_of_attested_slots : t -> int
+
 (** A shard_index aims to be a positive number. *)
 type shard_index = int
 
