@@ -1,6 +1,7 @@
 meta:
   id: ground__Z
   endian: be
+doc: Arbitrary precision integers
 types:
   group:
     instances:

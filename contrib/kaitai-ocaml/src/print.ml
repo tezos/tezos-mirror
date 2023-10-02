@@ -27,16 +27,9 @@
 open Types
 open Yaml
 
-let scalar value =
-  `Scalar
-    {
-      anchor = None;
-      tag = None;
-      value;
-      plain_implicit = true;
-      quoted_implicit = false;
-      style = `Any;
-    }
+let scalar ?anchor ?tag ?(plain_implicit = true) ?(quoted_implicit = false)
+    ?(style = `Any) value =
+  `Scalar {anchor; tag; value; plain_implicit; quoted_implicit; style}
 
 let sequence l =
   `A {s_anchor = None; s_tag = None; s_implicit = true; s_members = l}
@@ -63,7 +56,15 @@ let metaSpec (t : MetaSpec.t) =
         t.endian;
     ]
 
+let doc_spec DocSpec.{summary; refs = _} =
+  map_list_of_option
+    (fun summary ->
+      let style = if String.length summary > 80 then `Folded else `Any in
+      ("doc", scalar ~style summary))
+    summary
+
 let instanceSpec InstanceSpec.{doc = _; descr} =
+  (* TODO: pp doc spec as well. *)
   match descr with
   | ValueInstanceSpec instance ->
       mapping [("value", scalar (Ast.to_string instance.value))]
@@ -73,6 +74,7 @@ let instances_spec instances =
   mapping (instances |> List.map (fun (k, v) -> (k, instanceSpec v)))
 
 let enumSpec enumspec =
+  (* TODO: pp doc spec as well. *)
   mapping
     (List.map
        (fun (v, EnumValueSpec.{name; _}) -> (string_of_int v, scalar name))
@@ -103,6 +105,7 @@ let enum_spec attr =
   map_list_of_option (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
 
 let attr_spec attr =
+  (* TODO: pp doc spec as well. *)
   match attr.AttrSpec.dataType with
   (* [BytesType] attr require size header. *)
   | BytesType (BytesLimitType {size; _}) ->
@@ -133,6 +136,7 @@ let rec to_yaml (t : ClassSpec.t) =
   mapping_flatten
     [
       (if t.isTopLevel then [("meta", metaSpec t.meta)] else []);
+      doc_spec t.doc;
       spec_if_non_empty "types" t.types types_spec;
       spec_if_non_empty "instances" t.instances instances_spec;
       spec_if_non_empty "enums" t.enums enums_spec;

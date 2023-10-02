@@ -77,38 +77,40 @@ end
 (** [Class] module consists of [ClassSpec.t] for ground types. *)
 module Class : sig
   (** [bool] returns [ClassSpec.t] definition of bool ground type. *)
-  val bool : encoding_name:string -> ClassSpec.t
+  val bool : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [uint8] returns [ClassSpec.t] definition of 8-bit unsigned integer. *)
-  val uint8 : encoding_name:string -> ClassSpec.t
+  val uint8 : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [int8] returns [ClassSpec.t] definition of 8-bit signed integer. *)
-  val int8 : encoding_name:string -> ClassSpec.t
+  val int8 : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [uin16] returns [ClassSpec.t] definition of 16-bit unsigned integer. *)
-  val uint16 : encoding_name:string -> ClassSpec.t
+  val uint16 :
+    encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [int16] returns [ClassSpec.t] definition of 16-bit signed integer. *)
-  val int16 : encoding_name:string -> ClassSpec.t
+  val int16 : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [int32] returns [ClassSpec.t] definition of 32-bit signed integer. *)
-  val int32 : encoding_name:string -> ClassSpec.t
+  val int32 : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [int64] returns [ClassSpec.t] definition of 64-bit signed integer. *)
-  val int64 : encoding_name:string -> ClassSpec.t
+  val int64 : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [int31] returns [ClassSpec.t] definition of 31-bit signed integer.
       For more about this type see [Data_encoding.int31]. *)
-  val int31 : encoding_name:string -> ClassSpec.t
+  val int31 : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [float] returns [ClassSpec.t] definition of 64-bit float. *)
-  val float : encoding_name:string -> ClassSpec.t
+  val float : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [bytes] returns [ClassSpec.t] definition of [Data_encoding.bytes]. *)
-  val bytes : encoding_name:string -> ClassSpec.t
+  val bytes : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [string] returns [ClassSpec.t] definition of [Data_encoding.string]. *)
-  val string : encoding_name:string -> ClassSpec.t
+  val string :
+    encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [byte_group] represents a user defined type for a variable-length sequence
       of bytes encoding a Zarith natural number. It is used for describing
@@ -122,8 +124,8 @@ module Class : sig
   val byte_group : ClassSpec.t
 
   (** [n] returns [ClassSpec.t] for [Data_encoding.N]. *)
-  val n : encoding_name:string -> ClassSpec.t
+  val n : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
   (** [z] returns [ClassSpec.t] for [Data_encoding.Z]. *)
-  val z : encoding_name:string -> ClassSpec.t
+  val z : encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 end

@@ -46,9 +46,12 @@ seq:
   print_endline s ;
   [%expect
     {|
-    Parsing ok
-    Serialization ok
-    meta:
-      id: bytes_with_io
-    seq:
-    - id: data |}]
+Parsing ok
+Serialization ok
+meta:
+  id: bytes_with_io
+doc: ! >
+  Helper type to work around Kaitai Struct not providing an `_io` member for plain
+  byte arrays.
+seq:
+- id: data |}]

@@ -1,6 +1,7 @@
 meta:
   id: ground__N
   endian: be
+doc: Arbitrary precision natural numbers
 types:
   group:
     instances:
