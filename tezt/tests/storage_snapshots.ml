@@ -45,7 +45,7 @@ let pp_snapshot_history_mode fmt v =
 
 let get_constants client =
   let* constants =
-    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
   let preserved_cycles = JSON.(constants |-> "preserved_cycles" |> as_int) in
   let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
@@ -92,15 +92,17 @@ let export_snapshot node ~export_level ~snapshot_dir ~history_mode
 let check_consistency_after_import node ~expected_head ~expected_checkpoint
     ~expected_savepoint ~expected_caboose =
   Log.info "Checking node consistency for %s" (Node.name node) ;
-  let* block_head = RPC.call node @@ RPC.get_chain_block () in
+  let* block_head = Node.RPC.call node @@ RPC.get_chain_block () in
   let level = JSON.(block_head |-> "header" |-> "level" |> as_int) in
   let* {level = checkpoint; _} =
-    RPC.call node @@ RPC.get_chain_level_checkpoint ()
+    Node.RPC.call node @@ RPC.get_chain_level_checkpoint ()
   in
   let* {level = savepoint; _} =
-    RPC.call node @@ RPC.get_chain_level_savepoint ()
+    Node.RPC.call node @@ RPC.get_chain_level_savepoint ()
   in
-  let* {level = caboose; _} = RPC.call node @@ RPC.get_chain_level_caboose () in
+  let* {level = caboose; _} =
+    Node.RPC.call node @@ RPC.get_chain_level_caboose ()
+  in
   Check.((level = expected_head) int) ~error_msg:"expected level = %R, got %L" ;
   Check.((checkpoint = expected_checkpoint) int)
     ~error_msg:"expected checkpoint = %R, got %L" ;
@@ -114,17 +116,19 @@ let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
   (* The metadata of genesis is available anyway *)
   Log.info "Checking blocks availability for %s" (Node.name node) ;
   let* (_ : RPC.block_metadata) =
-    RPC.call node @@ RPC.get_chain_block_metadata ~block:"0" ()
+    Node.RPC.call node @@ RPC.get_chain_block_metadata ~block:"0" ()
   in
   let iter_block_range_s a b f =
     Lwt_list.iter_s f (range a b |> List.rev |> List.map string_of_int)
   in
   let expect_no_metadata block =
     (* Expects success, as the header must be stored. *)
-    let* (_ : JSON.t) = RPC.call node @@ RPC.get_chain_block_header ~block () in
+    let* (_ : JSON.t) =
+      Node.RPC.(call node @@ get_chain_block_header ~block ())
+    in
     (* Expects failure, as the metadata must not be stored. *)
     let* {body; code} =
-      RPC.call_json node @@ RPC.get_chain_block_metadata ~block ()
+      Node.RPC.(call_json node @@ get_chain_block_metadata ~block ())
     in
     (* In the client, attempting to retrieve missing metadata outputs:
        Command failed: Unable to find block *)
@@ -141,12 +145,12 @@ let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
   let expect_metadata block =
     (* Expects success, as the metadata must be stored. *)
     let* (_ : RPC.block_metadata) =
-      RPC.call node @@ RPC.get_chain_block_metadata ~block ()
+      Node.RPC.call node @@ RPC.get_chain_block_metadata ~block ()
     in
     unit
   in
   let expect_no_block block =
-    let* {code; _} = RPC.call_raw node @@ RPC.get_chain_block ~block () in
+    let* {code; _} = Node.RPC.(call_raw node @@ get_chain_block ~block ()) in
     (* In the client, attempting to retrieve an unknown block outputs:
        Did not find service *)
     Check.(
@@ -438,7 +442,7 @@ let test_info_command =
   let* () = Client.activate_protocol_and_wait ~protocol ~node client in
   let blocks_to_bake = 8 in
   let* () = bake_blocks node client ~blocks_to_bake in
-  let* head = RPC.call node @@ RPC.get_chain_block () in
+  let* head = Node.RPC.call node @@ RPC.get_chain_block () in
   let head_level = JSON.(head |-> "header" |-> "level" |> as_int) in
   let snapshot_dir = Temp.dir "snapshots_exports" in
   let* filename =

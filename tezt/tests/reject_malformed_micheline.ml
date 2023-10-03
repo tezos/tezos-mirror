@@ -84,7 +84,8 @@ let reject_malformed_micheline =
        valid signatures. *)
     let json : RPC_core.data = Data (Ezjsonm.from_string data) in
     let* response =
-      RPC.(call_raw node (post_chain_block_helpers_scripts_run_operation json))
+      Node.RPC.(
+        call_raw node (post_chain_block_helpers_scripts_run_operation json))
     in
     return response.body
   in

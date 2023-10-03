@@ -43,7 +43,7 @@ let pp_snapshot_history_mode fmt v =
 
 let get_constants client =
   let* constants =
-    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
   let* preserved_cycles =
     return JSON.(constants |-> "preserved_cycles" |> as_int)
@@ -96,11 +96,13 @@ let bake_blocks node client ~blocks_to_bake =
 let check_levels node expected_head_level =
   Log.info "Checking head, savepoint and caboose levels for %s" (Node.name node) ;
   let* head_level =
-    let* json = RPC.call node @@ RPC.get_chain_block_header () in
+    let* json = Node.RPC.call node @@ RPC.get_chain_block_header () in
     Lwt.return JSON.(json |-> "level" |> as_int)
   and* {level = savepoint; _} =
-    RPC.call node @@ RPC.get_chain_level_savepoint ()
-  and* {level = caboose; _} = RPC.call node @@ RPC.get_chain_level_caboose () in
+    Node.RPC.call node @@ RPC.get_chain_level_savepoint ()
+  and* {level = caboose; _} =
+    Node.RPC.call node @@ RPC.get_chain_level_caboose ()
+  in
   Check.((head_level = expected_head_level) int)
     ~error_msg:"expected head level = %R, got %L" ;
   Check.((savepoint = 0) int) ~error_msg:"expected savepoint = %R, got %L" ;
@@ -114,7 +116,7 @@ let check_blocks_availability node head =
   in
   let expect_metadata block =
     let* (_ : RPC.block_metadata) =
-      RPC.call node @@ RPC.get_chain_block_metadata ~block ()
+      Node.RPC.call node @@ RPC.get_chain_block_metadata ~block ()
     in
     unit
   in

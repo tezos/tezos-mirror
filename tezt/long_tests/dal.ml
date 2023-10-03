@@ -286,7 +286,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     in
     Log.info "Assert that the attestation was indeed posted." ;
     let* {dal_attestation; _} =
-      RPC.(call node1 @@ get_chain_block_metadata ())
+      Node.RPC.(call node1 @@ get_chain_block_metadata ())
     in
     Check.((Some [|true|] = dal_attestation) (option (array bool)))
       ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;

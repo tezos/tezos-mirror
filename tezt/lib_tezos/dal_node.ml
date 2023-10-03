@@ -232,7 +232,7 @@ let make_arguments node =
   in
   [
     "--endpoint";
-    Foreign_endpoint.as_string l1_endpoint;
+    Endpoint.as_string l1_endpoint;
     "--rpc-addr";
     Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
     "--net-addr";
@@ -267,7 +267,7 @@ let run ?(wait_ready = true) ?env node =
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in
   return ()
 
-let as_foreign_rpc_endpoint (t : t) =
+let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
-  Foreign_endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}

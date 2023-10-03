@@ -367,7 +367,7 @@ let tx_kernel_e2e setup protocol =
 
   (* Run the rollup node, ensure origination succeeds. *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup_address
   in

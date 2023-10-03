@@ -26,7 +26,7 @@
 
 open Runnable.Syntax
 
-type endpoint = Node of Dac_node.t | Foreign_endpoint of Foreign_endpoint.t
+type endpoint = Node of Dac_node.t | Foreign_endpoint of Endpoint.t
 
 type t = {
   name : string;
@@ -39,11 +39,11 @@ type t = {
 
 let rpc_host = function
   | Node dac_node -> Dac_node.rpc_host dac_node
-  | Foreign_endpoint foreign -> Foreign_endpoint.rpc_host foreign
+  | Foreign_endpoint foreign -> Endpoint.rpc_host foreign
 
 let rpc_port = function
   | Node dac_node -> Dac_node.rpc_port dac_node
-  | Foreign_endpoint foreign -> Foreign_endpoint.rpc_port foreign
+  | Foreign_endpoint foreign -> Endpoint.rpc_port foreign
 
 let next_name = ref 1
 

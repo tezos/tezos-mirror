@@ -43,8 +43,8 @@ module Parameters = struct
     runner : Runner.t option;
     base_dir : string;
     node_data_dir : string;
-    node_rpc_endpoint : Foreign_endpoint.t;
-    dal_node_rpc_endpoint : Foreign_endpoint.t option;
+    node_rpc_endpoint : Endpoint.t;
+    dal_node_rpc_endpoint : Endpoint.t option;
     mutable pending_ready : unit option Lwt.u list;
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
@@ -130,9 +130,7 @@ let create ~protocol ?path ?name ?color ?event_pipe ?runner ?(delegates = [])
     ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
     ?(remote_mode = false) ?operations_pool ?dal_node
     ?minimal_nanotez_per_gas_unit node client =
-  let dal_node_rpc_endpoint =
-    Option.map Dal_node.as_foreign_rpc_endpoint dal_node
-  in
+  let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   create_from_uris
     ~protocol
     ?path
@@ -150,7 +148,7 @@ let create ~protocol ?path ?name ?color ?event_pipe ?runner ?(delegates = [])
     ?dal_node_rpc_endpoint
     ~base_dir:(Client.base_dir client)
     ~node_data_dir:(Node.data_dir node)
-    ~node_rpc_endpoint:(Node.as_foreign_rpc_endpoint node)
+    ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
     ()
 
 let run ?event_level ?event_sections_levels (baker : t) =
@@ -161,9 +159,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
   let runner = baker.persistent_state.runner in
   let node_data_dir = baker.persistent_state.node_data_dir in
   let base_dir = baker.persistent_state.base_dir in
-  let node_addr =
-    Foreign_endpoint.as_string baker.persistent_state.node_rpc_endpoint
-  in
+  let node_addr = Endpoint.as_string baker.persistent_state.node_rpc_endpoint in
   let votefile =
     Cli_arg.optional_arg "votefile" Fun.id baker.persistent_state.votefile
   in
@@ -185,7 +181,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
   let dal_node_endpoint =
     Cli_arg.optional_arg
       "dal-node"
-      Foreign_endpoint.as_string
+      Endpoint.as_string
       baker.persistent_state.dal_node_rpc_endpoint
   in
   let minimal_nanotez_per_gas_unit =

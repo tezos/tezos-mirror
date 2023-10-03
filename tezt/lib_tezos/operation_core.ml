@@ -44,7 +44,7 @@ type t = {
 
 let get_branch ?(offset = 2) client =
   let block = sf "head~%d" offset in
-  RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
+  Client.RPC.call client @@ RPC.get_chain_block_hash ~block ()
 
 let make ~branch ?signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
@@ -57,7 +57,7 @@ let raw ?protocol t client =
       match protocol with
       | None ->
           let* raw =
-            RPC.Client.call client
+            Client.RPC.call client
             @@ RPC.post_chain_block_helpers_forge_operations
                  ~data:(Data (json t))
                  ()
@@ -145,7 +145,7 @@ let spawn_inject ?(force = false) ?protocol ?signature t client =
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
   in
-  return (RPC.Client.spawn client @@ inject_rpc (Data (`String op)))
+  return (Client.RPC.spawn client @@ inject_rpc (Data (`String op)))
 
 let inject ?(request = `Inject) ?force ?protocol ?signature ?error t client :
     [`OpHash of string] Lwt.t =
@@ -204,11 +204,11 @@ let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
   in
   match error with
   | None ->
-      let* ophs = RPC.Client.call client rpc in
+      let* ophs = Client.RPC.call client rpc in
       let* () = waiter in
       return ophs
   | Some msg ->
-      let*? process = RPC.Client.spawn client rpc in
+      let*? process = Client.RPC.spawn client rpc in
       let* () = Process.check_error ~msg process in
       Lwt_list.map_s (fun op -> hash op client) t
 
@@ -216,7 +216,7 @@ let make_run_operation_input ?chain_id t client =
   let* chain_id =
     match chain_id with
     | Some chain_id -> return chain_id
-    | None -> RPC.(Client.call client (get_chain_chain_id ()))
+    | None -> Client.RPC.call client (RPC.get_chain_chain_id ())
   in
   (* The [run_operation] RPC does not check the signature. *)
   let signature = Tezos_crypto.Signature.zero in
@@ -310,7 +310,7 @@ module Consensus = struct
     in
     let* chain_id =
       match chain_id with
-      | None -> RPC.Client.call client @@ RPC.get_chain_chain_id ()
+      | None -> Client.RPC.call client @@ RPC.get_chain_chain_id ()
       | Some branch -> return branch
     in
     let kind =
@@ -325,7 +325,7 @@ module Consensus = struct
     inject ?request ?force ?error op client
 
   let get_slots ~level client =
-    RPC.Client.call client @@ RPC.get_chain_block_helper_validators ~level ()
+    Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
 
   let first_slot ~slots_json (delegate : Account.key) =
     let open JSON in
@@ -346,7 +346,7 @@ module Consensus = struct
 
   let get_block_payload_hash client =
     let* block_header =
-      RPC.Client.call client @@ RPC.get_chain_block_header ()
+      Client.RPC.call client @@ RPC.get_chain_block_header ()
     in
     return JSON.(block_header |-> "payload_hash" |> as_string)
 end
@@ -492,7 +492,7 @@ module Manager = struct
 
   let get_next_counter ?(source = Constant.bootstrap1) client =
     let* counter_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_counter
            ~id:source.Account.public_key_hash
            ()
@@ -745,7 +745,7 @@ module Manager = struct
 
   let get_branch ?chain ?(offset = 2) client =
     let block = sf "head~%d" offset in
-    RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
+    Client.RPC.call client @@ RPC.get_chain_block_hash ?chain ~block ()
 
   let mk_single_transfer ?source ?counter ?fee ?gas_limit ?storage_limit ?dest
       ?amount ?branch ?signer client =

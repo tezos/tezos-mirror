@@ -946,7 +946,39 @@ let get_version node =
   in
   return @@ String.trim output
 
-let as_foreign_rpc_endpoint (t : t) =
+let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = if Option.is_some state.rpc_tls then "https" else "http" in
-  Foreign_endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+
+module RPC = struct
+  module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct
+    let call ?log_request ?log_response_status ?log_response_body node rpc =
+      RPC_core.call
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_rpc_endpoint node)
+        rpc
+
+    let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
+      RPC_core.call_raw
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_rpc_endpoint node)
+        rpc
+
+    let call_json ?log_request ?log_response_status ?log_response_body node rpc
+        =
+      RPC_core.call_json
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_rpc_endpoint node)
+        rpc
+  end
+
+  include RPC_callers
+  include RPC
+end

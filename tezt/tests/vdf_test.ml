@@ -41,7 +41,7 @@ type seed_computation_status =
 
 let get_seed_computation_status ?(info = false) client level =
   let* seed_status =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_seed_computation
          ~block:(string_of_int level)
          ()
@@ -65,7 +65,7 @@ let assert_computation_status ?(info = false) ?(assert_is_not = false)
     nonce_revelation_threshold client status =
   let comp = if assert_is_not then ( <> ) else ( = ) in
   let* level =
-    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
   in
   let* current_status = get_seed_computation_status ~info client level.level in
   (if current_status = Nonce_revelation_stage then
@@ -91,7 +91,7 @@ let assert_not_computation_status =
 
 let assert_level client actual expected =
   let* level =
-    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
   in
   if actual <> expected || level.level <> expected then (
     Log.info "Expected to be at level %d, actually at level %d" expected actual ;
@@ -222,7 +222,7 @@ let init_test ?parameter_file protocol =
   in
 
   let* constants =
-    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
   let* blocks_per_cycle =
     return JSON.(constants |-> "blocks_per_cycle" |> as_int)

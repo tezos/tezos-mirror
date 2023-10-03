@@ -34,9 +34,11 @@ module RPC : sig
       }
 
   val add_pending_transaction :
-    ?parameters:string * string -> int64 -> string -> (t, string) RPC_core.t
+    ?parameters:string * string -> int64 -> string -> string RPC_core.t
 
-  val operation_status : string -> (t, status option) RPC_core.t
+  val operation_status : string -> status option RPC_core.t
 
-  val inject : unit -> (t, unit) RPC_core.t
+  val inject : unit -> unit RPC_core.t
+
+  include RPC_core.CALLERS with type uri_provider := t
 end

@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include RPC_core
-
-type 'a t = (Node.t, 'a) RPC_core.t
-
 module Query_arg = struct
   let opt name f = function None -> [] | Some x -> [(name, f x)]
 
@@ -37,17 +33,15 @@ module Query_arg = struct
   let switch name b = if b then [(name, "")] else []
 end
 
-let make ?data ?query_string =
-  make
-    ?data
-    ?query_string
-    ~get_host:Node.rpc_host
-    ~get_port:Node.rpc_port
-    ~get_scheme:Node.rpc_scheme
-
 module Decode = struct
   let mutez json = json |> JSON.as_int |> Tez.of_mutez_int
 end
+
+type 'result t = 'result RPC_core.t
+
+type data = RPC_core.data
+
+let make = RPC_core.make
 
 let get_config = make GET ["config"] Fun.id
 
@@ -1521,5 +1515,3 @@ let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "dal"; "shards"]
     ~query_string
     Fun.id
-
-let make = RPC_core.make

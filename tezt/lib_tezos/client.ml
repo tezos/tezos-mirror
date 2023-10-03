@@ -30,14 +30,14 @@ open Cli_arg
 type endpoint =
   | Node of Node.t
   | Proxy_server of Proxy_server.t
-  | Foreign_endpoint of Foreign_endpoint.t
+  | Foreign_endpoint of Endpoint.t
 
 type media_type = Json | Binary | Any
 
 let rpc_port = function
   | Node n -> Node.rpc_port n
   | Proxy_server ps -> Proxy_server.rpc_port ps
-  | Foreign_endpoint fe -> Foreign_endpoint.rpc_port fe
+  | Foreign_endpoint fe -> Endpoint.rpc_port fe
 
 type mode =
   | Client of endpoint option * media_type option
@@ -105,7 +105,7 @@ let runner endpoint =
 let scheme = function
   | Node n -> Node.rpc_scheme n
   | Proxy_server _ -> Proxy_server.rpc_scheme
-  | Foreign_endpoint fe -> Foreign_endpoint.rpc_scheme fe
+  | Foreign_endpoint fe -> Endpoint.rpc_scheme fe
 
 let address ?(hostname = false) ?from peer =
   (* We locally overload the runner function to fake a runner for foreign
@@ -122,7 +122,7 @@ let address ?(hostname = false) ?from peer =
      in the case where [from] has the same address as [peer]. *)
   let runner = function
     | Foreign_endpoint endpoint ->
-        Some (Runner.create ~address:(Foreign_endpoint.rpc_host endpoint) ())
+        Some (Runner.create ~address:(Endpoint.rpc_host endpoint) ())
     | peer -> runner peer
   in
   match from with
@@ -268,7 +268,9 @@ let url_encode str =
   Buffer.reset buffer ;
   result
 
-type meth = GET | PUT | POST | PATCH | DELETE
+type meth = RPC_core.verb = GET | PUT | POST | PATCH | DELETE
+
+type data = RPC_core.data
 
 let string_of_meth = function
   | GET -> "get"
@@ -289,8 +291,6 @@ let string_of_query_string = function
       let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
 
-type data = Data of JSON.u | File of string
-
 let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
@@ -303,7 +303,7 @@ module Spawn = struct
         Option.fold
           ~none:[]
           ~some:(function
-            | Data data -> ["with"; JSON.encode_u data]
+            | RPC_core.Data data -> ["with"; JSON.encode_u data]
             | File file -> ["with"; "file:" ^ file])
           data
       in
@@ -4082,12 +4082,101 @@ let publish_dal_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~commitment
   {value = process; run = parse}
 
 let as_foreign_endpoint = function
-  | Node node -> Node.as_foreign_rpc_endpoint node
+  | Node node -> Node.as_rpc_endpoint node
   | Foreign_endpoint fe -> fe
   | Proxy_server ps ->
-      Foreign_endpoint.
+      Endpoint.
         {
           scheme = Proxy_server.rpc_scheme;
           host = Proxy_server.rpc_host;
           port = Proxy_server.rpc_port ps;
         }
+
+module RPC = struct
+  let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client
+      RPC_core.{verb; path; query_string; data; decode = _; _} =
+    (* No need to log here, the [Process] module already logs. *)
+    spawn_rpc
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?data
+      ?protocol_hash
+      ~query_string
+      verb
+      path
+      client
+    |> Process.check_and_read_stdout
+
+  let call_json ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client rpc =
+    let* raw =
+      call_raw
+        ?log_command
+        ?log_status_on_exit
+        ?log_output
+        ?better_errors
+        ?endpoint
+        ?hooks
+        ?env
+        ?protocol_hash
+        client
+        rpc
+    in
+    return (JSON.parse ~origin:"RPC response" raw)
+
+  let call ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
+      ?hooks ?env ?protocol_hash client rpc =
+    let* json =
+      call_json
+        ?log_command
+        ?log_status_on_exit
+        ?log_output
+        ?better_errors
+        ?endpoint
+        ?hooks
+        ?env
+        ?protocol_hash
+        client
+        rpc
+    in
+    return (rpc.decode json)
+
+  let schema ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client RPC_core.{verb; path; _} =
+    rpc_schema
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?protocol_hash
+      verb
+      path
+      client
+
+  let spawn ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client
+      RPC_core.{verb; path; query_string; data; decode = _; _} =
+    Spawn.rpc
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?data
+      ?protocol_hash
+      ~query_string
+      verb
+      path
+      client
+end

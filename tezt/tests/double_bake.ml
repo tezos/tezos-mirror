@@ -94,7 +94,7 @@ let wait_for_denunciation_injection node client accuser =
   let* _ = Node.wait_for node "request_completed_info.v0" filter in
   let* oph = denunciation_event in
   let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   if is_operation_in_validated_mempool mempool oph then return oph
   else Test.fail "the denunciation operation was rejected by the mempool"
@@ -233,7 +233,7 @@ let double_bake =
 
   log_step 8 "Check denunciation is in the last block." ;
   (* Getting the operations of the current head. *)
-  let* ops = RPC.Client.call client_1 @@ RPC.get_chain_block_operations () in
+  let* ops = Client.RPC.call client_1 @@ RPC.get_chain_block_operations () in
   let* () = Accuser.terminate accuser_3 in
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"

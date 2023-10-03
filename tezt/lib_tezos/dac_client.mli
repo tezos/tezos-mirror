@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type endpoint = Node of Dac_node.t | Foreign_endpoint of Foreign_endpoint.t
+type endpoint = Node of Dac_node.t | Foreign_endpoint of Endpoint.t
 
 (** The type of a dac client. *)
 type t

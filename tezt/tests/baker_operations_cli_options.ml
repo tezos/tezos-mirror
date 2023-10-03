@@ -205,7 +205,7 @@ let only_has_consensus block =
        else l |> as_list |> function [] -> true | _ -> false)
 
 let check_block_all_empty ~__LOC__ client =
-  let* head = RPC.Client.call client @@ RPC.get_chain_block () in
+  let* head = Client.RPC.call client @@ RPC.get_chain_block () in
   Check.is_true
     (all_empty head)
     ~__LOC__
@@ -213,7 +213,7 @@ let check_block_all_empty ~__LOC__ client =
   unit
 
 let check_block_only_has_consensus ?block ~__LOC__ client =
-  let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
+  let* head = Client.RPC.call client @@ RPC.get_chain_block ?block () in
   Check.is_true
     (only_has_consensus head)
     ~__LOC__
@@ -260,7 +260,7 @@ let get_operations client =
       }
   in
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   return JSON.(mempool |-> "validated" |> as_list |> List.map to_op)
@@ -424,7 +424,7 @@ let test_baker_external_operations =
      our operations file *)
   Log.info "Check block baked" ;
   let* block =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block ~block:(string_of_int level) ()
   in
   let manager_ops = JSON.(block |-> "operations" |=> 3) in

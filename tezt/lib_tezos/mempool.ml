@@ -105,7 +105,7 @@ let get_mempool ?endpoint ?hooks ?chain ?(validated = true)
     ?(branch_delayed = true) ?(branch_refused = true) ?(refused = true)
     ?(outdated = true) ?(validation_passes = []) client =
   let* mempool_json =
-    RPC.Client.call client ?hooks ?endpoint
+    Client.RPC.call client ?hooks ?endpoint
     @@ RPC.get_chain_mempool_pending_operations
          ?chain
          ~version:"2"
@@ -298,7 +298,7 @@ module Config = struct
     }
 
   let call_get_filter ?endpoint ?hooks ?include_default client =
-    RPC.Client.call ?endpoint ?hooks client
+    Client.RPC.call ?endpoint ?hooks client
     @@ RPC.get_chain_mempool_filter ?include_default ()
 
   let check_get_filter_all_variations ?(log = false) ?endpoint ?hooks
@@ -322,7 +322,7 @@ module Config = struct
     unit
 
   let call_post_filter ?endpoint ?hooks json_u client =
-    RPC.Client.call ?endpoint ?hooks client
+    Client.RPC.call ?endpoint ?hooks client
     @@ RPC.post_chain_mempool_filter ~data:(Data json_u) ()
 
   let post_filter ?(log = false) ?endpoint ?hooks config client =

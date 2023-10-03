@@ -53,7 +53,7 @@ let double_consensus_already_denounced_waiter accuser oph =
 
 let get_double_consensus_denounciation_hash consensus_name client =
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let ops = JSON.(mempool |-> "validated" |> as_list) in
@@ -85,7 +85,7 @@ let double_attestation_init
   let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Recover available slots for %s." Constant.bootstrap1.alias ;
   let* slots =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators
          ~delegate:Constant.bootstrap1.public_key_hash
          ()
@@ -103,7 +103,7 @@ let double_attestation_init
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
@@ -182,7 +182,7 @@ let double_consensus_wrong_block_payload_hash
     double_attestation_init consensus_for consensus_name protocol ()
   in
   let* header =
-    RPC.Client.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
+    Client.RPC.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
   in
   let block_payload_hash = JSON.(header |-> "payload_hash" |> as_string) in
   Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
@@ -203,7 +203,7 @@ let double_consensus_wrong_block_payload_hash
     "Inject another invalid %s and wait for already_denounced event"
     consensus_name ;
   let* header =
-    RPC.Client.call client @@ RPC.get_chain_block_header ~block:"head~3" ()
+    Client.RPC.call client @@ RPC.get_chain_block_header ~block:"head~3" ()
   in
   let block_payload_hash = JSON.(header |-> "payload_hash" |> as_string) in
   let op =
@@ -331,7 +331,7 @@ let operation_too_old =
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
@@ -395,7 +395,7 @@ let operation_too_far_in_future =
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
@@ -410,7 +410,7 @@ let operation_too_far_in_future =
     Constant.bootstrap1.alias
     level ;
   let* slots =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators
          ~delegate:Constant.bootstrap1.public_key_hash
          ~level

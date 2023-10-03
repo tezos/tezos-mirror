@@ -79,7 +79,7 @@ let test_chain_id_authentication =
       {|{DROP; NIL operation; PUSH address "%s"; CONTRACT unit; ASSERT_SOME; PUSH mutez 1000; UNIT; TRANSFER_TOKENS; CONS}|}
       destination
   in
-  let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
+  let* chain_id = Client.RPC.call client @@ RPC.get_chain_chain_id () in
   let* packed =
     let data =
       sf

@@ -41,7 +41,7 @@ let forge =
     Operation.Manager.(inject [make @@ transfer ()] client)
   in
   let* () = Client.bake_for_and_wait client in
-  let* _ = RPC.Client.call client @@ RPC.get_chain_block_operations () in
+  let* _ = Client.RPC.call client @@ RPC.get_chain_block_operations () in
   unit
 
 let register ~protocols = forge protocols

@@ -95,10 +95,11 @@ let reveal_accounts client accounts =
     Lwt_list.filter_s
       (fun account ->
         let* res =
-          RPC.call node
-          @@ RPC.get_chain_block_context_contract_manager_key
-               ~id:account.Account.public_key_hash
-               ()
+          Node.RPC.(
+            call node
+            @@ get_chain_block_context_contract_manager_key
+                 ~id:account.Account.public_key_hash
+                 ())
         in
         let revealed = not (JSON.is_null res) in
         if revealed then

@@ -150,11 +150,11 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   let* () = Client.bake_for_and_wait client in
   let* mockup_client = Client.init_mockup ~protocol () in
   let* _ =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_contract_script ~id:contract_id ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
   in
   let* indices_exprs =
@@ -178,7 +178,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let get_one_value key_hash =
     let* _ =
-      RPC.Client.call ?endpoint client
+      Client.RPC.call ?endpoint client
       @@ RPC.get_chain_block_context_big_map
            ~id:
              (* This big_map id can be found in origination response
@@ -287,13 +287,13 @@ let test_multi_protocols =
                    __LOC__))
         in
         let* proto_attestation_rights =
-          RPC.Client.call client
+          Client.RPC.call client
           @@ RPC.get_chain_block_helper_attestation_rights ?block ()
         in
         check proto_attestation_rights ;
         if Protocol.(number proto <= number Oxford) then (
           let* proto_endorsing_rights =
-            RPC.Client.call client
+            Client.RPC.call client
             @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
                This RPC helper should be removed once Oxford will be frozen. *)

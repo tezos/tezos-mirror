@@ -44,7 +44,7 @@ let disconnect (client_1, _node_1) (_client_2, node_2) =
 let get_proposer ~level client =
   let block = string_of_int level in
   let* metadata =
-    RPC.Client.call client @@ RPC.get_chain_block_metadata ~block ()
+    Client.RPC.call client @@ RPC.get_chain_block_metadata ~block ()
   in
   Lwt.return metadata.proposer
 
@@ -89,7 +89,7 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
   in
   (* Ensure that the block before migration *)
   let* pre_migration_block =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_metadata ~block:(Int.to_string migration_level) ()
   in
   Log.info "Checking migration block consistency" ;
@@ -104,7 +104,7 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
   let* () = Client.bake_for_and_wait client in
   (* Ensure that we migrated *)
   let* migration_block =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_metadata
          ~block:(Int.to_string (migration_level + 1))
          ()
@@ -301,7 +301,7 @@ let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
     match level with Some level -> Some (string_of_int level) | None -> None
   in
   let* metadata =
-    RPC.Client.call client @@ RPC.get_chain_block_metadata ?block ()
+    Client.RPC.call client @@ RPC.get_chain_block_metadata ?block ()
   in
   let protocol = metadata.protocol in
   let next_protocol = metadata.next_protocol in
@@ -350,7 +350,7 @@ let check_attestations ~protocol ~expected_count consensus_ops =
 (** Check that the block at [level] contains [expected_count] attestations. *)
 let check_attestations_in_block ~protocol ~level ~expected_count client =
   let* consensus_operations =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_operations_validation_pass
          ~version:"1"
          ~block:(string_of_int level)
@@ -728,10 +728,9 @@ let wait_for_qc_at_level level baker =
       if !level_seen then Some () else None)
 
 let get_block_at_level level client =
-  RPC.(
-    Client.call
-      client
-      (get_chain_block ~version:"1" ~block:(string_of_int level) ()))
+  Client.RPC.call
+    client
+    (RPC.get_chain_block ~version:"1" ~block:(string_of_int level) ())
 
 let test_forked_migration_bakers ~migrate_from ~migrate_to =
   Test.register

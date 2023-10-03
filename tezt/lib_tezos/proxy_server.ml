@@ -157,6 +157,6 @@ let init ?runner ?name ?rpc_port ?event_level ?event_sections_levels ?args node
   let* () = wait_for_ready endpoint in
   return endpoint
 
-let as_foreign_rpc_endpoint t =
+let as_rpc_endpoint t =
   let state = t.persistent_state in
-  {Foreign_endpoint.scheme = rpc_scheme; host = rpc_host; port = state.rpc_port}
+  {Endpoint.scheme = rpc_scheme; host = rpc_host; port = state.rpc_port}

@@ -120,7 +120,7 @@ let grafana_panels : Grafana.panel list =
 let synchronize_mempool client node =
   let mempool_notify_waiter = Node.wait_for_request ~request:`Notify node in
   let*? _ =
-    RPC.Client.spawn client @@ RPC.post_chain_mempool_request_operations ()
+    Client.RPC.spawn client @@ RPC.post_chain_mempool_request_operations ()
   in
   mempool_notify_waiter
 
@@ -296,7 +296,7 @@ let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
 let forging_n_operations ?contract_hash bootstraps manager_kind client =
   (* explicitly anchor the forged operations on the first block *)
   let* branch =
-    RPC.Client.call client @@ RPC.get_chain_block_hash ~block:"0" ()
+    Client.RPC.call client @@ RPC.get_chain_block_hash ~block:"0" ()
   in
   (* recover the counter of a bootstrap account, all other bootstrap accounts
      have the same counter *)
@@ -334,7 +334,7 @@ let revealing_additional_bootstrap_accounts additional_bootstraps
       bake_for ~wait_for_flush:true ~empty:false ~protocol node client
     in
     let* block_ophs =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_operation_hashes_of_validation_pass 3
     in
     return block_ophs
@@ -635,7 +635,7 @@ let operation_and_block_validation protocol manager_kind tag =
     "Ensure that the block baked contains %d operations"
     number_of_operations ;
   let* block =
-    RPC.Client.call client @@ RPC.get_chain_block ~block:(string_of_int lvl) ()
+    Client.RPC.call client @@ RPC.get_chain_block ~block:(string_of_int lvl) ()
   in
   let ops =
     JSON.(List.nth (block |> get "operations" |> as_list) 3 |> as_list)

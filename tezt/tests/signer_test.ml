@@ -98,7 +98,7 @@ let signer_bls_test =
   in
   let* () = Client.bake_for_and_wait client in
   let get_balance_tz4 client =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance
          ~id:Constant.tz4_account.public_key_hash
          ()

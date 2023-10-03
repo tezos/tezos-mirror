@@ -143,7 +143,7 @@ let forge_block ?client node ~key ~with_op =
     JSON.parse ~origin:"forge_fake_block" shell |> return
   in
   let* protocol_data =
-    RPC.Client.call client2 @@ RPC.get_chain_block_header_protocol_data_raw ()
+    Client.RPC.call client2 @@ RPC.get_chain_block_header_protocol_data_raw ()
   in
   Log.info
     "Sufficient information retrieved: shutting down second node, restarting \
@@ -382,7 +382,7 @@ let propagate_precheckable_bad_block_payload =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
     |> Process.check_error ~msg:(rex "Invalid payload hash")
   in
-  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
+  let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
   Log.info
     "Bake a valid block and check the cluster receives it (ensuring the \
      cluster is still connected)." ;

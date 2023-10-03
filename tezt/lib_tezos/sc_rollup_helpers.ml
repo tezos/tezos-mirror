@@ -226,7 +226,7 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
 
 let last_cemented_commitment_hash_with_level ~sc_rollup client =
   let* json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC
        .get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level
          sc_rollup
@@ -237,7 +237,7 @@ let last_cemented_commitment_hash_with_level ~sc_rollup client =
 
 let genesis_commitment ~sc_rollup tezos_client =
   let* genesis_info =
-    RPC.Client.call ~hooks tezos_client
+    Client.RPC.call ~hooks tezos_client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -245,7 +245,7 @@ let genesis_commitment ~sc_rollup tezos_client =
     JSON.(genesis_info |-> "commitment_hash" |> as_string)
   in
   let* json =
-    RPC.Client.call ~hooks tezos_client
+    Client.RPC.call ~hooks tezos_client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
          ~sc_rollup
          ~hash:genesis_commitment_hash

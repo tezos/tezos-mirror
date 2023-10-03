@@ -57,7 +57,7 @@ let wait_for_sync node =
   let is_synchronised =
     let* client = Client.init ~endpoint:(Node node) () in
     let* is_bootstrapped =
-      RPC.Client.call client @@ RPC.get_chain_is_bootstrapped ()
+      Client.RPC.call client @@ RPC.get_chain_is_bootstrapped ()
     in
     if is_bootstrapped.sync_state = Synced then Lwt.return_unit
     else fst @@ Lwt.task ()
@@ -217,7 +217,7 @@ let sync_state_typ =
 
 let check_sync_state ?__LOC__ ?endpoint client expected_state =
   let* sync_state =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
   in
   Check.(sync_state.sync_state = expected_state)
     sync_state_typ
@@ -250,7 +250,7 @@ let test_threshold_zero =
 
 let check_is_bootstrapped ?__LOC__ ?endpoint client =
   let* sync_state =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
   in
   if not sync_state.bootstrapped then
     Test.fail "Expected node to be bootstrapped" ;

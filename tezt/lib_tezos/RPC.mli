@@ -23,11 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Octez RPCs. *)
-
-(** [RPC_core] contains functions to declare and call RPCs.
-    It does not contain any RPC definition: those are in this module. *)
-include module type of RPC_core
+(** RPCs for [octez-node] *)
 
 (** {2 Naming Conventions} *)
 
@@ -57,8 +53,9 @@ include module type of RPC_core
 
 (** {2 RPC Definitions} *)
 
-(** RPCs for [octez-node] *)
-type 'a t = (Node.t, 'a) RPC_core.t
+type 'result t = 'result RPC_core.t
+
+type data = RPC_core.data
 
 (** RPC: [GET /config] *)
 val get_config : JSON.t t

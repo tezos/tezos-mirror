@@ -60,7 +60,7 @@ let setup_l2_node ?runner ?name ?loser_mode ~operator client node rollup =
 
 let game_in_progress ~staker rollup_address client =
   let* game =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
          ~staker
          rollup_address
