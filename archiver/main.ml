@@ -250,4 +250,10 @@ module M016 = PtMumbai_machine.M
 module M017 = PtNairob_machine.M
 module M018 = Proxford_machine.M
 
+module Client_config = struct
+  include Client_config
+
+  let default_media_type = Media_type.Command_line.Binary
+end
+
 let () = Client_main_run.run (module Client_config) ~select_commands
