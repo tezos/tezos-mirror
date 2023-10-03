@@ -367,8 +367,8 @@ let wait_for_layer1_block_processing dal_node level =
   Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
-let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
-    client =
+let inject_dal_attestation ?level ?(force = false) ~signer ~nb_slots
+    availability client =
   let attestation = Array.make nb_slots false in
   List.iter (fun i -> attestation.(i) <- true) availability ;
   let* level =
@@ -391,12 +391,12 @@ let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
     (Operation.Consensus.dal_attestation ~level ~attestation ~slot)
     client
 
-let dal_attestations ?level ?force
+let inject_dal_attestations ?level ?force
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
     client =
   Lwt_list.map_s
     (fun signer ->
-      dal_attestation ?level ?force ~signer ~nb_slots availability client)
+      inject_dal_attestation ?level ?force ~signer ~nb_slots availability client)
     signers
 
 let test_feature_flag _protocol _parameters _cryptobox node client
@@ -425,7 +425,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
   in
   let* level = next_level node in
   let* (`OpHash oph1) =
-    dal_attestation
+    inject_dal_attestation
       ~force:true
       ~nb_slots:params.number_of_slots
       ~level
@@ -700,14 +700,14 @@ let test_slot_management_logic _protocol parameters cryptobox node client
   let lag = parameters.attestation_lag in
   let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
   let* _ =
-    dal_attestations
+    inject_dal_attestations
       ~nb_slots
       ~signers:[Constant.bootstrap1; Constant.bootstrap2]
       [1; 0]
       client
   in
   let* _ =
-    dal_attestations
+    inject_dal_attestations
       ~nb_slots
       ~signers:[Constant.bootstrap3; Constant.bootstrap4; Constant.bootstrap5]
       [1]
@@ -744,7 +744,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   let lag = parameters.attestation_lag in
   assert (lag > 1) ;
   let attest ~level =
-    dal_attestation
+    inject_dal_attestation
       ~force:true
       ~nb_slots
       ~level
@@ -840,7 +840,9 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   let* now = Node.get_level node in
   let level = now + lag - 1 in
   let* attestation_ops =
-    let* hashes = dal_attestations ~force:true ~nb_slots ~level [10] client in
+    let* hashes =
+      inject_dal_attestations ~force:true ~nb_slots ~level [10] client
+    in
     return @@ List.map (fun (`OpHash h) -> h) hashes
   in
   Log.info
@@ -907,7 +909,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   (* The attestation from the bootstrap account should succeed as
      the bootstrap node is an attester and is on the DAL committee by default. *)
   let* (`OpHash _oph) =
-    dal_attestation
+    inject_dal_attestation
       ~force:true
       ~nb_slots
       ~level
@@ -982,7 +984,9 @@ let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client
   let* () =
     repeat attestation_lag (fun () -> Client.bake_for_and_wait client)
   in
-  let* _op_hashes = dal_attestations ~nb_slots:number_of_slots [index] client in
+  let* _op_hashes =
+    inject_dal_attestations ~nb_slots:number_of_slots [index] client
+  in
   Client.bake_for_and_wait client
 
 let check_get_commitment dal_node ~slot_level check_result slots_info =
@@ -1180,7 +1184,9 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let unattested = [slot1] in
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
   let* () = repeat (lag - 2) (fun () -> Client.bake_for_and_wait client) in
-  let* _op_hash = dal_attestations ~nb_slots (List.map fst attested) client in
+  let* _op_hash =
+    inject_dal_attestations ~nb_slots (List.map fst attested) client
+  in
   let wait_block_processing3 =
     let final_attested_level = final_pub_level + lag in
     wait_for_layer1_block_processing dal_node final_attested_level
@@ -1656,7 +1662,9 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let* () =
     repeat (attestation_lag - 1) (fun () -> Client.bake_for_and_wait client)
   in
-  let* _ops_hashes = dal_attestations ~nb_slots:number_of_slots [2; 1] client in
+  let* _ops_hashes =
+    inject_dal_attestations ~nb_slots:number_of_slots [2; 1] client
+  in
   let* () = Client.bake_for_and_wait client in
   let* slot_confirmed_level =
     Sc_rollup_node.wait_for_level
