@@ -101,6 +101,19 @@ module Protocols : sig
   include SINGLETON_STORE with type value = proto_info list
 end
 
+(** Data related to the effects of garbage collection. *)
+module Gc_levels : sig
+  type levels = {
+    last_gc_level : int32;
+        (** Records the last level at which GC was called. *)
+    first_available_level : int32;
+        (** Records the first level for which data is guaranteed to be stored.
+        Data for all previous levels might have been removed. *)
+  }
+
+  include SINGLETON_STORE with type value = levels
+end
+
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
@@ -112,6 +125,7 @@ type +'a store = {
   levels_to_hashes : 'a Levels_to_hashes.t;
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
+  gc_levels : 'a Gc_levels.t;
 }
 
 include Store_sig.S with type 'a store := 'a store

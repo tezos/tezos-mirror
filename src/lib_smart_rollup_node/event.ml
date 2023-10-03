@@ -187,7 +187,7 @@ module Simple = struct
       ~section
       ~name:"gc_failure"
       ~level:Warning
-      ~msg:"Context garbage collection failed: {error}"
+      ~msg:"[Warning] Context garbage collection failed: {error}"
       ("error", Data_encoding.string)
 
   let gc_launch_failure =
@@ -195,8 +195,16 @@ module Simple = struct
       ~section
       ~name:"gc_launch_failure"
       ~level:Warning
-      ~msg:"Context garbage collection launch failed: {error}"
+      ~msg:"[Warning] Context garbage collection launch failed: {error}"
       ("error", Data_encoding.string)
+
+  let gc_levels_storage_failure =
+    declare_0
+      ~section
+      ~name:"gc_levels_storage_failure"
+      ~level:Warning
+      ~msg:"[Warning] An attempt to write GC level information to disk failed"
+      ()
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -247,3 +255,5 @@ let ending_gc t = Simple.(emit ending_gc) t
 let gc_failure msg = Simple.(emit gc_failure) msg
 
 let gc_launch_failure msg = Simple.(emit gc_launch_failure) msg
+
+let gc_levels_storage_failure () = Simple.(emit gc_levels_storage_failure) ()

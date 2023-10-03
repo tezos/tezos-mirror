@@ -257,6 +257,32 @@ module Protocols = struct
   end)
 end
 
+module Gc_levels = struct
+  type levels = {
+    last_gc_level : int32;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6416
+     * Adapt RPC to take into account [first_available_level] *)
+    first_available_level : int32;
+  }
+
+  type value = levels
+
+  include Indexed_store.Make_singleton (struct
+    type t = levels
+
+    let name = "gc_levels"
+
+    let encoding : t Data_encoding.t =
+      let open Data_encoding in
+      conv
+        (fun {last_gc_level; first_available_level} ->
+          (last_gc_level, first_available_level))
+        (fun (last_gc_level, first_available_level) ->
+          {last_gc_level; first_available_level})
+      @@ obj2 (req "last_gc_level" int32) (req "first_available_level" int32)
+  end)
+end
+
 type 'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
@@ -268,6 +294,7 @@ type 'a store = {
   levels_to_hashes : 'a Levels_to_hashes.t;
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
+  gc_levels : 'a Gc_levels.t;
 }
 
 type 'a t = ([< `Read | `Write > `Read] as 'a) store
@@ -288,6 +315,7 @@ let readonly
        levels_to_hashes;
        protocols;
        irmin_store;
+       gc_levels;
      } :
       _ t) : ro =
   {
@@ -302,6 +330,7 @@ let readonly
     levels_to_hashes = Levels_to_hashes.readonly levels_to_hashes;
     protocols = Protocols.readonly protocols;
     irmin_store = Irmin_store.readonly irmin_store;
+    gc_levels = Gc_levels.readonly gc_levels;
   }
 
 let close
@@ -316,6 +345,7 @@ let close
        levels_to_hashes;
        protocols = _;
        irmin_store;
+       gc_levels = _;
      } :
       _ t) =
   let open Lwt_result_syntax in
@@ -366,6 +396,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
       ~path:(path "levels_to_hashes")
   in
   let* protocols = Protocols.load mode ~path:(path "protocols") in
+  let* gc_levels = Gc_levels.load mode ~path:(path "gc_levels") in
   let+ irmin_store = Irmin_store.load mode (path "irmin_store") in
   {
     l2_blocks;
@@ -378,6 +409,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     levels_to_hashes;
     protocols;
     irmin_store;
+    gc_levels;
   }
 
 let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
