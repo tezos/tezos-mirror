@@ -407,6 +407,10 @@ type proto_info = {
       (** Hash of the {e current} protocol for this level. *)
 }
 
+(** [protocol_of_level_with_store store level] returns the protocol of block level [level]. *)
+val protocol_of_level_with_store :
+  _ Store.t -> int32 -> proto_info tzresult Lwt.t
+
 (** [protocol_of_level t level] returns the protocol of block level [level]. *)
 val protocol_of_level : _ t -> int32 -> proto_info tzresult Lwt.t
 

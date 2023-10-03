@@ -785,10 +785,9 @@ type proto_info = {
   protocol : Protocol_hash.t;
 }
 
-let protocol_of_level node_ctxt level =
+let protocol_of_level_with_store (store : _ Store.t) level =
   let open Lwt_result_syntax in
-  assert (level >= node_ctxt.genesis_info.level) ;
-  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
+  let* protocols = Store.Protocols.read store.protocols in
   let*? protocols =
     match protocols with
     | None | Some [] ->
@@ -816,6 +815,10 @@ let protocol_of_level node_ctxt level =
         | _ -> (find [@tailcall]) protos)
   in
   Lwt.return (find protocols)
+
+let protocol_of_level node_ctxt level =
+  assert (level >= node_ctxt.genesis_info.level) ;
+  protocol_of_level_with_store node_ctxt.store level
 
 let last_seen_protocol node_ctxt =
   let open Lwt_result_syntax in
