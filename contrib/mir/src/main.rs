@@ -17,8 +17,6 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
-
     use crate::ast::*;
     use crate::gas::Gas;
     use crate::interpreter;
@@ -37,7 +35,7 @@ mod tests {
     #[test]
     fn interpret_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
-        let mut istack = VecDeque::from([Value::NumberValue(10)]);
+        let mut istack = stk![Value::NumberValue(10)];
         let mut gas = Gas::default();
         assert!(interpreter::interpret(&ast, &mut gas, &mut istack).is_ok());
         assert!(istack.len() == 1 && istack[0] == Value::NumberValue(55));
@@ -46,7 +44,7 @@ mod tests {
     #[test]
     fn interpret_test_gas_consumption() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
-        let mut istack = VecDeque::from([Value::NumberValue(5)]);
+        let mut istack = stk![Value::NumberValue(5)];
         let mut gas = Gas::new(1305);
         report_gas(&mut gas, |gas| {
             assert!(interpreter::interpret(&ast, gas, &mut istack).is_ok());
@@ -57,7 +55,7 @@ mod tests {
     #[test]
     fn interpret_test_gas_out_of_gas() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
-        let mut istack = VecDeque::from([Value::NumberValue(5)]);
+        let mut istack = stk![Value::NumberValue(5)];
         let mut gas = Gas::new(1);
         assert_eq!(
             interpreter::interpret(&ast, &mut gas, &mut istack),
