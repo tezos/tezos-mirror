@@ -2668,6 +2668,31 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
       ~error_msg:"The transaction should fail") ;
   unit
 
+let tez_kernelVersion evm_proxy_server =
+  let* json =
+    Evm_proxy_server.call_evm_rpc
+      evm_proxy_server
+      Evm_proxy_server.{method_ = "tez_kernelVersion"; parameters = `Null}
+  in
+  return JSON.(json |-> "result" |> as_string)
+
+let test_kernel_upgrade_version_change =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "upgrade"; "version"]
+    ~title:"Kernel version changes after an upgrade"
+  @@ fun protocol ->
+  let scenario_prior ~evm_setup =
+    tez_kernelVersion evm_setup.evm_proxy_server
+  in
+  let scenario_after ~evm_setup ~sanity_check:old =
+    let* new_ = tez_kernelVersion evm_setup.evm_proxy_server in
+    Check.((old <> new_) string)
+      ~error_msg:"The kernel version must change after an upgrade" ;
+    unit
+  in
+  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
+
 let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
@@ -3022,6 +3047,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_administrator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
+  test_kernel_upgrade_version_change protocols ;
   test_check_kernel_upgrade_nonce protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
