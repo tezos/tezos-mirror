@@ -38,12 +38,7 @@ let verify pp inputs proof =
   let inputs =
     List.map
       (fun (k, v) ->
-        ( k,
-          {
-            nb_proofs = List.length v;
-            public = v;
-            commitments = List.init (List.length v) (Fun.const []);
-          } ))
+        (k, {nb_proofs = List.length v; public = v; commitments = []}))
       inputs
   in
   Result.value ~default:false

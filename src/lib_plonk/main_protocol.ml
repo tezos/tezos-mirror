@@ -1331,12 +1331,14 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
       let nb_proofs = List.length public in
       let commitments =
-        List.map
-          (fun s ->
-            List.map
-              (fun (c : Input_commitment.t) -> c.public)
-              s.input_commitments)
-          secrets
+        if List.exists (fun c -> c.input_commitments <> []) secrets then
+          List.map
+            (fun s ->
+              List.map
+                (fun (c : Input_commitment.t) -> c.public)
+                s.input_commitments)
+            secrets
+        else []
       in
       {nb_proofs; public; commitments}
     in
@@ -1399,7 +1401,16 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     check_circuit_name pp.circuits_map ;
     let circuits_map = SMap.sub_map inputs pp.circuits_map in
     (* add the verifier inputs to the transcript *)
-    let transcript = Transcript.expand verifier_inputs_t inputs pp.transcript in
+    let transcript =
+      let inputs =
+        SMap.map
+          (fun i ->
+            if List.exists (fun c -> c <> []) i.commitments then i
+            else {i with commitments = []})
+          inputs
+      in
+      Transcript.expand verifier_inputs_t inputs pp.transcript
+    in
     let transcript, identities, _, commitments, eval_points =
       Verifier.verify_parameters
         ((pp.common_pp, circuits_map), transcript)
