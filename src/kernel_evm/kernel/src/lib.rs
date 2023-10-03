@@ -184,7 +184,7 @@ fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     match read_kernel_version(host) {
         Ok(kernel_version) => {
             if kernel_version != KERNEL_VERSION {
-                store_kernel_version(host, &kernel_version)?
+                store_kernel_version(host, KERNEL_VERSION)?
             };
             Ok(())
         }
