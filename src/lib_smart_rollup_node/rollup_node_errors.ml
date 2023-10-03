@@ -77,6 +77,8 @@ type error +=
 
 type error += Operator_not_in_whitelist
 
+type error += Operator_has_no_staked
+
 type error += Exit_bond_recovered_bailout_mode
 
 type error +=
@@ -429,6 +431,17 @@ let () =
     Data_encoding.unit
     (function Operator_not_in_whitelist -> Some () | _ -> None)
     (fun () -> Operator_not_in_whitelist) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.operator_has_no_staked"
+    ~title:"The operator does not has any stake"
+    ~description:"The operator does not has any stake."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf "The operator does not has any stake.")
+    `Permanent
+    Data_encoding.unit
+    (function Operator_has_no_staked -> Some () | _ -> None)
+    (fun () -> Operator_has_no_staked) ;
 
   register_error_kind
     ~id:"sc_rollup.node.exiting_bailout_mode"

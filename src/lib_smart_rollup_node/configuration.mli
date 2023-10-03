@@ -137,6 +137,10 @@ type t = {
   cors : Resto_cohttp.Cors.t;
 }
 
+type error +=
+  | Missing_mode_operators of {mode : string; missing_operators : string list}
+  | Empty_operation_kinds_for_custom_mode
+
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
     bindings [purposes], with a potential [default] value. *)
 val make_purpose_map :

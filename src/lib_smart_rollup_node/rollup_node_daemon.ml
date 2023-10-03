@@ -330,6 +330,41 @@ let install_finalizer state =
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
+let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
+  let open Lwt_result_syntax in
+  (* At the start of the rollup node when in bailout mode check that there is
+     an operator who has stake, otherwise stop the node *)
+  if Node_context.is_bailout node_ctxt then
+    let operator =
+      Node_context.get_operator node_ctxt Configuration.Operating
+    in
+    match operator with
+    | None ->
+        (* this case can't happen because the bailout mode needs a operator to start*)
+        tzfail
+          (Configuration.Missing_mode_operators
+             {
+               mode = Configuration.string_of_mode Bailout;
+               missing_operators = [Configuration.string_of_purpose Operating];
+             })
+    | Some operating_pkh -> (
+        let module Plugin = (val state.plugin) in
+        let* last_published_commitment =
+          Plugin.Layer1_helpers.get_last_published_commitment
+            ~allow_unstake:false
+            node_ctxt.cctxt
+            configuration.sc_rollup_address
+            operating_pkh
+        in
+        match last_published_commitment with
+        | None ->
+            (* when the operator is no longer stake on any commitment, then recover bond *)
+            Publisher.recover_bond node_ctxt
+        | Some _ ->
+            (* when the operator is still stake on something *)
+            return_unit)
+  else return_unit
+
 let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
@@ -395,6 +430,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
           Node_context.check_op_in_whitelist_or_bailout_mode node_ctxt whitelist
       | None -> Result_syntax.return_unit
     in
+    let* () = maybe_recover_bond state in
     let*! () =
       Event.node_is_ready
         ~rpc_addr:configuration.rpc_addr
@@ -444,9 +480,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   protect start ~on_error:(function
       | Rollup_node_errors.(
           ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-          | Operator_not_in_whitelist
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5442
-               Smart rollup node: "bailout" mode *) ))
+          | Operator_not_in_whitelist | Configuration.Missing_mode_operators _ ))
         :: _ as e ->
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->

@@ -334,6 +334,54 @@ let install_finalizer (daemon_components : (module Daemon_components.S))
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
+let maybe_recover_bond node_ctxt =
+  let open Lwt_result_syntax in
+  (* At the start of the rollup node when in bailout mode check that there is
+     an operator who has stake, otherwise stop the node *)
+  if Node_context.is_bailout node_ctxt then
+    let operator =
+      Node_context.get_operator node_ctxt Configuration.Operating
+    in
+    match operator with
+    | None ->
+        tzfail
+          (Configuration.Missing_mode_operators
+             {
+               mode = Configuration.string_of_mode Bailout;
+               missing_operators =
+                 [Configuration.string_of_purpose Configuration.Operating];
+             })
+    | Some operating_pkh -> (
+        let*! staked_on_commitment =
+          RPC.Sc_rollup.staked_on_commitment
+            (new Protocol_client_context.wrap_full node_ctxt.cctxt)
+            (node_ctxt.cctxt#chain, `Head 0)
+            node_ctxt.config.sc_rollup_address
+            operating_pkh
+        in
+        match staked_on_commitment with
+        | Error trace ->
+            if
+              TzTrace.fold
+                (fun exists -> function
+                  | Environment.Ecoproto_error
+                      Protocol.Sc_rollup_errors.Sc_rollup_not_staked ->
+                      true
+                  | _ -> exists)
+                false
+                trace
+            then
+              (* the operator is not staked *)
+              tzfail Sc_rollup_node_errors.Operator_has_no_staked
+            else fail trace
+        | Ok None ->
+            (* operator is no longer stake on any commitment *)
+            Publisher.recover_bond node_ctxt
+        | Ok (Some _) ->
+            (* operator still stake on something *)
+            return_unit)
+  else return_unit
+
 let run node_ctxt configuration
     (daemon_components : (module Daemon_components.S)) =
   let open Lwt_result_syntax in
@@ -405,7 +453,7 @@ let run node_ctxt configuration
         | Error err ->
             Event.(metrics_ended (Format.asprintf "%a" pp_print_trace err)))
       (fun exn -> Event.(metrics_ended_dont_wait (Printexc.to_string exn))) ;
-
+    let* () = maybe_recover_bond node_ctxt in
     let*! () =
       Event.node_is_ready
         ~rpc_addr:configuration.rpc_addr
@@ -454,7 +502,8 @@ let run node_ctxt configuration
   in
   protect start ~on_error:(function
       | Sc_rollup_node_errors.(
-          Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _)
+          ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
+          | Configuration.Missing_mode_operators _ | Operator_has_no_staked ))
         :: _ as e ->
           fatal_error_exit e
       | Sc_rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
