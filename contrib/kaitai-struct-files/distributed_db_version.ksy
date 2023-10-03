@@ -3,5 +3,5 @@ meta:
   endian: be
 doc: A version number for the distributed DB protocol
 seq:
-- id: uint16
+- id: distributed_db_version
   type: u2

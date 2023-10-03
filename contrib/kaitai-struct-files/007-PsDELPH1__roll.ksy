@@ -1,6 +1,6 @@
 meta:
-  id: 007-PsDELPH1__roll
+  id: id_007__psdelph1__roll
   endian: be
 seq:
-- id: int32
+- id: id_007__psdelph1__roll
   type: s4

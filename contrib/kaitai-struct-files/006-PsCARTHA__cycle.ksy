@@ -1,6 +1,6 @@
 meta:
-  id: 006-PsCARTHA__cycle
+  id: id_006__pscartha__cycle
   endian: be
 seq:
-- id: int32
+- id: id_006__pscartha__cycle
   type: s4

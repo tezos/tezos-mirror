@@ -1,6 +1,6 @@
 meta:
-  id: 012-Psithaca__period
+  id: id_012__psithaca__period
   endian: be
 seq:
-- id: int64
+- id: id_012__psithaca__period
   type: s8

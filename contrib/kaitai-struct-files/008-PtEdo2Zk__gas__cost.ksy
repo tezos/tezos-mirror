@@ -1,5 +1,5 @@
 meta:
-  id: 008-PtEdo2Zk__gas__cost
+  id: id_008__ptedo2zk__gas__cost
   endian: be
 types:
   group:

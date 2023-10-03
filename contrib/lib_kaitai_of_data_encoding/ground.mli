@@ -38,41 +38,52 @@ module Enum : sig
   val bool : string * EnumSpec.t
 end
 
-(** [Attr] is module for getting [AttrSpec.t] of ground types. *)
+(** [Attr] is module for getting [AttrSpec.t] of ground types.
+
+    All the functions in this module take an [id] parameter. This is used for
+    the [id] field of the generated attribute in the produced Kaitai Struct
+    file. E.g., [float ~id:"foo"] generates the attribute
+
+{[
+    - id: foo
+      type: f8
+]}
+
+ *)
 module Attr : sig
-  (** [bool] is an [AttrSpec.t] definition of bool ground type. *)
-  val bool : AttrSpec.t
+  (** [bool ~id] is an [AttrSpec.t] definition of bool ground type. *)
+  val bool : id:string -> AttrSpec.t
 
-  (** [uint8] is an [AttrSpec.t] definition of 8-bit unsigned integer. *)
-  val uint8 : AttrSpec.t
+  (** [uint8 ~id] is an [AttrSpec.t] definition of 8-bit unsigned integer. *)
+  val uint8 : id:string -> AttrSpec.t
 
-  (** [int8] is an [AttrSpec.t] definition of 8-bit signed integer. *)
-  val int8 : AttrSpec.t
+  (** [int8 ~id] is an [AttrSpec.t] definition of 8-bit signed integer. *)
+  val int8 : id:string -> AttrSpec.t
 
-  (** [uint16] is an [AttrSpec.t] definition of 16-bit unsigned integer. *)
-  val uint16 : AttrSpec.t
+  (** [uint16 ~id] is an [AttrSpec.t] definition of 16-bit unsigned integer. *)
+  val uint16 : id:string -> AttrSpec.t
 
-  (** [int16] is an [AttrSpec.t] definition of 16-bit signed integer. *)
-  val int16 : AttrSpec.t
+  (** [int16 ~id] is an [AttrSpec.t] definition of 16-bit signed integer. *)
+  val int16 : id:string -> AttrSpec.t
 
-  (** [int32] is an [AttrSpec.t] definition of 32-bit signed integer. *)
-  val int32 : AttrSpec.t
+  (** [int32 ~id] is an [AttrSpec.t] definition of 32-bit signed integer. *)
+  val int32 : id:string -> AttrSpec.t
 
-  (** [int64] is an [AttrSpec.t] definition of 64-bit signed integer. *)
-  val int64 : AttrSpec.t
+  (** [int64 ~id] is an [AttrSpec.t] definition of 64-bit signed integer. *)
+  val int64 : id:string -> AttrSpec.t
 
-  (** [int31] is an [AttrSpec.t] definition of 31-bit signed integer.
+  (** [int31 ~id] is an [AttrSpec.t] definition of 31-bit signed integer.
       For more about this type see [Data_encoding.int31]. *)
-  val int31 : AttrSpec.t
+  val int31 : id:string -> AttrSpec.t
 
-  (** [float] is an [AttrSpec.t] definition of 64-bit float. *)
-  val float : AttrSpec.t
+  (** [float ~id] is an [AttrSpec.t] definition of 64-bit float. *)
+  val float : id:string -> AttrSpec.t
 
-  (** [bytes] is an [AttrSpec.t] definition of [Data_encoding.bytes]. *)
-  val bytes : AttrSpec.t
+  (** [bytes ~id] is an [AttrSpec.t] definition of [Data_encoding.bytes]. *)
+  val bytes : id:string -> AttrSpec.t
 
-  (** [string] is an [AttrSpec.t] definition of [Data_encoding.string]. *)
-  val string : AttrSpec.t
+  (** [string ~id] is an [AttrSpec.t] definition of [Data_encoding.string]. *)
+  val string : id:string -> AttrSpec.t
 end
 
 (** [Class] module consists of [ClassSpec.t] for ground types. *)

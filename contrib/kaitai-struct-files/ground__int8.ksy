@@ -3,5 +3,5 @@ meta:
   endian: be
 doc: Signed 8 bit integers
 seq:
-- id: int8
+- id: ground__int8
   type: s1

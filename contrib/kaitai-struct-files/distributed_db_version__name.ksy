@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: distributed_db_version__name
   type: fixed_bytes

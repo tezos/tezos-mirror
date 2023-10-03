@@ -1,6 +1,6 @@
 meta:
-  id: 015-PtLimaPt__cycle
+  id: id_015__ptlimapt__cycle
   endian: be
 seq:
-- id: int32
+- id: id_015__ptlimapt__cycle
   type: s4

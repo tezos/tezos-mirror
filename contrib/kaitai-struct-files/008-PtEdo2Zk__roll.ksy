@@ -1,6 +1,6 @@
 meta:
-  id: 008-PtEdo2Zk__roll
+  id: id_008__ptedo2zk__roll
   endian: be
 seq:
-- id: int32
+- id: id_008__ptedo2zk__roll
   type: s4

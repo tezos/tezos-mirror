@@ -1,6 +1,6 @@
 meta:
-  id: 011-PtHangz2__roll
+  id: id_011__pthangz2__roll
   endian: be
 seq:
-- id: int32
+- id: id_011__pthangz2__roll
   type: s4

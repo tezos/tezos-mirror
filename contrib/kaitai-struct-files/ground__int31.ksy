@@ -3,5 +3,5 @@ meta:
   endian: be
 doc: Signed 31 bit integers
 seq:
-- id: int31
+- id: ground__int31
   type: s4

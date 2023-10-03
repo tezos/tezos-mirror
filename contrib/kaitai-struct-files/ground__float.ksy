@@ -3,5 +3,5 @@ meta:
   endian: be
 doc: Floating point numbers
 seq:
-- id: float
+- id: ground__float
   type: f8

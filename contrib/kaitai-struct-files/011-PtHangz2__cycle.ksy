@@ -1,6 +1,6 @@
 meta:
-  id: 011-PtHangz2__cycle
+  id: id_011__pthangz2__cycle
   endian: be
 seq:
-- id: int32
+- id: id_011__pthangz2__cycle
   type: s4

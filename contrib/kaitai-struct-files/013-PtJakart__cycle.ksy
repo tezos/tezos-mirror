@@ -1,6 +1,6 @@
 meta:
-  id: 013-PtJakart__cycle
+  id: id_013__ptjakart__cycle
   endian: be
 seq:
-- id: int32
+- id: id_013__ptjakart__cycle
   type: s4

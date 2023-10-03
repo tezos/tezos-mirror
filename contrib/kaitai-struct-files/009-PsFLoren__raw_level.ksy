@@ -1,6 +1,6 @@
 meta:
-  id: 009-PsFLoren__raw_level
+  id: id_009__psfloren__raw_level
   endian: be
 seq:
-- id: int32
+- id: id_009__psfloren__raw_level
   type: s4

@@ -28,6 +28,13 @@
 
 open Kaitai.Types
 
+(** A [tid_gen] is a generator for tuple ids. *)
+type tid_gen = unit -> string
+
+(** [mk_tid_gen prefix] is a [tid_gen] where generated ids have the given
+    [prefix]. *)
+val mk_tid_gen : string -> tid_gen
+
 (** [default_doc_spec] is without summary and references.  *)
 val default_doc_spec : DocSpec.t
 

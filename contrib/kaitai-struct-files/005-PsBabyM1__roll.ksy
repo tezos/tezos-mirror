@@ -1,6 +1,6 @@
 meta:
-  id: 005-PsBabyM1__roll
+  id: id_005__psbabym1__roll
   endian: be
 seq:
-- id: int32
+- id: id_005__psbabym1__roll
   type: s4

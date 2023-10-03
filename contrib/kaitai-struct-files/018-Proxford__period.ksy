@@ -1,6 +1,6 @@
 meta:
-  id: 018-Proxford__period
+  id: id_018__proxford__period
   endian: be
 seq:
-- id: int64
+- id: id_018__proxford__period
   type: s8

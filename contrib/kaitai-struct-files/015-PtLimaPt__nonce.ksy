@@ -1,5 +1,5 @@
 meta:
-  id: 015-PtLimaPt__nonce
+  id: id_015__ptlimapt__nonce
   endian: be
 types:
   fixed_bytes:
@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: id_015__ptlimapt__nonce
   type: fixed_bytes

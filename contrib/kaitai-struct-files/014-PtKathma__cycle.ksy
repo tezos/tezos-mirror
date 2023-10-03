@@ -1,6 +1,6 @@
 meta:
-  id: 014-PtKathma__cycle
+  id: id_014__ptkathma__cycle
   endian: be
 seq:
-- id: int32
+- id: id_014__ptkathma__cycle
   type: s4

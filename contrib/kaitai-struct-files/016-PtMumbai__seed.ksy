@@ -1,5 +1,5 @@
 meta:
-  id: 016-PtMumbai__seed
+  id: id_016__ptmumbai__seed
   endian: be
 types:
   fixed_bytes:
@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: id_016__ptmumbai__seed
   type: fixed_bytes

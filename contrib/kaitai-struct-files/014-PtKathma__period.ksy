@@ -1,6 +1,6 @@
 meta:
-  id: 014-PtKathma__period
+  id: id_014__ptkathma__period
   endian: be
 seq:
-- id: int64
+- id: id_014__ptkathma__period
   type: s8

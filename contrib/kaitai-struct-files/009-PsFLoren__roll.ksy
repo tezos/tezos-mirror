@@ -1,6 +1,6 @@
 meta:
-  id: 009-PsFLoren__roll
+  id: id_009__psfloren__roll
   endian: be
 seq:
-- id: int32
+- id: id_009__psfloren__roll
   type: s4

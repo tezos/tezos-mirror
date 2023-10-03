@@ -9,5 +9,5 @@ types:
     - id: value
       size: size
 seq:
-- id: fixed size (uint30) bytes
+- id: sapling__transaction__rcm
   type: fixed_bytes

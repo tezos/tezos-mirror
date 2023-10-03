@@ -1,6 +1,6 @@
 meta:
-  id: 011-PtHangz2__raw_level
+  id: id_011__pthangz2__raw_level
   endian: be
 seq:
-- id: int32
+- id: id_011__pthangz2__raw_level
   type: s4

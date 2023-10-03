@@ -1,6 +1,6 @@
 meta:
-  id: 006-PsCARTHA__voting_period
+  id: id_006__pscartha__voting_period
   endian: be
 seq:
-- id: int32
+- id: id_006__pscartha__voting_period
   type: s4
