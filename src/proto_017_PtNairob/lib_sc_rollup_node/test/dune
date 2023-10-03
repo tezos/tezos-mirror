@@ -11,8 +11,7 @@
   octez-libs.test-helpers
   octez-protocol-017-PtNairob-libs.smart-rollup-layer2
   octez_smart_rollup_node_PtNairob
-  octez-alcotezt
-  octez_smart_rollup_node_PtNairob_test_helpers)
+  octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -24,9 +23,8 @@
   -open Tezos_test_helpers
   -open Tezos_smart_rollup_layer2_017_PtNairob
   -open Octez_smart_rollup_node_PtNairob
-  -open Octez_alcotezt
-  -open Octez_smart_rollup_node_PtNairob_test_helpers)
- (modules canary test_octez_conversions))
+  -open Octez_alcotezt)
+ (modules serialized_proofs test_octez_conversions))
 
 (executable
  (name main)

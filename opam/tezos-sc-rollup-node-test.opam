@@ -10,21 +10,18 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "tezos-protocol-017-PtNairob"
-  "octez-protocol-017-PtNairob-libs"
-  "qcheck-alcotest" { >= "0.20" }
-  "qcheck-core"
-  "logs"
-  "octez-smart-rollup-node-PtNairob"
-  "octez-alcotezt"
-  "tezos-protocol-018-Proxford"
-  "octez-protocol-018-Proxford-libs"
-  "octez-smart-rollup-node-Proxford"
-  "tezos-protocol-alpha"
-  "octez-protocol-alpha-libs"
-  "octez-smart-rollup-node-alpha"
   "tezt" { with-test & >= "3.1.1" }
+  "octez-libs" {with-test}
+  "tezos-protocol-017-PtNairob" {with-test}
+  "octez-protocol-017-PtNairob-libs" {with-test}
+  "octez-smart-rollup-node-PtNairob" {with-test}
+  "octez-alcotezt" {with-test}
+  "tezos-protocol-018-Proxford" {with-test}
+  "octez-protocol-018-Proxford-libs" {with-test}
+  "octez-smart-rollup-node-Proxford" {with-test}
+  "tezos-protocol-alpha" {with-test}
+  "octez-protocol-alpha-libs" {with-test}
+  "octez-smart-rollup-node-alpha" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

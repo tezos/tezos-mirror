@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Octez_smart_rollup
-open Octez_smart_rollup_node
-
 let uid = ref 0
 
 let block_hash_of_level level =
@@ -37,7 +34,7 @@ let block_hash_of_level level =
   Block_hash.of_string_exn s
 
 let default_constants =
-  (* Same as default test const ants for alpha excepted for
+  (* Same as default test constants for alpha excepted for
      commitment_period_in_block. *)
   Rollup_constants.
     {
@@ -287,7 +284,3 @@ let alcotest ?name speed ?constants kind protocol ~boot_sector f =
   | Error err ->
       Format.printf "@\n%a@." pp_print_trace err ;
       Lwt.fail Alcotest.Test_error
-
-let _protocol =
-  (* force registration of protocols plugins in smart rollup node lib *)
-  Rollup_node_plugin.Plugin.protocol

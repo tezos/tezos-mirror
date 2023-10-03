@@ -26,13 +26,10 @@
 (** Testing
     -------
     Component:  Smart rollup node library
-    Invocation: dune exec src/proto_alpha/lib_sc_rollup_node/test/main.exe \
-                -- -f canary
+    Invocation: dune exec src/lib_smart_rollup_node/tests/main.exe \
+                -- -f src/lib_smart_rollup_node/tests/canary.ml
     Subject:    Canary unit tests to make sure the test helpers work as intended
 *)
-
-open Octez_smart_rollup
-open Octez_smart_rollup_node
 
 let build_chain node_ctxt ~genesis ~length =
   let open Lwt_result_syntax in
@@ -81,14 +78,20 @@ let canary_test node_ctxt ~genesis =
   return_unit
 
 let tests =
-  [
-    Helpers.alcotest
-      `Quick
-      Example_arith
-      Protocol.hash
-      ~boot_sector:""
-      canary_test;
-    Helpers.alcotest `Quick Wasm_2_0_0 Protocol.hash ~boot_sector:"" canary_test;
-  ]
+  List.flatten
+  @@ List.map
+       (fun proto ->
+         [
+           Helpers.alcotest
+             `Quick
+             Example_arith
+             proto
+             ~boot_sector:""
+             canary_test;
+           Helpers.alcotest `Quick Wasm_2_0_0 proto ~boot_sector:"" canary_test;
+         ])
+       (Protocol_plugins.registered_protocols ())
 
-let () = Alcotest_lwt.run ~__FILE__ "canary" [("canary", tests)] |> Lwt_main.run
+let () =
+  Alcotest_lwt.run ~__FILE__ "lib_smart_rollup_node" [("canary", tests)]
+  |> Lwt_main.run
