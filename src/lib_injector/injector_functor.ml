@@ -1277,11 +1277,7 @@ module Make (Parameters : PARAMETERS) = struct
 
     let on_completion w r _ st =
       let state = Worker.state w in
-      match Request.view r with
-      | Request.View (Add_pending _ | New_tezos_head _) ->
-          Event.(emit2 request_completed_debug) state (Request.view r) st
-      | View Inject ->
-          Event.(emit2 request_completed_notice) state (Request.view r) st
+      Event.(emit2 request_completed_debug) state (Request.view r) st
 
     let on_no_request _ = Lwt.return_unit
 

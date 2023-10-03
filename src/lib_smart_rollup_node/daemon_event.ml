@@ -36,7 +36,7 @@ module Simple = struct
       ~section
       ~name:"smart_rollup_node_daemon_process_head"
       ~msg:"Processing head {hash} at level {level}"
-      ~level:Info
+      ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -47,7 +47,7 @@ module Simple = struct
       ~msg:
         "Finished processing layer 1 head {hash} at level {level} in \
          {process_time}"
-      ~level:Info
+      ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("process_time", Time.System.Span.encoding)
@@ -60,7 +60,7 @@ module Simple = struct
       ~msg:
         "A new iteration of process_heads has been triggered: processing \
          {number} heads from level {from} to level {to}"
-      ~level:Info
+      ~level:Debug
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
@@ -71,7 +71,7 @@ module Simple = struct
       ~name:"smart_rollup_node_daemon_new_heads_processed"
       ~msg:
         "Finished processing {number} layer 1 heads for levels {from} to {to}"
-      ~level:Notice
+      ~level:Info
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
@@ -115,7 +115,7 @@ module Simple = struct
       ~msg:
         "{catching_up} from {old_protocol} ({old_protocol_level}) to \
          {new_protocol} ({new_protocol_level}) "
-      ~level:Info
+      ~level:Notice
       ("catching_up", Data_encoding.bool)
       ("old_protocol", Protocol_hash.encoding)
       ("old_protocol_level", Data_encoding.int31)

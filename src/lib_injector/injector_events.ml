@@ -102,16 +102,6 @@ module Make
           ("errors", Error_monad.trace_encoding)
           ~pp3:Error_monad.pp_print_trace
 
-      let request_completed_notice =
-        declare_2
-          ~name:"request_completed_notice"
-          ~msg:"{view} {worker_status}"
-          ~level:Notice
-          ("view", Request.encoding)
-          ("worker_status", Worker_types.request_status_encoding)
-          ~pp1:Request.pp
-          ~pp2:Worker_types.pp_status
-
       let request_completed_debug =
         declare_2
           ~name:"request_completed_debug"
@@ -140,7 +130,7 @@ module Make
         declare_1
           ~name:"injecting_pending"
           ~msg:"Injecting {count} pending operations"
-          ~level:Notice
+          ~level:Debug
           ("count", Data_encoding.int31)
 
       let pp_operations_list ppf operations =
@@ -163,7 +153,7 @@ module Make
           ~msg:
             "Injector's queue: there is currently {number_of_operations} \
              operations waiting to be injected"
-          ~level:Info
+          ~level:Debug
           ("number_of_operations", Data_encoding.int31)
 
       let considered_operations_info =
@@ -201,7 +191,7 @@ module Make
           ~msg:
             "Discarding operation {operation} failing {count} times with \
              {error}"
-          ~level:Notice
+          ~level:Error
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
           ("count", Data_encoding.int31)
@@ -228,7 +218,7 @@ module Make
         declare_1
           ~name:"add_pending"
           ~msg:"Add {operation} to pending"
-          ~level:Notice
+          ~level:Debug
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
 
@@ -236,7 +226,7 @@ module Make
         declare_1
           ~name:"retry_operation"
           ~msg:"Retry {operation}"
-          ~level:Notice
+          ~level:Debug
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
 
@@ -254,7 +244,7 @@ module Make
         declare_1
           ~name:"revert_operations"
           ~msg:"Reverting operations: {operations}"
-          ~level:Info
+          ~level:Debug
           ("operations", Data_encoding.list Inj_operation.Hash.encoding)
           ~pp1:pp_operations_hash_list
 
@@ -262,22 +252,22 @@ module Make
         declare_1
           ~name:"confirmed_level"
           ~msg:"Confirmed Tezos level {level}"
-          ~level:Info
+          ~level:Debug
           ("level", Data_encoding.int32)
 
       let loaded_from_disk =
         declare_2
           ~name:"loaded_from_disk"
           ~msg:"Loaded {nb} elements in {kind} from disk"
-          ~level:Info
+          ~level:Debug
           ("nb", Data_encoding.int31)
           ("kind", Data_encoding.string)
 
       let corrupted_operation_on_disk =
         declare_2
           ~name:"corrupted_operation_on_disk"
-          ~msg:"[Warning] Ignoring unreadable file {file} on disk: {error}"
-          ~level:Warning
+          ~msg:"Ignoring unreadable file {file} on disk: {error}"
+          ~level:Info
           ("file", Data_encoding.string)
           ("error", Error_monad.trace_encoding)
           ~pp1:Format.pp_print_string
@@ -287,7 +277,7 @@ module Make
         declare_1
           ~name:"inject_wait"
           ~msg:"Waiting {delay} seconds to trigger injection"
-          ~level:Info
+          ~level:Debug
           ("delay", Data_encoding.float)
 
       let never_included =

@@ -44,7 +44,7 @@ struct
       ~section
       ~name:"batched"
       ~msg:"Batched {nb_messages} messages into {nb_batches} batches"
-      ~level:Notice
+      ~level:Debug
       ("nb_batches", Data_encoding.int31)
       ("nb_messages", Data_encoding.int31)
 

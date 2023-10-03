@@ -49,8 +49,7 @@ val last_published_commitment_updated : Commitment.Hash.t -> int32 -> unit Lwt.t
     computed and stored for the block at the given [level]. *)
 val compute_commitment : int32 -> unit Lwt.t
 
-(** [new_commitment hash level] emits the event that a new commitment is
-    being built. *)
+(** [new_commitment hash level] emits the event that a new commitment was built. *)
 val new_commitment : Commitment.Hash.t -> int32 -> unit Lwt.t
 
 (** [publish_commitment hash level] emits the event that a new commitment is

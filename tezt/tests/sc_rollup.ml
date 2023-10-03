@@ -2788,8 +2788,10 @@ let _test_reinject_failed_commitment ~protocol:_ ~kind =
       ~default_operator:Constant.bootstrap5.public_key_hash
   in
   Log.info "Run two honest rollup nodes." ;
-  let* () = Sc_rollup_node.run sc_rollup_node1 sc_rollup []
-  and* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup [] in
+  let* () = Sc_rollup_node.run ~event_level:`Debug sc_rollup_node1 sc_rollup []
+  and* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node2 sc_rollup []
+  in
   Log.info "Add messages and advance L1 to trigger commitment." ;
   (* We bake one extra block to allow for the injection of the commitment and
      another block to allow for reinjection of the commitment that has the out
@@ -4963,7 +4965,9 @@ let test_rpcs ~kind
       description = "RPC API should work and be stable";
     }
   @@ fun protocol sc_rollup_node sc_client sc_rollup node client ->
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
   (* Smart rollup address endpoint test *)
   let*! sc_rollup_address =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "smart_rollup_address"]
