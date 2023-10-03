@@ -129,7 +129,7 @@ pub fn produce<Host: Runtime>(
                 (
                     BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas),
                     U256::zero(),
-                    H256::zero(),
+                    H256::from_slice(&hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()),
                 )
             }
         };
