@@ -74,6 +74,7 @@ impl IndexableStorage {
         Ok(length)
     }
 
+    #[allow(dead_code)]
     /// `length` returns the number of keys in the storage. If `/length` does
     /// not exists, the storage is considered as empty and returns '0'.
     pub fn length<Host: Runtime>(&self, host: &Host) -> Result<u64, StorageError> {
@@ -95,6 +96,7 @@ impl IndexableStorage {
         }
     }
 
+    #[allow(dead_code)]
     /// Same as `get_value`, but doesn't check for bounds.
     pub fn unsafe_get_value<Host: Runtime>(
         &self,

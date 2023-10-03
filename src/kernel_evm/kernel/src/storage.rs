@@ -28,9 +28,6 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-// This version incorporate the following changes:
-// - Add L2 block RLP encoding and store RLP-serialized blocks instead path per field encoding
-// - Change of the transaction receipt encoding format: supporting logs and bloom fields
 pub const STORAGE_VERSION: u64 = 1;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
@@ -40,9 +37,7 @@ const SMART_ROLLUP_ADDRESS: RefPath =
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
-pub const TICKETER_TO_MIGRATE: RefPath = TICKETER;
 const ADMIN: RefPath = RefPath::assert_from(b"/admin");
-pub const ADMIN_TO_MIGRATE: RefPath = ADMIN;
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
@@ -92,12 +87,6 @@ const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
 
 /// Subpath where transactions are indexed
 const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
-
-/// Subpath from where blocks' data is retrieved for migration.
-pub const BLOCKS_TO_MIGRATE: RefPath = EVM_BLOCKS;
-
-/// Subpath from where transaction receipts' data is retrieved for migration.
-pub const TX_RECEIPTS_TO_MIGRATE: RefPath = EVM_TRANSACTIONS_RECEIPTS;
 
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
