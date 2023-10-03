@@ -221,6 +221,18 @@ fn interpret_one(
             gas.consume(interpret_cost::NIL)?;
             stack.push(V::List(vec![]));
         }
+        I::Get(overload) => match overload {
+            overloads::Get::Map => {
+                let key = stack.pop().unwrap_or_else(|| unreachable_state());
+                let map = match stack.pop() {
+                    Some(V::Map(map)) => map,
+                    _ => unreachable_state(),
+                };
+                gas.consume(interpret_cost::map_get(&key, map.len())?)?;
+                let result = map.get(&key);
+                stack.push(V::new_option(result.cloned()));
+            }
+        },
     }
     Ok(())
 }
@@ -769,6 +781,53 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn get_map() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([
+            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
+            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+        ]);
+        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(1)];
+        assert_eq!(
+            interpret(&vec![Get(overloads::Get::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::new_option(Some(TypedValue::String(
+                "foo".to_owned()
+            )))]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::map_get(&TypedValue::Int(1), 2).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn get_map_none() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([
+            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
+            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+        ]);
+        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(100500)];
+        assert_eq!(
+            interpret(&vec![Get(overloads::Get::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Option(None)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::map_get(&TypedValue::Int(100500), 2).unwrap()
+                - interpret_cost::INTERPRET_RET
         );
     }
 }

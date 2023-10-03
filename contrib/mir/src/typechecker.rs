@@ -337,6 +337,31 @@ fn typecheck_instruction(
             stack.push(T::new_list(ty));
             I::Nil(())
         }
+        I::Get(..) => {
+            ensure_stack_len("GET", stack, 2)?;
+            match stack.as_slice() {
+                [.., T::Map(..), _] => {
+                    let kty_ = stack.pop().unwrap();
+                    let (kty, vty) = match stack.pop().unwrap() {
+                        T::Map(kty, vty) => (*kty, *vty),
+                        _ => unreachable!(),
+                    };
+                    ensure_ty_eq(ctx, &kty, &kty_)?;
+                    // can only fail if the typechecker is invoked on invalid
+                    // types, i.e. where `map` key is non-comparable
+                    ensure_comparable(&kty)?;
+                    stack.push(T::new_option(vty));
+                    I::Get(overloads::Get::Map)
+                }
+                _ => {
+                    return Err(TcError::NoMatchingOverload {
+                        instr: "GET",
+                        stack: stack.clone(),
+                        reason: None,
+                    })
+                }
+            }
+        }
     })
 }
 
@@ -372,6 +397,8 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
             TV::List(lst?)
         }
         (Map(tk, tv), Seq(vs)) => {
+            // can only fail if the typechecker is invoked on invalid
+            // types, i.e. where `map` key is non-comparable
             ensure_comparable(tk)?;
             let tc_elt = |v: Value| -> Result<(TypedValue, TypedValue), TcError> {
                 match v {
@@ -1189,6 +1216,37 @@ mod typecheck_tests {
                 Type::Int,
                 Type::String
             )))
+        );
+    }
+
+    #[test]
+    fn get_map() {
+        let mut stack = stk![Type::new_map(Type::Int, Type::String), Type::Int];
+        assert_eq!(
+            typecheck(parse("{ GET }").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(vec![Get(overloads::Get::Map)])
+        );
+        assert_eq!(stack, stk![Type::new_option(Type::String)]);
+    }
+
+    #[test]
+    fn get_map_incomparable() {
+        let mut stack = stk![
+            Type::new_map(Type::new_list(Type::Int), Type::String),
+            Type::new_list(Type::Int)
+        ];
+        assert_eq!(
+            typecheck(parse("{ GET }").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::TypeNotComparable(Type::new_list(Type::Int))),
+        );
+    }
+
+    #[test]
+    fn get_map_wrong_type() {
+        let mut stack = stk![Type::new_map(Type::Int, Type::String), Type::Nat];
+        assert_eq!(
+            typecheck(parse("{ GET }").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TypesNotEqual(Type::Int, Type::Nat).into()),
         );
     }
 }

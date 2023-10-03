@@ -142,6 +142,7 @@ pub trait Stage {
     type AddMeta;
     type PushValue;
     type NilType;
+    type GetOverload;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -167,6 +168,7 @@ pub enum Instruction<T: Stage> {
     Compare,
     Amount,
     Nil(T::NilType),
+    Get(T::GetOverload),
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

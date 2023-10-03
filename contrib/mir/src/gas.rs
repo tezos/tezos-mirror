@@ -226,6 +226,30 @@ pub mod interpret_cost {
             _ => unreachable!("Comparison of incomparable values"),
         })
     }
+
+    pub fn map_get(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+        // NB: this doesn't copy the tezos model exactly; tezos model uses
+        //
+        // 80 + sizeof(key)*log2(map.size)
+        //
+        // this seems dubious, from first principles and dimensional analysis,
+        // this seems more probable:
+        //
+        // 80 + cost_of_compare(key)*log2(map.size + 1)
+        //
+        // "+ 1" is from the observation that a lookup in a map of size 1 does
+        // exactly one comparison.
+        let compare_cost = compare(k, k)?;
+        // hack to get the integral logarithm rounded up. round up to the
+        // nearest power of 2 and count trailing zeroes. Thus, size_log(1) =
+        // size_log(0b1) = 0; size_log(2) = size_log(0b10) = 1; size_log(3) =
+        // size_log(4) = size_log(0b100) = 2, &c
+        //
+        // Note 0.trailing_zeros() isn't well-defined.
+        let size_log = (map_size + 1).next_power_of_two().trailing_zeros();
+        let lookup_cost = Checked::from(compare_cost) * size_log;
+        (80 + lookup_cost).as_gas_cost()
+    }
 }
 
 #[cfg(test)]

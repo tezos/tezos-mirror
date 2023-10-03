@@ -124,6 +124,7 @@ instruction: ParsedInstruction = {
   "COMPARE" => Compare,
   "AMOUNT" => Amount,
   "NIL" <type_expr> => Nil(<>),
+  "GET" => Get(()),
 }
 
 instructionSeq = semicolonSepSeq<instruction>;
