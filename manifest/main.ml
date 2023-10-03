@@ -2643,6 +2643,7 @@ let octez_wasmer =
           generated_entry_point = "Api";
           c_flags = ["-Wno-incompatible-pointer-types"];
           c_library_flags = [];
+          deps = [];
         }
 
 let _octez_wasmer_test =

@@ -930,48 +930,52 @@ module Ctypes = struct
     generated_entry_point : string;
     c_flags : string list;
     c_library_flags : string list;
+    deps : string list;
   }
 
   let to_dune desc =
-    Dune.
+    let open Dune in
+    let deps =
+      match desc.deps with [] -> E | deps -> S "deps" :: of_atom_list deps
+    in
+    [
+      S "ctypes";
+      [S "external_library_name"; S desc.external_library_name];
       [
-        S "ctypes";
-        [S "external_library_name"; S desc.external_library_name];
+        S "build_flags_resolver";
         [
-          S "build_flags_resolver";
-          [
-            S "vendored";
-            of_atom_list
-              ([
-                 "c_flags";
-                 ":standard";
-                 "-Wno-discarded-qualifiers";
-                 "-I" ^ desc.extra_search_dir;
-               ]
-              @ desc.c_flags);
-            of_atom_list
-              (["c_library_flags"; ":standard"]
-              @ desc.c_library_flags
-              @ [
-                  "-l" ^ desc.external_library_name; "-L" ^ desc.extra_search_dir;
-                ]);
-          ];
+          S "vendored";
+          of_atom_list
+            ([
+               "c_flags";
+               ":standard";
+               "-Wno-discarded-qualifiers";
+               "-I" ^ desc.extra_search_dir;
+             ]
+            @ desc.c_flags);
+          of_atom_list
+            (["c_library_flags"; ":standard"]
+            @ desc.c_library_flags
+            @ ["-l" ^ desc.external_library_name; "-L" ^ desc.extra_search_dir]
+            );
         ];
-        [S "headers"; [S "include"; S desc.include_header]];
-        [
-          S "type_description";
-          [S "instance"; S desc.type_description.instance];
-          [S "functor"; S desc.type_description.functor_];
-        ];
-        [
-          S "function_description";
-          [S "concurrency"; S "unlocked"];
-          [S "instance"; S desc.function_description.instance];
-          [S "functor"; S desc.function_description.functor_];
-        ];
-        [S "generated_types"; S desc.generated_types];
-        [S "generated_entry_point"; S desc.generated_entry_point];
-      ]
+      ];
+      [S "headers"; [S "include"; S desc.include_header]];
+      [
+        S "type_description";
+        [S "instance"; S desc.type_description.instance];
+        [S "functor"; S desc.type_description.functor_];
+      ];
+      [
+        S "function_description";
+        [S "concurrency"; S "unlocked"];
+        [S "instance"; S desc.function_description.instance];
+        [S "functor"; S desc.function_description.functor_];
+      ];
+      [S "generated_types"; S desc.generated_types];
+      [S "generated_entry_point"; S desc.generated_entry_point];
+      deps;
+    ]
 end
 
 module Env : sig

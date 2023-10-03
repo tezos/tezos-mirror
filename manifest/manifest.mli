@@ -538,6 +538,8 @@ module Ctypes : sig
         (* Output module name of the final generated stub module *)
     c_flags : string list;
     c_library_flags : string list;
+    deps : string list;
+        (** Other targets that Dune shall build before Ctypes does its thing *)
   }
 end
 
