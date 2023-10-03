@@ -33,9 +33,6 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 
-/// Maximum transaction stack depth.
-const MAXIMUM_TRANSACTION_DEPTH: usize = 1024_usize;
-
 /// Outcome of making the [EvmHandler] run an Ethereum transaction
 ///
 /// Be it contract -call, -create or simple transfer, the handler will update the world
@@ -191,7 +188,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Record the cost of a static-cost opcode
-    fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
+    pub fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
         let Some(layer) = self.transaction_data.last_mut() else {
             return Err(ExitError::Other(Cow::from("Recording cost, but there is no transaction in progress")))
         };
@@ -439,7 +436,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // TODO: mark `caller` and `address` as hot for gas calculation
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
 
-        if self.evm_account_storage.stack_depth() >= MAXIMUM_TRANSACTION_DEPTH {
+        if self.evm_account_storage.stack_depth() >= self.config.stack_limit {
             return Ok((
                 ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::CallTooDeep)),
                 None,
@@ -477,7 +474,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Rc::new(initial_code),
             Rc::new(Vec::new()),
             context,
-            self.config,
+            self.config.stack_limit,
+            self.config.memory_limit,
         );
 
         let result = self.execute(&mut runtime);
@@ -522,7 +520,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.evm_account_storage.stack_depth()
         );
 
-        if self.evm_account_storage.stack_depth() > MAXIMUM_TRANSACTION_DEPTH {
+        if self.evm_account_storage.stack_depth() > self.config.stack_limit {
             log!(self.host, Info, "Execution beyond the call limit of 1024");
 
             return Ok((
@@ -589,7 +587,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 Rc::new(code),
                 Rc::new(input),
                 transaction_context.context,
-                self.config,
+                1024_usize,
+                1024_usize, // TODO this is the memory limit - adjust to standard
             );
 
             let result = self.execute(&mut runtime);
@@ -1313,6 +1312,10 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         self.block.base_fee_per_gas
     }
 
+    fn block_randomness(&self) -> Option<H256> {
+        None // STUB
+    }
+
     fn chain_id(&self) -> U256 {
         self.block.chain_id
     }
@@ -1331,9 +1334,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         false
     }
 
-    fn is_cold(&self, address: H160, index: Option<H256>) -> bool {
+    fn is_cold(&mut self, address: H160, index: Option<H256>) -> Result<bool, ExitError> {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/4866
-        false // STUB until issue above has been fixed
+        Ok(false) // STUB until issue above has been fixed
     }
 
     fn set_storage(
@@ -1472,7 +1475,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 stack,
                 self.is_static(),
                 self.config,
-                &self,
+                self,
             )?;
 
             self.record_dynamic_cost(cost, memory_cost)

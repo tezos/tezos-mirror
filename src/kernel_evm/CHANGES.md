@@ -18,6 +18,8 @@
 - Impose a maximum gas limit per transaction based on the tick model. (!10094)
 - Transaction logs and bloom filter are returned in a transaction receipt. (!10019)
 - Support EIP-3607: reject transactions from senders with deployed code. (!10292)
+- Upgrade SputnikVM to version 0.39.1 and `primitive_types` to version 0.12.1 (!10043)
+- Upgrade ethereum crate to version 0.14.0
 
 ### EVM Node
 
