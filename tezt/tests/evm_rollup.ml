@@ -2381,6 +2381,32 @@ let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
   (* Check the values after the upgrade with [sanity_check] results. *)
   scenario_after ~evm_setup ~sanity_check
 
+let test_genesis_parent_hash_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "genesis"]
+    ~title:"Replace genesis.parent_hash"
+  @@ fun protocol ->
+  let previous_genesis_parent_hash =
+    "0x0000000000000000000000000000000000000000000000000000000000000000"
+  in
+  let new_genesis_parent_hash =
+    "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  in
+  let check_genesis_parent_hash expected_parent_hash endpoint =
+    let* genesis_block = Eth_cli.get_block ~block_id:"0" ~endpoint in
+    Check.((genesis_block.parent = expected_parent_hash) string)
+      ~error_msg:"The genesis parent hash should be %R but got %L" ;
+    unit
+  in
+  let scenario_prior ~evm_setup =
+    check_genesis_parent_hash previous_genesis_parent_hash evm_setup.endpoint
+  in
+  let scenario_after ~evm_setup ~sanity_check:() =
+    check_genesis_parent_hash new_genesis_parent_hash evm_setup.endpoint
+  in
+  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
+
 let test_kernel_migration =
   Protocol.register_test
     ~__FILE__
@@ -2705,6 +2731,7 @@ let test_kernel_upgrade_version_change =
   gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
 
 let register_evm_migration ~protocols =
+  test_genesis_parent_hash_migration protocols ;
   test_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols

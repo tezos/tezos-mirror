@@ -28,7 +28,7 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 1;
+pub const STORAGE_VERSION: u64 = 2;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const SMART_ROLLUP_ADDRESS: RefPath =
@@ -207,7 +207,7 @@ pub fn read_current_block_hash<Host: Runtime>(host: &mut Host) -> Result<H256, E
     Ok(H256::from_slice(&buffer))
 }
 
-fn store_rlp<T: Encodable, Host: Runtime>(
+pub fn store_rlp<T: Encodable, Host: Runtime>(
     src: &T,
     host: &mut Host,
     path: &OwnedPath,
