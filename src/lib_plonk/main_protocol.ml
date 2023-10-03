@@ -127,6 +127,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
   type public_inputs = scalar array list [@@deriving repr]
 
   type circuit_verifier_input = {
+    nb_proofs : int;
     public : public_inputs;
     commitments : Input_commitment.public list list;
   }
@@ -814,12 +815,12 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
         range_checks = SMap.map (fun l -> l <> []) prover_pp.range_checks;
       }
 
-    let build_identities circuits_map (n, generator) rd public_inputs_map =
+    let build_identities circuits_map (n, generator) rd inputs_map =
       let identities_map =
         SMap.mapi
-          (fun circuit_name pi_list ->
+          (fun circuit_name {nb_proofs; public = pi_list; _} ->
+            assert (List.compare_length_with pi_list nb_proofs = 0) ;
             let circuit_pp = SMap.find circuit_name circuits_map in
-            let nb_proofs = List.length pi_list in
             let circuit_prefix = SMap.Aggregation.add_prefix circuit_name in
             let proof_prefix i =
               SMap.Aggregation.add_prefix ~n:nb_proofs ~i circuit_name
@@ -894,7 +895,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               merge_verifier_identities
                 (perm_identities :: rc2_identities
                 :: (rc1_identities @ plookup_identities @ gates_identities)))
-          public_inputs_map
+          inputs_map
       in
       merge_verifier_identities (SMap.values identities_map)
 
@@ -930,7 +931,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           circuits_map
           (common_pp.n, common_pp.generator)
           rd
-          (SMap.map (fun {public; _} -> public) inputs_map)
+          inputs_map
       in
       let input_commitments = format_input_com inputs_map in
       let commitments =
@@ -1328,6 +1329,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
           (fun s -> Array.sub s.witness ic_size c.public_input_size)
           secrets
       in
+      let nb_proofs = List.length public in
       let commitments =
         List.map
           (fun s ->
@@ -1336,7 +1338,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
               s.input_commitments)
           secrets
       in
-      {public; commitments}
+      {nb_proofs; public; commitments}
     in
     SMap.mapi extract
 
@@ -1436,7 +1438,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
   module Internal_for_tests = struct
     let mutate_vi verifier_inputs =
       (* TODO we could do a more randomized search *)
-      let key, {public; commitments} = SMap.choose verifier_inputs in
+      let key, {nb_proofs; public; commitments} = SMap.choose verifier_inputs in
       match public with
       | head :: tail ->
           if head = [||] then None (* empty public inputs *)
@@ -1444,7 +1446,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             let new_head = Array.copy head in
             new_head.(0) <- Scalar.(add one new_head.(0)) ;
             let public = new_head :: tail in
-            let inputs = {public; commitments} in
+            let inputs = {nb_proofs; public; commitments} in
             Some (SMap.add key inputs verifier_inputs)
       | [] -> failwith "mutate_vi : all circuits should have verifier inputs."
   end

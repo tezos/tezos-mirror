@@ -86,8 +86,11 @@ module type S = sig
   (** The public inputs for one circuit & several statements *)
   type public_inputs [@@deriving repr]
 
-  (** The verifier input for a circuit, represented as the actual number of proofs that have been proved by the prover, the public inputs & the input commitments *)
+  (** The verifier input for a circuit, represented as the actual number of
+      proofs that have been proved by the prover, the public inputs & the input
+      commitments *)
   type circuit_verifier_input = {
+    nb_proofs : int;
     public : public_inputs;
     commitments : Input_commitment.public list list;
   }
