@@ -54,7 +54,7 @@ module Test_operation_repr = struct
     in
     Environment.wrap_tzresult @@ of_list [Contents op] >>?= fun contents_list ->
     match contents_list with
-    | Contents_list (Single op') when op == Obj.magic op' -> return_unit
+    | Contents_list (Single op') when Obj.repr op == Obj.repr op' -> return_unit
     | _ -> failwith "Unexpected value"
 
   let test_of_list_multiple_case () =
@@ -84,7 +84,7 @@ module Test_operation_repr = struct
     >>?= fun contents_list ->
     match contents_list with
     | Contents_list (Cons (op1', Single op2'))
-      when op1 == Obj.magic op1' && op2 == Obj.magic op2' ->
+      when Obj.repr op1 == Obj.repr op1' && Obj.repr op2 == Obj.repr op2' ->
         return_unit
     | _ -> failwith "Unexpected value"
 
