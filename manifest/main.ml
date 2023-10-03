@@ -133,7 +133,7 @@ let dynlink = external_lib "dynlink" V.True ~opam:""
 
 let eqaf = external_lib "eqaf" V.True
 
-let ezjsonm = external_lib ~js_compatible:true "ezjsonm" V.(at_least "1.1.0")
+let ezjsonm = external_lib ~js_compatible:true "ezjsonm" V.(at_least "1.3.0")
 
 let fmt = external_lib ~js_compatible:true "fmt" V.(at_least "0.8.7")
 
