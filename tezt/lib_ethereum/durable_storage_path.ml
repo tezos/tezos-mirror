@@ -49,7 +49,3 @@ let admin = evm "/admin"
 let ticketer = evm "/ticketer"
 
 let kernel_boot_wasm = kernel "/boot.wasm"
-
-module Legacy = struct
-  let dictator = evm "/dictator_key"
-end

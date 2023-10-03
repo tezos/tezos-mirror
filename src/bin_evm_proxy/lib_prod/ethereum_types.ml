@@ -33,22 +33,30 @@ let u16_to_bytes n =
   Bytes.set_uint16_le bytes 0 n ;
   Bytes.to_string bytes
 
-(** Append the [0x] prefix to a string. *)
-let append_0x s = "0x" ^ s
+(** Ethereum data, as Hex-encoded strings *)
+type hex = Hex of string [@@ocaml.unboxed]
 
-(** Strip the [0x] prefix of a string. *)
-let strip_0x s =
+(** Appends the [0x] prefix to a string. *)
+let hex_to_string (Hex s) = "0x" ^ s
+
+(** Strips the [0x] prefix of a string. *)
+let hex_of_string s =
   if String.starts_with ~prefix:"0x" s then
     let n = String.length s in
-    String.sub s 2 (n - 2)
-  else s
+    Hex (String.sub s 2 (n - 2))
+  else Hex s
+
+(** [hex_to_bytes hex] transforms the [hex] to binary format. *)
+let hex_to_bytes (Hex h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
+
+let hex_encoding = Data_encoding.(conv hex_to_string hex_of_string string)
 
 (** Ethereum address (20 bytes) *)
-type address = Address of string [@@ocaml.unboxed]
+type address = Address of hex [@@ocaml.unboxed]
 
-let address_of_string s = Address (String.lowercase_ascii (strip_0x s))
+let address_of_string s = Address (hex_of_string (String.lowercase_ascii s))
 
-let address_to_string (Address a) = append_0x a
+let address_to_string (Address a) = hex_to_string a
 
 let address_encoding =
   Data_encoding.(conv address_to_string address_of_string string)
@@ -115,45 +123,42 @@ let block_param_encoding =
     ]
 
 (** Ethereum block hash (32 bytes) *)
-type block_hash = Block_hash of string [@@ocaml.unboxed]
+type block_hash = Block_hash of hex [@@ocaml.unboxed]
 
-let block_hash_of_string s = Block_hash (strip_0x s)
+let block_hash_of_string s = Block_hash (hex_of_string s)
 
 let block_hash_encoding =
   Data_encoding.(
-    conv (fun (Block_hash h) -> append_0x h) block_hash_of_string string)
+    conv (fun (Block_hash h) -> hex_to_string h) block_hash_of_string string)
 
-(** Ethereum hash or data, that would encoded with a 0x prefix. *)
-type hash = Hash of string [@@ocaml.unboxed]
+(** Ethereum hash, that would encoded with a 0x prefix. *)
+type hash = Hash of hex [@@ocaml.unboxed]
 
 (** [hash_of_string s] takes a string [s] representing a hash in
     hexadecimal format, e.g. [0xFFFFFFF]. Strips the prefix and keeps the
     hash value, e.g. [FFFFFFF]. *)
-let hash_of_string s =
-  if s = "" then
-    (* Empty hash, tools can choose to send [""] instead of
-       omitting the field, e.g. ["data" : ""]. *)
-    Hash ""
-  else Hash (strip_0x s)
+let hash_of_string s = Hash (hex_of_string s)
 
 (** [hash_to_string h] constructs a valid hash encoded in hexadecimal format,
     e.g. [0xFFFFFFF]. *)
-let hash_to_string (Hash h) = append_0x h
+let hash_to_string (Hash h) = hex_to_string h
 
 (** [hash_to_bytes hash] transforms the [hash] to binary format. *)
-let hash_to_bytes (Hash h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
+let hash_to_bytes (Hash h) = hex_to_bytes h
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
-let empty_hash = Hash ""
+let empty_hash = Hash (Hex "")
 
-let decode_block_hash bytes = Block_hash Hex.(of_bytes bytes |> show)
+let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
 
-let decode_address bytes = Address Hex.(of_bytes bytes |> show)
+let decode_block_hash bytes = Block_hash (decode_hex bytes)
+
+let decode_address bytes = Address (decode_hex bytes)
 
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
-let decode_hash bytes = Hash Hex.(of_bytes bytes |> show)
+let decode_hash bytes = Hash (decode_hex bytes)
 
 type transaction_log = {
   address : address;
@@ -166,6 +171,19 @@ type transaction_log = {
   logIndex : quantity;
   removed : bool;
 }
+
+let transaction_log_body_from_rlp = function
+  | Rlp.List [Value address; List topics; Value data] ->
+      ( decode_address address,
+        List.map
+          (function
+            | Rlp.Value bytes -> decode_hash bytes
+            | _ -> raise (Invalid_argument "Expected hash representing topic"))
+          topics,
+        decode_hash data )
+  | _ ->
+      raise
+        (Invalid_argument "Expected list of 3 elements representing log body")
 
 let transaction_log_encoding =
   let open Data_encoding in
@@ -232,7 +250,7 @@ type transaction_receipt = {
   effectiveGasPrice : quantity;
   gasUsed : quantity;
   logs : transaction_log list;
-  logsBloom : hash;
+  logsBloom : hex;
   type_ : quantity;
   status : quantity;
   contractAddress : address option;
@@ -253,6 +271,8 @@ let transaction_receipt_from_rlp bytes =
           Value effective_gas_price;
           Value gas_used;
           Value contract_address;
+          List logs;
+          Value bloom;
           Value type_;
           Value status;
         ]) ->
@@ -269,6 +289,24 @@ let transaction_receipt_from_rlp bytes =
         if contract_address = Bytes.empty then None
         else Some (decode_address contract_address)
       in
+      let logs_body = List.map transaction_log_body_from_rlp logs in
+      let logs_objects =
+        List.mapi
+          (fun i (address, topics, data) ->
+            {
+              address;
+              topics;
+              data;
+              blockHash = block_hash;
+              blockNumber = block_number;
+              transactionHash = hash;
+              transactionIndex = index;
+              logIndex = quantity_of_z (Z.of_int i);
+              removed = false;
+            })
+          logs_body
+      in
+      let bloom = decode_hex bloom in
       let type_ = decode_number type_ in
       let status = decode_number status in
       {
@@ -281,13 +319,16 @@ let transaction_receipt_from_rlp bytes =
         cumulativeGasUsed = cumulative_gas_used;
         effectiveGasPrice = effective_gas_price;
         gasUsed = gas_used;
-        logs = [];
-        logsBloom = Hash (String.make 512 '0');
+        logs = logs_objects;
+        logsBloom = bloom;
         type_;
         status;
         contractAddress = contract_address;
       }
-  | _ -> raise (Invalid_argument "Expected a RlpList of 12 elements")
+  | _ ->
+      raise
+        (Invalid_argument
+           "Expected a RlpList of 14 elements in transaction receipt")
 
 let transaction_receipt_encoding =
   let open Data_encoding in
@@ -359,7 +400,7 @@ let transaction_receipt_encoding =
           (req "gasUsed" quantity_encoding)
           (req "logs" (list transaction_log_encoding)))
        (obj4
-          (req "logsBloom" hash_encoding)
+          (req "logsBloom" hex_encoding)
           (req "type" quantity_encoding)
           (req "status" quantity_encoding)
           (req "contractAddress" (option address_encoding))))
@@ -433,7 +474,7 @@ let transaction_object_from_rlp bytes =
         r;
         s;
       }
-  | _ -> raise (Invalid_argument "Expected a RlpList of 14 elements")
+  | _ -> raise (Invalid_argument "Expected a List of 14 elements")
 
 let transaction_object_encoding =
   let open Data_encoding in
@@ -537,13 +578,13 @@ type block = {
   number : block_height option;
   hash : block_hash option;
   parent : block_hash;
-  nonce : hash;
+  nonce : hex;
   sha3Uncles : hash;
-  logsBloom : hash option;
+  logsBloom : hex option;
   transactionRoot : hash;
   stateRoot : hash;
   receiptRoot : hash;
-  miner : hash;
+  miner : hex;
   difficulty : quantity;
   totalDifficulty : quantity;
   extraData : string;
@@ -554,6 +595,57 @@ type block = {
   transactions : block_transactions;
   uncles : hash list;
 }
+
+let decode_list decoder list =
+  List.map
+    Rlp.(
+      function
+      | Value r -> decoder r
+      | List _ -> raise (Invalid_argument "Expected a list of atomic data"))
+    list
+
+let block_from_rlp bytes =
+  match Rlp.decode bytes with
+  | Ok
+      (Rlp.List
+        [
+          Value number;
+          Value hash;
+          Value parent_hash;
+          List transactions;
+          Value gas_used;
+          Value timestamp;
+        ]) ->
+      let (Qty number) = decode_number number in
+      let hash = decode_block_hash hash in
+      let parent_hash = decode_block_hash parent_hash in
+      let transactions = TxHash (decode_list decode_hash transactions) in
+      let gas_used = decode_number gas_used in
+      let timestamp = decode_number timestamp in
+      {
+        number = Some (Block_height number);
+        hash = Some hash;
+        parent = parent_hash;
+        nonce = Hex (String.make 16 'a');
+        sha3Uncles = Hash (Hex (String.make 64 'a'));
+        logsBloom = Some (Hex (String.make 512 'a'));
+        transactionRoot = Hash (Hex (String.make 64 'a'));
+        stateRoot = Hash (Hex (String.make 64 'a'));
+        receiptRoot = Hash (Hex (String.make 64 'a'));
+        (* We need the following dummy value otherwise eth-cli will complain
+           that miner's address is not a valid Ethereum address. *)
+        miner = Hex "6471A723296395CF1Dcc568941AFFd7A390f94CE";
+        difficulty = Qty Z.zero;
+        totalDifficulty = Qty Z.zero;
+        extraData = "";
+        size = Qty (Z.of_int (Bytes.length bytes));
+        gasLimit = Qty Z.zero;
+        gasUsed = gas_used;
+        timestamp;
+        transactions;
+        uncles = [];
+      }
+  | _ -> raise (Invalid_argument "Expected a List of 6 elements")
 
 let block_encoding =
   let open Data_encoding in
@@ -643,13 +735,13 @@ let block_encoding =
           (req "number" (option block_height_encoding))
           (req "hash" (option block_hash_encoding))
           (req "parentHash" block_hash_encoding)
-          (req "nonce" hash_encoding)
+          (req "nonce" hex_encoding)
           (req "sha3Uncles" hash_encoding)
-          (req "logsBloom" (option hash_encoding))
+          (req "logsBloom" (option hex_encoding))
           (req "transactionsRoot" hash_encoding)
           (req "stateRoot" hash_encoding)
           (req "receiptsRoot" hash_encoding)
-          (req "miner" hash_encoding))
+          (req "miner" hex_encoding))
        (obj9
           (req "difficulty" quantity_encoding)
           (req "totalDifficulty" quantity_encoding)
@@ -800,7 +892,7 @@ module NonceMap = MapMake (Z)
 module Address = struct
   type t = address
 
-  let compare (Address h) (Address h') = String.compare h h'
+  let compare (Address (Hex h)) (Address (Hex h')) = String.compare h h'
 
   let to_string = address_to_string
 

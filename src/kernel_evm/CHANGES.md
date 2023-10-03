@@ -4,6 +4,22 @@
 
 ### EVM Kernel
 
+- Upgrade SputnikVM to version 0.39.1 and `primitive_types` to version 0.12.1 (!10043)
+- Upgrade ethereum crate to version 0.14.0
+- Store the `base_gas_per_fee` and use a default value of 21000. (!10234)
+
+### EVM Node
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version fc06d63568b1be253088ff5d6e422fd80ed3d2c2
+
+### EVM Kernel
+
 - Fallback mechanism if stage zero fails. (!9732)
 - Switch to `ExternalMessageFrame` protocol for external messages. (!9687)
 - Support EIP-2930 transaction serialization format. (!9555)
@@ -18,9 +34,6 @@
 - Impose a maximum gas limit per transaction based on the tick model. (!10094)
 - Transaction logs and bloom filter are returned in a transaction receipt. (!10019)
 - Support EIP-3607: reject transactions from senders with deployed code. (!10292)
-- Upgrade SputnikVM to version 0.39.1 and `primitive_types` to version 0.12.1 (!10043)
-- Upgrade ethereum crate to version 0.14.0
-- Store the `base_gas_per_fee` and use a default value of 21000. (!10234)
 
 ### EVM Node
 
