@@ -250,6 +250,17 @@ pub mod interpret_cost {
         let lookup_cost = Checked::from(compare_cost) * size_log;
         (80 + lookup_cost).as_gas_cost()
     }
+
+    pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+        // NB: same considerations as for map_get
+        let compare_cost = compare(k, k)?;
+        // hack to get the integral logarithm rounded up. see map_get.
+        let size_log = (map_size + 1).next_power_of_two().trailing_zeros();
+        let lookup_cost = Checked::from(compare_cost) * size_log;
+        // NB: 2 factor copied from Tezos protocol, in principle it should
+        // reflect update vs get overhead.
+        (80 + 2 * lookup_cost).as_gas_cost()
+    }
 }
 
 #[cfg(test)]

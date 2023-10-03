@@ -143,6 +143,7 @@ pub trait Stage {
     type PushValue;
     type NilType;
     type GetOverload;
+    type UpdateOverload;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -169,6 +170,7 @@ pub enum Instruction<T: Stage> {
     Amount,
     Nil(T::NilType),
     Get(T::GetOverload),
+    Update(T::UpdateOverload),
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
