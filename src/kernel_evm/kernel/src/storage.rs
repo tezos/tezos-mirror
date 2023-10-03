@@ -62,6 +62,8 @@ const EVM_TRANSACTIONS_OBJECTS: RefPath = RefPath::assert_from(b"/transactions_o
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
+const EVM_BASE_FEE_PER_GAS: RefPath = RefPath::assert_from(b"/base_fee_per_gas");
+
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
     RefPath::assert_from(b"/info_per_level/timestamp");
@@ -555,6 +557,17 @@ pub fn store_chain_id<Host: Runtime>(
 
 pub fn read_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     read_u256(host, &EVM_CHAIN_ID.into())
+}
+
+pub fn store_base_fee_per_gas<Host: Runtime>(
+    host: &mut Host,
+    base_fee_per_gas: U256,
+) -> Result<(), Error> {
+    write_u256(host, &EVM_BASE_FEE_PER_GAS.into(), base_fee_per_gas)
+}
+
+pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+    read_u256(host, &EVM_BASE_FEE_PER_GAS.into())
 }
 
 pub fn store_timestamp_path<Host: Runtime>(
