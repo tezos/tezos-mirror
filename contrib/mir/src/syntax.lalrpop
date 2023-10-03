@@ -92,7 +92,7 @@ composite_value: Value = {
 value_expr: Value = {
   atomic_value => <>,
   "(" <value_expr_naked> ")" => <>,
-  "{" <value_seq> "}" => Seq(<>),
+  "{" <value_seq> "}" => Value::Seq(<>),
 }
 
 value_expr_naked: Value = {
@@ -126,6 +126,7 @@ instruction: ParsedInstruction = {
   "NIL" <type_expr> => Nil(<>),
   "GET" => Get(()),
   "UPDATE" => Update(()),
+  instructionBlock => Instruction::Seq(<>),
 }
 
 instructionSeq = semicolonSepSeq<instruction>;

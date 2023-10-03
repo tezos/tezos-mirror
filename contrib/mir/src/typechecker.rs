@@ -394,6 +394,7 @@ fn typecheck_instruction(
                 }
             }
         }
+        I::Seq(nested) => I::Seq(typecheck(nested, ctx, stack)?),
     })
 }
 
@@ -1332,5 +1333,25 @@ mod typecheck_tests {
             ),
             Err(TcError::TypeNotComparable(Type::new_list(Type::Int),))
         );
+    }
+
+    #[test]
+    fn seq() {
+        let mut stack = stk![Type::Int, Type::Nat];
+        assert_eq!(
+            typecheck(
+                parse("{ { PAIR }; {{ CAR; }}; {}; {{{}}}; {{{{{DROP}}}}} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![
+                Seq(vec![Pair]),
+                Seq(vec![Seq(vec![Car])]),
+                Seq(vec![]),
+                Seq(vec![Seq(vec![Seq(vec![])])]),
+                Seq(vec![Seq(vec![Seq(vec![Seq(vec![Seq(vec![Drop(None)])])])])])
+            ])
+        );
+        assert_eq!(stack, stk![]);
     }
 }
