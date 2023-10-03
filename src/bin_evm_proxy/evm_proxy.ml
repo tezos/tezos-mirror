@@ -143,10 +143,10 @@ let rollup_node_config_dev ~rollup_node_endpoint =
       let* smart_rollup_address = Mockup.smart_rollup_address in
       return ((module Mockup : Rollup_node.S), smart_rollup_address)
 
-let prod_directory rollup_node_config =
+let prod_directory ~verbose rollup_node_config =
   let open Lwt_result_syntax in
   let open Evm_proxy_lib_prod in
-  return @@ Services.directory rollup_node_config
+  return @@ Services.directory ~verbose rollup_node_config
 
 let dev_directory ~verbose rollup_node_config =
   let open Lwt_result_syntax in
@@ -332,7 +332,10 @@ let main_command =
             let* rollup_config =
               rollup_node_config_prod ~rollup_node_endpoint
             in
-            let* directory = prod_directory rollup_config in
+            let* () = Evm_proxy_lib_prod.Tx_pool.start rollup_config in
+            let* directory =
+              prod_directory ~verbose:config.verbose rollup_config
+            in
             let* server = start config ~directory in
             let (_ : Lwt_exit.clean_up_callback_id) =
               install_finalizer_prod server
@@ -360,7 +363,7 @@ let make_prod_messages ~smart_rollup_address s =
   let*? _, messages =
     Rollup_node.make_encoded_messages
       ~smart_rollup_address
-      (Hash (Ethereum_types.strip_0x s))
+      (Ethereum_types.hex_of_string s)
   in
   return messages
 

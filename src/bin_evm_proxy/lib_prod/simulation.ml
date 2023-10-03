@@ -26,7 +26,7 @@
 open Ethereum_types
 
 (** [hex_string_to_bytes s] transforms a hex string [s] into a byte string. *)
-let hex_string_to_bytes s = `Hex s |> Hex.to_bytes_exn
+let hex_string_to_bytes (Hex s) = `Hex s |> Hex.to_bytes_exn
 
 (** Encoding used to forward the call to the kernel, to be used in simulation
      mode only. *)
@@ -51,6 +51,8 @@ let rlp_encode call =
   in
   (* we aim to use [String.chunk_bytes] *)
   Rlp.encode rlp_form
+
+let tx_rlp_encode tx_raw = `Hex tx_raw |> Hex.to_bytes_exn
 
 type simulation_message =
   | Start
@@ -86,8 +88,17 @@ let new_chunked_tag = "\002"
 (** Tag signaling a simulation message containing a chunk *)
 let chunk_tag = "\003"
 
+(** Tag indicating simulation is an evaluation *)
+let evaluation_tag = "\000"
+
+(** Tag indicating simulation is a validation *)
+let validation_tag = "\001"
+
 (** [hex_str_of_binary_string s] translate a binary string into an hax string *)
 let hex_str_of_binary_string s = s |> Hex.of_string |> Hex.show
+
+(** [add_tag tag bytes] prefixes bytes by the given tag *)
+let add_tag tag bytes = tag ^ Bytes.to_string bytes |> String.to_bytes
 
 let encode_message = function
   | Start -> hex_str_of_binary_string @@ simulation_tag
@@ -101,7 +112,16 @@ let encode_message = function
 
 let encode call =
   let open Result_syntax in
-  let* messages = call |> rlp_encode |> split_in_messages in
+  let* messages =
+    call |> rlp_encode |> add_tag evaluation_tag |> split_in_messages
+  in
+  return @@ List.map encode_message messages
+
+let encode_tx tx =
+  let open Result_syntax in
+  let* messages =
+    tx |> tx_rlp_encode |> add_tag validation_tag |> split_in_messages
+  in
   return @@ List.map encode_message messages
 
 module Encodings = struct
@@ -214,29 +234,54 @@ end
 
 let parse_insights decode (r : Data_encoding.json) =
   let s = Data_encoding.Json.destruct Encodings.eval_result r in
-  match s.insights with
-  | Some b :: _ -> Lwt.return_ok (decode b)
-  | _ ->
+  match decode s.insights with
+  | Some insight -> Lwt.return_ok insight
+  | None ->
       Error_monad.failwith
         "Couldn't parse insights: %s"
         (Data_encoding.Json.to_string r)
 
-let call_result =
-  parse_insights (fun b ->
+let decode_call_result bytes =
+  match bytes with
+  | Some b :: _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      Hash v)
+      Some (Hash (Hex v))
+  | _ -> None
+
+let call_result json = parse_insights decode_call_result json
+
+let decode_gas_estimation bytes =
+  match bytes with
+  | Some b :: _ -> b |> Bytes.to_string |> Z.of_bits |> Option.some
+  | _ -> None
 
 let gas_estimation json =
   let open Lwt_result_syntax in
-  let decode b = b |> Bytes.to_string |> Z.of_bits in
-  let* simulated_amount = parse_insights decode json in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5977
-     remove this once the gas is accounted correctly *)
-  (* minimum gas for any Ethereum transaction *)
-  let min_amount = Z.of_int 21000 in
-  let amount =
-    Z.(
-      if simulated_amount < min_amount then simulated_amount + min_amount
-      else simulated_amount)
-  in
-  return @@ quantity_of_z @@ Z.max simulated_amount amount
+  let* simulated_amount = parse_insights decode_gas_estimation json in
+  (* See EIP2200 for reference. But the tl;dr is: we cannot do the
+     opcode SSTORE if we have less than 2300 gas available, even if we don't
+     consume it. The simulated amount then gives an amount of gas insufficient
+     to execute the transaction.
+
+     The extra gas units, i.e. 2300, will be refunded.
+  *)
+  let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
+  return (quantity_of_z simulated_amount)
+
+let decode_is_valid bytes =
+  match bytes with
+  | [Some b; error_msg] -> (
+      let is_valid =
+        b |> Data_encoding.Binary.of_bytes_exn Data_encoding.bool
+      in
+      let error_msg = error_msg |> Option.map Bytes.to_string in
+      match (is_valid, error_msg) with
+      | true, None -> Some (Ok ())
+      | false, Some reason -> Some (Error reason)
+      | _, _ -> None)
+  | _ -> None
+
+let is_tx_valid json =
+  let open Lwt_result_syntax in
+  let* result = parse_insights decode_is_valid json in
+  return result

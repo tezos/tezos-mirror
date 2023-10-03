@@ -101,17 +101,25 @@ module Error : sig
 end
 
 (** Extensible variant representing the possible input requests extended by the
-    application of the method generator. *)
-type input = ..
+    application of the method generator.
+    Parameterized by a type indicating which method this input is for.
+*)
+type 'method_ input = ..
 
 (** Extensible variant representing the possible outputs extended by the
-    application of the method generator. *)
-type output = ..
+    application of the method generator.
+    Parameterized by a type indicating which method produced this output.
+*)
+type 'method_ output = ..
 
 type 'result rpc_result = ('result, Error.t JSONRPC.error) result
 
 (** API of an Ethereum method. *)
 module type METHOD_DEF = sig
+  (** Type-level identifier of the method.
+      Used as parameter for [input] and [output] types. *)
+  type method_
+
   (** Method name in the specification. *)
   val method_ : string
 
@@ -128,6 +136,8 @@ end
 
 (** Interface of a generated method. *)
 module type METHOD = sig
+  type method_
+
   (** Input type of the method, if any. *)
   type m_input
 
@@ -135,10 +145,10 @@ module type METHOD = sig
   type m_output
 
   (** Variant representing the method's request. *)
-  type input += Input of m_input option
+  type 'a input += Input : m_input option -> method_ input
 
   (** Variant representing the method's response. *)
-  type output += Output of m_output rpc_result
+  type 'a output += Output : m_output rpc_result -> method_ output
 
   (** See METHOD_DEF.method_ *)
   val method_ : string
@@ -171,9 +181,9 @@ val methods : (module METHOD) list
 (** [Input] defines the input encoding matching the defined methods in
     [methods]. *)
 module Input : sig
-  type t = input
+  type t = Box : 'a input -> t [@@ocaml.unboxed]
 
-  val encoding : (input * JSONRPC.id) Data_encoding.t
+  val encoding : (t * JSONRPC.id) Data_encoding.t
 end
 
 (** [Output] defines the output encoding matching the defined methods in
@@ -181,11 +191,15 @@ end
 module Output : sig
   type nonrec 'a result = ('a, error JSONRPC.error) result
 
-  val encoding : (output * JSONRPC.id) Data_encoding.t
+  type t = Box : 'a output -> t [@@ocaml.unboxed]
+
+  val encoding : (t * JSONRPC.id) Data_encoding.t
 end
 
 module Kernel_version :
   METHOD with type m_input = unit and type m_output = string
+
+module Upgrade_nonce : METHOD with type m_input = unit and type m_output = int32
 
 module Network_id : METHOD with type m_input = unit and type m_output = string
 
@@ -214,13 +228,13 @@ module Get_block_by_number :
 
 module Get_block_by_hash :
   METHOD
-    with type m_input = Ethereum_types.hash * bool
+    with type m_input = Ethereum_types.block_hash * bool
      and type m_output = Ethereum_types.block
 
 module Get_code :
   METHOD
     with type m_input = Ethereum_types.address * Ethereum_types.block_param
-     and type m_output = Ethereum_types.hash
+     and type m_output = Ethereum_types.hex
 
 module Gas_price :
   METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
@@ -228,6 +242,26 @@ module Gas_price :
 module Get_transaction_count :
   METHOD
     with type m_input = Ethereum_types.address * Ethereum_types.block_param
+     and type m_output = Ethereum_types.quantity
+
+module Get_block_transaction_count_by_hash :
+  METHOD
+    with type m_input = Ethereum_types.block_hash
+     and type m_output = Ethereum_types.quantity
+
+module Get_block_transaction_count_by_number :
+  METHOD
+    with type m_input = Ethereum_types.block_param
+     and type m_output = Ethereum_types.quantity
+
+module Get_uncle_count_by_block_hash :
+  METHOD
+    with type m_input = Ethereum_types.block_hash
+     and type m_output = Ethereum_types.quantity
+
+module Get_uncle_count_by_block_number :
+  METHOD
+    with type m_input = Ethereum_types.block_param
      and type m_output = Ethereum_types.quantity
 
 module Get_transaction_receipt :
@@ -240,9 +274,29 @@ module Get_transaction_by_hash :
     with type m_input = Ethereum_types.hash
      and type m_output = Ethereum_types.transaction_object option
 
+module Get_transaction_by_block_hash_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_hash * Ethereum_types.quantity
+     and type m_output = Ethereum_types.transaction_object option
+
+module Get_transaction_by_block_number_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_param * Ethereum_types.quantity
+     and type m_output = Ethereum_types.transaction_object option
+
+module Get_uncle_by_block_hash_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_hash * Ethereum_types.quantity
+     and type m_output = Ethereum_types.block option
+
+module Get_uncle_by_block_number_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_param * Ethereum_types.quantity
+     and type m_output = Ethereum_types.block option
+
 module Send_raw_transaction :
   METHOD
-    with type m_input = Ethereum_types.hash
+    with type m_input = Ethereum_types.hex
      and type m_output = Ethereum_types.hash
 
 module Send_transaction :
@@ -265,3 +319,8 @@ module Txpool_content :
 
 module Web3_clientVersion :
   METHOD with type m_input = unit and type m_output = string
+
+module Web3_sha3 :
+  METHOD
+    with type m_input = Ethereum_types.hex
+     and type m_output = Ethereum_types.hash

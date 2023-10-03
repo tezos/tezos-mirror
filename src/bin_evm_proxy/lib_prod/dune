@@ -8,10 +8,14 @@
  (libraries
   octez-libs.base
   octez-libs.rpc-http
+  octez-libs.tezos-workers
   octez-libs.rpc-http-client-unix
   octez-version.value
+  octez-libs.stdlib-unix
   lwt-exit)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_rpc_http))
+  -open Tezos_rpc_http
+  -open Tezos_workers
+  -open Tezos_stdlib_unix))
