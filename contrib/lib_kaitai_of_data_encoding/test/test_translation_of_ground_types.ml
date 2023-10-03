@@ -204,7 +204,7 @@ let%expect_test "test dynamic size bytes translation" =
           endian: be
         seq:
         - id: ground_bytes
-          type: variable size bytes
+          size-eos: true
     seq:
     - id: len_ground_bytes
       type: s4
@@ -247,7 +247,7 @@ let%expect_test "test dynamic size string translation" =
           endian: be
         seq:
         - id: ground_string
-          type: variable size bytes
+          size-eos: true
     seq:
     - id: len_ground_string
       type: s4

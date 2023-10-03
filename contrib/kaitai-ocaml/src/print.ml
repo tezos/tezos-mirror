@@ -83,12 +83,11 @@ let enumSpec enumspec =
 let enums_spec enums =
   mapping (enums |> List.map (fun (k, v) -> (k, enumSpec v)))
 
-(** We only add "type" to Yaml if not [AnyType].
-    TODO: This is only correct if [AnyType] means no type? *)
-let attr_type_if_not_any attr =
+(** We only add "type" to Yaml if not [AnyType]. *)
+let type_spec attr =
   match attr.AttrSpec.dataType with
-  | AnyType -> []
-  | NumericType _ | BooleanType | BytesType _ | StrType _ | ComplexDataType _ ->
+  | AnyType | BytesType _ -> []
+  | NumericType _ | BooleanType | StrType _ | ComplexDataType _ ->
       [("type", scalar (DataType.to_string attr.AttrSpec.dataType))]
 
 let repeat_spec =
@@ -109,30 +108,23 @@ let size_spec attr =
   map_list_of_option
     (fun e -> ("size", scalar (Ast.to_string e)))
     attr.AttrSpec.size
+  @
+  match attr.AttrSpec.dataType with
+  | BytesType (BytesEosType _) -> [("size-eos", scalar "true")]
+  | _ -> []
 
 let attr_spec attr =
-  (* TODO: pp doc spec as well. *)
-  match attr.AttrSpec.dataType with
-  (* [BytesType] attr require size header. *)
-  | BytesType (BytesLimitType {size; _}) ->
+  [
+    mapping_flatten
       [
-        mapping
-          [
-            ("id", scalar attr.AttrSpec.id);
-            ("size", scalar (Ast.to_string size));
-          ];
-      ]
-  | _ ->
-      [
-        mapping_flatten
-          [
-            [("id", scalar attr.AttrSpec.id)];
-            attr_type_if_not_any attr;
-            size_spec attr;
-            repeat_spec attr.cond.repeat;
-            enum_spec attr;
-          ];
-      ]
+        [("id", scalar attr.AttrSpec.id)];
+        type_spec attr;
+        size_spec attr;
+        repeat_spec attr.cond.repeat;
+        enum_spec attr;
+        doc_spec attr.doc;
+      ];
+  ]
 
 let seq_spec seq = sequence (List.concat_map attr_spec seq)
 

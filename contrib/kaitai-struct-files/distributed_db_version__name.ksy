@@ -9,7 +9,7 @@ types:
       endian: be
     seq:
     - id: distributed_db_version__name
-      type: variable size bytes
+      size-eos: true
 seq:
 - id: len_distributed_db_version__name
   type: s4

@@ -8,7 +8,7 @@ types:
       endian: be
     seq:
     - id: ground__string
-      type: variable size bytes
+      size-eos: true
 seq:
 - id: len_ground__string
   type: s4
