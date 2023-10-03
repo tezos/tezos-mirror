@@ -88,6 +88,26 @@
  (modules simulation_scenario))
 
 (executable
+ (name extract_data)
+ (libraries
+  octez-libs.base
+  octez-libs.base.unix
+  octez-shell-libs.store
+  octez-libs.clic
+  octez-shell-libs.client-base-unix)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_store
+  -open Tezos_client_base_unix)
+ (modules extract_data))
+
+(executable
  (name safety_checker)
  (libraries
   octez-libs.base
