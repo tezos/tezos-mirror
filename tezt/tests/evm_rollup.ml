@@ -288,8 +288,7 @@ let setup_l1_contracts ~admin client =
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
-let make_config ?bootstrap_accounts ?ticketer ?administrator ?legacy_dictator ()
-    =
+let make_config ?bootstrap_accounts ?ticketer ?administrator () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
     Option.fold
@@ -316,22 +315,13 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?legacy_dictator ()
       bootstrap_accounts
   in
   let administrator =
-    (* If we use a legacy dictator, we do not set the same key. *)
-    let r =
-      match legacy_dictator with
-      | Some dictator ->
-          Some
-            ( Durable_storage_path.Legacy.dictator,
-              dictator.Eth_account.public_key )
-      | None ->
-          Option.map
-            (fun administrator ->
-              let to_ = Durable_storage_path.admin in
-              let administrator = Hex.(of_string administrator |> show) in
-              (to_, administrator))
-            administrator
-    in
-    Option.fold ~some:(fun (to_, value) -> [Set {value; to_}]) ~none:[] r
+    Option.fold
+      ~some:(fun administrator ->
+        let to_ = Durable_storage_path.admin in
+        let value = Hex.(of_string administrator |> show) in
+        [Set {value; to_}])
+      ~none:[]
+      administrator
   in
   match ticketer @ bootstrap_accounts @ administrator with
   | [] -> None
@@ -339,20 +329,11 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?legacy_dictator ()
 
 type kernel_installee = {base_installee : string; installee : string}
 
-let set_storage_version_in_config = function
-  | `Config instrs ->
-      `Config
-        (Installer_kernel_config.Set
-           {value = "0000000000000000"; to_ = "/evm/storage_version"}
-        :: instrs)
-  | _ -> assert false
-
 let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(with_administrator = true) ?legacy_dictator
-    ?(ghostnet_storage_version = false) ~admin protocol =
+    ?(with_administrator = true) ~admin protocol =
   let* node, client = setup_l1 protocol in
   let* l1_contracts =
     match admin with
@@ -374,22 +355,7 @@ let setup_evm_kernel ?config ?kernel_installee
             Option.map (fun {admin; _} -> admin) l1_contracts
           else None
         in
-        make_config
-          ~bootstrap_accounts
-          ?ticketer
-          ?administrator
-          ?legacy_dictator
-          ()
-  in
-  let config =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6296
-       This corner case where we need to set a specific storage version
-       is required because ghostnet doesn't have a storage version set in
-       the storage.
-       Upgrading on ghostnet should lead to the removal of this code. *)
-    if ghostnet_storage_version then
-      Option.map set_storage_version_in_config config
-    else config
+        make_config ~bootstrap_accounts ?ticketer ?administrator ()
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -447,8 +413,7 @@ let setup_evm_kernel ?config ?kernel_installee
     }
 
 let setup_past_genesis ?config ?with_administrator ?kernel_installee
-    ?originator_key ?bootstrap_accounts ?rollup_operator_key ~admin
-    ?legacy_dictator ?ghostnet_storage_version protocol =
+    ?originator_key ?bootstrap_accounts ?rollup_operator_key ~admin protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
       ?config
@@ -457,8 +422,6 @@ let setup_past_genesis ?config ?with_administrator ?kernel_installee
       ?bootstrap_accounts
       ?rollup_operator_key
       ?with_administrator
-      ?legacy_dictator
-      ?ghostnet_storage_version
       ~admin
       protocol
   in
@@ -1853,33 +1816,33 @@ let test_preinitialized_evm_kernel =
     ~tags:["evm"; "administrator"; "config"]
     ~title:"Creates a kernel with an initialized administrator key"
   @@ fun protocol ->
-  let dictator_key_path = Durable_storage_path.admin in
-  let dictator_key = Eth_account.bootstrap_accounts.(0).address in
+  let administrator_key_path = Durable_storage_path.admin in
+  let administrator_key = Eth_account.bootstrap_accounts.(0).address in
   let config =
     `Config
       Sc_rollup_helpers.Installer_kernel_config.
         [
           Set
             {
-              value = Hex.(of_string dictator_key |> show);
-              to_ = dictator_key_path;
+              value = Hex.(of_string administrator_key |> show);
+              to_ = administrator_key_path;
             };
         ]
   in
   let* {sc_rollup_client; _} = setup_evm_kernel ~config ~admin:None protocol in
-  let*! found_dictator_key_hex =
+  let*! found_administrator_key_hex =
     Sc_rollup_client.inspect_durable_state_value
       sc_rollup_client
       ~pvm_kind:"wasm_2_0_0"
       ~operation:Sc_rollup_client.Value
-      ~key:dictator_key_path
+      ~key:administrator_key_path
   in
-  let found_dictator_key =
+  let found_administrator_key =
     Option.map
       (fun administrator -> Hex.to_string (`Hex administrator))
-      found_dictator_key_hex
+      found_administrator_key_hex
   in
-  Check.((Some dictator_key = found_dictator_key) (option string))
+  Check.((Some administrator_key = found_administrator_key) (option string))
     ~error_msg:
       (sf "Expected to read %%L as administrator key, but found %%R instead") ;
   unit
@@ -1964,55 +1927,10 @@ let get_kernel_boot_wasm ~sc_rollup_client =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let legacy_upgrade ~sc_rollup_node ~node ~client ~upgrade_nonce_bytes
-    ~preimage_root_hash_bytes ~sc_rollup_address ~private_key =
-  let* rollup_address_bytes =
-    let address_opt =
-      Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt sc_rollup_address
-    in
-    match address_opt with
-    | Some address ->
-        return
-        @@ Data_encoding.Binary.to_string_exn
-             Tezos_crypto.Hashed.Smart_rollup_address.encoding
-             address
-    | None -> failwith "Unexpected smart rollup address."
-  in
-  let message_to_sign =
-    rollup_address_bytes ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes
-  in
-  let* secret_key =
-    let sk = Hex.to_string (`Hex (Helpers.no_0x private_key)) in
-    match
-      Data_encoding.Binary.of_string_opt
-        Tezos_crypto.Signature.Secp256k1.Secret_key.encoding
-        sk
-    with
-    | Some sk -> return sk
-    | None -> failwith "An invalid secret key was provided."
-  in
-  let signature =
-    Data_encoding.Binary.to_string_exn Tezos_crypto.Signature.Secp256k1.encoding
-    @@ Tezos_crypto.Signature.Secp256k1.sign_keccak256
-         secret_key
-         (String.to_bytes message_to_sign)
-  in
-  let upgrade_tag_bytes = "\003" in
-  let full_external_message =
-    Hex.show @@ Hex.of_string @@ rollup_address_bytes ^ upgrade_tag_bytes
-    ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes ^ signature
-  in
-  send_external_message_and_wait
-    ~sc_rollup_node
-    ~node
-    ~client
-    ~sender:Constant.bootstrap1.public_key_hash
-    ~hex_msg:full_external_message
-
 let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
     ?(nonce = 2) ~base_installee ~installee ?with_administrator
-    ?expect_l1_failure ?legacy_dictator ?(admin = Constant.bootstrap1)
-    ?(upgrador = admin) protocol =
+    ?expect_l1_failure ?(admin = Constant.bootstrap1) ?(upgrador = admin)
+    protocol =
   let* {
          node;
          client;
@@ -2025,12 +1943,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
        } =
     match evm_setup with
     | Some evm_setup -> return evm_setup
-    | None ->
-        setup_evm_kernel
-          ?with_administrator
-          ?legacy_dictator
-          ~admin:(Some admin)
-          protocol
+    | None -> setup_evm_kernel ?with_administrator ~admin:(Some admin) protocol
   in
   let l1_contracts =
     match l1_contracts with
@@ -2070,29 +1983,18 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
       @@ read_file (project_root // base_installee // (installee ^ ".wasm"))
   in
   let* () =
-    match legacy_dictator with
-    | Some dictator ->
-        legacy_upgrade
-          ~sc_rollup_node
-          ~node
-          ~client
-          ~upgrade_nonce_bytes
-          ~preimage_root_hash_bytes
-          ~sc_rollup_address
-          ~private_key:dictator.private_key
-    | None ->
-        let* () =
-          Client.transfer
-            ?expect_failure:expect_l1_failure
-            ~amount:Tez.zero
-            ~giver:upgrador.public_key_hash
-            ~receiver:l1_contracts.admin
-            ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address upgrade_payload)
-            ~burn_cap:Tez.one
-            client
-        in
-        let* _ = next_evm_level ~sc_rollup_node ~node ~client in
-        unit
+    let* () =
+      Client.transfer
+        ?expect_failure:expect_l1_failure
+        ~amount:Tez.zero
+        ~giver:upgrador.public_key_hash
+        ~receiver:l1_contracts.admin
+        ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address upgrade_payload)
+        ~burn_cap:Tez.one
+        client
+    in
+    let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+    unit
   in
   let* kernel_boot_wasm_after_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
@@ -2196,7 +2098,7 @@ let test_kernel_upgrade_wrong_rollup_address =
   in
   unit
 
-let test_kernel_upgrade_no_dictator =
+let test_kernel_upgrade_no_administrator =
   Protocol.register_test
     ~__FILE__
     ~tags:["administrator"; "upgrade"]
@@ -2426,7 +2328,6 @@ let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
     ~scenario_after protocol =
   let current_kernel_base_installee = "src/kernel_evm/kernel/tests/resources" in
   let current_kernel_installee = "ghostnet_evm_kernel" in
-  let legacy_dictator = Eth_account.bootstrap_accounts.(0) in
   let* evm_setup =
     setup_past_genesis
       ~kernel_installee:
@@ -2435,8 +2336,6 @@ let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
           installee = current_kernel_installee;
         }
       ~admin:(Some admin)
-      ~legacy_dictator
-      ~ghostnet_storage_version:true
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
@@ -2453,9 +2352,9 @@ let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
   let* _ =
     gen_test_kernel_upgrade
       ~evm_setup
-      ~legacy_dictator
       ~base_installee:next_kernel_base_installee
       ~installee:next_kernel_installee
+      ~admin
       protocol
   in
   let* _ =
@@ -3097,7 +2996,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_wrong_key protocols ;
   test_kernel_upgrade_wrong_nonce protocols ;
   test_kernel_upgrade_wrong_rollup_address protocols ;
-  test_kernel_upgrade_no_dictator protocols ;
+  test_kernel_upgrade_no_administrator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
   test_check_kernel_upgrade_nonce protocols ;
   test_rpc_sendRawTransaction protocols ;

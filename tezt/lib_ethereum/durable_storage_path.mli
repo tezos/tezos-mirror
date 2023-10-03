@@ -52,8 +52,3 @@ val ticketer : path
 
 (** [kernel_boot_wasm] is the path to the kernel `boot.wasm`. *)
 val kernel_boot_wasm : path
-
-module Legacy : sig
-  (** [dictator] is the path to the dictator key. *)
-  val dictator : path
-end
