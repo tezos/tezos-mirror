@@ -92,8 +92,8 @@ module Types : sig
 
   (** Profiles that operate on shards/slots. *)
   type operator_profile =
-    | Attestor of Tezos_crypto.Signature.public_key_hash
-        (** [Attestor pkh] downloads all shards assigned to [pkh].
+    | Attester of Tezos_crypto.Signature.public_key_hash
+        (** [Attester pkh] downloads all shards assigned to [pkh].
             Used by bakers to attest availability of their assigned shards. *)
     | Producer of {slot_index : int}
         (** [Producer {slot_index}] produces/publishes slot for slot index [slot_index]. *)

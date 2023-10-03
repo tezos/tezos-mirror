@@ -62,7 +62,7 @@ let add_operator_profiles t proto_parameters gs_worker
         List.fold_left
           (fun operator_sets operator ->
             match operator with
-            | Services.Types.Attestor pkh ->
+            | Services.Types.Attester pkh ->
                 init_attester
                   operator_sets
                   proto_parameters.Dal_plugin.number_of_slots
@@ -131,7 +131,7 @@ let get_profiles t =
       in
       let attester_profiles =
         Pkh_set.fold
-          (fun pkh acc -> Services.Types.Attestor pkh :: acc)
+          (fun pkh acc -> Services.Types.Attester pkh :: acc)
           attesters
           producer_profiles
       in

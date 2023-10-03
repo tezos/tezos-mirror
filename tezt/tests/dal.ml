@@ -2051,13 +2051,13 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let patch_profile_rpc profile =
     Dal_RPC.(call dal_node (patch_profiles [profile]))
   in
-  let profile1 = Dal_RPC.Attestor Constant.bootstrap1.public_key_hash in
-  let profile2 = Dal_RPC.Attestor Constant.bootstrap2.public_key_hash in
+  let profile1 = Dal_RPC.Attester Constant.bootstrap1.public_key_hash in
+  let profile2 = Dal_RPC.Attester Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
   let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator []) in
-  (* Adding [Attestor] profile with pkh that is not encoded as
+  (* Adding [Attester] profile with pkh that is not encoded as
      [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
-  let* () = check_bad_attester_pkh_encoding (Attestor "This is invalid PKH") in
+  let* () = check_bad_attester_pkh_encoding (Attester "This is invalid PKH") in
   (* Test adding duplicate profiles stores profile only once *)
   let* () = patch_profile_rpc profile1 in
   let* () = patch_profile_rpc profile1 in
@@ -3116,7 +3116,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     from the first node, so that when it joins the topics, it also sends Graft messages
     in addition to sending Subscribe messages. *)
 let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
-  let profile1 = Dal_RPC.Attestor pkh1 in
+  let profile1 = Dal_RPC.Attester pkh1 in
   let peer_id1 =
     JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
   in
@@ -3236,7 +3236,7 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
 let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
     dal_node1 =
   let pkh1 = Constant.bootstrap1.public_key_hash in
-  let profile1 = Dal_RPC.Attestor pkh1 in
+  let profile1 = Dal_RPC.Attester pkh1 in
   let num_slots = parameters.Dal.Parameters.number_of_slots in
   let event_waiter =
     check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
@@ -3542,7 +3542,7 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
     List.to_seq Constant.all_secret_keys |> Seq.take 3 |> List.of_seq
   in
   let profiles =
-    List.map (fun key -> Dal_RPC.Attestor key.Account.public_key_hash) delegates
+    List.map (fun key -> Dal_RPC.Attester key.Account.public_key_hash) delegates
   in
   let delegates = List.map (fun key -> key.Account.alias) delegates in
 

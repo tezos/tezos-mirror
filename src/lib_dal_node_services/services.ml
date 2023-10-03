@@ -65,7 +65,7 @@ module Types = struct
   }
 
   type operator_profile =
-    | Attestor of Tezos_crypto.Signature.public_key_hash
+    | Attester of Tezos_crypto.Signature.public_key_hash
     | Producer of {slot_index : int}
 
   type operator_profiles = operator_profile list
@@ -167,15 +167,15 @@ module Types = struct
     union
       [
         case
-          ~title:"Attestor with pkh"
+          ~title:"Attester with pkh"
           (Tag 0)
           (obj2
              (req "kind" (constant "attester"))
              (req
                 "public_key_hash"
                 Tezos_crypto.Signature.Public_key_hash.encoding))
-          (function Attestor attest -> Some ((), attest) | _ -> None)
-          (function (), attest -> Attestor attest);
+          (function Attester attest -> Some ((), attest) | _ -> None)
+          (function (), attest -> Attester attest);
         case
           ~title:"Slot producer"
           (Tag 1)
