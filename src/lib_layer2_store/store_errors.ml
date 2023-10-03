@@ -45,6 +45,7 @@ type error +=
       new_value : string;
       name : string;
     }
+  | Gc_failed of string
 
 let pp_hex ppf s = Hex.pp ppf (Hex.of_string s)
 
@@ -233,3 +234,15 @@ let () =
       | _ -> None)
     (fun (key, old_value, new_value, name) ->
       Cannot_overwrite_key_in_store {key; old_value; new_value; name})
+
+let () =
+  register_error_kind
+    ~id:"layer2_store.gc_failed"
+    ~title:"GC of store failed"
+    ~description:"Garbage collection of store failed."
+    ~pp:(fun ppf name ->
+      Format.fprintf ppf "Garbage collection of store %s failed." name)
+    `Permanent
+    Data_encoding.(obj1 (req "name" string))
+    (function Gc_failed n -> Some n | _ -> None)
+    (fun n -> Gc_failed n)
