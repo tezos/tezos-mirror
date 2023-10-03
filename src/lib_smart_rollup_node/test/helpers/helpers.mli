@@ -31,12 +31,12 @@ open Octez_smart_rollup_node
 (** {2 Creating Node Contexts} *)
 
 (** [with_node_context ?constants kind protocol ~boot_sector f] creates a node
-    context and (with a store, a context, etc.) where protocol [constants] can
-    be specified, and runs [f] with this node context. The L2 chain is
-    initialized with a genesis block and the PVM with the [boot_sector] and
-    starts with the specified [protocol]. When [f] terminates or fails, the
-    created node context is closed properly. Test that need a node context need
-    to use this function in order to avoid file descriptor leaks. *)
+    context (with a store, a context, etc.) where protocol [constants] can be
+    specified. It then runs [f] within this node context. The L2 chain is
+    initialized with a genesis block and the specified [protocol], and the PVM
+    is started with the [boot_sector]. When [f] terminates or fails, the created
+    node context is properly closed. Test that need a node context need to use
+    this function in order to avoid file descriptor leaks. *)
 val with_node_context :
   ?constants:Rollup_constants.protocol_constants ->
   Kind.t ->

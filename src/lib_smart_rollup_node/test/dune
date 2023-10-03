@@ -2,15 +2,17 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_017_PtNairob_lib_sc_rollup_node_test_tezt_lib)
+ (name src_lib_smart_rollup_node_test__tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-libs.base
-  tezos-protocol-017-PtNairob.protocol
+  octez-libs.stdlib-unix
   octez-libs.test-helpers
-  octez-protocol-017-PtNairob-libs.smart-rollup-layer2
-  octez_smart_rollup_node_PtNairob
+  octez-l2-libs.layer2_store
+  octez-l2-libs.smart-rollup
+  octez-smart-rollup-node-lib
+  octez_smart_rollup_node_test_helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -19,18 +21,20 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_017_PtNairob
+  -open Tezos_stdlib_unix
   -open Tezos_test_helpers
-  -open Tezos_smart_rollup_layer2_017_PtNairob
-  -open Octez_smart_rollup_node_PtNairob
+  -open Tezos_layer2_store
+  -open Octez_smart_rollup
+  -open Octez_smart_rollup_node
+  -open Octez_smart_rollup_node_test_helpers
   -open Octez_alcotezt)
- (modules serialized_proofs test_octez_conversions))
+ (modules canary))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_017_PtNairob_lib_sc_rollup_node_test_tezt_lib
+  src_lib_smart_rollup_node_test__tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -39,7 +43,7 @@
 
 (rule
  (alias runtest)
- (package tezos-sc-rollup-node-test)
+ (package tezos-smart-rollup-node-lib-test)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

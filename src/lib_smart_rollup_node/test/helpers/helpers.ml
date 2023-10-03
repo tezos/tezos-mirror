@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Octez_smart_rollup
-open Octez_smart_rollup_node
-
 let uid = ref 0
 
 let block_hash_of_level level =
@@ -37,7 +34,7 @@ let block_hash_of_level level =
   Block_hash.of_string_exn s
 
 let default_constants =
-  (* Same as default test const ants for alpha excepted for
+  (* Same as default test constants for alpha excepted for
      commitment_period_in_block. *)
   Rollup_constants.
     {
@@ -49,21 +46,8 @@ let default_constants =
           commitment_period_in_blocks = 3;
           reveal_activation_level =
             Some {blake2B = 0l; metadata = 0l; dal_page = 0l};
-          max_number_of_stored_cemented_commitments = 5;
         };
-      dal =
-        {
-          feature_enable = false;
-          attestation_lag = 4;
-          number_of_slots = 16;
-          cryptobox_parameters =
-            {
-              redundancy_factor = 8;
-              page_size = 4096;
-              slot_size = 32768;
-              number_of_shards = 64;
-            };
-        };
+      dal = {feature_enable = false; attestation_lag = 4; number_of_slots = 16};
     }
 
 let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
@@ -287,7 +271,3 @@ let alcotest ?name speed ?constants kind protocol ~boot_sector f =
   | Error err ->
       Format.printf "@\n%a@." pp_print_trace err ;
       Lwt.fail Alcotest.Test_error
-
-let _protocol =
-  (* force registration of protocols plugins in smart rollup node lib *)
-  Rollup_node_plugin.Plugin.protocol
