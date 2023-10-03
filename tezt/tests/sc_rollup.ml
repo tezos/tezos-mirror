@@ -223,21 +223,21 @@ let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
 
 (** Wait for the rollup node to detect a conflict *)
 let wait_for_conflict_detected sc_node =
-  Sc_rollup_node.wait_for sc_node "sc_rollup_node_conflict_detected.v0"
+  Sc_rollup_node.wait_for sc_node "smart_rollup_node_conflict_detected.v0"
   @@ fun json ->
   let our_hash = JSON.(json |-> "our_commitment_hash" |> as_string) in
   Some (our_hash, json)
 
 (** Wait for the rollup node to detect a timeout *)
 let wait_for_timeout_detected sc_node =
-  Sc_rollup_node.wait_for sc_node "sc_rollup_node_timeout_detected.v0"
+  Sc_rollup_node.wait_for sc_node "smart_rollup_node_timeout_detected.v0"
   @@ fun json ->
   let other = JSON.(json |> as_string) in
   Some other
 
 (** Wait for the rollup node to compute a dissection *)
 let wait_for_computed_dissection sc_node =
-  Sc_rollup_node.wait_for sc_node "sc_rollup_node_computed_dissection.v0"
+  Sc_rollup_node.wait_for sc_node "smart_rollup_node_computed_dissection.v0"
   @@ fun json ->
   let opponent = JSON.(json |-> "opponent" |> as_string) in
   Some (opponent, json)
@@ -781,7 +781,9 @@ let wait_for_injecting_event ?(tags = []) ?count node =
 (** Wait for the [sc_rollup_node_publish_commitment] event from the
     rollup node. *)
 let wait_for_publish_commitment node =
-  Sc_rollup_node.wait_for node "sc_rollup_node_publish_commitment.v0"
+  Sc_rollup_node.wait_for
+    node
+    "smart_rollup_node_commitment_publish_commitment.v0"
   @@ fun json ->
   let hash = JSON.(json |-> "hash" |> as_string) in
   let level = JSON.(json |-> "level" |> as_int) in
@@ -792,7 +794,7 @@ let wait_for_publish_commitment node =
 let wait_for_publish_execute_whitelist_update node =
   Sc_rollup_node.wait_for
     node
-    "sc_rollup_node_publish_execute_whitelist_update.v0"
+    "smart_rollup_node_publish_execute_whitelist_update.v0"
   @@ fun json ->
   let hash = JSON.(json |-> "hash" |> as_string) in
   let outbox_level = JSON.(json |-> "outbox_level" |> as_int) in
@@ -804,7 +806,7 @@ let wait_for_publish_execute_whitelist_update node =
 let wait_for_included_successful_operation node ~operation_kind =
   Sc_rollup_node.wait_for
     node
-    "sc_rollup_daemon_included_successful_operation.v0"
+    "smart_rollup_node_daemon_included_successful_operation.v0"
   @@ fun json ->
   if JSON.(json |-> "kind" |> as_string) = operation_kind then Some () else None
 
@@ -1197,7 +1199,9 @@ let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client
     Returns the level at which the lpc was updated. *)
 let bake_until_lpc_updated ?hook ?at_least ?timeout client sc_rollup_node =
   let event =
-    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_node_lpc_updated.v0"
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "smart_rollup_node_commitment_lpc_updated.v0"
     @@ fun json -> JSON.(json |-> "level" |> as_int_opt)
   in
   bake_until_event ?hook ?at_least ?timeout client sc_rollup_node event
@@ -2960,7 +2964,10 @@ let test_reveals_fails_on_wrong_hash =
   let () = close_out cout in
 
   let error_promise =
-    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_daemon_error.v0" (fun e ->
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "smart_rollup_node_daemon_error.v0"
+      (fun e ->
         let id = JSON.(e |=> 0 |-> "id" |> as_string) in
         if id =~ rex "wrong_hash_of_reveal_preimage" then Some () else None)
   in
@@ -2989,7 +2996,10 @@ let test_reveals_fails_on_unknown_hash =
   in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let error_promise =
-    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_daemon_error.v0" (fun e ->
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "smart_rollup_node_daemon_error.v0"
+      (fun e ->
         let id = JSON.(e |=> 0 |-> "id" |> as_string) in
         if id =~ rex "could_not_open_reveal_preimage_file" then Some ()
         else None)
@@ -3060,7 +3070,10 @@ let test_reveals_above_4k =
   let () = output_string cout data in
   let () = close_out cout in
   let error_promise =
-    Sc_rollup_node.wait_for sc_rollup_node "sc_rollup_daemon_error.v0" (fun e ->
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "smart_rollup_node_daemon_error.v0"
+      (fun e ->
         let id = JSON.(e |=> 0 |-> "id" |> as_string) in
         if id =~ rex "could_not_encode_raw_data" then Some () else None)
   in
@@ -3709,7 +3722,7 @@ let test_refutation protocols ~kind =
               (inputs_for 10)
               ~final_level:80
               ~reset_honest_on:
-                [("sc_rollup_node_conflict_detected.v0", 2, None)]
+                [("smart_rollup_node_conflict_detected.v0", 2, None)]
               ~priority:`Priority_honest );
           ( "degraded_new",
             refutation_scenario_parameters
@@ -3823,15 +3836,15 @@ let l1_level_event level tezos_node _rollup_node =
   unit
 
 let published_commitment_event ~inbox_level _tezos_node rollup_node =
-  Sc_rollup_node.wait_for rollup_node "sc_rollup_node_lpc_updated.v0"
+  Sc_rollup_node.wait_for
+    rollup_node
+    "smart_rollup_node_commitment_lpc_updated.v0"
   @@ fun json ->
   let level = JSON.(json |-> "level" |> as_int) in
   if level >= inbox_level then Some () else None
 
 let commitment_computed_event ~inbox_level _tezos_node rollup_node =
-  Sc_rollup_node.wait_for
-    rollup_node
-    "sc_rollup_node_commitment_process_head.v0"
+  Sc_rollup_node.wait_for rollup_node "smart_rollup_node_commitment_compute.v0"
   @@ fun json ->
   let level = JSON.as_int json in
   if level >= inbox_level then Some () else None
@@ -3919,7 +3932,7 @@ let test_bailout_refutation protocols =
        (inputs_for 10)
        ~final_level:80
        ~reset_honest_on:
-         [("sc_rollup_node_conflict_detected.v0", 2, Some Bailout)]
+         [("smart_rollup_node_conflict_detected.v0", 2, Some Bailout)]
        ~priority:`Priority_honest)
     protocols
 
@@ -4413,7 +4426,7 @@ let test_interrupt_rollup_node =
   let processing_promise =
     Sc_rollup_node.wait_for
       sc_rollup_node
-      "sc_rollup_daemon_process_head.v0"
+      "smart_rollup_node_daemon_process_head.v0"
       (fun _ -> Some ())
   in
   let* () = bake_levels 15 client in
@@ -6373,12 +6386,12 @@ let bailout_mode_not_publish ~kind =
   and* () =
     Sc_rollup_node.wait_for
       sc_rollup_node
-      "sc_rollup_node_recover_bond.v0"
+      "smart_rollup_node_recover_bond.v0"
       (Fun.const (Some ()))
   and* () =
     Sc_rollup_node.wait_for
       sc_rollup_node
-      "sc_rollup_daemon_exit_bailout_mode.v0"
+      "smart_rollup_node_daemon_exit_bailout_mode.v0"
       (Fun.const (Some ()))
   and* exit_error = Sc_rollup_node.wait sc_rollup_node in
   let* lcc_hash, _level =

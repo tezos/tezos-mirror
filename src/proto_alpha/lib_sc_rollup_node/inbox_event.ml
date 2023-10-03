@@ -26,12 +26,12 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = [Protocol.name; "sc_rollup_node"; "inbox"]
+  let section = [Protocol.name; "smart_rollup_node"; "inbox"]
 
   let get_messages =
     declare_3
       ~section
-      ~name:"sc_rollup_node_layer_1_get_messages"
+      ~name:"smart_rollup_node_layer_1_get_messages"
       ~msg:
         "Fetching {number_of_messages} messages from block {hash} at level \
          {level}"

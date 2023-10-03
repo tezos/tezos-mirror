@@ -112,7 +112,7 @@ module Simple = struct
   let waiting_first_block =
     declare_1
       ~section
-      ~name:"waiting_first_block"
+      ~name:"smart_rollup_node_waiting_first_block"
       ~level:Info
       ~msg:"Waiting for first block of protocol {protocol} to appear"
       ("protocol", Protocol_hash.encoding)
@@ -120,7 +120,7 @@ module Simple = struct
   let received_first_block =
     declare_2
       ~section
-      ~name:"received_first_block"
+      ~name:"smart_rollup_node_received_first_block"
       ~level:Info
       ~msg:"First block of protocol {protocol} received: {block}"
       ("block", Block_hash.encoding)

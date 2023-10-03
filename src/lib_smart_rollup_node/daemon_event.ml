@@ -29,12 +29,12 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "daemon"]
+  let section = ["smart_rollup_node"; "daemon"]
 
   let head_processing =
     declare_2
       ~section
-      ~name:"sc_rollup_daemon_process_head"
+      ~name:"smart_rollup_node_daemon_process_head"
       ~msg:"Processing head {hash} at level {level}"
       ~level:Info
       ("hash", Block_hash.encoding)
@@ -43,7 +43,7 @@ module Simple = struct
   let new_head_processed =
     declare_3
       ~section
-      ~name:"sc_rollup_node_layer_1_new_head_processed"
+      ~name:"smart_rollup_node_daemon_new_head_processed"
       ~msg:
         "Finished processing layer 1 head {hash} at level {level} in \
          {process_time}"
@@ -56,7 +56,7 @@ module Simple = struct
   let processing_heads_iteration =
     declare_3
       ~section
-      ~name:"sc_rollup_daemon_processing_heads"
+      ~name:"smart_rollup_node_daemon_processing_heads"
       ~msg:
         "A new iteration of process_heads has been triggered: processing \
          {number} heads from level {from} to level {to}"
@@ -68,7 +68,7 @@ module Simple = struct
   let new_heads_processed =
     declare_3
       ~section
-      ~name:"sc_rollup_node_layer_1_new_heads_processed"
+      ~name:"smart_rollup_node_daemon_new_heads_processed"
       ~msg:
         "Finished processing {number} layer 1 heads for levels {from} to {to}"
       ~level:Notice
@@ -79,7 +79,7 @@ module Simple = struct
   let included_successful_operation =
     declare_1
       ~section
-      ~name:"sc_rollup_daemon_included_successful_operation"
+      ~name:"smart_rollup_node_daemon_included_successful_operation"
       ~msg:"Operation {operation} was included as successful"
       ~level:Debug
       ("operation", L1_operation.encoding)
@@ -88,7 +88,7 @@ module Simple = struct
   let included_failed_operation =
     declare_3
       ~section
-      ~name:"sc_rollup_daemon_included_failed_operation"
+      ~name:"smart_rollup_node_daemon_included_failed_operation"
       ~msg:
         "[Warning]: Operation {operation} was included as {status} with error \
          {error}"
@@ -111,7 +111,7 @@ module Simple = struct
 
   let migration =
     declare_5
-      ~name:"sc_rollup_daemon_protocol_migration"
+      ~name:"smart_rollup_node_daemon_protocol_migration"
       ~msg:
         "{catching_up} from {old_protocol} ({old_protocol_level}) to \
          {new_protocol} ({new_protocol_level}) "
@@ -129,7 +129,7 @@ module Simple = struct
   let error =
     declare_1
       ~section
-      ~name:"sc_rollup_daemon_error"
+      ~name:"smart_rollup_node_daemon_error"
       ~msg:"[Fatal daemon error]: {error}"
       ~level:Fatal
       ("error", trace_encoding)
@@ -138,7 +138,7 @@ module Simple = struct
   let degraded_mode =
     declare_0
       ~section
-      ~name:"sc_rollup_daemon_degraded_mode"
+      ~name:"smart_rollup_node_daemon_degraded_mode"
       ~msg:
         "[Daemon error]: entering degraded mode - only playing refutation game \
          to defend commitments"
@@ -148,7 +148,7 @@ module Simple = struct
   let exit_bailout_mode =
     declare_0
       ~section
-      ~name:"sc_rollup_daemon_exit_bailout_mode"
+      ~name:"smart_rollup_node_daemon_exit_bailout_mode"
       ~msg:
         "Exit bailout mode - stakes have been recovered, and the node is \
          exiting safely now"

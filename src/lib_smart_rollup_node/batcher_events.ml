@@ -29,7 +29,7 @@ end) =
 struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; WORKER.worker_name]
+  let section = ["smart_rollup_node"; WORKER.worker_name]
 
   let queue =
     declare_1

@@ -28,12 +28,12 @@ open Publisher_worker_types
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "commitment"]
+  let section = ["smart_rollup_node"; "commitment"]
 
   let starting =
     declare_0
       ~section
-      ~name:"sc_rollup_commitment_publisher_starting"
+      ~name:"smart_rollup_node_commitment_publisher_starting"
       ~msg:"Starting commitment publisher for the smart rollup node"
       ~level:Info
       ()
@@ -41,7 +41,7 @@ module Simple = struct
   let stopping =
     declare_0
       ~section
-      ~name:"sc_rollup_node_commitment_publisher_stopping"
+      ~name:"smart_rollup_node_commitment_publisher_stopping"
       ~msg:"Stopping commitment publisher for the smart rollup node"
       ~level:Info
       ()
@@ -49,7 +49,7 @@ module Simple = struct
   let last_cemented_commitment_updated =
     declare_2
       ~section
-      ~name:"sc_rollup_node_lcc_updated"
+      ~name:"smart_rollup_node_commitment_lcc_updated"
       ~msg:
         "Last cemented commitment was updated to hash {hash} at inbox level \
          {level}"
@@ -60,7 +60,7 @@ module Simple = struct
   let last_published_commitment_updated =
     declare_2
       ~section
-      ~name:"sc_rollup_node_lpc_updated"
+      ~name:"smart_rollup_node_commitment_lpc_updated"
       ~msg:
         "Last published commitment was updated to hash {hash} at inbox level \
          {level}"
@@ -71,7 +71,7 @@ module Simple = struct
   let compute_commitment =
     declare_1
       ~section
-      ~name:"sc_rollup_node_commitment_process_head"
+      ~name:"smart_rollup_node_commitment_compute"
       ~msg:"Computing and storing new commitment for level {level}"
       ~level:Info
       ("level", Data_encoding.int32)
@@ -79,7 +79,7 @@ module Simple = struct
   let new_commitment =
     declare_2
       ~section
-      ~name:"sc_rollup_node_new_commitment"
+      ~name:"smart_rollup_node_new_commitment"
       ~msg:"New commitment {hash} for inbox level {level}"
       ~level:Notice
       ("hash", Commitment.Hash.encoding)
@@ -88,7 +88,7 @@ module Simple = struct
   let publish_commitment =
     declare_2
       ~section
-      ~name:"sc_rollup_node_publish_commitment"
+      ~name:"smart_rollup_node_commitment_publish_commitment"
       ~msg:"Publishing commitment {hash} for inbox level {level}"
       ~level:Info
       ("hash", Commitment.Hash.encoding)
@@ -97,7 +97,7 @@ module Simple = struct
   let recover_bond =
     declare_1
       ~section
-      ~name:"sc_rollup_node_recover_bond"
+      ~name:"smart_rollup_node_recover_bond"
       ~msg:"Recover bond for {staker}"
       ~level:Info
       ("staker", Signature.Public_key_hash.encoding)
@@ -105,7 +105,7 @@ module Simple = struct
   let publish_execute_whitelist_update =
     declare_3
       ~section
-      ~name:"sc_rollup_node_publish_execute_whitelist_update"
+      ~name:"smart_rollup_node_publish_execute_whitelist_update"
       ~msg:
         "Publishing execute whitelist update for cemented commitment {hash}, \
          outbox level {outbox_level} and index {message_index}"

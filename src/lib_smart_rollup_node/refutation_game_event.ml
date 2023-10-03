@@ -26,7 +26,7 @@
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2880
    Add corresponding .mli file. *)
 
-let section = ["sc_rollup_node"; "refutation_game"]
+let section = ["smart_rollup_node"; "refutation_game"]
 
 module Simple = struct
   include Internal_event.Simple
@@ -34,7 +34,7 @@ module Simple = struct
   let conflict_detected =
     declare_5
       ~section
-      ~name:"sc_rollup_node_conflict_detected"
+      ~name:"smart_rollup_node_conflict_detected"
       ~msg:
         "A conflict has been found with our commitment {our_commitment_hash} \
          at level {level} with staker {other} that hash issued commitment \
@@ -49,7 +49,7 @@ module Simple = struct
   let potential_conflict_detected =
     declare_4
       ~section
-      ~name:"sc_rollup_node_potential_conflict_detected"
+      ~name:"smart_rollup_node_potential_conflict_detected"
       ~msg:
         "A potential conflict has been found with our commitment \
          {our_commitment_hash} at level {level} with staker {other} that hash \
@@ -63,7 +63,7 @@ module Simple = struct
   let timeout_detected =
     declare_1
       ~section
-      ~name:"sc_rollup_node_timeout_detected"
+      ~name:"smart_rollup_node_timeout_detected"
       ~msg:"The rollup node has detected that opponent {other} can be timed out"
       ~level:Notice
       ("other", Signature.Public_key_hash.encoding)
@@ -71,7 +71,7 @@ module Simple = struct
   let computed_dissection =
     declare_4
       ~section
-      ~name:"sc_rollup_node_computed_dissection"
+      ~name:"smart_rollup_node_computed_dissection"
       ~msg:
         "Computed dissection against {opponent} between ticks {start_tick} and \
          {end_tick}: {dissection}"

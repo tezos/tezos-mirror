@@ -350,7 +350,7 @@ let wait_for_level ?timeout sc_node level =
       check_event
         ?timeout
         sc_node
-        "sc_rollup_node_layer_1_new_head_processed.v0"
+        "smart_rollup_node_daemon_new_head_processed.v0"
         ~where:("level >= " ^ string_of_int level)
         promise
 
@@ -373,10 +373,10 @@ let wait_sync ?path_client sc_node ~timeout =
 let handle_event sc_node {name; value; timestamp = _} =
   match name with
   | "smart_rollup_node_is_ready.v0" -> set_ready sc_node
-  | "sc_rollup_node_layer_1_new_head_processed.v0" ->
+  | "smart_rollup_node_daemon_new_head_processed.v0" ->
       let level = JSON.(value |-> "level" |> as_int) in
       update_level sc_node level
-  | "sc_rollup_node_layer_1_new_heads_processed.v0" ->
+  | "smart_rollup_node_daemon_new_heads_processed.v0" ->
       let level = JSON.(value |-> "to" |> as_int) in
       update_level sc_node level
   | _ -> ()

@@ -39,7 +39,7 @@ module Parameters :
      and type Operation.t = L1_operation.t = struct
   type nonrec state = state
 
-  let events_section = ["sc_rollup_node"]
+  let events_section = ["smart_rollup_node"]
 
   module Tag : TAG with type t = Configuration.operation_kind = struct
     type t = Configuration.operation_kind

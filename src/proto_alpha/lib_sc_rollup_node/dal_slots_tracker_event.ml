@@ -29,7 +29,7 @@ open Alpha_context
 module Simple = struct
   include Internal_event.Simple
 
-  let section = [Protocol.name; "sc_rollup_node"; "dal_slots_tracker"]
+  let section = [Protocol.name; "smart_rollup_node"; "dal_slots_tracker"]
 
   let slot_has_been_confirmed =
     declare_3
