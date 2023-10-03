@@ -758,10 +758,11 @@ let test_consistent_block_hashes =
     Eth_cli.get_block ~block_id:(string_of_int number) ~endpoint
   in
 
-  let* block0 = new_block () in
+  let* block0 = Eth_cli.get_block ~block_id:(string_of_int 0) ~endpoint in
   let* block1 = new_block () in
   let* block2 = new_block () in
   let* block3 = new_block () in
+  let* block4 = new_block () in
 
   let check_parent_hash parent block =
     let parent_hash = Option.value ~default:"" parent.Block.hash in
@@ -773,11 +774,12 @@ let test_consistent_block_hashes =
   check_parent_hash block0 block1 ;
   check_parent_hash block1 block2 ;
   check_parent_hash block2 block3 ;
+  check_parent_hash block3 block4 ;
 
   let block_hashes, parent_hashes =
     List.map
       (fun Block.{hash; parent; _} -> (hash, parent))
-      [block0; block1; block2; block3]
+      [block0; block1; block2; block3; block4]
     |> List.split
   in
   let block_hashes_uniq = List.sort_uniq compare block_hashes in
