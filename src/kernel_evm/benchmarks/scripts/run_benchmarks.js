@@ -21,6 +21,7 @@ const { execSync } = require('child_process');
 const external = require("./lib/external")
 const path = require('node:path')
 const { timestamp } = require("./lib/timestamp")
+const csv = require('csv-stringify/sync');
 
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_unstripped_installer.wasm');
@@ -30,6 +31,13 @@ const OUTPUT_DIRECTORY = external.output()
 
 function sumArray(arr) {
     return arr.reduce((acc, curr) => acc + curr, 0);
+}
+
+function push_match(output, array, regexp) {
+    var match;
+    while ((match = regexp.exec(output))) {
+        array.push(match[1]);
+    }
 }
 
 function run_profiler(path) {
@@ -66,23 +74,10 @@ function run_profiler(path) {
             if (profiler_output_path_result !== null) {
                 profiler_output_path = profiler_output_path_result;
             }
-            const gas_used_regex = /\bgas_used:\s*(\d+)/g;
-            var match;
-            while ((match = gas_used_regex.exec(output))) {
-                gas_used.push(match[1]);
-            }
-            const status_regexp = /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z]+)\b/g;
-            while ((match = status_regexp.exec(output))) {
-                tx_status.push(match[1]);
-            }
-            const estimated_ticks_regex = /\bEstimated ticks:\s*(\d+)/g;
-            while ((match = estimated_ticks_regex.exec(output))) {
-                estimated_ticks.push(match[1]);
-            }
-            const estimated_ticks_per_tx_regex = /\bEstimated ticks after tx:\s*(\d+)/g;
-            while ((match = estimated_ticks_per_tx_regex.exec(output))) {
-                estimated_ticks_per_tx.push(match[1]);
-            }
+            push_match(output, gas_used, /\bgas_used:\s*(\d+)/g)
+            push_match(output, tx_status, /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
+            push_match(output, estimated_ticks, /\bEstimated ticks:\s*(\d+)/g)
+            push_match(output, estimated_ticks_per_tx, /\bEstimated ticks after tx:\s*(\d+)/g)
         });
         childProcess.on('close', _ => {
             if (profiler_output_path == "") {
@@ -97,7 +92,7 @@ function run_profiler(path) {
             if (tx_status.length != estimated_ticks_per_tx.length) {
                 console.log(new Error("Tx status array length (" + tx_status.length + ") != estimated ticks per tx array length (" + estimated_ticks_per_tx.length + ")"));
             }
-            resolve({ profiler_output_path: profiler_output_path, gas_used: gas_used, tx_status: tx_status, estimated_ticks: estimated_ticks, estimated_ticks_per_tx: estimated_ticks_per_tx });
+            resolve({ profiler_output_path, gas_costs: gas_used, tx_status, estimated_ticks, estimated_ticks_per_tx });
         });
     })
     return profiler_result;
@@ -161,13 +156,11 @@ async function analyze_profiler_output(path) {
 // Run given benchmark
 async function run_benchmark(path) {
     run_profiler_result = await run_profiler(path);
-    profiler_output_path = run_profiler_result.profiler_output_path;
-    profiler_output_analysis_result = await analyze_profiler_output(profiler_output_path);
-    profiler_output_analysis_result.gas_costs = run_profiler_result.gas_used;
-    profiler_output_analysis_result.tx_status = run_profiler_result.tx_status;
-    profiler_output_analysis_result.estimated_ticks = run_profiler_result.estimated_ticks;
-    profiler_output_analysis_result.estimated_ticks_per_tx = run_profiler_result.estimated_ticks_per_tx;
-    return profiler_output_analysis_result;
+    profiler_output_analysis_result = await analyze_profiler_output(run_profiler_result.profiler_output_path);
+    return {
+        ...profiler_output_analysis_result,
+        ...run_profiler_result
+    }
 }
 
 function build_benchmark_scenario(benchmark_script) {
@@ -198,14 +191,43 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     unaccounted_ticks = sumArray(kernel_run_ticks) - sumArray(run_transaction_ticks) - sumArray(signature_verification_ticks) - sumArray(store_transaction_object_ticks) - sumArray(fetch_blueprint_ticks)
     console.log(`Number of transactions: ${tx_status.length}`)
     run_time_index = 0;
+    gas_cost_index = 0;
     for (var j = 0; j < tx_status.length; j++) {
-        if (tx_status[j].includes("OK")) {
-            sputnik_runtime_tick = (gas_costs[j] > 21000) ? sputnik_runtime_ticks[run_time_index++] : 0
-            rows.push([benchmark_name, gas_costs[j], run_transaction_ticks[j], sputnik_runtime_tick, signature_verification_ticks[j], store_transaction_object_ticks[j], "", "", "", "", "", tx_status[j], estimated_ticks_per_tx[j]]);
+        let basic_info_row = {
+            benchmark_name,
+            signature_verification_ticks: signature_verification_ticks[j],
+            status: tx_status[j],
+            estimated_ticks: estimated_ticks_per_tx[j],
+        }
+        if (tx_status[j].includes("OK_UNKNOWN")) {
+            // no outcome should mean never invoking sputnik
+            rows.push(
+                {
+                    gas_cost: 21000,
+                    run_transaction_ticks: run_transaction_ticks[j],
+                    sputnik_runtime_ticks: 0,
+                    store_transaction_object_ticks: store_transaction_object_ticks[j],
+                    ...basic_info_row
+                });
+
+        }
+        else if (tx_status[j].includes("OK")) {
+            // sputnik runtime called only if not a transfer
+            sputnik_runtime_tick = (gas_costs[gas_cost_index] > 21000) ? sputnik_runtime_ticks[run_time_index++] : 0
+
+            rows.push(
+                {
+                    gas_cost: gas_costs[gas_cost_index],
+                    run_transaction_ticks: run_transaction_ticks[j],
+                    sputnik_runtime_ticks: sputnik_runtime_tick,
+                    store_transaction_object_ticks: store_transaction_object_ticks[j],
+                    ...basic_info_row
+                });
+            gas_cost_index += 1;
         } else {
             // we can expect no gas cost, no storage of the tx object, and no run transaction, but there will be signature verification
-            // invalide transaction detected: ERROR_NONCE and ERROR_SIGNATURE, in both case `caller` is called.
-            rows.push([benchmark_name, "", "", "", signature_verification_ticks[j], "", "", "", "", "", "", tx_status[j], estimated_ticks_per_tx[j]]);
+            // invalide transaction detected: ERROR_NONCE, ERROR_PRE_PAY and ERROR_SIGNATURE, in all cases `caller` is called.
+            rows.push(basic_info_row);
 
         }
     }
@@ -214,10 +236,21 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         console.log("Warning: runtime not matched with a transaction in: " + benchmark_name);
     }
 
+    // first kernel run and reboots
     for (var j = 0; j < kernel_run_ticks.length; j++) {
-        rows.push([benchmark_name + "(all)", "", "", "", "", "", interpreter_init_ticks[j], interpreter_decode_ticks[j], fetch_blueprint_ticks[j], kernel_run_ticks[j], "", "", estimated_ticks[j]]);
+        rows.push({
+            benchmark_name: benchmark_name + "(all)",
+            interpreter_init_ticks: interpreter_init_ticks[j],
+            interpreter_decode_ticks: interpreter_decode_ticks[j],
+            fetch_blueprint_ticks: fetch_blueprint_ticks[j],
+            kernel_run_ticks: kernel_run_ticks[j],
+            estimated_ticks: estimated_ticks[j]
+        });
     }
-    rows.push([benchmark_name + "(all)", "", "", "", "", "", "", "", "", "", unaccounted_ticks, "", ""]);
+    rows.push({
+        benchmark_name: benchmark_name + "(all)",
+        unaccounted_ticks,
+    });
     return rows;
 }
 
@@ -229,10 +262,25 @@ function output_filename() {
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Running benchmarks on: [${benchmark_scripts.join('\n  ')}]`);
-    var fields = ["benchmark_name", "gas_cost", "run_transaction_ticks", "sputnik_runtime_ticks", "signature_verification_ticks", "store_transaction_object_ticks", "interpreter_init_ticks", "interpreter_decode_ticks", "fetch_blueprint_ticks", "kernel_run_ticks", "unaccounted_ticks", "status", "estimated_ticks"];
+    var fields = [
+        "benchmark_name",
+        "gas_cost",
+        "run_transaction_ticks",
+        "sputnik_runtime_ticks",
+        "signature_verification_ticks",
+        "store_transaction_object_ticks",
+        "interpreter_init_ticks",
+        "interpreter_decode_ticks",
+        "fetch_blueprint_ticks",
+        "kernel_run_ticks",
+        "unaccounted_ticks",
+        "status",
+        "estimated_ticks"
+    ];
     let output = output_filename();
     console.log(`Output in ${output}`);
-    fs.writeFileSync(output, fields.join(",") + "\n");
+    const csv_config = { columns: fields };
+    fs.writeFileSync(output, csv.stringify([], { header: true, ...csv_config }));
     for (var i = 0; i < benchmark_scripts.length; i++) {
         var benchmark_script = benchmark_scripts[i];
         var parts = benchmark_script.split("/");
@@ -241,7 +289,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         build_benchmark_scenario(benchmark_script);
         run_benchmark_result = await run_benchmark("transactions.json");
         benchmark_log = log_benchmark_result(benchmark_name, run_benchmark_result);
-        fs.appendFileSync(output, benchmark_log.map(row => row.join(",")).join("\n") + "\n");
+        fs.appendFileSync(output, csv.stringify(benchmark_log, csv_config));
     }
     console.log("Benchmarking complete");
     execSync("rm transactions.json");
