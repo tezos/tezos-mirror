@@ -44,13 +44,33 @@ module Transport_layer = struct
       Interface.connection_metadata )
     P2p.t
 
-  let create ~network_name config limits =
-    P2p.create
-      ~config
-      ~limits
-      Interface.peer_meta_config
-      Interface.conn_meta_config
-    @@ Interface.message_config ~network_name
+  let create =
+    let special_addresses =
+      ["0.0.0.0"; "127.0.0.1"; "localhost"; "[::]"; "::1"]
+    in
+    fun ~network_name config limits ->
+      let advertised_net_addr =
+        Option.filter
+          (fun addr ->
+            not
+              (List.mem
+                 ~equal:String.equal
+                 (P2p_addr.to_string addr)
+                 special_addresses))
+          config.P2p.listening_addr
+      in
+      let connection_metadata =
+        {
+          Transport_layer_interface.advertised_net_addr;
+          advertised_net_port = config.P2p.listening_port;
+        }
+      in
+      P2p.create
+        ~config
+        ~limits
+        Interface.peer_meta_config
+        (Interface.conn_meta_config connection_metadata)
+      @@ Interface.message_config ~network_name
 
   let activate ?(additional_points = []) p2p =
     let open Lwt_syntax in

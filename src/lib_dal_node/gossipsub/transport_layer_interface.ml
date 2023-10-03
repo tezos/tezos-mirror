@@ -163,11 +163,25 @@ let peer_meta_config : peer_metadata P2p_params.peer_meta_config =
   let score (_ : peer_metadata) = 1.0 in
   {peer_meta_encoding = encoding; peer_meta_initial = empty; score}
 
-type connection_metadata = unit
+type connection_metadata = {
+  advertised_net_addr : P2p_addr.t option;
+  advertised_net_port : int option;
+}
 
-let conn_meta_config : connection_metadata P2p_params.conn_meta_config =
+let conn_meta_encoding =
+  let open Data_encoding in
+  (conv
+     (fun {advertised_net_addr; advertised_net_port} ->
+       (advertised_net_addr, advertised_net_port))
+     (fun (advertised_net_addr, advertised_net_port) ->
+       {advertised_net_addr; advertised_net_port}))
+    (obj2
+       (opt "advertised_net_addr" P2p_addr.encoding)
+       (opt "advertised_net_port" uint16))
+
+let conn_meta_config cfg : connection_metadata P2p_params.conn_meta_config =
   {
-    conn_meta_encoding = Data_encoding.unit;
-    private_node = (fun () -> false);
-    conn_meta_value = (fun () -> ());
+    conn_meta_encoding;
+    private_node = (fun _cfg -> false);
+    conn_meta_value = (fun () -> cfg);
   }
