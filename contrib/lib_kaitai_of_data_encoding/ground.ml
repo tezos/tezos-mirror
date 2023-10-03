@@ -25,28 +25,9 @@
 (*****************************************************************************)
 
 open Kaitai.Types
-open Helpers
-
-let default_doc_spec = DocSpec.{summary = None; refs = []}
-
-let cond_no_cond =
-  AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
-
-let default_attr_spec =
-  AttrSpec.
-    {
-      path = [];
-      id = "";
-      dataType = DataType.AnyType;
-      cond = cond_no_cond;
-      valid = None;
-      doc = default_doc_spec;
-      enum = None;
-      size = None;
-    }
 
 module Enum = struct
-  type map = (string * Kaitai.Types.EnumSpec.t) list
+  type assoc = (string * Kaitai.Types.EnumSpec.t) list
 
   let bool =
     ( "bool",
@@ -55,8 +36,9 @@ module Enum = struct
           path = [];
           map =
             [
-              (0, EnumValueSpec.{name = "false"; doc = default_doc_spec});
-              (255, EnumValueSpec.{name = "true"; doc = default_doc_spec});
+              (0, EnumValueSpec.{name = "false"; doc = Helpers.default_doc_spec});
+              ( 255,
+                EnumValueSpec.{name = "true"; doc = Helpers.default_doc_spec} );
             ];
         } )
 end
@@ -64,7 +46,7 @@ end
 module Attr = struct
   let bool =
     {
-      default_attr_spec with
+      Helpers.default_attr_spec with
       id = "bool";
       dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
       valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
@@ -73,14 +55,14 @@ module Attr = struct
 
   let int1_type_attr_spec ~signed =
     {
-      default_attr_spec with
+      Helpers.default_attr_spec with
       id = (if signed then "int8" else "uint8");
       dataType = DataType.(NumericType (Int_type (Int1Type {signed})));
     }
 
   let int_multi_type_atrr_spec ~id ~signed width =
     {
-      default_attr_spec with
+      Helpers.default_attr_spec with
       id;
       dataType =
         DataType.(
@@ -89,7 +71,7 @@ module Attr = struct
 
   let float_multi_type_attr_spec ~id =
     {
-      default_attr_spec with
+      Helpers.default_attr_spec with
       id;
       dataType =
         DataType.(
@@ -105,7 +87,7 @@ module Attr = struct
 
   let bytes_limit_type_attr_spec ~id =
     {
-      default_attr_spec with
+      Helpers.default_attr_spec with
       id;
       dataType =
         DataType.(
@@ -120,20 +102,20 @@ module Attr = struct
                }));
     }
 
-  let u1 = int1_type_attr_spec ~signed:false
+  let uint8 = int1_type_attr_spec ~signed:false
 
-  let s1 = int1_type_attr_spec ~signed:true
+  let int8 = int1_type_attr_spec ~signed:true
 
-  let u2 = int_multi_type_atrr_spec ~id:"uint16" ~signed:false DataType.W2
+  let uint16 = int_multi_type_atrr_spec ~id:"uint16" ~signed:false DataType.W2
 
-  let s2 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
+  let int16 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
 
-  let u4 ?(id = "uint32") () =
+  let uint32 ?(id = "uint32") () =
     int_multi_type_atrr_spec ~id ~signed:false DataType.W4
 
-  let s4 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
+  let int32 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
 
-  let s8 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
+  let int64 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
 
   let int31 =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6261
@@ -141,15 +123,15 @@ module Attr = struct
              range. *)
     int_multi_type_atrr_spec ~id:"int31" ~signed:true DataType.W4
 
-  let f8 = float_multi_type_attr_spec ~id:"float"
+  let float = float_multi_type_attr_spec ~id:"float"
 
   let fixed_size_header_class_spec =
     {
       (* TODO / nice to have: Add a docstring, i.e. [?description]
                               to custom defined class spec. *)
-      (default_class_spec ~encoding_name:"fixed_bytes" ())
+      (Helpers.default_class_spec ~encoding_name:"fixed_bytes" ())
       with
-      seq = u4 ~id:"size" () :: [bytes_limit_type_attr_spec ~id:"value"];
+      seq = [uint32 ~id:"size" (); bytes_limit_type_attr_spec ~id:"value"];
       isTopLevel = false;
     }
 
@@ -159,7 +141,7 @@ module Attr = struct
               size header of ground bytes encoding. Later on we want to add
               support for [`Uint16], [`Uint8] and [`N]. *)
     {
-      default_attr_spec with
+      Helpers.default_attr_spec with
       id = "fixed size (uint30) bytes";
       dataType =
         DataType.(ComplexDataType (UserType fixed_size_header_class_spec));
@@ -170,49 +152,53 @@ end
 
 module Class = struct
   let bool ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description ~enums:[Enum.bool] Attr.bool
+    Helpers.class_spec_of_attr
+      ~encoding_name
+      ?description
+      ~enums:[Enum.bool]
+      Attr.bool
 
   let uint8 ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.u1
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.uint8
 
   let int8 ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.s1
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int8
 
   let uint16 ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.u2
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.uint16
 
   let int16 ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.s2
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int16
 
   let int32 ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.s4
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int32
 
   let int64 ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.s8
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int64
 
   let int31 ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.int31
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.int31
 
   let float ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.f8
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.float
 
   let bytes ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.bytes
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.bytes
 
   let string ~encoding_name ?description () =
-    class_spec_of_attr ~encoding_name ?description Attr.string
+    Helpers.class_spec_of_attr ~encoding_name ?description Attr.string
 
   let byte_group =
     {
       (* TODO/nice to have: Add a docstring, i.e. [?description]
                             to custom defined class spec. *)
-      (default_class_spec ~encoding_name:"group" ())
+      (Helpers.default_class_spec ~encoding_name:"group" ())
       with
-      seq = [{Attr.u1 with id = "b"}];
+      seq = [{Attr.uint8 with id = "b"}];
       instances =
         [
           ( "has_next",
-            default_instance_spec
+            Helpers.default_instance_spec
               ~id:"has_next"
               Ast.(
                 Compare
@@ -223,7 +209,7 @@ module Class = struct
                     right = IntNum 0;
                   }) );
           ( "value",
-            default_instance_spec
+            Helpers.default_instance_spec
               ~id:"value"
               (BinOp {left = Name "b"; op = BitAnd; right = IntNum 127}) );
         ];
@@ -232,7 +218,7 @@ module Class = struct
 
   let repeat_until_end_bytes_group_attr =
     {
-      default_attr_spec with
+      Helpers.default_attr_spec with
       id = "groups";
       dataType = DataType.(ComplexDataType (UserType byte_group));
       cond =
@@ -251,7 +237,7 @@ module Class = struct
     }
 
   let n ~encoding_name ?description () =
-    class_spec_of_attr
+    Helpers.class_spec_of_attr
       ~encoding_name
       ?description
       repeat_until_end_bytes_group_attr
@@ -260,7 +246,7 @@ module Class = struct
     let instances =
       [
         ( "is_negative",
-          default_instance_spec
+          Helpers.default_instance_spec
             ~id:"is_negative"
             Ast.(
               Compare
@@ -284,7 +270,7 @@ module Class = struct
                 }) );
       ]
     in
-    class_spec_of_attr
+    Helpers.class_spec_of_attr
       ~encoding_name
       ?description
       repeat_until_end_bytes_group_attr
