@@ -738,8 +738,8 @@ let empty_mempool_file ?(filename = "mempool.json") () =
 
 let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-    ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?force
-    ?context_path ?dal_node_endpoint client =
+    ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
+    ?force ?context_path ?dal_node_endpoint client =
   spawn_command
     ?endpoint
     client
@@ -757,13 +757,14 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     @ optional_arg "operations-pool" Fun.id mempool
     @ (if ignore_node_mempool then ["--ignore-node-mempool"] else [])
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
+    @ optional_arg "count" string_of_int count
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
     @ optional_arg "dal-node" Fun.id dal_node_endpoint)
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path ?dal_node_endpoint
+    ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
     ?expect_failure client =
   spawn_bake_for
     ?endpoint
@@ -774,6 +775,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_timestamp
     ?mempool
     ?ignore_node_mempool
+    ?count
     ?force
     ?context_path
     ?protocol
@@ -783,8 +785,8 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
 
 let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path ?level_before ?node
-    ?dal_node_endpoint client =
+    ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
+    ?node ?dal_node_endpoint client =
   let node =
     match node with
     | Some n -> n
@@ -811,6 +813,7 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
       ?minimal_timestamp
       ?mempool
       ?ignore_node_mempool
+      ?count
       ?force
       ?context_path
       ?dal_node_endpoint
@@ -820,8 +823,8 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
 
 let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path ?level_before ?node
-    ?dal_node_endpoint client =
+    ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
+    ?node ?dal_node_endpoint client =
   let* (_level : int) =
     bake_for_and_wait_level
       ?endpoint
@@ -833,6 +836,7 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
       ?minimal_timestamp
       ?mempool
       ?ignore_node_mempool
+      ?count
       ?force
       ?context_path
       ?level_before
