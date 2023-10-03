@@ -165,18 +165,22 @@ struct
 
   type public_inputs = scalar list [@@deriving repr]
 
-  type verifier_inputs =
-    (public_inputs * Input_commitment.public list list) SMap.t
+  type circuit_verifier_input = {
+    public : public_inputs;
+    commitments : Input_commitment.public list list;
+  }
   [@@deriving repr]
+
+  type verifier_inputs = circuit_verifier_input SMap.t [@@deriving repr]
 
   let to_verifier_inputs (pp : prover_public_parameters) inputs =
     let vi = Main_Pack.to_verifier_inputs pp.main_pp inputs in
     SMap.mapi
-      (fun circuit_name (pi, ic) ->
+      (fun circuit_name Main_Pack.{public; commitments} ->
         let module PI = (val PIs.get_pi_module circuit_name) in
-        let pi = PI.outer_of_inner (List.map Array.to_list pi) in
-        assert (List.for_all (fun i -> i = []) ic) ;
-        (pi, ic))
+        let public = PI.outer_of_inner (List.map Array.to_list public) in
+        assert (List.for_all (fun i -> i = []) commitments) ;
+        {public; commitments})
       vi
 
   (* We only need to modify the main circuit PP, since it rules them all
@@ -315,7 +319,8 @@ struct
       Aggreg_circuit.compute_switches prover_meta_pp.nb_proofs nb_proofs
     in
     let inner_pi =
-      SMap.find circuit_name inner_pi_map |> fst |> List.map Array.to_list
+      let Main_Pack.{public; _} = SMap.find circuit_name inner_pi_map in
+      List.map Array.to_list public
     in
     let trace =
       let outer_pi = PI.outer_of_inner inner_pi in
@@ -407,7 +412,9 @@ struct
     let meta_proof = SMap.find circuit_name proof.meta_proofs in
     let batch = SMap.find circuit_name proof.batches in
     let ids_batch = SMap.find circuit_name proof.ids_batch |> fst in
-    let pi, input_commitments_list = SMap.find circuit_name inputs in
+    let {public = pi; commitments = input_commitments_list} =
+      SMap.find circuit_name inputs
+    in
     let nb_proofs = List.length input_commitments_list in
     if List.exists (fun l -> l <> []) input_commitments_list then
       raise
@@ -432,7 +439,7 @@ struct
     let inputs =
       SMap.singleton
         ("meta_" ^ circuit_name)
-        ([public_inputs], [[cm_pi; cm_answers]])
+        Main_KZG.{public = [public_inputs]; commitments = [[cm_pi; cm_answers]]}
     in
     Main_KZG.verify pp_aggreg_circuit ~inputs meta_proof
 
@@ -487,10 +494,8 @@ struct
 
   module Internal_for_tests = struct
     let mutate_vi verifier_inputs =
-      let key, (public_inputs, input_commitments_list) =
-        SMap.choose verifier_inputs
-      in
-      match public_inputs with
+      let key, {public; commitments} = SMap.choose verifier_inputs in
+      match public with
       | [] -> None
       | input ->
           let input = Array.of_list input in
@@ -499,7 +504,7 @@ struct
           Some
             (SMap.add
                key
-               (Array.to_list input, input_commitments_list)
+               {public = Array.to_list input; commitments}
                verifier_inputs)
   end
 end

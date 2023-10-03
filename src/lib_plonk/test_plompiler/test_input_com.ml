@@ -76,7 +76,9 @@ let test_input_com () =
   let inputs = Main.{input_commitments; witness = private_inputs} in
   let inputs_map = Kzg.SMap.singleton cname [inputs] in
   let verifier_inputs =
-    Kzg.SMap.singleton cname ([public], [verifier_input_commitments])
+    Kzg.SMap.singleton
+      cname
+      Main.{public = [public]; commitments = [verifier_input_commitments]}
   in
   let proof = Main.prove pp_prv ~inputs:inputs_map in
   let verif_ok = Main.verify pp_vrf ~inputs:verifier_inputs proof in

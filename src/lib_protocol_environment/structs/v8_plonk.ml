@@ -37,7 +37,8 @@ let scalar_array_encoding = Data_encoding.array scalar_encoding
 let verify pp inputs proof =
   let inputs =
     List.map
-      (fun (k, v) -> (k, (v, List.(init (length v) (Fun.const [])))))
+      (fun (k, v) ->
+        (k, {public = v; commitments = List.(init (length v) (Fun.const []))}))
       inputs
   in
   Result.value ~default:false

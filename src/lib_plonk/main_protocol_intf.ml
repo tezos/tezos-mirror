@@ -86,11 +86,16 @@ module type S = sig
   (** The public inputs for one circuit & several statements *)
   type public_inputs [@@deriving repr]
 
+  (** The verifier input for a circuit, represented as the actual number of proofs that have been proved by the prover, the public inputs & the input commitments *)
+  type circuit_verifier_input = {
+    public : public_inputs;
+    commitments : Input_commitment.public list list;
+  }
+  [@@deriving repr]
+
   (** The verifier inputs, represented as a map where each circuit is binded to
       the verifier inputs for this circuit. *)
-  type verifier_inputs =
-    (public_inputs * Input_commitment.public list list) SMap.t
-  [@@deriving repr]
+  type verifier_inputs = circuit_verifier_input SMap.t [@@deriving repr]
 
   (** Conversion from [prover_inputs] to [verifier_inputs]. *)
   val to_verifier_inputs :
