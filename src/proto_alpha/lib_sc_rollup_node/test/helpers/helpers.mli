@@ -24,24 +24,23 @@
 (*****************************************************************************)
 
 open Octez_smart_rollup
-open Protocol
-open Alpha_context
 open Octez_smart_rollup_node
 
 (** {1 Helper functions to build and run unit tests for the rollup node} *)
 
 (** {2 Creating Node Contexts} *)
 
-(** [with_node_context ?constants kind ~boot_sector f] creates a node context
-    and (with a store, a context, etc.) where protocol [constants] can be
-    specified, and runs [f] with this node context. The L2 chain is initialized
-    with a genesis block and the PVM with the [boot_sector]. When [f] terminates
-    or fails, the created node context is closed properly. Test that need a node
-    context need to use this function in order to avoid file descriptor
-    leaks. *)
+(** [with_node_context ?constants kind protocol ~boot_sector f] creates a node
+    context and (with a store, a context, etc.) where protocol [constants] can
+    be specified, and runs [f] with this node context. The L2 chain is
+    initialized with a genesis block and the PVM with the [boot_sector] and
+    starts with the specified [protocol]. When [f] terminates or fails, the
+    created node context is closed properly. Test that need a node context need
+    to use this function in order to avoid file descriptor leaks. *)
 val with_node_context :
   ?constants:Rollup_constants.protocol_constants ->
-  Octez_smart_rollup.Kind.t ->
+  Kind.t ->
+  Protocol_hash.t ->
   boot_sector:string ->
   ([`Read | `Write] Node_context.t ->
   genesis:Sc_rollup_block.t ->
@@ -92,14 +91,14 @@ module Assert : sig
   module L2_block : Assert.EQUALITIES with type t = Sc_rollup_block.t
 
   (** Assertions on commitments *)
-  module Commitment : Assert.EQUALITIES with type t = Sc_rollup.Commitment.t
+  module Commitment : Assert.EQUALITIES with type t = Commitment.t
 
   (** Assertions on commitment hashes *)
   module Commitment_hash :
-    Assert.EQUALITIES with type t = Sc_rollup.Commitment.Hash.t
+    Assert.EQUALITIES with type t = Octez_smart_rollup.Commitment.Hash.t
 
   (** Assertions on PVM state hashes *)
-  module State_hash : Assert.EQUALITIES with type t = Sc_rollup.State_hash.t
+  module State_hash : Assert.EQUALITIES with type t = State_hash.t
 end
 
 (** {2 Building and Running tests} *)
@@ -107,10 +106,11 @@ end
 (** Build an alcotest test case that executes with node context initialized with
     a genesis block with the provided [boot_sector]. *)
 val alcotest :
-  string ->
+  ?name:string ->
   Alcotest.speed_level ->
   ?constants:Rollup_constants.protocol_constants ->
-  Octez_smart_rollup.Kind.t ->
+  Kind.t ->
+  Protocol_hash.t ->
   boot_sector:string ->
   ([`Read | `Write] Node_context.t ->
   genesis:Sc_rollup_block.t ->

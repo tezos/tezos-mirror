@@ -83,14 +83,12 @@ let canary_test node_ctxt ~genesis =
 let tests =
   [
     Helpers.alcotest
-      "canary arith"
       `Quick
       Example_arith
+      Protocol.hash
       ~boot_sector:""
       canary_test;
-    Helpers.alcotest "canary wasm" `Quick Wasm_2_0_0 ~boot_sector:"" canary_test;
+    Helpers.alcotest `Quick Wasm_2_0_0 Protocol.hash ~boot_sector:"" canary_test;
   ]
 
-let () =
-  Alcotest_lwt.run ~__FILE__ "canary" [(Protocol.name ^ ": canary", tests)]
-  |> Lwt_main.run
+let () = Alcotest_lwt.run ~__FILE__ "canary" [("canary", tests)] |> Lwt_main.run
