@@ -718,6 +718,13 @@ opam:octez-proxy-server:
   variables:
     package: octez-proxy-server
 
+opam:octez-rpc-process:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_3
+  variables:
+    package: octez-rpc-process
+
 opam:octez-shell-libs:
   extends:
     - .opam_template
@@ -835,7 +842,7 @@ opam:tezos-benchmark:
 opam:tezos-client-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: tezos-client-demo-counter
 
@@ -881,7 +888,7 @@ opam:tezos-dal-node-lib:
 opam:tezos-dal-node-services:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-dal-node-services
 
@@ -935,7 +942,7 @@ opam:tezos-protocol-004-Pt24m4xi:
 opam:tezos-protocol-005-PsBABY5H:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-005-PsBABY5H
 
@@ -1026,7 +1033,7 @@ opam:tezos-protocol-015-PtLimaPt:
 opam:tezos-protocol-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: tezos-protocol-016-PtMumbai
 

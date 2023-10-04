@@ -30,10 +30,15 @@ let fresh_name () =
   incr next_name ;
   "cluster" ^ string_of_int index
 
-let create ?path ?name count arguments =
+let create ?path ?name count ?rpc_local arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   List.map
-    (fun i -> Node.create ?path ~name:(name ^ "." ^ string_of_int i) arguments)
+    (fun i ->
+      Node.create
+        ?path
+        ~name:(name ^ "." ^ string_of_int i)
+        ?rpc_local
+        arguments)
     (range 1 count)
 
 let symmetric_add_peer a b =

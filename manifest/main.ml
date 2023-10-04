@@ -4382,6 +4382,23 @@ let octez_node_config =
         octez_validation |> open_;
       ]
 
+let octez_rpc_process =
+  public_lib
+    "octez-rpc-process"
+    ~path:"src/lib_rpc_process"
+    ~synopsis:"Tezos: RPC process"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_node_config |> open_;
+        octez_rpc_http |> open_;
+        octez_rpc_http_server |> open_;
+        lwt_unix;
+        lwt_exit;
+        prometheus_app;
+      ]
+
 let octez_crawler =
   public_lib
     "octez-crawler"
@@ -7582,7 +7599,7 @@ let _octez_node =
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives" |> open_;
-         octez_base_unix;
+         octez_base_unix |> open_;
          octez_version;
          octez_version_value;
          octez_node_config |> open_;
@@ -7590,6 +7607,7 @@ let _octez_node =
          octez_shell_services |> open_;
          octez_rpc_http |> open_;
          octez_rpc_http_server |> open_;
+         octez_rpc_process |> open_;
          octez_p2p |> open_;
          octez_shell |> open_;
          octez_store |> open_;
