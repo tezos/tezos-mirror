@@ -227,8 +227,14 @@ impl BlockInProgress {
         self.valid_txs.push(transaction.tx_hash);
         self.index += 1;
 
+        // make receipt
+        let receipt = self.make_receipt(receipt_info);
+
+        // extend BIP's logs bloom
+        self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
+
         // store info
-        storage::store_transaction_receipt(host, &self.make_receipt(receipt_info))
+        storage::store_transaction_receipt(host, &receipt)
             .context("Failed to store the receipt")?;
         storage::store_transaction_object(host, &self.make_object(object_info))
             .context("Failed to store the transaction object")?;
