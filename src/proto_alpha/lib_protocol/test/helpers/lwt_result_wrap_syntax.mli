@@ -55,6 +55,14 @@ val ( let*?@ ) :
   ('a -> 'b tzresult Lwt.t) ->
   'b tzresult Lwt.t
 
+(** [let*!@ x = m in f x] is equivalent to [let*! x = wrap m in f x].
+
+      Mnemonic: [@] "wraps" a protocol error in a shell error. *)
+val ( let*!@ ) :
+  'a Environment.Error_monad.tzresult Lwt.t ->
+  ('a tzresult -> 'b Lwt.t) ->
+  'b Lwt.t
+
 (** [let+@ x = m in f x] is equivalent to [let+ x = wrap m in f x].
 
       Mnemonic: [@] "wraps" a protocol error in a shell error. *)
