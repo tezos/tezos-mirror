@@ -1,13 +1,18 @@
 meta:
   id: distributed_db_version__name
   endian: be
+doc: A name for the distributed DB protocol
 types:
-  fixed_bytes:
+  distributed_db_version__name:
+    meta:
+      id: distributed_db_version__name
+      endian: be
     seq:
-    - id: size
-      type: u4
-    - id: value
-      size: size
+    - id: distributed_db_version__name
+      type: variable size bytes
 seq:
+- id: len_distributed_db_version__name
+  type: s4
 - id: distributed_db_version__name
-  type: fixed_bytes
+  type: distributed_db_version__name
+  size: len_distributed_db_version__name

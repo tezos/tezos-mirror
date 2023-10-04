@@ -23,5 +23,5 @@ types:
       repeat: until
       repeat-until: not (_.has_next)
 seq:
-- id: n
+- id: ground__n
   type: n

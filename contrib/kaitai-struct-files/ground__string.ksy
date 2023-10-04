@@ -2,12 +2,16 @@ meta:
   id: ground__string
   endian: be
 types:
-  fixed_bytes:
+  ground__string:
+    meta:
+      id: ground__string
+      endian: be
     seq:
-    - id: size
-      type: u4
-    - id: value
-      size: size
+    - id: ground__string
+      type: variable size bytes
 seq:
+- id: len_ground__string
+  type: s4
 - id: ground__string
-  type: fixed_bytes
+  type: ground__string
+  size: len_ground__string

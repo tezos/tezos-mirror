@@ -198,15 +198,35 @@ let%expect_test "test dynamic size bytes translation" =
       id: ground_bytes
       endian: be
     types:
-      fixed_bytes:
+      ground_bytes:
+        meta:
+          id: ground_bytes
+          endian: be
         seq:
-        - id: size
-          type: u4
-        - id: value
-          size: size
+        - id: ground_bytes
+          type: variable size bytes
     seq:
+    - id: len_ground_bytes
+      type: s4
     - id: ground_bytes
-      type: fixed_bytes |}]
+      type: ground_bytes
+      size: len_ground_bytes |}]
+
+let%expect_test "test fixed size bytes translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"bytes_fixed_32"
+      (Data_encoding.Fixed.bytes 32)
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: bytes_fixed_32
+      endian: be
+    seq:
+    - id: bytes_fixed_32
+      size: 32 |}]
 
 let%expect_test "test dynamic size string translation" =
   let s =
@@ -221,15 +241,19 @@ let%expect_test "test dynamic size string translation" =
       id: ground_string
       endian: be
     types:
-      fixed_bytes:
+      ground_string:
+        meta:
+          id: ground_string
+          endian: be
         seq:
-        - id: size
-          type: u4
-        - id: value
-          size: size
+        - id: ground_string
+          type: variable size bytes
     seq:
+    - id: len_ground_string
+      type: s4
     - id: ground_string
-      type: fixed_bytes |}]
+      type: ground_string
+      size: len_ground_string |}]
 
 let%expect_test "test big numbers translation" =
   let s =
@@ -264,7 +288,7 @@ let%expect_test "test big numbers translation" =
           repeat: until
           repeat-until: not (_.has_next)
     seq:
-    - id: n
+    - id: ground_n
       type: n
   |}]
 
@@ -281,6 +305,28 @@ let%expect_test "test big numbers translation" =
       id: ground_z
       endian: be
     types:
+      z:
+        meta:
+          id: z
+          endian: be
+        types:
+          n_group:
+            instances:
+              has_next:
+                value: ((b & 128) != 0)
+              value:
+                value: (b & 127)
+            seq:
+            - id: b
+              type: u1
+        instances:
+          is_negative:
+            value: (((groups[0].value) >> 6) == 1)
+        seq:
+        - id: n
+          type: n_group
+          repeat: until
+          repeat-until: not (_.has_next)
       n:
         meta:
           id: n
@@ -301,6 +347,6 @@ let%expect_test "test big numbers translation" =
           repeat: until
           repeat-until: not (_.has_next)
     seq:
-    - id: z
-      type: n
+    - id: ground_z
+      type: z
   |}]
