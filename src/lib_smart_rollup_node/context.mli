@@ -56,7 +56,7 @@ type hash = Smart_rollup_context_hash.t
 type commit
 
 (** [load cache_size path] initializes from disk a context from [path].
-    [cache_size] allows to change the LRU cache size of Irmin 
+    [cache_size] allows to change the LRU cache size of Irmin
     (100_000 by default at irmin-pack/config.ml *)
 val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
 
@@ -89,6 +89,18 @@ val empty : 'a index -> 'a t
 (** [is_empty context] returns [true] iff the context content of [context] is
     empty. *)
 val is_empty : _ t -> bool
+
+(** [gc index ?callback hash] removes all data older than [hash] from disk.
+    If passed, [callback] will be executed when garbage collection finishes. *)
+val gc : [> `Write] index -> ?callback:(unit -> unit) -> hash -> unit Lwt.t
+
+(** [is_gc_finished index] returns true if a GC is finished (or idle) and false
+    if a GC is running for [index]. *)
+val is_gc_finished : [> `Write] index -> bool
+
+(** [wait_gc_completion index] will return a blocking thread if a
+    GC run is currently ongoing. *)
+val wait_gc_completion : [> `Write] index -> unit Lwt.t
 
 (** Module for generating and verifying proofs for a context *)
 module Proof (Hash : sig
@@ -172,4 +184,10 @@ module Rollup : sig
 
   val check_or_set_address :
     'a mode -> 'a index -> Octez_smart_rollup.Address.t -> unit tzresult Lwt.t
+end
+
+module Internal_for_tests : sig
+  (** [get_a_tree key] provides a value of internal type [tree] which can be
+      used as a state to be set in the context directly. *)
+  val get_a_tree : string -> tree Lwt.t
 end

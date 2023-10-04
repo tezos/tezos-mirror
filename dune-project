@@ -133,6 +133,7 @@
 (package (name tezos-proxy-server-config))
 (package (name tezos-sc-rollup-node-test)(allow_empty))
 (package (name tezos-scoru-wasm-regressions)(allow_empty))
+(package (name tezos-smart-rollup-node-lib-test)(allow_empty))
 (package (name tezos-tooling))
 (package (name tezos-tps-evaluation))
 (package (name tezos-tree-encoding-test)(allow_empty))

@@ -91,3 +91,27 @@ val detected_protocol_migration : unit -> unit Lwt.t
 (** [acquiring_lock ()] emits an event to indicate that the node is attempting
     to acquire a lock on the data directory. *)
 val acquiring_lock : unit -> unit Lwt.t
+
+(** [calling_gc level] emits and event which indicates that a call to GC was
+    made at [level]. *)
+val calling_gc : int32 -> unit Lwt.t
+
+(** [starting_gc hash] emits and event which indicates that a GC run
+    was launched for [hash]. *)
+val starting_gc : Smart_rollup_context_hash.t -> unit Lwt.t
+
+(** [gc_already_launched ()] emits an event which indicates that a GC launch
+    was attempted but resulted in no action because a GC run is already
+    in progress. *)
+val gc_already_launched : unit -> unit Lwt.t
+
+(** [ending_gc total_duration finalise_duration] emits an event which indicates
+    that a GC run has ended, providing its total duration and its finalisation
+    duration. *)
+val ending_gc : Ptime.span * Ptime.span -> unit Lwt.t
+
+(** [gc_failure err] emits an event which indicates a GC failure. *)
+val gc_failure : string -> unit Lwt.t
+
+(** [gc_launch_failure err] emits an event which indicates a GC launch error. *)
+val gc_launch_failure : string -> unit Lwt.t

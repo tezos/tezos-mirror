@@ -113,6 +113,8 @@ let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
     IStore.Repo.v
       (Irmin_pack.config
          ~readonly
+           (* Note that the use of GC in the context requires that
+            * the [always] indexing strategy not be used. *)
          ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
          ~lru_size:cache_size
          path)
@@ -144,6 +146,48 @@ let checkout index key =
 let empty index = {index; tree = IStore.Tree.empty ()}
 
 let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
+
+(* adapted from lib_context/disk/context.ml *)
+let gc index ?(callback : unit -> unit = fun () -> ()) (hash : hash) =
+  let open Lwt_syntax in
+  let repo = index.repo in
+  let istore_hash = hash_to_istore_hash hash in
+  let* commit_opt = IStore.Commit.of_hash index.repo istore_hash in
+  match commit_opt with
+  | None ->
+      Fmt.failwith "%a: unknown context hash" Smart_rollup_context_hash.pp hash
+  | Some commit -> (
+      let finished = function
+        | Ok (stats : Irmin_pack_unix.Stats.Latest_gc.stats) ->
+            let total_duration =
+              Irmin_pack_unix.Stats.Latest_gc.total_duration stats
+            in
+            let finalise_duration =
+              Irmin_pack_unix.Stats.Latest_gc.finalise_duration stats
+            in
+            callback () ;
+            Event.ending_gc
+              ( Time.System.Span.of_seconds_exn total_duration,
+                Time.System.Span.of_seconds_exn finalise_duration )
+        | Error (`Msg err) -> Event.gc_failure err
+      in
+      let commit_key = IStore.Commit.key commit in
+      let* launch_result = IStore.Gc.run ~finished repo commit_key in
+      match launch_result with
+      | Error (`Msg err) -> Event.gc_launch_failure err
+      | Ok false -> Event.gc_already_launched ()
+      | Ok true -> Event.starting_gc hash)
+
+let wait_gc_completion index =
+  let open Lwt_syntax in
+  let* r = IStore.Gc.wait index.repo in
+  match r with
+  | Ok _stats_opt -> return_unit
+  | Error (`Msg _msg) ->
+      (* Logs will be printed by the [gc] caller. *)
+      return_unit
+
+let is_gc_finished index = IStore.Gc.is_finished index.repo
 
 let index context = context.index
 
@@ -335,3 +379,9 @@ let load :
     | Read_write -> Version.check_and_set index
   in
   index
+
+module Internal_for_tests = struct
+  let get_a_tree key =
+    let tree = IStore.Tree.empty () in
+    IStore.Tree.add tree [key] Bytes.empty
+end
