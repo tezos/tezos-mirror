@@ -177,12 +177,15 @@ let reply_public_json ?status ?(headers = []) encoding data =
     encoding
     data
 
-let reply_compressed_json ?status ?(headers = []) encoding data =
-  reply_compressed_json0
-    ?status
-    ~headers:(("Content-Encoding", "gzip") :: headers)
-    encoding
-    data
+let reply_compressed_json ?status ?headers request_header encoding data =
+  let rec aux = function
+    | [] | (_, Cohttp.Accept.Identity) :: _ ->
+        reply_json ?status ?headers encoding data
+    | (_, Cohttp.Accept.Gzip) :: _ ->
+        reply_compressed_json0 ?status ?headers encoding data
+    | _ :: t -> aux t
+  in
+  aux Cohttp.(Accept.qsort (Header.get_acceptable_encodings request_header))
 
 let reply_public_compressed_json ?status ?(headers = []) encoding data =
   reply_compressed_json
@@ -687,7 +690,7 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str ".json";
         ],
-      fun g ~conf ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~conf ~admins:_ ~users:_ db_pool header meth _body ->
         get_only_endpoint meth (fun () ->
             let min = Re.Group.get g 1 in
             let max = Re.Group.get g 2 in
@@ -706,6 +709,7 @@ let routes :
                    (Int32.of_string min, Int32.of_string max))
                 (fun data ->
                   reply_public_compressed_json
+                    header
                     Teztale_lib.Data.batch_encoding
                     data)) );
     ( Re.seq
