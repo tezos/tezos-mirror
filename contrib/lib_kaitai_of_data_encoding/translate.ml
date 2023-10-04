@@ -83,10 +83,18 @@ let rec seq_field_of_data_encoding :
   | Int64 -> (enums, types, [Ground.Attr.int64 ~id])
   | Int31 -> (enums, types, [Ground.Attr.int31 ~id])
   | Float -> (enums, types, [Ground.Attr.float ~id])
-  | Bytes (`Fixed n, _) -> (enums, types, [Ground.Attr.bytes_fixed ~id n])
-  | Bytes (`Variable, _) -> (enums, types, [Ground.Attr.bytes_eos ~id])
-  | String (`Fixed n, _) -> (enums, types, [Ground.Attr.string_fixed ~id n])
-  | String (`Variable, _) -> (enums, types, [Ground.Attr.string_eos ~id])
+  | Bytes (`Fixed n, _) -> (enums, types, [Ground.Attr.bytes ~id (Fixed n)])
+  | Bytes (`Variable, _) -> (enums, types, [Ground.Attr.bytes ~id Variable])
+  | Dynamic_size {kind; encoding = {encoding = Bytes (`Variable, _); _}} ->
+      let size_id = "len_" ^ id in
+      let size_attr = Ground.Attr.binary_length_kind ~id:size_id kind in
+      (enums, types, [size_attr; Ground.Attr.bytes ~id (Dynamic size_id)])
+  | String (`Fixed n, _) -> (enums, types, [Ground.Attr.string ~id (Fixed n)])
+  | String (`Variable, _) -> (enums, types, [Ground.Attr.string ~id Variable])
+  | Dynamic_size {kind; encoding = {encoding = String (`Variable, _); _}} ->
+      let size_id = "len_" ^ id in
+      let size_attr = Ground.Attr.binary_length_kind ~id:size_id kind in
+      (enums, types, [size_attr; Ground.Attr.string ~id (Dynamic size_id)])
   | N ->
       let types = Helpers.add_uniq_assoc types Ground.Type.n in
       (enums, types, [Ground.Attr.n ~id])

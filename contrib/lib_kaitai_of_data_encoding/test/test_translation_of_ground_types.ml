@@ -197,19 +197,10 @@ let%expect_test "test dynamic size bytes translation" =
     meta:
       id: ground_bytes
       endian: be
-    types:
-      ground_bytes:
-        meta:
-          id: ground_bytes
-          endian: be
-        seq:
-        - id: ground_bytes
-          size-eos: true
     seq:
     - id: len_ground_bytes
       type: s4
     - id: ground_bytes
-      type: ground_bytes
       size: len_ground_bytes |}]
 
 let%expect_test "test fixed size bytes translation" =
@@ -228,6 +219,22 @@ let%expect_test "test fixed size bytes translation" =
     - id: bytes_fixed_32
       size: 32 |}]
 
+let%expect_test "test variable size bytes translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"bytes_variable"
+      Data_encoding.Variable.bytes
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: bytes_variable
+      endian: be
+    seq:
+    - id: bytes_variable
+      size-eos: true |}]
+
 let%expect_test "test dynamic size string translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
@@ -240,19 +247,10 @@ let%expect_test "test dynamic size string translation" =
     meta:
       id: ground_string
       endian: be
-    types:
-      ground_string:
-        meta:
-          id: ground_string
-          endian: be
-        seq:
-        - id: ground_string
-          size-eos: true
     seq:
     - id: len_ground_string
       type: s4
     - id: ground_string
-      type: ground_string
       size: len_ground_string |}]
 
 let%expect_test "test big numbers translation" =

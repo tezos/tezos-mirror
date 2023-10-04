@@ -202,8 +202,6 @@ module Attr = struct
 
   let int16 ~id = int_multi_type_atrr_spec ~id ~signed:true DataType.W2
 
-  let uint32 ~id = int_multi_type_atrr_spec ~id ~signed:false DataType.W4
-
   let int32 ~id = int_multi_type_atrr_spec ~id ~signed:true DataType.W4
 
   let int64 ~id = int_multi_type_atrr_spec ~id ~signed:true DataType.W8
@@ -222,69 +220,63 @@ module Attr = struct
 
   let float ~id = float_multi_type_attr_spec ~id
 
-  let bytes_limit_type_attr_spec ~id =
-    {
-      Helpers.default_attr_spec with
-      id;
-      dataType =
-        DataType.(
-          BytesType
-            (BytesLimitType
-               {
-                 size = Name "size";
-                 terminator = None;
-                 include_ = false;
-                 padRight = None;
-                 process = None;
-               }));
-    }
+  type byte_size =
+    | Fixed of int  (** [size: <int>] *)
+    | Dynamic of string  (** [size: <name>] *)
+    | Variable  (** [size-eos: true] *)
 
-  let fixed_size_header_class_spec =
-    {
-      (* TODO / nice to have: Add a docstring, i.e. [?description]
-                              to custom defined class spec. *)
-      (Helpers.default_class_spec ~encoding_name:"fixed_bytes" ())
-      with
-      seq = [uint32 ~id:"size"; bytes_limit_type_attr_spec ~id:"value"];
-      isTopLevel = false;
-    }
+  let bytes ~id = function
+    | Fixed n ->
+        {
+          Helpers.default_attr_spec with
+          id;
+          dataType =
+            DataType.(
+              BytesType
+                (BytesLimitType
+                   {
+                     size = Ast.IntNum n;
+                     terminator = None;
+                     include_ = false;
+                     padRight = None;
+                     process = None;
+                   }));
+          size = Some (Ast.IntNum n);
+        }
+    | Dynamic size_id ->
+        {
+          Helpers.default_attr_spec with
+          id;
+          dataType =
+            DataType.(
+              BytesType
+                (BytesLimitType
+                   {
+                     size = Ast.Name size_id;
+                     terminator = None;
+                     include_ = false;
+                     padRight = None;
+                     process = None;
+                   }));
+          size = Some (Ast.Name size_id);
+        }
+    | Variable ->
+        {
+          Helpers.default_attr_spec with
+          id;
+          dataType =
+            DataType.(
+              BytesType
+                (BytesEosType
+                   {
+                     terminator = None;
+                     include_ = false;
+                     padRight = None;
+                     process = None;
+                   }));
+        }
 
-  let bytes ~id =
-    (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
-              We fix size header to [`Uint30] for now. This corresponds to
-              size header of ground bytes encoding. Later on we want to add
-              support for [`Uint16], [`Uint8] and [`N]. *)
-    {
-      Helpers.default_attr_spec with
-      id;
-      dataType =
-        DataType.(ComplexDataType (UserType fixed_size_header_class_spec));
-    }
-
-  let bytes_eos ~id =
-    {
-      Helpers.default_attr_spec with
-      id;
-      dataType =
-        DataType.(
-          BytesType
-            (BytesEosType
-               {
-                 terminator = None;
-                 include_ = false;
-                 padRight = None;
-                 process = None;
-               }));
-    }
-
-  let bytes_fixed ~id n =
-    {Helpers.default_attr_spec with id; size = Some (Ast.IntNum n)}
-
-  let string ~id = bytes ~id
-
-  let string_fixed ~id n = bytes_fixed ~id n
-
-  let string_eos ~id = bytes_eos ~id
+  let string = bytes
 
   let n ~id =
     {
@@ -299,4 +291,11 @@ module Attr = struct
       id;
       dataType = DataType.(ComplexDataType (UserType (snd Type.z)));
     }
+
+  let binary_length_kind ~id kind =
+    match kind with
+    | `N -> failwith "Not implemented"
+    | `Uint30 -> uint30 ~id
+    | `Uint16 -> uint16 ~id
+    | `Uint8 -> uint8 ~id
 end

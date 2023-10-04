@@ -89,38 +89,20 @@ ground.bytes test
   meta:
     id: ground__bytes
     endian: be
-  types:
-    ground__bytes:
-      meta:
-        id: ground__bytes
-        endian: be
-      seq:
-      - id: ground__bytes
-        size-eos: true
   seq:
   - id: len_ground__bytes
     type: s4
   - id: ground__bytes
-    type: ground__bytes
     size: len_ground__bytes
 ground.string test
   $ ./codec.exe dump kaitai for ground.string
   meta:
     id: ground__string
     endian: be
-  types:
-    ground__string:
-      meta:
-        id: ground__string
-        endian: be
-      seq:
-      - id: ground__string
-        size-eos: true
   seq:
   - id: len_ground__string
     type: s4
   - id: ground__string
-    type: ground__string
     size: len_ground__string
 ground.N test
   $ ./codec.exe dump kaitai for ground.N

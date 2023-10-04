@@ -95,31 +95,33 @@ module Attr : sig
   (** [float ~id] is an [AttrSpec.t] definition of 64-bit float. *)
   val float : id:string -> AttrSpec.t
 
-  (** [bytes ~id] is an [AttrSpec.t] definition of [Data_encoding.bytes]. *)
-  val bytes : id:string -> AttrSpec.t
+  (** [byte_size] is a description of the different kinds of sizing that bytes
+      (and strings) can have in data-encoding. *)
+  type byte_size =
+    | Fixed of int  (** Fixed known size, makes [size: <int>] in kaitai *)
+    | Dynamic of string
+        (** Dynamic size header, the string is the [id] of the
+                             header field, makes [size: <name>] in kaitai *)
+    | Variable
+        (** Unknown size (until end of stream), makes [size-eos: true]
+                    in kaitai *)
 
-  (** [string ~id] is an [AttrSpec.t] definition of [Data_encoding.string]. *)
-  val string : id:string -> AttrSpec.t
+  (** [bytes] is an [AttrSpec.t] definition of [Data_encoding.bytes]. See
+      [byte_size] for details about this parameter. *)
+  val bytes : id:string -> byte_size -> AttrSpec.t
 
-  (** [bytes_fixed] is an [AttrSpec.t] definition of [Data_encoding.bytes] of
-      fixed length. *)
-  val bytes_fixed : id:string -> int -> AttrSpec.t
-
-  (** [string_fixed] is an [AttrSpec.t] definition of [Data_encoding.string] of
-      fixed length. *)
-  val string_fixed : id:string -> int -> AttrSpec.t
-
-  (** [bytes_eos] is an [AttrSpec.t] definition of [Data_encoding.bytes] of
-      variable length. *)
-  val bytes_eos : id:string -> AttrSpec.t
-
-  (** [string_eos] is an [AttrSpec.t] definition of [Data_encoding.string] of
-      variable length. *)
-  val string_eos : id:string -> AttrSpec.t
+  (** [string] is an [AttrSpec.t] definition of [Data_encoding.string]. See
+      [bytes] for detail. *)
+  val string : id:string -> byte_size -> AttrSpec.t
 
   (** [n] is an [AttrSpec.t] definition of [Data_encoding.n]. *)
   val n : id:string -> AttrSpec.t
 
   (** [z] is an [AttrSpec.t] definition of [Data_encoding.z]. *)
   val z : id:string -> AttrSpec.t
+
+  (** [binary_length_kind ~id k] is an [AttrSpec.t] definition for the
+    [Data_encoding__Binary_length.length] type. *)
+  val binary_length_kind :
+    id:string -> [`N | `Uint30 | `Uint16 | `Uint8] -> AttrSpec.t
 end
