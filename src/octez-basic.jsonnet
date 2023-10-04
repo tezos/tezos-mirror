@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -36,9 +36,9 @@ local boardtitle = 'Octez basic dashboard';
 
 //Position variables
 local p2p_y = 39;
-local worker_y = 56;
-local rpc_y = 81;
-local misc_y = 98;
+local worker_y = 72;
+local rpc_y = 97;
+local misc_y = 114;
 
 //###
 // Grafana main stuffs
@@ -106,6 +106,17 @@ dashboard.new(
 
     p2p.peers { gridPos: { h: 8, w: 12, x: 0, y: p2p_y + 8 } },
     p2p.points { gridPos: { h: 8, w: 12, x: 12, y: p2p_y + 8 } },
+
+    p2p.DDBCurrentHead { gridPos: { h: 8, w: 6, x: 0, y: p2p_y + 16 } },
+    p2p.DDBCurrentBranch { gridPos: { h: 8, w: 6, x: 6, y: p2p_y + 16 } },
+    p2p.DDBBlockHeaders { gridPos: { h: 8, w: 6, x: 12, y: p2p_y + 16 } },
+    p2p.DDBPredHeader { gridPos: { h: 8, w: 6, x: 18, y: p2p_y + 16 } },
+    p2p.DDBOperations { gridPos: { h: 8, w: 6, x: 0, y: p2p_y + 24 } },
+    p2p.DDBOps4Blocks { gridPos: { h: 8, w: 6, x: 6, y: p2p_y + 24 } },
+    p2p.DDBProtocols { gridPos: { h: 8, w: 3, x: 12, y: p2p_y + 24 } },
+    p2p.DDBProtoBranch { gridPos: { h: 8, w: 3, x: 15, y: p2p_y + 24 } },
+    p2p.DDBCheckpoint { gridPos: { h: 8, w: 3, x: 18, y: p2p_y + 24 } },
+    p2p.DDBDeactivate { gridPos: { h: 8, w: 3, x: 21, y: p2p_y + 24 } },
 
     //#######
     row.new(

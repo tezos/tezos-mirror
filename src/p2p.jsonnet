@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -251,5 +251,388 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
         instant=true
       ),
     ]).hideColumn('Time'),
+
+
+  DDBCurrentHead:
+    local get_broadcasted = 'get current head broadcasted';
+    local get_sent = 'get current head sent';
+    local received = 'current head received';
+    local get_received = 'get current head received';
+    local sent = 'current head sent';
+    local broadcasted = 'current head broadcasted';
+    graphPanel.new(
+      title='DDB current head messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_broadcasted]: 'green',
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+        [broadcasted]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_current_head_messages{action="broadcasted",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_broadcasted,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_current_head_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_current_head_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_current_head_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_current_head_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_current_head_messages{action="broadcasted",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=broadcasted,
+      ),
+    ]),
+
+  DDBCurrentBranch:
+    local get_sent = 'get current branch sent';
+    local received = 'current branch received';
+    local get_received = 'get current branch received';
+    local sent = 'current branch sent';
+    graphPanel.new(
+      title='DDB current branch messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_current_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_current_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_current_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_current_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBBlockHeaders:
+    local get_sent = 'get block headers sent';
+    local received = 'block header received';
+    local get_received = 'get block headers received';
+    local sent = 'block header sent';
+    graphPanel.new(
+      title='DDB block headers messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_block_headers_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_block_header_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_block_headers_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_block_header_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBPredHeader:
+    local get_sent = 'get predecessor header sent';
+    local received = 'predecessor header received';
+    local get_received = 'get predecessor header received';
+    local sent = 'predecessor header sent';
+    graphPanel.new(
+      title='DDB predecessor header messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_predecessor_header_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_predecessor_header_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_predecessor_header_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_predecessor_header_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBOperations:
+    local get_sent = 'get operations sent';
+    local received = 'operation received';
+    local get_received = 'get operations received';
+    local sent = 'operation sent';
+    graphPanel.new(
+      title='DDB operations messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_operations_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_operation_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_operations_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_operation_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBOps4Blocks:
+    local get_sent = 'get ops for blocks sent';
+    local received = 'ops for block received';
+    local get_received = 'get ops for blocks received';
+    local sent = 'ops for block sent';
+    graphPanel.new(
+      title='DDB operations for blocks messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_operations_for_blocks_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_operations_for_block_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_operations_for_blocks_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_operations_for_block_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBProtocols:
+    local get_sent = 'get protocols sent';
+    local received = 'protocol received';
+    local get_received = 'get protocols received';
+    local sent = 'protocol sent';
+    graphPanel.new(
+      title='DDB protocols messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_protocols_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_protocol_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_protocols_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_protocol_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBProtoBranch:
+    local get_sent = 'get protocol branch sent';
+    local received = 'protocol branch received';
+    local get_received = 'get protocol branch received';
+    local sent = 'protocol branch sent';
+    graphPanel.new(
+      title='DDB protocol branch messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_protocol_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_protocol_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_protocol_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_protocol_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBCheckpoint:
+    local get_sent = 'get checkpoint sent';
+    local received = 'checkpoint received';
+    local get_received = 'get checkpoint received';
+    local sent = 'checkpoint sent';
+    graphPanel.new(
+      title='DDB checkpoint messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_checkpoint_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_checkpoint_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_checkpoint_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_checkpoint_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
+
+  DDBDeactivate:
+    local get_sent = 'get deactivate sent';
+    local received = 'deactivate received';
+    local get_received = 'get deactivate received';
+    local sent = 'deactivate sent';
+    graphPanel.new(
+      title='DDB deactivate messages',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      logBase1Y=10,
+      aliasColors={
+        [get_sent]: 'green',
+        [received]: 'light-blue',
+        [get_received]: 'blue',
+        [sent]: 'light-green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_distributed_db_message_get_deactivate_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_sent,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_deactivate_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_get_deactivate_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=get_received,
+      ),
+      prometheus.target(
+        namespace + '_distributed_db_message_deactivate_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
+        legendFormat=sent,
+      ),
+    ]),
 
 }
