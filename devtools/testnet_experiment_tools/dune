@@ -33,6 +33,9 @@
   octez-libs.base.unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
+  octez-shell-libs.store
+  octez-shell-libs.store.shared
+  octez-libs.tezos-context
   octez-protocol-017-PtNairob-libs.baking
   octez-protocol-017-PtNairob-libs.client
   octez-protocol-017-PtNairob-libs.client.commands
@@ -52,7 +55,10 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_client_base
-  -open Tezos_client_base_unix)
+  -open Tezos_client_base_unix
+  -open Tezos_store
+  -open Tezos_store_shared
+  -open Tezos_context)
  (modules sigs tool_017_PtNairob tool_018_Proxford tool_alpha))
 
 (executable
