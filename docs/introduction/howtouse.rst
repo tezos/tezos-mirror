@@ -629,6 +629,26 @@ Other binaries
 
 In this short tutorial we will not use some other binaries, but let as briefly review their roles.
 
+.. _octez-admin-client:
+
+Admin Client
+~~~~~~~~~~~~
+
+The admin client enables you to interact with the peer-to-peer layer in order
+to:
+
+- check the status of the connections
+- force connections to known peers
+- ban/unban peers
+
+A useful command to debug a node that is not syncing is:
+
+::
+
+   octez-admin-client p2p stat
+
+The admin client uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+
 Codec
 ~~~~~
 

@@ -151,7 +151,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: User doc
+   :caption: Octez manual
    :hidden:
 
    user/setup-client
@@ -159,7 +159,7 @@ Platform developers are also provided reference materials for internal APIs of O
    user/multisig
    user/fa12
    user/logging
-   user/various
+   user/exits
 
 .. toctree::
    :maxdepth: 2
