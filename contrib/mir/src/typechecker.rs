@@ -154,13 +154,11 @@ fn typecheck_instruction(
         };
     }
 
-    let gas = &mut ctx.gas;
-
     if stack.is_failed() {
         return Err(TcError::FailNotInTail);
     }
 
-    gas.consume(gas::tc_cost::INSTR_STEP)?;
+    ctx.gas.consume(gas::tc_cost::INSTR_STEP)?;
 
     Ok(match i {
         I::Add(..) => {
@@ -190,7 +188,7 @@ fn typecheck_instruction(
         I::Dip(opt_height, nested) => {
             let protected_height = opt_height.unwrap_or(1) as usize;
 
-            gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
+            ctx.gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
             ensure_stack_len("DIP", stack, protected_height)?;
             // Here we split off the protected portion of the stack, typecheck the code with the
@@ -205,7 +203,7 @@ fn typecheck_instruction(
         }
         I::Drop(opt_height) => {
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
-            gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
+            ctx.gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len("DROP", stack, drop_height)?;
             stack.drop_top(drop_height);
             I::Drop(opt_height)

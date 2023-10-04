@@ -69,34 +69,32 @@ fn interpret_one(
         };
     }
 
-    let gas = &mut ctx.gas;
-
     match i {
         I::Add(overload) => match overload {
             overloads::Add::IntInt => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Int);
-                gas.consume(interpret_cost::add_int(o1, o2)?)?;
+                ctx.gas.consume(interpret_cost::add_int(o1, o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Int(sum));
             }
             overloads::Add::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Nat);
-                gas.consume(interpret_cost::add_int(o1, o2)?)?;
+                ctx.gas.consume(interpret_cost::add_int(o1, o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Nat(sum));
             }
             overloads::Add::MutezMutez => {
                 let o1 = pop!(V::Mutez);
                 let o2 = pop!(V::Mutez);
-                gas.consume(interpret_cost::ADD_TEZ)?;
+                ctx.gas.consume(interpret_cost::ADD_TEZ)?;
                 let sum = o1.checked_add(o2).ok_or(InterpretError::MutezOverflow)?;
                 stack.push(V::Mutez(sum));
             }
         },
         I::Dip(opt_height, nested) => {
-            gas.consume(interpret_cost::dip(*opt_height)?)?;
+            ctx.gas.consume(interpret_cost::dip(*opt_height)?)?;
             let protected_height: u16 = opt_height.unwrap_or(1);
             let mut protected = stack.split_off(protected_height as usize);
             interpret(nested, ctx, stack)?;
@@ -104,22 +102,22 @@ fn interpret_one(
             stack.append(&mut protected);
         }
         I::Drop(opt_height) => {
-            gas.consume(interpret_cost::drop(*opt_height)?)?;
+            ctx.gas.consume(interpret_cost::drop(*opt_height)?)?;
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
             stack.drop_top(drop_height);
         }
         I::Dup(opt_height) => {
-            gas.consume(interpret_cost::dup(*opt_height)?)?;
+            ctx.gas.consume(interpret_cost::dup(*opt_height)?)?;
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             stack.push(stack[dup_height - 1].clone());
         }
         I::Gt => {
-            gas.consume(interpret_cost::GT)?;
+            ctx.gas.consume(interpret_cost::GT)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(i > 0));
         }
         I::If(nested_t, nested_f) => {
-            gas.consume(interpret_cost::IF)?;
+            ctx.gas.consume(interpret_cost::IF)?;
             if pop!(V::Bool) {
                 interpret(nested_t, ctx, stack)?;
             } else {
@@ -127,7 +125,7 @@ fn interpret_one(
             }
         }
         I::IfNone(when_none, when_some) => {
-            gas.consume(interpret_cost::IF_NONE)?;
+            ctx.gas.consume(interpret_cost::IF_NONE)?;
             match pop!(V::Option) {
                 Some(x) => {
                     stack.push(*x);
@@ -138,11 +136,11 @@ fn interpret_one(
         }
         I::Int => {
             let i = pop!(V::Nat);
-            gas.consume(interpret_cost::INT_NAT)?;
+            ctx.gas.consume(interpret_cost::INT_NAT)?;
             stack.push(V::Int(i.try_into().unwrap()));
         }
         I::Loop(nested) => {
-            gas.consume(interpret_cost::LOOP_ENTER)?;
+            ctx.gas.consume(interpret_cost::LOOP_ENTER)?;
             loop {
                 ctx.gas.consume(interpret_cost::LOOP)?;
                 if pop!(V::Bool) {
@@ -154,11 +152,11 @@ fn interpret_one(
             }
         }
         I::Push(v) => {
-            gas.consume(interpret_cost::PUSH)?;
+            ctx.gas.consume(interpret_cost::PUSH)?;
             stack.push(v.clone());
         }
         I::Swap => {
-            gas.consume(interpret_cost::SWAP)?;
+            ctx.gas.consume(interpret_cost::SWAP)?;
             stack.swap(0, 1);
         }
         I::Failwith => {
@@ -166,50 +164,50 @@ fn interpret_one(
             return Err(InterpretError::FailedWith(x));
         }
         I::Unit => {
-            gas.consume(interpret_cost::UNIT)?;
+            ctx.gas.consume(interpret_cost::UNIT)?;
             stack.push(V::Unit);
         }
         I::Car => {
-            gas.consume(interpret_cost::CAR)?;
+            ctx.gas.consume(interpret_cost::CAR)?;
             pop!(V::Pair, l, _r);
             stack.push(*l);
         }
         I::Cdr => {
-            gas.consume(interpret_cost::CDR)?;
+            ctx.gas.consume(interpret_cost::CDR)?;
             pop!(V::Pair, _l, r);
             stack.push(*r);
         }
         I::Pair => {
-            gas.consume(interpret_cost::PAIR)?;
+            ctx.gas.consume(interpret_cost::PAIR)?;
             let l = pop!();
             let r = pop!();
             stack.push(V::new_pair(l, r));
         }
         I::ISome => {
-            gas.consume(interpret_cost::SOME)?;
+            ctx.gas.consume(interpret_cost::SOME)?;
             let v = pop!();
             stack.push(V::new_option(Some(v)));
         }
         I::Compare => {
             let l = pop!();
             let r = pop!();
-            gas.consume(interpret_cost::compare(&l, &r)?)?;
+            ctx.gas.consume(interpret_cost::compare(&l, &r)?)?;
             let cmp = l.partial_cmp(&r).expect("comparison failed") as i8;
             stack.push(V::Int(cmp.into()));
         }
         I::Amount => {
-            gas.consume(interpret_cost::AMOUNT)?;
+            ctx.gas.consume(interpret_cost::AMOUNT)?;
             stack.push(V::Mutez(ctx.amount));
         }
         I::Nil(..) => {
-            gas.consume(interpret_cost::NIL)?;
+            ctx.gas.consume(interpret_cost::NIL)?;
             stack.push(V::List(vec![]));
         }
         I::Get(overload) => match overload {
             overloads::Get::Map => {
                 let key = pop!();
                 let map = pop!(V::Map);
-                gas.consume(interpret_cost::map_get(&key, map.len())?)?;
+                ctx.gas.consume(interpret_cost::map_get(&key, map.len())?)?;
                 let result = map.get(&key);
                 stack.push(V::new_option(result.cloned()));
             }
@@ -219,7 +217,8 @@ fn interpret_one(
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
                 let mut map = pop!(V::Map);
-                gas.consume(interpret_cost::map_update(&key, map.len())?)?;
+                ctx.gas
+                    .consume(interpret_cost::map_update(&key, map.len())?)?;
                 match opt_new_val {
                     None => map.remove(&key),
                     Some(val) => map.insert(key, *val),
