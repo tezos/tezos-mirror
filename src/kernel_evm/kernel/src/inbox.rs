@@ -398,17 +398,27 @@ mod tests {
             Input::NewChunkedTransaction {
                 tx_hash,
                 num_chunks,
+                chunk_hashes,
             } => {
                 // New chunked transaction tag
                 buffer.push(1);
                 buffer.extend_from_slice(&tx_hash);
-                buffer.extend_from_slice(&u16::to_le_bytes(num_chunks))
+                buffer.extend_from_slice(&u16::to_le_bytes(num_chunks));
+                for chunk_hash in chunk_hashes.iter() {
+                    buffer.extend_from_slice(chunk_hash)
+                }
             }
-            Input::TransactionChunk { tx_hash, i, data } => {
+            Input::TransactionChunk {
+                tx_hash,
+                i,
+                chunk_hash,
+                data,
+            } => {
                 // Transaction chunk tag
                 buffer.push(2);
                 buffer.extend_from_slice(&tx_hash);
                 buffer.extend_from_slice(&u16::to_le_bytes(i));
+                buffer.extend_from_slice(&chunk_hash);
                 buffer.extend_from_slice(&data);
             }
             _ => (),
@@ -417,13 +427,20 @@ mod tests {
     }
 
     fn make_chunked_transactions(tx_hash: TransactionHash, data: Vec<u8>) -> Vec<Input> {
+        let mut chunk_hashes = vec![];
         let mut chunks: Vec<Input> = data
             .chunks(MAX_SIZE_PER_CHUNK)
             .enumerate()
-            .map(|(i, bytes)| Input::TransactionChunk {
-                tx_hash,
-                i: i as u16,
-                data: bytes.to_vec(),
+            .map(|(i, bytes)| {
+                let data = bytes.to_vec();
+                let chunk_hash = Keccak256::digest(&data).try_into().unwrap();
+                chunk_hashes.push(chunk_hash);
+                Input::TransactionChunk {
+                    tx_hash,
+                    i: i as u16,
+                    chunk_hash,
+                    data,
+                }
             })
             .collect();
         let number_of_chunks = chunks.len() as u16;
@@ -431,6 +448,7 @@ mod tests {
         let new_chunked_transaction = Input::NewChunkedTransaction {
             tx_hash,
             num_chunks: number_of_chunks,
+            chunk_hashes,
         };
 
         let mut buffer = Vec::new();
@@ -449,10 +467,11 @@ mod tests {
     fn parse_valid_simple_transaction() {
         let mut host = MockHost::default();
 
-        let tx =
-            EthereumTransactionCommon::from_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+        let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap();
+        let tx = EthereumTransactionCommon::from_bytes(tx_bytes).unwrap();
+        let tx_hash = Keccak256::digest(tx_bytes).into();
         let input = Input::SimpleTransaction(Box::new(Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx.clone()),
         }));
 
@@ -461,7 +480,7 @@ mod tests {
         let inbox_content =
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
@@ -473,8 +492,9 @@ mod tests {
         let mut host = MockHost::with_address(&address);
 
         let (data, tx) = large_transaction();
+        let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
 
-        let inputs = make_chunked_transactions(ZERO_TX_HASH, data);
+        let inputs = make_chunked_transactions(tx_hash, data);
 
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
@@ -483,7 +503,7 @@ mod tests {
         let inbox_content =
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
@@ -539,14 +559,17 @@ mod tests {
     fn recreate_chunked_transaction() {
         let mut host = MockHost::default();
 
+        let chunk_hashes = vec![[1; TRANSACTION_HASH_SIZE], [2; TRANSACTION_HASH_SIZE]];
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let new_chunk1 = Input::NewChunkedTransaction {
             tx_hash,
             num_chunks: 2,
+            chunk_hashes: chunk_hashes.clone(),
         };
         let new_chunk2 = Input::NewChunkedTransaction {
             tx_hash,
             num_chunks: 42,
+            chunk_hashes,
         };
 
         host.add_external(Bytes::from(input_to_bytes(
@@ -589,10 +612,12 @@ mod tests {
             Input::TransactionChunk {
                 tx_hash,
                 i: _,
+                chunk_hash,
                 data,
             } => Input::TransactionChunk {
                 tx_hash,
                 i: out_of_bound_i,
+                chunk_hash,
                 data,
             },
             _ => panic!("Expected a transaction chunk"),
@@ -665,7 +690,7 @@ mod tests {
         let mut host = MockHost::default();
 
         let (data, tx) = large_transaction();
-        let tx_hash = ZERO_TX_HASH;
+        let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
 
         let inputs = make_chunked_transactions(tx_hash, data);
         // The test works if there are 3 inputs: new chunked of size 2, first and second
@@ -697,7 +722,7 @@ mod tests {
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
 
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
@@ -711,13 +736,14 @@ mod tests {
 
         let mut host = MockHost::with_address(&address);
 
-        let tx =
-            EthereumTransactionCommon::from_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
-e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
-fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+        let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
+        e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
+        fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap();
+        let tx_hash = Keccak256::digest(tx_bytes).into();
+        let tx = EthereumTransactionCommon::from_bytes(tx_bytes).unwrap();
 
         let input = Input::SimpleTransaction(Box::new(Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx.clone()),
         }));
 
@@ -749,7 +775,7 @@ fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwr
         let inbox_content =
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
