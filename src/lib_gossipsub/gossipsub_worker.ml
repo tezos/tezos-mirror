@@ -123,6 +123,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** A worker instance is made of its status and state. *)
   type t = {mutable status : worker_status; mutable state : worker_state}
 
+  let state {state; _} = GS.Introspection.view state.gossip_state
+
   let emit_app_output state e = Stream.push e state.app_output_stream
 
   let emit_p2p_output {connected_bootstrap_peers; p2p_output_stream; _}

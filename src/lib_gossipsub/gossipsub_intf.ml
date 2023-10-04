@@ -1163,4 +1163,6 @@ module type WORKER = sig
 
   (** Pretty-printer for values of type {!app_output}. *)
   val pp_app_output : Format.formatter -> app_output -> unit
+
+  val state : t -> GS.Introspection.view
 end

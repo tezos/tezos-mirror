@@ -52,6 +52,12 @@ module Types : sig
   (** An ID associated to a slot or to its commitment. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
+  (** Definition of a topic used for gossipsub. *)
+  type topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
+
+  (** Encoding of a topic. *)
+  val topic_encoding : topic Data_encoding.t
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
      Use a bitset instead, when available in the standard library. *)
 
@@ -272,3 +278,16 @@ val monitor_shards :
   ; params : unit
   ; query : unit >
   service
+
+module P2P : sig
+  module Gossipsub : sig
+    val get_topics :
+      < meth : [`GET]
+      ; input : unit
+      ; output : Types.topic list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+  end
+end

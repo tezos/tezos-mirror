@@ -4283,6 +4283,7 @@ let octez_dal_node_gossipsub_lib =
         octez_gossipsub |> open_;
         octez_p2p |> open_;
         octez_p2p_services |> open_;
+        octez_dal_node_services |> open_;
         octez_crypto |> open_;
       ]
 

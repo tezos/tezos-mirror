@@ -26,8 +26,6 @@
 
 open Gossipsub_intf
 
-type topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5543
 
    Refine the GS message_id to save bandwidth.
@@ -60,18 +58,6 @@ type message_id = {
 type message = {share : Cryptobox.share; shard_proof : Cryptobox.shard_proof}
 
 type peer = P2p_peer.Id.t
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5607
-
-   Bound / add checks for bounds of these encodings *)
-let topic_encoding : topic Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun ({slot_index; pkh} : topic) -> (slot_index, pkh))
-    (fun (slot_index, pkh) -> {slot_index; pkh})
-    (obj2
-       (req "slot_index" uint8)
-       (req "pkh" Signature.Public_key_hash.encoding))
 
 let message_id_encoding : message_id Data_encoding.t =
   let open Data_encoding in
@@ -109,7 +95,10 @@ struct
 end
 
 module Topic = struct
-  type t = topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
+  type t = Tezos_dal_node_services.Services.Types.topic = {
+    slot_index : int;
+    pkh : Signature.Public_key_hash.t;
+  }
 
   include Iterable (struct
     type nonrec t = t
@@ -127,6 +116,8 @@ module Topic = struct
       pkh
       slot_index
 end
+
+let topic_encoding = Tezos_dal_node_services.Services.Types.topic_encoding
 
 module Message_id = struct
   type t = message_id
@@ -160,7 +151,7 @@ module Message_id = struct
       Topic.pp
       {slot_index; pkh}
 
-  let get_topic {slot_index; pkh; _} = {slot_index; pkh}
+  let get_topic {slot_index; pkh; _} = Topic.{slot_index; pkh}
 end
 
 module Validate_message_hook = struct
@@ -250,7 +241,7 @@ module Automaton_config :
     with type Time.t = Ptime.t
      and module Span = Span
      and type Subconfig.Peer.t = peer
-     and type Subconfig.Topic.t = topic
+     and type Subconfig.Topic.t = Topic.t
      and type Subconfig.Message_id.t = message_id
      and type Subconfig.Message.t = message = struct
   module Span = Span
@@ -277,7 +268,7 @@ end
 (** Instantiate the worker functor *)
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
-    with type GS.Topic.t = topic
+    with type GS.Topic.t = Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer

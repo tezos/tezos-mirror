@@ -177,6 +177,14 @@ module Profile_handlers = struct
         |> Errors.to_tzresult)
 end
 
+module P2P = struct
+  module Gossipsub = struct
+    let get_topics ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.get_topics ctxt
+  end
+end
+
 let add_service registerer service handler directory =
   registerer directory service handler
 
@@ -236,6 +244,10 @@ let register_new :
        Tezos_rpc.Directory.gen_register
        Services.monitor_shards
        (Slots_handlers.monitor_shards ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_topics
+       (P2P.Gossipsub.get_topics ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
