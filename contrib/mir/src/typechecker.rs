@@ -80,32 +80,25 @@ fn typecheck_instruction(
             ensure_stack_len(stack, dup_height)?;
             stack.push(stack[dup_height - 1].clone());
         }
-        Gt => match stack.as_slice() {
-            [.., Type::Int] => {
-                stack[0] = Type::Bool;
-            }
+        Gt => match stack.pop() {
+            Some(Type::Int) => stack.push(Type::Bool),
             _ => return Err(TcError::GenericTcError),
         },
-        If(nested_t, nested_f) => match stack.as_slice() {
-            // Check if top is bool and bind the tail to `t`.
-            [t @ .., Type::Bool] => {
-                // Clone the stack so that we have two stacks to run
-                // the two branches with.
-                let mut t_stack: TypeStack = TopIsLast::from(t).0;
-                let mut f_stack: TypeStack = TopIsLast::from(t).0;
+        If(nested_t, nested_f) => match stack.pop() {
+            // Check if top is bool
+            Some(Type::Bool) => {
+                // Clone the stack so that we have a copy to run one branch on.
+                // We can run the other branch on the live stack.
+                let mut t_stack: TypeStack = stack.clone();
                 typecheck(nested_t, gas, &mut t_stack)?;
-                typecheck(nested_f, gas, &mut f_stack)?;
-                // If both stacks are same after typecheck, then make result
-                // stack using one of them and return success.
-                ensure_stacks_eq(gas, t_stack.as_slice(), f_stack.as_slice())?;
-                *stack = t_stack;
+                typecheck(nested_f, gas, stack)?;
+                // If both stacks are same after typecheck, all is good.
+                ensure_stacks_eq(gas, t_stack.as_slice(), stack.as_slice())?;
             }
             _ => return Err(TcError::GenericTcError),
         },
-        Instruction::Int => match stack.as_mut_slice() {
-            [.., val @ Type::Nat] => {
-                *val = Type::Int;
-            }
+        Instruction::Int => match stack.pop() {
+            Some(Type::Nat) => stack.push(Type::Int),
             _ => return Err(TcError::GenericTcError),
         },
         Loop(nested) => match stack.as_slice() {
