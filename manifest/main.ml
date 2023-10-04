@@ -8229,7 +8229,7 @@ let evm_proxy_lib_dev =
 
 let _octez_evm_proxy_tests =
   tezt
-    ["test_rlp"]
+    ["test_rlp"; "test_ethbloom"]
     ~path:"src/bin_evm_proxy/test"
     ~opam:"octez-evm-proxy-tests"
     ~synopsis:"Tests for the EVM Proxy"
