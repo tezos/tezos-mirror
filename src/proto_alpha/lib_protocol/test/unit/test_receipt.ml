@@ -67,33 +67,36 @@ let test_encodings balance =
   | _ -> assert false
 
 let test_encodings () =
+  let open Lwt_result_syntax in
   let open Receipt in
   let pkh = Signature.Public_key_hash.zero in
   let pkh2, _pk, _sk = Signature.generate_key () in
   let staker1 = Receipt.Shared pkh in
   let staker2 = Receipt.Single (Contract.Implicit pkh, pkh) in
   let staker3 = Receipt.Single (Contract.Implicit pkh2, pkh) in
-  test_encodings (Contract (Contract.Implicit pkh)) >>=? fun () ->
-  test_encodings Block_fees >>=? fun () ->
-  test_encodings (Deposits staker1) >>=? fun () ->
-  test_encodings (Deposits staker2) >>=? fun () ->
-  test_encodings (Deposits staker3) >>=? fun () ->
-  test_encodings Nonce_revelation_rewards >>=? fun () ->
-  test_encodings Attesting_rewards >>=? fun () ->
-  test_encodings Baking_rewards >>=? fun () ->
-  test_encodings Baking_bonuses >>=? fun () ->
-  test_encodings Storage_fees >>=? fun () ->
-  test_encodings Double_signing_punishments >>=? fun () ->
-  test_encodings (Lost_attesting_rewards (pkh, Random.bool (), Random.bool ()))
-  >>=? fun () ->
-  test_encodings Liquidity_baking_subsidies >>=? fun () ->
-  test_encodings Burned >>=? fun () ->
-  test_encodings (Commitments Blinded_public_key_hash.zero) >>=? fun () ->
-  test_encodings Bootstrap >>=? fun () ->
-  test_encodings Invoice >>=? fun () ->
-  test_encodings Initial_commitments >>=? fun () ->
-  test_encodings Minted >>=? fun () ->
-  test_encodings Sc_rollup_refutation_punishments >>=? fun () ->
+  let* () = test_encodings (Contract (Contract.Implicit pkh)) in
+  let* () = test_encodings Block_fees in
+  let* () = test_encodings (Deposits staker1) in
+  let* () = test_encodings (Deposits staker2) in
+  let* () = test_encodings (Deposits staker3) in
+  let* () = test_encodings Nonce_revelation_rewards in
+  let* () = test_encodings Attesting_rewards in
+  let* () = test_encodings Baking_rewards in
+  let* () = test_encodings Baking_bonuses in
+  let* () = test_encodings Storage_fees in
+  let* () = test_encodings Double_signing_punishments in
+  let* () =
+    test_encodings
+      (Lost_attesting_rewards (pkh, Random.bool (), Random.bool ()))
+  in
+  let* () = test_encodings Liquidity_baking_subsidies in
+  let* () = test_encodings Burned in
+  let* () = test_encodings (Commitments Blinded_public_key_hash.zero) in
+  let* () = test_encodings Bootstrap in
+  let* () = test_encodings Invoice in
+  let* () = test_encodings Initial_commitments in
+  let* () = test_encodings Minted in
+  let* () = test_encodings Sc_rollup_refutation_punishments in
   test_encodings Sc_rollup_refutation_rewards
 
 let tests = Tztest.[tztest "receipt - encoding" `Quick test_encodings]

@@ -151,8 +151,10 @@ let tests =
   ]
 
 let wrap (n, f) =
+  let open Lwt_syntax in
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      f () >|= function
+      let+ result = f () in
+      match result with
       | Ok () -> ()
       | Error error ->
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
