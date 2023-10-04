@@ -32,13 +32,7 @@ operations<manager_operations_alpha>`. This order also specifies the
 of each of these classes. Consensus operations are considered the
 highest priority ones, and manager operations the lowest.
 
-As an exception, the :ref:`failing_noop` is currently the only operation not associated to any class.
-
-Overall, the current protocol implementation enforces the following invariant:
-
-- each kind of operation belongs to *at most one* validation pass;
-- operations whose kind does not belong to any validation pass cannot
-  be :ref:`applied<operation_validity_alpha>`.
+Each kind of operation belongs to exactly one validation pass, except for the :ref:`failing_noop` which belongs to no validation pass and therefore cannot be :ref:`applied<operation_validity_alpha>`.
 
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
@@ -261,12 +255,15 @@ Batches satisfy the following properties:
 Failing_noop operation
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Starting with protocol 009 a ``Failing_noop`` operation is added. This operation
-is not executable in the protocol and will always fail when injected. It allows
-to sign an arbitrary string that cannot be misinterpreted in the protocol.
+The ``Failing_noop`` operation is not executable in the protocol:
 
-The client has commands to sign a message with a given key or to check that
-message has been signed by a given key. These commands create a ``failing_noop``
+- it can only be validated in :ref:`mempool mode <partial_construction_alpha>`, by the :doc:`prevalidator component <../shell/prevalidation>`;
+- consequently, this operation cannot be :ref:`applied <operation_validity_alpha>`, and in fact will never be included into a block.
+
+Rather, the ``Failing_noop`` operation allows
+to sign an arbitrary string, without introducing an operation that could be misinterpreted in the protocol.
+
+The Octez client provides commands to sign and verify the signature of input messages by a given key. These commands create a ``failing_noop``
 operation from the message that is being signed or checked.
 
 ::
