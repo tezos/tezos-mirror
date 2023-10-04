@@ -24,8 +24,6 @@
 (*****************************************************************************)
 
 open Octez_smart_rollup
-open Protocol
-open Alpha_context
 open Octez_smart_rollup_node
 
 let uid = ref 0
@@ -39,18 +37,34 @@ let block_hash_of_level level =
   Block_hash.of_string_exn s
 
 let default_constants =
-  let test_constants =
-    Layer1_helpers.constants_of_parametric Default_parameters.constants_test
-  in
-  {
-    test_constants with
-    sc_rollup =
-      {
-        test_constants.sc_rollup with
-        challenge_window_in_blocks = 4032;
-        commitment_period_in_blocks = 3;
-      };
-  }
+  (* Same as default test const ants for alpha excepted for
+     commitment_period_in_block. *)
+  Rollup_constants.
+    {
+      minimal_block_delay = 1L;
+      delay_increment_per_round = 1L;
+      sc_rollup =
+        {
+          challenge_window_in_blocks = 4032;
+          commitment_period_in_blocks = 3;
+          reveal_activation_level =
+            Some {blake2B = 0l; metadata = 0l; dal_page = 0l};
+          max_number_of_stored_cemented_commitments = 5;
+        };
+      dal =
+        {
+          feature_enable = false;
+          attestation_lag = 4;
+          number_of_slots = 16;
+          cryptobox_parameters =
+            {
+              redundancy_factor = 8;
+              page_size = 4096;
+              slot_size = 32768;
+              number_of_shards = 64;
+            };
+        };
+    }
 
 let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let open Lwt_result_syntax in
@@ -60,37 +74,34 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let* () = Node_context.save_level node_ctxt head in
   let predecessor = head in
   let predecessor_timestamp = Time.Protocol.epoch in
+  let*? (module Plugin) =
+    Protocol_plugins.proto_plugin_for_protocol node_ctxt.current_protocol.hash
+  in
   let inbox =
-    Sc_rollup.Inbox.genesis
+    (* The global inbox starts at level 0, with the origination. *)
+    Plugin.Inbox.init
       ~predecessor_timestamp
       ~predecessor:predecessor.hash
-      (Raw_level.of_int32_exn node_ctxt.genesis_info.level)
+      ~level:node_ctxt.genesis_info.level
   in
-  let* inbox_hash =
-    Node_context.save_inbox
-      node_ctxt
-      (Sc_rollup_proto_types.Inbox.to_octez inbox)
-  in
-  let inbox_witness = Sc_rollup.Inbox.current_witness inbox in
+  let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+  let inbox_witness = Inbox.current_witness inbox in
   let ctxt = Octez_smart_rollup_node.Context.empty node_ctxt.context in
   let num_ticks = 0L in
-  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let initial_tick = Sc_rollup.Tick.initial in
-  let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
-  let*! state = PVM.install_boot_sector initial_state boot_sector in
-  let*! genesis_state_hash = PVM.state_hash state in
-  let*! ctxt = PVM.State.set ctxt state in
+  let initial_tick = Z.zero in
+  let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
+  let*! state =
+    Plugin.Pvm.install_boot_sector node_ctxt.kind initial_state boot_sector
+  in
+  let*! genesis_state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
+  let*! ctxt = Context.PVMState.set ctxt state in
   let*! context_hash = Octez_smart_rollup_node.Context.commit ctxt in
   let commitment =
-    Sc_rollup.Commitment.genesis_commitment
-      ~origination_level:(Raw_level.of_int32_exn node_ctxt.genesis_info.level)
+    Commitment.genesis_commitment
+      ~origination_level:node_ctxt.genesis_info.level
       ~genesis_state_hash
   in
-  let* commitment_hash =
-    Node_context.save_commitment
-      node_ctxt
-      (Sc_rollup_proto_types.Commitment.to_octez commitment)
-  in
+  let* commitment_hash = Node_context.save_commitment node_ctxt commitment in
   let previous_commitment_hash = node_ctxt.genesis_info.commitment_hash in
   let header =
     Sc_rollup_block.
@@ -106,42 +117,40 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
       }
   in
   let l2_block =
-    Sc_rollup_block.
-      {
-        header;
-        content = ();
-        num_ticks;
-        initial_tick = Sc_rollup.Tick.to_z initial_tick;
-      }
+    Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let* () = Node_context.set_l2_head node_ctxt l2_block in
   return l2_block
 
-let initialize_node_context ?(constants = default_constants) kind ~boot_sector =
+let initialize_node_context protocol ?(constants = default_constants) kind
+    ~boot_sector =
   let open Lwt_result_syntax in
   incr uid ;
   (* To avoid any conflict with previous runs of this test. *)
   let pid = Unix.getpid () in
   let data_dir =
     Filename.(concat @@ get_temp_dir_name ())
-      (Format.sprintf "sc-rollup-node-test-%s-%d-%d" Protocol.name pid !uid)
+      (Format.asprintf
+         "sc-rollup-node-test-%a-%d-%d"
+         Protocol_hash.pp_short
+         protocol
+         pid
+         !uid)
   in
   let base_dir =
     Filename.(concat @@ get_temp_dir_name ())
-      (Format.sprintf
-         "sc-rollup-node-test-%s-base-%d-%d"
-         Protocol.name
+      (Format.asprintf
+         "sc-rollup-node-test-%a-base-%d-%d"
+         Protocol_hash.pp_short
+         protocol
          pid
          !uid)
   in
   let filesystem = String.Hashtbl.create 10 in
-  let cctxt =
-    new Protocol_client_context.wrap_full
-      (new Faked_client_context.unix_faked ~base_dir ~filesystem)
-  in
+  let cctxt = new Faked_client_context.unix_faked ~base_dir ~filesystem in
   let current_protocol =
-    {Node_context.hash = Protocol.hash; proto_level = 0; constants}
+    {Node_context.hash = protocol; proto_level = 0; constants}
   in
   let* ctxt =
     Node_context.Internal_for_tests.create_node_context
@@ -159,10 +168,10 @@ let initialize_node_context ?(constants = default_constants) kind ~boot_sector =
   in
   return (ctxt, genesis, [data_dir; base_dir])
 
-let with_node_context ?constants kind ~boot_sector f =
+let with_node_context ?constants kind protocol ~boot_sector f =
   let open Lwt_result_syntax in
   let* node_ctxt, genesis, dirs_to_clean =
-    initialize_node_context ?constants kind ~boot_sector
+    initialize_node_context protocol ?constants kind ~boot_sector
   in
   Lwt.finalize (fun () -> f node_ctxt ~genesis) @@ fun () ->
   let open Lwt_syntax in
@@ -209,7 +218,11 @@ let append_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
   let head =
     head_of_level ~predecessor:predecessor.hash (Int32.succ pred_level)
   in
-  Daemon.Internal_for_tests.process_messages
+  let*? plugin =
+    Protocol_plugins.proto_plugin_for_protocol node_ctxt.current_protocol.hash
+  in
+  Rollup_node_daemon.Internal_for_tests.process_messages
+    plugin
     node_ctxt
     ~is_first_block
     ~predecessor
@@ -250,17 +263,31 @@ module Assert = struct
   end)
 
   module L2_block = Make_with_encoding (Sc_rollup_block)
-  module Commitment = Make_with_encoding (Sc_rollup.Commitment)
-  module Commitment_hash = Make_with_encoding (Sc_rollup.Commitment.Hash)
-  module State_hash = Make_with_encoding (Sc_rollup.State_hash)
+  module Commitment = Make_with_encoding (Commitment)
+  module Commitment_hash =
+    Make_with_encoding (Octez_smart_rollup.Commitment.Hash)
+  module State_hash = Make_with_encoding (State_hash)
 end
 
-let alcotest name speed ?constants kind ~boot_sector f =
+let alcotest ?name speed ?constants kind protocol ~boot_sector f =
+  let name =
+    Format.asprintf
+      "%s%a %a"
+      (match name with None -> "" | Some n -> n ^ " - ")
+      Protocol_hash.pp_short
+      protocol
+      Kind.pp
+      kind
+  in
   Alcotest_lwt.test_case name speed @@ fun _lwt_switch () ->
   let open Lwt_result_syntax in
-  let*! r = with_node_context ?constants kind ~boot_sector f in
+  let*! r = with_node_context ?constants kind protocol ~boot_sector f in
   match r with
   | Ok () -> Lwt.return_unit
   | Error err ->
       Format.printf "@\n%a@." pp_print_trace err ;
       Lwt.fail Alcotest.Test_error
+
+let _protocol =
+  (* force registration of protocols plugins in smart rollup node lib *)
+  Rollup_node_plugin.Plugin.protocol
