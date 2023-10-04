@@ -221,7 +221,6 @@ pub struct EvmHandler<'a, Host: Runtime> {
     transaction_data: Vec<TransactionLayerData<'a>>,
 }
 
-#[allow(unused_variables)]
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Create a new handler to suit a new, initial EVM call context
     pub fn new(
@@ -669,7 +668,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 r @ ExitReason::Error(_) => {
                     return Ok((r, None, vec![]));
                 }
-                r @ ExitReason::Revert(_) => {
+                _r @ ExitReason::Revert(_) => {
                     // A transfer cannot revert - this implies internal error in
                     // EVM execution
                     return Err(EthereumError::InconsistentState(Cow::from(
