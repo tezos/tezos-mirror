@@ -114,7 +114,7 @@ where
    * ``$THRESHOLD`` - Minimum number of DAC Members that must commit to provide the data before the command returns.
 
 Upon executing the command, the client will wait until the threshold number of signatures on the certificate is reached before returning the certificate as a hex-encoded string.
-This certificate must be posted to the global rollup inbox (see :ref:`sending_external_inbox_message`) which will eventually be processed by the kernel.
+This certificate must be posted to the global rollup inbox (see :ref:`Sending external inbox message <sending_external_inbox_message>`) which will eventually be processed by the kernel.
 
 The kernel and the underlying rollup node must already have DAC support to receive data from the DAC infrastructure.
 If you are looking to support DAC in your rollup, please refer to `Integrate DAC with a Smart Rollup node`_.
