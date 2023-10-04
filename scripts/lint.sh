@@ -19,10 +19,6 @@ EOF
 }
 
 ## Testing for dependencies
-if ! type ocamlformat > /dev/null 2>&-; then
-  echo "ocamlformat is required but could not be found. Aborting."
-  exit 1
-fi
 if ! type find > /dev/null 2>&-; then
   echo "find is required but could not be found. Aborting."
   exit 1
@@ -41,6 +37,11 @@ declare -a source_directories
 source_directories=(src docs/doc_gen tezt devtools)
 
 update_all_dot_ocamlformats () {
+    if ! type ocamlformat > /dev/null 2>&-; then
+        echo "ocamlformat is required but could not be found. Aborting."
+        exit 1
+    fi
+
     if git diff --name-only HEAD --exit-code
     then
         say "Repository clean :thumbsup:"
