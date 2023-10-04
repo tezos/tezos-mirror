@@ -166,7 +166,7 @@ let ipaddr =
   external_lib
     ~js_compatible:true
     "ipaddr"
-    V.(at_least "5.0.0" && less_than "6.0.0")
+    V.(at_least "5.3.0" && less_than "6.0.0")
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
