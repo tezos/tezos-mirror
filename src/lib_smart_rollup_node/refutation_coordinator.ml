@@ -58,14 +58,14 @@ let on_process Layer1.{level; _} state =
       (* Not injecting refutations, don't play refutation games *)
       return_unit
   | Some self ->
-      let Node_context.{rollup_address; _} = node_ctxt in
+      let Node_context.{config; _} = node_ctxt in
       let* plugin = Protocol_plugins.last_proto_plugin node_ctxt in
       let module Plugin = (val plugin) in
       (* Current conflicts in L1 *)
       let* conflicts =
         Plugin.Refutation_game_helpers.get_conflicts
           state.node_ctxt.cctxt
-          rollup_address
+          config.sc_rollup_address
           self
       in
       (* Map of opponents the node is playing against to the corresponding
@@ -80,7 +80,7 @@ let on_process Layer1.{level; _} state =
       let* ongoing_games =
         Plugin.Refutation_game_helpers.get_ongoing_games
           state.node_ctxt.cctxt
-          rollup_address
+          config.sc_rollup_address
           self
       in
       (* Map between opponents and their corresponding games *)

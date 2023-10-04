@@ -131,7 +131,7 @@ let get_batch_sequences state head =
     let* signed_sequence =
       Kernel_message.encode_and_sign_sequence
         (state.node_ctxt.cctxt, snd state.signer)
-        state.node_ctxt.rollup_address
+        state.node_ctxt.config.sc_rollup_address
         ~prefix:(Int32.of_int (delayed_inbox_size - 1))
         ~suffix:1l
         l2_messages_serialized

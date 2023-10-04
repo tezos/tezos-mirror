@@ -213,7 +213,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
         | ( Sc_rollup_originate {boot_sector; _},
             Sc_rollup_originate_result {address; _} )
           when Octez_smart_rollup.Address.(
-                 node_ctxt.rollup_address
+                 node_ctxt.config.sc_rollup_address
                  = Sc_rollup_proto_types.Address.to_octez address) ->
             raise (Found_boot_sector boot_sector)
         | _ -> accu

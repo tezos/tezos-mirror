@@ -56,8 +56,6 @@ type private_info = {
           is public then it's None. *)
 }
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6316
-   Refactor this type with more structure and less redundancy. *)
 type 'a t = {
   config : Configuration.t;  (** Inlined configuration for the rollup node. *)
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
@@ -69,14 +67,6 @@ type 'a t = {
   data_dir : string;  (** Node data dir. *)
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
-  rollup_address : Address.t;  (** Smart rollup tracked by the rollup node. *)
-  boot_sector_file : string option;
-      (** Optional path to the boot sector file. Useful only if the smart
-          rollup was bootstrapped and not originated. *)
-  mode : Configuration.mode;
-      (** Mode of the node, see {!type:Configuration.mode}. *)
-  operators : Configuration.operators;
-      (** Addresses of the rollup node operators by purposes. *)
   genesis_info : genesis_info;
       (** Origination information of the smart rollup. *)
   injector_retention_period : int;
@@ -85,11 +75,6 @@ type 'a t = {
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Kind.t;  (** Kind of the smart rollup. *)
-  fee_parameters : Configuration.fee_parameters;
-      (** Fee parameters to use when injecting operations in layer 1. *)
-  loser_mode : Loser_mode.t;
-      (** If different from [Loser_mode.no_failures], the rollup node
-          issues wrong commitments (for tests). *)
   lockfile : Lwt_unix.file_descr;
       (** A lock file acquired when the node starts. *)
   store : 'a store;  (** The store for the persistent storage. *)
