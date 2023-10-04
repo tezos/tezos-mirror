@@ -9,8 +9,11 @@ use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
 use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK, UPGRADE_NONCE_SIZE};
 use crate::simulation;
 use crate::storage::{
+    chunked_hash_transaction_path, chunked_transaction_num_chunks,
+    chunked_transaction_path, create_chunked_transaction,
     get_and_increment_deposit_nonce, read_kernel_upgrade_nonce,
-    store_last_info_per_level_timestamp,
+    remove_chunked_transaction, store_last_info_per_level_timestamp,
+    store_transaction_chunk,
 };
 use crate::tick_model;
 use crate::Error;
@@ -19,7 +22,7 @@ use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
-use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -188,41 +191,50 @@ fn handle_transaction_chunk<Host: Runtime>(
     host: &mut Host,
     tx_hash: TransactionHash,
     i: u16,
+    chunk_hash: TransactionHash,
     data: Vec<u8>,
 ) -> Result<Option<Transaction>, Error> {
     // If the number of chunks doesn't exist in the storage, the chunked
     // transaction wasn't created, so the chunk is ignored.
-    let num_chunks = match crate::storage::chunked_transaction_num_chunks(host, &tx_hash)
-    {
+    let num_chunks = match chunked_transaction_num_chunks(host, &tx_hash) {
         Ok(x) => x,
         Err(_) => {
             log!(
                 host,
                 Info,
-                "Ignoring chunk {} of unknown transaction {}\n",
+                "Ignoring chunk {} of unknown transaction {}",
                 i,
                 hex::encode(tx_hash)
             );
             return Ok(None);
         }
     };
-    // Checks that the transaction is not out of bounds
+    // Checks that the transaction is not out of bounds.
     if i >= num_chunks {
+        return Ok(None);
+    }
+    // Check if the chunk hash is part of the announced chunked hashes.
+    let chunked_transaction_path = chunked_transaction_path(&tx_hash)?;
+    let chunk_hash_path =
+        chunked_hash_transaction_path(&chunk_hash, &chunked_transaction_path)?;
+    if host.store_read(&chunk_hash_path, 0, 0).is_err() {
         return Ok(None);
     }
     // Sanity check to verify that the transaction chunk uses the maximum
     // space capacity allowed.
     if i != num_chunks - 1 && data.len() < MAX_SIZE_PER_CHUNK {
-        crate::storage::remove_chunked_transaction(host, &tx_hash)?;
+        remove_chunked_transaction(host, &tx_hash)?;
         return Ok(None);
     };
     // When the transaction is stored in the storage, it returns the full transaction
     // if `data` was the missing chunk.
-    if let Some(data) = crate::storage::store_transaction_chunk(host, &tx_hash, i, data)?
-    {
-        if let Ok(tx) = EthereumTransactionCommon::from_bytes(&data) {
-            let content = TransactionContent::Ethereum(tx);
-            return Ok(Some(Transaction { tx_hash, content }));
+    if let Some(data) = store_transaction_chunk(host, &tx_hash, i, data)? {
+        let full_data_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(&data).into();
+        if full_data_hash == tx_hash {
+            if let Ok(tx) = EthereumTransactionCommon::from_bytes(&data) {
+                let content = TransactionContent::Ethereum(tx);
+                return Ok(Some(Transaction { tx_hash, content }));
+            }
         }
     }
     Ok(None)
@@ -292,9 +304,17 @@ pub fn read_inbox<Host: Runtime>(
             InputResult::Input(Input::NewChunkedTransaction {
                 tx_hash,
                 num_chunks,
-            }) => crate::storage::create_chunked_transaction(host, &tx_hash, num_chunks)?,
-            InputResult::Input(Input::TransactionChunk { tx_hash, i, data }) => {
-                if let Some(tx) = handle_transaction_chunk(host, tx_hash, i, data)? {
+                chunk_hashes,
+            }) => create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?,
+            InputResult::Input(Input::TransactionChunk {
+                tx_hash,
+                i,
+                chunk_hash,
+                data,
+            }) => {
+                if let Some(tx) =
+                    handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
+                {
                     res.transactions.push(tx)
                 }
             }
