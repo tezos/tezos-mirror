@@ -5,7 +5,7 @@
 .test_template:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies
+    - .image_template__runtime_build_dependencies
     - .template__coverage
   needs:
     - "build_x86_64-released"

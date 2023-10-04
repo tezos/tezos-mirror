@@ -1,7 +1,7 @@
 sanity_ci:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies
+    - .image_template__runtime_prebuild_dependencies
   stage: sanity
   script:
     - ./scripts/ci/take_ownership.sh
