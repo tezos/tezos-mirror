@@ -80,6 +80,14 @@ module type INBOX = sig
       beginning. *)
   val serialize_external_message : string -> string tzresult
 
+  (** Returns the initial global inbox where [level] is the first level of the
+      protocol with smart rollups. *)
+  val init :
+    predecessor_timestamp:Time.Protocol.t ->
+    predecessor:Block_hash.t ->
+    level:int32 ->
+    Octez_smart_rollup.Inbox.t
+
   (**/**)
 
   module Internal_for_tests : sig
