@@ -22,7 +22,7 @@ agents:
     port: 30000
     identity: ~/.ssh/tf
 
-  #  Attestors' agents
+  #  Attesters' agents
 
   %%ATTESTORS_AGENTS%%
 

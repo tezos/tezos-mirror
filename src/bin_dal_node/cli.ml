@@ -100,7 +100,7 @@ module Term = struct
       & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
 
   let operator_profile_printer fmt = function
-    | Services.Types.Attestor pkh ->
+    | Services.Types.Attester pkh ->
         Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
     | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
 
@@ -109,7 +109,7 @@ module Term = struct
     let decoder string =
       match Signature.Public_key_hash.of_b58check_opt string with
       | None -> Error (`Msg "Unrecognized profile")
-      | Some pkh -> Services.Types.Attestor pkh |> Result.ok
+      | Some pkh -> Services.Types.Attester pkh |> Result.ok
     in
     Arg.conv (decoder, operator_profile_printer)
 

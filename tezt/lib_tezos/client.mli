@@ -529,6 +529,7 @@ val bake_for :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?ignore_node_mempool:bool ->
+  ?count:int ->
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
@@ -557,6 +558,7 @@ val bake_for_and_wait :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?ignore_node_mempool:bool ->
+  ?count:int ->
   ?force:bool ->
   ?context_path:string ->
   ?level_before:int ->
@@ -576,6 +578,7 @@ val bake_for_and_wait_level :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?ignore_node_mempool:bool ->
+  ?count:int ->
   ?force:bool ->
   ?context_path:string ->
   ?level_before:int ->
@@ -595,6 +598,7 @@ val spawn_bake_for :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?ignore_node_mempool:bool ->
+  ?count:int ->
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->

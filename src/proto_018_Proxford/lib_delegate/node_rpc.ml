@@ -303,7 +303,7 @@ let register_dal_profiles dal_node_rpc_ctxt delegates =
   let profiles =
     List.map
       (fun consensus_key ->
-        Tezos_dal_node_services.Services.Types.Attestor
+        Tezos_dal_node_services.Services.Types.Attester
           consensus_key.public_key_hash)
       delegates
   in

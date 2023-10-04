@@ -777,7 +777,6 @@ let get_dal_attestations state =
           ( delegate,
             Dal.Attestation.
               {
-                attester = signing_key delegate;
                 attestation;
                 level = Raw_level.of_int32_exn attestation_level;
                 slot = first_slot;

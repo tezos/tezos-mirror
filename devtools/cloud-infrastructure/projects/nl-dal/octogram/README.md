@@ -26,7 +26,7 @@ convenience).
   keys generated with `octez-client stresstest` command. On the `boot_` agent,
   we will spawn an L1 and a DAL node what will play the role of bootstrap nodes;
 
-- Attestors: each agent of this kind (agent = VM in our scenario) is dedicated
+- Attesters: each agent of this kind (agent = VM in our scenario) is dedicated
   to a particular delegate taken from the set of generated keys. On the agent,
   we will run an L1 node, a DAL node with an attester profile and a baker for
   that delegate;

@@ -48,7 +48,7 @@ Breaking Changes
 ----------------
 
 A DAL attestation operation now contains a new ``slot`` field, while the
-``attestor`` field is renamed to ``attester``. (MRs :gl:`!10183`, :gl:`!10294`)
+``attestor`` field is removed. (MRs :gl:`!10183`, :gl:`!10294`, :gl:`!10317`)
 
 RPC Changes
 -----------
