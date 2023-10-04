@@ -32,17 +32,13 @@ operations<manager_operations_alpha>`. This order also specifies the
 of each of these classes. Consensus operations are considered the
 highest priority ones, and manager operations the lowest.
 
-The current protocol implementation enforces the following invariant:
+As an exception, the :ref:`failing_noop` is currently the only operation not associated to any class.
+
+Overall, the current protocol implementation enforces the following invariant:
 
 - each kind of operation belongs to *at most one* validation pass;
 - operations whose kind does not belong to any validation pass cannot
   be :ref:`applied<operation_validity_alpha>`.
-
-.. FIXME tezos/tezos#3915:
-
-   Failing noops don't fit within any of the validation passes
-   below. We need to change the structure a bit to be able to list
-   them here.
 
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
@@ -259,3 +255,23 @@ Batches satisfy the following properties:
   atomically: all its operations are executed sequentially, without
   interleaving other operations. Either all the operations in the
   batch succeed, or none is applied.
+
+.. _failing_noop:
+
+Failing_noop operation
+~~~~~~~~~~~~~~~~~~~~~~
+
+Starting with protocol 009 a ``Failing_noop`` operation is added. This operation
+is not executable in the protocol and will always fail when injected. It allows
+to sign an arbitrary string that cannot be misinterpreted in the protocol.
+
+The client has commands to sign a message with a given key or to check that
+message has been signed by a given key. These commands create a ``failing_noop``
+operation from the message that is being signed or checked.
+
+::
+
+   octez-client sign message "hello world" for <account>
+
+   octez-client check that message "hello world" was signed by <account> to
+   produce <signature>
