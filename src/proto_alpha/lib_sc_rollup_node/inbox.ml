@@ -269,6 +269,13 @@ let serialize_external_message msg =
   let+ msg = serialize @@ External msg in
   unsafe_to_string msg
 
+let init ~predecessor_timestamp ~predecessor ~level =
+  Sc_rollup.Inbox.genesis
+    ~predecessor_timestamp
+    ~predecessor
+    (Raw_level.of_int32_exn level)
+  |> Sc_rollup_proto_types.Inbox.to_octez
+
 module Internal_for_tests = struct
   let process_messages = process_messages
 end
