@@ -7,6 +7,8 @@
 - Upgrade SputnikVM to version 0.39.1 and `primitive_types` to version 0.12.1 (!10043)
 - Upgrade ethereum crate to version 0.14.0
 - Store the `base_gas_per_fee` and use a default value of 21000. (!10234)
+- Transaction can no longer be overwritten nor reincluded (implicit transaction size limit now
+  becomes ~1200 chunks). (!10337)
 
 ### EVM Node
 
