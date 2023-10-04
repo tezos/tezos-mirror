@@ -1,7 +1,7 @@
 # `teztale`
 
 `teztale` is a tool that gathers information on arrival times of
-blocks and consensus operations.
+tezos blocks and consensus operations.
 
 It is splitted in 2 parts:
 
@@ -12,7 +12,7 @@ It is splitted in 2 parts:
 ## Building
 
 - Install dependencies by doing `opam install octez caqti-lwt
-  caqti-driver-sqlite3 caqti-driver-postgresql safepass`
+  caqti-driver-sqlite3 caqti-driver-postgresql safepass ezgzip`
 - clone this repo, `cd teztale` and do `make`
 
 (As an alternative to install dependencies, clone this repo at the
@@ -35,13 +35,15 @@ folowing the schema:
                 }
                 <list_of_network_point_to_bind_to>
               ],
+"admins": [ {"login":"admin","password":"zzz"},
+           <admins_allowed_to_add_remove_users>
+          ],
 "users": [ {"login":"alice","password":"secret"},
            {"login":"bob","password":"xxx"}
            <archivers_allowed_to_post_data>
          ],
-"admins": [ {"login":"admin","password":"zzz"},
-           <admins_allowed_to_add_remove_users>
-          ]
+"max_batch_size": <number_of_levels_queryable_at_once>,
+"public_directory": "optionally_a_path_to_a_build_of_the_frontend"
 }
 ```
 
@@ -53,19 +55,19 @@ and restart your server if you want to modify them.
 You can know the list of users allowed (but not the password) with
 
 ```
-curl http://0.0.0.0:8443/users
+curl http://localhost:8080/users
 ```
 
 Adding a user can be achieve with
 
 ```
-curl -X PUT 'http://admin:zzz@0.0.0.0:8880/user' -d '{ "login" : "michmuch", "password" : "foobar" }'
+curl -X PUT 'http://admin:zzz@localhost:8080/user' -d '{ "login" : "michmuch", "password" : "foobar" }'
 ```
 
 Removing a user can be achieve with
 
 ```
-curl -X DELETE 'http://admin:zzz@0.0.0.0:8880/user' -d '{ "login" : "michmuch" }'
+curl -X DELETE 'http://admin:zzz@localhost:8080/user' -d '{ "login" : "michmuch" }'
 ```
 
 You can launch the server by giving your config file as argument like

@@ -1,8 +1,8 @@
 {
     "db": "sqlite3:db",
+    "max_batch_size": 10,
     "interfaces": [
         {
-            "address": "0.0.0.0",
             "port": 8880
         }
     ],
