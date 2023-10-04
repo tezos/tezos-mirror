@@ -163,7 +163,7 @@ let propagate_precheckable_bad_block =
   Protocol.register_test
     ~__FILE__
     ~title:"forge fake block"
-    ~tags:["precheck"; "fake_block"; "propagation"]
+    ~tags:["precheck"; "fake_block"; "propagation"; Tag.memory_3k]
   @@ fun protocol ->
   (* Expected topology is :
                N3
@@ -276,7 +276,7 @@ let propagate_precheckable_bad_block_payload =
   Protocol.register_test
     ~__FILE__
     ~title:"forge block with wrong payload"
-    ~tags:["precheck"; "fake_block"; "propagation"; "payload"]
+    ~tags:["precheck"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
   @@ fun protocol ->
   (* Expected topology is :
                N3

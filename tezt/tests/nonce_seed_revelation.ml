@@ -54,7 +54,7 @@ let test_nonce_seed_revelation =
   Protocol.register_test
     ~__FILE__
     ~title:"Nonce seed revelation"
-    ~tags:["nonce"; "seed"; "revelation"]
+    ~tags:["nonce"; "seed"; "revelation"; Tag.memory_3k]
   @@ fun protocol ->
   (* Run a node and a baker.
      The node runs in archive mode to obtain metadata with [RPC.get_chain_block]. *)
