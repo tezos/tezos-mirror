@@ -9,6 +9,7 @@ mod ast;
 mod context;
 mod gas;
 mod interpreter;
+mod irrefutable_match;
 mod parser;
 mod stack;
 mod syntax;

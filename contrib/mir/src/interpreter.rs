@@ -47,37 +47,53 @@ fn interpret_one(
     use Instruction as I;
     use TypedValue as V;
 
+    // helper to reduce boilerplate. Usage:
+    // `pop!()` force-pops the top elements from the stack (panics if nothing to
+    // pop), returning it
+    // `let x = pop!()` is roughly equivalent to `let x = stack.pop().unwrap()`
+    // but with a clear error message
+    // `pop!(T::Foo)` force-pops the stack and unwraps `T::Foo(x)`, returning
+    // `x`
+    // `let x = pop!(T::Foo)` is roughly equivalent to `let T::Foo(x) = pop!()
+    // else {panic!()}` but with a clear error message
+    // `pop!(T::Bar, x, y, z)` force-pops the stack, unwraps `T::Bar(x, y, z)`
+    // and binds those to `x, y, z` in the surrounding scope
+    // `pop!(T::Bar, x, y, z)` is roughly equivalent to `let T::Bar(x, y, z) =
+    // pop!() else {panic!()}` but with a clear error message.
+    macro_rules! pop {
+        ($($args:tt)*) => {
+            crate::irrefutable_match::irrefutable_match!(
+              stack.pop().unwrap_or_else(|| unreachable_state());
+              $($args)*
+            )
+        };
+    }
+
     let gas = &mut ctx.gas;
 
     match i {
         I::Add(overload) => match overload {
-            overloads::Add::IntInt => match stack.as_slice() {
-                [.., V::Int(o2), V::Int(o1)] => {
-                    gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
-                    let sum = *o1 + *o2;
-                    stack.pop();
-                    stack[0] = V::Int(sum);
-                }
-                _ => unreachable_state(),
-            },
-            overloads::Add::NatNat => match stack.as_slice() {
-                [.., V::Nat(o2), V::Nat(o1)] => {
-                    gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
-                    let sum = *o1 + *o2;
-                    stack.pop();
-                    stack[0] = V::Nat(sum);
-                }
-                _ => unreachable_state(),
-            },
-            overloads::Add::MutezMutez => match stack.as_slice() {
-                [.., V::Mutez(o2), V::Mutez(o1)] => {
-                    gas.consume(interpret_cost::ADD_TEZ)?;
-                    let sum = o1.checked_add(*o2).ok_or(InterpretError::MutezOverflow)?;
-                    stack.pop();
-                    stack[0] = V::Mutez(sum);
-                }
-                _ => unreachable_state(),
-            },
+            overloads::Add::IntInt => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Int);
+                gas.consume(interpret_cost::add_int(o1, o2)?)?;
+                let sum = o1 + o2;
+                stack.push(V::Int(sum));
+            }
+            overloads::Add::NatNat => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Nat);
+                gas.consume(interpret_cost::add_int(o1, o2)?)?;
+                let sum = o1 + o2;
+                stack.push(V::Nat(sum));
+            }
+            overloads::Add::MutezMutez => {
+                let o1 = pop!(V::Mutez);
+                let o2 = pop!(V::Mutez);
+                gas.consume(interpret_cost::ADD_TEZ)?;
+                let sum = o1.checked_add(o2).ok_or(InterpretError::MutezOverflow)?;
+                stack.push(V::Mutez(sum));
+            }
         },
         I::Dip(opt_height, nested) => {
             gas.consume(interpret_cost::dip(*opt_height)?)?;
@@ -99,60 +115,41 @@ fn interpret_one(
         }
         I::Gt => {
             gas.consume(interpret_cost::GT)?;
-            match stack.as_slice() {
-                [.., V::Int(i)] => {
-                    stack[0] = V::Bool(*i > 0);
-                }
-                _ => unreachable_state(),
-            }
+            let i = pop!(V::Int);
+            stack.push(V::Bool(i > 0));
         }
         I::If(nested_t, nested_f) => {
             gas.consume(interpret_cost::IF)?;
-            if let Some(V::Bool(b)) = stack.pop() {
-                if b {
-                    interpret(nested_t, ctx, stack)?;
-                } else {
-                    interpret(nested_f, ctx, stack)?;
-                }
+            if pop!(V::Bool) {
+                interpret(nested_t, ctx, stack)?;
             } else {
-                unreachable_state();
+                interpret(nested_f, ctx, stack)?;
             }
         }
         I::IfNone(when_none, when_some) => {
             gas.consume(interpret_cost::IF_NONE)?;
-            match stack.pop() {
-                Some(V::Option(x)) => match x {
-                    Some(x) => {
-                        stack.push(*x);
-                        interpret(when_some, ctx, stack)?
-                    }
-                    None => interpret(when_none, ctx, stack)?,
-                },
-                _ => unreachable_state(),
+            match pop!(V::Option) {
+                Some(x) => {
+                    stack.push(*x);
+                    interpret(when_some, ctx, stack)?
+                }
+                None => interpret(when_none, ctx, stack)?,
             }
         }
-        I::Int => match stack.as_slice() {
-            [.., V::Nat(i)] => {
-                gas.consume(interpret_cost::INT_NAT)?;
-                stack[0] = V::Int(*i as _);
-            }
-            _ => {
-                unreachable_state();
-            }
-        },
+        I::Int => {
+            let i = pop!(V::Nat);
+            gas.consume(interpret_cost::INT_NAT)?;
+            stack.push(V::Int(i.try_into().unwrap()));
+        }
         I::Loop(nested) => {
             gas.consume(interpret_cost::LOOP_ENTER)?;
             loop {
                 ctx.gas.consume(interpret_cost::LOOP)?;
-                if let Some(V::Bool(b)) = stack.pop() {
-                    if b {
-                        interpret(nested, ctx, stack)?;
-                    } else {
-                        ctx.gas.consume(interpret_cost::LOOP_EXIT)?;
-                        break;
-                    }
+                if pop!(V::Bool) {
+                    interpret(nested, ctx, stack)?;
                 } else {
-                    unreachable_state();
+                    ctx.gas.consume(interpret_cost::LOOP_EXIT)?;
+                    break;
                 }
             }
         }
@@ -164,55 +161,42 @@ fn interpret_one(
             gas.consume(interpret_cost::SWAP)?;
             stack.swap(0, 1);
         }
-        I::Failwith => match stack.pop() {
-            Some(x) => return Err(InterpretError::FailedWith(x)),
-            None => unreachable_state(),
-        },
+        I::Failwith => {
+            let x = pop!();
+            return Err(InterpretError::FailedWith(x));
+        }
         I::Unit => {
             gas.consume(interpret_cost::UNIT)?;
             stack.push(V::Unit);
         }
         I::Car => {
             gas.consume(interpret_cost::CAR)?;
-            match stack.pop() {
-                Some(V::Pair(l, _)) => stack.push(*l),
-                _ => unreachable_state(),
-            }
+            pop!(V::Pair, l, _r);
+            stack.push(*l);
         }
         I::Cdr => {
             gas.consume(interpret_cost::CDR)?;
-            match stack.pop() {
-                Some(V::Pair(_, r)) => stack.push(*r),
-                _ => unreachable_state(),
-            }
+            pop!(V::Pair, _l, r);
+            stack.push(*r);
         }
         I::Pair => {
             gas.consume(interpret_cost::PAIR)?;
-            match (stack.pop(), stack.pop()) {
-                (Some(l), Some(r)) => stack.push(V::new_pair(l, r)),
-                _ => unreachable_state(),
-            }
+            let l = pop!();
+            let r = pop!();
+            stack.push(V::new_pair(l, r));
         }
         I::ISome => {
             gas.consume(interpret_cost::SOME)?;
-            match stack.pop() {
-                v @ Some(..) => stack.push(V::new_option(v)),
-                _ => unreachable_state(),
-            }
+            let v = pop!();
+            stack.push(V::new_option(Some(v)));
         }
-        I::Compare => match stack.as_slice() {
-            [.., r, l] => {
-                gas.consume(interpret_cost::compare(l, r)?)?;
-                let cmp = l.partial_cmp(&r);
-                let val = match cmp {
-                    Some(v) => v as i8,
-                    _ => unreachable_state(),
-                };
-                stack.pop();
-                stack[0] = V::Int(val.into());
-            }
-            _ => unreachable_state(),
-        },
+        I::Compare => {
+            let l = pop!();
+            let r = pop!();
+            gas.consume(interpret_cost::compare(&l, &r)?)?;
+            let cmp = l.partial_cmp(&r).expect("comparison failed") as i8;
+            stack.push(V::Int(cmp.into()));
+        }
         I::Amount => {
             gas.consume(interpret_cost::AMOUNT)?;
             stack.push(V::Mutez(ctx.amount));
@@ -223,11 +207,8 @@ fn interpret_one(
         }
         I::Get(overload) => match overload {
             overloads::Get::Map => {
-                let key = stack.pop().unwrap_or_else(|| unreachable_state());
-                let map = match stack.pop() {
-                    Some(V::Map(map)) => map,
-                    _ => unreachable_state(),
-                };
+                let key = pop!();
+                let map = pop!(V::Map);
                 gas.consume(interpret_cost::map_get(&key, map.len())?)?;
                 let result = map.get(&key);
                 stack.push(V::new_option(result.cloned()));
@@ -235,17 +216,13 @@ fn interpret_one(
         },
         I::Update(overload) => match overload {
             overloads::Update::Map => {
-                let key = stack.pop().unwrap_or_else(|| unreachable_state());
-                let opt_new_val = stack.pop().unwrap_or_else(|| unreachable_state());
-                let mut map = match stack.pop() {
-                    Some(V::Map(map)) => map,
-                    _ => unreachable_state(),
-                };
+                let key = pop!();
+                let opt_new_val = pop!(V::Option);
+                let mut map = pop!(V::Map);
                 gas.consume(interpret_cost::map_update(&key, map.len())?)?;
                 match opt_new_val {
-                    V::Option(None) => map.remove(&key),
-                    V::Option(Some(val)) => map.insert(key, *val),
-                    _ => unreachable_state(),
+                    None => map.remove(&key),
+                    Some(val) => map.insert(key, *val),
                 };
                 stack.push(V::Map(map));
             }

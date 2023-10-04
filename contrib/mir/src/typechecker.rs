@@ -12,6 +12,7 @@ use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas;
 use crate::gas::OutOfGas;
+use crate::irrefutable_match::irrefutable_match;
 use crate::stack::*;
 
 /// Typechecker error type.
@@ -131,6 +132,28 @@ fn typecheck_instruction(
     use Instruction as I;
     use Type as T;
 
+    // helper to reduce boilerplate. Usage:
+    // `pop!()` force-pops the top elements from the stack (panics if nothing to
+    // pop), returning it
+    // `let x = pop!()` is roughly equivalent to `let x = stack.pop().unwrap()`
+    // but with a clear error message
+    // `pop!(T::Foo)` force-pops the stack and unwraps `T::Foo(x)`, returning
+    // `x`
+    // `let x = pop!(T::Foo)` is roughly equivalent to `let T::Foo(x) = pop!()
+    // else {panic!()}` but with a clear error message
+    // `pop!(T::Bar, x, y, z)` force-pops the stack, unwraps `T::Bar(x, y, z)`
+    // and binds those to `x, y, z` in the surrounding scope
+    // `pop!(T::Bar, x, y, z)` is roughly equivalent to `let T::Bar(x, y, z) =
+    // pop!() else {panic!()}` but with a clear error message.
+    macro_rules! pop {
+        ($($args:tt)*) => {
+            irrefutable_match!(
+              stack.pop().expect("pop from empty stack!");
+              $($args)*
+            )
+        };
+    }
+
     let gas = &mut ctx.gas;
 
     if stack.is_failed() {
@@ -187,10 +210,8 @@ fn typecheck_instruction(
             stack.drop_top(drop_height);
             I::Drop(opt_height)
         }
-        I::Dup(Some(0)) => {
-            // DUP instruction requires an argument that is > 0.
-            return Err(TcError::Dup0);
-        }
+        // DUP instruction requires an argument that is > 0.
+        I::Dup(Some(0)) => return Err(TcError::Dup0),
         I::Dup(opt_height) => {
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len("DUP", stack, dup_height)?;
@@ -277,7 +298,7 @@ fn typecheck_instruction(
         }
         I::Failwith => {
             ensure_stack_len("FAILWITH", stack, 1)?;
-            let ty = stack.pop().unwrap();
+            let ty = pop!();
             ensure_packable(ty)?;
             stack.fail();
             I::Failwith
@@ -298,7 +319,7 @@ fn typecheck_instruction(
         }
         I::Pair => {
             ensure_stack_len("PAIR", stack, 2)?;
-            let (l, r) = (stack.pop().unwrap(), stack.pop().unwrap());
+            let (l, r) = (pop!(), pop!());
             stack.push(Type::new_pair(l, r));
             I::Pair
         }
@@ -341,16 +362,13 @@ fn typecheck_instruction(
             ensure_stack_len("GET", stack, 2)?;
             match stack.as_slice() {
                 [.., T::Map(..), _] => {
-                    let kty_ = stack.pop().unwrap();
-                    let (kty, vty) = match stack.pop().unwrap() {
-                        T::Map(kty, vty) => (*kty, *vty),
-                        _ => unreachable!(),
-                    };
+                    let kty_ = pop!();
+                    pop!(T::Map, kty, vty);
                     ensure_ty_eq(ctx, &kty, &kty_)?;
                     // can only fail if the typechecker is invoked on invalid
                     // types, i.e. where `map` key is non-comparable
                     ensure_comparable(&kty)?;
-                    stack.push(T::new_option(vty));
+                    stack.push(T::new_option(*vty));
                     I::Get(overloads::Get::Map)
                 }
                 _ => {
@@ -366,24 +384,17 @@ fn typecheck_instruction(
             ensure_stack_len("UPDATE", stack, 3)?;
             match stack.as_slice() {
                 [.., T::Map(..), _, _] => {
-                    let kty_ = stack.pop().unwrap();
-                    let vty_new = stack.pop().unwrap();
-                    match stack.pop().unwrap() {
-                        T::Map(kty, vty) => {
-                            ensure_ty_eq(ctx, &kty, &kty_)?;
-                            ensure_ty_eq(ctx, &T::new_option(*vty), &vty_new)?;
-                            // can only fail if the typechecker is invoked on invalid
-                            // types, i.e. where `map` key is non-comparable
-                            ensure_comparable(&kty)?;
-                            let boxed_vty = match vty_new {
-                                T::Option(bty) => bty,
-                                _ => unreachable!("We ensured it's an option a line above"),
-                            };
-                            stack.push(T::Map(kty, boxed_vty));
-                            I::Update(overloads::Update::Map)
-                        }
-                        _ => unreachable!("Ensured by the outer match"),
-                    }
+                    let kty_ = pop!();
+                    let vty_new = pop!();
+                    pop!(T::Map, kty, vty);
+                    ensure_ty_eq(ctx, &kty, &kty_)?;
+                    ensure_ty_eq(ctx, &T::new_option(*vty), &vty_new)?;
+                    // can only fail if the typechecker is invoked on invalid
+                    // types, i.e. where `map` key is non-comparable
+                    ensure_comparable(&kty)?;
+                    let boxed_vty = irrefutable_match!(vty_new; T::Option);
+                    stack.push(T::Map(kty, boxed_vty));
+                    I::Update(overloads::Update::Map)
                 }
                 _ => {
                     return Err(TcError::NoMatchingOverload {
