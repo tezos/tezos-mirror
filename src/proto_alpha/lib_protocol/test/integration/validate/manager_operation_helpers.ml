@@ -523,7 +523,7 @@ let init_infos :
   let* reveal_operations =
     if reveal_accounts then
       reveal_accounts_operations block [Some source; dest; del]
-    else return []
+    else return_nil
   in
   let operations = create_contract_hash :: reveal_operations in
   let+ block = Block.bake ~operations block in
@@ -1114,7 +1114,7 @@ let expected_witness witness probes ~mode ctxt =
     | Some g_in, Construction ->
         return_some (Gas.Arith.sub g_in (Gas.Arith.fp probes.gas_limit))
     | _, Mempool ->
-        Context.get_constants ctxt >>=? fun c ->
+        let* c = Context.get_constants ctxt in
         return_some
           (Gas.Arith.sub
              (Gas.Arith.fp c.parametric.hard_gas_limit_per_block)

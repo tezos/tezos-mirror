@@ -90,7 +90,7 @@ let assert_fails_with ~__LOC__ (res : unit Environment.Error_monad.tzresult)
       let expected_trace =
         Environment.Error_monad.trace_of_error expected_err
       in
-      if expected_trace = trace then Lwt.return true
+      if expected_trace = trace then Lwt.return_true
       else
         let pp = Environment.Error_monad.pp_trace in
         QCheck2.Test.fail_reportf
@@ -99,7 +99,7 @@ let assert_fails_with ~__LOC__ (res : unit Environment.Error_monad.tzresult)
           expected_trace
           pp
           trace
-  | Ok () -> Lwt.return false
+  | Ok () -> Lwt.return_false
 
 let initial_of_dissection dissection =
   List.hd dissection |> WithExceptions.Option.get ~loc:__LOC__

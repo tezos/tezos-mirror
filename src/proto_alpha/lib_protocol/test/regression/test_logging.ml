@@ -256,7 +256,7 @@ let fail_on_error f () =
   let open Lwt_syntax in
   let* result = f () in
   match result with
-  | Ok () -> return ()
+  | Ok () -> return_unit
   | Error e -> Test.fail "%a" Error_monad.pp_print_trace e
 
 (* Make sure that after a snapshot the snapshotted version of the test

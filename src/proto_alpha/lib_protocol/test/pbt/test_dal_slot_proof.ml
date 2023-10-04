@@ -118,10 +118,10 @@ struct
     let open Result_syntax in
     if skip_slot then
       (* We cannot check that a page of an unconfirmed slot is confirmed. *)
-      return None
+      return_none
     else
       let* page_info, page_id = mk_page_info slot poly in
-      return @@ Some (page_info, page_id)
+      return_some (page_info, page_id)
 
   (** This function returns information of a page to prove that it is
       unconfirmed, if the page's slot is skipped, the information look correct
@@ -141,7 +141,7 @@ struct
     let* _page_info, page_id = mk_page_info ~level slot poly in
     (* We should not provide the page's info if we want to build an
        unconfirmation proof. *)
-    return @@ Some (None, page_id)
+    return_some (None, page_id)
 
   (** This helper function allows to test DAL's {!produce_proof} and
       {!verify_proof} functions, using the data constructed from
