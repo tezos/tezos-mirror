@@ -14,6 +14,7 @@ depends: [
   "octez-shell-libs"
   "safepass"
   "tls-lwt"
+  "aches"
   ]
 depopts: [
   "octez-protocol-001-PtCJ7pwo-libs"

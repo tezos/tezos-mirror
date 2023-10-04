@@ -376,57 +376,75 @@ let endorsing_rights_callback db_pool g rights =
         ~body:"Endorsing_right noted"
         ())
 
-let block_callback db_pool g source
-    ( Teztale_lib.Data.Block.
-        {delegate; timestamp; reception_times; round; hash; predecessor; _},
-      cycle_info,
-      (endorsements, preendorsements) ) =
-  let out =
+module Block_lru_cache =
+  Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
+    (Tezos_base.TzPervasives.Block_hash)
+
+let block_callback =
+  let block_cache = Block_lru_cache.create 100 in
+  fun db_pool
+      g
+      source
+      ( Teztale_lib.Data.Block.
+          {delegate; timestamp; reception_times; round; hash; predecessor; _},
+        cycle_info,
+        (endorsements, preendorsements) ) ->
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-    Caqti_lwt.Pool.use
-      (fun (module Db : Caqti_lwt.CONNECTION) ->
-        let* () = Db.exec Sql_requests.maybe_insert_source source in
-        let* () = Db.exec Sql_requests.maybe_insert_delegate delegate in
-        let level = Int32.of_string (Re.Group.get g 1) in
-        let* () =
-          Db.exec
-            Sql_requests.maybe_insert_block
-            ((level, timestamp, hash, round), (predecessor, delegate))
-        in
-        let* () =
-          match cycle_info with
-          | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size} ->
-              Db.exec
-                Sql_requests.maybe_insert_cycle
-                (cycle, Int32.sub level cycle_position, cycle_size)
-          | _ -> Lwt.return_ok ()
-        in
-        let* () =
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun r ->
-              let open Teztale_lib.Data.Block in
-              Db.exec
-                Sql_requests.insert_received_block
-                (r.application_time, r.validation_time, hash, source))
-            reception_times
-        in
-        let* () =
-          insert_operations_from_block
-            (module Db)
-            (Int32.pred level)
-            hash
-            endorsements
-        in
-        insert_operations_from_block (module Db) level hash preendorsements)
-      db_pool
-  in
-  with_caqti_error out (fun () ->
-      Cohttp_lwt_unix.Server.respond_string
-        ~headers:
-          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
-        ~status:`OK
-        ~body:"Block registered"
-        ())
+    let is_already_treated = Block_lru_cache.mem block_cache hash in
+    Block_lru_cache.add block_cache hash ;
+    let may_handle f = if is_already_treated then return_unit else f () in
+    let out =
+      Caqti_lwt.Pool.use
+        (fun (module Db : Caqti_lwt.CONNECTION) ->
+          let* () = Db.exec Sql_requests.maybe_insert_source source in
+          let* () =
+            may_handle @@ fun () ->
+            Db.exec Sql_requests.maybe_insert_delegate delegate
+          in
+          let level = Int32.of_string (Re.Group.get g 1) in
+          let* () =
+            may_handle @@ fun () ->
+            Db.exec
+              Sql_requests.maybe_insert_block
+              ((level, timestamp, hash, round), (predecessor, delegate))
+          in
+          let* () =
+            may_handle @@ fun () ->
+            match cycle_info with
+            | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size} ->
+                Db.exec
+                  Sql_requests.maybe_insert_cycle
+                  (cycle, Int32.sub level cycle_position, cycle_size)
+            | _ -> Lwt.return_ok ()
+          in
+          let* () =
+            (* This data is non-redondant: we always treat it. *)
+            Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+              (fun r ->
+                let open Teztale_lib.Data.Block in
+                Db.exec
+                  Sql_requests.insert_received_block
+                  (r.application_time, r.validation_time, hash, source))
+              reception_times
+          in
+          let* () =
+            may_handle @@ fun () ->
+            insert_operations_from_block
+              (module Db)
+              (Int32.pred level)
+              hash
+              endorsements
+          in
+          insert_operations_from_block (module Db) level hash preendorsements)
+        db_pool
+    in
+    with_caqti_error out (fun () ->
+        Cohttp_lwt_unix.Server.respond_string
+          ~headers:
+            (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+          ~status:`OK
+          ~body:"Block registered"
+          ())
 
 let operations_callback db_pool g source operations =
   let level = Int32.of_string (Re.Group.get g 1) in
