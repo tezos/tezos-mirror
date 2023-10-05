@@ -172,6 +172,11 @@ fn typecheck_instruction(
                     stack.pop();
                     I::Add(overloads::Add::IntInt)
                 }
+                [.., T::Nat, T::Int] => {
+                    stack.pop();
+                    stack[0] = T::Int;
+                    I::Add(overloads::Add::IntNat)
+                }
                 [.., T::Mutez, T::Mutez] => {
                     stack.pop();
                     I::Add(overloads::Add::MutezMutez)
@@ -1362,5 +1367,15 @@ mod typecheck_tests {
             ])
         );
         assert_eq!(stack, stk![]);
+    }
+
+    #[test]
+    fn add_int_nat() {
+        let mut stack = stk![Type::Nat, Type::Int];
+        assert_eq!(
+            typecheck(parse("{ ADD }").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(vec![Add(overloads::Add::IntNat)])
+        );
+        assert_eq!(stack, stk![Type::Int]);
     }
 }

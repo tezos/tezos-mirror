@@ -85,6 +85,15 @@ fn interpret_one(
                 let sum = o1 + o2;
                 stack.push(V::Nat(sum));
             }
+            overloads::Add::IntNat => {
+                let o1 = pop!(V::Int);
+                // this potentially overflows on i128, but can't overflow on
+                // bigints, unwrap for now
+                let o2 = pop!(V::Nat).try_into().unwrap();
+                ctx.gas.consume(interpret_cost::add_int(o1, o2)?)?;
+                let sum = o1 + o2;
+                stack.push(V::Int(sum));
+            }
             overloads::Add::MutezMutez => {
                 let o1 = pop!(V::Mutez);
                 let o2 = pop!(V::Mutez);
@@ -920,5 +929,33 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::Nat(2)]);
+    }
+
+    #[test]
+    fn add_int_nat() {
+        let mut stack = stk![TypedValue::Nat(123), TypedValue::Int(456)];
+        assert_eq!(
+            interpret(
+                &vec![Add(overloads::Add::IntNat)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Int(579)]);
+    }
+
+    #[test]
+    fn add_int_nat_2() {
+        let mut stack = stk![TypedValue::Nat(123), TypedValue::Int(-456)];
+        assert_eq!(
+            interpret(
+                &vec![Add(overloads::Add::IntNat)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Int(-333)]);
     }
 }
