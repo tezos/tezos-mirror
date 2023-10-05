@@ -434,7 +434,7 @@ module Alpha_context_tests = struct
     let open Lwt_result_syntax in
     let* ctx = init () in
     let rounds = 5 in
-    Printf.printf "\nrounds: %d\n" rounds ;
+    Log.info "\nrounds: %d\n" rounds ;
     let w = wallet_gen () in
     let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
@@ -444,7 +444,7 @@ module Alpha_context_tests = struct
     let start = Unix.gettimeofday () in
     let vts = List.map (fun _ -> transfer w cs []) (1 -- rounds) in
     let ctime_shields = Unix.gettimeofday () -. start in
-    Printf.printf "client_shields %f\n" ctime_shields ;
+    Log.info "client_shields %f\n" ctime_shields ;
     let start = Unix.gettimeofday () in
     let* ctx =
       List.fold_left_es
@@ -455,12 +455,12 @@ module Alpha_context_tests = struct
         vts
     in
     let vtime_shields = Unix.gettimeofday () -. start in
-    Printf.printf "valdtr_shields %f\n" vtime_shields ;
+    Log.info "valdtr_shields %f\n" vtime_shields ;
     let* cs = client_state_alpha ctx id in
     let start = Unix.gettimeofday () in
     let vts = List.map (fun i -> transfer w cs [i]) (1 -- rounds) in
     let ctime_transfers = Unix.gettimeofday () -. start in
-    Printf.printf "client_txs %f\n" ctime_transfers ;
+    Log.info "client_txs %f\n" ctime_transfers ;
     let start = Unix.gettimeofday () in
     let+ (_ctx : context) =
       List.fold_left_es
@@ -471,14 +471,14 @@ module Alpha_context_tests = struct
         vts
     in
     let vtime_transfers = Unix.gettimeofday () -. start in
-    Printf.printf "valdtr_txs %f\n" vtime_transfers
+    Log.info "valdtr_txs %f\n" vtime_transfers
 
   (* Same as before but for the legacy instruction. *)
   let test_bench_phases_legacy () =
     let open Lwt_result_syntax in
     let* ctx = init () in
     let rounds = 5 in
-    Printf.printf "\nrounds: %d\n" rounds ;
+    Log.info "\nrounds: %d\n" rounds ;
     let w = wallet_gen () in
     let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
@@ -488,7 +488,7 @@ module Alpha_context_tests = struct
     let start = Unix.gettimeofday () in
     let vts = List.map (fun _ -> transfer_legacy w cs []) (1 -- rounds) in
     let ctime_shields = Unix.gettimeofday () -. start in
-    Printf.printf "client_shields %f\n" ctime_shields ;
+    Log.info "client_shields %f\n" ctime_shields ;
     let start = Unix.gettimeofday () in
     let* ctx =
       List.fold_left_es
@@ -499,12 +499,12 @@ module Alpha_context_tests = struct
         vts
     in
     let vtime_shields = Unix.gettimeofday () -. start in
-    Printf.printf "valdtr_shields %f\n" vtime_shields ;
+    Log.info "valdtr_shields %f\n" vtime_shields ;
     let* cs = client_state_alpha ctx id in
     let start = Unix.gettimeofday () in
     let vts = List.map (fun i -> transfer_legacy w cs [i]) (1 -- rounds) in
     let ctime_transfers = Unix.gettimeofday () -. start in
-    Printf.printf "client_txs %f\n" ctime_transfers ;
+    Log.info "client_txs %f\n" ctime_transfers ;
     let start = Unix.gettimeofday () in
     let+ (_ctx : context) =
       List.fold_left_es
@@ -515,7 +515,7 @@ module Alpha_context_tests = struct
         vts
     in
     let vtime_transfers = Unix.gettimeofday () -. start in
-    Printf.printf "valdtr_txs %f\n" vtime_transfers
+    Log.info "valdtr_txs %f\n" vtime_transfers
 
   (* Transfer several times the same token. *)
   let test_bench_fold_over_same_token () =
