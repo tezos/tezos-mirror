@@ -6,40 +6,46 @@
 /******************************************************************************/
 
 use crate::ast::*;
+use crate::lexer::{LexerError, Tok};
 use crate::syntax;
-use lalrpop_util::lexer::Token;
 use lalrpop_util::ParseError;
+use logos::Logos;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum ParserError {
-    #[error("parsing of numeric literal {0} failed")]
-    NumericLiteral(String),
     #[error("expected a natural from 0 to 1023 inclusive, but got {0}")]
-    ExpectedU10(String),
-    #[error("forbidden character found in string literal \"{0}\"")]
-    ForbiddenCharacterIn(String),
-    #[error("undefined escape sequence: \"\\{0}\"")]
-    UndefinedEscape(char),
+    ExpectedU10(i128),
+    #[error(transparent)]
+    LexerError(#[from] LexerError),
 }
 
-pub fn parse(
-    src: &str,
-) -> Result<ParsedInstructionBlock, ParseError<usize, Token<'_>, ParserError>> {
-    syntax::instructionBlockParser::new().parse(src)
+#[allow(dead_code)]
+pub fn parse(src: &str) -> Result<ParsedInstructionBlock, ParseError<usize, Tok, ParserError>> {
+    syntax::instructionBlockParser::new().parse(spanned_lexer(src))
+}
+
+fn spanned_lexer(
+    src: &'_ str,
+) -> impl Iterator<Item = Result<(usize, Tok, usize), ParserError>> + '_ {
+    Tok::lexer(src)
+        .spanned()
+        .map(|(tok_or_err, span)| match tok_or_err {
+            Ok(tok) => Ok((span.start, tok, span.end)),
+            Err(err) => Err(err.into()),
+        })
 }
 
 /// Takes a string _with_ the sourrounding quotes, strips the quotes, checks the
 /// string is valid (i.e. contains only printable ASCII characters) and replaces
 /// escapes with corresponding characters.
-pub fn validate_unescape_string(
-    s: &str,
-) -> Result<String, ParseError<usize, Token<'_>, ParserError>> {
+pub fn parse_string(lex: &mut crate::lexer::Lexer) -> Result<String, LexerError> {
+    let s = lex.slice();
     // strip the quotes
     let s = &s[1..s.len() - 1];
 
     // check if all characters are printable ASCII
     if !s.chars().all(|c| matches!(c, ' '..='~')) {
-        return Err(ParserError::ForbiddenCharacterIn(s.to_owned()).into());
+        return Err(LexerError::ForbiddenCharacterIn(s.to_owned()).into());
     }
 
     let mut res = String::new();
@@ -50,7 +56,7 @@ pub fn validate_unescape_string(
         'n' => Ok('\n'),
         '"' => Ok('"'),
         '\\' => Ok('\\'),
-        _ => Err(ParserError::UndefinedEscape(c)),
+        _ => Err(LexerError::UndefinedEscape(c)),
     };
 
     let mut in_escape: bool = false;
@@ -70,16 +76,18 @@ pub fn validate_unescape_string(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn unescape_string() {
         macro_rules! assert_parse {
             ($s:expr, $e:expr) => {
                 assert_eq!(
-                    syntax::stringParser::new()
-                        .parse($s)
-                        .as_deref()
-                        .map_err(|e| e.to_string()),
-                    $e
+                    Tok::lexer($s)
+                        .map(|i| i.map_err(|x| x.to_string()))
+                        .collect::<Vec<Result<Tok, String>>>(),
+                    vec![($e as Result<&str, &str>)
+                        .map(|v| Tok::String(v.to_owned()))
+                        .map_err(|e| e.to_owned())]
                 )
             };
         }
@@ -92,16 +100,13 @@ mod tests {
         // unicode is not accepted
         assert_parse!(
             r#""हिन्दी""#,
-            Err("forbidden character found in string literal \"हिन्दी\"".to_owned())
+            Err("forbidden character found in string literal \"हिन्दी\"")
         );
         // unknown escapes are not accepted
-        assert_parse!(
-            r#""\a""#,
-            Err("undefined escape sequence: \"\\a\"".to_owned())
-        );
+        assert_parse!(r#""\a""#, Err("undefined escape sequence: \"\\a\""));
         // unterminated strings are not accepted
-        assert_parse!(r#"""#, Err("Invalid token at 0".to_owned()));
-        assert_parse!(r#""\""#, Err("Invalid token at 0".to_owned()));
+        assert_parse!(r#"""#, Err("unknown token"));
+        assert_parse!(r#""\""#, Err("unknown token"));
     }
 
     #[test]
@@ -182,7 +187,7 @@ mod tests {
         use Type::*;
         macro_rules! parse_type {
             ($s:expr) => {
-                crate::syntax::TypeParser::new().parse($s)
+                crate::syntax::TypeParser::new().parse(spanned_lexer($s))
             };
         }
         assert_eq!(parse_type!("(int :p)"), Ok(Int));
@@ -202,7 +207,7 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "Unrecognized token `%b` found at 15:17\nExpected one of \")\""
+            "Unrecognized token `<ann>` found at 15:17\nExpected one of \")\""
         );
     }
 
