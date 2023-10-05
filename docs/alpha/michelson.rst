@@ -910,7 +910,7 @@ A detailed description of the following instructions can be found in the `intera
 -  ``VIEW name 'return``: Call the view named ``name`` from the contract whose address is the second element of the stack, sending it as input the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-VIEW>`__).
 
 Removed instructions and types
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
 :doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
