@@ -1774,7 +1774,7 @@ let test_eth_call_large =
 let test_estimate_gas =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "eth_estimategas"; "simulate"]
+    ~tags:["evm"; "eth_estimategas"; "simulate"; "create"]
     ~uses:(fun protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -1803,7 +1803,7 @@ let test_estimate_gas =
 
       (* Check the RPC returns a `result`. *)
       let r = call_result |> Evm_node.extract_result in
-      Check.((JSON.as_int r = 23423) int)
+      Check.((JSON.as_int r >= 23423) int)
         ~error_msg:"Expected result greater than %R, but got %L" ;
 
       unit)
@@ -1850,7 +1850,7 @@ let test_estimate_gas_additionnal_field =
 
       (* Check the RPC returns a `result`. *)
       let r = call_result |> Evm_node.extract_result in
-      Check.((JSON.as_int r = 23423) int)
+      Check.((JSON.as_int r >= 23423) int)
         ~error_msg:"Expected result greater than %R, but got %L" ;
 
       unit)

@@ -479,7 +479,9 @@ mod test {
             &caller,
             U256::from(1_000_000),
         );
-
+        // gas limit was estimated using Remix on Shanghai network (256,842)
+        // plus a safety margin for gas accounting discrepancies
+        let gas_limit = 300_000;
         let result = run_transaction(
             &mut mock_runtime,
             &block,
@@ -489,7 +491,7 @@ mod test {
             callee,
             caller,
             call_data,
-            Some(31000),
+            Some(gas_limit),
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -605,13 +607,19 @@ mod test {
         let transaction_value = U256::from(0);
         let call_data: Vec<u8> = hex::decode(ERC20_CONTRACT_INITIALISATION).unwrap();
 
+        // gas_limit estimated using remix on shanghai network (1,631,430)
+        // plus a 50% margin for gas accounting discrepancies
+        let gas_limit = 2_400_000;
+
+        // the test is not to check that account can prepay,
+        // so we can choose the balance depending on set gas limit
+        let balance = block.gas_price.saturating_mul(gas_limit.into());
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            U256::from(100000),
+            balance,
         );
-
         let result = run_transaction(
             &mut mock_runtime,
             &block,
@@ -621,7 +629,7 @@ mod test {
             callee,
             caller,
             call_data,
-            Some(100000),
+            Some(gas_limit),
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -631,7 +639,6 @@ mod test {
         let result = result.unwrap();
         assert!(result.is_some());
         let result = result.unwrap();
-
         assert!(result.is_success);
         assert_eq!(
             Some(H160::from_str("907823e0a92f94355968feb2cbf0fbb594fe3214").unwrap()),

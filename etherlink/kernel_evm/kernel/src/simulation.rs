@@ -528,6 +528,9 @@ mod tests {
         let transaction_value = U256::from(0);
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
 
+        // gas limit was estimated using Remix on Shanghai network (256,842)
+        // plus a safety margin for gas accounting discrepancies
+        let gas_limit = 300_000;
         // create contract
         let outcome = evm_execution::run_transaction(
             host,
@@ -538,7 +541,7 @@ mod tests {
             callee,
             caller,
             call_data,
-            Some(31000),
+            Some(gas_limit),
             Some(transaction_value),
             false,
             DUMMY_ALLOCATED_TICKS,

@@ -363,8 +363,10 @@ mod tests {
         private_key: &str,
     ) -> EthereumTransactionCommon {
         let nonce = U256::from(nonce);
-        let gas_price = U256::from(40000000000u64);
-        let gas_limit = 42000u64;
+        let gas_price = U256::from(21000u64);
+        // gas limit was estimated using Remix on Shanghai network (256,842)
+        // plus a safety margin for gas accounting discrepancies
+        let gas_limit = 300_000u64;
         let value = U256::zero();
         // corresponding contract is kernel_benchmark/scripts/benchmarks/contracts/storage.sol
         let data: Vec<u8> = hex::decode("608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033").unwrap();
@@ -571,7 +573,6 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .expect("The block production failed.");
-
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
             .expect("should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);

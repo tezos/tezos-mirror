@@ -34,6 +34,12 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 
+/// Gas constant specific to cost of storing a contract code.
+/// Doesn't seem to be specified in the sputnik `Config` object.
+/// For the value, cf yellow paper p29, Appendix G "fee schedule",
+/// value for `G_codedeposit`.
+const GAS_CODE_DEPOSIT: u64 = 200;
+
 /// Outcome of making the [EvmHandler] run an Ethereum transaction
 ///
 /// Be it contract -call, -create or simple transfer, the handler will update the world
@@ -309,6 +315,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .last()
             .map(|layer| layer.gasometer.as_ref().map(|g| g.gas()).unwrap_or(0_u64))
             .unwrap_or(0_u64)
+    }
+
+    /// Cost of storing a contract
+    fn compute_gas_code_deposit(&self, code_size: usize) -> u64 {
+        // There is no way to deploy a contract that contains more than 2^64 bytes
+        // of code..
+        (code_size as u64) * GAS_CODE_DEPOSIT
     }
 
     /// Record the cost of a static-cost opcode
@@ -663,6 +676,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // issue: https://gitlab.com/tezos/tezos/-/issues/4869
         if let Ok(ExitReason::Succeed(_)) = result {
             let code_out = runtime.machine().return_value();
+
+            if let Err(err) =
+                self.record_cost(self.compute_gas_code_deposit(code_out.len()))
+            {
+                return Ok((ExitReason::Error(err), None, vec![]));
+            }
 
             if self.deleted(address) {
                 // The contract has been deleted, so the address is empty. However, after
