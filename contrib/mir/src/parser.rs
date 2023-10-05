@@ -205,4 +205,19 @@ mod tests {
             "Unrecognized token `%b` found at 15:17\nExpected one of \")\""
         );
     }
+
+    #[test]
+    fn instr_anns() {
+        use Instruction::*;
+        use Type as T;
+        use Value as V;
+        assert_eq!(
+            parse("{PUSH @var :ty %field int 1}").unwrap(),
+            vec![Push((T::Int, V::NumberValue(1)))],
+        );
+        assert_eq!(
+            parse("{CAR @var :ty %field :ty.2 @var.2 %field.2}").unwrap(),
+            vec![Car],
+        );
+    }
 }
