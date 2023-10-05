@@ -900,6 +900,14 @@ A detailed description of the following instructions can be found in the `intera
 - ``EMIT %tag 'ty``: constructs an operation that will write an event into
   the transaction receipt (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMIT>`__).
 
+.. _MichelsonViews_alpha:
+
+Operations on views
+~~~~~~~~~~~~~~~~~~~~
+
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
+-  ``VIEW name 'return``: Call the view named ``name`` from the contract whose address is the second element of the stack, sending it as input the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-VIEW>`__).
 
 Removed instructions and types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -949,16 +957,6 @@ reject any contract using it.
    a transaction rollup ledger. It is the hash of a BLS public key,
    used to authenticate layer-2 operations to transfer tickets from
    this account.
-
-.. _MichelsonViews_alpha:
-
-Operations on views
-~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``VIEW name 'return``: Call the view named ``name`` from the contract whose address is the second element of the stack, sending it as input the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-VIEW>`__).
-
 
 Macros
 ------
