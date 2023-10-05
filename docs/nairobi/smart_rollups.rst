@@ -13,6 +13,10 @@ blockchain.  Indeed, anyone can originate and operate one or more
 rollups, allowing to increase the throughput of the Tezos blockchain,
 (almost) arbitrarily.
 
+The purpose of this documentation is to provide an overview of the terminology and basic principles of smart rollups.
+In the :doc:`../shell/smart_rollup_node`, we will provide a complete tour 
+of smart rollups related workflows and reference documentation for the development of a WASM kernel.
+
 The integration of these rollups in the Tezos protocol is
 *optimistic*: this means that when a participant publishes a claim
 about the state of the rollup, this claim is *a priori*
@@ -44,10 +48,6 @@ on top of the Tezos blockchain. WASM rollups are not limited to this
 use case though: they are fully programmable, hence their names, smart
 optimistic rollups, as they are very close to smart contracts in terms
 of expressiveness.
-
-The purpose of this documentation is to provide an overview of the terminology and basic principles of smart rollups.
-In the :doc:`../shell/smart_rollup_node`, we will provide a complete tour 
-of smart rollups related workflows and reference documentation for the development of a WASM kernel.
 
 Overview
 --------
