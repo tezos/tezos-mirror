@@ -10,11 +10,11 @@
 
 # Default runner tags for jobs in the build stage
 .tags_template__build:
-  tags: []
+  tags: ["gcp"]
 
 # Default runner tags for arm64 jobs in the build stage
 .tags_template__build_arm64:
-  tags: ["arm64"]
+  tags: ["gcp_arm64"]
 
 # Add variables for bisect_ppx instrumentation
 .template__coverage:
