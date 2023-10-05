@@ -48,45 +48,59 @@ let constants =
 
 (** Checks that staking balance is sum of delegators' stake. *)
 let check_delegate_staking_invariant blk delegate_pkh =
-  Context.Delegate.staking_balance (B blk) delegate_pkh
-  >>=? fun delegate_staking_balance ->
-  Context.Delegate.full_balance (B blk) delegate_pkh
-  >>=? fun self_staking_balance ->
-  Context.Delegate.info (B blk) delegate_pkh >>=? fun delegate_info ->
+  let open Lwt_result_wrap_syntax in
+  let* delegate_staking_balance =
+    Context.Delegate.staking_balance (B blk) delegate_pkh
+  in
+  let* self_staking_balance =
+    Context.Delegate.full_balance (B blk) delegate_pkh
+  in
+  let* delegate_info = Context.Delegate.info (B blk) delegate_pkh in
   let delegate_contract = Contract.Implicit delegate_pkh in
   let delegated_contracts =
     List.filter
       (fun c -> Contract.(c <> delegate_contract))
       delegate_info.delegated_contracts
   in
-  List.fold_left_es
-    (fun total pkh ->
-      Context.Contract.balance_and_frozen_bonds (B blk) pkh
-      >>=? fun staking_balance ->
-      Lwt.return Tez.(total +? staking_balance) >|= Environment.wrap_tzresult)
-    self_staking_balance
-    delegated_contracts
-  >>=? fun delegators_stake ->
+  let* delegators_stake =
+    List.fold_left_es
+      (fun total pkh ->
+        let* staking_balance =
+          Context.Contract.balance_and_frozen_bonds (B blk) pkh
+        in
+        let*?@ t = Tez.(total +? staking_balance) in
+        return t)
+      self_staking_balance
+      delegated_contracts
+  in
   Assert.equal_tez ~loc:__LOC__ delegate_staking_balance delegators_stake
 
 let update_consensus_key blk delegate public_key =
+  let open Lwt_result_syntax in
   let nb_delay_cycles = constants.preserved_cycles + 1 in
-  Op.update_consensus_key (B blk) (Contract.Implicit delegate) public_key
-  >>=? fun update_ck ->
-  Block.bake ~operation:update_ck blk >>=? fun blk' ->
+  let* update_ck =
+    Op.update_consensus_key (B blk) (Contract.Implicit delegate) public_key
+  in
+  let* blk' = Block.bake ~operation:update_ck blk in
   Block.bake_until_n_cycle_end nb_delay_cycles blk'
 
 let delegate_stake blk source delegate =
-  Op.delegation (B blk) (Contract.Implicit source) (Some delegate)
-  >>=? fun delegation -> Block.bake ~operation:delegation blk
+  let open Lwt_result_syntax in
+  let* delegation =
+    Op.delegation (B blk) (Contract.Implicit source) (Some delegate)
+  in
+  Block.bake ~operation:delegation blk
 
 let transfer_tokens blk source destination amount =
-  Op.transaction
-    (B blk)
-    (Contract.Implicit source)
-    (Contract.Implicit destination)
-    amount
-  >>=? fun transfer_op -> Block.bake ~operation:transfer_op blk
+  let open Lwt_result_syntax in
+  let* transfer_op =
+    Op.transaction
+      (B blk)
+      (Contract.Implicit source)
+      (Contract.Implicit destination)
+      amount
+  in
+  Block.bake ~operation:transfer_op blk
 
 let may_reveal_manager_key blk (pkh, pk) =
   let open Lwt_result_syntax in
@@ -95,24 +109,28 @@ let may_reveal_manager_key blk (pkh, pk) =
   in
   if is_revealed then return blk
   else
-    Op.revelation (B blk) pk >>=? fun reveal_op ->
+    let* reveal_op = Op.revelation (B blk) pk in
     Block.bake ~operation:reveal_op blk
 
 let drain_delegate ~policy blk consensus_key delegate destination
     expected_final_balance =
-  Op.drain_delegate (B blk) ~consensus_key ~delegate ~destination
-  >>=? fun drain_del ->
-  Block.bake ~policy ~operation:drain_del blk >>=? fun blk' ->
-  check_delegate_staking_invariant blk' delegate >>=? fun () ->
-  Context.Contract.balance (B blk') (Contract.Implicit delegate)
-  >>=? fun final_balance ->
+  let open Lwt_result_syntax in
+  let* drain_del =
+    Op.drain_delegate (B blk) ~consensus_key ~delegate ~destination
+  in
+  let* blk' = Block.bake ~policy ~operation:drain_del blk in
+  let* () = check_delegate_staking_invariant blk' delegate in
+  let* final_balance =
+    Context.Contract.balance (B blk') (Contract.Implicit delegate)
+  in
   Assert.equal_tez ~loc:__LOC__ final_balance expected_final_balance
 
 let get_first_2_accounts_contracts (a1, a2) =
   ((a1, Context.Contract.pkh a1), (a2, Context.Contract.pkh a2))
 
 let test_drain_delegate_scenario f =
-  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let open Lwt_result_syntax in
+  let* genesis, contracts = Context.init_with_constants2 constants in
   let (_contract1, account1_pkh), (_contract2, account2_pkh) =
     get_first_2_accounts_contracts contracts
   in
@@ -120,33 +138,44 @@ let test_drain_delegate_scenario f =
   let delegate = account1_pkh in
   let consensus_pk = consensus_account.pk in
   let consensus_pkh = consensus_account.pkh in
-  transfer_tokens genesis account2_pkh consensus_pkh Tez.one_mutez
-  >>=? fun blk' ->
-  update_consensus_key blk' delegate consensus_pk >>=? fun blk' ->
+  let* blk' =
+    transfer_tokens genesis account2_pkh consensus_pkh Tez.one_mutez
+  in
+  let* blk' = update_consensus_key blk' delegate consensus_pk in
   f blk' consensus_pkh consensus_pk delegate
 
 let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
+  let open Lwt_result_syntax in
   test_drain_delegate_scenario (fun blk consensus_pkh consensus_pk delegate ->
       let policy =
         if exclude_ck then Block.Excluding [consensus_pkh]
         else Block.By_account delegate
       in
-      (if ck_delegates then
-       may_reveal_manager_key blk (consensus_pkh, consensus_pk) >>=? fun blk ->
-       delegate_stake blk consensus_pkh delegate
-      else return blk)
-      >>=? fun blk ->
-      Context.Contract.balance (B blk) (Contract.Implicit delegate)
-      >>=? fun delegate_balance ->
-      (if low_balance then
-       transfer_tokens blk delegate consensus_pkh delegate_balance
-       >>=? fun blk ->
-       may_reveal_manager_key blk (consensus_pkh, consensus_pk) >>=? fun blk ->
-       transfer_tokens blk consensus_pkh delegate Tez.(of_mutez_exn 1_000_000L)
-      else return blk)
-      >>=? fun blk ->
-      Context.Contract.balance (B blk) (Contract.Implicit delegate)
-      >>=? fun delegate_balance ->
+      let* blk =
+        if ck_delegates then
+          let* blk = may_reveal_manager_key blk (consensus_pkh, consensus_pk) in
+          delegate_stake blk consensus_pkh delegate
+        else return blk
+      in
+      let* delegate_balance =
+        Context.Contract.balance (B blk) (Contract.Implicit delegate)
+      in
+      let* blk =
+        if low_balance then
+          let* blk =
+            transfer_tokens blk delegate consensus_pkh delegate_balance
+          in
+          let* blk = may_reveal_manager_key blk (consensus_pkh, consensus_pk) in
+          transfer_tokens
+            blk
+            consensus_pkh
+            delegate
+            Tez.(of_mutez_exn 1_000_000L)
+        else return blk
+      in
+      let* delegate_balance =
+        Context.Contract.balance (B blk) (Contract.Implicit delegate)
+      in
       let expected_final_balance =
         if exclude_ck then Tez.zero
         else Tez.(max one (div_exn delegate_balance 100))
@@ -160,17 +189,19 @@ let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
         expected_final_balance)
 
 let test_drain_empty_delegate ~exclude_ck () =
+  let open Lwt_result_syntax in
   test_drain_delegate_scenario (fun blk consensus_pkh _consensus_pk delegate ->
       let policy =
         if exclude_ck then Block.Excluding [consensus_pkh]
         else Block.By_account delegate
       in
-      Context.Contract.balance (B blk) (Contract.Implicit delegate)
-      >>=? fun delegate_balance ->
-      transfer_tokens blk delegate consensus_pkh delegate_balance
-      >>=? fun blk ->
-      drain_delegate ~policy blk consensus_pkh delegate consensus_pkh Tez.zero
-      >>= fun res ->
+      let* delegate_balance =
+        Context.Contract.balance (B blk) (Contract.Implicit delegate)
+      in
+      let* blk = transfer_tokens blk delegate consensus_pkh delegate_balance in
+      let*! res =
+        drain_delegate ~policy blk consensus_pkh delegate consensus_pkh Tez.zero
+      in
       Assert.proto_error_with_info
         ~loc:__LOC__
         res
@@ -178,16 +209,19 @@ let test_drain_empty_delegate ~exclude_ck () =
          fees")
 
 let test_tz4_consensus_key () =
-  Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->
+  let open Lwt_result_syntax in
+  let* genesis, contracts = Context.init_with_constants1 constants in
   let account1_pkh = Context.Contract.pkh contracts in
   let consensus_account = Account.new_account ~algo:Bls () in
   let delegate = account1_pkh in
   let consensus_pk = consensus_account.pk in
   let consensus_pkh = consensus_account.pkh in
-  transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
-  >>=? fun blk' ->
-  Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
-  >>=? fun operation ->
+  let* blk' =
+    transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+  in
+  let* operation =
+    Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
+  in
   let tz4_pk = match consensus_pk with Bls pk -> pk | _ -> assert false in
   let expect_failure = function
     | [
@@ -204,30 +238,35 @@ let test_tz4_consensus_key () =
           Error_monad.pp_print_trace
           err
   in
-  Incremental.begin_construction blk' >>=? fun inc ->
-  Incremental.validate_operation ~expect_failure inc operation
-  >>=? fun (_i : Incremental.t) -> return_unit
+  let* inc = Incremental.begin_construction blk' in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc operation
+  in
+  return_unit
 
 let test_attestation_with_consensus_key () =
-  Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->
+  let open Lwt_result_syntax in
+  let* genesis, contracts = Context.init_with_constants1 constants in
   let account1_pkh = Context.Contract.pkh contracts in
   let consensus_account = Account.new_account () in
   let delegate = account1_pkh in
   let consensus_pk = consensus_account.pk in
   let consensus_pkh = consensus_account.pkh in
-  transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
-  >>=? fun blk' ->
-  update_consensus_key blk' delegate consensus_pk >>=? fun b_pre ->
-  Block.bake b_pre >>=? fun b ->
+  let* blk' =
+    transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+  in
+  let* b_pre = update_consensus_key blk' delegate consensus_pk in
+  let* b = Block.bake b_pre in
   let slot = Slot.of_int_do_not_use_except_for_parameters 0 in
-  Op.attestation ~delegate:account1_pkh ~slot b >>=? fun attestation ->
-  Block.bake ~operation:attestation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Operation.Invalid_signature -> true
-      | _ -> false)
-  >>=? fun () ->
-  Op.attestation ~delegate:consensus_pkh ~slot b >>=? fun attestation ->
-  Block.bake ~operation:attestation b >>=? fun (_good_block : Block.t) ->
+  let* attestation = Op.attestation ~delegate:account1_pkh ~slot b in
+  let*! res = Block.bake ~operation:attestation b in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Operation.Invalid_signature -> true
+        | _ -> false)
+  in
+  let* attestation = Op.attestation ~delegate:consensus_pkh ~slot b in
+  let* (_good_block : Block.t) = Block.bake ~operation:attestation b in
   return_unit
 
 let tests =

@@ -550,8 +550,9 @@ let test_early_incorrect_unverified_correct_already_vdf () =
 
 (* We check that bounds used in [Seed_storage.for_cycle] are as expected. *)
 let test_cycle_bounds () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (b, _accounts) ->
-  Context.get_constants (B b) >>=? fun csts ->
+  let open Lwt_result_syntax in
+  let* b, _accounts = Context.init1 ~consensus_threshold:0 () in
+  let* csts = Context.get_constants (B b) in
   let past_offset = csts.parametric.max_slashing_period - 1 in
   let future_offset = csts.parametric.preserved_cycles in
   let open Alpha_context.Cycle in
@@ -584,46 +585,54 @@ let test_cycle_bounds () =
           cycle
   in
   let cycle = root in
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
-  >>=? fun (_ : _ list) ->
+  let* (_ : _ list) =
+    Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  in
   let future_cycle = add cycle (future_offset + 1) in
-  Context.get_bakers ~cycle:future_cycle (B b) >>= fun res ->
+  let*! res = Context.get_bakers ~cycle:future_cycle (B b) in
   (* the first cycle is special *)
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    ~error_info_field:`Message
-    res
-    (expected_error_message (`Missing_sampler_state future_cycle) cycle)
-  >>=? fun () ->
-  Block.bake_until_cycle_end b >>=? fun b ->
+  let* () =
+    Assert.proto_error_with_info
+      ~loc:__LOC__
+      ~error_info_field:`Message
+      res
+      (expected_error_message (`Missing_sampler_state future_cycle) cycle)
+  in
+  let* b = Block.bake_until_cycle_end b in
   let cycle = add cycle 1 in
-  Context.get_bakers ~cycle:root (B b) >>=? fun (_ : _ list) ->
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
-  >>=? fun (_ : _ list) ->
-  Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    ~error_info_field:`Message
-    (expected_error_message `Future cycle)
-  >>=? fun () ->
-  Block.bake_until_n_cycle_end past_offset b >>=? fun b ->
+  let* (_ : _ list) = Context.get_bakers ~cycle:root (B b) in
+  let* (_ : _ list) =
+    Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  in
+  let*! res = Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) in
+  let* () =
+    Assert.proto_error_with_info
+      ~loc:__LOC__
+      res
+      ~error_info_field:`Message
+      (expected_error_message `Future cycle)
+  in
+  let* b = Block.bake_until_n_cycle_end past_offset b in
   let cycle = add cycle past_offset in
-  Context.get_bakers ~cycle:(Stdlib.Option.get (sub cycle past_offset)) (B b)
-  >>=? fun (_ : _ list) ->
-  Context.get_bakers
-    ~cycle:(Stdlib.Option.get (sub cycle (past_offset + 1)))
-    (B b)
-  >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    ~error_info_field:`Message
-    (expected_error_message `Past cycle)
-  >>=? fun () ->
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
-  >>=? fun (_ : _ list) ->
-  Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) >>= fun res ->
+  let* (_ : _ list) =
+    Context.get_bakers ~cycle:(Stdlib.Option.get (sub cycle past_offset)) (B b)
+  in
+  let*! res =
+    Context.get_bakers
+      ~cycle:(Stdlib.Option.get (sub cycle (past_offset + 1)))
+      (B b)
+  in
+  let* () =
+    Assert.proto_error_with_info
+      ~loc:__LOC__
+      res
+      ~error_info_field:`Message
+      (expected_error_message `Past cycle)
+  in
+  let* (_ : _ list) =
+    Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  in
+  let*! res = Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) in
   Assert.proto_error_with_info
     ~loc:__LOC__
     res

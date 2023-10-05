@@ -35,28 +35,29 @@
    Future levels or cycles are not tested because it's hard in this framework,
    using only RPCs, to fabricate them. *)
 let test_baking_rights () =
-  Context.init2 () >>=? fun (b, (c1, _c2)) ->
+  let open Lwt_result_syntax in
+  let* b, (c1, _c2) = Context.init2 () in
   let open Plugin.RPC.Baking_rights in
   (* default max_round returns 65 results *)
-  get Block.rpc_ctxt b ~all:true >>=? fun rights ->
+  let* rights = get Block.rpc_ctxt b ~all:true in
   assert (Compare.List_length_with.(rights = 65)) ;
   (* arbitrary max_round *)
   let max_round = 15 in
-  get Block.rpc_ctxt b ~all:true ~max_round >>=? fun rights ->
+  let* rights = get Block.rpc_ctxt b ~all:true ~max_round in
   assert (Compare.List_length_with.(rights = max_round + 1)) ;
   (* filtering by delegate *)
   let d = Context.Contract.pkh c1 in
-  get Block.rpc_ctxt b ~all:true ~delegates:[d] >>=? fun rights ->
+  let* rights = get Block.rpc_ctxt b ~all:true ~delegates:[d] in
   assert (List.for_all (fun {delegate; _} -> delegate = d) rights) ;
   (* filtering by cycle *)
-  Plugin.RPC.current_level Block.rpc_ctxt b >>=? fun {cycle; _} ->
-  get Block.rpc_ctxt b ~all:true ~cycle >>=? fun rights ->
-  Plugin.RPC.levels_in_current_cycle Block.rpc_ctxt b >>=? fun (first, last) ->
+  let* {cycle; _} = Plugin.RPC.current_level Block.rpc_ctxt b in
+  let* rights = get Block.rpc_ctxt b ~all:true ~cycle in
+  let* first, last = Plugin.RPC.levels_in_current_cycle Block.rpc_ctxt b in
   assert (
     List.for_all (fun {level; _} -> level >= first && level <= last) rights) ;
   (* filtering by level *)
-  Plugin.RPC.current_level Block.rpc_ctxt b >>=? fun {level; _} ->
-  get Block.rpc_ctxt b ~all:true ~levels:[level] >>=? fun rights ->
+  let* {level; _} = Plugin.RPC.current_level Block.rpc_ctxt b in
+  let* rights = get Block.rpc_ctxt b ~all:true ~levels:[level] in
   let expected_level = level in
   assert (List.for_all (fun {level; _} -> level = expected_level) rights) ;
   return_unit
