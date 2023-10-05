@@ -96,6 +96,10 @@ Codec
 Docker Images
 -------------
 
+- The rollup node is protocol agnostic and released as part of the Docker
+  image. (MR :gl:`!10086`)
+
+
 Smart Rollup node
 -----------------
 
@@ -108,6 +112,13 @@ Smart Rollup node
   field ``"log_kernel_debug_file"`` which allows to specify a file in which
   kernel logs should be written (this file is in
   ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
+
+- The protocol specific rollup nodes binaries are now deprecated and replaced
+  by symbolic links to the protocol agnostic rollup node. In the future, the
+  symbolic links will be removed. (MR :gl:`!10086`)
+
+- Released the protocol agnostic rollup node ``octez-smart-rollup-node`` as part
+  of the Octez distribution. (MR :gl:`!10086`)
 
 Smart Rollup client
 -------------------
