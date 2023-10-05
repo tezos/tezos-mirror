@@ -7,9 +7,35 @@
 
 use logos::Logos;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
-pub enum Prim {
+/// Takes a list of primitive names, creates a simple `enum` with the names
+/// provided, and defines `FromStr` implementation using stringified
+/// representation of the identifiers.
+macro_rules! defprim {
+    ($($prim:ident),* $(,)*) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[allow(non_camel_case_types)]
+        pub enum Prim {
+            $($prim),*
+        }
+
+        impl std::str::FromStr for Prim {
+          type Err = PrimError;
+          fn from_str(s: &str) -> Result<Self, Self::Err> {
+              match s {
+                $(stringify!($prim) => Ok(Prim::$prim),)*
+                _ => Err(PrimError(s.to_owned()))
+              }
+          }
+        }
+    };
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[error("unknown primitive: {0}")]
+pub struct PrimError(String);
+
+// NB: Primitives will be lexed as written, so capitalization matters.
+defprim! {
     int,
     nat,
     bool,
@@ -61,46 +87,7 @@ impl std::fmt::Display for Prim {
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+")]
 pub enum Tok {
-    #[token("int", |_| Prim::int)]
-    #[token("nat", |_| Prim::nat)]
-    #[token("bool", |_| Prim::bool)]
-    #[token("mutez", |_| Prim::mutez)]
-    #[token("string", |_| Prim::string)]
-    #[token("unit", |_| Prim::unit)]
-    #[token("operation", |_| Prim::operation)]
-    #[token("pair", |_| Prim::pair)]
-    #[token("option", |_| Prim::option)]
-    #[token("list", |_| Prim::list)]
-    #[token("map", |_| Prim::map)]
-    #[token("True", |_| Prim::True)]
-    #[token("False", |_| Prim::False)]
-    #[token("Unit", |_| Prim::Unit)]
-    #[token("None", |_| Prim::None)]
-    #[token("Pair", |_| Prim::Pair)]
-    #[token("Some", |_| Prim::Some)]
-    #[token("Elt", |_| Prim::Elt)]
-    #[token("PUSH", |_| Prim::PUSH)]
-    #[token("INT", |_| Prim::INT)]
-    #[token("GT", |_| Prim::GT)]
-    #[token("LOOP", |_| Prim::LOOP)]
-    #[token("DIP", |_| Prim::DIP)]
-    #[token("ADD", |_| Prim::ADD)]
-    #[token("DROP", |_| Prim::DROP)]
-    #[token("SWAP", |_| Prim::SWAP)]
-    #[token("IF", |_| Prim::IF)]
-    #[token("DUP", |_| Prim::DUP)]
-    #[token("FAILWITH", |_| Prim::FAILWITH)]
-    #[token("UNIT", |_| Prim::UNIT)]
-    #[token("CAR", |_| Prim::CAR)]
-    #[token("CDR", |_| Prim::CDR)]
-    #[token("PAIR", |_| Prim::PAIR)]
-    #[token("IF_NONE", |_| Prim::IF_NONE)]
-    #[token("SOME", |_| Prim::SOME)]
-    #[token("COMPARE", |_| Prim::COMPARE)]
-    #[token("AMOUNT", |_| Prim::AMOUNT)]
-    #[token("NIL", |_| Prim::NIL)]
-    #[token("GET", |_| Prim::GET)]
-    #[token("UPDATE", |_| Prim::UPDATE)]
+    #[regex(r"[A-Za-z_]+", lex_prim)]
     Prim(Prim),
 
     #[regex("([+-]?)[0-9]+", lex_number)]
@@ -151,6 +138,8 @@ pub enum LexerError {
     ForbiddenCharacterIn(String),
     #[error("undefined escape sequence: \"\\{0}\"")]
     UndefinedEscape(char),
+    #[error(transparent)]
+    PrimError(#[from] PrimError),
 }
 
 impl Default for LexerError {
@@ -160,6 +149,10 @@ impl Default for LexerError {
 }
 
 type Lexer<'a> = logos::Lexer<'a, Tok>;
+
+fn lex_prim(lex: &mut Lexer) -> Result<Prim, LexerError> {
+    lex.slice().parse().map_err(LexerError::from)
+}
 
 fn lex_number(lex: &mut Lexer) -> Result<i128, LexerError> {
     lex.slice()
@@ -242,5 +235,13 @@ mod tests {
         // unterminated strings are not accepted
         assert_parse!(r#"""#, Err("unknown token"));
         assert_parse!(r#""\""#, Err("unknown token"));
+    }
+
+    #[test]
+    fn unknown_prim_err() {
+        assert_eq!(
+            Tok::lexer("foo").next().unwrap().unwrap_err().to_string(),
+            "unknown primitive: foo"
+        )
     }
 }
