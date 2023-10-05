@@ -66,6 +66,8 @@ Node
 - Introduced a new ``--local-rpc-addr`` that starts the RPC server
   locally, not using the dedicated RPC-process.
 
+- Add logs at ``Info`` level about the disconnection reasons in the p2p section.
+
 Client
 ------
 
