@@ -590,9 +590,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             value
         );
 
-        // TODO let transfers cost gas
-        // issue: https://gitlab.com/tezos/tezos/-/issues/5118
-
         if value == U256::zero() {
             // Nothing to transfer so succeeds by default
             Ok(ExitReason::Succeed(ExitSucceed::Returned))
@@ -1770,14 +1767,6 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
             self.record_dynamic_cost(cost, memory_cost)
         }
-    }
-
-    fn create_feedback(
-        &mut self,
-        _feedback: Self::CreateFeedback,
-    ) -> Result<(), ExitError> {
-        // TODO: issue: https://gitlab.com/tezos/tezos/-/issues/4872
-        Ok(()) // this is a stub
     }
 }
 
