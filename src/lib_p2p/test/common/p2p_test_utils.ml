@@ -106,7 +106,8 @@ let wait_conns ?timeout ~pool n =
 let close_active_conns pool =
   P2p_pool.Connection.fold
     ~init:Lwt.return_unit
-    ~f:(fun _ conn _ -> P2p_conn.disconnect ~wait:true conn)
+    ~f:(fun _ conn _ ->
+      P2p_conn.disconnect ~reason:(User "closed by test") ~wait:true conn)
     pool
 
 let canceler = Lwt_canceler.create () (* unused *)

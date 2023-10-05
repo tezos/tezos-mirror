@@ -153,7 +153,8 @@ let build_rpc_directory net =
         | Some pool -> (
             match P2p_pool.Connection.find_by_peer_id pool peer_id with
             | None -> Lwt.return_unit
-            | Some conn -> P2p_conn.disconnect ~wait:q#wait conn))
+            | Some conn ->
+                P2p_conn.disconnect ~wait:q#wait ~reason:Explicit_RPC conn))
   in
   let dir =
     Tezos_rpc.Directory.register0

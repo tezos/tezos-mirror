@@ -90,9 +90,20 @@ val pp_read_write_error : Format.formatter -> read_write_error -> unit
     Identifiers are generated sequentially at creation time. *)
 val id : t -> int
 
-(** [close fd] closes the connection and the underlying fd.
+(** [set_point ~point t] sets the point where [fd] is or will be connected to.
+   *)
+val set_point : point:P2p_point.Id.t -> t -> unit
+
+(** [set_peer_id ~peer_id t] sets the peer id where [fd] is or will be
+    connected to. *)
+val set_peer_id : peer_id:P2p_peer.Id.t -> t -> unit
+
+(** [close ?reason fd] closes the connection and the underlying fd.
     It is idempotent. *)
-val close : t -> unit Lwt.t
+val close : ?reason:P2p_disconnection_reason.t -> t -> unit Lwt.t
+
+(** Stores in the fd a reason for which it will be closed in a near future. *)
+val add_closing_reason : reason:P2p_disconnection_reason.t -> t -> unit
 
 (** [read fd buf ofs len] reads up to [len] bytes from [fd], and writes them to
     [buf], starting at offset [ofs].
@@ -124,7 +135,8 @@ val create_listening_socket :
   int ->
   Lwt_unix.file_descr tzresult Lwt.t
 
-(** [connect fd addr] connects [fd] to [addr]. *)
+(** [connect fd addr] connects [fd] to [addr]. If there is an error, [fd] is
+    closed. *)
 val connect : t -> Lwt_unix.sockaddr -> (unit, connect_error) result Lwt.t
 
 (** [accept sock] accepts connections on socket [sock]. *)

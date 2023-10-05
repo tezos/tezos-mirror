@@ -227,7 +227,11 @@ module Self_identification = struct
               ~canceler
               (P2p_io_scheduler.to_readable conn)
           in
-          let* () = P2p_io_scheduler.close conn in
+          let* () =
+            P2p_io_scheduler.close
+              ~reason:(User "client first explicit close")
+              conn
+          in
           (* During the second connection, the client will send the server's
              connection message instead of its own. *)
           let*! conn = P2p_test_utils.raw_connect sched addr port in

@@ -164,7 +164,7 @@ module Simple = struct
     let open Lwt_syntax in
     P2p_pool.Connection.fold
       ~f:(fun _ conn acc ->
-        let* () = P2p_conn.disconnect conn in
+        let* () = P2p_conn.disconnect ~reason:(User "test shutdown") conn in
         acc)
       ~init:Lwt.return_unit
       pool

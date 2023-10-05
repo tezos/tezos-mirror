@@ -304,7 +304,7 @@ module Real = struct
   let find_connection_by_point {pool; _} point =
     P2p_pool.Connection.find_by_point pool point
 
-  let disconnect ?wait conn = P2p_conn.disconnect ?wait conn
+  let disconnect ?wait ~reason = P2p_conn.disconnect ?wait ~reason:(User reason)
 
   let connection_info _net conn = P2p_conn.info conn
 
@@ -513,7 +513,10 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   find_connection_by_point :
     P2p_point.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection option;
   disconnect :
-    ?wait:bool -> ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t;
+    ?wait:bool ->
+    reason:string ->
+    ('msg, 'peer_meta, 'conn_meta) connection ->
+    unit Lwt.t;
   connection_info :
     ('msg, 'peer_meta, 'conn_meta) connection ->
     'conn_meta P2p_connection.Info.t;
@@ -678,7 +681,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     connections = (fun () -> []);
     find_connection_by_peer_id = (fun _ -> None);
     find_connection_by_point = (fun _ -> None);
-    disconnect = (fun ?wait:_ _ -> Lwt.return_unit);
+    disconnect = (fun ?wait:_ ~reason:_ _ -> Lwt.return_unit);
     connection_info =
       (fun _ -> Fake.connection_info announced_version faked_metadata);
     connection_local_metadata = (fun _ -> faked_metadata);

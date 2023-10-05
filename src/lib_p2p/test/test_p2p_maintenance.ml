@@ -428,13 +428,16 @@ module Triggers = struct
       in
       let active_connections = P2p_pool.active_connections node.pool in
       let*! () = Event.(emit x_active_connections) active_connections in
-      (* Close connections to each min_connections. *)
+      (* Close connections to reach min_connections. *)
       let nb_connections_to_close = active_connections - min_connections + 1 in
       let*! () =
         Lwt_list.iteri_p
           (fun i (_, conn) ->
             if i < nb_connections_to_close then
-              P2p_conn.disconnect ~wait:true conn
+              P2p_conn.disconnect
+                ~wait:true
+                ~reason:(User "close connection to reach min_connections")
+                conn
             else Lwt.return_unit)
           (P2p_pool.Connection.list node.pool)
       in

@@ -103,9 +103,19 @@ type accept_error =
 type t = {
   fd : Lwt_unix.file_descr;
   id : int;
+  mutable point : P2p_point.Id.t option;
+  mutable peer_id : P2p_peer.Id.t option;
   mutable nread : int;
   mutable nwrit : int;
+  mutable closing_reasons : P2p_disconnection_reason.t list;
 }
+
+let set_point ~point t = t.point <- Some point
+
+let set_peer_id ~peer_id t = t.peer_id <- Some peer_id
+
+let add_closing_reason ~reason t =
+  t.closing_reasons <- reason :: t.closing_reasons
 
 let pp_read_write_error fmt = function
   | `Connection_closed_by_peer -> Format.fprintf fmt "connection closed by peer"
@@ -126,7 +136,17 @@ let create =
   fun fd ->
     let open Lwt_syntax in
     incr counter ;
-    let t = {fd; id = !counter; nread = 0; nwrit = 0} in
+    let t =
+      {
+        fd;
+        id = !counter;
+        point = None;
+        peer_id = None;
+        nread = 0;
+        nwrit = 0;
+        closing_reasons = [];
+      }
+    in
     let* () = Events.(emit create_fd) t.id in
     return t
 
@@ -164,9 +184,17 @@ let create_listening_socket ?(reuse_port = false) ~backlog
                {reason = err; address = addr; port})
       | exn -> Lwt.reraise exn)
 
-let close t =
+let close ?reason t =
   let open Lwt_syntax in
-  let* () = Events.(emit close_fd) (t.id, t.nread, t.nwrit) in
+  Option.iter (fun reason -> add_closing_reason ~reason t) reason ;
+  let* () =
+    Events.(emit close_fd) (t.id, t.closing_reasons, t.nread, t.nwrit)
+  in
+  let* () =
+    match t.closing_reasons with
+    | [] -> Events.(emit close_fd_unknown_reason) (t.point, t.peer_id)
+    | _ -> Events.(emit close_fd_reason) (t.point, t.peer_id, t.closing_reasons)
+  in
   Lwt.catch
     (fun () ->
       (* Guarantee idempotency. *)
@@ -198,7 +226,7 @@ let close t =
          are rather meant to be fatal, so we let them raise to top level. *)
       | ex -> raise ex)
 
-let read_write_error_handler t =
+let read_write_error_handler ~rw t =
   let open Lwt_syntax in
   function
   (* from Lwt_unix *)
@@ -206,13 +234,18 @@ let read_write_error_handler t =
       Lwt.return_error `Connection_locally_closed
   (* from [man 7 tcp], [man 3 read], [man 3 write] *)
   | (Unix.Unix_error (ETIMEDOUT, _, _) | End_of_file) as e ->
-      let* () = close t in
+      let* () = close ~reason:(Connection_lost rw) t in
       Lwt.return_error (`Connection_lost e)
   | Unix.Unix_error ((ECONNRESET | EPIPE), _, _) ->
-      let* () = close t in
+      let* () = close ~reason:(Connection_closed_by_peer rw) t in
       Lwt.return_error `Connection_closed_by_peer
   | ex ->
-      let* () = close t in
+      let* () =
+        close
+          ~reason:
+            (Connection_closed_by_unexpected_error (rw, Printexc.to_string ex))
+          t
+      in
       Lwt.return_error (`Unexpected_error ex)
 
 let read t buf pos len =
@@ -226,7 +259,7 @@ let read t buf pos len =
         else
           let*! nread = Lwt_unix.read t.fd buf pos len in
           return nread)
-      (read_write_error_handler t)
+      (read_write_error_handler ~rw:Read t)
   in
   t.nread <- t.nread + nread ;
   let*! () = Events.(emit read_fd) (t.id, nread, t.nread) in
@@ -245,7 +278,7 @@ let write t buf =
         else
           let*! () = Lwt_utils_unix.write_bytes t.fd buf in
           return_unit)
-      (read_write_error_handler t)
+      (read_write_error_handler ~rw:Write t)
   in
   t.nwrit <- t.nwrit + len ;
   let*! () = Events.(emit written_fd) (t.id, len, t.nwrit) in
@@ -258,10 +291,21 @@ let connect t saddr =
     (fun () -> Lwt_unix.connect t.fd saddr |> Lwt.map Result.ok)
     (function
       | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
-          let*! () = close t in
+          let*! () = close ~reason:TCP_connection_refused t in
+          Lwt.return_error `Connection_failed
+      | Unix.Unix_error (Unix.EHOSTUNREACH, _, _) ->
+          let*! () = close ~reason:TCP_connection_unreachable t in
+          Lwt.return_error `Connection_failed
+      | Lwt.Canceled ->
+          let*! () = close ~reason:TCP_connection_canceled t in
           Lwt.return_error `Connection_failed
       | ex ->
-          let*! () = close t in
+          let*! () =
+            close
+              ~reason:
+                (TCP_connection_failed_unexpected_error (Printexc.to_string ex))
+              t
+          in
           Lwt.return_error (`Unexpected_error ex))
 
 let accept listening_socket =

@@ -245,10 +245,10 @@ let get_chain global_db chain_id =
 let greylist {global_db = {p2p; _}; _} peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)
 
-let disconnect {global_db = {p2p; _}; _} peer_id =
+let disconnect ~reason {global_db = {p2p; _}; _} peer_id =
   match P2p.find_connection_by_peer_id p2p peer_id with
   | None -> Lwt.return_unit
-  | Some conn -> P2p.disconnect p2p conn
+  | Some conn -> P2p.disconnect ~reason p2p conn
 
 let shutdown {p2p_readers; active_chains; _} =
   let open Lwt_syntax in

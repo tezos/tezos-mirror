@@ -390,7 +390,6 @@ let nack {scheduled_conn; cryptobox_data; info} motive
       Lwt.return Ack.Nack_v_0
   in
   let* (_ : unit tzresult) = Ack.write scheduled_conn cryptobox_data nack in
-  let* (_ : unit tzresult) = P2p_io_scheduler.close scheduled_conn in
   Lwt.return_unit
 
 (* First step: write and read credentials, makes no difference
@@ -723,7 +722,7 @@ let private_node {conn; _} = conn.info.private_node
 let accept ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size ~canceler conn encoding =
   let open Lwt_result_syntax in
-  let on_error err =
+  let on_error reason err =
     let rw_trace =
       match err with
       | [P2p_errors.Connection_closed] ->
@@ -731,7 +730,7 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
       | [P2p_errors.Decipher_error] -> TzTrace.cons P2p_errors.Invalid_auth err
       | _ -> err
     in
-    let*! close_tzr = P2p_io_scheduler.close conn.scheduled_conn in
+    let*! close_tzr = P2p_io_scheduler.close ~reason conn.scheduled_conn in
     match close_tzr with
     | Error close_trace ->
         (* If an error occurs when closing the scheduled_conn, errors from read or
@@ -743,7 +742,7 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
     protect
       (fun () ->
         Ack.write ~canceler conn.scheduled_conn conn.cryptobox_data Ack)
-      ~on_error
+      ~on_error:(fun err -> on_error (Accept_write_error err) err)
   in
   let* ack =
     protect
@@ -752,7 +751,7 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
           ~canceler
           (P2p_io_scheduler.to_readable conn.scheduled_conn)
           conn.cryptobox_data)
-      ~on_error
+      ~on_error:(fun err -> on_error (Ack_read_error err) err)
   in
   match ack with
   | Ack ->
@@ -851,7 +850,10 @@ let read_now {reader; _} =
 
 let stat {conn = {scheduled_conn; _}; _} = P2p_io_scheduler.stat scheduled_conn
 
-let close ?(wait = false) st =
+let add_closing_reason ~reason st =
+  P2p_io_scheduler.add_closing_reason ~reason st.conn.scheduled_conn
+
+let close ?(wait = false) ~reason st =
   let open Lwt_syntax in
   let* () =
     if not wait then Lwt.return_unit
@@ -860,9 +862,11 @@ let close ?(wait = false) st =
       Lwt_pipe.Maybe_bounded.close st.writer.messages ;
       st.writer.worker)
   in
+  (* [st.conn.scheduled_conn] is closed by [Reader.shutdown] and
+     [Writer.shutdown], the reason must be added before. *)
+  P2p_io_scheduler.add_closing_reason ~reason st.conn.scheduled_conn ;
   let* () = Reader.shutdown st.reader in
   let* () = Writer.shutdown st.writer in
-  let* (_ : unit tzresult) = P2p_io_scheduler.close st.conn.scheduled_conn in
   Lwt.return_unit
 
 module Internal_for_tests = struct

@@ -229,6 +229,7 @@ val negotiated_version :
 val disconnect :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ?wait:bool ->
+  reason:string ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
   unit Lwt.t
 
