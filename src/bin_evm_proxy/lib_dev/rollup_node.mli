@@ -110,6 +110,9 @@ module type S = sig
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 
+  (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)
+  val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
+
   (** [kernel_version ()] returns the internal kernel version (i.e the commit hash where
         the kernel was compiled). *)
   val kernel_version : unit -> string tzresult Lwt.t

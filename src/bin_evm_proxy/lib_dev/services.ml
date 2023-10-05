@@ -153,7 +153,9 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
     | Get_code.Input (Some (address, _)) ->
         let* code = Rollup_node_rpc.code address in
         return (Get_code.Output (Ok code))
-    | Gas_price.Input _ -> return (Gas_price.Output (Ok Mockup.gas_price))
+    | Gas_price.Input (Some ()) ->
+        let* base_fee = Rollup_node_rpc.base_fee_per_gas () in
+        return (Gas_price.Output (Ok base_fee))
     | Get_transaction_count.Input (Some (address, _)) ->
         let* nonce = Rollup_node_rpc.nonce address in
         return (Get_transaction_count.Output (Ok nonce))
