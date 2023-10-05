@@ -102,10 +102,12 @@ let rec seq_field_of_data_encoding :
       let size_attr = Ground.Attr.binary_length_kind ~id:size_id kind in
       (enums, types, [size_attr; Ground.Attr.string ~id (Dynamic size_id)])
   | N ->
+      let types = Helpers.add_uniq_assoc types Ground.Type.n_chunk in
       let types = Helpers.add_uniq_assoc types Ground.Type.n in
       (enums, types, [Ground.Attr.n ~id])
   | Z ->
-      let types = Helpers.add_uniq_assoc types Ground.Type.n in
+      let types = Helpers.add_uniq_assoc types Ground.Type.n_chunk in
+      let types = Helpers.add_uniq_assoc types Ground.Type.z in
       (enums, types, [Ground.Attr.z ~id])
   | Conv {encoding; _} ->
       seq_field_of_data_encoding enums types encoding id tid_gen

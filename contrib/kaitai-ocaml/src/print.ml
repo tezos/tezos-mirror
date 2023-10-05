@@ -101,6 +101,10 @@ let repeat_spec =
   | RepeatEos -> [("repeat", scalar "eos")]
   | RepeatExpr _ -> failwith "not supported (RepeatExpr)"
 
+let if_spec = function
+  | None -> []
+  | Some ast -> [("if", scalar (Ast.to_string ast))]
+
 let enum_spec attr =
   map_list_of_option (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
 
@@ -121,6 +125,7 @@ let attr_spec attr =
         type_spec attr;
         size_spec attr;
         repeat_spec attr.cond.repeat;
+        if_spec attr.cond.ifExpr;
         enum_spec attr;
         doc_spec attr.doc;
       ];
