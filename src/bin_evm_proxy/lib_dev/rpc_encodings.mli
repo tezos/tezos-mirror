@@ -216,6 +216,14 @@ module Get_balance :
     with type m_input = Ethereum_types.address * Ethereum_types.block_param
      and type m_output = Ethereum_types.quantity
 
+module Get_storage_at :
+  METHOD
+    with type m_input =
+      Ethereum_types.address
+      * Ethereum_types.quantity
+      * Ethereum_types.block_param
+     and type m_output = Ethereum_types.hex
+
 module Block_number :
   METHOD
     with type m_input = unit

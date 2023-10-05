@@ -126,6 +126,9 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
     | Get_balance.Input (Some (address, _block_param)) ->
         let* balance = Rollup_node_rpc.balance address in
         return (Get_balance.Output (Ok balance))
+    | Get_storage_at.Input (Some (address, position, _block_param)) ->
+        let* value = Rollup_node_rpc.storage_at address position in
+        return (Get_storage_at.Output (Ok value))
     | Block_number.Input _ ->
         let* block_number = Rollup_node_rpc.current_block_number () in
         return (Block_number.Output (Ok block_number))
