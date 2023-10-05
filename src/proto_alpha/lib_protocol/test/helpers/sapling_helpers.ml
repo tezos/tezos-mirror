@@ -62,7 +62,7 @@ module Common = struct
     match result with Ok _ -> assert false | Error _ -> return_ok_unit
 
   let print ?(prefix = "") e v =
-    Printf.printf
+    Format.printf
       "%s: %s\n"
       prefix
       Data_encoding.(Json.to_string (Json.construct e v))
