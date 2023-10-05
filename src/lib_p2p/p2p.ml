@@ -689,7 +689,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     set_peer_metadata = (fun _ _ -> ());
     connect =
       (fun ?trusted:_ ?expected_peer_id:_ ?timeout:_ _ ->
-        Lwt_result_syntax.tzfail P2p_errors.Connection_refused);
+        Lwt_result_syntax.tzfail P2p_errors.Connection_failed);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
     send = (fun _ _ -> Lwt_result_syntax.tzfail P2p_errors.Connection_closed);

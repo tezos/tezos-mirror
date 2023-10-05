@@ -210,8 +210,8 @@ module Self_identification = struct
       let*! id_client = id2 in
       let pp_connect_error ppf e =
         match e with
-        | `Connection_refused ->
-            Format.pp_print_string ppf "Connection Connection_refused"
+        | `Connection_failed ->
+            Format.pp_print_string ppf "Connection Connection_failed"
         | `Unexpected_error e ->
             Format.pp_print_string ppf (Printexc.to_string e)
       in

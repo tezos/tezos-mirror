@@ -66,7 +66,7 @@ type read_write_error =
   | `Connection_locally_closed
   | unexpected_error ]
 
-type connect_error = [`Connection_refused | unexpected_error]
+type connect_error = [`Connection_failed | unexpected_error]
 
 (** [accept_error] is used in case of error while trying to [accept] some connection.
 

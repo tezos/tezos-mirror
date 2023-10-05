@@ -92,7 +92,7 @@ module Simple = struct
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
     | Error
-        ((( Tezos_p2p_services.P2p_errors.Connection_refused
+        ((( Tezos_p2p_services.P2p_errors.Connection_failed
           | Tezos_p2p_services.P2p_errors.Pending_connection
           | Tezos_p2p_services.P2p_errors.Rejected_socket_connection
           | Tezos_p2p_services.P2p_errors.Rejected_by_nack _ | Canceled
@@ -104,7 +104,7 @@ module Simple = struct
           point
           (fun ppf err ->
             match err with
-            | Tezos_p2p_services.P2p_errors.Connection_refused ->
+            | Tezos_p2p_services.P2p_errors.Connection_failed ->
                 Format.fprintf ppf "connection refused"
             | Tezos_p2p_services.P2p_errors.Pending_connection ->
                 Format.fprintf ppf "pending connection"

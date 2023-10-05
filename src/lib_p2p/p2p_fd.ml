@@ -95,7 +95,7 @@ type read_write_error =
   | `Connection_locally_closed
   | unexpected_error ]
 
-type connect_error = [`Connection_refused | unexpected_error]
+type connect_error = [`Connection_failed | unexpected_error]
 
 type accept_error =
   [`System_error of exn | `Socket_error of exn | unexpected_error]
@@ -259,7 +259,7 @@ let connect t saddr =
     (function
       | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
           let*! () = close t in
-          Lwt.return_error `Connection_refused
+          Lwt.return_error `Connection_failed
       | ex ->
           let*! () = close t in
           Lwt.return_error (`Unexpected_error ex))

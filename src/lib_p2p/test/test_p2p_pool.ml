@@ -50,7 +50,7 @@ module Simple = struct
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
     | Error
-        ((( Tezos_p2p_services.P2p_errors.Connection_refused
+        ((( Tezos_p2p_services.P2p_errors.Connection_failed
           | Tezos_p2p_services.P2p_errors.Pending_connection
           | Tezos_p2p_services.P2p_errors.Rejected_socket_connection
           | Tezos_p2p_services.P2p_errors.Rejected_by_nack _ | Canceled
@@ -63,7 +63,7 @@ module Simple = struct
             point
             (fun ppf err ->
               match err with
-              | Tezos_p2p_services.P2p_errors.Connection_refused ->
+              | Tezos_p2p_services.P2p_errors.Connection_failed ->
                   Format.fprintf ppf "connection refused"
               | Tezos_p2p_services.P2p_errors.Pending_connection ->
                   Format.fprintf ppf "pending connection"
@@ -264,7 +264,7 @@ module Overcrowded = struct
         | None -> failwith "Woops...")
     | Error
         [
-          (( Tezos_p2p_services.P2p_errors.Connection_refused
+          (( Tezos_p2p_services.P2p_errors.Connection_failed
            | Tezos_p2p_services.P2p_errors.Pending_connection
            | Tezos_p2p_services.P2p_errors.Rejected_socket_connection | Canceled
            | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as err);
@@ -278,7 +278,7 @@ module Overcrowded = struct
           point
           (fun ppf err ->
             match err with
-            | Tezos_p2p_services.P2p_errors.Connection_refused ->
+            | Tezos_p2p_services.P2p_errors.Connection_failed ->
                 Format.fprintf ppf "connection refused"
             | Tezos_p2p_services.P2p_errors.Pending_connection ->
                 Format.fprintf ppf "pending connection"
@@ -564,7 +564,7 @@ module No_common_network = struct
         | None -> failwith "Woops...")
     | Error
         [
-          (( Tezos_p2p_services.P2p_errors.Connection_refused
+          (( Tezos_p2p_services.P2p_errors.Connection_failed
            | Tezos_p2p_services.P2p_errors.Pending_connection
            | Tezos_p2p_services.P2p_errors.Rejected_socket_connection | Canceled
            | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as err);
@@ -578,7 +578,7 @@ module No_common_network = struct
           point
           (fun ppf err ->
             match err with
-            | Tezos_p2p_services.P2p_errors.Connection_refused ->
+            | Tezos_p2p_services.P2p_errors.Connection_failed ->
                 Format.fprintf ppf "connection refused"
             | Tezos_p2p_services.P2p_errors.Pending_connection ->
                 Format.fprintf ppf "pending connection"

@@ -224,7 +224,7 @@ module Low_level = struct
     let msg = Bytes.create (Bytes.length simple_msg) in
     let*! r = raw_connect sched addr port in
     match r with
-    | Error (`Connection_refused | `Unexpected_error _) ->
+    | Error (`Connection_failed | `Unexpected_error _) ->
         Lwt.fail Alcotest.Test_error
     | Ok fd ->
         let* () =

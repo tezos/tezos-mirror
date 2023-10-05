@@ -671,12 +671,12 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                         (point, lazy (Printexc.to_string ex))
                     in
                     Lwt.return_error (TzTrace.make (error_of_exn ex))
-                | `Connection_refused ->
+                | `Connection_failed ->
                     let*! () =
                       Events.(emit connect_error)
                         (point, lazy "connection_refused")
                     in
-                    tzfail P2p_errors.Connection_refused)
+                    tzfail P2p_errors.Connection_failed)
               r)
       in
       let*! () = Events.(emit connect_status) ("authenticate", point) in
