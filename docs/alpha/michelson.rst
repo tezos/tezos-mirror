@@ -449,6 +449,17 @@ as well-typed. This is because the implementation uses a simple single
 pass typechecking algorithm, and does not handle any form of
 polymorphism.
 
+Types and instructions
+----------------------
+
+The complete sets of Michelson types and instructions are detailed in the
+`interactive Michelson reference page <https://tezos.gitlab.io/michelson-reference/>`__.
+
+- Specifically, it contains synthesis tables for `types <https://tezos.gitlab.io/michelson-reference/#types>`__
+  and for `instructions <https://tezos.gitlab.io/michelson-reference/#instructions>`_.
+- Instructions are also organized by `categories <https://tezos.gitlab.io/michelson-reference/#instructions-by-category>`__.
+- Each instruction is precisely defined using typing and semantic inference rules.
+
 Core data types and notations
 -----------------------------
 
