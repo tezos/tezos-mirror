@@ -435,6 +435,7 @@ let block_callback =
               hash
               endorsements
           in
+          may_handle @@ fun () ->
           insert_operations_from_block (module Db) level hash preendorsements)
         db_pool
     in
