@@ -26,6 +26,7 @@ commander
     .option('-i, --inbox-directory <path>', 'Directory to store the inbox if building from bench script', '/tmp')
     .option('-k, --skip <n>', 'Number of levels to process before profiling', '0')
     .option('--flamegraph-bin <path>', 'Flamegraph utility', 'flamegraph.pl')
+    .option('--keep-temp', "Keep temporary files", false)
     .option("--debugger <path>", "debugger binary")
     .option('--kernel-dir <path>', 'directory containing kernel and preimage dir', ".")
     .addHelpText('after', '\nRequires installation of https://github.com/brendangregg/FlameGraph')
@@ -66,6 +67,8 @@ const LOG_FILE = path.format({ dir: FLAMECHART_DIR, name: `${path.basename(inbox
 const FLAMECHART_FILE = path.format({ dir: FLAMECHART_DIR, name: `${path.basename(inbox, ".json")}_${timestamp()}`, ext: ".svg" })
 
 const SKIPS = commander.opts().skip;
+
+const KEEP_TEMP = commander.opts().keepTemp;
 
 function run_profiler(file) {
 
@@ -123,6 +126,17 @@ async function flamechart(inbox) {
     let profiler_result = await run_profiler(inbox)
     console.log(`Building flamechart ${FLAMECHART_FILE}`)
     execSync(`${FLAMEGRAPH_BIN} --flamechart ${profiler_result.profiler_output_path} > ${FLAMECHART_FILE}`)
+
+    // cover our tracks
+    if (BUILD_INBOX && !KEEP_TEMP) {
+        console.log(`Deleting inbox ${inbox}`)
+        fs.rmSync(inbox, { recursive: true, force: true })
+    }
+    if (!KEEP_TEMP) {
+        console.log(`Deleting profiling ${profiler_result.profiler_output_path}`)
+        fs.rmSync(
+            profiler_result.profiler_output_path, { recursive: true, force: true })
+    }
 }
 
 flamechart(inbox)
