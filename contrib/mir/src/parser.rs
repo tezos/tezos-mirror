@@ -35,79 +35,9 @@ fn spanned_lexer(
         })
 }
 
-/// Takes a string _with_ the sourrounding quotes, strips the quotes, checks the
-/// string is valid (i.e. contains only printable ASCII characters) and replaces
-/// escapes with corresponding characters.
-pub fn parse_string(lex: &mut crate::lexer::Lexer) -> Result<String, LexerError> {
-    let s = lex.slice();
-    // strip the quotes
-    let s = &s[1..s.len() - 1];
-
-    // check if all characters are printable ASCII
-    if !s.chars().all(|c| matches!(c, ' '..='~')) {
-        return Err(LexerError::ForbiddenCharacterIn(s.to_owned()).into());
-    }
-
-    let mut res = String::new();
-    // this may overreserve, but no more than 2x
-    res.reserve(s.len());
-
-    let unescape_char = |c| match c {
-        'n' => Ok('\n'),
-        '"' => Ok('"'),
-        '\\' => Ok('\\'),
-        _ => Err(LexerError::UndefinedEscape(c)),
-    };
-
-    let mut in_escape: bool = false;
-    for c in s.chars() {
-        if in_escape {
-            res.push(unescape_char(c)?);
-            in_escape = false;
-        } else if matches!(c, '\\') {
-            in_escape = true;
-        } else {
-            res.push(c);
-        }
-    }
-    Ok(res)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn unescape_string() {
-        macro_rules! assert_parse {
-            ($s:expr, $e:expr) => {
-                assert_eq!(
-                    Tok::lexer($s)
-                        .map(|i| i.map_err(|x| x.to_string()))
-                        .collect::<Vec<Result<Tok, String>>>(),
-                    vec![($e as Result<&str, &str>)
-                        .map(|v| Tok::String(v.to_owned()))
-                        .map_err(|e| e.to_owned())]
-                )
-            };
-        }
-        assert_parse!(r#""bar""#, Ok("bar"));
-        assert_parse!(r#""foo\nbar""#, Ok("foo\nbar"));
-        assert_parse!(r#""foo\\nbar""#, Ok("foo\\nbar"));
-        assert_parse!(r#""foo\"bar\"""#, Ok("foo\"bar\""));
-        assert_parse!(r#""foo\\nbar""#, Ok("foo\\nbar"));
-        assert_parse!(r#""foo\\\\bar""#, Ok("foo\\\\bar"));
-        // unicode is not accepted
-        assert_parse!(
-            r#""हिन्दी""#,
-            Err("forbidden character found in string literal \"हिन्दी\"")
-        );
-        // unknown escapes are not accepted
-        assert_parse!(r#""\a""#, Err("undefined escape sequence: \"\\a\""));
-        // unterminated strings are not accepted
-        assert_parse!(r#"""#, Err("unknown token"));
-        assert_parse!(r#""\""#, Err("unknown token"));
-    }
 
     #[test]
     fn pair_type() {
