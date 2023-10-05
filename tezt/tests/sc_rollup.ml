@@ -4079,6 +4079,37 @@ let test_bailout_refutation protocols =
        ~priority:`Priority_honest)
     protocols
 
+(** Run the node in bailout mode, the node will exit with an error,
+    when it's run without an operator key *)
+let bailout_mode_fail_to_start_without_operator ~kind =
+  test_l1_scenario
+    ~kind
+    {
+      variant = None;
+      tags = ["rollup_node"; "mode"; "bailout"];
+      description = "rollup node in bailout fails without operator";
+    }
+  @@ fun _protocol sc_rollup tezos_node tezos_client ->
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      Bailout
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~operators:
+        [
+          (Sc_rollup_node.Cementing, Constant.bootstrap1.alias);
+          (Sc_rollup_node.Recovering, Constant.bootstrap1.alias);
+        ]
+  in
+  let process = Sc_rollup_node.spawn_run sc_rollup_node sc_rollup [] in
+  let* () =
+    Process.check_error
+      process
+      ~exit_code:1
+      ~msg:(rex "Missing operators operating for mode bailout.")
+  in
+  unit
+
 (** Helper to check that the operation whose hash is given is successfully
     included (applied) in the current head block. *)
 let check_op_included ~__LOC__ =
@@ -6750,6 +6781,7 @@ let register ~kind ~protocols =
     ~kind ;
   test_cement_ignore_commitment ~kind [Nairobi; Alpha] ;
   bailout_mode_not_publish ~kind protocols ;
+  bailout_fail_to_start_without_operator ~kind protocols ;
   custom_mode_empty_operation_kinds ~kind protocols ;
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
