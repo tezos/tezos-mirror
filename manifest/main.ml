@@ -8062,7 +8062,7 @@ let _octez_smart_rollup_node =
     ~internal_name:"main_smart_rollup_node"
     ~path:"src/bin_smart_rollup_node"
     ~synopsis:"Octez: Smart rollup node"
-    ~release_status:Experimental
+    ~release_status:Released
     ~linkall:true
     ~with_macos_security_framework:true
     ~deps:

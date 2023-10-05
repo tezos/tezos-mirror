@@ -532,7 +532,7 @@ opam:octez-injector:
 opam:octez-l2-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: octez-l2-libs
 
@@ -581,21 +581,21 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
 opam:octez-protocol-002-PsYLVpVv-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-002-PsYLVpVv-libs
 
 opam:octez-protocol-003-PsddFKi3-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-003-PsddFKi3-libs
 
 opam:octez-protocol-004-Pt24m4xi-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-004-Pt24m4xi-libs
 
@@ -672,7 +672,7 @@ opam:octez-protocol-014-PtKathma-libs:
 opam:octez-protocol-015-PtLimaPt-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: octez-protocol-015-PtLimaPt-libs
 
@@ -721,7 +721,7 @@ opam:octez-proxy-server:
 opam:octez-rpc-process:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: octez-rpc-process
 
@@ -757,15 +757,40 @@ opam:octez-smart-rollup-client-PtNairob:
 
 # Ignoring unreleased package octez-smart-rollup-client-alpha.
 
-# Ignoring unreleased package octez-smart-rollup-node.
+opam:octez-smart-rollup-node:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_exec_opam_batch_1
+  variables:
+    package: octez-smart-rollup-node
 
-# Ignoring unreleased package octez-smart-rollup-node-Proxford.
+opam:octez-smart-rollup-node-Proxford:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-smart-rollup-node-Proxford
 
-# Ignoring unreleased package octez-smart-rollup-node-PtNairob.
+opam:octez-smart-rollup-node-PtNairob:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-smart-rollup-node-PtNairob
 
-# Ignoring unreleased package octez-smart-rollup-node-alpha.
+opam:octez-smart-rollup-node-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-smart-rollup-node-alpha
 
-# Ignoring unreleased package octez-smart-rollup-node-lib.
+opam:octez-smart-rollup-node-lib:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-smart-rollup-node-lib
 
 # Ignoring unreleased package octez-smart-rollup-sequencer.
 
@@ -913,7 +938,7 @@ opam:tezos-protocol-002-PsYLVpVv:
 opam:tezos-protocol-003-PsddFKi3:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-003-PsddFKi3
 
