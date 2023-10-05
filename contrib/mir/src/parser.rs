@@ -175,4 +175,34 @@ mod tests {
             vec![Instruction::Push((Type::Unit, Value::UnitValue))]
         );
     }
+
+    #[test]
+    fn type_anns() {
+        use Type as T;
+        use Type::*;
+        macro_rules! parse_type {
+            ($s:expr) => {
+                crate::syntax::TypeParser::new().parse($s)
+            };
+        }
+        assert_eq!(parse_type!("(int :p)"), Ok(Int));
+        assert_eq!(
+            parse_type!("(pair :point (int :x_pos) (int :y_pos))"),
+            Ok(T::new_pair(Int, Int))
+        );
+        assert_eq!(parse_type!("(string %foo)"), Ok(String));
+        assert_eq!(parse_type!("(string %foo :bar @baz)"), Ok(String));
+        assert_eq!(parse_type!("(string @foo)"), Ok(String));
+        assert_eq!(
+            parse_type!("(pair %a (int %b) (int %c))"),
+            Ok(T::new_pair(Int, Int))
+        );
+        assert_eq!(
+            parse_type!("(option %a int %b)")
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Unrecognized token `%b` found at 15:17\nExpected one of \")\""
+        );
+    }
 }

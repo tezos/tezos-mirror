@@ -36,6 +36,11 @@ u10: u16 = <s:r"([+-]?)[0-9]+"> =>? {
 
 pub string: String = <r#""(?:\\.|[^\\"])*""#> =>? validate_unescape_string(<>);
 
+// regex as per https://tezos.gitlab.io/active/michelson.html#syntax
+ann: () = r#"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*"# => ();
+
+anns: () = ann* => ();
+
 atomic_type: Type = {
   "int"  => Type::Int,
   "nat"  => Type::Nat,
@@ -52,14 +57,15 @@ pair_args: Type = {
 }
 
 composite_type: Type = {
-    "pair" <type_expr> <pair_args> => Type::new_pair(<>),
-    "option" <type_expr> => Type::new_option(<>),
-    "list" <type_expr> => Type::new_list(<>),
-    "map" <type_expr> <type_expr> => Type::new_map(<>),
+    "pair"   anns <type_expr> <pair_args> => Type::new_pair(<>),
+    "option" anns <type_expr> => Type::new_option(<>),
+    "list"   anns <type_expr> => Type::new_list(<>),
+    "map"    anns <type_expr> <type_expr> => Type::new_map(<>),
 }
 
 type_expr: Type = {
-    atomic_type => <>,
+    <atomic_type> => <>,
+    "(" <atomic_type> ann anns ")" => <>,
     "(" <composite_type> ")" => <>,
     "(" <type_expr> ")" => <>,
 }
@@ -151,3 +157,5 @@ semicolonSepSeq<T>: Vec<T> = {
 pub instructionBlock: ParsedInstructionBlock = {
   "{" <is:instructionSeq> "}" => is,
 }
+
+pub Type: Type = type_expr;
