@@ -304,8 +304,6 @@ benchmark_scripts = [
     "benchmarks/bench_keccak.js",
     "benchmarks/bench_verifySignature.js",
     "benchmarks/bench_erc20tok.js",
-    "benchmarks/bench_loop_progressive.js",
-    "benchmarks/bench_loop_expensive.js",
     "benchmarks/bench_read_info.js",
 
     "benchmarks/scenarios/solidity_by_example/bench_abi_decode.js",
@@ -339,6 +337,29 @@ benchmark_scripts = [
     "benchmarks/scenarios/solidity_by_example/bench_binary_exponentiation.js",
     "benchmarks/bench_erc1155.js",
     "benchmarks/bench_selfdestruct.js",
+
+    "benchmarks/bench_creates_erc20.js",
+    "benchmarks/bench_creates_erc1155.js",
+
+    "benchmarks/bench_linear_transfers.js 0",
+    "benchmarks/bench_linear_transfers.js 5",
+    "benchmarks/bench_linear_transfers.js 10",
+    "benchmarks/bench_linear_transfers.js 15",
+    "benchmarks/bench_linear_transfers.js 20",
+    "benchmarks/bench_linear_transfers.js 25",
+    "benchmarks/bench_linear_transfers.js 30",
+
+    "benchmarks/bench_linear_erc20.js 0",
+    "benchmarks/bench_linear_erc20.js 5",
+    "benchmarks/bench_linear_erc20.js 10",
+    "benchmarks/bench_linear_erc20.js 15",
+    "benchmarks/bench_linear_erc20.js 20",
+    "benchmarks/bench_linear_erc20.js 25",
+    "benchmarks/bench_linear_erc20.js 30",
+
+    "benchmarks/bench_loop_progressive.js",
+    "benchmarks/bench_loop_expensive.js",
+
 ]
 
 run_all_benchmarks(benchmark_scripts);
