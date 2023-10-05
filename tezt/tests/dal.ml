@@ -488,9 +488,9 @@ let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
           ~error_msg:
             "Unexpected different DAL committees at first level: %L, versus \
              current level: %R" ;
-        unit)
+        iter (offset + 1))
       else if offset = blocks_per_epoch then (
-        Check.((first_committee = committee) Dal.Committee.typ)
+        Check.((first_committee <> committee) Dal.Committee.typ)
           ~error_msg:
             "Unexpected equal DAL committees at first levels in subsequent \
              epochs: %L and %R" ;
