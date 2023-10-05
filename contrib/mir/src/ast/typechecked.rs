@@ -26,6 +26,7 @@ pub mod overloads {
         IntInt,
         NatNat,
         IntNat,
+        NatInt,
         MutezMutez,
     }
 
