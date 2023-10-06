@@ -38,9 +38,10 @@ open Storage_functors
 module A = Alpha_context
 
 let create () =
+  let open Lwt_result_syntax in
   let account = Account.new_account () in
   let bootstrap_account = Account.make_bootstrap_account account in
-  Block.alpha_context [bootstrap_account] >>=? fun alpha_ctxt ->
+  let* alpha_ctxt = Block.alpha_context [bootstrap_account] in
   return @@ A.Internal_for_tests.to_raw alpha_ctxt
 
 (* /a/b/c *)
@@ -89,12 +90,13 @@ module C =
     (Value)
 
 let eq_context ctxt1 ctxt2 =
+  let open Lwt_result_wrap_syntax in
   let hash ctxt =
-    Raw_context.get_tree ctxt [] >|= Environment.wrap_tzresult >|=? fun root ->
+    let+@ root = Raw_context.get_tree ctxt [] in
     Raw_context.Tree.hash root
   in
-  hash ctxt1 >>=? fun x ->
-  hash ctxt2 >>=? fun y ->
+  let* x = hash ctxt1 in
+  let* y = hash ctxt2 in
   Assert.equal
     ~loc:__LOC__
     Context_hash.equal
@@ -104,26 +106,29 @@ let eq_context ctxt1 ctxt2 =
     y
 
 let write_with_local ctxt local_dir f =
-  Indexed_context.with_local_context ctxt local_dir (fun local ->
-      f local >|=? fun local -> (local, ()))
-  >|=? fun (ctxt, ()) -> ctxt
+  let open Lwt_result_syntax in
+  let+ ctxt, () =
+    Indexed_context.with_local_context ctxt local_dir (fun local ->
+        let+ local = f local in
+        (local, ()))
+  in
+  ctxt
 
 let test_local_remove_existing () =
-  create () >>=? fun ctxt ->
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = create () in
   let subdir = "foo" in
   let value = Bytes.of_string "ABCDE" in
   (* init *)
-  write_with_local ctxt subdir (fun local -> C.Local.init local value)
-  >|= Environment.wrap_tzresult
-  >>=? fun ctxt1 ->
-  C.init ctxt subdir value >|= Environment.wrap_tzresult >>=? fun ctxt2 ->
-  eq_context ctxt1 ctxt2 >>=? fun () ->
+  let*@ ctxt1 =
+    write_with_local ctxt subdir (fun local -> C.Local.init local value)
+  in
+  let*@ ctxt2 = C.init ctxt subdir value in
+  let* () = eq_context ctxt1 ctxt2 in
   let ctxt = ctxt2 in
   (* remove_existing *)
-  write_with_local ctxt subdir C.Local.remove_existing
-  >|= Environment.wrap_tzresult
-  >>=? fun ctxt1 ->
-  C.remove_existing ctxt subdir >|= Environment.wrap_tzresult >>=? fun ctxt2 ->
+  let*@ ctxt1 = write_with_local ctxt subdir C.Local.remove_existing in
+  let*@ ctxt2 = C.remove_existing ctxt subdir in
   eq_context ctxt1 ctxt2
 
 let tests =
