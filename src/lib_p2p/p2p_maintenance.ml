@@ -275,7 +275,9 @@ and too_many_connections ~rng t n_connected =
   let n = n_connected - t.bounds.max_target in
   let* () = Events.(emit too_many_connections) n in
   let connections = random_connections ~rng t.pool n in
-  let* () = List.iter_p P2p_conn.disconnect connections in
+  let* () =
+    List.iter_p (P2p_conn.disconnect ~reason:Maintenance_too_many) connections
+  in
   do_maintain ~rng t
 
 let rec worker_loop ~rng ~motive t =

@@ -52,6 +52,7 @@ let rec worker_loop st =
               | Lwt_unix.ADDR_INET (addr, port) ->
                   (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
             in
+            P2p_fd.set_point ~point fd ;
             P2p_connect_handler.accept connect_handler fd point ;
             Lwt.return_ok ())
           ~error:(function

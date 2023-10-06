@@ -198,7 +198,12 @@ let handle_msg state msg =
           (head_hash :: history)
       in
       if known_invalid then (
-        let* () = P2p.disconnect state.p2p state.conn in
+        let* () =
+          P2p.disconnect
+            ~reason:"invalid current branch has been received"
+            state.p2p
+            state.conn
+        in
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit)
       else if
@@ -251,7 +256,12 @@ let handle_msg state msg =
            probably warrant a reduction of the sender's score. *)
       in
       if known_invalid then (
-        let* () = P2p.disconnect state.p2p state.conn in
+        let* () =
+          P2p.disconnect
+            ~reason:"invalid current head has been received"
+            state.p2p
+            state.conn
+        in
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit)
       else if

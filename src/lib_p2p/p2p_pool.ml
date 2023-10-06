@@ -128,7 +128,7 @@ let set_expected_peer_id :
       | Running {current_peer_id; data} ->
           if not (P2p_peer.Id.equal peer_id current_peer_id) then (
             greylist_addr pool (fst point) ;
-            P2p_conn.disconnect data)
+            P2p_conn.disconnect ~reason:Unexpected_peer_id data)
           else Lwt.return_unit
       | Accepted {current_peer_id; _} ->
           if not (P2p_peer.Id.equal peer_id current_peer_id) then (
@@ -321,7 +321,7 @@ module Points = struct
       (fun conn ->
         if ban_peers then
           P2p_acl.PeerBlacklist.add pool.acl (P2p_conn.peer_id conn) ;
-        P2p_conn.disconnect conn)
+        P2p_conn.disconnect ~reason:IP_manually_banned conn)
       (connections_of_addr pool addr)
 
   let unban pool (addr, _port) =
@@ -393,7 +393,7 @@ module Peers = struct
     P2p_acl.PeerBlacklist.add pool.acl peer ;
     (* Kick [peer] if it is in `Running` state. *)
     match connection_of_peer_id pool peer with
-    | Some conn -> P2p_conn.disconnect conn
+    | Some conn -> P2p_conn.disconnect ~reason:Peer_id_manually_banned conn
     | None -> Lwt.return_unit
 
   let unban pool peer = P2p_acl.unban_peer pool.acl peer
@@ -567,14 +567,14 @@ let save_peers {config; peer_meta_config; known_peer_ids; _} =
   in
   Result.iter_error_s Event.(emit save_peers_error) r
 
-let tear_down_connections {known_peer_ids; known_points; _} =
+let tear_down_connections ~reason {known_peer_ids; known_points; _} =
   let open Lwt_syntax in
   let* () =
     P2p_peer.Table.iter_p
       (fun _peer_id peer_info ->
         match P2p_peer_state.get peer_info with
         | Accepted {cancel; _} -> Error_monad.cancel_with_exceptions cancel
-        | Running {data = conn; _} -> P2p_conn.disconnect conn
+        | Running {data = conn; _} -> P2p_conn.disconnect ~reason conn
         | Disconnected -> Lwt.return_unit)
       known_peer_ids
   in
@@ -583,14 +583,14 @@ let tear_down_connections {known_peer_ids; known_points; _} =
       match P2p_point_state.get point_info with
       | Requested {cancel} | Accepted {cancel; _} ->
           Error_monad.cancel_with_exceptions cancel
-      | Running {data = conn; _} -> P2p_conn.disconnect conn
+      | Running {data = conn; _} -> P2p_conn.disconnect ~reason conn
       | Disconnected -> Lwt.return_unit)
     known_points
 
 let destroy pool =
   let open Lwt_syntax in
   let* () = save_peers pool in
-  tear_down_connections pool
+  tear_down_connections ~reason:Pool_destroyed pool
 
 let add_to_id_points t point =
   Point_LRU_set.add t.my_id_points point ;

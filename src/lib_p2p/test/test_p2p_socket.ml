@@ -224,7 +224,7 @@ module Low_level = struct
     let msg = Bytes.create (Bytes.length simple_msg) in
     let*! r = raw_connect sched addr port in
     match r with
-    | Error (`Connection_refused | `Unexpected_error _) ->
+    | Error (`Connection_failed | `Unexpected_error _) ->
         Lwt.fail Alcotest.Test_error
     | Ok fd ->
         let* () =
@@ -233,7 +233,7 @@ module Low_level = struct
         in
         let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
         let* () = sync ch in
-        P2p_io_scheduler.close fd
+        P2p_io_scheduler.close ~reason:(User "client shutdown") fd
 
   let server ch sched socket =
     let open Lwt_result_syntax in
@@ -244,7 +244,7 @@ module Low_level = struct
     | Ok (fd, _point) ->
         let* () = P2p_io_scheduler.write fd simple_msg in
         let* () = sync ch in
-        let* () = P2p_io_scheduler.close fd in
+        let* () = P2p_io_scheduler.close ~reason:(User "server shutdown") fd in
         return_unit
 
   let run addr _dir = run_nodes ~addr client server
@@ -301,7 +301,7 @@ module Simple_message = struct
     let* _msg_size, msg = P2p_socket.read conn in
     let* () = tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ in
     let* () = sync ch in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "server shutdown") conn in
     return_unit
 
   let client ch sched addr port =
@@ -313,7 +313,7 @@ module Simple_message = struct
     let* _msg_size, msg = P2p_socket.read conn in
     let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
     let* () = sync ch in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "client shutdown") conn in
     return_unit
 
   let run addr _dir = run_nodes ~addr client server
@@ -341,7 +341,7 @@ module Chunked_message = struct
     let* _msg_size, msg = P2p_socket.read conn in
     let* () = tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ in
     let* () = sync ch in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "server shutdown") conn in
     return_unit
 
   let client ch sched addr port =
@@ -355,7 +355,7 @@ module Chunked_message = struct
     let* _msg_size, msg = P2p_socket.read conn in
     let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
     let* () = sync ch in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "client shutdown") conn in
     return_unit
 
   let run addr _dir = run_nodes ~addr client server
@@ -385,7 +385,7 @@ module Oversized_message = struct
     let* _msg_size, msg = P2p_socket.read conn in
     let* () = tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ in
     let* () = sync ch in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "server shutdown") conn in
     return_unit
 
   let client ch sched addr port =
@@ -397,7 +397,7 @@ module Oversized_message = struct
     let* _msg_size, msg = P2p_socket.read conn in
     let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
     let* () = sync ch in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "client shutdown") conn in
     return_unit
 
   let run addr _dir = run_nodes ~addr client server
@@ -415,7 +415,7 @@ module Close_on_read = struct
     let* _info, auth_fd = accept sched socket in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let* () = sync ch in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "server shutdown") conn in
     return_unit
 
   let client ch sched addr port =
@@ -426,7 +426,7 @@ module Close_on_read = struct
     let* () = sync ch in
     let*! err = P2p_socket.read conn in
     let* () = tzassert (is_connection_closed err) __POS__ in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "client shutdown") conn in
     return_unit
 
   let run addr _dir = run_nodes ~addr client server
@@ -445,7 +445,7 @@ module Close_on_write = struct
     let open Lwt_result_syntax in
     let* _info, auth_fd = accept sched socket in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "server shutdown") conn in
     let* () = sync ch in
     return_unit
 
@@ -458,7 +458,7 @@ module Close_on_write = struct
     let*! () = Lwt_unix.sleep 0.1 in
     let*! err = P2p_socket.write_sync conn simple_msg in
     let* () = tzassert (is_connection_closed err) __POS__ in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "client shutdown") conn in
     return_unit
 
   let run addr _dir = run_nodes ~addr client server
@@ -492,7 +492,7 @@ module Garbled_data = struct
     let* () = P2p_socket.Internal_for_tests.raw_write_sync conn garbled_msg in
     let*! err = P2p_socket.read conn in
     let* () = tzassert (is_connection_closed err) __POS__ in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "server shutdown") conn in
     return_unit
 
   let client _ch sched addr port =
@@ -502,7 +502,7 @@ module Garbled_data = struct
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let*! err = P2p_socket.read conn in
     let* () = tzassert (is_decoding_error err) __POS__ in
-    let*! _stat = P2p_socket.close conn in
+    let*! _stat = P2p_socket.close ~reason:(User "client shutdown") conn in
     return_unit
 
   let run addr _dir = run_nodes ~addr client server

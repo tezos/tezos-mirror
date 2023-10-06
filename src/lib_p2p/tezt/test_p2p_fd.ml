@@ -48,7 +48,7 @@ let test_connect () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Ok () -> return_unit
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
   in
@@ -96,7 +96,7 @@ let test_read_write () =
     let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     let*! r = P2p_fd.connect fd uaddr in
     match r with
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok () -> (
@@ -153,7 +153,7 @@ let test_closed_by_peer_read_outgoing () =
     | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok (fd, _sockaddr) ->
-        let*! () = P2p_fd.close fd in
+        let*! () = P2p_fd.close ~reason:(User "server explicit close") fd in
         let* () = sync ch in
         return_unit
   in
@@ -163,7 +163,7 @@ let test_closed_by_peer_read_outgoing () =
     let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     let*! r = P2p_fd.connect fd uaddr in
     match r with
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok () -> (
@@ -227,11 +227,11 @@ let test_closed_by_peer_read_incoming () =
     let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     let*! r = P2p_fd.connect fd uaddr in
     match r with
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok () ->
-        let*! () = P2p_fd.close fd in
+        let*! () = P2p_fd.close ~reason:(User "client explicit close") fd in
         let* () = sync ch in
         return_unit
   in
@@ -272,11 +272,11 @@ let test_locally_closed_read_outgoing () =
     let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     let*! r = P2p_fd.connect fd uaddr in
     match r with
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok () -> (
-        let*! () = P2p_fd.close fd in
+        let*! () = P2p_fd.close ~reason:(User "client explicit close") fd in
         let data_length = 10 in
         let recv_data = Bytes.create data_length in
         let*! r = P2p_fd.read fd recv_data 0 data_length in
@@ -318,7 +318,7 @@ let test_locally_closed_read_incoming () =
     | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok (fd, _sockaddr) -> (
-        let*! () = P2p_fd.close fd in
+        let*! () = P2p_fd.close ~reason:(User "server explicit close") fd in
         let data_length = 10 in
         let recv_data = Bytes.create data_length in
         let*! r = P2p_fd.read fd recv_data 0 data_length in
@@ -336,7 +336,7 @@ let test_locally_closed_read_incoming () =
     let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     let*! r = P2p_fd.connect fd uaddr in
     match r with
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok () -> return_unit
@@ -378,11 +378,11 @@ let test_locally_closed_write_outgoing () =
     let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     let*! r = P2p_fd.connect fd uaddr in
     match r with
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok () -> (
-        let*! () = P2p_fd.close fd in
+        let*! () = P2p_fd.close ~reason:(User "client explicit close") fd in
         let data = Bytes.of_string "test" in
         let*! r = P2p_fd.write fd data in
         match r with
@@ -423,7 +423,7 @@ let test_locally_closed_write_incoming () =
     | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok (fd, _sockaddr) -> (
-        let*! () = P2p_fd.close fd in
+        let*! () = P2p_fd.close ~reason:(User "server explicit close") fd in
         let data = Bytes.of_string "test" in
         let*! r = P2p_fd.write fd data in
         match r with
@@ -440,7 +440,7 @@ let test_locally_closed_write_incoming () =
     let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     let*! r = P2p_fd.connect fd uaddr in
     match r with
-    | Error `Connection_refused -> tzfail P2p_errors.Connection_refused
+    | Error `Connection_failed -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
     | Ok () -> return_unit

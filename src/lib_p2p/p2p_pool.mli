@@ -81,9 +81,10 @@ val create :
 (** [save_peers pool] save all peer currently known by the node on disk *)
 val save_peers : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
-(** [tear_down_connections pool] close all connections, and returns when member
-    connections are either disconnected or canceled. *)
-val tear_down_connections : ('msg, 'peer, 'conn) t -> unit Lwt.t
+(** [tear_down_connections ~reason pool] close all connections, and returns
+    when member connections are either disconnected or canceled. *)
+val tear_down_connections :
+  reason:P2p_disconnection_reason.t -> ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (** [destroy pool] calls tear_down_connections and save the known peers list on the disk *)
 val destroy : ('msg, 'peer, 'conn) t -> unit Lwt.t

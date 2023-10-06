@@ -199,7 +199,15 @@ val read_now : ('msg, 'meta) t -> (int * 'msg) tzresult option
     [conn]. *)
 val stat : ('msg, 'meta) t -> P2p_stat.t
 
-val close : ?wait:bool -> ('msg, 'meta) t -> unit Lwt.t
+(** Stores a reason for which it will be closed in a near future. *)
+val add_closing_reason :
+  reason:P2p_disconnection_reason.t -> ('msg, 'meta) t -> unit
+
+val close :
+  ?wait:bool ->
+  reason:P2p_disconnection_reason.t ->
+  ('msg, 'meta) t ->
+  unit Lwt.t
 
 (**/**)
 

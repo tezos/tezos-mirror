@@ -95,7 +95,7 @@ let check_message_consumption_without_peer_discovery () =
   let* res = Lwt.pick [timeout; read] in
 
   (* Releasing resources to end the test properly. *)
-  let* () = P2p_conn.close conn in
+  let* () = P2p_conn.close ~reason:(User "end of the tests") conn in
 
   match res with
   | Ok () -> unit
