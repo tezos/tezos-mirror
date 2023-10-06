@@ -126,6 +126,7 @@
         "Carbonated_map_costs",
         "Carbonated_map",
         "Staking_parameters_repr",
+        "Denunciations_repr",
 
         "Raw_context_intf",
         "Raw_context",
