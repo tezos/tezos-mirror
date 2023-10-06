@@ -188,7 +188,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           hash
       in
-      match res with Ok data -> return @@ Some data | Error _ -> return None
+      match res with Ok data -> return_some data | Error _ -> return_none
 
     module Inbox_with_history = struct
       let inbox = snapshot
@@ -268,19 +268,21 @@ let generate_proof (node_ctxt : _ Node_context.t)
            inbox_level = game.inbox_level;
            start_tick = Sc_rollup.Tick.to_z start_tick;
          })
-    @@ (Sc_rollup.Proof.produce
-          ~metadata
-          (module P)
-          (Raw_level.of_int32_exn game.inbox_level)
-          ~is_reveal_enabled
-       >|= Environment.wrap_tzresult)
+    @@ let*! result =
+         Sc_rollup.Proof.produce
+           ~metadata
+           (module P)
+           (Raw_level.of_int32_exn game.inbox_level)
+           ~is_reveal_enabled
+       in
+       Lwt.return @@ Environment.wrap_tzresult result
   in
   let*? pvm_step =
     Sc_rollup.Proof.unserialize_pvm_step ~pvm:(module PVM) proof.pvm_step
     |> Environment.wrap_tzresult
   in
   let unserialized_proof = {proof with pvm_step} in
-  let*! res =
+  let*! result =
     Sc_rollup.Proof.valid
       ~metadata
       snapshot
@@ -291,8 +293,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
       ~pvm:(module PVM)
       unserialized_proof
       ~is_reveal_enabled
-    >|= Environment.wrap_tzresult
   in
+  let res = Environment.wrap_tzresult result in
   assert (Result.is_ok res) ;
   let proof =
     Data_encoding.Binary.to_string_exn Sc_rollup.Proof.encoding proof

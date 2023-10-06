@@ -153,7 +153,7 @@ let get_delegates (cctxt : Protocol_client_context.full) =
       cctxt#warning
         "Warning: the list of public key hash aliases contains duplicate \
          hashes, which are ignored"
-    else Lwt.return ()
+    else Lwt.return_unit
   in
   return delegates_no_duplicates
 

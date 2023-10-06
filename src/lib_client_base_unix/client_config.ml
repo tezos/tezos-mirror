@@ -352,7 +352,7 @@ let endpoint_parameter () =
       let parsed = Uri.of_string x in
       let* _ =
         match Uri.scheme parsed with
-        | Some "http" | Some "https" -> return ()
+        | Some "http" | Some "https" -> return_unit
         | _ ->
             tzfail
               (Invalid_endpoint_arg
@@ -1149,7 +1149,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
     in
     if superr <> [] then
       tzfail (Suppressed_arg {args = superr; by = endpoint_confdesc})
-    else return ()
+    else return_unit
   in
   let tls = if tls then Some true else None in
   let* endpoint =

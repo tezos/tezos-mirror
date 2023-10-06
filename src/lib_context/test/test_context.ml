@@ -370,7 +370,7 @@ struct
           in
           Assert.String.List_list.equal ~loc:__LOC__ ecs cs ;
           Assert.String.List_list.equal ~loc:__LOC__ ens ns ;
-          Lwt.return ()
+          Lwt.return_unit
         in
         let* () =
           fold
@@ -429,7 +429,7 @@ struct
           in
           Assert.String.List_list.equal ~loc:__LOC__ ecs cs ;
           Assert.String.List_list.equal ~loc:__LOC__ ens ns ;
-          Lwt.return ()
+          Lwt.return_unit
         in
         let* () =
           fold
@@ -465,7 +465,7 @@ struct
         Assert.Bytes.Option.equal ~loc:__LOC__ None v ;
         let* v1 = Tree.remove v1 [] in
         Assert.Bool.equal ~loc:__LOC__ true (Tree.is_empty v1) ;
-        Lwt.return ()
+        Lwt.return_unit
 
   let test_raw {idx; genesis; _} =
     let* o = checkout idx genesis in
@@ -485,7 +485,7 @@ struct
         let d = String.Map.singleton "foo" (`Tree c) in
         let e = `Tree d in
         Raw_Tree.equal ~loc:__LOC__ e raw ;
-        Lwt.return ()
+        Lwt.return_unit
 
   let string n = String.make n 'a'
 
@@ -515,7 +515,7 @@ struct
           (Context_hash.of_b58check_exn
              "CoVexcEHMXmSA2k42aNc5MCDtVJFRs3CC6vcQWYwFoj7EFsBPw1c")
           h ;
-        Lwt.return ()
+        Lwt.return_unit
 
   let test_is_empty {idx; block2; _} =
     let* o = checkout idx block2 in

@@ -507,7 +507,7 @@ module Make (Parameters : PARAMETERS) = struct
     match Injected_ophs.find state.injected.injected_ophs oph with
     | None ->
         (* Nothing removed *)
-        return []
+        return_nil
     | Some {inj_ops; _} ->
         let* () = Injected_ophs.remove state.injected.injected_ophs oph in
         let+ removed =
@@ -538,7 +538,7 @@ module Make (Parameters : PARAMETERS) = struct
     match Included_in_blocks.find state.included.included_in_blocks block with
     | None ->
         (* Nothing removed *)
-        return []
+        return_nil
     | Some {inj_ops; _} ->
         let* () =
           Included_in_blocks.remove state.included.included_in_blocks block

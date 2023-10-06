@@ -87,7 +87,7 @@ let create_handlers (type a) ?on_completion () =
         | View (RqErr _) -> ()
       in
       let* () =
-        match on_completion with Some f -> f () | None -> Lwt.return ()
+        match on_completion with Some f -> f () | None -> Lwt.return_unit
       in
       Lwt.return_unit
 

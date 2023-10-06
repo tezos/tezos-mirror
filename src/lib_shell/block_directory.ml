@@ -574,7 +574,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       if Store.Block.level block >= savepoint_level then
         let*! o = Store.Block.context_opt chain_store block in
         match o with
-        | None -> return None
+        | None -> return_none
         | Some context ->
             let holey = Option.value ~default:false query#holey in
             let leaf_kind =

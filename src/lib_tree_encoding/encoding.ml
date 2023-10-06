@@ -179,8 +179,8 @@ let tagged_union encode_tag cases =
               let* x =
                 (scope ["value"] encode).encode backend value prefix target_tree
               in
-              return (Some x)
-          | None -> return None
+              return_some x
+          | None -> return_none
         in
         let* tree_opt = List.find_map_s match_case cases in
         match tree_opt with

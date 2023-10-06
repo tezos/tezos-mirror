@@ -240,8 +240,8 @@ struct
     match Tree.kinded_key tree with
     | Some k ->
         let* p = IStoreProof.produce_tree_proof index.repo k step in
-        return (Some p)
-    | None -> return None
+        return_some p
+    | None -> return_none
 
   let verify_proof proof step =
     (* The rollup node is not supposed to verify proof. We keep
@@ -249,11 +249,11 @@ struct
     let open Lwt_syntax in
     let* result = IStoreProof.verify_tree_proof proof step in
     match result with
-    | Ok v -> return (Some v)
+    | Ok v -> return_some v
     | Error _ ->
         (* We skip the error analysis here since proof verification is not a
            job for the rollup node. *)
-        return None
+        return_none
 end
 
 (** State of the PVM that this rollup node deals with. *)

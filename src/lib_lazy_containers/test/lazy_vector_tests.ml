@@ -204,7 +204,7 @@ let drop_works =
              && check_dropped_equal_popped)
            (function
              | Bounds -> Lwt.return (IntVector.num_elements map = 0)
-             | _ -> Lwt.return false))
+             | _ -> Lwt.return_false))
 
 let check_overflow () =
   let open Lwt.Syntax in

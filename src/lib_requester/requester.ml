@@ -226,7 +226,7 @@ end = struct
     let open Lwt_syntax in
     let* () = Events.(emit notify_push) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify (p, k)) ;
-    Lwt.return ()
+    Lwt.return_unit
 
   (* [notify_cancellation] is used within non-Lwt context and needs to
      perform logging without yielding. We use
@@ -240,19 +240,19 @@ end = struct
     let open Lwt_syntax in
     let* () = Events.(emit notify_push_invalid) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify_invalid (p, k)) ;
-    Lwt.return ()
+    Lwt.return_unit
 
   let notify_duplicate t p k =
     let open Lwt_syntax in
     let* () = Events.(emit notify_push_duplicate) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify_duplicate (p, k)) ;
-    Lwt.return ()
+    Lwt.return_unit
 
   let notify_unrequested t p k =
     let open Lwt_syntax in
     let* () = Events.(emit notify_push_unrequested) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify_unrequested (p, k)) ;
-    Lwt.return ()
+    Lwt.return_unit
 
   let compute_timeout state =
     match state.min_next_request with

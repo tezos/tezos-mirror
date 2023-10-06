@@ -6,7 +6,7 @@ module Vector = Lazy_vector.Int32Vector
 let lwt_ignore p =
   let open Lwt.Syntax in
   let* _ = p in
-  Lwt.return ()
+  Lwt.return_unit
 
 type stream = {name : string; bytes : Chunked_byte_vector.t; mutable pos : int}
 
@@ -32,7 +32,7 @@ let read s = Chunked_byte_vector.load_byte s.bytes (Int64.of_int s.pos)
 
 let peek s =
   let open Lwt.Syntax in
-  if eos s then Lwt.return None
+  if eos s then Lwt.return_none
   else
     let+ x = read s in
     Some x
@@ -246,7 +246,7 @@ let bool s =
 
 let rec list f n s =
   let open Lwt.Syntax in
-  if n = 0 then Lwt.return []
+  if n = 0 then Lwt.return_nil
   else
     let* x = f s in
     let+ rst = list f (n - 1) s in
@@ -257,7 +257,7 @@ let opt f b s =
   if b then
     let+ x = f s in
     Some x
-  else Lwt.return None
+  else Lwt.return_none
 
 let vec f s =
   let open Lwt.Syntax in
@@ -1914,7 +1914,7 @@ let non_custom_section s =
   let open Lwt.Syntax in
   let* x = id s in
   match x with
-  | None | Some `CustomSection -> Lwt.return None
+  | None | Some `CustomSection -> Lwt.return_none
   | _ ->
       skip 1 s ;
       let+ () = sized (fun pos s -> skip pos s |> Lwt.return) s in
@@ -1925,7 +1925,7 @@ let non_custom_section s =
 let rec iterate f s =
   let open Lwt.Syntax in
   let* x = f s in
-  if x <> None then iterate f s else Lwt.return ()
+  if x <> None then iterate f s else Lwt.return_unit
 
 let magic = 0x6d736100l
 
@@ -2462,7 +2462,7 @@ let all_custom tag s =
     let* () = iterate non_custom_section s in
     let* x = custom_section s in
     match x with
-    | None -> Lwt.return []
+    | None -> Lwt.return_nil
     | Some (n, s) when n = tag ->
         let+ rst = collect () in
         s :: rst

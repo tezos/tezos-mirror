@@ -892,7 +892,7 @@ module With_get_data (Store : Storelike) = struct
           | _, Some tree ->
               let* tree = Store.unshallow tree in
               return [(k, Some (Either.Left tree))]
-          | _ -> return [])
+          | _ -> return_nil)
     in
     let* values = Lwt_list.map_p find keys in
     return (tree, List.concat values)

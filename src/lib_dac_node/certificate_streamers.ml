@@ -76,5 +76,5 @@ let close dac_plugin certificate_streamers raw_root_hash =
   | Some streamer ->
       Data_streamer.close streamer ;
       certificate_streamers := Map.remove root_hash !certificate_streamers ;
-      return true
-  | None -> return false
+      return_true
+  | None -> return_false

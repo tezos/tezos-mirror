@@ -141,7 +141,7 @@ let ensure_reveal_data_dir_exists reveal_data_dir =
   Lwt.catch
     (fun () ->
       let*! () = Lwt_utils_unix.create_dir ~perm:0o744 reveal_data_dir in
-      return ())
+      return_unit)
     (function
       | Failure s ->
           if String.equal s "Not a directory" then
@@ -189,7 +189,7 @@ module Filesystem : S with type configuration = string = struct
       Lwt_utils_unix.write_bytes chan content
     in
     match result with
-    | Ok () -> return ()
+    | Ok () -> return_unit
     | Error _ ->
         tzfail
         @@ Cannot_write_page_to_page_storage {hash = hash_string; content}
@@ -199,11 +199,11 @@ module Filesystem : S with type configuration = string = struct
     let hash_string = Plugin.to_hex hash in
     let path = path data_dir hash_string in
     let*! result =
-      Lwt_utils_unix.with_open_in path (fun _fd -> Lwt.return ())
+      Lwt_utils_unix.with_open_in path (fun _fd -> Lwt.return_unit)
     in
     match result with
-    | Ok () -> return true
-    | Error {unix_code = Unix.ENOENT; _} -> return false
+    | Ok () -> return_true
+    | Error {unix_code = Unix.ENOENT; _} -> return_false
     | Error _ -> tzfail @@ Cannot_read_page_from_page_storage hash_string
 
   let load ((module Plugin) : Dac_plugin.t) data_dir hash =

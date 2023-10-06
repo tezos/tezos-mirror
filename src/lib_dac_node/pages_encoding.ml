@@ -413,7 +413,7 @@ module Merkle_tree = struct
       let* () =
         if not @@ is_empty_page_data page_data then
           add_rec dac_plugin ~page_store stack page_data
-        else return ()
+        else return_unit
       in
       return @@ Stack.push merkle_level stack
 

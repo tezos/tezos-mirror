@@ -132,7 +132,7 @@ module Vec = struct
     in
     match eq_s with
     | Ok b -> return (List.for_all Stdlib.(( = ) true) b)
-    | Error () -> return false
+    | Error () -> return_false
 
   (* Checks two vectors are equivalent. *)
   let check (eq_value : 'a -> 'a -> (bool, _) result Lwt.t) (vector : 'a V.t)
@@ -260,14 +260,14 @@ module Func_type = struct
     let open Lwt_result_syntax in
     let eq_value_types t t' = return Stdlib.(t = t') in
     match (fk, fk') with
-    | Decode.FKStart, Decode.FKStart -> return true
+    | Decode.FKStart, Decode.FKStart -> return_true
     | FKIns ins, FKIns ins' -> LazyVec.check eq_value_types ins ins'
     | FKOut (ins, out), FKOut (ins', out') ->
         let* eq_ins = Vec.check eq_value_types ins ins' in
         let+ eq_out = LazyVec.check eq_value_types out out' in
         eq_ins && eq_out
     | FKStop ft, FKStop ft' -> func_type_check ft ft'
-    | _, _ -> return false
+    | _, _ -> return_false
 
   let tests = [make_test ~name:"Func_type" Parser.Func_type.encoding gen check]
 end
@@ -308,13 +308,13 @@ module Imports = struct
   let check import import' =
     let open Lwt_result_syntax in
     match (import, import') with
-    | Decode.ImpKStart, Decode.ImpKStart -> return true
+    | Decode.ImpKStart, Decode.ImpKStart -> return_true
     | ImpKModuleName m, ImpKModuleName m' -> Names.check m m'
     | ImpKItemName (m, i), ImpKItemName (m', i') ->
         let* eq_items = Names.check i i' in
         return (m = m' && eq_items)
     | ImpKStop imp, ImpKStop imp' -> return (import_check imp imp')
-    | _, _ -> return false
+    | _, _ -> return_false
 
   let tests = [make_test ~name:"Imports" Parser.Import.encoding gen check]
 end
@@ -373,10 +373,10 @@ module Exports = struct
   let check export export' =
     let open Lwt_result_syntax in
     match (export, export') with
-    | Decode.ExpKStart, Decode.ExpKStart -> return true
+    | Decode.ExpKStart, Decode.ExpKStart -> return_true
     | ExpKName n, ExpKName n' -> Names.check n n'
     | ExpKStop exp, ExpKStop exp' -> return (export_check exp exp')
-    | _, _ -> return false
+    | _, _ -> return_false
 
   let tests = [make_test ~name:"Exports" Parser.Export.encoding gen check]
 end
@@ -572,7 +572,7 @@ module Code = struct
     | Decode.CKStop Source.{it = func; _}, Decode.CKStop Source.{it = func'; _}
       ->
         check_func func func'
-    | _, _ -> return false
+    | _, _ -> return_false
 
   let tests = [make_test ~name:"Code" Parser.Code.encoding gen check]
 end
@@ -744,7 +744,7 @@ module Data = struct
         let+ eq_init = Byte_vector.check init_kont init_kont' in
         dmode = dmode' && eq_init
     | DKStop data, DKStop data' -> data_check data data'
-    | _, _ -> return false
+    | _, _ -> return_false
 
   let tests = [make_test ~name:"Data" Parser.Data.encoding gen check]
 end

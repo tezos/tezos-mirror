@@ -60,7 +60,7 @@ let some_false_es = Lwt.return some_false_e
 
 let some_e v = Ok (Some v)
 
-let some_s v = Lwt.return (Some v)
+let some_s v = Lwt.return_some v
 
 let some_es v = Lwt.return (Ok (Some v))
 
