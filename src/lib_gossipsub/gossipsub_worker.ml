@@ -108,17 +108,19 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** The different kinds of events the Gossipsub worker handles. *)
   type event = Heartbeat | P2P_input of p2p_input | App_input of app_input
 
-  (** The worker's state is made of its status, the gossipsub automaton's state,
+  (** The worker's state is made of the gossipsub automaton's state,
       and a stream of events to process. It also has two output streams to
       communicate with the application and P2P layers. *)
-  type t = {
+  type worker_state = {
     mutable gossip_state : GS.state;
-    mutable status : worker_status;
     events_stream : event Stream.t;
     p2p_output_stream : p2p_output Stream.t;
     app_output_stream : app_output Stream.t;
     events_logging : event -> unit Monad.t;
   }
+
+  (** A worker instance is made of its status and state. *)
+  type t = {mutable status : worker_status; state : worker_state}
 
   let send_p2p_output ~emit_p2p_output ~mk_output =
     let emit to_peer = emit_p2p_output @@ mk_output to_peer in
@@ -488,7 +490,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | App_input event -> apply_app_event ~emit_p2p_output gossip_state event
 
   (** A helper function that pushes events in the state *)
-  let push e t = Stream.push e t.events_stream
+  let push e {status = _; state} = Stream.push e state.events_stream
 
   let app_input t input = push (App_input input) t
 
@@ -503,7 +505,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let heartbeat_events_producer ~heartbeat_span t =
     let open Monad in
     let shutdown = ref false in
-    let stream = t.events_stream in
+    let stream = t.state.events_stream in
     let rec loop () =
       let* () = Monad.sleep heartbeat_span in
       Stream.push Heartbeat stream ;
@@ -525,19 +527,23 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let open Monad in
     let shutdown = ref false in
     let rev_push stream e = Stream.push e stream in
-    let emit_p2p_output = rev_push t.p2p_output_stream in
-    let emit_app_output = rev_push t.app_output_stream in
-    let events_stream = t.events_stream in
-    let events_logging = t.events_logging in
+    let emit_p2p_output = rev_push t.state.p2p_output_stream in
+    let emit_app_output = rev_push t.state.app_output_stream in
+    let events_stream = t.state.events_stream in
+    let events_logging = t.state.events_logging in
     let rec loop t =
       let* event = Stream.pop events_stream in
       if !shutdown then return ()
       else
         let* () = events_logging event in
         let gossip_state =
-          apply_event ~emit_p2p_output ~emit_app_output t.gossip_state event
+          apply_event
+            ~emit_p2p_output
+            ~emit_app_output
+            t.state.gossip_state
+            event
         in
-        t.gossip_state <- gossip_state ;
+        t.state.gossip_state <- gossip_state ;
         loop t
     in
     let promise = loop t in
@@ -551,7 +557,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     match t.status with
     | Starting ->
         let heartbeat_span =
-          View.((view t.gossip_state).limits.heartbeat_interval)
+          View.((view t.state.gossip_state).limits.heartbeat_interval)
         in
         let heartbeat_handle = heartbeat_events_producer ~heartbeat_span t in
         let event_loop_handle = event_loop t in
@@ -587,20 +593,23 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let make ?(events_logging = fun _event -> Monad.return ()) rng limits
       parameters =
     {
-      gossip_state = GS.make rng limits parameters;
       status = Starting;
-      events_stream = Stream.empty ();
-      p2p_output_stream = Stream.empty ();
-      app_output_stream = Stream.empty ();
-      events_logging;
+      state =
+        {
+          gossip_state = GS.make rng limits parameters;
+          events_stream = Stream.empty ();
+          p2p_output_stream = Stream.empty ();
+          app_output_stream = Stream.empty ();
+          events_logging;
+        };
     }
 
-  let p2p_output_stream t = t.p2p_output_stream
+  let p2p_output_stream t = t.state.p2p_output_stream
 
-  let app_output_stream t = t.app_output_stream
+  let app_output_stream t = t.state.app_output_stream
 
-  let is_subscribed state topic =
-    GS.Introspection.(has_joined topic (view state.gossip_state))
+  let is_subscribed t topic =
+    GS.Introspection.(has_joined topic (view t.state.gossip_state))
 
   let pp_list pp_elt =
     Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt
