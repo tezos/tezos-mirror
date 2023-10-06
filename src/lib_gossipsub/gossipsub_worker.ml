@@ -122,18 +122,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** A worker instance is made of its status and state. *)
   type t = {mutable status : worker_status; mutable state : worker_state}
 
-  let rev_push stream e = Stream.push e stream
+  let emit_app_output state e = Stream.push e state.app_output_stream
 
-  let emit_p2p_output state = rev_push state.p2p_output_stream
-
-  let emit_app_output state = rev_push state.app_output_stream
-
-  let send_p2p_output state ~mk_output =
-    let emit to_peer = emit_p2p_output state @@ mk_output to_peer in
+  let emit_p2p_output state ~mk_output =
+    let emit to_peer =
+      Stream.push (mk_output to_peer) state.p2p_output_stream
+    in
     Seq.iter emit
 
-  let send_p2p_message state p2p_message =
-    send_p2p_output state ~mk_output:(fun to_peer ->
+  let emit_p2p_message state p2p_message =
+    emit_p2p_output state ~mk_output:(fun to_peer ->
         Out_message {to_peer; p2p_message})
 
   (** From the worker's perspective, handling publishing a message consists in:
@@ -149,7 +147,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         in
         let message_with_header = {message; topic; message_id} in
         let p2p_message = Message_with_header message_with_header in
-        send_p2p_message state p2p_message (Peer.Set.to_seq to_publish) ;
+        emit_p2p_message state p2p_message (Peer.Set.to_seq to_publish) ;
         state
     | state, GS.Already_published -> state
 
@@ -167,7 +165,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         in
         let message_with_header = {message; topic; message_id} in
         let p2p_message = Message_with_header message_with_header in
-        send_p2p_message state p2p_message (Peer.Set.to_seq to_route) ;
+        emit_p2p_message state p2p_message (Peer.Set.to_seq to_route) ;
         let has_joined = View.(has_joined topic @@ view state.gossip_state) in
         if has_joined then emit_app_output state message_with_header ;
         state
@@ -188,8 +186,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
            topic first. *)
-        send_p2p_message state (Subscribe {topic}) (List.to_seq peers) ;
-        send_p2p_message state (Graft {topic}) (Peer.Set.to_seq to_graft) ;
+        emit_p2p_message state (Subscribe {topic}) (List.to_seq peers) ;
+        emit_p2p_message state (Graft {topic}) (Peer.Set.to_seq to_graft) ;
         state
 
   (** From the worker's perspective, the outcome of leaving a topic by the
@@ -215,9 +213,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
               in
               Prune {topic; px; backoff}
             in
-            send_p2p_message state prune (Seq.return peer_to_prune))
+            emit_p2p_message state prune (Seq.return peer_to_prune))
           to_prune ;
-        send_p2p_message state (Unsubscribe {topic}) (List.to_seq peers) ;
+        emit_p2p_message state (Unsubscribe {topic}) (List.to_seq peers) ;
         state
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
@@ -227,7 +225,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | state, Peer_added ->
         View.(view state.gossip_state |> get_our_topics)
         |> List.iter (fun topic ->
-               send_p2p_message state (Subscribe {topic}) (Seq.return peer)) ;
+               emit_p2p_message state (Subscribe {topic}) (Seq.return peer)) ;
         state
 
   (** When a peer is disconnected, the worker has nothing to do, as:
@@ -257,7 +255,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         in
         Prune {topic; px; backoff}
       in
-      send_p2p_message state prune (Seq.return peer)
+      emit_p2p_message state prune (Seq.return peer)
     in
     (* NOTE: if the cases when we send a Prune change, be sure to also update
        the backoffs accordingly in the automaton. *)
@@ -290,7 +288,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_ihave ({peer; _} : GS.ihave) = function
     | state, GS.Message_requested_message_ids message_ids ->
         if not (List.is_empty message_ids) then
-          send_p2p_message state (IWant {message_ids}) (Seq.return peer) ;
+          emit_p2p_message state (IWant {message_ids}) (Seq.return peer) ;
         state
     | ( state,
         ( GS.Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
@@ -318,7 +316,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    Message_id.t). This also applies for Message_with_header and IHave. *)
                 let message_with_header = {message; topic; message_id} in
                 let p2p_message = Message_with_header message_with_header in
-                send_p2p_message state p2p_message (Seq.return peer)
+                emit_p2p_message state p2p_message (Seq.return peer)
             | _ -> ())
           routed_message_ids ;
         state
@@ -337,18 +335,18 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | ( state,
         ( GS.Prune_topic_not_tracked | Peer_not_in_mesh
         | Ignore_PX_score_too_low _ | No_PX ) ) ->
-        send_p2p_output
+        emit_p2p_output
           state
           ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
           input_px ;
         state
     | state, GS.PX peers ->
-        send_p2p_output
+        emit_p2p_output
           state
           ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
           (Peer.Set.to_seq peers) ;
         (* Forget peers that were filtered out by the automaton. *)
-        send_p2p_output
+        emit_p2p_output
           state
           ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
           (Peer.Set.to_seq @@ Peer.Set.(diff (of_seq input_px) peers)) ;
@@ -368,7 +366,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             (fun peer topicset ->
               Topic.Set.iter
                 (fun topic ->
-                  send_p2p_message state (mk_msg peer topic) (Seq.return peer))
+                  emit_p2p_message state (mk_msg peer topic) (Seq.return peer))
                 topicset)
             pmap
         in
@@ -386,7 +384,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.select_gossip_messages gstate
         |> List.iter (fun GS.{peer; topic; message_ids} ->
                if not (List.is_empty message_ids) then
-                 send_p2p_message
+                 emit_p2p_message
                    state
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
