@@ -2933,9 +2933,10 @@ let as_opam_monorepo_opam_provided = function
   | _ -> None
 
 let dune_depend =
+  (* version 3.11 removes support for ctypes extension versions 0.1 and 0.2 *)
   {
     Opam.package = "dune";
-    version = Version.(at_least "3.0" && at_most "3.10");
+    version = Version.(at_least "3.0" && less_than "3.11");
     with_test = Never;
     optional = false;
   }
