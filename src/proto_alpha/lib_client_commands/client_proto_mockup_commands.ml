@@ -47,10 +47,10 @@ let asynchronous_flag =
 let load_json_file (cctxt : Protocol_client_context.full) json_file =
   let open Lwt_result_syntax in
   match json_file with
-  | None -> return None
+  | None -> return_none
   | Some filename ->
       let* json_string = cctxt#read_file filename in
-      return (Some (Ezjsonm.from_string json_string :> Data_encoding.json))
+      return_some (Ezjsonm.from_string json_string :> Data_encoding.json)
 
 let create_mockup_command_handler
     (constants_overrides_file, bootstrap_accounts_file, asynchronous)

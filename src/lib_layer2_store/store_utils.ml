@@ -186,7 +186,7 @@ module Make (B : BACKEND) = struct
     let mem store ~primary_key ~secondary_key =
       let open Lwt_result_syntax in
       let* primary_key_binding_exists = M.mem store primary_key in
-      if not primary_key_binding_exists then return false
+      if not primary_key_binding_exists then return_false
       else
         let+ secondary_key_map = M.get store primary_key in
         Secondary_key_map.mem secondary_key secondary_key_map

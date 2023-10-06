@@ -322,8 +322,8 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
         | Some {output; _} ->
             let+ result = Wasm_vm.get_output output_info output in
             Some result
-        | None -> Lwt.return None)
-      (fun _ -> Lwt.return None)
+        | None -> Lwt.return_none)
+      (fun _ -> Lwt.return_none)
 
   let get_info tree =
     let open Lwt_syntax in

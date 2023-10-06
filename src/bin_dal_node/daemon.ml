@@ -447,11 +447,11 @@ let store_profiles_finalizer ctxt data_dir =
   | Ok config -> (
       let* r = Configuration_file.save {config with profiles} in
       match r with
-      | Ok () -> return ()
+      | Ok () -> return_unit
       | Error e -> Event.(emit failed_to_persist_profiles (profiles, e)))
   | Error e ->
       let* () = Event.(emit failed_to_persist_profiles (profiles, e)) in
-      return ()
+      return_unit
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
@@ -564,4 +564,4 @@ let run ~data_dir configuration_override =
   let* () =
     daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
   in
-  return ()
+  return_unit

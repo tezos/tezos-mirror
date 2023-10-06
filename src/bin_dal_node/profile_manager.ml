@@ -158,7 +158,7 @@ let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
       in
       let open Errors in
       match r with
-      | Error `Not_found -> return false
+      | Error `Not_found -> return_false
       | Error (#decoding as e) -> fail (e :> [Errors.decoding | Errors.other])
       | Ok commitment ->
           let*! b =

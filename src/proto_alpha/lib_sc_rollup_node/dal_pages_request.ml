@@ -134,7 +134,7 @@ let slot_pages ~dal_attestation_lag ~inbox_level node_ctxt
          ~published_level:(Raw_level.to_int32 published_level)
          ~origination_level
          ~inbox_level
-  then return None
+  then return_none
   else
     let* confirmed_in_block_hash =
       store_entry_from_published_level
@@ -152,7 +152,7 @@ let slot_pages ~dal_attestation_lag ~inbox_level node_ctxt
           download_confirmed_slot_pages node_ctxt ~published_level ~index
         in
         return (Some pages)
-    | Some `Unconfirmed -> return None
+    | Some `Unconfirmed -> return_none
     | None -> storage_invariant_broken published_level index
 
 let page_content ~dal_attestation_lag ~inbox_level node_ctxt page_id =
@@ -169,7 +169,7 @@ let page_content ~dal_attestation_lag ~inbox_level node_ctxt page_id =
          ~published_level:(Raw_level.to_int32 published_level)
          ~origination_level
          ~inbox_level
-  then return None
+  then return_none
   else
     let* confirmed_in_block_hash =
       store_entry_from_published_level
@@ -189,5 +189,5 @@ let page_content ~dal_attestation_lag ~inbox_level node_ctxt page_id =
         match List.nth_opt pages page_index with
         | Some page -> return @@ Some page
         | None -> tzfail @@ Dal_invalid_page_for_slot page_id)
-    | Some `Unconfirmed -> return None
+    | Some `Unconfirmed -> return_none
     | None -> storage_invariant_broken published_level index

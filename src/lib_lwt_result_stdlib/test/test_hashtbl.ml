@@ -183,7 +183,7 @@ let test_order _ _ =
   (* Check that the `world` record is as expected *)
   match !world with
   | ["b_outer"; "a_outer"; "a_inner"] | ["a_outer"; "b_outer"; "a_inner"] ->
-      Lwt.return ()
+      Lwt.return_unit
   | world ->
       Assert.String.fail
         "[outers;a_inner]"

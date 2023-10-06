@@ -63,8 +63,8 @@ let test_padding_state ~version () =
   in
   let should_continue state =
     match state.tick_state with
-    | Padding -> Lwt_syntax.return false
-    | _ -> Lwt_syntax.return true
+    | Padding -> Lwt_syntax.return_false
+    | _ -> Lwt_syntax.return_true
   in
   let*! pvm_state, _ =
     Wasm_vm.compute_step_many_until

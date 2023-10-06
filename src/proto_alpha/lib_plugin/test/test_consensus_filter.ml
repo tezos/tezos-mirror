@@ -106,8 +106,10 @@ module Generator = struct
   let successive_timestamp =
     let+ ts, (diff : int) = pair timestamp small_nat in
     let x =
-      Period.of_seconds (Int64.of_int diff) >>? fun diff ->
-      Timestamp.(ts +? diff) >>? fun ts2 -> Ok (ts, ts2)
+      let open Result_syntax in
+      let* diff = Period.of_seconds (Int64.of_int diff) in
+      let* ts2 = Timestamp.(ts +? diff) in
+      Ok (ts, ts2)
     in
     of_result x
 
@@ -147,9 +149,10 @@ let no_error = function
 
 (** Helper to compute  *)
 let durations round_durations start stop =
+  let open Result_syntax in
   List.map_e
     (fun round ->
-      Round.of_int round >|? fun round ->
+      let+ round = Round.of_int round in
       Round.round_duration round_durations round |> Period.to_seconds)
     Tezos_stdlib.Utils.Infix.(start -- stop)
 
@@ -162,24 +165,29 @@ let durations round_durations start stop =
 *)
 let timestamp_of_round round_durations ~proposal_timestamp ~proposal_round
     ~round =
-  (let iproposal_round = Int32.to_int @@ Round.to_int32 proposal_round in
-   let iround = Int32.to_int @@ Round.to_int32 round in
-   if Round.(proposal_round = round) then ok (Period.zero, proposal_timestamp)
-   else if Round.(proposal_round < round) then
-     durations round_durations iproposal_round (iround - 1) >>? fun durations ->
-     Period.of_seconds @@ List.fold_left Int64.add Int64.zero durations
-     >>? fun rounds_duration ->
-     Timestamp.(proposal_timestamp +? rounds_duration) >|? fun ts ->
-     (rounds_duration, ts)
-   else
-     durations round_durations iround (iproposal_round - 1) >>? fun durations ->
-     List.fold_left Int64.add Int64.zero durations |> fun rounds_duration ->
-     Timestamp.of_seconds
-     @@ Int64.sub (Timestamp.to_seconds proposal_timestamp) rounds_duration
-     |> fun ts ->
-     Period.of_seconds rounds_duration >|? fun rounds_duration ->
-     (rounds_duration, ts))
-  >>? fun (_rnd_dur, exp_ts) -> ok exp_ts
+  let open Result_syntax in
+  let* _rnd_dur, exp_ts =
+    let iproposal_round = Int32.to_int @@ Round.to_int32 proposal_round in
+    let iround = Int32.to_int @@ Round.to_int32 round in
+    if Round.(proposal_round = round) then
+      return (Period.zero, proposal_timestamp)
+    else if Round.(proposal_round < round) then
+      let* durations = durations round_durations iproposal_round (iround - 1) in
+      let* rounds_duration =
+        Period.of_seconds @@ List.fold_left Int64.add Int64.zero durations
+      in
+      let+ ts = Timestamp.(proposal_timestamp +? rounds_duration) in
+      (rounds_duration, ts)
+    else
+      let* durations = durations round_durations iround (iproposal_round - 1) in
+      List.fold_left Int64.add Int64.zero durations |> fun rounds_duration ->
+      Timestamp.of_seconds
+      @@ Int64.sub (Timestamp.to_seconds proposal_timestamp) rounds_duration
+      |> fun ts ->
+      let+ rounds_duration = Period.of_seconds rounds_duration in
+      (rounds_duration, ts)
+  in
+  return exp_ts
 
 let drift_of =
   let r0_dur = Round.round_duration round_durations Round.zero in
@@ -192,16 +200,20 @@ let max_ts clock_drift prop_ts now =
   Timestamp.(max prop_ts now +? drift_of clock_drift)
 
 let predecessor_start proposal_timestamp proposal_round grandparent_round =
+  let open Result_syntax in
   assert_no_error
-  @@ ( Round.level_offset_of_round
+  @@ let* proposal_level_offset =
+       Round.level_offset_of_round
          round_durations
          ~round:Round.(succ grandparent_round)
-     >>? fun proposal_level_offset ->
+     in
+     let* proposal_round_offset =
        Round.level_offset_of_round round_durations ~round:proposal_round
-       >>? fun proposal_round_offset ->
+     in
+     let* proposal_offset =
        Period.(add proposal_level_offset proposal_round_offset)
-       >>? fun proposal_offset ->
-       Ok Timestamp.(proposal_timestamp - proposal_offset) )
+     in
+     Ok Timestamp.(proposal_timestamp - proposal_offset)
 
 (** {2. Tests} *)
 
@@ -270,6 +282,7 @@ let test_acceptable_current_level_current_round =
 (** Test operations at same level, different round, with an acceptable expected
     timestamp for the operation.   *)
 let test_acceptable_current_level =
+  let open Result_syntax in
   let open QCheck2 in
   Test.make
     ~print:Generator.print_param_acceptable
@@ -280,15 +293,17 @@ let test_acceptable_current_level =
              (proposal_timestamp, now_timestamp) ) ) ->
       let proposal_level = op_level in
       no_error
-        ( timestamp_of_round
-            round_durations
-            ~proposal_timestamp
-            ~proposal_round
-            ~round:op_round
-        >>? fun expected_time ->
-          max_ts (get_clock_drift config) proposal_timestamp now_timestamp
-          >>? fun max_timestamp -> ok Timestamp.(expected_time <= max_timestamp)
-        )
+        (let* expected_time =
+           timestamp_of_round
+             round_durations
+             ~proposal_timestamp
+             ~proposal_round
+             ~round:op_round
+         in
+         let* max_timestamp =
+           max_ts (get_clock_drift config) proposal_timestamp now_timestamp
+         in
+         return Timestamp.(expected_time <= max_timestamp))
       ==> no_error
           @@ acceptable_op
                ~config
@@ -309,6 +324,7 @@ let test_acceptable_current_level =
 (** Test operations at same level, different round, with a too high expected
     timestamp for the operation,  and not at current round (which is always accepted). *)
 let test_not_acceptable_current_level =
+  let open Result_syntax in
   let open QCheck2 in
   Test.make
     ~print:Generator.print_param_acceptable
@@ -319,39 +335,43 @@ let test_not_acceptable_current_level =
              (proposal_timestamp, now_timestamp) ) ) ->
       let proposal_level = op_level in
       no_error
-        ( timestamp_of_round
-            round_durations
-            ~proposal_timestamp
-            ~proposal_round
-            ~round:op_round
-        >>? fun expected_time ->
-          max_ts (get_clock_drift config) proposal_timestamp now_timestamp
-          >>? fun max_timestamp ->
-          ok
-            Timestamp.(
-              expected_time > max_timestamp
-              && Round.(proposal_round <> op_round)) )
+        (let* expected_time =
+           timestamp_of_round
+             round_durations
+             ~proposal_timestamp
+             ~proposal_round
+             ~round:op_round
+         in
+         let* max_timestamp =
+           max_ts (get_clock_drift config) proposal_timestamp now_timestamp
+         in
+         return
+           Timestamp.(
+             expected_time > max_timestamp && Round.(proposal_round <> op_round)))
       ==> no_error
-            (acceptable_op
-               ~config
-               ~round_durations
-               ~round_zero_duration
-               ~proposal_level
-               ~proposal_round
-               ~proposal_timestamp
-               ~proposal_predecessor_level_start:
-                 (predecessor_start
-                    proposal_timestamp
-                    proposal_round
-                    Round.zero)
-               ~op_level
-               ~op_round
-               ~now_timestamp
-            >|? not))
+            (let+ result =
+               acceptable_op
+                 ~config
+                 ~round_durations
+                 ~round_zero_duration
+                 ~proposal_level
+                 ~proposal_round
+                 ~proposal_timestamp
+                 ~proposal_predecessor_level_start:
+                   (predecessor_start
+                      proposal_timestamp
+                      proposal_round
+                      Round.zero)
+                 ~op_level
+                 ~op_round
+                 ~now_timestamp
+             in
+             not result))
 
 (** Test operations at next level, different round, with an acceptable timestamp for
     the operation. *)
 let test_acceptable_next_level =
+  let open Result_syntax in
   let open QCheck2 in
   Test.make
     ~print:Generator.print_param_acceptable
@@ -362,21 +382,24 @@ let test_acceptable_next_level =
              (proposal_timestamp, now_timestamp) ) ) ->
       let op_level = Raw_level.succ proposal_level in
       no_error
-        ( timestamp_of_round
-            round_durations
-            ~proposal_timestamp
-            ~proposal_round
-            ~round:Round.zero
-        >>? fun current_level_start ->
-          Round.timestamp_of_round
-            round_durations
-            ~predecessor_timestamp:current_level_start
-            ~predecessor_round:Round.zero
-            ~round:op_round
-          >>? fun expected_time ->
-          max_ts (get_clock_drift config) proposal_timestamp now_timestamp
-          >>? fun max_timestamp -> ok Timestamp.(expected_time <= max_timestamp)
-        )
+        (let* current_level_start =
+           timestamp_of_round
+             round_durations
+             ~proposal_timestamp
+             ~proposal_round
+             ~round:Round.zero
+         in
+         let* expected_time =
+           Round.timestamp_of_round
+             round_durations
+             ~predecessor_timestamp:current_level_start
+             ~predecessor_round:Round.zero
+             ~round:op_round
+         in
+         let* max_timestamp =
+           max_ts (get_clock_drift config) proposal_timestamp now_timestamp
+         in
+         return Timestamp.(expected_time <= max_timestamp))
       ==> no_error
           @@ acceptable_op
                ~config
@@ -397,6 +420,7 @@ let test_acceptable_next_level =
 (** Test operations at next level, different round, with a too high timestamp
    for the operation. *)
 let test_not_acceptable_next_level =
+  let open Result_syntax in
   let open QCheck2 in
   Test.make
     ~print:Generator.print_param_acceptable
@@ -409,39 +433,45 @@ let test_not_acceptable_next_level =
       let op_level = Raw_level.succ proposal_level in
       QCheck2.assume
       @@ no_error
-           ( timestamp_of_round
-               round_durations
-               ~proposal_timestamp
-               ~proposal_round
-               ~round:Round.zero
-           >>? fun current_level_start ->
-             Round.timestamp_of_round
-               round_durations
-               ~predecessor_timestamp:current_level_start
-               ~predecessor_round:Round.zero
-               ~round:op_round
-             >>? fun expected_time ->
-             Timestamp.(
-               proposal_timestamp
-               +? Round.round_duration round_durations proposal_round)
-             >>? fun next_level_ts ->
-             max_ts (get_clock_drift config) next_level_ts now_timestamp
-             >>? fun max_timestamp ->
-             ok Timestamp.(expected_time > max_timestamp) ) ;
+           (let* current_level_start =
+              timestamp_of_round
+                round_durations
+                ~proposal_timestamp
+                ~proposal_round
+                ~round:Round.zero
+            in
+            let* expected_time =
+              Round.timestamp_of_round
+                round_durations
+                ~predecessor_timestamp:current_level_start
+                ~predecessor_round:Round.zero
+                ~round:op_round
+            in
+            let* next_level_ts =
+              Timestamp.(
+                proposal_timestamp
+                +? Round.round_duration round_durations proposal_round)
+            in
+            let* max_timestamp =
+              max_ts (get_clock_drift config) next_level_ts now_timestamp
+            in
+            return Timestamp.(expected_time > max_timestamp)) ;
       no_error
-      @@ (acceptable_op
-            ~config
-            ~round_durations
-            ~round_zero_duration
-            ~proposal_level
-            ~proposal_round
-            ~proposal_timestamp
-            ~proposal_predecessor_level_start:
-              (predecessor_start proposal_timestamp proposal_round Round.zero)
-            ~op_level
-            ~op_round
-            ~now_timestamp
-         >|? not))
+      @@ let+ result =
+           acceptable_op
+             ~config
+             ~round_durations
+             ~round_zero_duration
+             ~proposal_level
+             ~proposal_round
+             ~proposal_timestamp
+             ~proposal_predecessor_level_start:
+               (predecessor_start proposal_timestamp proposal_round Round.zero)
+             ~op_level
+             ~op_round
+             ~now_timestamp
+         in
+         not result)
 
 let () =
   Alcotest.run

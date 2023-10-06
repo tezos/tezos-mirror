@@ -1120,7 +1120,7 @@ end = struct
       let buffer_size = 32768 in
       let buffer = Cstruct.create buffer_size in
       let rec loop (n : int) =
-        if n <= 0 then Lwt.return ()
+        if n <= 0 then Lwt.return_unit
         else
           let amount = min n buffer_size in
           let block = Cstruct.sub buffer 0 amount in
@@ -1268,7 +1268,7 @@ end = struct
     let block_size = 32768 in
     let buffer = Cstruct.create block_size in
     let rec loop remaining =
-      if remaining = 0L then Lwt.return ()
+      if remaining = 0L then Lwt.return_unit
       else
         let this = Int64.(to_int (min (of_int block_size) remaining)) in
         let block = Cstruct.sub buffer 0 this in

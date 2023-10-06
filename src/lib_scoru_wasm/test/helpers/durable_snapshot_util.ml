@@ -87,7 +87,7 @@ module Snapshot : Testable_durable_sig = struct
     let open Lwt_syntax in
     let* cbv = find_value tree key in
     match cbv with
-    | None -> Lwt.return None
+    | None -> Lwt.return_none
     | Some cbv -> Lwt.map Option.some (CBV.to_bytes cbv)
 
   let find_value_exn tree key =
@@ -111,7 +111,7 @@ module Current : Testable_durable_sig = struct
     let open Lwt_syntax in
     let* cbv = find_value tree key in
     match cbv with
-    | None -> Lwt.return None
+    | None -> Lwt.return_none
     | Some cbv -> Lwt.map Option.some (CBV.to_bytes cbv)
 
   let find_value_exn tree key =

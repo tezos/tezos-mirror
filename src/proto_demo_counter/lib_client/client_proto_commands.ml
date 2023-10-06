@@ -27,15 +27,18 @@ open Protocol
 module Demo_block_services = Block_services.Make (Protocol) (Protocol)
 
 let bake (cctxt : Protocol_client_context.full) message : unit tzresult Lwt.t =
-  Demo_block_services.Mempool.pending_operations cctxt ()
-  >>=? fun {validated; _} ->
+  let open Lwt_result_syntax in
+  let* {validated; _} =
+    Demo_block_services.Mempool.pending_operations cctxt ()
+  in
   let operations = List.map snd validated in
   let block_header_data = Header.create message in
-  Demo_block_services.Helpers.Preapply.block
-    cctxt
-    [operations]
-    ~protocol_data:block_header_data
-  >>=? fun (shell, preapply_result) ->
+  let* shell, preapply_result =
+    Demo_block_services.Helpers.Preapply.block
+      cctxt
+      [operations]
+      ~protocol_data:block_header_data
+  in
   let block_header_data_encoded =
     Data_encoding.Binary.to_bytes_exn Header.encoding block_header_data
   in
@@ -49,9 +52,10 @@ let bake (cctxt : Protocol_client_context.full) message : unit tzresult Lwt.t =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd preapply_result
   in
   let operations = [List.map snd preapply_result.applied] in
-  Shell_services.Injection.block cctxt header_encoded operations
-  >>=? fun block_hash ->
-  cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
+  let* block_hash =
+    Shell_services.Injection.block cctxt header_encoded operations
+  in
+  let*! () = cctxt#message "Injected block %a" Block_hash.pp_short block_hash in
   return_unit
 
 let operation_encoding =
@@ -63,20 +67,24 @@ let operation_encoding =
 let forge_op = Data_encoding.Binary.to_bytes_exn operation_encoding
 
 let inject_op (cctxt : Protocol_client_context.full) (pop : Proto_operation.t) =
-  Demo_block_services.hash cctxt () >>=? fun (block_hash : Block_hash.t) ->
+  let open Lwt_result_syntax in
+  let* (block_hash : Block_hash.t) = Demo_block_services.hash cctxt () in
   let shell_header : Operation.shell_header = Operation.{branch = block_hash} in
   let op : operation = {shell = shell_header; protocol_data = pop} in
-  Demo_block_services.Helpers.Preapply.operations cctxt [op] >>=? function
+  let* result = Demo_block_services.Helpers.Preapply.operations cctxt [op] in
+  match result with
   | [(_op_data, op_receipt)] ->
       let receipt_str = Receipt.to_string op_receipt in
-      cctxt#message "Operation receipt: %s" receipt_str >>= fun () ->
+      let*! () = cctxt#message "Operation receipt: %s" receipt_str in
       let mbytes = forge_op (shell_header, pop) in
-      Shell_services.Injection.operation cctxt mbytes >>=? fun op_hash ->
+      let* op_hash = Shell_services.Injection.operation cctxt mbytes in
       let injected = Operation_hash.to_short_b58check op_hash in
-      cctxt#message "Injected: %s" injected >>= fun () -> return_unit
+      let*! () = cctxt#message "Injected: %s" injected in
+      return_unit
   | _ -> assert false
 
 let get_counter (cctxt : Protocol_client_context.full) account =
-  Services.get_counter cctxt (cctxt#chain, cctxt#block) account >>=? fun cnt ->
-  cctxt#message "The counter value is %d" (Int32.to_int cnt) >>= fun () ->
+  let open Lwt_result_syntax in
+  let* cnt = Services.get_counter cctxt (cctxt#chain, cctxt#block) account in
+  let*! () = cctxt#message "The counter value is %d" (Int32.to_int cnt) in
   return_unit

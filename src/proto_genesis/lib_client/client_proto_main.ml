@@ -27,23 +27,27 @@ open Protocol
 open Protocol_client_context
 
 let bake cctxt ?timestamp block command sk =
+  let open Lwt_result_syntax in
   let timestamp =
     match timestamp with
     | Some t -> t
     | None -> Time.System.(to_protocol (Tezos_base.Time.System.now ()))
   in
   let protocol_data = {command; signature = Tezos_crypto.Signature.V0.zero} in
-  Genesis_block_services.Helpers.Preapply.block
-    cctxt
-    ~block
-    ~timestamp
-    ~protocol_data
-    []
-  >>=? fun (shell_header, _) ->
+  let* shell_header, _ =
+    Genesis_block_services.Helpers.Preapply.block
+      cctxt
+      ~block
+      ~timestamp
+      ~protocol_data
+      []
+  in
   let blk = Data.Command.forge shell_header command in
-  Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun chain_id ->
-  Client_keys_v0.append cctxt sk ~watermark:(Block_header chain_id) blk
-  >>=? fun signed_blk -> Shell_services.Injection.block cctxt signed_blk []
+  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain:`Main () in
+  let* signed_blk =
+    Client_keys_v0.append cctxt sk ~watermark:(Block_header chain_id) blk
+  in
+  Shell_services.Injection.block cctxt signed_blk []
 
 let int32_parameter =
   Tezos_clic.parameter (fun _ p ->
@@ -123,6 +127,7 @@ let proto_param ~name ~desc t =
     t
 
 let commands () =
+  let open Lwt_result_syntax in
   let open Tezos_clic in
   let args =
     args1
@@ -164,19 +169,21 @@ let commands () =
            param_json_file
            (cctxt : Client_context.full) ->
         let fitness = fitness_from_uint32 fitness in
-        Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
-        >>=? fun json ->
+        let* json =
+          Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
+        in
         let protocol_parameters =
           Data_encoding.Binary.to_bytes_exn Data_encoding.json json
         in
-        bake
-          cctxt
-          ?timestamp
-          cctxt#block
-          (Activate {protocol = hash; fitness; protocol_parameters})
-          sk
-        >>=? fun hash ->
-        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        let* hash =
+          bake
+            cctxt
+            ?timestamp
+            cctxt#block
+            (Activate {protocol = hash; fitness; protocol_parameters})
+            sk
+        in
+        let*! () = cctxt#answer "Injected %a" Block_hash.pp_short hash in
         return_unit);
     command
       ~desc:"Fork a test protocol"
@@ -201,21 +208,23 @@ let commands () =
       @@ stop)
       (fun (timestamp, delay) hash fitness sk param_json_file cctxt ->
         let fitness = fitness_from_uint32 fitness in
-        Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
-        >>=? fun json ->
+        let* json =
+          Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
+        in
         let protocol_parameters =
           Data_encoding.Binary.to_bytes_exn Data_encoding.json json
         in
         let timestamp = Option.map Time.System.to_protocol timestamp in
-        bake
-          cctxt
-          ?timestamp
-          cctxt#block
-          (Activate_testchain
-             {protocol = hash; fitness; protocol_parameters; delay})
-          sk
-        >>=? fun hash ->
-        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        let* hash =
+          bake
+            cctxt
+            ?timestamp
+            cctxt#block
+            (Activate_testchain
+               {protocol = hash; fitness; protocol_parameters; delay})
+            sk
+        in
+        let*! () = cctxt#answer "Injected %a" Block_hash.pp_short hash in
         return_unit);
   ]
 

@@ -1537,7 +1537,7 @@ module Chain = struct
                 in
                 (* The new memory highwatermark is new_head_lafl, the disk
                    value will be updated after the merge completion. *)
-                return (Some new_head_lafl)
+                return_some new_head_lafl
           else return cementing_highwatermark
         in
         let*! new_checkpoint =

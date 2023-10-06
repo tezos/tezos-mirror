@@ -1804,7 +1804,7 @@ let run_data (inst : module_inst) i data =
   let at = data.it.dmode.at in
   let x = i @@ at in
   match data.it.dmode.it with
-  | Passive -> Lwt.return []
+  | Passive -> Lwt.return_nil
   | Active {index; offset} ->
       assert (index.it = 0l) ;
       let+ data = Ast.get_data data.it.dinit inst.allocations.datas in

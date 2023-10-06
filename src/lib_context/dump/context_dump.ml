@@ -119,7 +119,7 @@ let read_mbytes rbuf b =
   let open Lwt_result_syntax in
   let* string = read_string rbuf ~len:(Bytes.length b) in
   Bytes.blit_string string 0 b 0 (Bytes.length b) ;
-  return ()
+  return_unit
 
 let get_int64 rbuf =
   let open Lwt_result_syntax in

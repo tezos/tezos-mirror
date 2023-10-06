@@ -432,7 +432,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         Events.(emit authenticate_status ("nack", point, info.peer_id))
       in
       let*! nack_point_list =
-        if t.config.disable_peer_discovery then Lwt.return []
+        if t.config.disable_peer_discovery then Lwt.return_nil
         else
           (* Never send more than 100 points, you would be greylisted *)
           P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool

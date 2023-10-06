@@ -270,7 +270,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let* inboxes =
       match inputs with
       | Some inputs -> Messages.parse_inboxes inputs config
-      | None -> return []
+      | None -> return_nil
     in
     let+ _tree = repl tree inboxes 0l config in
     ()

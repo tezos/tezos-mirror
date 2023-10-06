@@ -320,7 +320,7 @@ module Fold = struct
         list
     in
     assert (Lwt.state p = Lwt.Fail Exit) ;
-    Lwt.return ()
+    Lwt.return_unit
 
   let test_fold_left_map_es _ () =
     let open Lwt_syntax in

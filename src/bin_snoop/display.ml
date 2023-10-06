@@ -245,7 +245,7 @@ let plot_scatter opts title input_columns outputs =
       let plot = scatterplot_3d opts title column1 column2 outputs in
       return [plot]
   | _ ->
-      if opts.reduced_plot_verbosity then return []
+      if opts.reduced_plot_verbosity then return_nil
       else
         let subsets = Stats.Combi.enumerate_subsets 2 input_columns in
         let plots =
@@ -431,7 +431,7 @@ let is_trivial_workload workload = Array.for_all (fun x -> x = 1.0) workload
 
 let empirical opts (workload_data : (Sparse_vec.String.t * float array) list) =
   let open Result_syntax in
-  if opts.reduced_plot_verbosity then return []
+  if opts.reduced_plot_verbosity then return_nil
   else
     let* columns, timings = empirical_data opts workload_data in
     (* If the data is non-trivial, we produce a scatter plot.
