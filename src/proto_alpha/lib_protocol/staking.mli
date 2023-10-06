@@ -61,6 +61,6 @@ val punish_delegate :
   context ->
   public_key_hash ->
   Level.t ->
-  [`Double_baking | `Double_attesting] ->
+  Misbehaviour.t ->
   rewarded:Contract.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t

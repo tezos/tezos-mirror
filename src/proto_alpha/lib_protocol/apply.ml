@@ -2293,7 +2293,7 @@ let punish_double_attestation_or_preattestation (type kind) ctxt
         ctxt
         consensus_pk1.delegate
         level
-        `Double_attesting
+        Double_attesting
         mk_result
         ~payload_producer
 
@@ -2310,7 +2310,7 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
     ctxt
     consensus_pk1.delegate
     level
-    `Double_baking
+    Double_baking
     ~payload_producer
     (fun balance_updates -> Double_baking_evidence_result balance_updates)
 
