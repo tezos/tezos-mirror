@@ -4449,6 +4449,7 @@ let octez_smart_rollup_lib =
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
         octez_crypto_dal;
+        yaml;
       ]
 
 let octez_smart_rollup_node_lib =
