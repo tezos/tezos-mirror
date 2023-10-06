@@ -2990,7 +2990,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let depends =
     {
       Opam.package = "dune";
-      version = Version.at_least "3.0";
+      version = Version.(at_least "3.0" && at_most "3.10");
       with_test = Never;
       optional = false;
     }
