@@ -9,7 +9,8 @@ find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
 diff poetry.lock /home/tezos/poetry.lock
 diff pyproject.toml /home/tezos/pyproject.toml
 
-make check-linting
+CHECK_LICENSES_DIFF_BASE=${CI_MERGE_REQUEST_DIFF_BASE_SHA:-} \
+    make check-linting
 
 # python checks
 make check-python-linting
