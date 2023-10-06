@@ -38,6 +38,10 @@ let ( let*?@ ) m f =
   let*? x = Environment.wrap_tzresult m in
   f x
 
+let ( let*!@ ) m f =
+  let*! x = wrap m in
+  f x
+
 let ( let+@ ) m f =
   let+ x = wrap m in
   f x
