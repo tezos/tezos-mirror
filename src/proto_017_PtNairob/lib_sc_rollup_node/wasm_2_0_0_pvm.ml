@@ -114,6 +114,9 @@ module type Durable_state = sig
         for the [key] in the durable storage of the PVM state [state].
         Empty list in case if path doesn't exist. *)
   val list : state -> string -> string list Lwt.t
+
+  module Tree_encoding_runner :
+    Tezos_tree_encoding.Runner.S with type tree = state
 end
 
 module Make_durable_state
