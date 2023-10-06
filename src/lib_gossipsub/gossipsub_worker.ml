@@ -113,6 +113,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       communicate with the application and P2P layers. *)
   type worker_state = {
     gossip_state : GS.state;
+    connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
     p2p_output_stream : p2p_output Stream.t;
     app_output_stream : app_output Stream.t;
@@ -220,9 +221,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
       to that peer for each topic the local peer tracks. *)
-  let handle_new_connection peer = function
+  let handle_new_connection peer ~bootstrap = function
     | state, GS.Peer_already_known -> state
     | state, Peer_added ->
+        let connected_bootstrap_peers =
+          if bootstrap then Peer.Set.add peer state.connected_bootstrap_peers
+          else state.connected_bootstrap_peers
+        in
+        let state = {state with connected_bootstrap_peers} in
         View.(view state.gossip_state |> get_our_topics)
         |> List.iter (fun topic ->
                emit_p2p_message state (Subscribe {topic}) (Seq.return peer)) ;
@@ -233,7 +239,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         connection is closed;
       - [Prune] or [Unsubscribe] are already handled when calling
         {!GS.remove_peer}. *)
-  let handle_disconnection = function state, GS.Removing_peer -> state
+  let handle_disconnection peer = function
+    | state, GS.Removing_peer ->
+        {
+          state with
+          connected_bootstrap_peers =
+            Peer.Set.remove peer state.connected_bootstrap_peers;
+        }
 
   (** When a [Graft] request from a remote peer is received, the worker forwards
       it to the automaton. In certain cases the peer needs to be pruned. Other
@@ -447,12 +459,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ({gossip_state; _} as state) = function
     | New_connection {peer; direct; outbound; bootstrap} ->
-        ignore bootstrap ;
         GS.add_peer {direct; outbound; peer} gossip_state
-        |> update_gossip_state state |> handle_new_connection peer
+        |> update_gossip_state state
+        |> handle_new_connection peer ~bootstrap
     | Disconnection {peer} ->
         GS.remove_peer {peer} gossip_state
-        |> update_gossip_state state |> handle_disconnection
+        |> update_gossip_state state |> handle_disconnection peer
     | In_message {from_peer; p2p_message} ->
         apply_p2p_message state from_peer p2p_message
 
@@ -571,6 +583,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       state =
         {
           gossip_state = GS.make rng limits parameters;
+          connected_bootstrap_peers = Peer.Set.empty;
           events_stream = Stream.empty ();
           p2p_output_stream = Stream.empty ();
           app_output_stream = Stream.empty ();
