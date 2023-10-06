@@ -48,6 +48,7 @@
   Bitset
   Bounded_history_repr
   Context_binary_proof
+  Misbehaviour
   Michelson_v1_primitives
   Slot_repr
   Cycle_repr
@@ -335,6 +336,7 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
+  misbehaviour.ml misbehaviour.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -627,6 +629,7 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
+  misbehaviour.ml misbehaviour.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -903,6 +906,7 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
+  misbehaviour.ml misbehaviour.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
