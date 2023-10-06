@@ -100,10 +100,6 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   in
   let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
   let*? should_forbid, staked = compute_reward_and_burn frozen_deposits in
-  let*! ctxt =
-    if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
-    else Lwt.return ctxt
-  in
   let* unstaked =
     let oldest_slashable_cycle =
       Cycle_repr.sub level.cycle preserved_cycles
@@ -141,6 +137,10 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   in
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
+  in
+  let*! ctxt =
+    if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
+    else Lwt.return ctxt
   in
   return (ctxt, {staked; unstaked})
 
