@@ -10,10 +10,18 @@
 
 # Default runner tags for jobs in the build stage
 .tags_template__build:
-  tags: ["gcp"]
+  tags: []
 
 # Default runner tags for arm64 jobs in the build stage
 .tags_template__build_arm64:
+  tags: ["arm64"]
+
+# Default runner tags for amd64 jobs migrated to gcp gitlab runners
+.tags_template__gcp:
+  tags: ["gcp"]
+
+# Default runner tags for arm64 jobs migrated to gcp gitlab runners
+.tags_template__gcp_arm64:
   tags: ["gcp_arm64"]
 
 # Add variables for bisect_ppx instrumentation

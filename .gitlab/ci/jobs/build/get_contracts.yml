@@ -4,5 +4,6 @@ build_get_contracts:
   extends:
     - .tags_template__build
     - .build_template
+    - .tags_template__gcp
   script:
     - dune build @devtools/get_contracts/check
