@@ -2932,6 +2932,14 @@ let as_opam_monorepo_opam_provided = function
   | Target.Opam_only {can_vendor = false; name; _} -> Some name
   | _ -> None
 
+let dune_depend =
+  {
+    Opam.package = "dune";
+    version = Version.(at_least "3.0" && at_most "3.10");
+    with_test = Never;
+    optional = false;
+  }
+
 let generate_opam ?release for_package (internals : Target.internal list) :
     Opam.t =
   let for_release = release <> None in
@@ -2987,15 +2995,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
         }
         :: depends
   in
-  let depends =
-    {
-      Opam.package = "dune";
-      version = Version.(at_least "3.0" && at_most "3.10");
-      with_test = Never;
-      optional = false;
-    }
-    :: depends
-  in
+  let depends = dune_depend :: depends in
   let depends =
     (* Remove duplicate dependencies but when one occurs twice,
        only keep {with-test} if both dependencies had it. *)
@@ -3829,6 +3829,7 @@ let generate_profiles ~default_profile =
       |> List.map @@ fun (package, version) ->
          {Opam.package; version; with_test = Never; optional = false}
     in
+    let depends = dune_depend :: depends in
     let conflicts =
       String_map.bindings profile_conflicts
       |> List.map @@ fun (package, version) ->
