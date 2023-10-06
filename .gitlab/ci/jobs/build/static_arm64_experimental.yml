@@ -5,6 +5,7 @@ build:static-arm64-linux-binaries:
   extends:
     - .tags_template__build_arm64
     - .build_static_binaries_template
+    - .tags_template__gcp_arm64
   variables:
     ARCH: "arm64"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"

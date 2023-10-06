@@ -16,6 +16,7 @@ build_x86_64-released:
   extends:
     - .tags_template__build
     - .build_x86_64
+    - .tags_template__gcp
   variables:
     EXECUTABLE_FILES: "script-inputs/released-executables"
 
@@ -26,6 +27,7 @@ build_x86_64-exp-dev-extra:
   extends:
     - .tags_template__build
     - .build_x86_64
+    - .tags_template__gcp
   variables:
     EXECUTABLE_FILES: "script-inputs/experimental-executables script-inputs/dev-executables"
     # BUILD_EXTRA contains dune targets that should be built in addition to EXECUTABLE_FILES above.

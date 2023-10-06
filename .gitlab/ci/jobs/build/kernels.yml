@@ -2,6 +2,7 @@ build_kernels:
   extends:
     - .tags_template__build
     - .kernels_template
+    - .tags_template__gcp
   stage: build
   needs: [trigger]
   script:
