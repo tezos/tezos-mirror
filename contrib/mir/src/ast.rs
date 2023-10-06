@@ -88,23 +88,23 @@ impl Type {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Value {
-    NumberValue(i128),
-    BooleanValue(bool),
-    StringValue(String),
-    UnitValue,
-    PairValue(Box<Value>, Box<Value>),
-    OptionValue(Option<Box<Value>>),
+    Number(i128),
+    Boolean(bool),
+    String(String),
+    Unit,
+    Pair(Box<Value>, Box<Value>),
+    Option(Option<Box<Value>>),
     Seq(Vec<Value>),
     Elt(Box<Value>, Box<Value>),
 }
 
 impl Value {
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::PairValue(Box::new(l), Box::new(r))
+        Self::Pair(Box::new(l), Box::new(r))
     }
 
     pub fn new_option(x: Option<Self>) -> Self {
-        Self::OptionValue(x.map(Box::new))
+        Self::Option(x.map(Box::new))
     }
 
     pub fn new_elt(k: Self, v: Self) -> Self {

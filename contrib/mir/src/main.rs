@@ -38,7 +38,7 @@ mod tests {
 
     #[test]
     fn interpret_test_expect_success() {
-        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_SRC).unwrap();
         let ast = typechecker::typecheck(ast, &mut Ctx::default(), &mut stk![Type::Nat]).unwrap();
         let mut istack = stk![TypedValue::Nat(10)];
         assert!(interpreter::interpret(&ast, &mut Ctx::default(), &mut istack).is_ok());
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn interpret_test_gas_consumption() {
-        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_SRC).unwrap();
         let ast = typechecker::typecheck(ast, &mut Ctx::default(), &mut stk![Type::Nat]).unwrap();
         let mut istack = stk![TypedValue::Nat(5)];
         let mut ctx = Ctx::default();
@@ -69,11 +69,13 @@ mod tests {
 
     #[test]
     fn interpret_test_gas_out_of_gas() {
-        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_SRC).unwrap();
         let ast = typechecker::typecheck(ast, &mut Ctx::default(), &mut stk![Type::Nat]).unwrap();
         let mut istack = stk![TypedValue::Nat(5)];
-        let mut ctx = Ctx::default();
-        ctx.gas = Gas::new(1);
+        let mut ctx = Ctx {
+            gas: Gas::new(1),
+            ..Ctx::default()
+        };
         assert_eq!(
             interpreter::interpret(&ast, &mut ctx, &mut istack),
             Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
@@ -82,7 +84,7 @@ mod tests {
 
     #[test]
     fn typecheck_test_expect_success() {
-        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_SRC).unwrap();
         let mut stack = stk![Type::Nat];
         assert!(typechecker::typecheck(ast, &mut Ctx::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![Type::Int]);
@@ -90,7 +92,7 @@ mod tests {
 
     #[test]
     fn typecheck_gas() {
-        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_SRC).unwrap();
         let mut stack = stk![Type::Nat];
         let mut ctx = Ctx::default();
         report_gas(&mut ctx, |ctx| {
@@ -101,10 +103,12 @@ mod tests {
 
     #[test]
     fn typecheck_out_of_gas() {
-        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_SRC).unwrap();
         let mut stack = stk![Type::Nat];
-        let mut ctx = Ctx::default();
-        ctx.gas = Gas::new(1000);
+        let mut ctx = Ctx {
+            gas: Gas::new(1000),
+            ..Ctx::default()
+        };
         assert_eq!(
             typechecker::typecheck(ast, &mut ctx, &mut stack),
             Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
@@ -114,7 +118,7 @@ mod tests {
     #[test]
     fn typecheck_test_expect_fail() {
         use typechecker::{NoMatchingOverloadReason, TcError};
-        let ast = parser::parse(&FIBONACCI_ILLTYPED_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_ILLTYPED_SRC).unwrap();
         let mut stack = stk![Type::Nat];
         assert_eq!(
             typechecker::typecheck(ast, &mut Ctx::default(), &mut stack),
@@ -131,26 +135,26 @@ mod tests {
         use Instruction::*;
         use Value::*;
 
-        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let ast = parser::parse(FIBONACCI_SRC).unwrap();
         // use built in pretty printer to validate the expected AST.
         assert_eq!(
             ast,
             vec![
                 Int,
-                Push((Type::Int, NumberValue(0))),
+                Push((Type::Int, Number(0))),
                 Dup(Some(2)),
                 Gt,
                 If(
                     vec![
-                        Dip(None, vec![Push((Type::Int, NumberValue(-1))), Add(())]),
-                        Push((Type::Int, NumberValue(1))),
+                        Dip(None, vec![Push((Type::Int, Number(-1))), Add(())]),
+                        Push((Type::Int, Number(1))),
                         Dup(Some(3)),
                         Gt,
                         Loop(vec![
                             Swap,
                             Dup(Some(2)),
                             Add(()),
-                            Dip(Some(2), vec![Push((Type::Int, NumberValue(-1))), Add(())]),
+                            Dip(Some(2), vec![Push((Type::Int, Number(-1))), Add(())]),
                             Dup(Some(3)),
                             Gt,
                         ]),
@@ -165,7 +169,7 @@ mod tests {
     #[test]
     fn parser_test_expect_fail() {
         assert_eq!(
-            &parser::parse(&FIBONACCI_MALFORMED_SRC)
+            &parser::parse(FIBONACCI_MALFORMED_SRC)
                 .unwrap_err()
                 .to_string(),
             "Unrecognized token `GT` found at 133:135\nExpected one of \";\" or \"}\""

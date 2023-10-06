@@ -6,6 +6,7 @@
 //****************************************************************************//
 
 #![allow(dead_code, unused_imports)]
+#![allow(clippy::all)]
 
 use crate::ast::*;
 use crate::parser::ParserError;
@@ -114,13 +115,12 @@ boolean: bool = {
   "False" => false,
 }
 
-use Value::*;
 atomic_value: Value = {
-  <n:number> => NumberValue(n),
-  <b:boolean> => BooleanValue(b),
-  <string> => StringValue(<>),
-  "Unit" => UnitValue,
-  "None" => OptionValue(None),
+  <n:number> => Value::Number(n),
+  <b:boolean> => Value::Boolean(b),
+  <string> => Value::String(<>),
+  "Unit" => Value::Unit,
+  "None" => Value::Option(None),
 }
 
 pair_val_args: Value = {

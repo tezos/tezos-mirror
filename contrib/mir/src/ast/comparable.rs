@@ -76,7 +76,7 @@ mod tests {
         assert_cmp!(V::new_pair; Int(3), Nat(5); Int(3), Nat(4); Greater);
 
         // different types don't compare
-        assert!(Bool(true).partial_cmp(&Int(5)) == None);
+        assert_eq!(Bool(true).partial_cmp(&Int(5)), None);
     }
 
     #[test]
