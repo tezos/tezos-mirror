@@ -13,6 +13,7 @@
 ### Bug fixes
 
 - The internal kernel version is now automatically updated at each upgrade. (!10321)
+- Genesis parent hash is 0xff..ff, all parent hashes are now unique. (!00000)
 
 ### Breaking changes
 
