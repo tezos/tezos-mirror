@@ -64,6 +64,10 @@ module Slashed_deposits_history : sig
       at the beginning of the list.
   *)
   val add : Cycle_repr.t -> slashed_percentage -> t -> t
+
+  (** [get cycle history] returns the percentage for [cycle] in [history] or
+      0 if there is no such cycle. *)
+  val get : Cycle_repr.t -> t -> slashed_percentage
 end
 
 module Unstake_request : sig
