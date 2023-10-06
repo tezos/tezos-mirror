@@ -2259,11 +2259,12 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   in
   return (ctxt, contents_result_list)
 
-let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
+let punish_delegate ctxt delegate level misbehaviour mk_result ~payload_producer
+    =
   let open Lwt_result_syntax in
   let rewarded = Contract.Implicit payload_producer.Consensus_key.delegate in
   let+ ctxt, balance_updates =
-    Staking.punish_delegate ctxt delegate level mistake ~rewarded
+    Staking.punish_delegate ctxt delegate level misbehaviour ~rewarded
   in
   (ctxt, Single_result (mk_result balance_updates))
 

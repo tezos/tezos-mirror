@@ -98,10 +98,10 @@ let finalize_unstake ctxt contract =
   let check_unfinalizable ctxt _unfinalizable = return ctxt in
   finalize_unstake_and_check ~check_unfinalizable ctxt contract
 
-let punish_delegate ctxt delegate level mistake ~rewarded =
+let punish_delegate ctxt delegate level misbehaviour ~rewarded =
   let open Lwt_result_syntax in
   let punish =
-    match mistake with
+    match misbehaviour with
     | `Double_baking -> Delegate.punish_double_baking
     | `Double_attesting -> Delegate.punish_double_attesting
   in
