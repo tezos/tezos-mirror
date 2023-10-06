@@ -30,6 +30,7 @@ include:
   - .gitlab/ci/jobs/test/integration_compiler_rejections.yml
   - .gitlab/ci/jobs/test/check_scripts.yml
   - .gitlab/ci/jobs/test/liquidity_baking_scripts-integrity.yml
+  - .gitlab/ci/jobs/test/install_octez.yml
   - .gitlab/ci/jobs/test/tezt.yml
   - .gitlab/ci/jobs/test/tezt_build_long.yml
   - .gitlab/ci/jobs/test/kernels.yml
@@ -42,4 +43,4 @@ include:
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/linkcheck.yml
-  - .gitlab/ci/jobs/doc/tests.yml
+  - .gitlab/ci/jobs/doc/test_install_python.yml
