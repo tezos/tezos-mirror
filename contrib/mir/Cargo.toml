@@ -11,3 +11,7 @@ lalrpop-util = "0.20.0"
 checked = "0.5"
 thiserror = "1.0"
 logos = "0.13"
+
+[[bin]]
+name = "tzt_runner"
+path = "tzt_runner/main.rs"
