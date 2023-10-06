@@ -122,12 +122,18 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** A worker instance is made of its status and state. *)
   type t = {mutable status : worker_status; mutable state : worker_state}
 
-  let send_p2p_output ~emit_p2p_output ~mk_output =
-    let emit to_peer = emit_p2p_output @@ mk_output to_peer in
+  let rev_push stream e = Stream.push e stream
+
+  let emit_p2p_output state = rev_push state.p2p_output_stream
+
+  let emit_app_output state = rev_push state.app_output_stream
+
+  let send_p2p_output state ~mk_output =
+    let emit to_peer = emit_p2p_output state @@ mk_output to_peer in
     Seq.iter emit
 
-  let send_p2p_message ~emit_p2p_output p2p_message =
-    send_p2p_output ~emit_p2p_output ~mk_output:(fun to_peer ->
+  let send_p2p_message state p2p_message =
+    send_p2p_output state ~mk_output:(fun to_peer ->
         Out_message {to_peer; p2p_message})
 
   (** From the worker's perspective, handling publishing a message consists in:
@@ -136,17 +142,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
       Note that it's the responsability of the automaton modules to filter out
       peers based on various criteria (bad score, connection expired, ...). *)
-  let handle_publish_message ~emit_p2p_output publish_message = function
+  let handle_publish_message publish_message = function
     | state, GS.Publish_message {to_publish} ->
         let ({topic; message_id; message} : GS.publish_message) =
           publish_message
         in
         let message_with_header = {message; topic; message_id} in
         let p2p_message = Message_with_header message_with_header in
-        send_p2p_message
-          ~emit_p2p_output
-          p2p_message
-          (Peer.Set.to_seq to_publish) ;
+        send_p2p_message state p2p_message (Peer.Set.to_seq to_publish) ;
         state
     | state, GS.Already_published -> state
 
@@ -157,17 +160,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
       Note that it's the responsability of the automaton modules to filter out
       peers based on various criteria (bad score, connection expired, ...). *)
-  let handle_receive_message ~emit_p2p_output ~emit_app_output received_message
-      = function
+  let handle_receive_message received_message = function
     | state, GS.Route_message {to_route} ->
         let ({sender = _; topic; message_id; message} : GS.receive_message) =
           received_message
         in
         let message_with_header = {message; topic; message_id} in
         let p2p_message = Message_with_header message_with_header in
-        send_p2p_message ~emit_p2p_output p2p_message (Peer.Set.to_seq to_route) ;
+        send_p2p_message state p2p_message (Peer.Set.to_seq to_route) ;
         let has_joined = View.(has_joined topic @@ view state.gossip_state) in
-        if has_joined then emit_app_output message_with_header ;
+        if has_joined then emit_app_output state message_with_header ;
         state
     | state, GS.Already_received
     | state, GS.Not_subscribed
@@ -179,28 +181,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       application layer are:
       - Sending [Subscribe] messages to connected peers with that topic;
       - Sending [Graft] messages to the newly construced topic's mesh. *)
-  let handle_join ~emit_p2p_output topic = function
+  let handle_join topic = function
     | state, GS.Already_joined -> state
     | state, Joining_topic {to_graft} ->
         let peers = View.(view state.gossip_state |> get_connected_peers) in
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
            topic first. *)
-        send_p2p_message
-          ~emit_p2p_output
-          (Subscribe {topic})
-          (List.to_seq peers) ;
-        send_p2p_message
-          ~emit_p2p_output
-          (Graft {topic})
-          (Peer.Set.to_seq to_graft) ;
+        send_p2p_message state (Subscribe {topic}) (List.to_seq peers) ;
+        send_p2p_message state (Graft {topic}) (Peer.Set.to_seq to_graft) ;
         state
 
   (** From the worker's perspective, the outcome of leaving a topic by the
       application layer are:
       - Sending [Prune] messages to the topic's mesh;
       - Sending [Unsubscribe] messages to connected peers. *)
-  let handle_leave ~emit_p2p_output topic = function
+  let handle_leave topic = function
     | state, GS.Not_joined -> state
     | state, Leaving_topic {to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
@@ -219,26 +215,19 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
               in
               Prune {topic; px; backoff}
             in
-            send_p2p_message ~emit_p2p_output prune (Seq.return peer_to_prune))
+            send_p2p_message state prune (Seq.return peer_to_prune))
           to_prune ;
-
-        send_p2p_message
-          ~emit_p2p_output
-          (Unsubscribe {topic})
-          (List.to_seq peers) ;
+        send_p2p_message state (Unsubscribe {topic}) (List.to_seq peers) ;
         state
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
       to that peer for each topic the local peer tracks. *)
-  let handle_new_connection ~emit_p2p_output peer = function
+  let handle_new_connection peer = function
     | state, GS.Peer_already_known -> state
     | state, Peer_added ->
         View.(view state.gossip_state |> get_our_topics)
         |> List.iter (fun topic ->
-               send_p2p_message
-                 ~emit_p2p_output
-                 (Subscribe {topic})
-                 (Seq.return peer)) ;
+               send_p2p_message state (Subscribe {topic}) (Seq.return peer)) ;
         state
 
   (** When a peer is disconnected, the worker has nothing to do, as:
@@ -251,7 +240,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** When a [Graft] request from a remote peer is received, the worker forwards
       it to the automaton. In certain cases the peer needs to be pruned. Other
       than that there is nothing else to do. *)
-  let handle_graft ~emit_p2p_output peer topic (state, output) =
+  let handle_graft peer topic (state, output) =
     let gstate = state.gossip_state in
     let backoff = View.(view gstate |> limits).prune_backoff in
     let do_prune ~do_px =
@@ -268,7 +257,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         in
         Prune {topic; px; backoff}
       in
-      send_p2p_message ~emit_p2p_output prune (Seq.return peer)
+      send_p2p_message state prune (Seq.return peer)
     in
     (* NOTE: if the cases when we send a Prune change, be sure to also update
        the backoffs accordingly in the automaton. *)
@@ -298,13 +287,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       automaton checks whether it is interested is some full messages whose ids
       are given. If so, the worker requests them from the remote peer via an
       [IWant] message. *)
-  let handle_ihave ~emit_p2p_output ({peer; _} : GS.ihave) = function
+  let handle_ihave ({peer; _} : GS.ihave) = function
     | state, GS.Message_requested_message_ids message_ids ->
         if not (List.is_empty message_ids) then
-          send_p2p_message
-            ~emit_p2p_output
-            (IWant {message_ids})
-            (Seq.return peer) ;
+          send_p2p_message state (IWant {message_ids}) (Seq.return peer) ;
         state
     | ( state,
         ( GS.Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
@@ -319,7 +305,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       automaton checks which full messages it can send back (based on message
       availability and on the number of received requests). Selected messages,
       if any, are transmitted to the remote peer via [Message_with_header]. *)
-  let handle_iwant ~emit_p2p_output ({peer; _} : GS.iwant) = function
+  let handle_iwant ({peer; _} : GS.iwant) = function
     | state, GS.On_iwant_messages_to_route {routed_message_ids} ->
         Message_id.Map.iter
           (fun message_id status ->
@@ -332,7 +318,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    Message_id.t). This also applies for Message_with_header and IHave. *)
                 let message_with_header = {message; topic; message_id} in
                 let p2p_message = Message_with_header message_with_header in
-                send_p2p_message ~emit_p2p_output p2p_message (Seq.return peer)
+                send_p2p_message state p2p_message (Seq.return peer)
             | _ -> ())
           routed_message_ids ;
         state
@@ -347,23 +333,23 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       automaton removes that peer from the given topic's mesh. It also filters
       the given collection of alternative peers to connect to. The worker then
       asks the P2P part to connect to those peeers. *)
-  let handle_prune ~emit_p2p_output ~from_peer input_px = function
+  let handle_prune ~from_peer input_px = function
     | ( state,
         ( GS.Prune_topic_not_tracked | Peer_not_in_mesh
         | Ignore_PX_score_too_low _ | No_PX ) ) ->
         send_p2p_output
-          ~emit_p2p_output
+          state
           ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
           input_px ;
         state
     | state, GS.PX peers ->
         send_p2p_output
-          ~emit_p2p_output
+          state
           ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
           (Peer.Set.to_seq peers) ;
         (* Forget peers that were filtered out by the automaton. *)
         send_p2p_output
-          ~emit_p2p_output
+          state
           ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
           (Peer.Set.to_seq @@ Peer.Set.(diff (of_seq input_px) peers)) ;
         state
@@ -374,7 +360,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** On a [Heartbeat] events, the worker sends graft and prune messages
       following the automaton's output. It also sends [IHave] messages (computed
       by the automaton as well). *)
-  let handle_heartheat ~emit_p2p_output = function
+  let handle_heartheat = function
     | state, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
         let iter pmap mk_msg =
@@ -382,10 +368,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             (fun peer topicset ->
               Topic.Set.iter
                 (fun topic ->
-                  send_p2p_message
-                    ~emit_p2p_output
-                    (mk_msg peer topic)
-                    (Seq.return peer))
+                  send_p2p_message state (mk_msg peer topic) (Seq.return peer))
                 topicset)
             pmap
         in
@@ -404,7 +387,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         |> List.iter (fun GS.{peer; topic; message_ids} ->
                if not (List.is_empty message_ids) then
                  send_p2p_message
-                   ~emit_p2p_output
+                   state
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
         state
@@ -413,39 +396,33 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     ({state with gossip_state}, output)
 
   (** Handling application events. *)
-  let apply_app_event ~emit_p2p_output ({gossip_state; _} as state) = function
+  let apply_app_event ({gossip_state; _} as state) = function
     | Publish_message {message; message_id; topic} ->
         let publish_message = GS.{topic; message_id; message} in
         GS.publish_message publish_message gossip_state
         |> update_gossip_state state
-        |> handle_publish_message ~emit_p2p_output publish_message
+        |> handle_publish_message publish_message
     | Join topic ->
         GS.join {topic} gossip_state
-        |> update_gossip_state state
-        |> handle_join ~emit_p2p_output topic
+        |> update_gossip_state state |> handle_join topic
     | Leave topic ->
         GS.leave {topic} gossip_state
-        |> update_gossip_state state
-        |> handle_leave ~emit_p2p_output topic
+        |> update_gossip_state state |> handle_leave topic
 
   (** Handling messages received from the P2P network. *)
-  let apply_p2p_message ~emit_p2p_output ~emit_app_output
-      ({gossip_state; _} as state) from_peer = function
+  let apply_p2p_message ({gossip_state; _} as state) from_peer = function
     | Message_with_header {message; topic; message_id} ->
         let receive_message =
           {GS.sender = from_peer; topic; message_id; message}
         in
         GS.handle_receive_message receive_message gossip_state
         |> update_gossip_state state
-        |> handle_receive_message
-             ~emit_p2p_output
-             ~emit_app_output
-             receive_message
+        |> handle_receive_message receive_message
     | Graft {topic} ->
         let graft : GS.graft = {peer = from_peer; topic} in
         GS.handle_graft graft gossip_state
         |> update_gossip_state state
-        |> handle_graft ~emit_p2p_output from_peer topic
+        |> handle_graft from_peer topic
     | Subscribe {topic} ->
         let subscribe : GS.subscribe = {peer = from_peer; topic} in
         GS.handle_subscribe subscribe gossip_state
@@ -458,45 +435,33 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* The automaton should guarantee that the list is not empty. *)
         let ihave : GS.ihave = {peer = from_peer; topic; message_ids} in
         GS.handle_ihave ihave gossip_state
-        |> update_gossip_state state
-        |> handle_ihave ~emit_p2p_output ihave
+        |> update_gossip_state state |> handle_ihave ihave
     | IWant {message_ids} ->
         (* The automaton should guarantee that the list is not empty. *)
         let iwant : GS.iwant = {peer = from_peer; message_ids} in
         GS.handle_iwant iwant gossip_state
-        |> update_gossip_state state
-        |> handle_iwant ~emit_p2p_output iwant
+        |> update_gossip_state state |> handle_iwant iwant
     | Prune {topic; px; backoff} ->
         let prune : GS.prune = {peer = from_peer; topic; px; backoff} in
         GS.handle_prune prune gossip_state
-        |> update_gossip_state state
-        |> handle_prune ~emit_p2p_output ~from_peer px
+        |> update_gossip_state state |> handle_prune ~from_peer px
 
   (** Handling events received from P2P layer. *)
-  let apply_p2p_event ~emit_p2p_output ~emit_app_output
-      ({gossip_state; _} as state) = function
+  let apply_p2p_event ({gossip_state; _} as state) = function
     | New_connection {peer; direct; outbound; bootstrap} ->
         ignore bootstrap ;
         GS.add_peer {direct; outbound; peer} gossip_state
-        |> update_gossip_state state
-        |> handle_new_connection ~emit_p2p_output peer
+        |> update_gossip_state state |> handle_new_connection peer
     | Disconnection {peer} ->
         GS.remove_peer {peer} gossip_state
         |> update_gossip_state state |> handle_disconnection
     | In_message {from_peer; p2p_message} ->
-        apply_p2p_message
-          ~emit_p2p_output
-          ~emit_app_output
-          state
-          from_peer
-          p2p_message
+        apply_p2p_message state from_peer p2p_message
 
   (** This is the main function of the worker. It interacts with the Gossipsub
       automaton given an event. The function possibly sends messages to the P2P
-      and application layers via the functions [emit_p2p_output] and [emit_app_output]
-      and returns the new automaton's state. *)
-  let apply_event ~emit_p2p_output ~emit_app_output ({gossip_state; _} as state)
-      = function
+      and application layers and returns the new worker's state. *)
+  let apply_event ({gossip_state; _} as state) = function
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5326
 
        Notify the GS worker about the status of messages sent to peers. *)
@@ -506,10 +471,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Do we want to detect cases where two successive [Heartbeat] events
            would be handled (e.g. because the first one is late)? *)
         GS.heartbeat gossip_state |> update_gossip_state state
-        |> handle_heartheat ~emit_p2p_output
-    | P2P_input event ->
-        apply_p2p_event ~emit_p2p_output ~emit_app_output state event
-    | App_input event -> apply_app_event ~emit_p2p_output state event
+        |> handle_heartheat
+    | P2P_input event -> apply_p2p_event state event
+    | App_input event -> apply_app_event state event
 
   (** A helper function that pushes events in the state *)
   let push e {status = _; state} = Stream.push e state.events_stream
@@ -548,9 +512,6 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let event_loop t =
     let open Monad in
     let shutdown = ref false in
-    let rev_push stream e = Stream.push e stream in
-    let emit_p2p_output = rev_push t.state.p2p_output_stream in
-    let emit_app_output = rev_push t.state.app_output_stream in
     let events_stream = t.state.events_stream in
     let events_logging = t.state.events_logging in
     let rec loop t =
@@ -558,7 +519,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       if !shutdown then return ()
       else
         let* () = events_logging event in
-        t.state <- apply_event ~emit_p2p_output ~emit_app_output t.state event ;
+        t.state <- apply_event t.state event ;
         loop t
     in
     let promise = loop t in
