@@ -306,8 +306,9 @@ let update_ema ctxt ~vote =
   let open Constants_storage in
   let+ ctxt, launch_cycle =
     if
-      Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
-        new_ema < adaptive_issuance_launch_ema_threshold ctxt)
+      (not (Constants_storage.adaptive_issuance_activation_vote_enable ctxt))
+      || Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
+           new_ema < adaptive_issuance_launch_ema_threshold ctxt)
     then return (ctxt, launch_cycle)
     else
       match launch_cycle with
