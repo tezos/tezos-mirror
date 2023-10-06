@@ -138,8 +138,22 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
+  let should_forbid_from_history =
+    let current_cycle = (Raw_context.current_level ctxt).cycle in
+    let slashed_this_cycle =
+      Storage.Slashed_deposits_history.get current_cycle slash_history
+    in
+    let slashed_previous_cycle =
+      match Cycle_repr.pred current_cycle with
+      | Some previous_cycle ->
+          Storage.Slashed_deposits_history.get previous_cycle slash_history
+      | None -> 0
+    in
+    Compare.Int.(slashed_this_cycle + slashed_previous_cycle >= 100)
+  in
   let*! ctxt =
-    if should_forbid then Delegate_storage.forbid_delegate ctxt delegate
+    if should_forbid || should_forbid_from_history then
+      Delegate_storage.forbid_delegate ctxt delegate
     else Lwt.return ctxt
   in
   return (ctxt, {staked; unstaked})
