@@ -185,3 +185,10 @@ pub enum Instruction<T: Stage> {
 pub type ParsedAST = Vec<ParsedInstruction>;
 
 pub type TypecheckedAST = Vec<TypecheckedInstruction>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContractScript<T: Stage> {
+    pub parameter: Type,
+    pub storage: Type,
+    pub code: Instruction<T>,
+}
