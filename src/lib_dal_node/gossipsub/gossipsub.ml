@@ -48,22 +48,25 @@ module Transport_layer = struct
     let special_addresses =
       ["0.0.0.0"; "127.0.0.1"; "localhost"; "[::]"; "::1"]
     in
-    fun ~network_name config limits ->
+    fun ~network_name ~public_addr config limits ->
       let advertised_net_addr =
-        Option.filter
-          (fun addr ->
-            not
-              (List.mem
-                 ~equal:String.equal
-                 (P2p_addr.to_string addr)
-                 special_addresses))
-          config.P2p.listening_addr
+        if
+          not
+            (List.mem
+               ~equal:String.equal
+               (P2p_addr.to_string (fst public_addr))
+               special_addresses)
+        then Some (fst public_addr)
+        else None
+      in
+      let advertised_net_port =
+        (* If the public addressed was filtered, take the listening port. *)
+        match advertised_net_addr with
+        | None -> config.P2p.listening_port
+        | Some _ -> Some (snd public_addr)
       in
       let connection_metadata =
-        {
-          Transport_layer_interface.advertised_net_addr;
-          advertised_net_port = config.P2p.listening_port;
-        }
+        {Transport_layer_interface.advertised_net_addr; advertised_net_port}
       in
       P2p.create
         ~config
