@@ -138,12 +138,20 @@ impl TypedValue {
 
 pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
 
+macro_rules! meta_types {
+    ($($i:ident),* $(,)*) => {
+        $(type $i: std::fmt::Debug + PartialEq + Clone;)*
+    };
+}
+
 pub trait Stage {
-    type AddMeta;
-    type PushValue;
-    type NilType;
-    type GetOverload;
-    type UpdateOverload;
+    meta_types! {
+      AddMeta,
+      PushValue,
+      NilType,
+      GetOverload,
+      UpdateOverload,
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
