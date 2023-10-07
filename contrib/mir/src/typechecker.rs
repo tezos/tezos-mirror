@@ -82,9 +82,17 @@ pub fn typecheck(
     ctx: &mut Ctx,
     stack: &mut TypeStack,
 ) -> Result<TypecheckedAST, TcError> {
-    ast.into_iter()
-        .map(|i| typecheck_instruction(i, ctx, stack))
-        .collect()
+    ast.into_iter().map(|i| i.typecheck(ctx, stack)).collect()
+}
+
+impl ParsedInstruction {
+    pub fn typecheck(
+        self,
+        ctx: &mut Ctx,
+        stack: &mut TypeStack,
+    ) -> Result<TypecheckedInstruction, TcError> {
+        typecheck_instruction(self, ctx, stack)
+    }
 }
 
 macro_rules! nothing_to_none {
@@ -414,6 +422,12 @@ fn typecheck_instruction(
         }
         I::Seq(nested) => I::Seq(typecheck(nested, ctx, stack)?),
     })
+}
+
+impl Value {
+    pub fn typecheck(self, ctx: &mut Ctx, t: &Type) -> Result<TypedValue, TcError> {
+        typecheck_value(ctx, t, self)
+    }
 }
 
 fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcError> {

@@ -27,10 +27,16 @@ pub fn interpret(
     stack: &mut IStack,
 ) -> Result<(), InterpretError> {
     for i in ast {
-        interpret_one(i, ctx, stack)?;
+        i.interpret(ctx, stack)?;
     }
     ctx.gas.consume(interpret_cost::INTERPRET_RET)?;
     Ok(())
+}
+
+impl TypecheckedInstruction {
+    fn interpret(&self, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
+        interpret_one(self, ctx, stack)
+    }
 }
 
 fn unreachable_state() -> ! {
