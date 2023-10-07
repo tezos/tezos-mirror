@@ -74,13 +74,27 @@ module Term = struct
     let default_port = Configuration_file.default.listen_addr |> snd in
     let doc =
       Format.asprintf
+        "The TCP address and port at which the socket is bound. If \
+         [public_addr] is not set, this is also the address and port at which \
+         this instance can be reached by other P2P nodes."
+    in
+    Arg.(
+      value
+      & opt (some (p2p_point_arg ~default_port)) None
+      & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
+
+  let public_addr =
+    let open Cmdliner in
+    let default_port = Configuration_file.default.public_addr |> snd in
+    let doc =
+      Format.asprintf
         "The TCP address and port at which this instance can be reached by \
          other P2P nodes."
     in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
+      & info ~docs ~doc ~docv:"ADDR:PORT" ["public-addr"])
 
   let endpoint_arg =
     let open Cmdliner in
@@ -187,8 +201,8 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ endpoint $ metrics_addr $ attester_profile $ producer_profile
-       $ bootstrap_profile $ peers))
+       $ public_addr $ endpoint $ metrics_addr $ attester_profile
+       $ producer_profile $ bootstrap_profile $ peers))
 end
 
 module Run = struct
@@ -246,6 +260,7 @@ type options = {
   rpc_addr : P2p_point.Id.t option;
   expected_pow : float option;
   listen_addr : P2p_point.Id.t option;
+  public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
   profiles : Services.Types.profiles option;
   metrics_addr : P2p_point.Id.t option;
@@ -255,8 +270,8 @@ type options = {
 type t = Run | Config_init
 
 let make ~run =
-  let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
-      metrics_addr attesters producers bootstrap_flag peers =
+  let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
+      endpoint metrics_addr attesters producers bootstrap_flag peers =
     let run profiles =
       run
         subcommand
@@ -265,6 +280,7 @@ let make ~run =
           rpc_addr;
           expected_pow;
           listen_addr;
+          public_addr;
           endpoint;
           profiles;
           metrics_addr;
