@@ -45,6 +45,7 @@ let merge
         rpc_addr;
         expected_pow;
         listen_addr;
+        public_addr;
         endpoint;
         metrics_addr;
         profiles;
@@ -56,6 +57,7 @@ let merge
       data_dir = Option.value ~default:configuration.data_dir data_dir;
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
+      public_addr = Option.value ~default:configuration.public_addr public_addr;
       expected_pow =
         Option.value ~default:configuration.expected_pow expected_pow;
       endpoint = Option.value ~default:configuration.endpoint endpoint;

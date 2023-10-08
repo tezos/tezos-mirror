@@ -103,7 +103,11 @@ module Transport_layer : sig
   (** [create ~network_name config limits] create a new instance of type
       {!t}. It is a wrapper on top of {!P2p.create}. *)
   val create :
-    network_name:string -> P2p.config -> P2p_limits.t -> t tzresult Lwt.t
+    network_name:string ->
+    public_addr:P2p_point.Id.t ->
+    P2p.config ->
+    P2p_limits.t ->
+    t tzresult Lwt.t
 
   (** [activate ?additional_points t] activates the given transport layer [t]. It
       is a wrapper on top of {!P2p.activate}. If some [additional_points] are

@@ -469,8 +469,16 @@ let run ~data_dir configuration_override =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   let*! () = Event.(emit starting_node) () in
-  let* ({network_name; rpc_addr; peers; endpoint; profiles; listen_addr; _} as
-       config) =
+  let* ({
+          network_name;
+          rpc_addr;
+          peers;
+          endpoint;
+          profiles;
+          listen_addr;
+          public_addr;
+          _;
+        } as config) =
     let*! result = Configuration_file.load ~data_dir in
     match result with
     | Ok configuration -> return (configuration_override configuration)
@@ -524,7 +532,11 @@ let run ~data_dir configuration_override =
   let* transport_layer =
     let open Transport_layer_parameters in
     let* p2p_config = p2p_config config in
-    Gossipsub.Transport_layer.create p2p_config p2p_limits ~network_name
+    Gossipsub.Transport_layer.create
+      ~public_addr
+      p2p_config
+      p2p_limits
+      ~network_name
   in
   let* store = Store.init config in
   let cctxt = Rpc_context.make endpoint in
