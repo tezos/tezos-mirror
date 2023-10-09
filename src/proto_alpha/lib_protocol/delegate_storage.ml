@@ -269,6 +269,17 @@ let current_frozen_deposits ctxt delegate =
   let*? total = Tez_repr.(own_frozen +? staked_frozen) in
   return total
 
+let frozen_deposits_limit ctxt delegate =
+  Storage.Contract.Frozen_deposits_limit.find
+    ctxt
+    (Contract_repr.Implicit delegate)
+
+let set_frozen_deposits_limit ctxt delegate limit =
+  Storage.Contract.Frozen_deposits_limit.add_or_remove
+    ctxt
+    (Contract_repr.Implicit delegate)
+    limit
+
 let spendable_balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract

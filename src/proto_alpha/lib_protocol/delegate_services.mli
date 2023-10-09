@@ -58,6 +58,7 @@ type info = {
   current_frozen_deposits : Tez.t;
   frozen_deposits : Tez.t;
   staking_balance : Tez.t;
+  frozen_deposits_limit : Tez.t option;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
   total_delegated_stake : Tez.t;
@@ -110,6 +111,12 @@ val staking_balance :
   'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
+
+val frozen_deposits_limit :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  Tez.t option shell_tzresult Lwt.t
 
 val delegated_contracts :
   'a #RPC_context.simple ->
