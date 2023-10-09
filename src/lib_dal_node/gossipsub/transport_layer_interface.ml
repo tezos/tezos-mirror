@@ -166,18 +166,20 @@ let peer_meta_config : peer_metadata P2p_params.peer_meta_config =
 type connection_metadata = {
   advertised_net_addr : P2p_addr.t option;
   advertised_net_port : int option;
+  is_bootstrap_peer : bool;
 }
 
 let conn_meta_encoding =
   let open Data_encoding in
   (conv
-     (fun {advertised_net_addr; advertised_net_port} ->
-       (advertised_net_addr, advertised_net_port))
-     (fun (advertised_net_addr, advertised_net_port) ->
-       {advertised_net_addr; advertised_net_port}))
-    (obj2
+     (fun {advertised_net_addr; advertised_net_port; is_bootstrap_peer} ->
+       (advertised_net_addr, advertised_net_port, is_bootstrap_peer))
+     (fun (advertised_net_addr, advertised_net_port, is_bootstrap_peer) ->
+       {advertised_net_addr; advertised_net_port; is_bootstrap_peer}))
+    (obj3
        (opt "advertised_net_addr" P2p_addr.encoding)
-       (opt "advertised_net_port" uint16))
+       (opt "advertised_net_port" uint16)
+       (req "is_bootstrap_peer" bool))
 
 let conn_meta_config cfg : connection_metadata P2p_params.conn_meta_config =
   {
