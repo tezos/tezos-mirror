@@ -188,7 +188,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
-    gas_price: U256,
+    block_constant: &BlockConstants,
 ) -> Result<Option<H160>, Error> {
     // The transaction signature is valid.
     let caller = match transaction.caller() {
@@ -219,8 +219,11 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     };
 
     // The sender account balance contains at least the cost.
-    let cost = U256::from(transaction.gas_limit) * gas_price;
-    if balance < cost {
+    let cost = U256::from(transaction.gas_limit).saturating_mul(block_constant.gas_price);
+    // The sender can afford the max gas fee he set, see EIP-1559
+    let max_fee =
+        U256::from(transaction.gas_limit).saturating_mul(transaction.max_fee_per_gas);
+    if balance < cost || balance < max_fee {
         log!(host, Debug, "Transaction status: ERROR_PRE_PAY.");
         return Ok(None);
     }
@@ -228,6 +231,16 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     // The sender does not have code, see EIP3607.
     if code_exists {
         log!(host, Debug, "Transaction status: ERROR_CODE.");
+        return Ok(None);
+    }
+
+    // EIP 1559 checks
+    // ensure that the user was willing to at least pay the base fee
+    // and that max is greater than both fees
+    if transaction.max_fee_per_gas < block_constant.base_fee_per_gas
+        || transaction.max_fee_per_gas < transaction.max_priority_fee_per_gas
+    {
+        log!(host, Debug, "Transaction status: ERROR_MAX_BASE_FEE");
         return Ok(None);
     }
 
@@ -245,7 +258,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         host,
         evm_account_storage,
         transaction,
-        block_constants.gas_price,
+        block_constants,
     )? {
         Some(caller) => caller,
         None => return Ok(None),
@@ -445,5 +458,49 @@ pub fn apply_transaction<Host: Runtime>(
             Ok(Some((receipt_info, object_info)))
         }
         None => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use primitive_types::{H160, U256};
+    use tezos_ethereum::{
+        transaction::{TransactionType, TRANSACTION_HASH_SIZE},
+        tx_common::EthereumTransactionCommon,
+    };
+
+    use crate::inbox::{Transaction, TransactionContent};
+
+    use super::make_object_info;
+
+    #[test]
+    // when the user specify a max fee per gas lower than base fee,
+    // the function should fail gracefully
+    fn test_no_underflow_make_object_tx() {
+        let transaction = Transaction {
+            tx_hash: [0u8; TRANSACTION_HASH_SIZE],
+            content: TransactionContent::Ethereum(EthereumTransactionCommon {
+                type_: TransactionType::Eip1559,
+                chain_id: U256::from(1),
+                nonce: U256::from(1),
+                max_priority_fee_per_gas: U256::zero(),
+                max_fee_per_gas: U256::from(1),
+                gas_limit: 21000,
+                to: Some(H160::zero()),
+                value: U256::zero(),
+                data: vec![],
+                access_list: vec![],
+                signature: None,
+            }),
+        };
+
+        let obj = make_object_info(
+            &transaction,
+            H160::zero(),
+            0u32,
+            U256::from(21_000),
+            U256::from(9),
+        );
+        assert!(obj.is_err())
     }
 }

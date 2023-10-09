@@ -166,12 +166,14 @@ struct TxValidation {
     transaction: EthereumTransactionCommon,
 }
 
+#[derive(Debug, PartialEq)]
 enum TxValidationOutcome {
     Valid(H160),
     NonceTooLow,
     NotCorrectSignature,
     InvalidChainId,
     GasLimitTooHigh,
+    MaxGasFeeTooLow,
 }
 
 impl TxValidation {
@@ -192,6 +194,7 @@ impl TxValidation {
             Some(account) => account.nonce(host)?,
             None => U256::zero(),
         };
+        let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
         // Get the chain_id
         let chain_id = storage::read_chain_id(host)?;
         // Check if nonce is too low
@@ -206,6 +209,14 @@ impl TxValidation {
         if tx.gas_limit > MAX_TRANSACTION_GAS_LIMIT {
             return Ok(TxValidationOutcome::GasLimitTooHigh);
         }
+        // Check if the gas price is high enough
+        if tx.max_fee_per_gas < base_fee_per_gas
+            || tx.max_fee_per_gas < tx.max_priority_fee_per_gas
+        {
+            return Ok(TxValidationOutcome::MaxGasFeeTooLow);
+        }
+        // TODO: #6498
+        // check PRE_PAY condition
         Ok(TxValidationOutcome::Valid(caller))
     }
 }
@@ -371,6 +382,10 @@ fn store_tx_validation_outcome<Host: Runtime>(
         TxValidationOutcome::GasLimitTooHigh => {
             storage::store_simulation_status(host, false)?;
             storage::store_simulation_result(host, Some(b"Gas limit too high.".to_vec()))
+        }
+        TxValidationOutcome::MaxGasFeeTooLow => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(host, Some(b"Max gas fee too low.".to_vec()))
         }
     }
 }
@@ -780,5 +795,54 @@ mod tests {
             parsed,
             "should have been parsed as complete tx validation"
         );
+    }
+
+    fn address_from_str(s: &str) -> Option<H160> {
+        let data = &hex::decode(s).unwrap();
+        Some(H160::from_slice(data))
+    }
+
+    #[test]
+    fn test_tx_validation_gas_price() {
+        let mut host = MockHost::default();
+
+        let transaction = EthereumTransactionCommon {
+            type_: TransactionType::Eip1559,
+            chain_id: U256::from(1),
+            nonce: U256::from(0),
+            max_priority_fee_per_gas: U256::zero(),
+            max_fee_per_gas: U256::from(1),
+            gas_limit: 21000,
+            to: Some(H160::zero()),
+            value: U256::zero(),
+            data: vec![],
+            access_list: vec![],
+            signature: None,
+        };
+        let signed = transaction
+            .sign_transaction(
+                "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158"
+                    .to_string(),
+            )
+            .unwrap();
+        let simulation = TxValidation {
+            transaction: signed,
+        };
+        storage::store_chain_id(&mut host, U256::from(1))
+            .expect("should be able to store a chain id");
+        let evm_account_storage = account_storage::init_account_storage().unwrap();
+        let _account = evm_account_storage
+            .get_or_create(
+                &host,
+                &account_storage::account_path(
+                    &address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let result = simulation.run(&mut host);
+        assert!(result.is_ok());
+        assert_eq!(TxValidationOutcome::MaxGasFeeTooLow, result.unwrap());
     }
 }
