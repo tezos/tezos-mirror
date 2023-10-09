@@ -39,8 +39,7 @@ val node_is_ready : unit t
 
 val data_dir_not_found : string t
 
-val failed_to_persist_profiles :
-  (Services.Types.profiles * Error_monad.tztrace) t
+val failed_to_persist_profiles : (Types.profiles * Error_monad.tztrace) t
 
 val fetched_slot : (int * int) t
 
@@ -66,7 +65,7 @@ val stored_slot_content : Cryptobox.Commitment.t t
 
 val stored_slot_shard : (Cryptobox.Commitment.t * int) t
 
-val decoding_data_failed : Types.kind t
+val decoding_data_failed : Types.Store.kind t
 
 val loading_shard_data_failed : string t
 

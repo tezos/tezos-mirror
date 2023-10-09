@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Types = Tezos_dal_node_services.Types
+
 module Term = struct
   let p2p_point_arg ~default_port =
     let open Cmdliner in
@@ -114,7 +116,7 @@ module Term = struct
       & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
 
   let operator_profile_printer fmt = function
-    | Services.Types.Attester pkh ->
+    | Types.Attester pkh ->
         Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
     | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
 
@@ -123,7 +125,7 @@ module Term = struct
     let decoder string =
       match Signature.Public_key_hash.of_b58check_opt string with
       | None -> Error (`Msg "Unrecognized profile")
-      | Some pkh -> Services.Types.Attester pkh |> Result.ok
+      | Some pkh -> Types.Attester pkh |> Result.ok
     in
     Arg.conv (decoder, operator_profile_printer)
 
@@ -140,7 +142,7 @@ module Term = struct
       match int_of_string_opt string with
       | None -> error ()
       | Some i when i < 0 -> error ()
-      | Some slot_index -> Services.Types.Producer {slot_index} |> Result.ok
+      | Some slot_index -> Types.Producer {slot_index} |> Result.ok
     in
     Arg.conv (decoder, operator_profile_printer)
 
@@ -262,7 +264,7 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  profiles : Services.Types.profiles option;
+  profiles : Types.profiles option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
 }
@@ -289,7 +291,7 @@ let make ~run =
     in
     match (bootstrap_flag, attesters @ producers) with
     | false, [] -> run None
-    | true, [] -> run @@ Some Services.Types.Bootstrap
+    | true, [] -> run @@ Some Types.Bootstrap
     | false, operator_profiles -> run @@ Some (Operator operator_profiles)
     | true, _ :: _ ->
         `Error

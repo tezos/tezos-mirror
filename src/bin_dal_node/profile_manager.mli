@@ -42,7 +42,7 @@ val add_operator_profiles :
   t ->
   Dal_plugin.proto_parameters ->
   Gossipsub.Worker.t ->
-  Services.Types.operator_profiles ->
+  Types.operator_profiles ->
   t option
 
 (** Checks that each producer profile only refers to slot indexes strictly
@@ -61,7 +61,7 @@ val on_new_head :
   unit
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
-val get_profiles : t -> Services.Types.profiles
+val get_profiles : t -> Types.profiles
 
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :
@@ -69,5 +69,4 @@ val get_attestable_slots :
   Store.node_store ->
   Dal_plugin.proto_parameters ->
   attested_level:int32 ->
-  (Services.Types.attestable_slots, [Errors.decoding | Errors.other]) result
-  Lwt.t
+  (Types.attestable_slots, [Errors.decoding | Errors.other]) result Lwt.t

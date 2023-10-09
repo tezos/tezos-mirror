@@ -26,7 +26,7 @@
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
    Improve profile configuration UX for when we have conflicting CLI and config file. *)
 let merge_profiles ~from_config_file ~from_cli =
-  let open Services.Types in
+  let open Types in
   match from_cli with
   | None -> from_config_file
   | Some from_cli -> (

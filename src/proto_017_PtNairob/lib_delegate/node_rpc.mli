@@ -89,4 +89,4 @@ val get_attestable_slots :
   Tezos_rpc.Context.generic ->
   public_key_hash ->
   level:int32 ->
-  Tezos_dal_node_services.Services.Types.attestable_slots tzresult Lwt.t
+  Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t

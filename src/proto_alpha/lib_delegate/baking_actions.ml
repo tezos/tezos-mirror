@@ -740,8 +740,7 @@ let get_dal_attestations state =
                 return acc
             | Ok res -> (
                 match res with
-                | Tezos_dal_node_services.Services.Types.Not_in_committee ->
-                    return acc
+                | Tezos_dal_node_services.Types.Not_in_committee -> return acc
                 | Attestable_slots {slots = attestation; published_level} ->
                     if List.exists Fun.id attestation then
                       return

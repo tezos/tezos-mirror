@@ -36,7 +36,7 @@ type t = {
   network_name : string;
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t;
-  profiles : Services.Types.profiles;
+  profiles : Types.profiles;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -211,7 +211,7 @@ let encoding : t Data_encoding.t =
           (dft
              "profiles"
              ~description:"The Octez DAL node profiles"
-             Services.Types.profiles_encoding
+             Types.profiles_encoding
              (Operator []))))
 
 type error += DAL_node_unable_to_write_configuration_file of string

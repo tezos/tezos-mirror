@@ -74,7 +74,7 @@ let failed_to_persist_profiles =
     ~name:"failed_to_persist_profiles"
     ~msg:"failed to persist the profiles to the config file"
     ~level:Error
-    ("profiles", Services.Types.profiles_encoding)
+    ("profiles", Types.profiles_encoding)
     ("error", Error_monad.trace_encoding)
 
 let fetched_slot =
@@ -188,7 +188,7 @@ let decoding_data_failed =
     ~name:"decoding_failed"
     ~msg:"error while decoding a {data_kind} value"
     ~level:Warning
-    ("data_kind", Types.kind_encoding)
+    ("data_kind", Types.Store.encoding)
 
 let loading_shard_data_failed =
   declare_1
