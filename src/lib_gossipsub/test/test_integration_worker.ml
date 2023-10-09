@@ -201,7 +201,9 @@ let test_worker_connect_and_graft rng limits parameters =
   let* () =
     Worker.(
       step
-        (In_p2p (New_connection {peer; direct = false; outbound = true}))
+        (In_p2p
+           (New_connection
+              {peer; direct = false; outbound = true; bootstrap = false}))
         [Out_p2p (Out_message {to_peer; p2p_message = Subscribe {topic}})])
   in
 
@@ -210,7 +212,9 @@ let test_worker_connect_and_graft rng limits parameters =
   let* () =
     Worker.(
       step
-        (In_p2p (New_connection {peer = peer'; direct = false; outbound = true}))
+        (In_p2p
+           (New_connection
+              {peer = peer'; direct = false; outbound = true; bootstrap = false}))
         [
           Out_p2p
             (Out_message {to_peer = peer'; p2p_message = Subscribe {topic}});

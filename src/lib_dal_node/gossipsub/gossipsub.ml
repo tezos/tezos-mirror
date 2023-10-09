@@ -48,7 +48,7 @@ module Transport_layer = struct
     let special_addresses =
       ["0.0.0.0"; "127.0.0.1"; "localhost"; "[::]"; "::1"]
     in
-    fun ~network_name ~public_addr config limits ->
+    fun ~network_name ~public_addr ~is_bootstrap_peer config limits ->
       let advertised_net_addr =
         if
           not
@@ -66,7 +66,11 @@ module Transport_layer = struct
         | Some _ -> Some (snd public_addr)
       in
       let connection_metadata =
-        {Transport_layer_interface.advertised_net_addr; advertised_net_port}
+        {
+          Transport_layer_interface.advertised_net_addr;
+          advertised_net_port;
+          is_bootstrap_peer;
+        }
       in
       P2p.create
         ~config

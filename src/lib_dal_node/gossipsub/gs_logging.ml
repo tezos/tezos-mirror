@@ -75,17 +75,18 @@ module Events = struct
       ("topic", topic_encoding)
 
   let new_connection =
-    declare_3
+    declare_4
       ~section
       ~name:(prefix "new_connection")
       ~msg:
         "Process New_connection from/to {peer} (direct={direct}, \
-         outbound={outbound})"
+         outbound={outbound}, bootstrap={bootstrap})"
       ~level:Notice
       ~pp1:P2p_peer.Id.pp
       ("peer", P2p_peer.Id.encoding)
       ("direct", bool)
       ("outbound", bool)
+      ("bootstrap", bool)
 
   let disconnection =
     declare_1
@@ -197,8 +198,8 @@ let event =
       | Leave topic -> emit leave topic)
   | P2P_input event -> (
       match event with
-      | New_connection {peer; direct; outbound} ->
-          emit new_connection (peer, direct, outbound)
+      | New_connection {peer; direct; outbound; bootstrap} ->
+          emit new_connection (peer, direct, outbound, bootstrap)
       | Disconnection {peer} -> emit disconnection peer
       | In_message {from_peer; p2p_message} -> (
           match p2p_message with

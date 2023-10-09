@@ -534,6 +534,7 @@ let run ~data_dir configuration_override =
     let* p2p_config = p2p_config config in
     Gossipsub.Transport_layer.create
       ~public_addr
+      ~is_bootstrap_peer:(profiles = Services.Types.Bootstrap)
       p2p_config
       p2p_limits
       ~network_name

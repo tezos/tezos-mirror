@@ -100,11 +100,13 @@ module Transport_layer : sig
 
   type t
 
-  (** [create ~network_name config limits] create a new instance of type
-      {!t}. It is a wrapper on top of {!P2p.create}. *)
+  (** [create ~network_name ~is_bootstrap_peer ~public_addr config limits]
+      creates a new instance of type {!t}. It is a wrapper on top of
+      {!P2p.create}. *)
   val create :
     network_name:string ->
     public_addr:P2p_point.Id.t ->
+    is_bootstrap_peer:bool ->
     P2p.config ->
     P2p_limits.t ->
     t tzresult Lwt.t

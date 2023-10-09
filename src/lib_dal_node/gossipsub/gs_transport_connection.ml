@@ -149,6 +149,9 @@ let new_connections_handler gs_worker p2p_layer peer conn =
   let P2p_connection.Info.{incoming; id_point = addr, port_opt; _} =
     P2p.connection_info p2p_layer conn
   in
+  let {Transport_layer_interface.is_bootstrap_peer = bootstrap; _} =
+    P2p.connection_remote_metadata p2p_layer conn
+  in
   let pool_opt = P2p.pool p2p_layer in
   let fold_pool_opt f arg =
     Option.fold
@@ -166,7 +169,8 @@ let new_connections_handler gs_worker p2p_layer peer conn =
 
      Add the ability to have direct peers. *)
   let direct = false in
-  Worker.(New_connection {peer; direct; outbound} |> p2p_input gs_worker)
+  Worker.(
+    New_connection {peer; direct; outbound; bootstrap} |> p2p_input gs_worker)
 
 (** This handler forwards information about P2P disconnections to the Gossipsub
     worker. *)
@@ -184,11 +188,14 @@ let px_of_peer p2p_layer peer =
   let open Transport_layer_interface in
   let* conn = P2p.find_connection_by_peer_id p2p_layer peer in
   (* In general, people either provide an address and a port, or just a port.
-     In any case, we use `P2p.connection_remote_metadata` to get the address and the port of the provided values, and we fall back to the values given by `P2p.connection_info` if the former are not available (respectively/independently for the address and the port).
-     The first case is covered by {!P2p.connection_remote_metadata}. But if the
-     IP address is not explicitly given, we rely on the function
-     {!P2p.connection_info p2p_layer conn}. *)
-  let {advertised_net_addr; advertised_net_port} =
+     In any case, we use `P2p.connection_remote_metadata` to get the address and
+     the port of the provided values, and we fall back to the values given by
+     `P2p.connection_info` if the former are not available
+     (respectively/independently for the address and the port).  The first case
+     is covered by {!P2p.connection_remote_metadata}. But if the IP address is
+     not explicitly given, we rely on the function {!P2p.connection_info
+     p2p_layer conn}. *)
+  let {advertised_net_addr; advertised_net_port; is_bootstrap_peer = _} =
     P2p.connection_remote_metadata p2p_layer conn
   in
   let {P2p_connection.Info.id_point = conn_addr, conn_port_opt; _} =
