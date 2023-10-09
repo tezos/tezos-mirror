@@ -10,19 +10,19 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model sc_rollup/Sc_rollup_deserialize_output_proof_benchmark *)
-(* fun size -> 7100. + (6. * size) *)
+(* fun size -> max 10 (7100. + (6. * size)) *)
 let cost_Sc_rollup_deserialize_output_proof_benchmark size =
   let size = S.safe_int size in
   (size * S.safe_int 6) + S.safe_int 7100
 
 (* model sc_rollup/Sc_rollup_install_boot_sector_benchmark *)
-(* fun size -> 13550. + (3.5 * size) *)
+(* fun size -> max 10 (13550. + (3.5 * size)) *)
 let cost_Sc_rollup_install_boot_sector_benchmark size =
   let size = S.safe_int size in
   (size lsr 1) + (size * S.safe_int 3) + S.safe_int 13550
 
 (* model sc_rollup/Sc_rollup_verify_output_proof_benchmark *)
-(* fun size -> 103450. + (7. * size) *)
+(* fun size -> max 10 (103450. + (7. * size)) *)
 let cost_Sc_rollup_verify_output_proof_benchmark size =
   let size = S.safe_int size in
   (size * S.safe_int 7) + S.safe_int 103450

@@ -10,7 +10,7 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model cache/CACHE_UPDATE *)
-(* fun size -> 600. + (43. * (log2 (1 + size))) *)
+(* fun size -> max 10 (600. + (43. * (log2 (1 + size)))) *)
 let cost_CACHE_UPDATE size =
   let size = S.safe_int size in
   (log2 (size + S.safe_int 1) * S.safe_int 43) + S.safe_int 600

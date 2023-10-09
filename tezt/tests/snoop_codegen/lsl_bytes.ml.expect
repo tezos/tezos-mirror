@@ -10,18 +10,19 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model builtin/timer_model *)
-(* 0. *)
-let cost_timer_model = S.safe_int 0
+(* max 10 0. *)
+let cost_timer_model = S.safe_int 10
 
 (* model interpreter/N_IHalt *)
-(* 13.4367670271 *)
+(* max 10 13.4367670271 *)
 let cost_N_IHalt = S.safe_int 15
 
 (* model interpreter/N_ILsl_bytes *)
 (* fun size1 ->
      fun size2 ->
-       (68.5632329729 + (0.118615666787 * size1)) +
-         (0.00495349620101 * (sub size2 1)) *)
+       max 10
+         ((68.5632329729 + (0.118615666787 * size1)) +
+            (0.00495349620101 * (sub size2 1))) *)
 let cost_N_ILsl_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -30,11 +31,11 @@ let cost_N_ILsl_bytes size1 size2 =
   + (size1 lsr 6) + (size1 lsr 7) + (size1 lsr 9) + S.safe_int 70
 
 (* model interpreter/amplification_loop_model *)
-(* fun size -> 0.318599639559 * size *)
+(* fun size -> max 10 (0.318599639559 * size) *)
 let cost_amplification_loop_model size =
   let size = S.safe_int size in
-  (size lsr 2) + (size lsr 4) + (size lsr 7)
+  S.max (S.safe_int 10) ((size lsr 2) + (size lsr 4) + (size lsr 7))
 
 (* model zero *)
-(* 0 *)
-let cost_zero = S.safe_int 0
+(* max 10 0 *)
+let cost_zero = S.safe_int 10

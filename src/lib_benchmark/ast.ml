@@ -860,9 +860,16 @@ module Optimize =
        struct
          open Ast
 
-         (* [at_least_10] is not really an optimization, but we include it here.
-            It will be enabled once [Ast] module is merged.
-         *)
-         let transform t =
-           cse @@ optimize_affine @@ subst_let (* @@ at_least_10 *) t
+         let transform t = cse @@ optimize_affine @@ subst_let t
+       end)
+
+module At_least_10 =
+  Transform
+    (functor
+       (Ast : S)
+       ->
+       struct
+         open Ast
+
+         let transform = at_least_10
        end)

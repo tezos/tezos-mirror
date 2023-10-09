@@ -424,6 +424,7 @@ let codegen (Model.Model model) (sol : solution)
     let ( ++ ) = compose in
     let ((module Transform) : transform) =
       (module Beta_normalize)
+      ++ (module Ast.At_least_10)
       ++ (module Subst (struct
            let subst = subst
          end))
@@ -442,6 +443,7 @@ let codegen (Model.Model model) (sol : solution)
     let ( ++ ) = compose in
     let ((module Transform) : transform) =
       (module Ast.Optimize)
+      ++ (module Ast.At_least_10)
       ++ (module Let_lift)
       ++ transform
       ++ (module Subst (struct

@@ -10,290 +10,290 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model encoding/B58CHECK_DECODING_CHAIN_ID *)
-(* 1600. *)
+(* max 10 1600. *)
 let cost_B58CHECK_DECODING_CHAIN_ID = S.safe_int 1600
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_bls *)
-(* 3600. *)
+(* max 10 3600. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 3600
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 *)
-(* 3300. *)
+(* max 10 3300. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 3300
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 *)
-(* 3300. *)
+(* max 10 3300. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 = S.safe_int 3300
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 *)
-(* 3300. *)
+(* max 10 3300. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 3300
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_bls *)
-(* 79000. *)
+(* max 10 79000. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_bls = S.safe_int 79000
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_ed25519 *)
-(* 4200. *)
+(* max 10 4200. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 4200
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_p256 *)
-(* 13450. *)
+(* max 10 13450. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = S.safe_int 13450
 
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_secp256k1 *)
-(* 9000. *)
+(* max 10 9000. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1 = S.safe_int 9000
 
 (* model encoding/B58CHECK_DECODING_SIGNATURE_bls *)
-(* 6400. *)
+(* max 10 6400. *)
 let cost_B58CHECK_DECODING_SIGNATURE_bls = S.safe_int 6400
 
 (* model encoding/B58CHECK_DECODING_SIGNATURE_ed25519 *)
-(* 6400. *)
+(* max 10 6400. *)
 let cost_B58CHECK_DECODING_SIGNATURE_ed25519 = S.safe_int 6400
 
 (* model encoding/B58CHECK_DECODING_SIGNATURE_p256 *)
-(* 6400. *)
+(* max 10 6400. *)
 let cost_B58CHECK_DECODING_SIGNATURE_p256 = S.safe_int 6400
 
 (* model encoding/B58CHECK_DECODING_SIGNATURE_secp256k1 *)
-(* 6400. *)
+(* max 10 6400. *)
 let cost_B58CHECK_DECODING_SIGNATURE_secp256k1 = S.safe_int 6400
 
 (* model encoding/B58CHECK_ENCODING_CHAIN_ID *)
-(* 1800. *)
+(* max 10 1800. *)
 let cost_B58CHECK_ENCODING_CHAIN_ID = S.safe_int 1800
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls *)
-(* 3200. *)
+(* max 10 3200. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls = S.safe_int 3200
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 *)
-(* 3200. *)
+(* max 10 3200. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 3200
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 *)
-(* 3200. *)
+(* max 10 3200. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 = S.safe_int 3200
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
-(* 3200. *)
+(* max 10 3200. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 3200
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_bls *)
-(* 5900. *)
+(* max 10 5900. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_bls = S.safe_int 5900
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_ed25519 *)
-(* 4500. *)
+(* max 10 4500. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 4500
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_p256 *)
-(* 4550. *)
+(* max 10 4550. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_p256 = S.safe_int 4550
 
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 *)
-(* 4950. *)
+(* max 10 4950. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 = S.safe_int 4950
 
 (* model encoding/B58CHECK_ENCODING_SIGNATURE_bls *)
-(* 8300. *)
+(* max 10 8300. *)
 let cost_B58CHECK_ENCODING_SIGNATURE_bls = S.safe_int 8300
 
 (* model encoding/B58CHECK_ENCODING_SIGNATURE_ed25519 *)
-(* 8300. *)
+(* max 10 8300. *)
 let cost_B58CHECK_ENCODING_SIGNATURE_ed25519 = S.safe_int 8300
 
 (* model encoding/B58CHECK_ENCODING_SIGNATURE_p256 *)
-(* 8300. *)
+(* max 10 8300. *)
 let cost_B58CHECK_ENCODING_SIGNATURE_p256 = S.safe_int 8300
 
 (* model encoding/B58CHECK_ENCODING_SIGNATURE_secp256k1 *)
-(* 8300. *)
+(* max 10 8300. *)
 let cost_B58CHECK_ENCODING_SIGNATURE_secp256k1 = S.safe_int 8300
 
 (* model encoding/BLS_FR_FROM_Z *)
-(* 178.443333333 *)
+(* max 10 178.443333333 *)
 let cost_BLS_FR_FROM_Z = S.safe_int 180
 
 (* model encoding/BLS_FR_TO_Z *)
-(* 82.8933333333 *)
+(* max 10 82.8933333333 *)
 let cost_BLS_FR_TO_Z = S.safe_int 85
 
 (* model encoding/CHECK_PRINTABLE *)
-(* fun size -> 14. + (10. * size) *)
+(* fun size -> max 10 (14. + (10. * size)) *)
 let cost_CHECK_PRINTABLE size =
   let size = S.safe_int size in
   (size * S.safe_int 10) + S.safe_int 15
 
 (* model encoding/DECODING_BLS_FR *)
-(* 120. *)
+(* max 10 120. *)
 let cost_DECODING_BLS_FR = S.safe_int 120
 
 (* model encoding/DECODING_BLS_G1 *)
-(* 54600. *)
+(* max 10 54600. *)
 let cost_DECODING_BLS_G1 = S.safe_int 54600
 
 (* model encoding/DECODING_BLS_G2 *)
-(* 69000. *)
+(* max 10 69000. *)
 let cost_DECODING_BLS_G2 = S.safe_int 69000
 
 (* model encoding/DECODING_CHAIN_ID *)
-(* 50. *)
+(* max 10 50. *)
 let cost_DECODING_CHAIN_ID = S.safe_int 50
 
 (* model encoding/DECODING_Chest *)
-(* fun size -> 3750. + (0.03125 * size) *)
+(* fun size -> max 10 (3750. + (0.03125 * size)) *)
 let cost_DECODING_Chest size =
   let size = S.safe_int size in
   (size lsr 5) + S.safe_int 3750
 
 (* model encoding/DECODING_Chest_key *)
-(* 9550. *)
+(* max 10 9550. *)
 let cost_DECODING_Chest_key = S.safe_int 9550
 
 (* model encoding/DECODING_PUBLIC_KEY_HASH_bls *)
-(* 60. *)
+(* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 60
 
 (* model encoding/DECODING_PUBLIC_KEY_HASH_ed25519 *)
-(* 60. *)
+(* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 60
 
 (* model encoding/DECODING_PUBLIC_KEY_HASH_p256 *)
-(* 60. *)
+(* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_HASH_p256 = S.safe_int 60
 
 (* model encoding/DECODING_PUBLIC_KEY_HASH_secp256k1 *)
-(* 60. *)
+(* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 60
 
 (* model encoding/DECODING_PUBLIC_KEY_bls *)
-(* 74000. *)
+(* max 10 74000. *)
 let cost_DECODING_PUBLIC_KEY_bls = S.safe_int 74000
 
 (* model encoding/DECODING_PUBLIC_KEY_ed25519 *)
-(* 60. *)
+(* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 60
 
 (* model encoding/DECODING_PUBLIC_KEY_p256 *)
-(* 9550. *)
+(* max 10 9550. *)
 let cost_DECODING_PUBLIC_KEY_p256 = S.safe_int 9550
 
 (* model encoding/DECODING_PUBLIC_KEY_secp256k1 *)
-(* 4900. *)
+(* max 10 4900. *)
 let cost_DECODING_PUBLIC_KEY_secp256k1 = S.safe_int 4900
 
 (* model encoding/DECODING_SIGNATURE_bls *)
-(* 40. *)
+(* max 10 40. *)
 let cost_DECODING_SIGNATURE_bls = S.safe_int 40
 
 (* model encoding/DECODING_SIGNATURE_ed25519 *)
-(* 35. *)
+(* max 10 35. *)
 let cost_DECODING_SIGNATURE_ed25519 = S.safe_int 35
 
 (* model encoding/DECODING_SIGNATURE_p256 *)
-(* 35. *)
+(* max 10 35. *)
 let cost_DECODING_SIGNATURE_p256 = S.safe_int 35
 
 (* model encoding/DECODING_SIGNATURE_secp256k1 *)
-(* 35. *)
+(* max 10 35. *)
 let cost_DECODING_SIGNATURE_secp256k1 = S.safe_int 35
 
 (* model encoding/ENCODING_BLS_FR *)
-(* 80. *)
+(* max 10 80. *)
 let cost_ENCODING_BLS_FR = S.safe_int 80
 
 (* model encoding/ENCODING_BLS_G1 *)
-(* 3200. *)
+(* max 10 3200. *)
 let cost_ENCODING_BLS_G1 = S.safe_int 3200
 
 (* model encoding/ENCODING_BLS_G2 *)
-(* 3900. *)
+(* max 10 3900. *)
 let cost_ENCODING_BLS_G2 = S.safe_int 3900
 
 (* model encoding/ENCODING_CHAIN_ID *)
-(* 50. *)
+(* max 10 50. *)
 let cost_ENCODING_CHAIN_ID = S.safe_int 50
 
 (* model encoding/ENCODING_Chest *)
-(* fun size -> 6250. + (0.09375 * size) *)
+(* fun size -> max 10 (6250. + (0.09375 * size)) *)
 let cost_ENCODING_Chest size =
   let size = S.safe_int size in
   (size lsr 4) + (size lsr 5) + S.safe_int 6250
 
 (* model encoding/ENCODING_Chest_key *)
-(* 15900. *)
+(* max 10 15900. *)
 let cost_ENCODING_Chest_key = S.safe_int 15900
 
 (* model encoding/ENCODING_PUBLIC_KEY_HASH_bls *)
-(* 80. *)
+(* max 10 80. *)
 let cost_ENCODING_PUBLIC_KEY_HASH_bls = S.safe_int 80
 
 (* model encoding/ENCODING_PUBLIC_KEY_HASH_ed25519 *)
-(* 70. *)
+(* max 10 70. *)
 let cost_ENCODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 70
 
 (* model encoding/ENCODING_PUBLIC_KEY_HASH_p256 *)
-(* 70. *)
+(* max 10 70. *)
 let cost_ENCODING_PUBLIC_KEY_HASH_p256 = S.safe_int 70
 
 (* model encoding/ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
-(* 70. *)
+(* max 10 70. *)
 let cost_ENCODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 70
 
 (* model encoding/ENCODING_PUBLIC_KEY_bls *)
-(* 90. *)
+(* max 10 90. *)
 let cost_ENCODING_PUBLIC_KEY_bls = S.safe_int 90
 
 (* model encoding/ENCODING_PUBLIC_KEY_ed25519 *)
-(* 80. *)
+(* max 10 80. *)
 let cost_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 80
 
 (* model encoding/ENCODING_PUBLIC_KEY_p256 *)
-(* 90. *)
+(* max 10 90. *)
 let cost_ENCODING_PUBLIC_KEY_p256 = S.safe_int 90
 
 (* model encoding/ENCODING_PUBLIC_KEY_secp256k1 *)
-(* 455. *)
+(* max 10 455. *)
 let cost_ENCODING_PUBLIC_KEY_secp256k1 = S.safe_int 455
 
 (* model encoding/ENCODING_SIGNATURE_bls *)
-(* 55. *)
+(* max 10 55. *)
 let cost_ENCODING_SIGNATURE_bls = S.safe_int 55
 
 (* model encoding/ENCODING_SIGNATURE_ed25519 *)
-(* 45. *)
+(* max 10 45. *)
 let cost_ENCODING_SIGNATURE_ed25519 = S.safe_int 45
 
 (* model encoding/ENCODING_SIGNATURE_p256 *)
-(* 45. *)
+(* max 10 45. *)
 let cost_ENCODING_SIGNATURE_p256 = S.safe_int 45
 
 (* model encoding/ENCODING_SIGNATURE_secp256k1 *)
-(* 45. *)
+(* max 10 45. *)
 let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 45
 
 (* model encoding/TIMESTAMP_READABLE_DECODING *)
-(* fun size -> 105. + (0.046875 * (size * (sqrt size))) *)
+(* fun size -> max 10 (105. + (0.046875 * (size * (sqrt size)))) *)
 let cost_TIMESTAMP_READABLE_DECODING size =
   let size = S.safe_int size in
   let w2 = sqrt size * size in
   (w2 lsr 5) + (w2 lsr 6) + S.safe_int 105
 
 (* model encoding/TIMESTAMP_READABLE_ENCODING *)
-(* 820. *)
+(* max 10 820. *)
 let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 820
 
 (* model interpreter/N_IAbs_int *)
-(* fun size -> 20. + (0.5 * size) *)
+(* fun size -> max 10 (20. + (0.5 * size)) *)
 let cost_N_IAbs_int size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 20
 
 (* model interpreter/N_IAbs_int_alloc *)
-(* fun size -> 14.9523489645 + (0.50021084529 * size) *)
+(* fun size -> max 10 (14.9523489645 + (0.50021084529 * size)) *)
 let cost_N_IAbs_int_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 15
@@ -301,50 +301,51 @@ let cost_N_IAbs_int_alloc size =
 (* model interpreter/N_IAbs_int_synthesized *)
 (* fun size ->
      let time = 20. + (0.5 * size) in
-     let alloc = 14.9523489645 + (0.50021084529 * size) in max time alloc *)
+     let alloc = 14.9523489645 + (0.50021084529 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IAbs_int_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
   S.max (w1 + S.safe_int 20) (w1 + (size lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_IAdd_bls12_381_fr *)
-(* 30. *)
+(* max 10 30. *)
 let cost_N_IAdd_bls12_381_fr = S.safe_int 30
 
 (* model interpreter/N_IAdd_bls12_381_fr_alloc *)
-(* 24. *)
+(* max 10 24. *)
 let cost_N_IAdd_bls12_381_fr_alloc = S.safe_int 25
 
 (* model interpreter/N_IAdd_bls12_381_fr_synthesized *)
-(* let time = 30. in let alloc = 24. in max time alloc *)
+(* let time = 30. in let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_IAdd_bls12_381_fr_synthesized = S.safe_int 30
 
 (* model interpreter/N_IAdd_bls12_381_g1 *)
-(* 900. *)
+(* max 10 900. *)
 let cost_N_IAdd_bls12_381_g1 = S.safe_int 900
 
 (* model interpreter/N_IAdd_bls12_381_g1_alloc *)
-(* 80. *)
+(* max 10 80. *)
 let cost_N_IAdd_bls12_381_g1_alloc = S.safe_int 80
 
 (* model interpreter/N_IAdd_bls12_381_g1_synthesized *)
-(* let time = 900. in let alloc = 80. in max time alloc *)
+(* let time = 900. in let alloc = 80. in max 10 (max time alloc) *)
 let cost_N_IAdd_bls12_381_g1_synthesized = S.safe_int 900
 
 (* model interpreter/N_IAdd_bls12_381_g2 *)
-(* 2470. *)
+(* max 10 2470. *)
 let cost_N_IAdd_bls12_381_g2 = S.safe_int 2470
 
 (* model interpreter/N_IAdd_bls12_381_g2_alloc *)
-(* 152. *)
+(* max 10 152. *)
 let cost_N_IAdd_bls12_381_g2_alloc = S.safe_int 155
 
 (* model interpreter/N_IAdd_bls12_381_g2_synthesized *)
-(* let time = 2470. in let alloc = 152. in max time alloc *)
+(* let time = 2470. in let alloc = 152. in max 10 (max time alloc) *)
 let cost_N_IAdd_bls12_381_g2_synthesized = S.safe_int 2470
 
 (* model interpreter/N_IAdd_int *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IAdd_int size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -352,7 +353,8 @@ let cost_N_IAdd_int size1 size2 =
 
 (* model interpreter/N_IAdd_int_alloc *)
 (* fun size1 ->
-     fun size2 -> 16.6371367954 + (0.500211859928 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (16.6371367954 + (0.500211859928 * (max size1 size2))) *)
 let cost_N_IAdd_int_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -364,7 +366,7 @@ let cost_N_IAdd_int_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 16.6371367954 + (0.500211859928 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IAdd_int_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -373,7 +375,7 @@ let cost_N_IAdd_int_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_IAdd_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IAdd_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -381,7 +383,8 @@ let cost_N_IAdd_nat size1 size2 =
 
 (* model interpreter/N_IAdd_nat_alloc *)
 (* fun size1 ->
-     fun size2 -> 17.7896408261 + (0.500239743224 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (17.7896408261 + (0.500239743224 * (max size1 size2))) *)
 let cost_N_IAdd_nat_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -393,7 +396,7 @@ let cost_N_IAdd_nat_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 17.7896408261 + (0.500239743224 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IAdd_nat_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -402,7 +405,7 @@ let cost_N_IAdd_nat_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_IAdd_seconds_to_timestamp *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IAdd_seconds_to_timestamp size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -410,7 +413,8 @@ let cost_N_IAdd_seconds_to_timestamp size1 size2 =
 
 (* model interpreter/N_IAdd_seconds_to_timestamp_alloc *)
 (* fun size1 ->
-     fun size2 -> 16.6371367954 + (0.500211859928 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (16.6371367954 + (0.500211859928 * (max size1 size2))) *)
 let cost_N_IAdd_seconds_to_timestamp_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -422,7 +426,7 @@ let cost_N_IAdd_seconds_to_timestamp_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 16.6371367954 + (0.500211859928 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IAdd_seconds_to_timestamp_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -431,19 +435,19 @@ let cost_N_IAdd_seconds_to_timestamp_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_IAdd_tez *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_IAdd_tez = S.safe_int 20
 
 (* model interpreter/N_IAdd_tez_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IAdd_tez_alloc = S.safe_int 15
 
 (* model interpreter/N_IAdd_tez_synthesized *)
-(* let time = 20. in let alloc = 12. in max time alloc *)
+(* let time = 20. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IAdd_tez_synthesized = S.safe_int 20
 
 (* model interpreter/N_IAdd_timestamp_to_seconds *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IAdd_timestamp_to_seconds size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -451,7 +455,8 @@ let cost_N_IAdd_timestamp_to_seconds size1 size2 =
 
 (* model interpreter/N_IAdd_timestamp_to_seconds_alloc *)
 (* fun size1 ->
-     fun size2 -> 16.6371367954 + (0.500211859928 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (16.6371367954 + (0.500211859928 * (max size1 size2))) *)
 let cost_N_IAdd_timestamp_to_seconds_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -463,7 +468,7 @@ let cost_N_IAdd_timestamp_to_seconds_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 16.6371367954 + (0.500211859928 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IAdd_timestamp_to_seconds_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -472,39 +477,39 @@ let cost_N_IAdd_timestamp_to_seconds_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_IAddress *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IAddress = S.safe_int 10
 
 (* model interpreter/N_IAddress_alloc *)
-(* 28. *)
+(* max 10 28. *)
 let cost_N_IAddress_alloc = S.safe_int 30
 
 (* model interpreter/N_IAddress_synthesized *)
-(* let time = 10. in let alloc = 28. in max time alloc *)
+(* let time = 10. in let alloc = 28. in max 10 (max time alloc) *)
 let cost_N_IAddress_synthesized = S.safe_int 30
 
 (* model interpreter/N_IAmount *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IAmount = S.safe_int 10
 
 (* model interpreter/N_IAmount_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IAmount_alloc = S.safe_int 15
 
 (* model interpreter/N_IAmount_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IAmount_synthesized = S.safe_int 15
 
 (* model interpreter/N_IAnd *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IAnd = S.safe_int 10
 
 (* model interpreter/N_IAnd_alloc *)
-(* 0. *)
-let cost_N_IAnd_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IAnd_alloc = S.safe_int 10
 
 (* model interpreter/N_IAnd_bytes *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (min size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (min size1 size2))) *)
 let cost_N_IAnd_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -512,7 +517,7 @@ let cost_N_IAnd_bytes size1 size2 =
 
 (* model interpreter/N_IAnd_bytes_alloc *)
 (* fun size1 ->
-     fun size2 -> 11.02845262 + (0.499972333803 * (min size1 size2)) *)
+     fun size2 -> max 10 (11.02845262 + (0.499972333803 * (min size1 size2))) *)
 let cost_N_IAnd_bytes_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -523,21 +528,22 @@ let cost_N_IAnd_bytes_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (min size1 size2)) in
        let alloc = 11.02845262 + (0.499972333803 * (min size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IAnd_bytes_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   (S.min size1 size2 lsr 1) + S.safe_int 35
 
 (* model interpreter/N_IAnd_int_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (min size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (min size1 size2))) *)
 let cost_N_IAnd_int_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   (S.min size1 size2 lsr 1) + S.safe_int 35
 
 (* model interpreter/N_IAnd_int_nat_alloc *)
-(* fun size1 -> fun size2 -> 15.9658045767 + (0.500213721396 * size2) *)
+(* fun size1 ->
+     fun size2 -> max 10 (15.9658045767 + (0.500213721396 * size2)) *)
 let cost_N_IAnd_int_nat_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   (size2 lsr 1) + (size2 lsr 6) + S.safe_int 20
@@ -546,7 +552,8 @@ let cost_N_IAnd_int_nat_alloc _size1 size2 =
 (* fun size1 ->
      fun size2 ->
        let time = 35. + (0.5 * (min size1 size2)) in
-       let alloc = 15.9658045767 + (0.500213721396 * size2) in max time alloc *)
+       let alloc = 15.9658045767 + (0.500213721396 * size2) in
+       max 10 (max time alloc) *)
 let cost_N_IAnd_int_nat_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -555,7 +562,7 @@ let cost_N_IAnd_int_nat_synthesized size1 size2 =
     ((size2 lsr 1) + (size2 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_IAnd_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (min size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (min size1 size2))) *)
 let cost_N_IAnd_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -563,7 +570,7 @@ let cost_N_IAnd_nat size1 size2 =
 
 (* model interpreter/N_IAnd_nat_alloc *)
 (* fun size1 ->
-     fun size2 -> 15.929319772 + (0.50029450095 * (min size1 size2)) *)
+     fun size2 -> max 10 (15.929319772 + (0.50029450095 * (min size1 size2))) *)
 let cost_N_IAnd_nat_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -575,7 +582,7 @@ let cost_N_IAnd_nat_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (min size1 size2)) in
        let alloc = 15.929319772 + (0.50029450095 * (min size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IAnd_nat_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -584,43 +591,46 @@ let cost_N_IAnd_nat_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_IAnd_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IAnd_synthesized = S.safe_int 10
 
 (* model interpreter/N_IApply_alloc *)
-(* fun size -> if size = 0 then 225.986577181 else 510.013245033 *)
+(* fun size -> max 10 (if size = 0 then 225.986577181 else 510.013245033) *)
 let cost_N_IApply_alloc size =
   let size = S.safe_int size in
-  if size = S.safe_int 0 then S.safe_int 230 else S.safe_int 510
+  S.max
+    (S.safe_int 10)
+    (if size = S.safe_int 0 then S.safe_int 230 else S.safe_int 510)
 
 (* model interpreter/N_IApply_synthesized *)
 (* fun size ->
      let time = if size = 0 then 140. else 220. in
      let alloc = if size = 0 then 225.986577181 else 510.013245033 in
-     max time alloc *)
+     max 10 (max time alloc) *)
 let cost_N_IApply_synthesized size =
   let size = S.safe_int size in
   let w1 = size = S.safe_int 0 in
   S.max
-    (if w1 then S.safe_int 140 else S.safe_int 220)
+    (S.max (S.safe_int 10) (if w1 then S.safe_int 140 else S.safe_int 220))
     (if w1 then S.safe_int 230 else S.safe_int 510)
 
 (* model interpreter/N_IBalance *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IBalance = S.safe_int 10
 
 (* model interpreter/N_IBalance_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IBalance_alloc = S.safe_int 15
 
 (* model interpreter/N_IBalance_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IBalance_synthesized = S.safe_int 15
 
 (* model interpreter/N_IBig_map_get *)
 (* fun size1 ->
      fun size2 ->
-       822.930542675 + (2.84341564432 * (size1 * (log2 (1 + size2)))) *)
+       max 10
+         (822.930542675 + (2.84341564432 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_get size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -628,13 +638,14 @@ let cost_N_IBig_map_get size1 size2 =
   (w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
 
 (* model interpreter/N_IBig_map_get_alloc *)
-(* fun size1 -> fun size2 -> 0. *)
-let cost_N_IBig_map_get_alloc _size1 _size2 = S.safe_int 0
+(* fun size1 -> fun size2 -> max 10 0. *)
+let cost_N_IBig_map_get_alloc _size1 _size2 = S.safe_int 10
 
 (* model interpreter/N_IBig_map_get_and_update *)
 (* fun size1 ->
      fun size2 ->
-       834.633876008 + (2.84264684858 * (size1 * (log2 (1 + size2)))) *)
+       max 10
+         (834.633876008 + (2.84264684858 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_get_and_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -643,7 +654,8 @@ let cost_N_IBig_map_get_and_update size1 size2 =
 
 (* model interpreter/N_IBig_map_get_and_update_alloc *)
 (* fun size1 ->
-     fun size2 -> (25.084669453 * (log2 (1 + size2))) + 178.035218425 *)
+     fun size2 ->
+       max 10 ((25.084669453 * (log2 (1 + size2))) + 178.035218425) *)
 let cost_N_IBig_map_get_and_update_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   let w1 = log2 (size2 + S.safe_int 1) in
@@ -655,7 +667,7 @@ let cost_N_IBig_map_get_and_update_alloc _size1 size2 =
        let time =
          834.633876008 + (2.84264684858 * (size1 * (log2 (1 + size2)))) in
        let alloc = (25.084669453 * (log2 (1 + size2))) + 178.035218425 in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IBig_map_get_and_update_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -670,7 +682,7 @@ let cost_N_IBig_map_get_and_update_synthesized size1 size2 =
      fun size2 ->
        let time =
          822.930542675 + (2.84341564432 * (size1 * (log2 (1 + size2)))) in
-       let alloc = 0. in max time alloc *)
+       let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IBig_map_get_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -680,7 +692,7 @@ let cost_N_IBig_map_get_synthesized size1 size2 =
 (* model interpreter/N_IBig_map_mem *)
 (* fun size1 ->
      fun size2 ->
-       824.703876008 + (2.8436528598 * (size1 * (log2 (1 + size2)))) *)
+       max 10 (824.703876008 + (2.8436528598 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_mem size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -688,15 +700,15 @@ let cost_N_IBig_map_mem size1 size2 =
   (w3 * S.safe_int 2) + (w3 lsr 1) + (w3 lsr 2) + (w3 lsr 3) + S.safe_int 825
 
 (* model interpreter/N_IBig_map_mem_alloc *)
-(* fun size1 -> fun size2 -> 0. *)
-let cost_N_IBig_map_mem_alloc _size1 _size2 = S.safe_int 0
+(* fun size1 -> fun size2 -> max 10 0. *)
+let cost_N_IBig_map_mem_alloc _size1 _size2 = S.safe_int 10
 
 (* model interpreter/N_IBig_map_mem_synthesized *)
 (* fun size1 ->
      fun size2 ->
        let time =
          824.703876008 + (2.8436528598 * (size1 * (log2 (1 + size2)))) in
-       let alloc = 0. in max time alloc *)
+       let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IBig_map_mem_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -706,7 +718,8 @@ let cost_N_IBig_map_mem_synthesized size1 size2 =
 (* model interpreter/N_IBig_map_update *)
 (* fun size1 ->
      fun size2 ->
-       816.020542675 + (3.16181279998 * (size1 * (log2 (1 + size2)))) *)
+       max 10
+         (816.020542675 + (3.16181279998 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IBig_map_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -715,7 +728,8 @@ let cost_N_IBig_map_update size1 size2 =
 
 (* model interpreter/N_IBig_map_update_alloc *)
 (* fun size1 ->
-     fun size2 -> (25.084669453 * (log2 (1 + size2))) + 166.035218425 *)
+     fun size2 ->
+       max 10 ((25.084669453 * (log2 (1 + size2))) + 166.035218425) *)
 let cost_N_IBig_map_update_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   let w1 = log2 (size2 + S.safe_int 1) in
@@ -727,7 +741,7 @@ let cost_N_IBig_map_update_alloc _size1 size2 =
        let time =
          816.020542675 + (3.16181279998 * (size1 * (log2 (1 + size2)))) in
        let alloc = (25.084669453 * (log2 (1 + size2))) + 166.035218425 in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IBig_map_update_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -738,30 +752,31 @@ let cost_N_IBig_map_update_synthesized size1 size2 =
     ((w1 * S.safe_int 25) + (w1 lsr 1) + S.safe_int 170)
 
 (* model interpreter/N_IBlake2b *)
-(* fun size -> 430. + (1.125 * size) *)
+(* fun size -> max 10 (430. + (1.125 * size)) *)
 let cost_N_IBlake2b size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 430
 
 (* model interpreter/N_IBlake2b_alloc *)
-(* fun size -> 24. *)
+(* fun size -> max 10 24. *)
 let cost_N_IBlake2b_alloc _size = S.safe_int 25
 
 (* model interpreter/N_IBlake2b_synthesized *)
 (* fun size ->
-     let time = 430. + (1.125 * size) in let alloc = 24. in max time alloc *)
+     let time = 430. + (1.125 * size) in
+     let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_IBlake2b_synthesized size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 430
 
 (* model interpreter/N_IBytes_int *)
-(* fun size -> 90. + (3. * size) *)
+(* fun size -> max 10 (90. + (3. * size)) *)
 let cost_N_IBytes_int size =
   let size = S.safe_int size in
   (size * S.safe_int 3) + S.safe_int 90
 
 (* model interpreter/N_IBytes_int_alloc *)
-(* fun size -> 10.3902313247 + (0.499502439767 * size) *)
+(* fun size -> max 10 (10.3902313247 + (0.499502439767 * size)) *)
 let cost_N_IBytes_int_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 10
@@ -769,19 +784,20 @@ let cost_N_IBytes_int_alloc size =
 (* model interpreter/N_IBytes_int_synthesized *)
 (* fun size ->
      let time = 90. + (3. * size) in
-     let alloc = 10.3902313247 + (0.499502439767 * size) in max time alloc *)
+     let alloc = 10.3902313247 + (0.499502439767 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IBytes_int_synthesized size =
   let size = S.safe_int size in
   S.max ((size * S.safe_int 3) + S.safe_int 90) ((size lsr 1) + S.safe_int 10)
 
 (* model interpreter/N_IBytes_nat *)
-(* fun size -> 75. + (3. * size) *)
+(* fun size -> max 10 (75. + (3. * size)) *)
 let cost_N_IBytes_nat size =
   let size = S.safe_int size in
   (size * S.safe_int 3) + S.safe_int 75
 
 (* model interpreter/N_IBytes_nat_alloc *)
-(* fun size -> 10.7311846492 + (0.499435286092 * size) *)
+(* fun size -> max 10 (10.7311846492 + (0.499435286092 * size)) *)
 let cost_N_IBytes_nat_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 15
@@ -789,166 +805,171 @@ let cost_N_IBytes_nat_alloc size =
 (* model interpreter/N_IBytes_nat_synthesized *)
 (* fun size ->
      let time = 75. + (3. * size) in
-     let alloc = 10.7311846492 + (0.499435286092 * size) in max time alloc *)
+     let alloc = 10.7311846492 + (0.499435286092 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IBytes_nat_synthesized size =
   let size = S.safe_int size in
   S.max ((size * S.safe_int 3) + S.safe_int 75) ((size lsr 1) + S.safe_int 15)
 
 (* model interpreter/N_IBytes_size *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IBytes_size = S.safe_int 10
 
 (* model interpreter/N_IBytes_size_alloc *)
-(* 0. *)
-let cost_N_IBytes_size_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IBytes_size_alloc = S.safe_int 10
 
 (* model interpreter/N_IBytes_size_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IBytes_size_synthesized = S.safe_int 10
 
 (* model interpreter/N_ICar *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ICar = S.safe_int 10
 
 (* model interpreter/N_ICar_alloc *)
-(* 0. *)
-let cost_N_ICar_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ICar_alloc = S.safe_int 10
 
 (* model interpreter/N_ICar_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICar_synthesized = S.safe_int 10
 
 (* model interpreter/N_ICdr *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ICdr = S.safe_int 10
 
 (* model interpreter/N_ICdr_alloc *)
-(* 0. *)
-let cost_N_ICdr_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ICdr_alloc = S.safe_int 10
 
 (* model interpreter/N_ICdr_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICdr_synthesized = S.safe_int 10
 
 (* model interpreter/N_IChainId *)
-(* 15. *)
+(* max 10 15. *)
 let cost_N_IChainId = S.safe_int 15
 
 (* model interpreter/N_IChainId_alloc *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_IChainId_alloc = S.safe_int 20
 
 (* model interpreter/N_IChainId_synthesized *)
-(* let time = 15. in let alloc = 20. in max time alloc *)
+(* let time = 15. in let alloc = 20. in max 10 (max time alloc) *)
 let cost_N_IChainId_synthesized = S.safe_int 20
 
 (* model interpreter/N_ICheck_signature_bls *)
-(* fun size -> 1570000. + (3. * size) *)
+(* fun size -> max 10 (1570000. + (3. * size)) *)
 let cost_N_ICheck_signature_bls size =
   let size = S.safe_int size in
   (size * S.safe_int 3) + S.safe_int 1570000
 
 (* model interpreter/N_ICheck_signature_bls_alloc *)
-(* fun size -> 0. *)
-let cost_N_ICheck_signature_bls_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_ICheck_signature_bls_alloc _size = S.safe_int 10
 
 (* model interpreter/N_ICheck_signature_bls_synthesized *)
 (* fun size ->
-     let time = 1570000. + (3. * size) in let alloc = 0. in max time alloc *)
+     let time = 1570000. + (3. * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICheck_signature_bls_synthesized size =
   let size = S.safe_int size in
   (size * S.safe_int 3) + S.safe_int 1570000
 
 (* model interpreter/N_ICheck_signature_ed25519 *)
-(* fun size -> 65800. + (1.125 * size) *)
+(* fun size -> max 10 (65800. + (1.125 * size)) *)
 let cost_N_ICheck_signature_ed25519 size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 65800
 
 (* model interpreter/N_ICheck_signature_ed25519_alloc *)
-(* fun size -> 0. *)
-let cost_N_ICheck_signature_ed25519_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_ICheck_signature_ed25519_alloc _size = S.safe_int 10
 
 (* model interpreter/N_ICheck_signature_ed25519_synthesized *)
 (* fun size ->
-     let time = 65800. + (1.125 * size) in let alloc = 0. in max time alloc *)
+     let time = 65800. + (1.125 * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICheck_signature_ed25519_synthesized size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 65800
 
 (* model interpreter/N_ICheck_signature_p256 *)
-(* fun size -> 341000. + (1.125 * size) *)
+(* fun size -> max 10 (341000. + (1.125 * size)) *)
 let cost_N_ICheck_signature_p256 size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 341000
 
 (* model interpreter/N_ICheck_signature_p256_alloc *)
-(* fun size -> 0. *)
-let cost_N_ICheck_signature_p256_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_ICheck_signature_p256_alloc _size = S.safe_int 10
 
 (* model interpreter/N_ICheck_signature_p256_synthesized *)
 (* fun size ->
-     let time = 341000. + (1.125 * size) in let alloc = 0. in max time alloc *)
+     let time = 341000. + (1.125 * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICheck_signature_p256_synthesized size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 341000
 
 (* model interpreter/N_ICheck_signature_secp256k1 *)
-(* fun size -> 51600. + (1.125 * size) *)
+(* fun size -> max 10 (51600. + (1.125 * size)) *)
 let cost_N_ICheck_signature_secp256k1 size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 51600
 
 (* model interpreter/N_ICheck_signature_secp256k1_alloc *)
-(* fun size -> 0. *)
-let cost_N_ICheck_signature_secp256k1_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_ICheck_signature_secp256k1_alloc _size = S.safe_int 10
 
 (* model interpreter/N_ICheck_signature_secp256k1_synthesized *)
 (* fun size ->
-     let time = 51600. + (1.125 * size) in let alloc = 0. in max time alloc *)
+     let time = 51600. + (1.125 * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICheck_signature_secp256k1_synthesized size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 51600
 
 (* model interpreter/N_IComb *)
-(* fun size -> 40. + (3.25 * (sub size 2)) *)
+(* fun size -> max 10 (40. + (3.25 * (sub size 2))) *)
 let cost_N_IComb size =
   let size = S.safe_int size in
   let w1 = S.sub size (S.safe_int 2) in
   (w1 * S.safe_int 3) + (w1 lsr 2) + S.safe_int 40
 
 (* model interpreter/N_IComb_alloc *)
-(* fun size -> 5.60949553813 + (11.9823552149 * size) *)
+(* fun size -> max 10 (5.60949553813 + (11.9823552149 * size)) *)
 let cost_N_IComb_alloc size =
   let size = S.safe_int size in
   (size * S.safe_int 12) + S.safe_int 10
 
 (* model interpreter/N_IComb_get *)
-(* fun size -> 20. + (0.5625 * size) *)
+(* fun size -> max 10 (20. + (0.5625 * size)) *)
 let cost_N_IComb_get size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 4) + S.safe_int 20
 
 (* model interpreter/N_IComb_get_alloc *)
-(* fun size -> 0. + (0. * size) *)
-let cost_N_IComb_get_alloc _size = S.safe_int 0
+(* fun size -> max 10 (0. + (0. * size)) *)
+let cost_N_IComb_get_alloc _size = S.safe_int 10
 
 (* model interpreter/N_IComb_get_synthesized *)
 (* fun size ->
      let time = 20. + (0.5625 * size) in
-     let alloc = 0. + (0. * size) in max time alloc *)
+     let alloc = 0. + (0. * size) in max 10 (max time alloc) *)
 let cost_N_IComb_get_synthesized size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 4) + S.safe_int 20
 
 (* model interpreter/N_IComb_set *)
-(* fun size -> 30. + (1.28125 * size) *)
+(* fun size -> max 10 (30. + (1.28125 * size)) *)
 let cost_N_IComb_set size =
   let size = S.safe_int size in
   (size lsr 2) + (size lsr 5) + size + S.safe_int 30
 
 (* model interpreter/N_IComb_set_alloc *)
-(* fun size -> 5.97947366264 + (6.00684211245 * size) *)
+(* fun size -> max 10 (5.97947366264 + (6.00684211245 * size)) *)
 let cost_N_IComb_set_alloc size =
   let size = S.safe_int size in
   (size lsr 3) + (size * S.safe_int 6) + S.safe_int 10
@@ -956,7 +977,8 @@ let cost_N_IComb_set_alloc size =
 (* model interpreter/N_IComb_set_synthesized *)
 (* fun size ->
      let time = 30. + (1.28125 * size) in
-     let alloc = 5.97947366264 + (6.00684211245 * size) in max time alloc *)
+     let alloc = 5.97947366264 + (6.00684211245 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IComb_set_synthesized size =
   let size = S.safe_int size in
   S.max
@@ -966,7 +988,8 @@ let cost_N_IComb_set_synthesized size =
 (* model interpreter/N_IComb_synthesized *)
 (* fun size ->
      let time = 40. + (3.25 * (sub size 2)) in
-     let alloc = 5.60949553813 + (11.9823552149 * size) in max time alloc *)
+     let alloc = 5.60949553813 + (11.9823552149 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IComb_synthesized size =
   let size = S.safe_int size in
   let w1 = S.sub size (S.safe_int 2) in
@@ -975,7 +998,8 @@ let cost_N_IComb_synthesized size =
     ((size * S.safe_int 12) + S.safe_int 10)
 
 (* model interpreter/N_ICompare *)
-(* fun size1 -> fun size2 -> 35. + (0.0234375 * (sub (min size1 size2) 1)) *)
+(* fun size1 ->
+     fun size2 -> max 10 (35. + (0.0234375 * (sub (min size1 size2) 1))) *)
 let cost_N_ICompare size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -983,14 +1007,14 @@ let cost_N_ICompare size1 size2 =
   (w1 lsr 6) + (w1 lsr 7) + S.safe_int 35
 
 (* model interpreter/N_ICompare_alloc *)
-(* fun size1 -> fun size2 -> 0. *)
-let cost_N_ICompare_alloc _size1 _size2 = S.safe_int 0
+(* fun size1 -> fun size2 -> max 10 0. *)
+let cost_N_ICompare_alloc _size1 _size2 = S.safe_int 10
 
 (* model interpreter/N_ICompare_synthesized *)
 (* fun size1 ->
      fun size2 ->
        let time = 35. + (0.0234375 * (sub (min size1 size2) 1)) in
-       let alloc = 0. in max time alloc *)
+       let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICompare_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -999,13 +1023,14 @@ let cost_N_ICompare_synthesized size1 size2 =
 
 (* model interpreter/N_IConcat_bytes_alloc *)
 (* fun size1 ->
-     fun size2 -> (8.00002622858 + (0. * size1)) + (0.499999999744 * size2) *)
+     fun size2 ->
+       max 10 ((8.00002622858 + (0. * size1)) + (0.499999999744 * size2)) *)
 let cost_N_IConcat_bytes_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   (size2 lsr 1) + S.safe_int 10
 
 (* model interpreter/N_IConcat_bytes_pair *)
-(* fun size1 -> fun size2 -> 45. + (0.5 * (size1 + size2)) *)
+(* fun size1 -> fun size2 -> max 10 (45. + (0.5 * (size1 + size2))) *)
 let cost_N_IConcat_bytes_pair size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1013,7 +1038,7 @@ let cost_N_IConcat_bytes_pair size1 size2 =
 
 (* model interpreter/N_IConcat_bytes_pair_alloc *)
 (* fun size1 ->
-     fun size2 -> 8.00048828125 + (0.499999761581 * (size1 + size2)) *)
+     fun size2 -> max 10 (8.00048828125 + (0.499999761581 * (size1 + size2))) *)
 let cost_N_IConcat_bytes_pair_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1024,7 +1049,7 @@ let cost_N_IConcat_bytes_pair_alloc size1 size2 =
      fun size2 ->
        let time = 45. + (0.5 * (size1 + size2)) in
        let alloc = 8.00048828125 + (0.499999761581 * (size1 + size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IConcat_bytes_pair_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1035,7 +1060,7 @@ let cost_N_IConcat_bytes_pair_synthesized size1 size2 =
      fun size2 ->
        let time = (31.0272093413 + (0. * size1)) + (0.0853190494597 * size2) in
        let alloc = (8.00002622858 + (0. * size1)) + (0.499999999744 * size2) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IConcat_bytes_synthesized _size1 size2 =
   let size2 = S.safe_int size2 in
   S.max
@@ -1044,13 +1069,14 @@ let cost_N_IConcat_bytes_synthesized _size1 size2 =
 
 (* model interpreter/N_IConcat_string_alloc *)
 (* fun size1 ->
-     fun size2 -> (6.82629751442 + (0. * size1)) + (0.500114619383 * size2) *)
+     fun size2 ->
+       max 10 ((6.82629751442 + (0. * size1)) + (0.500114619383 * size2)) *)
 let cost_N_IConcat_string_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   (size2 lsr 1) + (size2 lsr 6) + S.safe_int 10
 
 (* model interpreter/N_IConcat_string_pair *)
-(* fun size1 -> fun size2 -> 45. + (0.5 * (size1 + size2)) *)
+(* fun size1 -> fun size2 -> max 10 (45. + (0.5 * (size1 + size2))) *)
 let cost_N_IConcat_string_pair size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1058,7 +1084,7 @@ let cost_N_IConcat_string_pair size1 size2 =
 
 (* model interpreter/N_IConcat_string_pair_alloc *)
 (* fun size1 ->
-     fun size2 -> 8.00048828125 + (0.499999761581 * (size1 + size2)) *)
+     fun size2 -> max 10 (8.00048828125 + (0.499999761581 * (size1 + size2))) *)
 let cost_N_IConcat_string_pair_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1069,7 +1095,7 @@ let cost_N_IConcat_string_pair_alloc size1 size2 =
      fun size2 ->
        let time = 45. + (0.5 * (size1 + size2)) in
        let alloc = 8.00048828125 + (0.499999761581 * (size1 + size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IConcat_string_pair_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1080,7 +1106,7 @@ let cost_N_IConcat_string_pair_synthesized size1 size2 =
      fun size2 ->
        let time = (33.8372093413 + (0. * size1)) + (0.089723875507 * size2) in
        let alloc = (6.82629751442 + (0. * size1)) + (0.500114619383 * size2) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IConcat_string_synthesized _size1 size2 =
   let size2 = S.safe_int size2 in
   let w1 = size2 lsr 6 in
@@ -1089,71 +1115,71 @@ let cost_N_IConcat_string_synthesized _size1 size2 =
     ((size2 lsr 1) + w1 + S.safe_int 10)
 
 (* model interpreter/N_ICons_list *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ICons_list = S.safe_int 10
 
 (* model interpreter/N_ICons_list_alloc *)
-(* 24. *)
+(* max 10 24. *)
 let cost_N_ICons_list_alloc = S.safe_int 25
 
 (* model interpreter/N_ICons_list_synthesized *)
-(* let time = 10. in let alloc = 24. in max time alloc *)
+(* let time = 10. in let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_ICons_list_synthesized = S.safe_int 25
 
 (* model interpreter/N_ICons_none *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ICons_none = S.safe_int 10
 
 (* model interpreter/N_ICons_none_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_ICons_none_alloc = S.safe_int 15
 
 (* model interpreter/N_ICons_none_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_ICons_none_synthesized = S.safe_int 15
 
 (* model interpreter/N_ICons_pair *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ICons_pair = S.safe_int 10
 
 (* model interpreter/N_ICons_pair_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_ICons_pair_alloc = S.safe_int 15
 
 (* model interpreter/N_ICons_pair_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_ICons_pair_synthesized = S.safe_int 15
 
 (* model interpreter/N_ICons_some *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ICons_some = S.safe_int 10
 
 (* model interpreter/N_ICons_some_alloc *)
-(* 8. *)
+(* max 10 8. *)
 let cost_N_ICons_some_alloc = S.safe_int 10
 
 (* model interpreter/N_ICons_some_synthesized *)
-(* let time = 10. in let alloc = 8. in max time alloc *)
+(* let time = 10. in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_ICons_some_synthesized = S.safe_int 10
 
 (* model interpreter/N_IContract_alloc *)
-(* 16. *)
+(* max 10 16. *)
 let cost_N_IContract_alloc = S.safe_int 20
 
 (* model interpreter/N_IContract_synthesized *)
-(* let time = 30. in let alloc = 16. in max time alloc *)
+(* let time = 30. in let alloc = 16. in max 10 (max time alloc) *)
 let cost_N_IContract_synthesized = S.safe_int 30
 
 (* model interpreter/N_ICreate_contract_alloc *)
-(* 196. *)
+(* max 10 196. *)
 let cost_N_ICreate_contract_alloc = S.safe_int 200
 
 (* model interpreter/N_ICreate_contract_synthesized *)
-(* let time = 60. in let alloc = 196. in max time alloc *)
+(* let time = 60. in let alloc = 196. in max 10 (max time alloc) *)
 let cost_N_ICreate_contract_synthesized = S.safe_int 200
 
 (* model interpreter/N_IDiff_timestamps *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IDiff_timestamps size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1161,7 +1187,8 @@ let cost_N_IDiff_timestamps size1 size2 =
 
 (* model interpreter/N_IDiff_timestamps_alloc *)
 (* fun size1 ->
-     fun size2 -> 17.5501373306 + (0.500211925836 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (17.5501373306 + (0.500211925836 * (max size1 size2))) *)
 let cost_N_IDiff_timestamps_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1173,7 +1200,7 @@ let cost_N_IDiff_timestamps_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 17.5501373306 + (0.500211925836 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IDiff_timestamps_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1182,13 +1209,13 @@ let cost_N_IDiff_timestamps_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_IDig *)
-(* fun size -> 30. + (6.75 * size) *)
+(* fun size -> max 10 (30. + (6.75 * size)) *)
 let cost_N_IDig size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 2) + (size * S.safe_int 6) + S.safe_int 30
 
 (* model interpreter/N_IDig_alloc *)
-(* fun size -> 11.9761359318 + (12.005966017 * size) *)
+(* fun size -> max 10 (11.9761359318 + (12.005966017 * size)) *)
 let cost_N_IDig_alloc size =
   let size = S.safe_int size in
   (size lsr 2) + (size * S.safe_int 12) + S.safe_int 15
@@ -1196,7 +1223,8 @@ let cost_N_IDig_alloc size =
 (* model interpreter/N_IDig_synthesized *)
 (* fun size ->
      let time = 30. + (6.75 * size) in
-     let alloc = 11.9761359318 + (12.005966017 * size) in max time alloc *)
+     let alloc = 11.9761359318 + (12.005966017 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IDig_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 2 in
@@ -1205,47 +1233,49 @@ let cost_N_IDig_synthesized size =
     (w1 + (size * S.safe_int 12) + S.safe_int 15)
 
 (* model interpreter/N_IDip *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IDip = S.safe_int 10
 
 (* model interpreter/N_IDipN *)
-(* fun size -> 15. + (4. * size) *)
+(* fun size -> max 10 (15. + (4. * size)) *)
 let cost_N_IDipN size =
   let size = S.safe_int size in
   (size * S.safe_int 4) + S.safe_int 15
 
 (* model interpreter/N_IDipN_alloc *)
-(* fun size -> 0.00283557047624 + (11.9999972146 * size) *)
+(* fun size -> max 10 (0.00283557047624 + (11.9999972146 * size)) *)
 let cost_N_IDipN_alloc size =
   let size = S.safe_int size in
-  size * S.safe_int 12
+  S.max (S.safe_int 10) (size * S.safe_int 12)
 
 (* model interpreter/N_IDipN_synthesized *)
 (* fun size ->
      let time = 15. + (4. * size) in
-     let alloc = 0.00283557047624 + (11.9999972146 * size) in max time alloc *)
+     let alloc = 0.00283557047624 + (11.9999972146 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IDipN_synthesized size =
   let size = S.safe_int size in
   S.max ((size * S.safe_int 4) + S.safe_int 15) (size * S.safe_int 12)
 
 (* model interpreter/N_IDip_alloc *)
-(* 0. *)
-let cost_N_IDip_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IDip_alloc = S.safe_int 10
 
 (* model interpreter/N_IDip_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IDip_synthesized = S.safe_int 10
 
 (* model interpreter/N_IDrop *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IDrop = S.safe_int 10
 
 (* model interpreter/N_IDropN_alloc *)
 (* fun size ->
-     (((0. * (min 300 size)) + (0. * (sub (min 400 size) 300))) +
-        (0. * (sub size 400)))
-       + 0. *)
-let cost_N_IDropN_alloc _size = S.safe_int 0
+     max 10
+       ((((0. * (min 300 size)) + (0. * (sub (min 400 size) 300))) +
+           (0. * (sub size 400)))
+          + 0.) *)
+let cost_N_IDropN_alloc _size = S.safe_int 10
 
 (* model interpreter/N_IDropN_synthesized *)
 (* fun size ->
@@ -1258,7 +1288,7 @@ let cost_N_IDropN_alloc _size = S.safe_int 0
        (((0. * (min 300 size)) + (0. * (sub (min 400 size) 300))) +
           (0. * (sub size 400)))
          + 0. in
-     max time alloc *)
+     max 10 (max time alloc) *)
 let cost_N_IDropN_synthesized size =
   let size = S.safe_int size in
   let w2 = S.sub size (S.safe_int 400) in
@@ -1271,21 +1301,21 @@ let cost_N_IDropN_synthesized size =
   + S.safe_int 30
 
 (* model interpreter/N_IDrop_alloc *)
-(* 0. *)
-let cost_N_IDrop_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IDrop_alloc = S.safe_int 10
 
 (* model interpreter/N_IDrop_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IDrop_synthesized = S.safe_int 10
 
 (* model interpreter/N_IDug *)
-(* fun size -> 35. + (6.75 * size) *)
+(* fun size -> max 10 (35. + (6.75 * size)) *)
 let cost_N_IDug size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 2) + (size * S.safe_int 6) + S.safe_int 35
 
 (* model interpreter/N_IDug_alloc *)
-(* fun size -> 11.9761359318 + (12.005966017 * size) *)
+(* fun size -> max 10 (11.9761359318 + (12.005966017 * size)) *)
 let cost_N_IDug_alloc size =
   let size = S.safe_int size in
   (size lsr 2) + (size * S.safe_int 12) + S.safe_int 15
@@ -1293,7 +1323,8 @@ let cost_N_IDug_alloc size =
 (* model interpreter/N_IDug_synthesized *)
 (* fun size ->
      let time = 35. + (6.75 * size) in
-     let alloc = 11.9761359318 + (12.005966017 * size) in max time alloc *)
+     let alloc = 11.9761359318 + (12.005966017 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IDug_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 2 in
@@ -1302,15 +1333,16 @@ let cost_N_IDug_synthesized size =
     (w1 + (size * S.safe_int 12) + S.safe_int 15)
 
 (* model interpreter/N_IDup *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IDup = S.safe_int 10
 
 (* model interpreter/N_IDupN_alloc *)
 (* fun size ->
      let size = sub size 1 in
-     (((0. * (min 300 size)) + (0. * (sub (min 400 size) 300))) +
-        (0. * (sub size 400)))
-       + 12. *)
+     max 10
+       ((((0. * (min 300 size)) + (0. * (sub (min 400 size) 300))) +
+           (0. * (sub size 400)))
+          + 12.) *)
 let cost_N_IDupN_alloc _size = S.safe_int 15
 
 (* model interpreter/N_IDupN_synthesized *)
@@ -1325,7 +1357,7 @@ let cost_N_IDupN_alloc _size = S.safe_int 15
        (((0. * (min 300 size)) + (0. * (sub (min 400 size) 300))) +
           (0. * (sub size 400)))
          + 12. in
-     max time alloc *)
+     max 10 (max time alloc) *)
 let cost_N_IDupN_synthesized size =
   let size = S.safe_int size in
   let w3 = S.sub size (S.safe_int 1) in
@@ -1338,19 +1370,20 @@ let cost_N_IDupN_synthesized size =
   + (w4 lsr 2) + S.safe_int 20
 
 (* model interpreter/N_IDup_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IDup_alloc = S.safe_int 15
 
 (* model interpreter/N_IDup_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IDup_synthesized = S.safe_int 15
 
 (* model interpreter/N_IEdiv_int *)
 (* fun size1 ->
      fun size2 ->
        let q = sub size1 size2 in
-       ((((0.0010986328125 * q) * size2) + (1.25 * size1)) + (12. * q)) +
-         150. *)
+       max 10
+         (((((0.0010986328125 * q) * size2) + (1.25 * size1)) + (12. * q)) +
+            150.) *)
 let cost_N_IEdiv_int size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1361,7 +1394,8 @@ let cost_N_IEdiv_int size1 size2 =
 
 (* model interpreter/N_IEdiv_int_alloc *)
 (* fun size1 ->
-     fun size2 -> 47.5167186214 + (0.500572259393 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (47.5167186214 + (0.500572259393 * (max size1 size2))) *)
 let cost_N_IEdiv_int_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1376,7 +1410,7 @@ let cost_N_IEdiv_int_alloc size1 size2 =
          ((((0.0010986328125 * q) * size2) + (1.25 * size1)) + (12. * q)) +
            150. in
        let alloc = 47.5167186214 + (0.500572259393 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IEdiv_int_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1392,8 +1426,9 @@ let cost_N_IEdiv_int_synthesized size1 size2 =
 (* fun size1 ->
      fun size2 ->
        let q = sub size1 size2 in
-       ((((0.0010986328125 * q) * size2) + (1.25 * size1)) + (12. * q)) +
-         150. *)
+       max 10
+         (((((0.0010986328125 * q) * size2) + (1.25 * size1)) + (12. * q)) +
+            150.) *)
 let cost_N_IEdiv_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1405,8 +1440,10 @@ let cost_N_IEdiv_nat size1 size2 =
 (* model interpreter/N_IEdiv_nat_alloc *)
 (* fun size1 ->
      fun size2 ->
-       (if size2 < size1 then (0.500667315975 * size1) + (0. * size2) else 0)
-         + 40.6929981256 *)
+       max 10
+         ((if size2 < size1
+           then (0.500667315975 * size1) + (0. * size2)
+           else 0) + 40.6929981256) *)
 let cost_N_IEdiv_nat_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1424,7 +1461,7 @@ let cost_N_IEdiv_nat_alloc size1 size2 =
          (if size2 < size1
           then (0.500667315975 * size1) + (0. * size2)
           else 0) + 40.6929981256 in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IEdiv_nat_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1437,237 +1474,237 @@ let cost_N_IEdiv_nat_synthesized size1 size2 =
     + S.safe_int 45)
 
 (* model interpreter/N_IEdiv_tez *)
-(* 80. *)
+(* max 10 80. *)
 let cost_N_IEdiv_tez = S.safe_int 80
 
 (* model interpreter/N_IEdiv_tez_alloc *)
-(* 32. *)
+(* max 10 32. *)
 let cost_N_IEdiv_tez_alloc = S.safe_int 35
 
 (* model interpreter/N_IEdiv_tez_synthesized *)
-(* let time = 80. in let alloc = 32. in max time alloc *)
+(* let time = 80. in let alloc = 32. in max 10 (max time alloc) *)
 let cost_N_IEdiv_tez_synthesized = S.safe_int 80
 
 (* model interpreter/N_IEdiv_teznat *)
-(* 70. *)
+(* max 10 70. *)
 let cost_N_IEdiv_teznat = S.safe_int 70
 
 (* model interpreter/N_IEdiv_teznat_alloc *)
-(* 44. *)
+(* max 10 44. *)
 let cost_N_IEdiv_teznat_alloc = S.safe_int 45
 
 (* model interpreter/N_IEdiv_teznat_synthesized *)
-(* let time = 70. in let alloc = 44. in max time alloc *)
+(* let time = 70. in let alloc = 44. in max 10 (max time alloc) *)
 let cost_N_IEdiv_teznat_synthesized = S.safe_int 70
 
 (* model interpreter/N_IEmit_alloc *)
-(* 124. *)
+(* max 10 124. *)
 let cost_N_IEmit_alloc = S.safe_int 125
 
 (* model interpreter/N_IEmit_synthesized *)
-(* let time = 30. in let alloc = 124. in max time alloc *)
+(* let time = 30. in let alloc = 124. in max 10 (max time alloc) *)
 let cost_N_IEmit_synthesized = S.safe_int 125
 
 (* model interpreter/N_IEmpty_big_map *)
-(* 300. *)
+(* max 10 300. *)
 let cost_N_IEmpty_big_map = S.safe_int 300
 
 (* model interpreter/N_IEmpty_big_map_alloc *)
-(* 44. *)
+(* max 10 44. *)
 let cost_N_IEmpty_big_map_alloc = S.safe_int 45
 
 (* model interpreter/N_IEmpty_big_map_synthesized *)
-(* let time = 300. in let alloc = 44. in max time alloc *)
+(* let time = 300. in let alloc = 44. in max 10 (max time alloc) *)
 let cost_N_IEmpty_big_map_synthesized = S.safe_int 300
 
 (* model interpreter/N_IEmpty_map *)
-(* 300. *)
+(* max 10 300. *)
 let cost_N_IEmpty_map = S.safe_int 300
 
 (* model interpreter/N_IEmpty_map_alloc *)
-(* 248. *)
+(* max 10 248. *)
 let cost_N_IEmpty_map_alloc = S.safe_int 250
 
 (* model interpreter/N_IEmpty_map_synthesized *)
-(* let time = 300. in let alloc = 248. in max time alloc *)
+(* let time = 300. in let alloc = 248. in max 10 (max time alloc) *)
 let cost_N_IEmpty_map_synthesized = S.safe_int 300
 
 (* model interpreter/N_IEmpty_set *)
-(* 300. *)
+(* max 10 300. *)
 let cost_N_IEmpty_set = S.safe_int 300
 
 (* model interpreter/N_IEmpty_set_alloc *)
-(* 184. *)
+(* max 10 184. *)
 let cost_N_IEmpty_set_alloc = S.safe_int 185
 
 (* model interpreter/N_IEmpty_set_synthesized *)
-(* let time = 300. in let alloc = 184. in max time alloc *)
+(* let time = 300. in let alloc = 184. in max 10 (max time alloc) *)
 let cost_N_IEmpty_set_synthesized = S.safe_int 300
 
 (* model interpreter/N_IEq *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IEq = S.safe_int 10
 
 (* model interpreter/N_IEq_alloc *)
-(* 0. *)
-let cost_N_IEq_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IEq_alloc = S.safe_int 10
 
 (* model interpreter/N_IEq_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IEq_synthesized = S.safe_int 10
 
 (* model interpreter/N_IExec *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IExec = S.safe_int 10
 
 (* model interpreter/N_IExec_alloc *)
-(* 0. *)
-let cost_N_IExec_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IExec_alloc = S.safe_int 10
 
 (* model interpreter/N_IExec_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IExec_synthesized = S.safe_int 10
 
 (* model interpreter/N_IFailwith *)
-(* 167.455190659 *)
+(* max 10 167.455190659 *)
 let cost_N_IFailwith = S.safe_int 170
 
 (* model interpreter/N_IFailwith_alloc *)
-(* 0. *)
-let cost_N_IFailwith_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IFailwith_alloc = S.safe_int 10
 
 (* model interpreter/N_IFailwith_synthesized *)
-(* let time = 167.455190659 in let alloc = 0. in max time alloc *)
+(* let time = 167.455190659 in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IFailwith_synthesized = S.safe_int 170
 
 (* model interpreter/N_IGe *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IGe = S.safe_int 10
 
 (* model interpreter/N_IGe_alloc *)
-(* 0. *)
-let cost_N_IGe_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IGe_alloc = S.safe_int 10
 
 (* model interpreter/N_IGe_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IGe_synthesized = S.safe_int 10
 
 (* model interpreter/N_IGt *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IGt = S.safe_int 10
 
 (* model interpreter/N_IGt_alloc *)
-(* 0. *)
-let cost_N_IGt_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IGt_alloc = S.safe_int 10
 
 (* model interpreter/N_IGt_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IGt_synthesized = S.safe_int 10
 
 (* model interpreter/N_IHalt *)
-(* 15. *)
+(* max 10 15. *)
 let cost_N_IHalt = S.safe_int 15
 
 (* model interpreter/N_IHalt_alloc *)
-(* 0. *)
-let cost_N_IHalt_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IHalt_alloc = S.safe_int 10
 
 (* model interpreter/N_IHalt_synthesized *)
-(* let time = 15. in let alloc = 0. in max time alloc *)
+(* let time = 15. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IHalt_synthesized = S.safe_int 15
 
 (* model interpreter/N_IHash_key *)
-(* 605. *)
+(* max 10 605. *)
 let cost_N_IHash_key = S.safe_int 605
 
 (* model interpreter/N_IHash_key_alloc *)
-(* 32. *)
+(* max 10 32. *)
 let cost_N_IHash_key_alloc = S.safe_int 35
 
 (* model interpreter/N_IHash_key_synthesized *)
-(* let time = 605. in let alloc = 32. in max time alloc *)
+(* let time = 605. in let alloc = 32. in max 10 (max time alloc) *)
 let cost_N_IHash_key_synthesized = S.safe_int 605
 
 (* model interpreter/N_IIf *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IIf = S.safe_int 10
 
 (* model interpreter/N_IIf_alloc *)
-(* 0. *)
-let cost_N_IIf_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IIf_alloc = S.safe_int 10
 
 (* model interpreter/N_IIf_cons *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IIf_cons = S.safe_int 10
 
 (* model interpreter/N_IIf_cons_alloc *)
-(* 0. *)
-let cost_N_IIf_cons_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IIf_cons_alloc = S.safe_int 10
 
 (* model interpreter/N_IIf_cons_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IIf_cons_synthesized = S.safe_int 10
 
 (* model interpreter/N_IIf_left *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IIf_left = S.safe_int 10
 
 (* model interpreter/N_IIf_left_alloc *)
-(* 0. *)
-let cost_N_IIf_left_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IIf_left_alloc = S.safe_int 10
 
 (* model interpreter/N_IIf_left_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IIf_left_synthesized = S.safe_int 10
 
 (* model interpreter/N_IIf_none *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IIf_none = S.safe_int 10
 
 (* model interpreter/N_IIf_none_alloc *)
-(* 0. *)
-let cost_N_IIf_none_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IIf_none_alloc = S.safe_int 10
 
 (* model interpreter/N_IIf_none_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IIf_none_synthesized = S.safe_int 10
 
 (* model interpreter/N_IIf_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IIf_synthesized = S.safe_int 10
 
 (* model interpreter/N_IImplicit_account *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IImplicit_account = S.safe_int 10
 
 (* model interpreter/N_IImplicit_account_alloc *)
-(* 8. *)
+(* max 10 8. *)
 let cost_N_IImplicit_account_alloc = S.safe_int 10
 
 (* model interpreter/N_IImplicit_account_synthesized *)
-(* let time = 10. in let alloc = 8. in max time alloc *)
+(* let time = 10. in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_IImplicit_account_synthesized = S.safe_int 10
 
 (* model interpreter/N_IInt_bls12_381_z_fr *)
-(* 115. *)
+(* max 10 115. *)
 let cost_N_IInt_bls12_381_z_fr = S.safe_int 115
 
 (* model interpreter/N_IInt_bls12_381_z_fr_alloc *)
-(* 28. *)
+(* max 10 28. *)
 let cost_N_IInt_bls12_381_z_fr_alloc = S.safe_int 30
 
 (* model interpreter/N_IInt_bls12_381_z_fr_synthesized *)
-(* let time = 115. in let alloc = 28. in max time alloc *)
+(* let time = 115. in let alloc = 28. in max 10 (max time alloc) *)
 let cost_N_IInt_bls12_381_z_fr_synthesized = S.safe_int 115
 
 (* model interpreter/N_IInt_bytes *)
-(* fun size -> 20. + (2.5 * size) *)
+(* fun size -> max 10 (20. + (2.5 * size)) *)
 let cost_N_IInt_bytes size =
   let size = S.safe_int size in
   (size lsr 1) + (size * S.safe_int 2) + S.safe_int 20
 
 (* model interpreter/N_IInt_bytes_alloc *)
-(* fun size -> 15.3727158555 + (0.505091365778 * size) *)
+(* fun size -> max 10 (15.3727158555 + (0.505091365778 * size)) *)
 let cost_N_IInt_bytes_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 15
@@ -1675,7 +1712,8 @@ let cost_N_IInt_bytes_alloc size =
 (* model interpreter/N_IInt_bytes_synthesized *)
 (* fun size ->
      let time = 20. + (2.5 * size) in
-     let alloc = 15.3727158555 + (0.505091365778 * size) in max time alloc *)
+     let alloc = 15.3727158555 + (0.505091365778 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IInt_bytes_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
@@ -1684,27 +1722,27 @@ let cost_N_IInt_bytes_synthesized size =
     (w1 + (size lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_IInt_nat *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IInt_nat = S.safe_int 10
 
 (* model interpreter/N_IInt_nat_alloc *)
-(* 0. *)
-let cost_N_IInt_nat_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IInt_nat_alloc = S.safe_int 10
 
 (* model interpreter/N_IInt_nat_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IInt_nat_synthesized = S.safe_int 10
 
 (* model interpreter/N_IIs_nat *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IIs_nat = S.safe_int 10
 
 (* model interpreter/N_IIs_nat_alloc *)
-(* 8. *)
+(* max 10 8. *)
 let cost_N_IIs_nat_alloc = S.safe_int 10
 
 (* model interpreter/N_IIs_nat_synthesized *)
-(* let time = 10. in let alloc = 8. in max time alloc *)
+(* let time = 10. in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_IIs_nat_synthesized = S.safe_int 10
 
 (* model interpreter/N_IJoin_tickets *)
@@ -1712,8 +1750,9 @@ let cost_N_IIs_nat_synthesized = S.safe_int 10
      fun content_size_y ->
        fun amount_size_x ->
          fun amount_size_y ->
-           (88.1705426747 + (0. * (min content_size_x content_size_y))) +
-             (0.0788934824125 * (max amount_size_x amount_size_y)) *)
+           max 10
+             ((88.1705426747 + (0. * (min content_size_x content_size_y))) +
+                (0.0788934824125 * (max amount_size_x amount_size_y))) *)
 let cost_N_IJoin_tickets _content_size_x _content_size_y amount_size_x
     amount_size_y =
   let amount_size_x = S.safe_int amount_size_x in
@@ -1726,8 +1765,9 @@ let cost_N_IJoin_tickets _content_size_x _content_size_y amount_size_x
      fun content_size_y ->
        fun amount_size_x ->
          fun amount_size_y ->
-           42.1137922063 +
-             (0.500124881342 * (max amount_size_x amount_size_y)) *)
+           max 10
+             (42.1137922063 +
+                (0.500124881342 * (max amount_size_x amount_size_y))) *)
 let cost_N_IJoin_tickets_alloc _content_size_x _content_size_y amount_size_x
     amount_size_y =
   let amount_size_x = S.safe_int amount_size_x in
@@ -1746,7 +1786,7 @@ let cost_N_IJoin_tickets_alloc _content_size_x _content_size_y amount_size_x
            let alloc =
              42.1137922063 +
                (0.500124881342 * (max amount_size_x amount_size_y)) in
-           max time alloc *)
+           max 10 (max time alloc) *)
 let cost_N_IJoin_tickets_synthesized _content_size_x _content_size_y
     amount_size_x amount_size_y =
   let amount_size_x = S.safe_int amount_size_x in
@@ -1758,183 +1798,185 @@ let cost_N_IJoin_tickets_synthesized _content_size_x _content_size_y
     ((w1 lsr 1) + w2 + S.safe_int 45)
 
 (* model interpreter/N_IKeccak *)
-(* fun size -> 1350. + (8.25 * size) *)
+(* fun size -> max 10 (1350. + (8.25 * size)) *)
 let cost_N_IKeccak size =
   let size = S.safe_int size in
   (size lsr 2) + (size * S.safe_int 8) + S.safe_int 1350
 
 (* model interpreter/N_IKeccak_alloc *)
-(* fun size -> 24. *)
+(* fun size -> max 10 24. *)
 let cost_N_IKeccak_alloc _size = S.safe_int 25
 
 (* model interpreter/N_IKeccak_synthesized *)
 (* fun size ->
-     let time = 1350. + (8.25 * size) in let alloc = 24. in max time alloc *)
+     let time = 1350. + (8.25 * size) in
+     let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_IKeccak_synthesized size =
   let size = S.safe_int size in
   (size lsr 2) + (size * S.safe_int 8) + S.safe_int 1350
 
 (* model interpreter/N_ILambda *)
-(* max 10. 10. *)
+(* max 10 (max 10. 10.) *)
 let cost_N_ILambda = S.safe_int 10
 
 (* model interpreter/N_ILambda_lam *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILambda_lam = S.safe_int 10
 
 (* model interpreter/N_ILambda_lam_alloc *)
-(* 68. *)
+(* max 10 68. *)
 let cost_N_ILambda_lam_alloc = S.safe_int 70
 
 (* model interpreter/N_ILambda_lam_synthesized *)
-(* let time = 10. in let alloc = 68. in max time alloc *)
+(* let time = 10. in let alloc = 68. in max 10 (max time alloc) *)
 let cost_N_ILambda_lam_synthesized = S.safe_int 70
 
 (* model interpreter/N_ILambda_lamrec *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILambda_lamrec = S.safe_int 10
 
 (* model interpreter/N_ILambda_lamrec_alloc *)
-(* 140. *)
+(* max 10 140. *)
 let cost_N_ILambda_lamrec_alloc = S.safe_int 140
 
 (* model interpreter/N_ILambda_lamrec_synthesized *)
-(* let time = 10. in let alloc = 140. in max time alloc *)
+(* let time = 10. in let alloc = 140. in max 10 (max time alloc) *)
 let cost_N_ILambda_lamrec_synthesized = S.safe_int 140
 
 (* model interpreter/N_ILe *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILe = S.safe_int 10
 
 (* model interpreter/N_ILe_alloc *)
-(* 0. *)
-let cost_N_ILe_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ILe_alloc = S.safe_int 10
 
 (* model interpreter/N_ILe_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ILe_synthesized = S.safe_int 10
 
 (* model interpreter/N_ILeft *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILeft = S.safe_int 10
 
 (* model interpreter/N_ILeft_alloc *)
-(* 8. *)
+(* max 10 8. *)
 let cost_N_ILeft_alloc = S.safe_int 10
 
 (* model interpreter/N_ILeft_synthesized *)
-(* let time = 10. in let alloc = 8. in max time alloc *)
+(* let time = 10. in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_ILeft_synthesized = S.safe_int 10
 
 (* model interpreter/N_ILevel *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILevel = S.safe_int 10
 
 (* model interpreter/N_ILevel_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_ILevel_alloc = S.safe_int 15
 
 (* model interpreter/N_ILevel_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_ILevel_synthesized = S.safe_int 15
 
 (* model interpreter/N_IList_iter *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_IList_iter = S.safe_int 20
 
 (* model interpreter/N_IList_iter_alloc *)
-(* 0. *)
-let cost_N_IList_iter_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IList_iter_alloc = S.safe_int 10
 
 (* model interpreter/N_IList_iter_synthesized *)
-(* let time = 20. in let alloc = 0. in max time alloc *)
+(* let time = 20. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IList_iter_synthesized = S.safe_int 20
 
 (* model interpreter/N_IList_map *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_IList_map = S.safe_int 20
 
 (* model interpreter/N_IList_map_alloc *)
-(* 1. *)
-let cost_N_IList_map_alloc = S.safe_int 5
+(* max 10 1. *)
+let cost_N_IList_map_alloc = S.safe_int 10
 
 (* model interpreter/N_IList_map_synthesized *)
-(* let time = 20. in let alloc = 1. in max time alloc *)
+(* let time = 20. in let alloc = 1. in max 10 (max time alloc) *)
 let cost_N_IList_map_synthesized = S.safe_int 20
 
 (* model interpreter/N_IList_size *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IList_size = S.safe_int 10
 
 (* model interpreter/N_IList_size_alloc *)
-(* 0. *)
-let cost_N_IList_size_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IList_size_alloc = S.safe_int 10
 
 (* model interpreter/N_IList_size_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IList_size_synthesized = S.safe_int 10
 
 (* model interpreter/N_ILoop *)
-(* max 10. 1.01451868265 *)
+(* max 10 (max 10. 1.01451868265) *)
 let cost_N_ILoop = S.safe_int 10
 
 (* model interpreter/N_ILoop_in *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILoop_in = S.safe_int 10
 
 (* model interpreter/N_ILoop_in_alloc *)
-(* 0. *)
-let cost_N_ILoop_in_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ILoop_in_alloc = S.safe_int 10
 
 (* model interpreter/N_ILoop_in_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ILoop_in_synthesized = S.safe_int 10
 
 (* model interpreter/N_ILoop_left *)
-(* max 10. 10. *)
+(* max 10 (max 10. 10.) *)
 let cost_N_ILoop_left = S.safe_int 10
 
 (* model interpreter/N_ILoop_left_in *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILoop_left_in = S.safe_int 10
 
 (* model interpreter/N_ILoop_left_in_alloc *)
-(* 0. *)
-let cost_N_ILoop_left_in_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ILoop_left_in_alloc = S.safe_int 10
 
 (* model interpreter/N_ILoop_left_in_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ILoop_left_in_synthesized = S.safe_int 10
 
 (* model interpreter/N_ILoop_left_out *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILoop_left_out = S.safe_int 10
 
 (* model interpreter/N_ILoop_left_out_alloc *)
-(* 0. *)
-let cost_N_ILoop_left_out_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ILoop_left_out_alloc = S.safe_int 10
 
 (* model interpreter/N_ILoop_left_out_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ILoop_left_out_synthesized = S.safe_int 10
 
 (* model interpreter/N_ILoop_out *)
-(* 1.01451868265 *)
-let cost_N_ILoop_out = S.safe_int 5
+(* max 10 1.01451868265 *)
+let cost_N_ILoop_out = S.safe_int 10
 
 (* model interpreter/N_ILoop_out_alloc *)
-(* 0. *)
-let cost_N_ILoop_out_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ILoop_out_alloc = S.safe_int 10
 
 (* model interpreter/N_ILoop_out_synthesized *)
-(* let time = 1.01451868265 in let alloc = 0. in max time alloc *)
-let cost_N_ILoop_out_synthesized = S.safe_int 5
+(* let time = 1.01451868265 in let alloc = 0. in max 10 (max time alloc) *)
+let cost_N_ILoop_out_synthesized = S.safe_int 10
 
 (* model interpreter/N_ILsl_bytes_alloc *)
 (* fun size1 ->
      fun size2 ->
-       (11.757438371 + (0.500014421862 * size1)) +
-         (0.0624426926223 * (sub size2 1)) *)
+       max 10
+         ((11.757438371 + (0.500014421862 * size1)) +
+            (0.0624426926223 * (sub size2 1))) *)
 let cost_N_ILsl_bytes_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1948,7 +1990,7 @@ let cost_N_ILsl_bytes_alloc size1 size2 =
        let alloc =
          (11.757438371 + (0.500014421862 * size1)) +
            (0.0624426926223 * (sub size2 1)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_ILsl_bytes_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1956,7 +1998,7 @@ let cost_N_ILsl_bytes_synthesized size1 size2 =
   S.max (w1 + (size1 lsr 2) + S.safe_int 65) (w1 + (size1 lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_ILsl_nat_alloc *)
-(* fun size -> 29.0640101265 + (0.500355618928 * size) *)
+(* fun size -> max 10 (29.0640101265 + (0.500355618928 * size)) *)
 let cost_N_ILsl_nat_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 30
@@ -1964,7 +2006,8 @@ let cost_N_ILsl_nat_alloc size =
 (* model interpreter/N_ILsl_nat_synthesized *)
 (* fun size ->
      let time = 128. + (0.5 * size) in
-     let alloc = 29.0640101265 + (0.500355618928 * size) in max time alloc *)
+     let alloc = 29.0640101265 + (0.500355618928 * size) in
+     max 10 (max time alloc) *)
 let cost_N_ILsl_nat_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
@@ -1972,7 +2015,8 @@ let cost_N_ILsl_nat_synthesized size =
 
 (* model interpreter/N_ILsr_bytes *)
 (* fun size1 ->
-     fun size2 -> let q = sub size1 (size2 * 0.125) in 55. + (0.75 * q) *)
+     fun size2 ->
+       let q = sub size1 (size2 * 0.125) in max 10 (55. + (0.75 * q)) *)
 let cost_N_ILsr_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1983,7 +2027,7 @@ let cost_N_ILsr_bytes size1 size2 =
 (* fun size1 ->
      fun size2 ->
        let q = sub size1 (size2 * 0.125) in
-       11.1748222186 + (0.499974561517 * q) *)
+       max 10 (11.1748222186 + (0.499974561517 * q)) *)
 let cost_N_ILsr_bytes_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1996,7 +2040,7 @@ let cost_N_ILsr_bytes_alloc size1 size2 =
        let alloc =
          let q = sub size1 (size2 * 0.125) in
          11.1748222186 + (0.499974561517 * q) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_ILsr_bytes_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2004,13 +2048,13 @@ let cost_N_ILsr_bytes_synthesized size1 size2 =
   (w1 lsr 1) + (w1 lsr 2) + S.safe_int 55
 
 (* model interpreter/N_ILsr_nat *)
-(* fun size -> 45. + (0.5 * size) *)
+(* fun size -> max 10 (45. + (0.5 * size)) *)
 let cost_N_ILsr_nat size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 45
 
 (* model interpreter/N_ILsr_nat_alloc *)
-(* fun size -> 19.6693071446 + (0.500176652166 * size) *)
+(* fun size -> max 10 (19.6693071446 + (0.500176652166 * size)) *)
 let cost_N_ILsr_nat_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 20
@@ -2018,26 +2062,28 @@ let cost_N_ILsr_nat_alloc size =
 (* model interpreter/N_ILsr_nat_synthesized *)
 (* fun size ->
      let time = 45. + (0.5 * size) in
-     let alloc = 19.6693071446 + (0.500176652166 * size) in max time alloc *)
+     let alloc = 19.6693071446 + (0.500176652166 * size) in
+     max 10 (max time alloc) *)
 let cost_N_ILsr_nat_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
   S.max (w1 + S.safe_int 45) (w1 + (size lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_ILt *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ILt = S.safe_int 10
 
 (* model interpreter/N_ILt_alloc *)
-(* 0. *)
-let cost_N_ILt_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ILt_alloc = S.safe_int 10
 
 (* model interpreter/N_ILt_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ILt_synthesized = S.safe_int 10
 
 (* model interpreter/N_IMap_get *)
-(* fun size1 -> fun size2 -> 45. + (0.046875 * (size1 * (log2 (1 + size2)))) *)
+(* fun size1 ->
+     fun size2 -> max 10 (45. + (0.046875 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IMap_get size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2045,11 +2091,12 @@ let cost_N_IMap_get size1 size2 =
   (w3 lsr 5) + (w3 lsr 6) + S.safe_int 45
 
 (* model interpreter/N_IMap_get_alloc *)
-(* fun size1 -> fun size2 -> 8. *)
+(* fun size1 -> fun size2 -> max 10 8. *)
 let cost_N_IMap_get_alloc _size1 _size2 = S.safe_int 10
 
 (* model interpreter/N_IMap_get_and_update *)
-(* fun size1 -> fun size2 -> 75. + (0.140625 * (size1 * (log2 (1 + size2)))) *)
+(* fun size1 ->
+     fun size2 -> max 10 (75. + (0.140625 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IMap_get_and_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2058,7 +2105,8 @@ let cost_N_IMap_get_and_update size1 size2 =
 
 (* model interpreter/N_IMap_get_and_update_alloc *)
 (* fun size1 ->
-     fun size2 -> (27.8275684249 * (log2 (1 + size2))) + 90.906332394 *)
+     fun size2 ->
+       max 10 ((27.8275684249 * (log2 (1 + size2))) + 90.906332394) *)
 let cost_N_IMap_get_and_update_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   (log2 (size2 + S.safe_int 1) * S.safe_int 28) + S.safe_int 95
@@ -2068,7 +2116,7 @@ let cost_N_IMap_get_and_update_alloc _size1 size2 =
      fun size2 ->
        let time = 75. + (0.140625 * (size1 * (log2 (1 + size2)))) in
        let alloc = (27.8275684249 * (log2 (1 + size2))) + 90.906332394 in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IMap_get_and_update_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2082,7 +2130,7 @@ let cost_N_IMap_get_and_update_synthesized size1 size2 =
 (* fun size1 ->
      fun size2 ->
        let time = 45. + (0.046875 * (size1 * (log2 (1 + size2)))) in
-       let alloc = 8. in max time alloc *)
+       let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_IMap_get_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2090,41 +2138,44 @@ let cost_N_IMap_get_synthesized size1 size2 =
   (w3 lsr 5) + (w3 lsr 6) + S.safe_int 45
 
 (* model interpreter/N_IMap_iter *)
-(* fun size -> 50. + (7.625 * size) *)
+(* fun size -> max 10 (50. + (7.625 * size)) *)
 let cost_N_IMap_iter size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 3) + (size * S.safe_int 7) + S.safe_int 50
 
 (* model interpreter/N_IMap_iter_alloc *)
-(* fun size -> 0. *)
-let cost_N_IMap_iter_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_IMap_iter_alloc _size = S.safe_int 10
 
 (* model interpreter/N_IMap_iter_synthesized *)
 (* fun size ->
-     let time = 50. + (7.625 * size) in let alloc = 0. in max time alloc *)
+     let time = 50. + (7.625 * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IMap_iter_synthesized size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 3) + (size * S.safe_int 7) + S.safe_int 50
 
 (* model interpreter/N_IMap_map *)
-(* fun size -> 40. + (8.5 * size) *)
+(* fun size -> max 10 (40. + (8.5 * size)) *)
 let cost_N_IMap_map size =
   let size = S.safe_int size in
   (size lsr 1) + (size * S.safe_int 8) + S.safe_int 40
 
 (* model interpreter/N_IMap_map_alloc *)
-(* fun size -> 0. *)
-let cost_N_IMap_map_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_IMap_map_alloc _size = S.safe_int 10
 
 (* model interpreter/N_IMap_map_synthesized *)
 (* fun size ->
-     let time = 40. + (8.5 * size) in let alloc = 0. in max time alloc *)
+     let time = 40. + (8.5 * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IMap_map_synthesized size =
   let size = S.safe_int size in
   (size lsr 1) + (size * S.safe_int 8) + S.safe_int 40
 
 (* model interpreter/N_IMap_mem *)
-(* fun size1 -> fun size2 -> 45. + (0.046875 * (size1 * (log2 (1 + size2)))) *)
+(* fun size1 ->
+     fun size2 -> max 10 (45. + (0.046875 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IMap_mem size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2132,14 +2183,14 @@ let cost_N_IMap_mem size1 size2 =
   (w3 lsr 5) + (w3 lsr 6) + S.safe_int 45
 
 (* model interpreter/N_IMap_mem_alloc *)
-(* fun size1 -> fun size2 -> 0. *)
-let cost_N_IMap_mem_alloc _size1 _size2 = S.safe_int 0
+(* fun size1 -> fun size2 -> max 10 0. *)
+let cost_N_IMap_mem_alloc _size1 _size2 = S.safe_int 10
 
 (* model interpreter/N_IMap_mem_synthesized *)
 (* fun size1 ->
      fun size2 ->
        let time = 45. + (0.046875 * (size1 * (log2 (1 + size2)))) in
-       let alloc = 0. in max time alloc *)
+       let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IMap_mem_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2147,19 +2198,20 @@ let cost_N_IMap_mem_synthesized size1 size2 =
   (w3 lsr 5) + (w3 lsr 6) + S.safe_int 45
 
 (* model interpreter/N_IMap_size *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IMap_size = S.safe_int 10
 
 (* model interpreter/N_IMap_size_alloc *)
-(* 0. *)
-let cost_N_IMap_size_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IMap_size_alloc = S.safe_int 10
 
 (* model interpreter/N_IMap_size_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IMap_size_synthesized = S.safe_int 10
 
 (* model interpreter/N_IMap_update *)
-(* fun size1 -> fun size2 -> 55. + (0.09375 * (size1 * (log2 (1 + size2)))) *)
+(* fun size1 ->
+     fun size2 -> max 10 (55. + (0.09375 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_IMap_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2168,7 +2220,8 @@ let cost_N_IMap_update size1 size2 =
 
 (* model interpreter/N_IMap_update_alloc *)
 (* fun size1 ->
-     fun size2 -> (27.8275684249 * (log2 (1 + size2))) + 78.906332394 *)
+     fun size2 ->
+       max 10 ((27.8275684249 * (log2 (1 + size2))) + 78.906332394) *)
 let cost_N_IMap_update_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   (log2 (size2 + S.safe_int 1) * S.safe_int 28) + S.safe_int 80
@@ -2178,7 +2231,7 @@ let cost_N_IMap_update_alloc _size1 size2 =
      fun size2 ->
        let time = 55. + (0.09375 * (size1 * (log2 (1 + size2)))) in
        let alloc = (27.8275684249 * (log2 (1 + size2))) + 78.906332394 in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IMap_update_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2189,83 +2242,85 @@ let cost_N_IMap_update_synthesized size1 size2 =
     ((w1 * S.safe_int 28) + S.safe_int 80)
 
 (* model interpreter/N_IMin_block_time *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_IMin_block_time = S.safe_int 20
 
 (* model interpreter/N_IMin_block_time_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IMin_block_time_alloc = S.safe_int 15
 
 (* model interpreter/N_IMin_block_time_synthesized *)
-(* let time = 20. in let alloc = 12. in max time alloc *)
+(* let time = 20. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IMin_block_time_synthesized = S.safe_int 20
 
 (* model interpreter/N_IMul_bls12_381_fr *)
-(* 45. *)
+(* max 10 45. *)
 let cost_N_IMul_bls12_381_fr = S.safe_int 45
 
 (* model interpreter/N_IMul_bls12_381_fr_alloc *)
-(* 24. *)
+(* max 10 24. *)
 let cost_N_IMul_bls12_381_fr_alloc = S.safe_int 25
 
 (* model interpreter/N_IMul_bls12_381_fr_synthesized *)
-(* let time = 45. in let alloc = 24. in max time alloc *)
+(* let time = 45. in let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_IMul_bls12_381_fr_synthesized = S.safe_int 45
 
 (* model interpreter/N_IMul_bls12_381_fr_z *)
-(* fun size -> 265. + (1.0625 * size) *)
+(* fun size -> max 10 (265. + (1.0625 * size)) *)
 let cost_N_IMul_bls12_381_fr_z size =
   let size = S.safe_int size in
   (size lsr 4) + size + S.safe_int 265
 
 (* model interpreter/N_IMul_bls12_381_fr_z_alloc *)
-(* fun size -> 24. *)
+(* fun size -> max 10 24. *)
 let cost_N_IMul_bls12_381_fr_z_alloc _size = S.safe_int 25
 
 (* model interpreter/N_IMul_bls12_381_fr_z_synthesized *)
 (* fun size ->
-     let time = 265. + (1.0625 * size) in let alloc = 24. in max time alloc *)
+     let time = 265. + (1.0625 * size) in
+     let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_IMul_bls12_381_fr_z_synthesized size =
   let size = S.safe_int size in
   (size lsr 4) + size + S.safe_int 265
 
 (* model interpreter/N_IMul_bls12_381_g1 *)
-(* 103000. *)
+(* max 10 103000. *)
 let cost_N_IMul_bls12_381_g1 = S.safe_int 103000
 
 (* model interpreter/N_IMul_bls12_381_g1_alloc *)
-(* 80. *)
+(* max 10 80. *)
 let cost_N_IMul_bls12_381_g1_alloc = S.safe_int 80
 
 (* model interpreter/N_IMul_bls12_381_g1_synthesized *)
-(* let time = 103000. in let alloc = 80. in max time alloc *)
+(* let time = 103000. in let alloc = 80. in max 10 (max time alloc) *)
 let cost_N_IMul_bls12_381_g1_synthesized = S.safe_int 103000
 
 (* model interpreter/N_IMul_bls12_381_g2 *)
-(* 220000. *)
+(* max 10 220000. *)
 let cost_N_IMul_bls12_381_g2 = S.safe_int 220000
 
 (* model interpreter/N_IMul_bls12_381_g2_alloc *)
-(* 152. *)
+(* max 10 152. *)
 let cost_N_IMul_bls12_381_g2_alloc = S.safe_int 155
 
 (* model interpreter/N_IMul_bls12_381_g2_synthesized *)
-(* let time = 220000. in let alloc = 152. in max time alloc *)
+(* let time = 220000. in let alloc = 152. in max 10 (max time alloc) *)
 let cost_N_IMul_bls12_381_g2_synthesized = S.safe_int 220000
 
 (* model interpreter/N_IMul_bls12_381_z_fr *)
-(* fun size -> 265. + (1.0625 * size) *)
+(* fun size -> max 10 (265. + (1.0625 * size)) *)
 let cost_N_IMul_bls12_381_z_fr size =
   let size = S.safe_int size in
   (size lsr 4) + size + S.safe_int 265
 
 (* model interpreter/N_IMul_bls12_381_z_fr_alloc *)
-(* fun size -> 24. *)
+(* fun size -> max 10 24. *)
 let cost_N_IMul_bls12_381_z_fr_alloc _size = S.safe_int 25
 
 (* model interpreter/N_IMul_bls12_381_z_fr_synthesized *)
 (* fun size ->
-     let time = 265. + (1.0625 * size) in let alloc = 24. in max time alloc *)
+     let time = 265. + (1.0625 * size) in
+     let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_IMul_bls12_381_z_fr_synthesized size =
   let size = S.safe_int size in
   (size lsr 4) + size + S.safe_int 265
@@ -2273,7 +2328,8 @@ let cost_N_IMul_bls12_381_z_fr_synthesized size =
 (* model interpreter/N_IMul_int *)
 (* fun size1 ->
      fun size2 ->
-       let a = size1 + size2 in (0.8125 * (a * (log2 (1 + a)))) + 55. *)
+       let a = size1 + size2 in
+       max 10 ((0.8125 * (a * (log2 (1 + a)))) + 55.) *)
 let cost_N_IMul_int size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2283,7 +2339,7 @@ let cost_N_IMul_int size1 size2 =
 
 (* model interpreter/N_IMul_int_alloc *)
 (* fun size1 ->
-     fun size2 -> 16.9221412881 + (0.500135612537 * (size1 + size2)) *)
+     fun size2 -> max 10 (16.9221412881 + (0.500135612537 * (size1 + size2))) *)
 let cost_N_IMul_int_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2296,7 +2352,7 @@ let cost_N_IMul_int_alloc size1 size2 =
        let time =
          let a = size1 + size2 in (0.8125 * (a * (log2 (1 + a)))) + 55. in
        let alloc = 16.9221412881 + (0.500135612537 * (size1 + size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IMul_int_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2309,7 +2365,8 @@ let cost_N_IMul_int_synthesized size1 size2 =
 (* model interpreter/N_IMul_nat *)
 (* fun size1 ->
      fun size2 ->
-       let a = size1 + size2 in (0.8125 * (a * (log2 (1 + a)))) + 55. *)
+       let a = size1 + size2 in
+       max 10 ((0.8125 * (a * (log2 (1 + a)))) + 55.) *)
 let cost_N_IMul_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2319,7 +2376,7 @@ let cost_N_IMul_nat size1 size2 =
 
 (* model interpreter/N_IMul_nat_alloc *)
 (* fun size1 ->
-     fun size2 -> 15.2155091333 + (0.500139029901 * (size1 + size2)) *)
+     fun size2 -> max 10 (15.2155091333 + (0.500139029901 * (size1 + size2))) *)
 let cost_N_IMul_nat_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2332,7 +2389,7 @@ let cost_N_IMul_nat_alloc size1 size2 =
        let time =
          let a = size1 + size2 in (0.8125 * (a * (log2 (1 + a)))) + 55. in
        let alloc = 15.2155091333 + (0.500139029901 * (size1 + size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IMul_nat_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2343,37 +2400,37 @@ let cost_N_IMul_nat_synthesized size1 size2 =
     ((w3 lsr 1) + (w3 lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_IMul_nattez *)
-(* 50. *)
+(* max 10 50. *)
 let cost_N_IMul_nattez = S.safe_int 50
 
 (* model interpreter/N_IMul_nattez_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IMul_nattez_alloc = S.safe_int 15
 
 (* model interpreter/N_IMul_nattez_synthesized *)
-(* let time = 50. in let alloc = 12. in max time alloc *)
+(* let time = 50. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IMul_nattez_synthesized = S.safe_int 50
 
 (* model interpreter/N_IMul_teznat *)
-(* 50. *)
+(* max 10 50. *)
 let cost_N_IMul_teznat = S.safe_int 50
 
 (* model interpreter/N_IMul_teznat_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IMul_teznat_alloc = S.safe_int 15
 
 (* model interpreter/N_IMul_teznat_synthesized *)
-(* let time = 50. in let alloc = 12. in max time alloc *)
+(* let time = 50. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IMul_teznat_synthesized = S.safe_int 50
 
 (* model interpreter/N_INat_bytes *)
-(* fun size -> 45. + (2.5 * size) *)
+(* fun size -> max 10 (45. + (2.5 * size)) *)
 let cost_N_INat_bytes size =
   let size = S.safe_int size in
   (size lsr 1) + (size * S.safe_int 2) + S.safe_int 45
 
 (* model interpreter/N_INat_bytes_alloc *)
-(* fun size -> 15.3744531872 + (0.505021872511 * size) *)
+(* fun size -> max 10 (15.3744531872 + (0.505021872511 * size)) *)
 let cost_N_INat_bytes_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 15
@@ -2381,7 +2438,8 @@ let cost_N_INat_bytes_alloc size =
 (* model interpreter/N_INat_bytes_synthesized *)
 (* fun size ->
      let time = 45. + (2.5 * size) in
-     let alloc = 15.3744531872 + (0.505021872511 * size) in max time alloc *)
+     let alloc = 15.3744531872 + (0.505021872511 * size) in
+     max 10 (max time alloc) *)
 let cost_N_INat_bytes_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
@@ -2390,102 +2448,103 @@ let cost_N_INat_bytes_synthesized size =
     (w1 + (size lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_INeg *)
-(* fun size -> 25. + (0.5 * size) *)
+(* fun size -> max 10 (25. + (0.5 * size)) *)
 let cost_N_INeg size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 25
 
 (* model interpreter/N_INeg_alloc *)
-(* fun size -> 15.6123273039 + (0.500207090115 * size) *)
+(* fun size -> max 10 (15.6123273039 + (0.500207090115 * size)) *)
 let cost_N_INeg_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 20
 
 (* model interpreter/N_INeg_bls12_381_fr *)
-(* 30. *)
+(* max 10 30. *)
 let cost_N_INeg_bls12_381_fr = S.safe_int 30
 
 (* model interpreter/N_INeg_bls12_381_fr_alloc *)
-(* 24. *)
+(* max 10 24. *)
 let cost_N_INeg_bls12_381_fr_alloc = S.safe_int 25
 
 (* model interpreter/N_INeg_bls12_381_fr_synthesized *)
-(* let time = 30. in let alloc = 24. in max time alloc *)
+(* let time = 30. in let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_INeg_bls12_381_fr_synthesized = S.safe_int 30
 
 (* model interpreter/N_INeg_bls12_381_g1 *)
-(* 50. *)
+(* max 10 50. *)
 let cost_N_INeg_bls12_381_g1 = S.safe_int 50
 
 (* model interpreter/N_INeg_bls12_381_g1_alloc *)
-(* 80. *)
+(* max 10 80. *)
 let cost_N_INeg_bls12_381_g1_alloc = S.safe_int 80
 
 (* model interpreter/N_INeg_bls12_381_g1_synthesized *)
-(* let time = 50. in let alloc = 80. in max time alloc *)
+(* let time = 50. in let alloc = 80. in max 10 (max time alloc) *)
 let cost_N_INeg_bls12_381_g1_synthesized = S.safe_int 80
 
 (* model interpreter/N_INeg_bls12_381_g2 *)
-(* 70. *)
+(* max 10 70. *)
 let cost_N_INeg_bls12_381_g2 = S.safe_int 70
 
 (* model interpreter/N_INeg_bls12_381_g2_alloc *)
-(* 152. *)
+(* max 10 152. *)
 let cost_N_INeg_bls12_381_g2_alloc = S.safe_int 155
 
 (* model interpreter/N_INeg_bls12_381_g2_synthesized *)
-(* let time = 70. in let alloc = 152. in max time alloc *)
+(* let time = 70. in let alloc = 152. in max 10 (max time alloc) *)
 let cost_N_INeg_bls12_381_g2_synthesized = S.safe_int 155
 
 (* model interpreter/N_INeg_synthesized *)
 (* fun size ->
      let time = 25. + (0.5 * size) in
-     let alloc = 15.6123273039 + (0.500207090115 * size) in max time alloc *)
+     let alloc = 15.6123273039 + (0.500207090115 * size) in
+     max 10 (max time alloc) *)
 let cost_N_INeg_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
   S.max (w1 + S.safe_int 25) (w1 + (size lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_INeq *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_INeq = S.safe_int 10
 
 (* model interpreter/N_INeq_alloc *)
-(* 0. *)
-let cost_N_INeq_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_INeq_alloc = S.safe_int 10
 
 (* model interpreter/N_INeq_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_INeq_synthesized = S.safe_int 10
 
 (* model interpreter/N_INil *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_INil = S.safe_int 10
 
 (* model interpreter/N_INil_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_INil_alloc = S.safe_int 15
 
 (* model interpreter/N_INil_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_INil_synthesized = S.safe_int 15
 
 (* model interpreter/N_INot *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_INot = S.safe_int 10
 
 (* model interpreter/N_INot_alloc *)
-(* 0. *)
-let cost_N_INot_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_INot_alloc = S.safe_int 10
 
 (* model interpreter/N_INot_bytes *)
-(* fun size -> 30. + (0.5 * size) *)
+(* fun size -> max 10 (30. + (0.5 * size)) *)
 let cost_N_INot_bytes size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 30
 
 (* model interpreter/N_INot_bytes_alloc *)
-(* fun size -> 10.5493304199 + (0.499980342588 * size) *)
+(* fun size -> max 10 (10.5493304199 + (0.499980342588 * size)) *)
 let cost_N_INot_bytes_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 15
@@ -2493,19 +2552,20 @@ let cost_N_INot_bytes_alloc size =
 (* model interpreter/N_INot_bytes_synthesized *)
 (* fun size ->
      let time = 30. + (0.5 * size) in
-     let alloc = 10.5493304199 + (0.499980342588 * size) in max time alloc *)
+     let alloc = 10.5493304199 + (0.499980342588 * size) in
+     max 10 (max time alloc) *)
 let cost_N_INot_bytes_synthesized size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 30
 
 (* model interpreter/N_INot_int *)
-(* fun size -> 25. + (0.5 * size) *)
+(* fun size -> max 10 (25. + (0.5 * size)) *)
 let cost_N_INot_int size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 25
 
 (* model interpreter/N_INot_int_alloc *)
-(* fun size -> 19.5017942553 + (0.500266135547 * size) *)
+(* fun size -> max 10 (19.5017942553 + (0.500266135547 * size)) *)
 let cost_N_INot_int_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 20
@@ -2513,31 +2573,33 @@ let cost_N_INot_int_alloc size =
 (* model interpreter/N_INot_int_synthesized *)
 (* fun size ->
      let time = 25. + (0.5 * size) in
-     let alloc = 19.5017942553 + (0.500266135547 * size) in max time alloc *)
+     let alloc = 19.5017942553 + (0.500266135547 * size) in
+     max 10 (max time alloc) *)
 let cost_N_INot_int_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
   S.max (w1 + S.safe_int 25) (w1 + (size lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_INot_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_INot_synthesized = S.safe_int 10
 
 (* model interpreter/N_INow *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_INow = S.safe_int 10
 
 (* model interpreter/N_INow_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_INow_alloc = S.safe_int 15
 
 (* model interpreter/N_INow_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_INow_synthesized = S.safe_int 15
 
 (* model interpreter/N_IOpen_chest *)
 (* fun size1 ->
-     fun size2 -> (919000. + (22528. * (sub size1 1))) + (3.25 * size2) *)
+     fun size2 ->
+       max 10 ((919000. + (22528. * (sub size1 1))) + (3.25 * size2)) *)
 let cost_N_IOpen_chest size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2549,8 +2611,9 @@ let cost_N_IOpen_chest size1 size2 =
 (* model interpreter/N_IOpen_chest_alloc *)
 (* fun size1 ->
      fun size2 ->
-       (15.4181598756 + (0.25261512656 * (sub size1 1))) +
-         (0.500643059623 * size2) *)
+       max 10
+         ((15.4181598756 + (0.25261512656 * (sub size1 1))) +
+            (0.500643059623 * size2)) *)
 let cost_N_IOpen_chest_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2564,7 +2627,7 @@ let cost_N_IOpen_chest_alloc size1 size2 =
        let alloc =
          (15.4181598756 + (0.25261512656 * (sub size1 1))) +
            (0.500643059623 * size2) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IOpen_chest_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2577,43 +2640,43 @@ let cost_N_IOpen_chest_synthesized size1 size2 =
     ((w1 lsr 2) + (w1 lsr 7) + (size2 lsr 1) + (size2 lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_IOpt_map *)
-(* max 10. 0. *)
+(* max 10 (max 10. 0.) *)
 let cost_N_IOpt_map = S.safe_int 10
 
 (* model interpreter/N_IOpt_map_none *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IOpt_map_none = S.safe_int 10
 
 (* model interpreter/N_IOpt_map_none_alloc *)
-(* 0. *)
-let cost_N_IOpt_map_none_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IOpt_map_none_alloc = S.safe_int 10
 
 (* model interpreter/N_IOpt_map_none_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IOpt_map_none_synthesized = S.safe_int 10
 
 (* model interpreter/N_IOpt_map_some *)
-(* 0. *)
-let cost_N_IOpt_map_some = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IOpt_map_some = S.safe_int 10
 
 (* model interpreter/N_IOpt_map_some_alloc *)
-(* 0. *)
-let cost_N_IOpt_map_some_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IOpt_map_some_alloc = S.safe_int 10
 
 (* model interpreter/N_IOpt_map_some_synthesized *)
-(* let time = 0. in let alloc = 0. in max time alloc *)
-let cost_N_IOpt_map_some_synthesized = S.safe_int 0
+(* let time = 0. in let alloc = 0. in max 10 (max time alloc) *)
+let cost_N_IOpt_map_some_synthesized = S.safe_int 10
 
 (* model interpreter/N_IOr *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IOr = S.safe_int 10
 
 (* model interpreter/N_IOr_alloc *)
-(* 0. *)
-let cost_N_IOr_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IOr_alloc = S.safe_int 10
 
 (* model interpreter/N_IOr_bytes *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IOr_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2621,7 +2684,8 @@ let cost_N_IOr_bytes size1 size2 =
 
 (* model interpreter/N_IOr_bytes_alloc *)
 (* fun size1 ->
-     fun size2 -> 10.6873582322 + (0.499979321651 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (10.6873582322 + (0.499979321651 * (max size1 size2))) *)
 let cost_N_IOr_bytes_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2632,14 +2696,14 @@ let cost_N_IOr_bytes_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 10.6873582322 + (0.499979321651 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IOr_bytes_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   (S.max size1 size2 lsr 1) + S.safe_int 35
 
 (* model interpreter/N_IOr_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IOr_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2647,7 +2711,8 @@ let cost_N_IOr_nat size1 size2 =
 
 (* model interpreter/N_IOr_nat_alloc *)
 (* fun size1 ->
-     fun size2 -> 13.9478780796 + (0.500186338819 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (13.9478780796 + (0.500186338819 * (max size1 size2))) *)
 let cost_N_IOr_nat_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2659,7 +2724,7 @@ let cost_N_IOr_nat_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 13.9478780796 + (0.500186338819 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IOr_nat_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2668,78 +2733,79 @@ let cost_N_IOr_nat_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_IOr_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IOr_synthesized = S.safe_int 10
 
 (* model interpreter/N_IPairing_check_bls12_381 *)
-(* fun size -> 450000. + (342500. * size) *)
+(* fun size -> max 10 (450000. + (342500. * size)) *)
 let cost_N_IPairing_check_bls12_381 size =
   let size = S.safe_int size in
   (size * S.safe_int 344064) + S.safe_int 450000
 
 (* model interpreter/N_IPairing_check_bls12_381_alloc *)
-(* fun size -> 0. *)
-let cost_N_IPairing_check_bls12_381_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_IPairing_check_bls12_381_alloc _size = S.safe_int 10
 
 (* model interpreter/N_IPairing_check_bls12_381_synthesized *)
 (* fun size ->
      let time = 450000. + (342500. * size) in
-     let alloc = 0. in max time alloc *)
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IPairing_check_bls12_381_synthesized size =
   let size = S.safe_int size in
   (size * S.safe_int 344064) + S.safe_int 450000
 
 (* model interpreter/N_IPush *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IPush = S.safe_int 10
 
 (* model interpreter/N_IPush_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IPush_alloc = S.safe_int 15
 
 (* model interpreter/N_IPush_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IPush_synthesized = S.safe_int 15
 
 (* model interpreter/N_IRead_ticket *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IRead_ticket = S.safe_int 10
 
 (* model interpreter/N_IRead_ticket_alloc *)
-(* 56. *)
+(* max 10 56. *)
 let cost_N_IRead_ticket_alloc = S.safe_int 60
 
 (* model interpreter/N_IRead_ticket_synthesized *)
-(* let time = 10. in let alloc = 56. in max time alloc *)
+(* let time = 10. in let alloc = 56. in max 10 (max time alloc) *)
 let cost_N_IRead_ticket_synthesized = S.safe_int 60
 
 (* model interpreter/N_IRight *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IRight = S.safe_int 10
 
 (* model interpreter/N_IRight_alloc *)
-(* 8. *)
+(* max 10 8. *)
 let cost_N_IRight_alloc = S.safe_int 10
 
 (* model interpreter/N_IRight_synthesized *)
-(* let time = 10. in let alloc = 8. in max time alloc *)
+(* let time = 10. in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_IRight_synthesized = S.safe_int 10
 
 (* model interpreter/N_ISapling_empty_state *)
-(* 300. *)
+(* max 10 300. *)
 let cost_N_ISapling_empty_state = S.safe_int 300
 
 (* model interpreter/N_ISapling_empty_state_alloc *)
-(* 28. *)
+(* max 10 28. *)
 let cost_N_ISapling_empty_state_alloc = S.safe_int 30
 
 (* model interpreter/N_ISapling_empty_state_synthesized *)
-(* let time = 300. in let alloc = 28. in max time alloc *)
+(* let time = 300. in let alloc = 28. in max 10 (max time alloc) *)
 let cost_N_ISapling_empty_state_synthesized = S.safe_int 300
 
 (* model interpreter/N_ISapling_verify_update *)
 (* fun size1 ->
-     fun size2 -> (432500. + (5740000. * size1)) + (4636500. * size2) *)
+     fun size2 ->
+       max 10 ((432500. + (5740000. * size1)) + (4636500. * size2)) *)
 let cost_N_ISapling_verify_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2749,7 +2815,8 @@ let cost_N_ISapling_verify_update size1 size2 =
 
 (* model interpreter/N_ISapling_verify_update_alloc *)
 (* fun size1 ->
-     fun size2 -> (50.74 + (12.0173040271 * size1)) + (24.0179324276 * size2) *)
+     fun size2 ->
+       max 10 ((50.74 + (12.0173040271 * size1)) + (24.0179324276 * size2)) *)
 let cost_N_ISapling_verify_update_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2764,7 +2831,7 @@ let cost_N_ISapling_verify_update_alloc size1 size2 =
        let time = (432500. + (5740000. * size1)) + (4636500. * size2) in
        let alloc =
          (50.74 + (12.0173040271 * size1)) + (24.0179324276 * size2) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_ISapling_verify_update_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2778,66 +2845,67 @@ let cost_N_ISapling_verify_update_synthesized size1 size2 =
     + S.safe_int 55)
 
 (* model interpreter/N_ISelf *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ISelf = S.safe_int 10
 
 (* model interpreter/N_ISelf_address *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ISelf_address = S.safe_int 10
 
 (* model interpreter/N_ISelf_address_alloc *)
-(* 64. *)
+(* max 10 64. *)
 let cost_N_ISelf_address_alloc = S.safe_int 65
 
 (* model interpreter/N_ISelf_address_synthesized *)
-(* let time = 10. in let alloc = 64. in max time alloc *)
+(* let time = 10. in let alloc = 64. in max 10 (max time alloc) *)
 let cost_N_ISelf_address_synthesized = S.safe_int 65
 
 (* model interpreter/N_ISelf_alloc *)
-(* 52. *)
+(* max 10 52. *)
 let cost_N_ISelf_alloc = S.safe_int 55
 
 (* model interpreter/N_ISelf_synthesized *)
-(* let time = 10. in let alloc = 52. in max time alloc *)
+(* let time = 10. in let alloc = 52. in max 10 (max time alloc) *)
 let cost_N_ISelf_synthesized = S.safe_int 55
 
 (* model interpreter/N_ISender *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ISender = S.safe_int 10
 
 (* model interpreter/N_ISender_alloc *)
-(* 72. *)
+(* max 10 72. *)
 let cost_N_ISender_alloc = S.safe_int 75
 
 (* model interpreter/N_ISender_synthesized *)
-(* let time = 10. in let alloc = 72. in max time alloc *)
+(* let time = 10. in let alloc = 72. in max 10 (max time alloc) *)
 let cost_N_ISender_synthesized = S.safe_int 75
 
 (* model interpreter/N_ISet_delegate *)
-(* 60. *)
+(* max 10 60. *)
 let cost_N_ISet_delegate = S.safe_int 60
 
 (* model interpreter/N_ISet_delegate_alloc *)
-(* 76. *)
+(* max 10 76. *)
 let cost_N_ISet_delegate_alloc = S.safe_int 80
 
 (* model interpreter/N_ISet_delegate_synthesized *)
-(* let time = 60. in let alloc = 76. in max time alloc *)
+(* let time = 60. in let alloc = 76. in max 10 (max time alloc) *)
 let cost_N_ISet_delegate_synthesized = S.safe_int 80
 
 (* model interpreter/N_ISet_iter *)
-(* fun size -> 50. + (7.625 * size) *)
+(* fun size -> max 10 (50. + (7.625 * size)) *)
 let cost_N_ISet_iter size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 3) + (size * S.safe_int 7) + S.safe_int 50
 
 (* model interpreter/N_ISet_iter_alloc *)
-(* fun size -> 0. *)
-let cost_N_ISet_iter_alloc _size = S.safe_int 0
+(* fun size -> max 10 0. *)
+let cost_N_ISet_iter_alloc _size = S.safe_int 10
 
 (* model interpreter/N_ISet_iter_synthesized *)
 (* fun size ->
-     let time = 50. + (7.625 * size) in let alloc = 0. in max time alloc *)
+     let time = 50. + (7.625 * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ISet_iter_synthesized size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 3) + (size * S.safe_int 7) + S.safe_int 50
@@ -2845,7 +2913,8 @@ let cost_N_ISet_iter_synthesized size =
 (* model interpreter/N_ISet_mem *)
 (* fun size1 ->
      fun size2 ->
-       39.3805426747 + (0.0564536354586 * (size1 * (log2 (1 + size2)))) *)
+       max 10
+         (39.3805426747 + (0.0564536354586 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_ISet_mem size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2853,15 +2922,15 @@ let cost_N_ISet_mem size1 size2 =
   (w3 lsr 5) + (w3 lsr 6) + (w3 lsr 7) + (w3 lsr 9) + S.safe_int 40
 
 (* model interpreter/N_ISet_mem_alloc *)
-(* fun size1 -> fun size2 -> 0. *)
-let cost_N_ISet_mem_alloc _size1 _size2 = S.safe_int 0
+(* fun size1 -> fun size2 -> max 10 0. *)
+let cost_N_ISet_mem_alloc _size1 _size2 = S.safe_int 10
 
 (* model interpreter/N_ISet_mem_synthesized *)
 (* fun size1 ->
      fun size2 ->
        let time =
          39.3805426747 + (0.0564536354586 * (size1 * (log2 (1 + size2)))) in
-       let alloc = 0. in max time alloc *)
+       let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ISet_mem_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2869,21 +2938,22 @@ let cost_N_ISet_mem_synthesized size1 size2 =
   (w3 lsr 5) + (w3 lsr 6) + (w3 lsr 7) + (w3 lsr 9) + S.safe_int 40
 
 (* model interpreter/N_ISet_size *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ISet_size = S.safe_int 10
 
 (* model interpreter/N_ISet_size_alloc *)
-(* 0. *)
-let cost_N_ISet_size_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_ISet_size_alloc = S.safe_int 10
 
 (* model interpreter/N_ISet_size_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ISet_size_synthesized = S.safe_int 10
 
 (* model interpreter/N_ISet_update *)
 (* fun size1 ->
      fun size2 ->
-       49.8905426747 + (0.140036207663 * (size1 * (log2 (1 + size2)))) *)
+       max 10
+         (49.8905426747 + (0.140036207663 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_ISet_update size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2892,7 +2962,8 @@ let cost_N_ISet_update size1 size2 =
 
 (* model interpreter/N_ISet_update_alloc *)
 (* fun size1 ->
-     fun size2 -> (21.7417458006 * (log2 (1 + size2))) + 77.6256737848 *)
+     fun size2 ->
+       max 10 ((21.7417458006 * (log2 (1 + size2))) + 77.6256737848) *)
 let cost_N_ISet_update_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   (log2 (size2 + S.safe_int 1) * S.safe_int 22) + S.safe_int 80
@@ -2903,7 +2974,7 @@ let cost_N_ISet_update_alloc _size1 size2 =
        let time =
          49.8905426747 + (0.140036207663 * (size1 * (log2 (1 + size2)))) in
        let alloc = (21.7417458006 * (log2 (1 + size2))) + 77.6256737848 in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_ISet_update_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -2914,64 +2985,67 @@ let cost_N_ISet_update_synthesized size1 size2 =
     ((w1 * S.safe_int 22) + S.safe_int 80)
 
 (* model interpreter/N_ISha256 *)
-(* fun size -> 600. + (4.75 * size) *)
+(* fun size -> max 10 (600. + (4.75 * size)) *)
 let cost_N_ISha256 size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 2) + (size * S.safe_int 4) + S.safe_int 600
 
 (* model interpreter/N_ISha256_alloc *)
-(* fun size -> 24. *)
+(* fun size -> max 10 24. *)
 let cost_N_ISha256_alloc _size = S.safe_int 25
 
 (* model interpreter/N_ISha256_synthesized *)
 (* fun size ->
-     let time = 600. + (4.75 * size) in let alloc = 24. in max time alloc *)
+     let time = 600. + (4.75 * size) in
+     let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_ISha256_synthesized size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 2) + (size * S.safe_int 4) + S.safe_int 600
 
 (* model interpreter/N_ISha3 *)
-(* fun size -> 1350. + (8.25 * size) *)
+(* fun size -> max 10 (1350. + (8.25 * size)) *)
 let cost_N_ISha3 size =
   let size = S.safe_int size in
   (size lsr 2) + (size * S.safe_int 8) + S.safe_int 1350
 
 (* model interpreter/N_ISha3_alloc *)
-(* fun size -> 24. *)
+(* fun size -> max 10 24. *)
 let cost_N_ISha3_alloc _size = S.safe_int 25
 
 (* model interpreter/N_ISha3_synthesized *)
 (* fun size ->
-     let time = 1350. + (8.25 * size) in let alloc = 24. in max time alloc *)
+     let time = 1350. + (8.25 * size) in
+     let alloc = 24. in max 10 (max time alloc) *)
 let cost_N_ISha3_synthesized size =
   let size = S.safe_int size in
   (size lsr 2) + (size * S.safe_int 8) + S.safe_int 1350
 
 (* model interpreter/N_ISha512 *)
-(* fun size -> 680. + (3. * size) *)
+(* fun size -> max 10 (680. + (3. * size)) *)
 let cost_N_ISha512 size =
   let size = S.safe_int size in
   (size * S.safe_int 3) + S.safe_int 680
 
 (* model interpreter/N_ISha512_alloc *)
-(* fun size -> 40. *)
+(* fun size -> max 10 40. *)
 let cost_N_ISha512_alloc _size = S.safe_int 40
 
 (* model interpreter/N_ISha512_synthesized *)
 (* fun size ->
-     let time = 680. + (3. * size) in let alloc = 40. in max time alloc *)
+     let time = 680. + (3. * size) in
+     let alloc = 40. in max 10 (max time alloc) *)
 let cost_N_ISha512_synthesized size =
   let size = S.safe_int size in
   (size * S.safe_int 3) + S.safe_int 680
 
 (* model interpreter/N_ISlice_bytes *)
-(* fun size -> 25. + (0.5 * size) *)
+(* fun size -> max 10 (25. + (0.5 * size)) *)
 let cost_N_ISlice_bytes size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 25
 
 (* model interpreter/N_ISlice_bytes_alloc *)
-(* fun size -> 14.6142328624 + (0.500160203859 * size) *)
+(* fun size -> max 10 (14.6142328624 + (0.500160203859 * size)) *)
 let cost_N_ISlice_bytes_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 15
@@ -2979,20 +3053,21 @@ let cost_N_ISlice_bytes_alloc size =
 (* model interpreter/N_ISlice_bytes_synthesized *)
 (* fun size ->
      let time = 25. + (0.5 * size) in
-     let alloc = 14.6142328624 + (0.500160203859 * size) in max time alloc *)
+     let alloc = 14.6142328624 + (0.500160203859 * size) in
+     max 10 (max time alloc) *)
 let cost_N_ISlice_bytes_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
   S.max (w1 + S.safe_int 25) (w1 + (size lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_ISlice_string *)
-(* fun size -> 25. + (0.5 * size) *)
+(* fun size -> max 10 (25. + (0.5 * size)) *)
 let cost_N_ISlice_string size =
   let size = S.safe_int size in
   (size lsr 1) + S.safe_int 25
 
 (* model interpreter/N_ISlice_string_alloc *)
-(* fun size -> 15.686099896 + (0.500163489638 * size) *)
+(* fun size -> max 10 (15.686099896 + (0.500163489638 * size)) *)
 let cost_N_ISlice_string_alloc size =
   let size = S.safe_int size in
   (size lsr 1) + (size lsr 6) + S.safe_int 20
@@ -3000,59 +3075,60 @@ let cost_N_ISlice_string_alloc size =
 (* model interpreter/N_ISlice_string_synthesized *)
 (* fun size ->
      let time = 25. + (0.5 * size) in
-     let alloc = 15.686099896 + (0.500163489638 * size) in max time alloc *)
+     let alloc = 15.686099896 + (0.500163489638 * size) in
+     max 10 (max time alloc) *)
 let cost_N_ISlice_string_synthesized size =
   let size = S.safe_int size in
   let w1 = size lsr 1 in
   S.max (w1 + S.safe_int 25) (w1 + (size lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_ISource *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ISource = S.safe_int 10
 
 (* model interpreter/N_ISource_alloc *)
-(* 72. *)
+(* max 10 72. *)
 let cost_N_ISource_alloc = S.safe_int 75
 
 (* model interpreter/N_ISource_synthesized *)
-(* let time = 10. in let alloc = 72. in max time alloc *)
+(* let time = 10. in let alloc = 72. in max 10 (max time alloc) *)
 let cost_N_ISource_synthesized = S.safe_int 75
 
 (* model interpreter/N_ISplit_ticket *)
-(* fun size1 -> fun size2 -> 40. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (40. + (0.5 * (max size1 size2))) *)
 let cost_N_ISplit_ticket size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   (S.max size1 size2 lsr 1) + S.safe_int 40
 
 (* model interpreter/N_ISplit_ticket_alloc *)
-(* fun size1 -> fun size2 -> 52. *)
+(* fun size1 -> fun size2 -> max 10 52. *)
 let cost_N_ISplit_ticket_alloc _size1 _size2 = S.safe_int 55
 
 (* model interpreter/N_ISplit_ticket_synthesized *)
 (* fun size1 ->
      fun size2 ->
        let time = 40. + (0.5 * (max size1 size2)) in
-       let alloc = 52. in max time alloc *)
+       let alloc = 52. in max 10 (max time alloc) *)
 let cost_N_ISplit_ticket_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   S.max ((S.max size1 size2 lsr 1) + S.safe_int 40) (S.safe_int 55)
 
 (* model interpreter/N_IString_size *)
-(* 15. *)
+(* max 10 15. *)
 let cost_N_IString_size = S.safe_int 15
 
 (* model interpreter/N_IString_size_alloc *)
-(* 0. *)
-let cost_N_IString_size_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IString_size_alloc = S.safe_int 10
 
 (* model interpreter/N_IString_size_synthesized *)
-(* let time = 15. in let alloc = 0. in max time alloc *)
+(* let time = 15. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IString_size_synthesized = S.safe_int 15
 
 (* model interpreter/N_ISub_int *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_ISub_int size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3060,7 +3136,8 @@ let cost_N_ISub_int size1 size2 =
 
 (* model interpreter/N_ISub_int_alloc *)
 (* fun size1 ->
-     fun size2 -> 17.5501373306 + (0.500211925836 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (17.5501373306 + (0.500211925836 * (max size1 size2))) *)
 let cost_N_ISub_int_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3072,7 +3149,7 @@ let cost_N_ISub_int_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 17.5501373306 + (0.500211925836 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_ISub_int_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3081,31 +3158,31 @@ let cost_N_ISub_int_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_ISub_tez *)
-(* 15. *)
+(* max 10 15. *)
 let cost_N_ISub_tez = S.safe_int 15
 
 (* model interpreter/N_ISub_tez_alloc *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_ISub_tez_alloc = S.safe_int 20
 
 (* model interpreter/N_ISub_tez_legacy *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_ISub_tez_legacy = S.safe_int 20
 
 (* model interpreter/N_ISub_tez_legacy_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_ISub_tez_legacy_alloc = S.safe_int 15
 
 (* model interpreter/N_ISub_tez_legacy_synthesized *)
-(* let time = 20. in let alloc = 12. in max time alloc *)
+(* let time = 20. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_ISub_tez_legacy_synthesized = S.safe_int 20
 
 (* model interpreter/N_ISub_tez_synthesized *)
-(* let time = 15. in let alloc = 20. in max time alloc *)
+(* let time = 15. in let alloc = 20. in max 10 (max time alloc) *)
 let cost_N_ISub_tez_synthesized = S.safe_int 20
 
 (* model interpreter/N_ISub_timestamp_seconds *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_ISub_timestamp_seconds size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3113,7 +3190,8 @@ let cost_N_ISub_timestamp_seconds size1 size2 =
 
 (* model interpreter/N_ISub_timestamp_seconds_alloc *)
 (* fun size1 ->
-     fun size2 -> 17.5501373306 + (0.500211925836 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (17.5501373306 + (0.500211925836 * (max size1 size2))) *)
 let cost_N_ISub_timestamp_seconds_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3125,7 +3203,7 @@ let cost_N_ISub_timestamp_seconds_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 17.5501373306 + (0.500211925836 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_ISub_timestamp_seconds_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3134,57 +3212,57 @@ let cost_N_ISub_timestamp_seconds_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 20)
 
 (* model interpreter/N_ISwap *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ISwap = S.safe_int 10
 
 (* model interpreter/N_ISwap_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_ISwap_alloc = S.safe_int 15
 
 (* model interpreter/N_ISwap_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_ISwap_synthesized = S.safe_int 15
 
 (* model interpreter/N_ITicket *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_ITicket = S.safe_int 10
 
 (* model interpreter/N_ITicket_alloc *)
-(* 56. *)
+(* max 10 56. *)
 let cost_N_ITicket_alloc = S.safe_int 60
 
 (* model interpreter/N_ITicket_synthesized *)
-(* let time = 10. in let alloc = 56. in max time alloc *)
+(* let time = 10. in let alloc = 56. in max 10 (max time alloc) *)
 let cost_N_ITicket_synthesized = S.safe_int 60
 
 (* model interpreter/N_ITotal_voting_power *)
-(* 450. *)
+(* max 10 450. *)
 let cost_N_ITotal_voting_power = S.safe_int 450
 
 (* model interpreter/N_ITotal_voting_power_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_ITotal_voting_power_alloc = S.safe_int 15
 
 (* model interpreter/N_ITotal_voting_power_synthesized *)
-(* let time = 450. in let alloc = 12. in max time alloc *)
+(* let time = 450. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_ITotal_voting_power_synthesized = S.safe_int 450
 
 (* model interpreter/N_ITransfer_tokens_alloc *)
-(* 120. *)
+(* max 10 120. *)
 let cost_N_ITransfer_tokens_alloc = S.safe_int 120
 
 (* model interpreter/N_ITransfer_tokens_synthesized *)
-(* let time = 60. in let alloc = 120. in max time alloc *)
+(* let time = 60. in let alloc = 120. in max 10 (max time alloc) *)
 let cost_N_ITransfer_tokens_synthesized = S.safe_int 120
 
 (* model interpreter/N_IUncomb *)
-(* fun size -> 30. + (4. * (sub size 2)) *)
+(* fun size -> max 10 (30. + (4. * (sub size 2))) *)
 let cost_N_IUncomb size =
   let size = S.safe_int size in
   (S.sub size (S.safe_int 2) * S.safe_int 4) + S.safe_int 30
 
 (* model interpreter/N_IUncomb_alloc *)
-(* fun size -> 6.30950568452 + (11.9815614243 * size) *)
+(* fun size -> max 10 (6.30950568452 + (11.9815614243 * size)) *)
 let cost_N_IUncomb_alloc size =
   let size = S.safe_int size in
   (size * S.safe_int 12) + S.safe_int 10
@@ -3192,7 +3270,8 @@ let cost_N_IUncomb_alloc size =
 (* model interpreter/N_IUncomb_synthesized *)
 (* fun size ->
      let time = 30. + (4. * (sub size 2)) in
-     let alloc = 6.30950568452 + (11.9815614243 * size) in max time alloc *)
+     let alloc = 6.30950568452 + (11.9815614243 * size) in
+     max 10 (max time alloc) *)
 let cost_N_IUncomb_synthesized size =
   let size = S.safe_int size in
   S.max
@@ -3200,71 +3279,71 @@ let cost_N_IUncomb_synthesized size =
     ((size * S.safe_int 12) + S.safe_int 10)
 
 (* model interpreter/N_IUnit *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IUnit = S.safe_int 10
 
 (* model interpreter/N_IUnit_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IUnit_alloc = S.safe_int 15
 
 (* model interpreter/N_IUnit_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IUnit_synthesized = S.safe_int 15
 
 (* model interpreter/N_IUnpack_alloc *)
-(* 8. *)
+(* max 10 8. *)
 let cost_N_IUnpack_alloc = S.safe_int 10
 
 (* model interpreter/N_IUnpack_synthesized *)
-(* let time = 278.760542675 in let alloc = 8. in max time alloc *)
+(* let time = 278.760542675 in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_IUnpack_synthesized = S.safe_int 280
 
 (* model interpreter/N_IUnpair *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_IUnpair = S.safe_int 10
 
 (* model interpreter/N_IUnpair_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_IUnpair_alloc = S.safe_int 15
 
 (* model interpreter/N_IUnpair_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_IUnpair_synthesized = S.safe_int 15
 
 (* model interpreter/N_IView *)
-(* 1460. *)
+(* max 10 1460. *)
 let cost_N_IView = S.safe_int 1460
 
 (* model interpreter/N_IView_alloc *)
-(* 0. *)
-let cost_N_IView_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IView_alloc = S.safe_int 10
 
 (* model interpreter/N_IView_synthesized *)
-(* let time = 1460. in let alloc = 0. in max time alloc *)
+(* let time = 1460. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IView_synthesized = S.safe_int 1460
 
 (* model interpreter/N_IVoting_power *)
-(* 640. *)
+(* max 10 640. *)
 let cost_N_IVoting_power = S.safe_int 640
 
 (* model interpreter/N_IVoting_power_alloc *)
-(* 0. *)
-let cost_N_IVoting_power_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IVoting_power_alloc = S.safe_int 10
 
 (* model interpreter/N_IVoting_power_synthesized *)
-(* let time = 640. in let alloc = 0. in max time alloc *)
+(* let time = 640. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IVoting_power_synthesized = S.safe_int 640
 
 (* model interpreter/N_IXor *)
-(* 15. *)
+(* max 10 15. *)
 let cost_N_IXor = S.safe_int 15
 
 (* model interpreter/N_IXor_alloc *)
-(* 0. *)
-let cost_N_IXor_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_IXor_alloc = S.safe_int 10
 
 (* model interpreter/N_IXor_bytes *)
-(* fun size1 -> fun size2 -> 40. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (40. + (0.5 * (max size1 size2))) *)
 let cost_N_IXor_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3272,7 +3351,8 @@ let cost_N_IXor_bytes size1 size2 =
 
 (* model interpreter/N_IXor_bytes_alloc *)
 (* fun size1 ->
-     fun size2 -> 10.6873582322 + (0.499979321651 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (10.6873582322 + (0.499979321651 * (max size1 size2))) *)
 let cost_N_IXor_bytes_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3283,14 +3363,14 @@ let cost_N_IXor_bytes_alloc size1 size2 =
      fun size2 ->
        let time = 40. + (0.5 * (max size1 size2)) in
        let alloc = 10.6873582322 + (0.499979321651 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IXor_bytes_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   (S.max size1 size2 lsr 1) + S.safe_int 40
 
 (* model interpreter/N_IXor_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
+(* fun size1 -> fun size2 -> max 10 (35. + (0.5 * (max size1 size2))) *)
 let cost_N_IXor_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3298,7 +3378,8 @@ let cost_N_IXor_nat size1 size2 =
 
 (* model interpreter/N_IXor_nat_alloc *)
 (* fun size1 ->
-     fun size2 -> 13.9478780796 + (0.500186338819 * (max size1 size2)) *)
+     fun size2 ->
+       max 10 (13.9478780796 + (0.500186338819 * (max size1 size2))) *)
 let cost_N_IXor_nat_alloc size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3310,7 +3391,7 @@ let cost_N_IXor_nat_alloc size1 size2 =
      fun size2 ->
        let time = 35. + (0.5 * (max size1 size2)) in
        let alloc = 13.9478780796 + (0.500186338819 * (max size1 size2)) in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_IXor_nat_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3319,59 +3400,61 @@ let cost_N_IXor_nat_synthesized size1 size2 =
   S.max (w2 + S.safe_int 35) (w2 + (w1 lsr 6) + S.safe_int 15)
 
 (* model interpreter/N_IXor_synthesized *)
-(* let time = 15. in let alloc = 0. in max time alloc *)
+(* let time = 15. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IXor_synthesized = S.safe_int 15
 
 (* model interpreter/N_KCons *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KCons = S.safe_int 10
 
 (* model interpreter/N_KCons_alloc *)
-(* 0. *)
-let cost_N_KCons_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KCons_alloc = S.safe_int 10
 
 (* model interpreter/N_KCons_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KCons_synthesized = S.safe_int 10
 
 (* model interpreter/N_KIter *)
-(* max 10. 10. *)
+(* max 10 (max 10. 10.) *)
 let cost_N_KIter = S.safe_int 10
 
 (* model interpreter/N_KIter_empty *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KIter_empty = S.safe_int 10
 
 (* model interpreter/N_KIter_empty_alloc *)
-(* 0. *)
-let cost_N_KIter_empty_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KIter_empty_alloc = S.safe_int 10
 
 (* model interpreter/N_KIter_empty_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KIter_empty_synthesized = S.safe_int 10
 
 (* model interpreter/N_KIter_nonempty *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KIter_nonempty = S.safe_int 10
 
 (* model interpreter/N_KIter_nonempty_alloc *)
-(* 0. *)
-let cost_N_KIter_nonempty_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KIter_nonempty_alloc = S.safe_int 10
 
 (* model interpreter/N_KIter_nonempty_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KIter_nonempty_synthesized = S.safe_int 10
 
 (* model interpreter/N_KList_enter_body_alloc *)
 (* fun size_xs ->
      fun size_ys ->
-       if size_xs = 0 then 23. + (12.0014700944 * size_ys) else 0. *)
+       max 10 (if size_xs = 0 then 23. + (12.0014700944 * size_ys) else 0.) *)
 let cost_N_KList_enter_body_alloc size_xs size_ys =
   let size_xs = S.safe_int size_xs in
   let size_ys = S.safe_int size_ys in
-  if size_xs = S.safe_int 0 then
-    (size_ys lsr 2) + (size_ys * S.safe_int 12) + S.safe_int 25
-  else S.safe_int 0
+  S.max
+    (S.safe_int 10)
+    (if size_xs = S.safe_int 0 then
+     (size_ys lsr 2) + (size_ys * S.safe_int 12) + S.safe_int 25
+    else S.safe_int 0)
 
 (* model interpreter/N_KList_enter_body_synthesized *)
 (* fun size_xs ->
@@ -3379,83 +3462,92 @@ let cost_N_KList_enter_body_alloc size_xs size_ys =
        let time = if size_xs = 0 then 30. + (1.8125 * size_ys) else 30. in
        let alloc =
          if size_xs = 0 then 23. + (12.0014700944 * size_ys) else 0. in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_KList_enter_body_synthesized size_xs size_ys =
   let size_xs = S.safe_int size_xs in
   let size_ys = S.safe_int size_ys in
   let w1 = size_ys lsr 2 in
   let w2 = size_xs = S.safe_int 0 in
   S.max
-    (if w2 then (size_ys lsr 1) + w1 + (size_ys lsr 4) + size_ys + S.safe_int 30
-    else S.safe_int 30)
+    (S.max
+       (S.safe_int 10)
+       (if w2 then
+        (size_ys lsr 1) + w1 + (size_ys lsr 4) + size_ys + S.safe_int 30
+       else S.safe_int 30))
     (if w2 then w1 + (size_ys * S.safe_int 12) + S.safe_int 25
     else S.safe_int 0)
 
 (* model interpreter/N_KList_exit_body *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KList_exit_body = S.safe_int 10
 
 (* model interpreter/N_KList_exit_body_alloc *)
-(* 0. *)
-let cost_N_KList_exit_body_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KList_exit_body_alloc = S.safe_int 10
 
 (* model interpreter/N_KList_exit_body_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KList_exit_body_synthesized = S.safe_int 10
 
 (* model interpreter/N_KLoop_in *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KLoop_in = S.safe_int 10
 
 (* model interpreter/N_KLoop_in_alloc *)
-(* 0. *)
-let cost_N_KLoop_in_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KLoop_in_alloc = S.safe_int 10
 
 (* model interpreter/N_KLoop_in_left *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KLoop_in_left = S.safe_int 10
 
 (* model interpreter/N_KLoop_in_left_alloc *)
-(* 0. *)
-let cost_N_KLoop_in_left_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KLoop_in_left_alloc = S.safe_int 10
 
 (* model interpreter/N_KLoop_in_left_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KLoop_in_left_synthesized = S.safe_int 10
 
 (* model interpreter/N_KLoop_in_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KLoop_in_synthesized = S.safe_int 10
 
 (* model interpreter/N_KMap_enter_body_alloc *)
-(* fun size -> if size = 0 then 11. else 0. *)
+(* fun size -> max 10 (if size = 0 then 11. else 0.) *)
 let cost_N_KMap_enter_body_alloc size =
   let size = S.safe_int size in
-  if size = S.safe_int 0 then S.safe_int 15 else S.safe_int 0
+  S.max
+    (S.safe_int 10)
+    (if size = S.safe_int 0 then S.safe_int 15 else S.safe_int 0)
 
 (* model interpreter/N_KMap_enter_body_synthesized *)
 (* fun size ->
      let time = if size = 0 then 10. else 80. in
-     let alloc = if size = 0 then 11. else 0. in max time alloc *)
+     let alloc = if size = 0 then 11. else 0. in max 10 (max time alloc) *)
 let cost_N_KMap_enter_body_synthesized size =
   let size = S.safe_int size in
   let w1 = size = S.safe_int 0 in
   S.max
-    (if w1 then S.safe_int 10 else S.safe_int 80)
+    (S.max (S.safe_int 10) (if w1 then S.safe_int 10 else S.safe_int 80))
     (if w1 then S.safe_int 15 else S.safe_int 0)
 
 (* model interpreter/N_KMap_exit_body *)
 (* fun size1 ->
-     fun size2 -> 0. + (0.114964427843 * (size1 * (log2 (1 + size2)))) *)
+     fun size2 ->
+       max 10 (0. + (0.114964427843 * (size1 * (log2 (1 + size2))))) *)
 let cost_N_KMap_exit_body size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let w3 = log2 (size2 + S.safe_int 1) * size1 in
-  (w3 lsr 4) + (w3 lsr 5) + (w3 lsr 6) + (w3 lsr 8) + (w3 lsr 9)
+  S.max
+    (S.safe_int 10)
+    ((w3 lsr 4) + (w3 lsr 5) + (w3 lsr 6) + (w3 lsr 8) + (w3 lsr 9))
 
 (* model interpreter/N_KMap_exit_body_alloc *)
 (* fun size1 ->
-     fun size2 -> (28.3877828935 * (log2 (1 + size2))) + 74.4085101791 *)
+     fun size2 ->
+       max 10 ((28.3877828935 * (log2 (1 + size2))) + 74.4085101791) *)
 let cost_N_KMap_exit_body_alloc _size1 size2 =
   let size2 = S.safe_int size2 in
   let w1 = log2 (size2 + S.safe_int 1) in
@@ -3466,7 +3558,7 @@ let cost_N_KMap_exit_body_alloc _size1 size2 =
      fun size2 ->
        let time = 0. + (0.114964427843 * (size1 * (log2 (1 + size2)))) in
        let alloc = (28.3877828935 * (log2 (1 + size2))) + 74.4085101791 in
-       max time alloc *)
+       max 10 (max time alloc) *)
 let cost_N_KMap_exit_body_synthesized size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -3477,93 +3569,98 @@ let cost_N_KMap_exit_body_synthesized size1 size2 =
     ((w1 * S.safe_int 28) + (w1 lsr 1) + S.safe_int 75)
 
 (* model interpreter/N_KMap_head *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_KMap_head = S.safe_int 20
 
 (* model interpreter/N_KMap_head_alloc *)
-(* 8. *)
+(* max 10 8. *)
 let cost_N_KMap_head_alloc = S.safe_int 10
 
 (* model interpreter/N_KMap_head_synthesized *)
-(* let time = 20. in let alloc = 8. in max time alloc *)
+(* let time = 20. in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_KMap_head_synthesized = S.safe_int 20
 
 (* model interpreter/N_KNil *)
-(* 15. *)
+(* max 10 15. *)
 let cost_N_KNil = S.safe_int 15
 
 (* model interpreter/N_KNil_alloc *)
-(* 0. *)
-let cost_N_KNil_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KNil_alloc = S.safe_int 10
 
 (* model interpreter/N_KNil_synthesized *)
-(* let time = 15. in let alloc = 0. in max time alloc *)
+(* let time = 15. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KNil_synthesized = S.safe_int 15
 
 (* model interpreter/N_KReturn *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KReturn = S.safe_int 10
 
 (* model interpreter/N_KReturn_alloc *)
-(* 0. *)
-let cost_N_KReturn_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KReturn_alloc = S.safe_int 10
 
 (* model interpreter/N_KReturn_synthesized *)
-(* let time = 10. in let alloc = 0. in max time alloc *)
+(* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KReturn_synthesized = S.safe_int 10
 
 (* model interpreter/N_KUndip *)
-(* 10. *)
+(* max 10 10. *)
 let cost_N_KUndip = S.safe_int 10
 
 (* model interpreter/N_KUndip_alloc *)
-(* 12. *)
+(* max 10 12. *)
 let cost_N_KUndip_alloc = S.safe_int 15
 
 (* model interpreter/N_KUndip_synthesized *)
-(* let time = 10. in let alloc = 12. in max time alloc *)
+(* let time = 10. in let alloc = 12. in max 10 (max time alloc) *)
 let cost_N_KUndip_synthesized = S.safe_int 15
 
 (* model interpreter/N_KView_exit *)
-(* 20. *)
+(* max 10 20. *)
 let cost_N_KView_exit = S.safe_int 20
 
 (* model interpreter/N_KView_exit_alloc *)
-(* 0. *)
-let cost_N_KView_exit_alloc = S.safe_int 0
+(* max 10 0. *)
+let cost_N_KView_exit_alloc = S.safe_int 10
 
 (* model interpreter/N_KView_exit_synthesized *)
-(* let time = 20. in let alloc = 0. in max time alloc *)
+(* let time = 20. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_KView_exit_synthesized = S.safe_int 20
 
 (* model interpreter/amplification_loop_model *)
-(* fun size -> 0.329309341324 * size *)
+(* fun size -> max 10 (0.329309341324 * size) *)
 let cost_amplification_loop_model size =
   let size = S.safe_int size in
-  (size lsr 2) + (size lsr 4) + (size lsr 6) + (size lsr 7)
+  S.max
+    (S.safe_int 10)
+    ((size lsr 2) + (size lsr 4) + (size lsr 6) + (size lsr 7))
 
 (* model translator/PARSE_TYPE *)
-(* fun size -> 0. + (60. * size) *)
+(* fun size -> max 10 (0. + (60. * size)) *)
 let cost_PARSE_TYPE size =
   let size = S.safe_int size in
-  size * S.safe_int 60
+  S.max (S.safe_int 10) (size * S.safe_int 60)
 
 (* model translator/Parsing_Code_gas *)
-(* fun size -> 0. + (0.890391244567 * size) *)
+(* fun size -> max 10 (0. + (0.890391244567 * size)) *)
 let cost_Parsing_Code_gas size =
   let size = S.safe_int size in
-  (size lsr 1) + (size lsr 2) + (size lsr 3) + (size lsr 6)
+  S.max
+    (S.safe_int 10)
+    ((size lsr 1) + (size lsr 2) + (size lsr 3) + (size lsr 6))
 
 (* model translator/Parsing_Code_size *)
 (* fun size1 ->
      fun size2 ->
-       fun size3 -> ((187.300458967 * size1) + (0. * size2)) + (0. * size3) *)
+       fun size3 ->
+         max 10 (((187.300458967 * size1) + (0. * size2)) + (0. * size3)) *)
 let cost_Parsing_Code_size size1 _size2 _size3 =
   let size1 = S.safe_int size1 in
-  size1 * S.safe_int 188
+  S.max (S.safe_int 10) (size1 * S.safe_int 188)
 
 (* model translator/Parsing_Data_gas *)
-(* fun size -> 67277.397394 + (0.142972986751 * size) *)
+(* fun size -> max 10 (67277.397394 + (0.142972986751 * size)) *)
 let cost_Parsing_Data_gas size =
   let size = S.safe_int size in
   (size lsr 3) + (size lsr 6) + (size lsr 8) + S.safe_int 67280
@@ -3572,41 +3669,45 @@ let cost_Parsing_Data_gas size =
 (* fun size1 ->
      fun size2 ->
        fun size3 ->
-         ((80.363444899 * size1) + (16.1426805777 * size2)) +
-           (68.9487320686 * size3) *)
+         max 10
+           (((80.363444899 * size1) + (16.1426805777 * size2)) +
+              (68.9487320686 * size3)) *)
 let cost_Parsing_Data_size size1 size2 size3 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let size3 = S.safe_int size3 in
-  (size2 lsr 1)
-  + (size1 * S.safe_int 82)
-  + (size2 * S.safe_int 16)
-  + (size3 * S.safe_int 70)
+  S.max
+    (S.safe_int 10)
+    ((size2 lsr 1)
+    + (size1 * S.safe_int 82)
+    + (size2 * S.safe_int 16)
+    + (size3 * S.safe_int 70))
 
 (* model translator/TY_EQ *)
-(* fun size -> 31.1882471167 + (21.8805791266 * size) *)
+(* fun size -> max 10 (31.1882471167 + (21.8805791266 * size)) *)
 let cost_TY_EQ size = (size * S.safe_int 22) + S.safe_int 35
 
 (* model translator/UNPARSE_TYPE *)
-(* fun size -> 0. + (20. * size) *)
-let cost_UNPARSE_TYPE size = size * S.safe_int 20
+(* fun size -> max 10 (0. + (20. * size)) *)
+let cost_UNPARSE_TYPE size = S.max (S.safe_int 10) (size * S.safe_int 20)
 
 (* model translator/Unparsing_Code_gas *)
-(* fun size -> 0. + (0.592309924661 * size) *)
+(* fun size -> max 10 (0. + (0.592309924661 * size)) *)
 let cost_Unparsing_Code_gas size =
   let size = S.safe_int size in
-  (size lsr 1) + (size lsr 4) + (size lsr 5)
+  S.max (S.safe_int 10) ((size lsr 1) + (size lsr 4) + (size lsr 5))
 
 (* model translator/Unparsing_Code_size *)
 (* fun size1 ->
      fun size2 ->
-       fun size3 -> ((124.72642512 * size1) + (0. * size2)) + (0. * size3) *)
+       fun size3 ->
+         max 10 (((124.72642512 * size1) + (0. * size2)) + (0. * size3)) *)
 let cost_Unparsing_Code_size size1 _size2 _size3 =
   let size1 = S.safe_int size1 in
-  size1 * S.safe_int 126
+  S.max (S.safe_int 10) (size1 * S.safe_int 126)
 
 (* model translator/Unparsing_Data_gas *)
-(* fun size -> 31944.7865384 + (0.033862305692 * size) *)
+(* fun size -> max 10 (31944.7865384 + (0.033862305692 * size)) *)
 let cost_Unparsing_Data_gas size =
   let size = S.safe_int size in
   (size lsr 5) + (size lsr 9) + (size lsr 10) + S.safe_int 31945
@@ -3614,7 +3715,8 @@ let cost_Unparsing_Data_gas size =
 (* model translator/Unparsing_Data_size *)
 (* fun size1 ->
      fun size2 ->
-       fun size3 -> ((54.8706646933 * size1) + (0. * size2)) + (0. * size3) *)
+       fun size3 ->
+         max 10 (((54.8706646933 * size1) + (0. * size2)) + (0. * size3)) *)
 let cost_Unparsing_Data_size size1 _size2 _size3 =
   let size1 = S.safe_int size1 in
-  size1 * S.safe_int 55
+  S.max (S.safe_int 10) (size1 * S.safe_int 55)
