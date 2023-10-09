@@ -580,14 +580,14 @@ type block = {
   parent : block_hash;
   nonce : hex;
   sha3Uncles : hash;
-  logsBloom : hex option;
+  logsBloom : hex;
   transactionRoot : hash;
   stateRoot : hash;
   receiptRoot : hash;
   miner : hex;
   difficulty : quantity;
   totalDifficulty : quantity;
-  extraData : string;
+  extraData : hex;
   size : quantity;
   gasLimit : quantity;
   gasUsed : quantity;
@@ -604,6 +604,10 @@ let decode_list decoder list =
       | List _ -> raise (Invalid_argument "Expected a list of atomic data"))
     list
 
+let decode_option ~default decoder bytes =
+  (if bytes = Bytes.empty then None else Some (decoder bytes))
+  |> Option.value ~default
+
 let block_from_rlp bytes =
   match Rlp.decode bytes with
   | Ok
@@ -612,50 +616,88 @@ let block_from_rlp bytes =
           Value number;
           Value hash;
           Value parent_hash;
+          Value logsBloom;
+          Value transactionRoot;
+          Value stateRoot;
+          Value receiptRoot;
+          Value miner;
+          Value extraData;
+          Value gasLimit;
           List transactions;
-          Value gas_used;
+          Value gasUsed;
           Value timestamp;
         ]) ->
       let (Qty number) = decode_number number in
       let hash = decode_block_hash hash in
-      let parent_hash = decode_block_hash parent_hash in
+      let parent = decode_block_hash parent_hash in
+      let logsBloom =
+        decode_option ~default:(Hex (String.make 512 'a')) decode_hex logsBloom
+      in
+      (* Post merge: this field is now used for the "fee recipient". We don't
+         have that, potentially this could be the sequencer. *)
+      let miner =
+        decode_option
+          ~default:(Hex "0000000000000000000000000000000000000000")
+          decode_hex
+          miner
+      in
+      let transactionRoot =
+        decode_option
+          ~default:(Hash (Hex (String.make 64 'a')))
+          decode_hash
+          transactionRoot
+      in
+      let stateRoot =
+        decode_option
+          ~default:(Hash (Hex (String.make 64 'a')))
+          decode_hash
+          stateRoot
+      in
+      let receiptRoot =
+        decode_option
+          ~default:(Hash (Hex (String.make 64 'a')))
+          decode_hash
+          receiptRoot
+      in
+      let extraData = decode_option ~default:(Hex "") decode_hex extraData in
+      let gasLimit =
+        decode_option ~default:(Qty Z.zero) decode_number gasLimit
+      in
       let transactions = TxHash (decode_list decode_hash transactions) in
-      let gas_used = decode_number gas_used in
+      let gasUsed = decode_number gasUsed in
       let timestamp = decode_number timestamp in
       {
         number = Some (Block_height number);
         hash = Some hash;
-        parent = parent_hash;
+        parent;
         (* Post merge: always 0. *)
         nonce = Hex "0000000000000000";
-        (* Post merge: uncles are always empty, therefore this is the "empty" hash
-           of these uncles. *)
+        (* Post merge: uncles are always empty, therefore this is the "empty"
+           hash of these uncles. *)
         sha3Uncles =
           Hash
             (Hex
                "1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
-        logsBloom = Some (Hex (String.make 512 'a'));
-        transactionRoot = Hash (Hex (String.make 64 'a'));
-        stateRoot = Hash (Hex (String.make 64 'a'));
-        receiptRoot = Hash (Hex (String.make 64 'a'));
-        (* Post merge: this field is now used for the "fee recipient". We don't
-           have that, potentially this could be the sequencer. *)
-        miner = Hex "0000000000000000000000000000000000000000";
+        logsBloom;
+        transactionRoot;
+        stateRoot;
+        receiptRoot;
+        miner;
         (* Post merge: always zero. *)
         difficulty = Qty Z.zero;
         (* Post merge: sum of difficulty will always be zero because difficulty
            has and will always be zero. *)
         totalDifficulty = Qty Z.zero;
-        extraData = "";
+        extraData;
         size = Qty (Z.of_int (Bytes.length bytes));
-        gasLimit = Qty Z.zero;
-        gasUsed = gas_used;
+        gasLimit;
+        gasUsed;
         timestamp;
         transactions;
         (* Post merge: always empty. *)
         uncles = [];
       }
-  | _ -> raise (Invalid_argument "Expected a List of 6 elements")
+  | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
 let block_encoding =
   let open Data_encoding in
@@ -747,7 +789,7 @@ let block_encoding =
           (req "parentHash" block_hash_encoding)
           (req "nonce" hex_encoding)
           (req "sha3Uncles" hash_encoding)
-          (req "logsBloom" (option hex_encoding))
+          (req "logsBloom" hex_encoding)
           (req "transactionsRoot" hash_encoding)
           (req "stateRoot" hash_encoding)
           (req "receiptsRoot" hash_encoding)
@@ -755,7 +797,7 @@ let block_encoding =
        (obj9
           (req "difficulty" quantity_encoding)
           (req "totalDifficulty" quantity_encoding)
-          (req "extraData" string)
+          (req "extraData" hex_encoding)
           (req "size" quantity_encoding)
           (req "gasLimit" quantity_encoding)
           (req "gasUsed" quantity_encoding)
