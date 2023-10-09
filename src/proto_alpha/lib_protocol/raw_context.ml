@@ -991,6 +991,16 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               cryptobox_parameters;
             }
         in
+        (* This test prevents the activation of the protocol if the
+           set of parameters given for the DAL is invalid. *)
+        let*? () =
+          if dal.feature_enable then
+            match Dal.make cryptobox_parameters with
+            | Ok _cryptobox -> ok ()
+            | Error (`Fail explanation) ->
+                error (Dal_errors_repr.Dal_cryptobox_error {explanation})
+          else ok ()
+        in
         (* When stitching from Oxford and after, [Raw_level_repr.root]
            should be replaced by the previous value, that is
            [c.reveal_activation_level.*]. *)
