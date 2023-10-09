@@ -58,7 +58,7 @@ type punishing_amounts = {
     The double signing event corresponds to a field in {!Storage.slashed_level}.
 *)
 let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
-    (level : Level_repr.t) =
+    (level : Level_repr.t) ~rewarded:_ =
   let open Lwt_result_syntax in
   let* slashed_opt =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)

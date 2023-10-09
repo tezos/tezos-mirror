@@ -102,7 +102,7 @@ let punish_delegate ctxt delegate level (misbehaviour : Misbehaviour.t)
     ~rewarded =
   let open Lwt_result_syntax in
   let* ctxt, {staked; unstaked} =
-    Delegate.punish_double_signing ctxt misbehaviour delegate level
+    Delegate.punish_double_signing ctxt misbehaviour delegate level ~rewarded
   in
   let init_to_burn_to_reward =
     let Delegate.{amount_to_burn; reward} = staked in

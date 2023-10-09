@@ -70,6 +70,7 @@ val punish_double_signing :
   Misbehaviour.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
+  rewarded:Signature.public_key_hash ->
   (Raw_context.t * punishing_amounts) tzresult Lwt.t
 
 val clear_outdated_slashed_deposits :
