@@ -36,7 +36,7 @@ pub enum Value {
     BooleanValue(bool),
 }
 
-pub type InstructionBlock = Vec<ParsedInstruction>;
+pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
 
 pub trait Stage {
     type AddMeta;
@@ -56,6 +56,6 @@ pub enum Instruction<T: Stage> {
     Swap,
 }
 
-pub type AST = Vec<ParsedInstruction>;
+pub type ParsedAST = Vec<ParsedInstruction>;
 
 pub type TypecheckedAST = Vec<TypecheckedInstruction>;

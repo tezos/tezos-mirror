@@ -76,6 +76,6 @@ instructionSeq: Vec<ParsedInstruction> = {
   }
 }
 
-pub instructionBlock: InstructionBlock = {
+pub instructionBlock: ParsedInstructionBlock = {
   "{" <is:instructionSeq> "}" => is,
 }

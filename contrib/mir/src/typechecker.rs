@@ -27,7 +27,7 @@ impl From<OutOfGas> for TcError {
 
 #[allow(dead_code)]
 pub fn typecheck(
-    ast: AST,
+    ast: ParsedAST,
     gas: &mut Gas,
     stack: &mut TypeStack,
 ) -> Result<TypecheckedAST, TcError> {

@@ -7,9 +7,11 @@
 
 use crate::ast::*;
 use crate::syntax;
-use lalrpop_util::ParseError;
 use lalrpop_util::lexer::Token;
+use lalrpop_util::ParseError;
 
-pub fn parse(src: &str) -> Result<InstructionBlock,ParseError<usize, Token<'_>, &'static str>> {
+pub fn parse(
+    src: &str,
+) -> Result<ParsedInstructionBlock, ParseError<usize, Token<'_>, &'static str>> {
     syntax::instructionBlockParser::new().parse(src)
 }
