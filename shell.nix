@@ -82,10 +82,7 @@ in
   pkgs.mkShell {
     name = "tezos-shell";
 
-    hardeningDisable =
-      pkgs.lib.optionals
-      (pkgs.stdenv.isAarch64 && pkgs.stdenv.isDarwin)
-      ["stackprotector"];
+    hardeningDisable = ["stackprotector"];
 
     inherit (mainPackage) NIX_LDFLAGS NIX_CFLAGS_COMPILE TEZOS_WITHOUT_OPAM OPAM_SWITCH_PREFIX;
 
