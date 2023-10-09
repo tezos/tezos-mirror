@@ -50,14 +50,14 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-(** [punish_double_signing misbehaviour ctxt delegate level] record
+(** [punish_double_signing ctxt misbehaviour delegate level] record
     in the context that the given [delegate] has now been slashed for the
     double signing event [misbehaviour] for the given [level] and return the amounts of the
     frozen deposits to burn and to reward the denuncer.
 
     The double signing event corresponds to a field in {!Storage.slashed_level}.
 *)
-let punish_double_signing (misbehaviour : Misbehaviour.t) ctxt delegate
+let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
     (level : Level_repr.t) =
   let open Lwt_result_syntax in
   let* slashed_opt =
@@ -168,10 +168,6 @@ let punish_double_signing (misbehaviour : Misbehaviour.t) ctxt delegate
     else Lwt.return ctxt
   in
   return (ctxt, {staked; unstaked})
-
-let punish_double_attesting = punish_double_signing Double_attesting
-
-let punish_double_baking = punish_double_signing Double_baking
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in

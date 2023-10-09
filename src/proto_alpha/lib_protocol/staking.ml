@@ -101,12 +101,9 @@ let finalize_unstake ctxt contract =
 let punish_delegate ctxt delegate level (misbehaviour : Misbehaviour.t)
     ~rewarded =
   let open Lwt_result_syntax in
-  let punish =
-    match misbehaviour with
-    | Double_baking -> Delegate.punish_double_baking
-    | Double_attesting -> Delegate.punish_double_attesting
+  let* ctxt, {staked; unstaked} =
+    Delegate.punish_double_signing ctxt misbehaviour delegate level
   in
-  let* ctxt, {staked; unstaked} = punish ctxt delegate level in
   let init_to_burn_to_reward =
     let Delegate.{amount_to_burn; reward} = staked in
     let giver = `Frozen_deposits (Receipt.Shared delegate) in
