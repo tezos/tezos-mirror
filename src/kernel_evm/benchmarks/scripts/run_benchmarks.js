@@ -360,6 +360,7 @@ benchmark_scripts = [
     "benchmarks/bench_loop_progressive.js",
     "benchmarks/bench_loop_expensive.js",
 
+    "benchmarks/bench_loop_calldataload.js"
 ]
 
 run_all_benchmarks(benchmark_scripts);
