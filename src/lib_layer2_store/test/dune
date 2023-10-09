@@ -9,7 +9,8 @@
   octez-libs.error-monad
   octez-l2-libs.layer2_store
   qcheck-alcotest
-  octez-alcotezt)
+  octez-alcotezt
+  tezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

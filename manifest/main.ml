@@ -4235,6 +4235,7 @@ let _octez_layer2_indexed_store_test =
         octez_layer2_store |> open_;
         qcheck_alcotest;
         alcotezt;
+        tezt_lib;
       ]
 
 let octez_dal_node_services =

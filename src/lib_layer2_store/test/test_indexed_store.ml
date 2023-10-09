@@ -87,6 +87,24 @@ module SKey = struct
   let encoding = Data_encoding.Fixed.string size
 end
 
+module Int32Key = struct
+  type t = Int32.t
+
+  let fixed_size = 4
+
+  let name = "key_int32"
+
+  let gen = QCheck2.Gen.int32
+
+  let gen_distinct distinct_keys = QCheck2.Gen.list_repeat distinct_keys gen
+
+  let pp fmt i = Format.fprintf fmt "%ld" i
+
+  let encoding = Data_encoding.int32
+
+  let equal = Int32.equal
+end
+
 (** Used for singleton store tests which do not need keys. *)
 module NoKey = struct
   type t = unit
@@ -536,7 +554,7 @@ module Indexable_for_test = struct
 
   let close = S.close
 
-  let gc s ~retain = S.gc ~async:false s ~retain
+  let gc s ~retain = S.gc ~async:false s (Retain retain)
 end
 
 let () =
@@ -583,7 +601,7 @@ module Indexable_removable_for_test = struct
 
   let close = S.close
 
-  let gc s ~retain = S.gc ~async:false s ~retain
+  let gc s ~retain = S.gc ~async:false s (Retain retain)
 end
 
 let () =
@@ -609,6 +627,24 @@ let () =
     (test_gen `Parallel)
     R.check_run
 
+module Value_with_size_header = struct
+  include Value
+
+  module Header = struct
+    type t = int32
+
+    let name = "sum_chars"
+
+    let encoding = Data_encoding.int32
+
+    let fixed_size = 4
+  end
+
+  (* Header contains sum of byte codes as an example *)
+  let header b =
+    Bytes.fold_left (fun n c -> n + Char.code c) 0 b |> Int32.of_int
+end
+
 module Indexed_file_for_test = struct
   module S =
     Make_simple_indexed_file
@@ -620,23 +656,7 @@ module Indexed_file_for_test = struct
 
         let equal = String.equal
       end))
-      (struct
-        include Value
-
-        module Header = struct
-          type t = int32
-
-          let name = "sum_chars"
-
-          let encoding = Data_encoding.int32
-
-          let fixed_size = 4
-        end
-
-        (* Header contains sum of byte codes as an example *)
-        let header b =
-          Bytes.fold_left (fun n c -> n + Char.code c) 0 b |> Int32.of_int
-      end)
+      (Value_with_size_header)
 
   type t = rw S.t
 
@@ -659,7 +679,51 @@ module Indexed_file_for_test = struct
 
   let close = S.close
 
-  let gc s ~retain = S.gc ~async:false s ~retain
+  let gc s ~retain = S.gc ~async:false s (Retain retain)
+end
+
+module Indexed_file_integers = struct
+  module S =
+    Make_simple_indexed_file
+      (struct
+        let name = "indexed_file_ints"
+      end)
+      (Make_index_key (Int32Key))
+      (Value_with_size_header)
+
+  type t = rw S.t
+
+  let load ~path =
+    S.load
+      ~index_buffer_size:default_index_buffer_size
+      ~path
+      ~cache_size:10
+      Read_write
+
+  open Lwt_result_syntax
+
+  let read s k =
+    let+ v = S.read s k in
+    Option.map fst v
+
+  let write s k v = S.append s ~key:k ~value:v
+
+  let delete _ _ = assert false
+
+  let close = S.close
+
+  let gc s ~largest ~smallest =
+    S.gc
+      ~async:false
+      s
+      (Iterator
+         {
+           first = largest;
+           next =
+             (fun i _ ->
+               if i <= smallest then Lwt.return_none
+               else Lwt.return_some (Int32.pred i));
+         })
 end
 
 let () =
@@ -760,9 +824,7 @@ let test_read_gc_store () =
   R.run scenario
 
 let test_load () =
-  Tezos_stdlib_unix.Lwt_utils_unix.with_tempdir
-    "tezos-layer2-indexed-store-test-load-"
-  @@ fun path ->
+  let path = Tezt.Temp.dir "tezos-layer2-indexed-store-test-load" in
   let open Lwt_result_syntax in
   let* store =
     Indexed_file_for_test.S.load
@@ -781,6 +843,57 @@ let test_load () =
   in
   Indexed_file_for_test.S.close store
 
+module type LOADABLE_STORE = sig
+  type t
+
+  val load : path:string -> t tzresult Lwt.t
+
+  val close : t -> unit tzresult Lwt.t
+end
+
+let with_load_store ~load ~close ~path f =
+  let open Lwt_result_syntax in
+  let* store = load ~path in
+  Lwt.finalize (fun () -> f store) @@ fun () ->
+  let open Lwt_syntax in
+  let* _ = close store in
+  return_unit
+
+let test_gc_iterator () =
+  let path = Tezt.Temp.dir "indexed-store-test-gc-iterator" in
+  let open Lwt_result_syntax in
+  with_load_store
+    ~load:Indexed_file_integers.load
+    ~close:Indexed_file_integers.close
+    ~path
+  @@ fun store ->
+  let bound = 1000l in
+  let rec fill i =
+    unless (i > bound) @@ fun () ->
+    let* () =
+      Indexed_file_integers.write store i (Int32.to_string i |> Bytes.of_string)
+    in
+    fill (Int32.succ i)
+  in
+  let* () = fill 0l in
+  let* () = Indexed_file_integers.gc store ~largest:998l ~smallest:500l in
+  let rec check i =
+    unless (i > bound) @@ fun () ->
+    let* found = Indexed_file_integers.read store i in
+    let* () =
+      if 500l <= i && i <= 998l then
+        match found with
+        | None -> failwith "Key %ld not found after GC" i
+        | Some _ -> return_unit
+      else
+        match found with
+        | Some _ -> failwith "Key %ld was not collected by the GC" i
+        | None -> return_unit
+    in
+    check (Int32.succ i)
+  in
+  check 0l
+
 let unit_tests =
   let wrap (name, t) =
     let f () =
@@ -796,6 +909,7 @@ let unit_tests =
       ("load", test_load);
       ("read_gc_index", test_read_gc_index);
       ("read_gc_store", test_read_gc_store);
+      ("gc_iterator", test_gc_iterator);
     ]
 
 let () =
