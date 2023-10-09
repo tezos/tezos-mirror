@@ -32,4 +32,27 @@
 
 module Dal = Dal_common
 
+let dal_distribution =
+  Test.register
+    ~__FILE__
+    ~title:"Get the DAL distribution"
+    ~tags:["dal"; "distribution"]
+  @@ fun () ->
+  let open Dal.Cryptobox in
+  let number_of_shards = Cli.get_int "number_of_shards" in
+  let slot_size = Cli.get_int "slot_size" in
+  let redundancy_factor = Cli.get_int "redundancy_factor" in
+  let page_size = Cli.get_int "page_size" in
+  let parameters =
+    {number_of_shards; redundancy_factor; page_size; slot_size}
+  in
+  Internal_for_tests.parameters_initialisation parameters
+  |> Internal_for_tests.load_parameters ;
+  match make parameters with
+  | Ok _ ->
+      Log.report "Set of parameters is valid" ;
+      unit
+  | Error (`Fail s) ->
+      Test.fail "The set of parameters is invalid. Reason:@.%s@." s
+
 let register () = ()
