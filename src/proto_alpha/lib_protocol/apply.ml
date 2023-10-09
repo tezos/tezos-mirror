@@ -440,17 +440,6 @@ let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
       Signature.Public_key_hash.(sender = destination)
       Invalid_self_transaction_destination
   in
-  let requested_amount_opt =
-    if Z.fits_int64 requested_amount then
-      Tez.of_mutez (Z.to_int64 requested_amount)
-    else None
-  in
-  let*? requested_amount =
-    match requested_amount_opt with
-    | None ->
-        Result_syntax.tzfail (Invalid_unstake_request_amount {requested_amount})
-    | Some requested_amount -> Ok requested_amount
-  in
   let sender_contract = Contract.Implicit sender in
   let*? ctxt = Gas.consume ctxt Adaptive_issuance_costs.find_delegate_cost in
   let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
@@ -1092,14 +1081,14 @@ let apply_manager_operation :
                   ~elab_conf
                   ctxt
                   ~allow_forged:false
-                  Script_typed_ir.int_t
+                  Script_typed_ir.mutez_t
                   (Micheline.root parameters)
               in
               apply_unstake
                 ~ctxt
                 ~sender:source
                 ~amount
-                ~requested_amount:(Script_int.to_zint requested_amount)
+                ~requested_amount
                 ~destination:pkh
                 ~before_operation:ctxt_before_op
           | "finalize_unstake" ->
