@@ -471,18 +471,7 @@ impl EthereumAccount {
 
     pub fn indexed(&self, host: &impl Runtime) -> Result<bool, DurableStorageError> {
         let path = concat(&self.path, &INDEXED_PATH)?;
-        match host.store_read(&path, 0, 0) {
-            Ok(_) => Ok(true),
-            Err(
-                RuntimeError::PathNotFound
-                | RuntimeError::HostErr(host::Error::StoreNotAValue)
-                | RuntimeError::HostErr(host::Error::StoreInvalidAccess),
-                // An InvalidAccess implies that the path does not exist at all
-                // in the storage: store_read fails because reading is out of
-                // bounds since the value has never been allocated before
-            ) => Ok(false),
-            Err(e) => Err(e.into()),
-        }
+        Ok(host.store_has(&path)?.is_some())
     }
 
     pub fn set_indexed(

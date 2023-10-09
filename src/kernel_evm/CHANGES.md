@@ -23,6 +23,8 @@
 
 ### Internal
 
+- Indexes of accounts are now correctly checked, they are no longer duplicated. (!10395)
+
 ## Version fc06d63568b1be253088ff5d6e422fd80ed3d2c2
 
 ### EVM Kernel
