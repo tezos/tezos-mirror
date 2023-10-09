@@ -31,14 +31,6 @@
 (** Below, we expose the main types needed for the integration with the existing
     DAL node alongside their encodings. *)
 
-module Topic : sig
-  include
-    Gossipsub_intf.ITERABLE
-      with type t = Tezos_dal_node_services.Services.Types.topic
-end
-
-val topic_encoding : Topic.t Data_encoding.t
-
 type message_id = Gs_interface.message_id = {
   commitment : Cryptobox.Commitment.t;
   level : int32;
@@ -64,7 +56,7 @@ val message_encoding : message Data_encoding.t
 module Worker : sig
   module Config :
     module type of Gs_interface.Worker_config
-      with type GS.Topic.t = Topic.t
+      with type GS.Topic.t = Types.Topic.t
        and type GS.Message_id.t = message_id
        and type GS.Message.t = message
        and type GS.Peer.t = peer
@@ -75,7 +67,7 @@ module Worker : sig
 
   include
     Gossipsub_intf.WORKER
-      with type GS.Topic.t = Topic.t
+      with type GS.Topic.t = Types.Topic.t
        and type GS.Message_id.t = message_id
        and type GS.Message.t = message
        and type GS.Peer.t = peer

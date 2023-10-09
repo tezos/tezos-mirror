@@ -34,11 +34,27 @@ type slot_index = int
 (** An ID associated to a slot or to its commitment. *)
 type slot_id = {slot_level : level; slot_index : slot_index}
 
-(** Definition of a topic used for gossipsub. *)
-type topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
+(** A topic is defined by a public key hash of an attester and a slot index.
+    - A slot producer tracks the topic associated to a given slot index for all
+    the public key-hashes;
+    - The attester tracks its own public key hash for all the slot indices;
+    - A slot consumer tracks topics associated to a given slot index and enough
+    public key-hashes so that the number of covered shards is enough to recover
+    the slot data. *)
+module Topic : sig
+  (** Definition of a topic used for gossipsub. *)
+  type t = {slot_index : int; pkh : Signature.Public_key_hash.t}
 
-(** Encoding of a topic. *)
-val topic_encoding : topic Data_encoding.t
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
    Use a bitset instead, when available in the standard library. *)

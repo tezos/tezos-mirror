@@ -29,19 +29,45 @@ type level = int32
 
 type slot_index = int
 
-type topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
+module Topic = struct
+  type t = {slot_index : int; pkh : Signature.Public_key_hash.t}
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5607
+  type topic = t
 
-   Bound / add checks for bounds of these encodings *)
-let topic_encoding : topic Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun ({slot_index; pkh} : topic) -> (slot_index, pkh))
-    (fun (slot_index, pkh) -> {slot_index; pkh})
-    (obj2
-       (req "slot_index" uint8)
-       (req "pkh" Signature.Public_key_hash.encoding))
+  let compare topic {slot_index; pkh} =
+    let c = Int.compare topic.slot_index slot_index in
+    if c <> 0 then c else Signature.Public_key_hash.compare topic.pkh pkh
+
+  module Cmp = struct
+    type nonrec t = t
+
+    let compare = compare
+  end
+
+  include Compare.Make (Cmp)
+  module Set = Set.Make (Cmp)
+  module Map = Map.Make (Cmp)
+
+  let pp fmt {pkh; slot_index} =
+    Format.fprintf
+      fmt
+      "{ pkh=%a; slot_index=%d }"
+      Signature.Public_key_hash.pp
+      pkh
+      slot_index
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5607
+
+     Bound / add checks for bounds of these encodings *)
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun ({slot_index; pkh} : topic) -> (slot_index, pkh))
+      (fun (slot_index, pkh) -> {slot_index; pkh})
+      (obj2
+         (req "slot_index" uint8)
+         (req "pkh" Signature.Public_key_hash.encoding))
+end
 
 (* Declaration of types used as inputs and/or outputs. *)
 type slot_id = {slot_level : level; slot_index : slot_index}

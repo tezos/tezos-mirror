@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 include Services_legacy
-include Types
+open Types
 
 type 'rpc service =
   ('meth, 'prefix, 'params, 'query, 'input, 'output) Tezos_rpc.Service.service
@@ -263,7 +263,7 @@ module P2P = struct
     let get_topics :
         < meth : [`GET]
         ; input : unit
-        ; output : Types.topic list
+        ; output : Types.Topic.t list
         ; prefix : unit
         ; params : unit
         ; query : unit >
@@ -271,7 +271,7 @@ module P2P = struct
       Tezos_rpc.Service.get_service
         ~description:"get the topics this node is currently subscribed to"
         ~query:Tezos_rpc.Query.empty
-        ~output:(Data_encoding.list Types.topic_encoding)
+        ~output:(Data_encoding.list Types.Topic.encoding)
         (open_root / "topics")
   end
 end

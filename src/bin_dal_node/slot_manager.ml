@@ -235,9 +235,7 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
                        shard_index
                  | Some pkh, Some shard_proof ->
                      let message = Gossipsub.{share; shard_proof} in
-                     let topic =
-                       Tezos_dal_node_services.Services.Types.{slot_index; pkh}
-                     in
+                     let topic = Types.Topic.{slot_index; pkh} in
                      let message_id =
                        Gossipsub.
                          {

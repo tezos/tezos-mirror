@@ -188,7 +188,7 @@ module P2P : sig
     val get_topics :
       < meth : [`GET]
       ; input : unit
-      ; output : Types.topic list
+      ; output : Types.Topic.t list
       ; prefix : unit
       ; params : unit
       ; query : unit >

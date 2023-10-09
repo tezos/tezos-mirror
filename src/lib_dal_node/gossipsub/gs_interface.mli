@@ -79,7 +79,7 @@ end
 
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
-    with type GS.Topic.t = Topic.t
+    with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer
@@ -88,7 +88,7 @@ module Worker_config :
 
 module Worker_instance :
   Gossipsub_intf.WORKER
-    with type GS.Topic.t = Topic.t
+    with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer
