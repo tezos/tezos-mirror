@@ -36,6 +36,8 @@ pub enum TcError {
         stack: TypeStack,
         reason: Option<NoMatchingOverloadReason>,
     },
+    #[error("type not packable: {0:?}")]
+    TypeNotPackable(Type),
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -266,7 +268,8 @@ fn typecheck_instruction(
         }
         I::Failwith => {
             ensure_stack_len("FAILWITH", stack, 1)?;
-            stack.pop();
+            let ty = stack.pop().unwrap();
+            ensure_packable(ty)?;
             stack.fail();
             I::Failwith
         }
@@ -374,6 +377,14 @@ fn ensure_stack_len(instr: &'static str, stack: &TypeStack, l: usize) -> Result<
             stack: stack.clone(),
             reason: Some(NoMatchingOverloadReason::StackTooShort { expected: l }),
         })
+    }
+}
+
+fn ensure_packable(ty: Type) -> Result<(), TcError> {
+    if ty.is_packable() {
+        Ok(())
+    } else {
+        Err(TcError::TypeNotPackable(ty))
     }
 }
 
@@ -1002,5 +1013,18 @@ mod typecheck_tests {
             Ok(vec![Nil(())])
         );
         assert_eq!(stack, stk![Type::new_list(Type::Operation)]);
+    }
+
+    #[test]
+    fn failwith_operation() {
+        let mut stack = stk![Type::new_list(Type::Operation)];
+        assert_eq!(
+            typecheck(
+                parse("{ FAILWITH }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::TypeNotPackable(Type::new_list(Type::Operation)))
+        );
     }
 }
