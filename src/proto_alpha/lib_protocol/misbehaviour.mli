@@ -6,3 +6,5 @@
 (*****************************************************************************)
 
 type t = Double_baking | Double_attesting
+
+val encoding : t Data_encoding.t
