@@ -136,12 +136,14 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
 
 let cycle_end ctxt last_cycle =
   let open Lwt_result_syntax in
-  let*! ctxt =
-    Delegate_slashed_deposits_storage.clear_current_cycle_denunciations ctxt
-  in
   let* ctxt, unrevealed_nonces = Seed_storage.cycle_end ctxt last_cycle in
-  let* ctxt, balance_updates =
+  let* ctxt, attesting_balance_updates =
     distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
+  in
+  let* ctxt, slashing_balance_updates =
+    Delegate_slashed_deposits_storage
+    .apply_and_clear_current_cycle_denunciations
+      ctxt
   in
   let new_cycle = Cycle_repr.add last_cycle 1 in
   let* ctxt =
@@ -161,6 +163,7 @@ let cycle_end ctxt last_cycle =
   let* ctxt =
     Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   in
+  let balance_updates = slashing_balance_updates @ attesting_balance_updates in
   return (ctxt, balance_updates, deactivated_delegates)
 
 let init_first_cycles ctxt =
