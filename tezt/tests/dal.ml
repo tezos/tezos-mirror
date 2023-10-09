@@ -1975,6 +1975,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   Log.info "Originate rollup." ;
   let* boot_sector =
     Sc_rollup_helpers.prepare_installer_kernel
+      ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
       "dal_echo_kernel"
