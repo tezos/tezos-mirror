@@ -48,14 +48,18 @@ fn interpret_one(
     use Value::*;
 
     match i {
-        Add(..) => match stack.as_slice() {
-            [.., NumberValue(o2), NumberValue(o1)] => {
-                gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
-                let sum = *o1 + *o2;
-                stack.drop_top(2);
-                stack.push(NumberValue(sum));
-            }
-            _ => unimplemented!(),
+        Add(overload) => match overload {
+            // NB: branches are temporarily unified because representation is
+            // the same, this is subject to change.
+            overloads::Add::IntInt | overloads::Add::NatNat => match stack.as_slice() {
+                [.., NumberValue(o2), NumberValue(o1)] => {
+                    gas.consume(interpret_cost::add_int(*o1, *o2)?)?;
+                    let sum = *o1 + *o2;
+                    stack.drop_top(2);
+                    stack.push(NumberValue(sum));
+                }
+                _ => unreachable_state(),
+            },
         },
         Dip(opt_height, nested) => {
             gas.consume(interpret_cost::dip(*opt_height)?)?;
@@ -141,7 +145,7 @@ mod interpreter_tests {
         let mut stack = stk![NumberValue(10), NumberValue(20)];
         let expected_stack = stk![NumberValue(30)];
         let mut gas = Gas::default();
-        assert!(interpret_one(&Add(()), &mut gas, &mut stack).is_ok());
+        assert!(interpret_one(&Add(overloads::Add::NatNat), &mut gas, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -150,7 +154,12 @@ mod interpreter_tests {
         let mut stack = stk![NumberValue(20), NumberValue(5), NumberValue(10)];
         let expected_stack = stk![NumberValue(25), NumberValue(10)];
         let mut gas = Gas::default();
-        assert!(interpret_one(&Dip(None, vec![Add(())]), &mut gas, &mut stack).is_ok());
+        assert!(interpret_one(
+            &Dip(None, vec![Add(overloads::Add::NatNat)]),
+            &mut gas,
+            &mut stack
+        )
+        .is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -223,7 +232,12 @@ mod interpreter_tests {
         let mut stack = stk![NumberValue(20), NumberValue(5), BooleanValue(true)];
         let expected_stack = stk![NumberValue(20)];
         let mut gas = Gas::default();
-        assert!(interpret_one(&If(vec![Drop(None)], vec![Add(())]), &mut gas, &mut stack,).is_ok());
+        assert!(interpret_one(
+            &If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)]),
+            &mut gas,
+            &mut stack,
+        )
+        .is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -232,7 +246,12 @@ mod interpreter_tests {
         let mut stack = stk![NumberValue(20), NumberValue(5), BooleanValue(false)];
         let expected_stack = stk![NumberValue(25)];
         let mut gas = Gas::default();
-        assert!(interpret_one(&If(vec![Drop(None)], vec![Add(())]), &mut gas, &mut stack,).is_ok());
+        assert!(interpret_one(
+            &If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)]),
+            &mut gas,
+            &mut stack,
+        )
+        .is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -262,7 +281,7 @@ mod interpreter_tests {
         assert!(interpret_one(
             &Loop(vec![
                 Push(Type::Nat, NumberValue(1)),
-                Add(()),
+                Add(overloads::Add::NatNat),
                 Push(Type::Bool, BooleanValue(false))
             ]),
             &mut gas,
@@ -280,7 +299,7 @@ mod interpreter_tests {
         assert!(interpret_one(
             &Loop(vec![
                 Push(Type::Nat, NumberValue(1)),
-                Add(()),
+                Add(overloads::Add::NatNat),
                 Push(Type::Bool, BooleanValue(false))
             ]),
             &mut gas,
@@ -298,7 +317,7 @@ mod interpreter_tests {
         assert!(interpret_one(
             &Loop(vec![
                 Push(Type::Int, NumberValue(-1)),
-                Add(()),
+                Add(overloads::Add::IntInt),
                 Dup(None),
                 Gt
             ]),

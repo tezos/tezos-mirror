@@ -9,7 +9,7 @@ pub mod parsed;
 pub mod typechecked;
 
 pub use parsed::{ParsedInstruction, ParsedStage};
-pub use typechecked::{TypecheckedInstruction, TypecheckedStage};
+pub use typechecked::{overloads, TypecheckedInstruction, TypecheckedStage};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
