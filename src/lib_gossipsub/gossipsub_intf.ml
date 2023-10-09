@@ -24,16 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type PRINTABLE = sig
-  type t
-
-  val pp : Format.formatter -> t -> unit
-end
-
 module type ITERABLE = sig
   type t
 
-  include Compare.S with type t := t
+  include COMPARABLE with type t := t
 
   include PRINTABLE with type t := t
 

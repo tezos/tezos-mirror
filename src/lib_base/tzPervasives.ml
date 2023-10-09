@@ -120,3 +120,17 @@ end
 
 module Skip_list = Skip_list
 module Profiler = Profiler
+
+module type PRINTABLE = sig
+  type t
+
+  val pp : Format.formatter -> t -> unit
+end
+
+module type COMPARABLE = Compare.S
+
+module type ENCODABLE = sig
+  type t
+
+  val encoding : t Data_encoding.t
+end
