@@ -123,7 +123,7 @@ let punish_delegate ctxt delegate level (misbehaviour : Misbehaviour.t)
     Token.transfer_n ctxt to_burn `Double_signing_punishments
   in
   let+ ctxt, reward_balance_updates =
-    Token.transfer_n ctxt to_reward (`Contract rewarded)
+    Token.transfer_n ctxt to_reward (`Contract (Contract.Implicit rewarded))
   in
   (ctxt, reward_balance_updates @ punish_balance_updates)
 
