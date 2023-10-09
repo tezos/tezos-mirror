@@ -181,15 +181,15 @@ impl Encodable for TransactionReceipt {
         stream.append(&self.hash.to_vec());
         stream.append(&self.index);
         stream.append(&self.block_hash);
-        append_u256_le(stream, self.block_number);
+        append_u256_le(stream, &self.block_number);
         stream.append(&self.from);
         match &self.to {
             Some(to) => stream.append(to),
             None => stream.append_empty_data(),
         };
-        append_u256_le(stream, self.cumulative_gas_used);
-        append_u256_le(stream, self.effective_gas_price);
-        append_u256_le(stream, self.gas_used);
+        append_u256_le(stream, &self.cumulative_gas_used);
+        append_u256_le(stream, &self.effective_gas_price);
+        append_u256_le(stream, &self.gas_used);
         match &self.contract_address {
             Some(address) => stream.append(address),
             None => stream.append_empty_data(),
@@ -288,19 +288,19 @@ impl Encodable for TransactionObject {
     fn rlp_append(&self, stream: &mut RlpStream) {
         stream.begin_list(14);
         stream.append(&self.block_hash);
-        append_u256_le(stream, self.block_number);
+        append_u256_le(stream, &self.block_number);
         stream.append(&self.from);
-        append_u256_le(stream, self.gas_used);
-        append_u256_le(stream, self.gas_price);
+        append_u256_le(stream, &self.gas_used);
+        append_u256_le(stream, &self.gas_price);
         stream.append(&self.hash.to_vec());
         stream.append(&self.input);
-        append_u256_le(stream, self.nonce);
+        append_u256_le(stream, &self.nonce);
         match &self.to {
             Some(to) => stream.append(to),
             None => stream.append_empty_data(),
         };
         stream.append(&self.index);
-        append_u256_le(stream, self.value);
+        append_u256_le(stream, &self.value);
         rlp_append_opt(&self.signature, stream);
     }
 }

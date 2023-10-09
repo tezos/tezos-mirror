@@ -53,11 +53,24 @@ pub fn decode_option<T: Decodable>(
     decoder: &Rlp<'_>,
     field_name: &'static str,
 ) -> Result<Option<T>, DecoderError> {
+    decode_option_explicit(decoder, field_name, decode_field)
+}
+
+// Combinator for decoding an optional field using an explicit
+// decoding function, instead of the implemented in the Decodable trait.
+pub fn decode_option_explicit<T, Dec>(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+    dec_field: Dec,
+) -> Result<Option<T>, DecoderError>
+where
+    Dec: Fn(&Rlp<'_>, &'static str) -> Result<T, DecoderError>,
+{
     if decoder.is_empty() {
         Ok(None)
     } else {
-        let addr: T = decode_field(decoder, field_name)?;
-        Ok(Some(addr))
+        let inner: T = dec_field(decoder, field_name)?;
+        Ok(Some(inner))
     }
 }
 
@@ -86,18 +99,31 @@ pub fn append_option<T: Encodable>(
     stream: &mut RlpStream,
     data: Option<T>,
 ) -> &mut RlpStream {
+    append_option_explicit(stream, &data, |s, v| s.append(v))
+}
+
+// Combinator for encoding an optional value using an explicit
+// encoding function, instead of the implemented in the Encodable trait.
+pub fn append_option_explicit<'a, T, Enc>(
+    stream: &'a mut RlpStream,
+    data: &Option<T>,
+    encoder: Enc,
+) -> &'a mut RlpStream
+where
+    Enc: Fn(&'a mut RlpStream, &T) -> &'a mut RlpStream,
+{
     if let Some(value) = data {
-        stream.append(&value)
+        encoder(stream, value)
     } else {
         stream.append_empty_data()
     }
 }
 
-pub fn append_vec(stream: &mut RlpStream, data: Vec<u8>) -> &mut RlpStream {
+pub fn append_vec<'a>(stream: &'a mut RlpStream, data: &Vec<u8>) -> &'a mut RlpStream {
     if data.is_empty() {
         stream.append_empty_data()
     } else {
-        stream.append_iter(data)
+        stream.append_iter((*data).clone())
     }
 }
 
@@ -130,10 +156,25 @@ pub fn decode_field_u256_le(
     Ok(U256::from_little_endian(&bytes))
 }
 
-pub fn append_u256_le(stream: &mut RlpStream, v: U256) {
-    let mut bytes: [u8; 32] = v.into();
+pub fn append_u256_le<'a>(stream: &'a mut RlpStream, v: &U256) -> &'a mut RlpStream {
+    let mut bytes = Into::<[u8; 32]>::into(*v);
     v.to_little_endian(&mut bytes);
-    stream.append(&bytes.to_vec());
+    stream.append(&bytes.to_vec())
+}
+
+pub fn decode_field_u64_le(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<u64, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, field_name)?;
+    let bytes_array: [u8; 8] = bytes.try_into().map_err(|_| {
+        DecoderError::Custom("Invalid conversion from vector of bytes to bytes.")
+    })?;
+    Ok(u64::from_le_bytes(bytes_array))
+}
+
+pub fn append_u64_le<'a>(stream: &'a mut RlpStream, v: &u64) -> &'a mut RlpStream {
+    stream.append(&v.to_le_bytes().to_vec())
 }
 
 pub fn decode_transaction_hash(
