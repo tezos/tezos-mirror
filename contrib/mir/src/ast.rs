@@ -37,9 +37,17 @@ impl Type {
             Option(x) => x.is_comparable(),
         }
     }
-}
 
-impl Type {
+    pub fn is_packable(&self) -> bool {
+        use Type::*;
+        match self {
+            Operation => false,
+            Nat | Int | Bool | Mutez | String | Unit => true,
+            Pair(l, r) => l.is_packable() && r.is_packable(),
+            Option(x) | List(x) => x.is_packable(),
+        }
+    }
+
     /// Returns abstract size of the type representation. Used for gas cost
     /// estimation.
     pub fn size_for_gas(&self) -> usize {
