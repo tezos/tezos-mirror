@@ -480,6 +480,14 @@ module Pending_consensus_keys :
      and type key = Contract_repr.t
      and type value = Signature.public_key
 
+(** All denunciations of the current cycle that will have an effect (slashing,
+    reward), i.e. all below 100%, deferred to the cycle end. *)
+module Current_cycle_denunciations :
+  Indexed_data_storage
+    with type t := Raw_context.t
+     and type key = Signature.public_key_hash
+     and type value = Denunciations_repr.t
+
 type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
 
 (** [slashed_level] with all fields being [false]. *)
