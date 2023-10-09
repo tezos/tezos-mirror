@@ -205,3 +205,6 @@ let clear_outdated_slashed_deposits ctxt ~new_cycle =
   match Cycle_repr.(sub new_cycle max_slashable_period) with
   | None -> Lwt.return ctxt
   | Some outdated_cycle -> Storage.Slashed_deposits.clear (ctxt, outdated_cycle)
+
+let clear_current_cycle_denunciations =
+  Storage.Current_cycle_denunciations.clear
