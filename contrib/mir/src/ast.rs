@@ -16,6 +16,7 @@ pub enum Type {
     Nat,
     Int,
     Bool,
+    Mutez,
 }
 
 impl Type {
@@ -26,13 +27,14 @@ impl Type {
             Type::Nat => 1,
             Type::Int => 1,
             Type::Bool => 1,
+            Type::Mutez => 1,
         }
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Value {
-    NumberValue(i32),
+    NumberValue(i128),
     BooleanValue(bool),
 }
 
@@ -45,9 +47,9 @@ pub trait Stage {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction<T: Stage> {
     Add(T::AddMeta),
-    Dip(Option<usize>, Vec<Instruction<T>>),
-    Drop(Option<usize>),
-    Dup(Option<usize>),
+    Dip(Option<u16>, Vec<Instruction<T>>),
+    Drop(Option<u16>),
+    Dup(Option<u16>),
     Gt,
     If(Vec<Instruction<T>>, Vec<Instruction<T>>),
     Int,

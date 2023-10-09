@@ -43,11 +43,21 @@ mod tests {
     }
 
     #[test]
+    fn interpret_mutez_push_add() {
+        let ast = parser::parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
+        let mut gas = Gas::default();
+        let ast = typechecker::typecheck(ast, &mut gas, &mut stk![]).unwrap();
+        let mut istack = stk![];
+        assert!(interpreter::interpret(&ast, &mut gas, &mut istack).is_ok());
+        assert_eq!(istack, stk![Value::NumberValue(600)]);
+    }
+
+    #[test]
     fn interpret_test_gas_consumption() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let ast = typechecker::typecheck(ast, &mut Gas::default(), &mut stk![Type::Nat]).unwrap();
         let mut istack = stk![Value::NumberValue(5)];
-        let mut gas = Gas::new(1305);
+        let mut gas = Gas::new(1359);
         report_gas(&mut gas, |gas| {
             assert!(interpreter::interpret(&ast, gas, &mut istack).is_ok());
         });
@@ -120,6 +130,41 @@ mod tests {
                 .unwrap_err()
                 .to_string(),
             "Unrecognized token `GT` found at 133:135\nExpected one of \";\" or \"}\""
+        );
+    }
+
+    #[test]
+    fn parser_test_dip_dup_drop_args() {
+        use Instruction::{Dip, Drop, Dup};
+
+        assert_eq!(parser::parse("{ DROP 1023 }"), Ok(vec![Drop(Some(1023))]));
+        assert_eq!(
+            parser::parse("{ DIP 1023 {} }"),
+            Ok(vec![Dip(Some(1023), vec![])])
+        );
+        assert_eq!(parser::parse("{ DUP 1023 }"), Ok(vec![Dup(Some(1023))]));
+
+        // failures
+        assert_eq!(
+            parser::parse("{ DROP 1025 }")
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected a natural from 0 to 1023 inclusive"
+        );
+        assert_eq!(
+            parser::parse("{ DIP 1024 {} }")
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected a natural from 0 to 1023 inclusive"
+        );
+        assert_eq!(
+            parser::parse("{ DUP 65536 }")
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected a natural from 0 to 1023 inclusive"
         );
     }
 

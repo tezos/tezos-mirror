@@ -56,10 +56,14 @@ fn typecheck_instruction(
                 stack.pop();
                 I::Add(overloads::Add::IntInt)
             }
+            [.., T::Mutez, T::Mutez] => {
+                stack.pop();
+                I::Add(overloads::Add::MutezMutez)
+            }
             _ => unimplemented!(),
         },
         I::Dip(opt_height, nested) => {
-            let protected_height: usize = opt_height.unwrap_or(1);
+            let protected_height = opt_height.unwrap_or(1) as usize;
 
             gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
@@ -72,7 +76,7 @@ fn typecheck_instruction(
             I::Dip(opt_height, nested)
         }
         I::Drop(opt_height) => {
-            let drop_height: usize = opt_height.unwrap_or(1);
+            let drop_height: usize = opt_height.unwrap_or(1) as usize;
             gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len(&stack, drop_height)?;
             stack.drop_top(drop_height);
@@ -83,7 +87,7 @@ fn typecheck_instruction(
             return Err(TcError::GenericTcError);
         }
         I::Dup(opt_height) => {
-            let dup_height: usize = opt_height.unwrap_or(1);
+            let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(stack, dup_height)?;
             stack.push(stack[dup_height - 1].clone());
             I::Dup(opt_height)
@@ -144,6 +148,8 @@ fn typecheck_instruction(
     })
 }
 
+pub const MAX_TEZ: i128 = 2i128.pow(63) - 1;
+
 fn typecheck_value(gas: &mut Gas, t: &Type, v: &Value) -> Result<(), TcError> {
     use Type::*;
     use Value::*;
@@ -152,6 +158,7 @@ fn typecheck_value(gas: &mut Gas, t: &Type, v: &Value) -> Result<(), TcError> {
         (Nat, NumberValue(n)) if *n >= 0 => Ok(()),
         (Int, NumberValue(_)) => Ok(()),
         (Bool, BooleanValue(_)) => Ok(()),
+        (Mutez, NumberValue(n)) if *n >= 0 && *n <= MAX_TEZ => Ok(()),
         _ => Err(TcError::GenericTcError),
     }
 }
@@ -326,6 +333,19 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(Add(()), &mut gas, &mut stack),
             Ok(Add(overloads::Add::NatNat))
+        );
+        assert_eq!(stack, expected_stack);
+        assert_eq!(gas.milligas(), 10000 - 440);
+    }
+
+    #[test]
+    fn test_add_mutez_mutez() {
+        let mut stack = stk![Type::Mutez, Type::Mutez];
+        let expected_stack = stk![Type::Mutez];
+        let mut gas = Gas::new(10000);
+        assert_eq!(
+            typecheck_instruction(Add(()), &mut gas, &mut stack),
+            Ok(Add(overloads::Add::MutezMutez))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440);

@@ -12,6 +12,7 @@ use crate::stack::*;
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterpretError {
     OutOfGas,
+    MutezOverflow,
 }
 
 impl From<OutOfGas> for InterpretError {
@@ -60,23 +61,40 @@ fn interpret_one(
                 }
                 _ => unreachable_state(),
             },
+            overloads::Add::MutezMutez => match stack.as_slice() {
+                [.., NumberValue(o2), NumberValue(o1)] => {
+                    use crate::typechecker::MAX_TEZ;
+
+                    gas.consume(interpret_cost::ADD_TEZ)?;
+                    if (*o1 > MAX_TEZ) || (*o2 > MAX_TEZ) {
+                        return Err(InterpretError::MutezOverflow);
+                    }
+                    let sum = *o1 + *o2;
+                    if sum > MAX_TEZ {
+                        return Err(InterpretError::MutezOverflow);
+                    }
+                    stack.drop_top(2);
+                    stack.push(NumberValue(sum));
+                }
+                _ => unreachable_state(),
+            },
         },
         Dip(opt_height, nested) => {
             gas.consume(interpret_cost::dip(*opt_height)?)?;
-            let protected_height: usize = opt_height.unwrap_or(1);
-            let mut protected = stack.split_off(protected_height);
+            let protected_height: u16 = opt_height.unwrap_or(1);
+            let mut protected = stack.split_off(protected_height as usize);
             interpret(nested, gas, stack)?;
             gas.consume(interpret_cost::undip(protected_height)?)?;
             stack.append(&mut protected);
         }
         Drop(opt_height) => {
             gas.consume(interpret_cost::drop(*opt_height)?)?;
-            let drop_height: usize = opt_height.unwrap_or(1);
+            let drop_height: usize = opt_height.unwrap_or(1) as usize;
             stack.drop_top(drop_height);
         }
         Dup(opt_height) => {
             gas.consume(interpret_cost::dup(*opt_height)?)?;
-            let dup_height: usize = opt_height.unwrap_or(1);
+            let dup_height: usize = opt_height.unwrap_or(1) as usize;
             stack.push(stack[dup_height - 1].clone());
         }
         Gt => {
@@ -147,6 +165,39 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret_one(&Add(overloads::Add::NatNat), &mut gas, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_add_mutez() {
+        let mut stack = stk![NumberValue(2i128.pow(62)), NumberValue(20)];
+        let mut gas = Gas::default();
+        assert!(interpret_one(&Add(overloads::Add::MutezMutez), &mut gas, &mut stack).is_ok());
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 20);
+        assert_eq!(stack, stk![NumberValue(2i128.pow(62) + 20)]);
+        assert_eq!(
+            interpret_one(
+                &Add(overloads::Add::MutezMutez),
+                &mut gas,
+                &mut stk![NumberValue(2i128.pow(62)), NumberValue(2i128.pow(62))]
+            ),
+            Err(InterpretError::MutezOverflow)
+        );
+        assert_eq!(
+            interpret_one(
+                &Add(overloads::Add::MutezMutez),
+                &mut gas,
+                &mut stk![NumberValue(2i128.pow(63) - 1), NumberValue(1)]
+            ),
+            Err(InterpretError::MutezOverflow)
+        );
+        assert_eq!(
+            interpret_one(
+                &Add(overloads::Add::MutezMutez),
+                &mut gas,
+                &mut stk![NumberValue(1), NumberValue(2i128.pow(63) - 1)]
+            ),
+            Err(InterpretError::MutezOverflow)
+        );
     }
 
     #[test]
