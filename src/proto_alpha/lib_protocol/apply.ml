@@ -46,7 +46,6 @@ type error +=
   | Staking_to_delegate_that_refuses_external_staking
   | Stake_modification_with_no_delegate_set
   | Invalid_nonzero_transaction_amount of Tez.t
-  | Invalid_unstake_request_amount of {requested_amount : Z.t}
   | Invalid_staking_parameters_sender
 
 let () =
@@ -270,23 +269,6 @@ let () =
     (function
       | Invalid_nonzero_transaction_amount amount -> Some amount | _ -> None)
     (fun amount -> Invalid_nonzero_transaction_amount amount) ;
-  register_error_kind
-    `Permanent
-    ~id:"operations.invalid_unstake_request_amount"
-    ~title:"Invalid unstake request amount"
-    ~description:"The unstake requested amount is negative or too large."
-    ~pp:(fun ppf requested_amount ->
-      Format.fprintf
-        ppf
-        "The unstake requested amount, %a, is negative or too large."
-        Z.pp_print
-        requested_amount)
-    Data_encoding.(obj1 (req "requested_amount" z))
-    (function
-      | Invalid_unstake_request_amount {requested_amount} ->
-          Some requested_amount
-      | _ -> None)
-    (fun requested_amount -> Invalid_unstake_request_amount {requested_amount}) ;
   register_error_kind
     `Permanent
     ~id:"operations.invalid_staking_parameters_sender"
