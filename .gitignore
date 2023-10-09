@@ -107,6 +107,7 @@ _evm_installer_preimages/
 tx_kernel.wasm
 tx_kernel_dal.wasm
 tx-demo-collector
+dal_echo_kernel.wasm
 
 # Terraform
 
