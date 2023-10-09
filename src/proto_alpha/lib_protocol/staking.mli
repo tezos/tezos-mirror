@@ -63,4 +63,4 @@ val punish_delegate :
   Level_repr.t ->
   Misbehaviour.t ->
   rewarded:Signature.public_key_hash ->
-  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t

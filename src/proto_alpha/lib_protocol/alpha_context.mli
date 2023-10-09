@@ -2209,7 +2209,7 @@ module Delegate : sig
     public_key_hash ->
     Level.t ->
     rewarded:public_key_hash ->
-    (context * punishing_amounts) tzresult Lwt.t
+    context tzresult Lwt.t
 
   type level_participation = Participated | Didn't_participate
 

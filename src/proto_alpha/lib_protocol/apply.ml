@@ -2263,10 +2263,10 @@ let punish_delegate ctxt delegate level misbehaviour mk_result ~payload_producer
     =
   let open Lwt_result_syntax in
   let rewarded = payload_producer.Consensus_key.delegate in
-  let+ ctxt, balance_updates =
+  let+ ctxt =
     Staking.punish_delegate ctxt delegate level misbehaviour ~rewarded
   in
-  (ctxt, Single_result (mk_result balance_updates))
+  (ctxt, Single_result (mk_result []))
 
 let punish_double_attestation_or_preattestation (type kind) ctxt
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
