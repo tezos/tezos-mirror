@@ -102,10 +102,6 @@ let finalize_unstake ctxt contract =
   let check_unfinalizable ctxt _unfinalizable = return ctxt in
   finalize_unstake_and_check ~check_unfinalizable ctxt contract
 
-let punish_delegate ctxt delegate level (misbehaviour : Misbehaviour.t)
-    ~rewarded =
-  Delegate.punish_double_signing ctxt misbehaviour delegate level ~rewarded
-
 let stake ctxt ~sender ~delegate amount =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt

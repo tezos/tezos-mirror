@@ -2264,7 +2264,7 @@ let punish_delegate ctxt delegate level misbehaviour mk_result ~payload_producer
   let open Lwt_result_syntax in
   let rewarded = payload_producer.Consensus_key.delegate in
   let+ ctxt =
-    Staking.punish_delegate ctxt delegate level misbehaviour ~rewarded
+    Delegate.punish_double_signing ctxt misbehaviour delegate level ~rewarded
   in
   (ctxt, Single_result (mk_result []))
 
