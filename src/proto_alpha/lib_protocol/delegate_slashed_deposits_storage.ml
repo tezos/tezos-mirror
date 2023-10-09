@@ -58,7 +58,7 @@ type punishing_amounts = {
     The double signing event corresponds to a field in {!Storage.slashed_level}.
 *)
 let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
-    (level : Level_repr.t) ~rewarded:_ =
+    (level : Level_repr.t) ~rewarded =
   let open Lwt_result_syntax in
   let* slashed_opt =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
@@ -139,6 +139,10 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
     Storage.Contract.Slashed_deposits.find ctxt delegate_contract
   in
   let slash_history = Option.value slash_history_opt ~default:[] in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let previously_slashed_this_cycle =
+    Storage.Slashed_deposits_history.get current_cycle slash_history
+  in
   let slash_history =
     Storage.Slashed_deposits_history.add
       level.cycle
@@ -149,7 +153,6 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
   let should_forbid_from_history =
-    let current_cycle = (Raw_context.current_level ctxt).cycle in
     let slashed_this_cycle =
       Storage.Slashed_deposits_history.get current_cycle slash_history
     in
@@ -168,6 +171,32 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
     if should_forbid || should_forbid_from_history then
       Delegate_storage.forbid_delegate ctxt delegate
     else Lwt.return ctxt
+  in
+  let* ctxt =
+    if Compare.Int.((previously_slashed_this_cycle :> int) >= 100) then
+      (* Do not store denunciations that have no effects .*) return ctxt
+    else
+      let* denunciations_opt =
+        Storage.Current_cycle_denunciations.find ctxt delegate
+      in
+      let denunciations = Option.value denunciations_opt ~default:[] in
+      let cycle =
+        if Cycle_repr.(level.cycle = current_cycle) then
+          Denunciations_repr.Current
+        else if Cycle_repr.(succ level.cycle = current_cycle) then
+          Denunciations_repr.Previous
+        else
+          (* [max_slashing_period = 2] according to
+             {!Constants_repr.check_constants}. *)
+          assert false
+      in
+      let denunciations =
+        Denunciations_repr.add rewarded misbehaviour cycle denunciations
+      in
+      let*! ctxt =
+        Storage.Current_cycle_denunciations.add ctxt delegate denunciations
+      in
+      return ctxt
   in
   return (ctxt, {staked; unstaked})
 

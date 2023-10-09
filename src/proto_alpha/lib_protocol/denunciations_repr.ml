@@ -38,3 +38,6 @@ let item_encoding =
 type t = item list
 
 let encoding = Data_encoding.list item_encoding
+
+let add rewarded misbehaviour misbehaviour_cycle list =
+  list @ [{rewarded; misbehaviour; misbehaviour_cycle}]
