@@ -5,13 +5,13 @@
 /*                                                                            */
 /******************************************************************************/
 
-use crate::ast::*;
-use crate::syntax;
-use lalrpop_util::lexer::Token;
-use lalrpop_util::ParseError;
+use super::{Instruction, Stage};
 
-pub fn parse(
-    src: &str,
-) -> Result<ParsedInstructionBlock, ParseError<usize, Token<'_>, &'static str>> {
-    syntax::instructionBlockParser::new().parse(src)
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TypecheckedStage {}
+
+impl Stage for TypecheckedStage {
+    type AddMeta = ();
 }
+
+pub type TypecheckedInstruction = Instruction<TypecheckedStage>;

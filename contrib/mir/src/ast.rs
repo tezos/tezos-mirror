@@ -5,6 +5,12 @@
 /*                                                                            */
 /******************************************************************************/
 
+pub mod parsed;
+pub mod typechecked;
+
+pub use parsed::{ParsedInstruction, ParsedStage};
+pub use typechecked::{TypecheckedInstruction, TypecheckedStage};
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
     Nat,
@@ -30,20 +36,26 @@ pub enum Value {
     BooleanValue(bool),
 }
 
-pub type InstructionBlock = Vec<Instruction>;
+pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
+
+pub trait Stage {
+    type AddMeta;
+}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Instruction {
-    Add,
-    Dip(Option<usize>, InstructionBlock),
+pub enum Instruction<T: Stage> {
+    Add(T::AddMeta),
+    Dip(Option<usize>, Vec<Instruction<T>>),
     Drop(Option<usize>),
     Dup(Option<usize>),
     Gt,
-    If(InstructionBlock, InstructionBlock),
+    If(Vec<Instruction<T>>, Vec<Instruction<T>>),
     Int,
-    Loop(InstructionBlock),
+    Loop(Vec<Instruction<T>>),
     Push(Type, Value),
     Swap,
 }
 
-pub type AST = Vec<Instruction>;
+pub type ParsedAST = Vec<ParsedInstruction>;
+
+pub type TypecheckedAST = Vec<TypecheckedInstruction>;
