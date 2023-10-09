@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use anyhow::anyhow;
 use evm_execution::account_storage::{
     account_path, EthereumAccount, EthereumAccountStorage,
 };
@@ -57,17 +58,20 @@ impl Transaction {
 
     // This function returns effective_gas_price
     // For more details see the first paragraph here https://eips.ethereum.org/EIPS/eip-1559#specification
-    fn gas_price(&self, block_base_fee_per_gas: U256) -> U256 {
+    fn gas_price(&self, block_base_fee_per_gas: U256) -> Result<U256, anyhow::Error> {
         match &self.content {
-            TransactionContent::Deposit(Deposit { gas_price, .. }) => *gas_price,
+            TransactionContent::Deposit(Deposit { gas_price, .. }) => Ok(*gas_price),
             TransactionContent::Ethereum(transaction) => {
                 let priority_fee_per_gas = U256::min(
                     transaction.max_priority_fee_per_gas,
                     transaction
                         .max_fee_per_gas
-                        .saturating_sub(block_base_fee_per_gas),
+                        .checked_sub(block_base_fee_per_gas)
+                        .ok_or_else(|| anyhow!("Underflow when calculating gas price"))?,
                 );
-                priority_fee_per_gas.saturating_add(block_base_fee_per_gas)
+                priority_fee_per_gas
+                    .checked_add(block_base_fee_per_gas)
+                    .ok_or_else(|| anyhow!("Overflow"))
             }
         }
     }
@@ -139,11 +143,11 @@ fn make_object_info(
     index: u32,
     gas_used: U256,
     block_base_fee_per_gas: U256,
-) -> TransactionObjectInfo {
-    TransactionObjectInfo {
+) -> Result<TransactionObjectInfo, anyhow::Error> {
+    Ok(TransactionObjectInfo {
         from,
         gas_used,
-        gas_price: transaction.gas_price(block_base_fee_per_gas),
+        gas_price: transaction.gas_price(block_base_fee_per_gas)?,
         hash: transaction.tx_hash,
         input: transaction.data(),
         nonce: transaction.nonce(),
@@ -151,7 +155,7 @@ fn make_object_info(
         index,
         value: transaction.value(),
         signature: transaction.signature(),
-    }
+    })
 }
 
 // From a receipt, indexes the caller, recipient and the new address if needs
@@ -413,7 +417,7 @@ pub fn apply_transaction<Host: Runtime>(
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
-) -> Result<Option<(TransactionReceiptInfo, TransactionObjectInfo)>, Error> {
+) -> Result<Option<(TransactionReceiptInfo, TransactionObjectInfo)>, anyhow::Error> {
     let to = transaction.to();
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
@@ -452,7 +456,7 @@ pub fn apply_transaction<Host: Runtime>(
                 index,
                 gas_used,
                 block_constants.base_fee_per_gas,
-            );
+            )?;
 
             index_new_accounts(host, accounts_index, &receipt_info)?;
             Ok(Some((receipt_info, object_info)))
