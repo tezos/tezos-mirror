@@ -54,6 +54,7 @@
   test_ticket_operations_diff
   test_ticket_scanner
   test_ticket_storage
+  test_ticket_direct_spending
   test_typechecking
   test_lambda_normalization))
 
