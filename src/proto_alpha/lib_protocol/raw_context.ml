@@ -967,9 +967,8 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         return result
     | Oxford_018 ->
         let*! c = get_previous_protocol_constants ctxt in
-        let*? max_bonus =
-          Issuance_bonus_repr.migrate_max_bonus_from_O_to_P
-            c.adaptive_issuance.adaptive_rewards_params.max_bonus
+        let max_bonus =
+          Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.(5 // 100)
         in
 
         let cryptobox_parameters =

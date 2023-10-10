@@ -36,5 +36,3 @@ val of_Q : max_bonus:max_bonus -> Q.t -> t tzresult
 
 (** Use only to define the [max_bonus] parameter from [Default_parameters]. *)
 val max_bonus_parameter_of_Q_exn : Q.t -> max_bonus
-
-val migrate_max_bonus_from_O_to_P : int64 -> max_bonus tzresult
