@@ -146,6 +146,9 @@ let equal_bool ~loc (a : bool) (b : bool) =
 let not_equal_bool ~loc (a : bool) (b : bool) =
   not_equal ~loc Bool.equal "Booleans are equal" Format.pp_print_bool a b
 
+let is_true ~loc (a : bool) =
+  equal ~loc Bool.equal "Boolean is not true" Format.pp_print_bool a true
+
 (* string *)
 let equal_string ~loc (a : string) (b : string) =
   equal ~loc String.equal "Strings aren't equal" Format.pp_print_string a b
