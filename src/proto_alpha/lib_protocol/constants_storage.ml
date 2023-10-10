@@ -247,3 +247,6 @@ let adaptive_issuance_launch_ema_threshold c =
 
 let adaptive_issuance_rewards_params c =
   (adaptive_issuance c).adaptive_rewards_params
+
+let adaptive_issuance_activation_vote_enable c =
+  (adaptive_issuance c).activation_vote_enable

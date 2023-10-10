@@ -787,7 +787,11 @@ let begin_test ~activate_ai ?(burn_rewards = false)
           {
             constants with
             adaptive_issuance =
-              {constants.adaptive_issuance with launch_ema_threshold = 0l};
+              {
+                constants.adaptive_issuance with
+                launch_ema_threshold = 0l;
+                activation_vote_enable = true;
+              };
           })
         else constants
       in

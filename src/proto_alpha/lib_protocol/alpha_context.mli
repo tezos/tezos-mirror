@@ -853,6 +853,7 @@ module Constants : sig
       edge_of_staking_over_delegation : int;
       launch_ema_threshold : int32;
       adaptive_rewards_params : adaptive_rewards_params;
+      activation_vote_enable : bool;
     }
 
     type issuance_weights = {

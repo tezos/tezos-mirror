@@ -271,6 +271,7 @@ let constants_mainnet =
             center_dz = Q.(1 // 2);
             radius_dz = Q.(1 // 50);
           };
+        activation_vote_enable = false;
       };
   }
 

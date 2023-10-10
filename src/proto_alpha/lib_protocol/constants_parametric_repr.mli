@@ -123,6 +123,11 @@ type adaptive_issuance = {
   launch_ema_threshold : (* Threshold of the activation vote *) int32;
   adaptive_rewards_params :
     (* Parameters for the reward mechanism *) adaptive_rewards_params;
+  activation_vote_enable :
+    (* If set to true, reaching the launch_ema_threshold in the adaptive
+       issuance activation vote triggers the activation of the adaptive
+       inflation feature; otherwise the activation vote has no effect. *)
+    bool;
 }
 
 type issuance_weights = {
