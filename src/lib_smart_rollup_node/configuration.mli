@@ -122,6 +122,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  no_degraded : bool;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -218,7 +219,7 @@ val description_of_mode : mode -> string
     the configration filename from the [data_dir] *)
 val config_filename : data_dir:string -> string
 
-(** [purposes_of_operation_kinds op_kinds] map a list of operation kinds 
+(** [purposes_of_operation_kinds op_kinds] map a list of operation kinds
     to their corresponding purposes based on their presence in the input list *)
 val purposes_of_operation_kinds : operation_kind list -> purpose list
 
@@ -232,7 +233,7 @@ val purposes_of_mode : mode -> purpose list
 (** [operation_kinds_of_mode mode] returns operation kinds with the provided mode. *)
 val operation_kinds_of_mode : mode -> operation_kind list
 
-(** [can_inject mode op_kind] determines if a given operation kind can 
+(** [can_inject mode op_kind] determines if a given operation kind can
     be injected based on the configuration settings. *)
 val can_inject : mode -> operation_kind -> bool
 
@@ -245,12 +246,12 @@ val refutation_player_buffer_levels : int
    this value will consume more memory. Copy from irmin-pack/config.ml *)
 val default_irmin_cache_size : int
 
-(** The `default_index_buffer_size` defines the maximum amount of memory 
-   reserved for caching index entries before they are written to disk. 
-   Essentially, this cache aids the efficiency of the index. 
-   The total cache capacity is determined by `index_buffer_size * entry`, 
+(** The `default_index_buffer_size` defines the maximum amount of memory
+   reserved for caching index entries before they are written to disk.
+   Essentially, this cache aids the efficiency of the index.
+   The total cache capacity is determined by `index_buffer_size * entry`,
    with each `entry` occupying approximately 56 bytes.
-   An `entry` represents a single log record which can encompass various 
+   An `entry` represents a single log record which can encompass various
    details such as a timestamp, message content, severity level, etc. *)
 val default_index_buffer_size : int
 
@@ -285,6 +286,7 @@ module Cli : sig
     index_buffer_size:int option ->
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
+    no_degraded:bool ->
     t tzresult
 
   val create_or_read_config :
@@ -310,5 +312,6 @@ module Cli : sig
     index_buffer_size:int option ->
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
+    no_degraded:bool ->
     t tzresult Lwt.t
 end

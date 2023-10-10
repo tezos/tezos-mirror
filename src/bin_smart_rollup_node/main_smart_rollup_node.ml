@@ -42,7 +42,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args17
+    (args18
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -59,7 +59,8 @@ let config_init_command =
        index_buffer_size_arg
        index_buffer_size_arg
        log_kernel_debug_arg
-       boot_sector_file_arg)
+       boot_sector_file_arg
+       no_degraded_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -81,7 +82,8 @@ let config_init_command =
            index_buffer_size,
            irmin_cache_size,
            log_kernel_debug,
-           boot_sector_file )
+           boot_sector_file,
+           no_degraded )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -106,6 +108,7 @@ let config_init_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~no_degraded
       in
       let* () = Configuration.save ~force ~data_dir config in
       let*! () =
@@ -122,7 +125,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args19
+    (args20
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -141,7 +144,8 @@ let legacy_run_command =
        index_buffer_size_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg
-       boot_sector_file_arg)
+       boot_sector_file_arg
+       no_degraded_arg)
     (prefixes ["run"] @@ stop)
     (fun ( data_dir,
            mode,
@@ -161,7 +165,8 @@ let legacy_run_command =
            irmin_cache_size,
            log_kernel_debug,
            log_kernel_debug_file,
-           boot_sector_file )
+           boot_sector_file,
+           no_degraded )
          cctxt ->
       let* configuration =
         Configuration.Cli.create_or_read_config
@@ -184,6 +189,7 @@ let legacy_run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~no_degraded
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -202,7 +208,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args17
+    (args18
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -219,7 +225,8 @@ let run_command =
        irmin_cache_size_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg
-       boot_sector_file_arg)
+       boot_sector_file_arg
+       no_degraded_arg)
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -240,7 +247,8 @@ let run_command =
            irmin_cache_size,
            log_kernel_debug,
            log_kernel_debug_file,
-           boot_sector_file )
+           boot_sector_file,
+           no_degraded )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -266,6 +274,7 @@ let run_command =
           ~irmin_cache_size
           ~log_kernel_debug
           ~boot_sector_file
+          ~no_degraded
       in
       Rollup_node_daemon.run
         ~data_dir
