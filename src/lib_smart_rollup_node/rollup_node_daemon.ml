@@ -285,7 +285,6 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
         update_l2_chain state ~catching_up header)
       new_chain_prefetching
   in
-  let module Plugin = (val state.plugin) in
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
@@ -301,7 +300,6 @@ let degraded_refutation_mode state =
   let open Lwt_result_syntax in
   let*! () = Daemon_event.degraded_mode () in
   let message = state.node_ctxt.Node_context.cctxt#message in
-  let module Plugin = (val state.plugin) in
   let*! () = message "Shutting down Batcher@." in
   let*! () = Batcher.shutdown () in
   let*! () = message "Shutting down Commitment Publisher@." in
@@ -310,7 +308,6 @@ let degraded_refutation_mode state =
   let* predecessor = Node_context.get_predecessor_header state.node_ctxt head in
   let* () = Node_context.save_protocol_info state.node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up:false state head in
-  let module Plugin = (val state.plugin) in
   let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
   let*! () = Injector.inject () in
   return_unit
@@ -319,7 +316,6 @@ let install_finalizer state =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let message = state.node_ctxt.Node_context.cctxt#message in
-  let module Plugin = (val state.plugin) in
   let* () = message "Shutting down RPC server@." in
   let* () = Rpc_server.shutdown state.rpc_server in
   let* () = message "Shutting down Injector@." in
