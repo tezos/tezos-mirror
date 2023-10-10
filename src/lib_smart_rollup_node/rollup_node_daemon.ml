@@ -415,7 +415,8 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   in
   let error_to_degraded_mode e =
     let*! () = Daemon_event.error e in
-    degraded_refutation_mode state
+    if node_ctxt.config.no_degraded then fatal_error_exit e
+    else degraded_refutation_mode state
   in
   let handle_preimage_not_found e =
     (* When running/initialising a rollup node with missing preimages
