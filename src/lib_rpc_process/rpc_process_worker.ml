@@ -111,23 +111,24 @@ end
 
 (* State of the worker. *)
 type t = {
-  rpc_config : Config_file.rpc;
-  events_config : Internal_event_config.t;
   mutable server : Lwt_process.process_none option;
   stop : (int * Unix.process_status) Lwt.t;
   stopper : (int * Unix.process_status) Lwt.u;
-  comm_socket_path : string;
+  external_process_parameters : Parameters.t;
 }
 
 let create ~comm_socket_path (config : Config_file.t) events_config =
   let stop, stopper = Lwt.wait () in
   {
-    rpc_config = config.rpc;
-    events_config;
     server = None;
     stop;
     stopper;
-    comm_socket_path;
+    external_process_parameters =
+      {
+        internal_events = events_config;
+        rpc = config.rpc;
+        rpc_comm_socket_path = comm_socket_path;
+      };
   }
 
 let shutdown t =
@@ -170,15 +171,12 @@ let run_server t () =
         assert false
   in
   let* () = Tezos_base_unix.Socket.handshake init_socket_fd Main.socket_magic in
-  let parameters =
-    Main.
-      {
-        rpc = t.rpc_config;
-        internal_events = t.events_config;
-        rpc_comm_socket_path = t.comm_socket_path;
-      }
+  let* () =
+    Socket.send
+      init_socket_fd
+      Parameters.parameters_encoding
+      t.external_process_parameters
   in
-  let* () = Socket.send init_socket_fd Main.parameters_encoding parameters in
   let* () = Socket.recv init_socket_fd Data_encoding.unit in
   let*! () = Lwt_unix.close init_socket_fd in
   let*! () = Event.(emit rpc_process_started) pid in

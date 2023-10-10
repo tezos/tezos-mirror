@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides middlewares that is used by the RPC servers to
-    forward unsupported RPCs to a full node. *)
+include Internal_event.Simple
 
-(** A Resto middleware that transforms any callback to an other
-    that rewrites queries that the proxy server cannot
-    handle and forwards them to the full node at the given [Uri.t]. *)
-val proxy_server_query_forwarder :
-  ?ctx:Cohttp_lwt_unix.Net.ctx ->
-  ?on_forwarding:(Cohttp.Request.t -> unit Lwt.t) ->
-  Uri.t ->
-  RPC_server.callback ->
-  RPC_server.callback
+let section = ["rpc-process"]
 
-(** A Resto middleware that transforms any server callback to an other
-    that handles RPC metrics *)
-val rpc_metrics_transform_callback :
-  update_metrics:
-    (string ->
-    string ->
-    (unit -> Cohttp_lwt_unix.Server.response_action Lwt.t) ->
-    Cohttp_lwt_unix.Server.response_action Lwt.t) ->
-  unit Tezos_rpc.Directory.t ->
-  RPC_server.callback ->
-  RPC_server.callback
+let starting_rpc_server =
+  declare_4
+    ~section
+    ~name:"starting_rpc_server"
+    ~msg:"starting RPC server on {host}:{port} (acl = {acl_policy})"
+    ~level:Notice
+    ("host", Data_encoding.string)
+    ("port", Data_encoding.uint16)
+    ("tls", Data_encoding.bool)
+    ("acl_policy", Data_encoding.string)
+
+let forwarding_rpc =
+  declare_1
+    ~section
+    ~name:"forwarding_rpc"
+    ~msg:"forwarding to the node : {uri}"
+    ~level:Debug
+    ("uri", Data_encoding.string)

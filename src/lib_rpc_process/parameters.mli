@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides middlewares that is used by the RPC servers to
-    forward unsupported RPCs to a full node. *)
+(** Type for the rpc process parameters received from the node *)
+type t = {
+  rpc : Config_file.rpc;
+  rpc_comm_socket_path : string;
+  internal_events : Tezos_base.Internal_event_config.t;
+}
 
-(** A Resto middleware that transforms any callback to an other
-    that rewrites queries that the proxy server cannot
-    handle and forwards them to the full node at the given [Uri.t]. *)
-val proxy_server_query_forwarder :
-  ?ctx:Cohttp_lwt_unix.Net.ctx ->
-  ?on_forwarding:(Cohttp.Request.t -> unit Lwt.t) ->
-  Uri.t ->
-  RPC_server.callback ->
-  RPC_server.callback
-
-(** A Resto middleware that transforms any server callback to an other
-    that handles RPC metrics *)
-val rpc_metrics_transform_callback :
-  update_metrics:
-    (string ->
-    string ->
-    (unit -> Cohttp_lwt_unix.Server.response_action Lwt.t) ->
-    Cohttp_lwt_unix.Server.response_action Lwt.t) ->
-  unit Tezos_rpc.Directory.t ->
-  RPC_server.callback ->
-  RPC_server.callback
+(** Encoding for parameters type {!t} *)
+val parameters_encoding : t Data_encoding.t

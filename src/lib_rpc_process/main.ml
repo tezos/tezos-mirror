@@ -27,24 +27,6 @@ type error +=
   | RPC_Process_Port_already_in_use of P2p_point.Id.t list
   | Missing_socket_dir
 
-type parameters = {
-  rpc : Config_file.rpc;
-  rpc_comm_socket_path : string;
-  internal_events : Tezos_base.Internal_event_config.t;
-}
-
-let parameters_encoding =
-  let open Data_encoding in
-  conv
-    (fun {rpc; rpc_comm_socket_path; internal_events} ->
-      (rpc, rpc_comm_socket_path, internal_events))
-    (fun (rpc, rpc_comm_socket_path, internal_events) ->
-      {rpc; rpc_comm_socket_path; internal_events})
-    (obj3
-       (req "rpc" Config_file.rpc_encoding)
-       (req "rpc_comm_socket_path" Data_encoding.string)
-       (req "internal_events" Tezos_base.Internal_event_config.encoding))
-
 let () =
   register_error_kind
     `Permanent
@@ -77,23 +59,6 @@ let () =
     (function Missing_socket_dir -> Some () | _ -> None)
     (fun () -> Missing_socket_dir)
 
-module Event = struct
-  include Internal_event.Simple
-
-  let section = ["rpc-server"; "main"]
-
-  let starting_rpc_server =
-    declare_4
-      ~section
-      ~name:"starting_rpc_server"
-      ~msg:"starting RPC server on {host}:{port} (acl = {acl_policy})"
-      ~level:Notice
-      ("host", Data_encoding.string)
-      ("port", Data_encoding.uint16)
-      ("tls", Data_encoding.bool)
-      ("acl_policy", Data_encoding.string)
-end
-
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =
   List.map String.lowercase_ascii headers
@@ -101,7 +66,7 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (config : parameters) (addr, port) =
+let launch_rpc_server (config : Parameters.t) (addr, port) =
   let open Lwt_result_syntax in
   let media_types = config.rpc.media_type in
   let*! acl_policy = RPC_server.Acl.resolve_domain_names config.rpc.acl in
@@ -118,7 +83,7 @@ let launch_rpc_server (config : parameters) (addr, port) =
     |> Option.value_f ~default:(fun () -> default addr)
   in
   let*! () =
-    Event.(emit starting_rpc_server)
+    Rpc_process_event.(emit starting_rpc_server)
       (host, port, config.rpc.tls <> None, RPC_server.Acl.policy_type acl)
   in
   let cors_headers =
@@ -139,27 +104,7 @@ let launch_rpc_server (config : parameters) (addr, port) =
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
-  let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
-    Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
-  in
-  let callback =
-    let resolver_handle = "octez-node-unix-socket" in
-    let localhost = Format.asprintf "http://%s" resolver_handle in
-    let forwarding_endpoint = Uri.of_string localhost in
-    let resolver =
-      let h = Stdlib.Hashtbl.create 1 in
-      Stdlib.Hashtbl.add
-        h
-        resolver_handle
-        (`Unix_domain_socket config.rpc_comm_socket_path) ;
-      Resolver_lwt_unix.static h
-    in
-    let ctx = Cohttp_lwt_unix.Client.custom_ctx ~resolver () in
-    RPC_middleware.proxy_server_query_forwarder
-      ~ctx
-      forwarding_endpoint
-      callback
-  in
+  let callback = Forward_handler.callback server config.rpc_comm_socket_path in
   Lwt.catch
     (fun () ->
       let*! () = RPC_server.launch ~host server ~callback mode in
@@ -176,7 +121,7 @@ let init_rpc parameters =
   let open Lwt_result_syntax in
   let* server =
     let* p2p_point =
-      match parameters.rpc.listen_addrs with
+      match parameters.Parameters.rpc.Config_file.listen_addrs with
       | [addr] -> Config_file.resolve_rpc_listening_addrs addr
       | _ ->
           (* We assume that the config contains only one listening
@@ -223,7 +168,7 @@ let create_init_socket socket_dir =
 let run socket_dir =
   let open Lwt_result_syntax in
   let* init_socket_fd = create_init_socket socket_dir in
-  let* parameters = Socket.recv init_socket_fd parameters_encoding in
+  let* parameters = Socket.recv init_socket_fd Parameters.parameters_encoding in
   let*! () =
     Tezos_base_unix.Internal_event_unix.init
       ~config:parameters.internal_events
