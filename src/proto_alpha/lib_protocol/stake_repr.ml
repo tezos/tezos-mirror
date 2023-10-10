@@ -22,8 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6380
-   Stitching is needed for current Stake_repr *)
+
 type t = {frozen : Tez_repr.t; weighted_delegated : Tez_repr.t}
 
 let make ~frozen ~weighted_delegated = {frozen; weighted_delegated}
