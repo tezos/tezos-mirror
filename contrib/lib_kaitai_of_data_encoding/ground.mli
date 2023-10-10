@@ -38,6 +38,18 @@ module Enum : sig
   val bool : string * EnumSpec.t
 end
 
+(** type definitions needed for describing data-encoding ground types. *)
+module Type : sig
+  (** A [Type.assoc] is an association list of type id ([string]) with the
+      corresponding [ClassSpec.t] to be used in a [UserType].
+
+      See [Helpers.add_uniq_assoc] for handling helper. *)
+  type assoc = (string * ClassSpec.t) list
+
+  (** [n] is an association for n (arbitrarily large integers) type. *)
+  val n : string * ClassSpec.t
+end
+
 (** [Attr] is module for getting [AttrSpec.t] of ground types.
 
     All the functions in this module take an [id] parameter. This is used for
@@ -76,6 +88,10 @@ module Attr : sig
       For more about this type see [Data_encoding.int31]. *)
   val int31 : id:string -> AttrSpec.t
 
+  (** [uint30 ~id] is an [AttrSpec.t] definition of 30-bit unsigned integer.
+      For more about this type see [Data_encoding.int31]. *)
+  val uint30 : id:string -> AttrSpec.t
+
   (** [float ~id] is an [AttrSpec.t] definition of 64-bit float. *)
   val float : id:string -> AttrSpec.t
 
@@ -84,6 +100,28 @@ module Attr : sig
 
   (** [string ~id] is an [AttrSpec.t] definition of [Data_encoding.string]. *)
   val string : id:string -> AttrSpec.t
+
+  (** [bytes_fixed] is an [AttrSpec.t] definition of [Data_encoding.bytes] of
+      fixed length. *)
+  val bytes_fixed : id:string -> int -> AttrSpec.t
+
+  (** [string_fixed] is an [AttrSpec.t] definition of [Data_encoding.string] of
+      fixed length. *)
+  val string_fixed : id:string -> int -> AttrSpec.t
+
+  (** [bytes_eos] is an [AttrSpec.t] definition of [Data_encoding.bytes] of
+      variable length. *)
+  val bytes_eos : id:string -> AttrSpec.t
+
+  (** [string_eos] is an [AttrSpec.t] definition of [Data_encoding.string] of
+      variable length. *)
+  val string_eos : id:string -> AttrSpec.t
+
+  (** [n] is an [AttrSpec.t] definition of [Data_encoding.n]. *)
+  val n : id:string -> AttrSpec.t
+
+  (** [z] is an [AttrSpec.t] definition of [Data_encoding.z]. *)
+  val z : id:string -> AttrSpec.t
 end
 
 (** [Class] module consists of [ClassSpec.t] for ground types. *)
@@ -123,17 +161,6 @@ module Class : sig
   (** [string] returns [ClassSpec.t] definition of [Data_encoding.string]. *)
   val string :
     encoding_name:string -> ?description:string -> unit -> ClassSpec.t
-
-  (** [byte_group] represents a user defined type for a variable-length sequence
-      of bytes encoding a Zarith natural number. It is used for describing
-      encoding such as [Data_encoding.Z] and [Data_encoding.N].
-
-      As from the [Data_encoding] documentation: "each byte has a running unary
-      size bit: the most significant bit of each byte indicates whether this is
-      the last byte in the sequence (0) or whether the sequence continues (1).
-      Size bits ignored, the data is the binary representation of the number 
-      in little-endian order." *)
-  val byte_group : ClassSpec.t
 
   (** [n] returns [ClassSpec.t] for [Data_encoding.N]. *)
   val n : encoding_name:string -> ?description:string -> unit -> ClassSpec.t

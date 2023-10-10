@@ -74,7 +74,7 @@ let add_uniq_assoc mappings ((k, v) as mapping) =
       if v = vv then mappings
       else raise (Invalid_argument "Mappings.add: duplicate keys")
 
-let types_field_from_attr_seq attributes =
+let types_field_from_attr_seq base attributes =
   let types =
     List.filter_map
       (fun {AttrSpec.dataType; _} ->
@@ -86,14 +86,14 @@ let types_field_from_attr_seq attributes =
         | _ -> None)
       attributes
   in
-  List.fold_left add_uniq_assoc [] types
+  List.fold_left add_uniq_assoc base types
 
-let class_spec_of_attr ~encoding_name ?description ?(enums = [])
-    ?(instances = []) attr =
-  let types = types_field_from_attr_seq [attr] in
+let class_spec_of_attrs ~encoding_name ?description ?(enums = []) ?(types = [])
+    ?(instances = []) attrs =
+  let types = types_field_from_attr_seq types attrs in
   {
     (default_class_spec ~encoding_name ?description ()) with
-    seq = [attr];
+    seq = attrs;
     enums;
     types;
     instances;
