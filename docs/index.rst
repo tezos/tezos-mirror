@@ -62,7 +62,7 @@ and more.
 
 **Already a user?** Here is everything you need to know!
 
-If you already installed Octez and can participate in the Tezos blockchain, the most useful resources are grouped in the ``User`` section in the documentation menu.
+If you already installed Octez and can participate in the Tezos blockchain, the most useful resources are grouped in the ``User manual`` section in the documentation menu.
 These pages:
 
 - present the key concepts and mechanisms for setting up Octez, including :doc:`user/setup-client`, :doc:`user/setup-node`, for different production or testing configurations;
@@ -80,12 +80,15 @@ If you intend to participate to Tezos not just as a mere user, but rather as a b
 
 **Want to know how it works?** It's no secret, let us explain!
 
-If you want to know more about the *technology* underlying Octez and the Tezos protocol, the following sections in the documentation present their rationale, main design principles, and some high-level implementation principles:
+If you want to know more about the *technology* underlying Octez and the Tezos protocol, the ``Reference manual`` section in the documentation present their rationale, main design principles, and some high-level implementation principles:
 
-- Section ``Shell`` explains how the :ref:`architecture of the Octez implementation <packages>` instantiates the common :ref:`architectural principles of any Tezos implementation <the_big_picture>`, consisting in a "shell" and a "protocol" . A group of pages in this section detail some major subsystems of :doc:`shell/shell`.
+- Page ``Octez software architecture`` explains how the :ref:`architecture of the Octez implementation <packages>` instantiates the high-level :ref:`architectural principles of any Tezos implementation <the_big_picture>`, consisting in a "shell" and a "protocol" .
 
-- Section ``Protocol`` explains the design principles and the salient features of the Tezos protocol. In fact, these pages are versioned for several Tezos protocols, current or upcoming, such as: the :doc:`active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
+- Page ``Octez Shell`` details some major subsystems of :doc:`shell/shell`.
 
+- Page ``Octez Protocol`` explains the design principles and the salient features of the Tezos protocol. In fact, these pages are versioned for several Tezos protocols, current or upcoming, such as: the :doc:`active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
+
+- Other pages are related to the important Smart Rollups feature, and present tools such as the Smart rollup node and Data Availability Committees.
 
 .. raw:: html
 
@@ -116,9 +119,9 @@ This website complements those resources with reference documentation, mostly in
 
 **Are you a platform developer?** Here are the nuts and bolts!
 
-The main focus of this technical documentation website is on resources for Tezos platform developers, that is, contributing to Octez (Octez developers) and contributors to the Tezos protocol (protocol developers).
+One major focus of this website is on resources for platform developers, that is, contributing to Octez (Octez developers) and contributors to the Tezos protocol (protocol developers).
 
-Platform developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Platform Developer`` section, including:
+Platform developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Contributing`` section, including:
 
 - a tutorial on the various forms of contributing (:doc:`developer/contributing`), and guidelines such as :doc:`developer/guidelines`
 - programming tutorials covering various libraries and frameworks specific to the Octez OCaml implementation, such as using :doc:`developer/gadt`, using :doc:`developer/error_monad`, using :doc:`developer/clic`, :doc:`developer/event_logging_framework`, etc.
@@ -139,7 +142,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Octez & the Tezos protocol
+   :caption: Introduction
    :hidden:
 
    introduction/tezos
@@ -151,7 +154,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Octez manual
+   :caption: Octez User manual
    :hidden:
 
    user/setup-client
@@ -163,7 +166,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Shell doc
+   :caption: Octez Reference manual
    :hidden:
 
    shell/the_big_picture
@@ -177,7 +180,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Nairobi Protocol doc
+   :caption: Nairobi Protocol Reference
    :hidden:
 
    active/protocol
@@ -187,7 +190,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Oxford Protocol doc
+   :caption: Oxford Protocol Reference
    :hidden:
 
    oxford/protocol
@@ -197,7 +200,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Alpha Dev Protocol doc
+   :caption: Alpha Dev Protocol Reference
    :hidden:
 
    alpha/protocol
@@ -207,7 +210,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Tezos developer doc
+   :caption: Tezos developer Reference
    :hidden:
 
    developer/rpc
@@ -216,7 +219,28 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Platform developer doc
+   :caption: Changes in Octez releases
+   :hidden:
+
+   releases/releases
+   releases/version-18
+   releases/version-19
+   releases/history
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Changes in protocol versions
+   :hidden:
+
+   protocols/naming
+   protocols/017_nairobi
+   protocols/018_oxford
+   protocols/alpha
+   protocols/history
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contributing
    :hidden:
 
    developer/contributing_index
@@ -228,27 +252,6 @@ Platform developers are also provided reference materials for internal APIs of O
    developer/encodings
    developer/merkle-proof-encoding-formats
    api/api-inline
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Protocols
-   :hidden:
-
-   protocols/naming
-   protocols/017_nairobi
-   protocols/018_oxford
-   protocols/alpha
-   protocols/history
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Releases
-   :hidden:
-
-   releases/releases
-   releases/version-18
-   releases/version-19
-   releases/history
 
 .. toctree::
    :maxdepth: 2
