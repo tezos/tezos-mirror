@@ -67,9 +67,6 @@ val update_ema :
     voted to be activated (yet). *)
 val launch_cycle : Raw_context.t -> Cycle_repr.t option tzresult Lwt.t
 
-val migrate_adaptive_issuance_storages_from_O_to_P :
-  Raw_context.t -> Raw_context.t tzresult Lwt.t
-
 module For_RPC : sig
   (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
       from the storage.
