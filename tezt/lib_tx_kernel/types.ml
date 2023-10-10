@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -232,7 +233,7 @@ let targetted_encoding =
     (fun (address, contents) -> {address; contents})
     (obj2
        (req "address" Hashed.Smart_rollup_address.encoding)
-       (req "contents" string))
+       (req "contents" Data_encoding.Variable.string))
 
 let external_message_frame_encoding =
   let open Data_encoding in

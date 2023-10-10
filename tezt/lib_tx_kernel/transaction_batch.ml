@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -114,9 +115,9 @@ let make_encoded_batch ?(wrap_with = `None) t =
   match wrap_with with
   | `None -> encoded_batch
   | `External_message_frame sc_rollup_addr ->
-      let external_message =
-        Targetted {address = sc_rollup_addr; contents = encoded_batch}
-      in
+      let batch_tag = "\001" in
+      let contents = batch_tag ^ encoded_batch in
+      let external_message = Targetted {address = sc_rollup_addr; contents} in
       let encoded_external_message =
         Binary.to_string_exn external_message_frame_encoding external_message
       in
