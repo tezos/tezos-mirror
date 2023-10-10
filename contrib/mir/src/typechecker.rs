@@ -13,6 +13,7 @@ use crate::context::Ctx;
 use crate::gas;
 use crate::gas::OutOfGas;
 use crate::irrefutable_match::irrefutable_match;
+use crate::lexer::Prim;
 use crate::stack::*;
 
 /// Typechecker error type.
@@ -42,7 +43,7 @@ pub enum TcError {
     DuplicateElements(Type),
     #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {}", x)))]
     NoMatchingOverload {
-        instr: &'static str,
+        instr: Prim,
         stack: TypeStack,
         reason: Option<NoMatchingOverloadReason>,
     },
@@ -174,7 +175,7 @@ fn typecheck_instruction(
         ($instr:ident, len $expected_len:expr) => {
             {
                 return Err(TcError::NoMatchingOverload {
-                    instr: stringify!($instr),
+                    instr: Prim::$instr,
                     stack: stack.clone(),
                     reason: Some(NoMatchingOverloadReason::StackTooShort {
                         expected: $expected_len
@@ -185,7 +186,7 @@ fn typecheck_instruction(
         ($instr:ident$(, $reason:expr)?) => {
             {
                 return Err(TcError::NoMatchingOverload {
-                    instr: stringify!($instr),
+                    instr: Prim::$instr,
                     stack: stack.clone(),
                     reason: nothing_to_none!($($reason.into())?)
                 })
@@ -225,7 +226,7 @@ fn typecheck_instruction(
 
             ctx.gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
-            ensure_stack_len("DIP", stack, protected_height)?;
+            ensure_stack_len(Prim::DIP, stack, protected_height)?;
             // Here we split off the protected portion of the stack, typecheck the code with the
             // remaining unprotected part, then append the protected portion back on top.
             let mut protected = stack.split_off(protected_height);
@@ -239,7 +240,7 @@ fn typecheck_instruction(
         (I::Drop(opt_height), ..) => {
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
             ctx.gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
-            ensure_stack_len("DROP", stack, drop_height)?;
+            ensure_stack_len(Prim::DROP, stack, drop_height)?;
             stack.drop_top(drop_height);
             I::Drop(opt_height)
         }
@@ -248,7 +249,7 @@ fn typecheck_instruction(
         (I::Dup(Some(0)), ..) => return Err(TcError::Dup0),
         (I::Dup(opt_height), ..) => {
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
-            ensure_stack_len("DUP", stack, dup_height)?;
+            ensure_stack_len(Prim::DUP, stack, dup_height)?;
             stack.push(stack[dup_height - 1].clone());
             I::Dup(opt_height)
         }
@@ -373,7 +374,7 @@ fn typecheck_instruction(
         (I::Compare, [.., u, t]) => {
             ensure_ty_eq(ctx, t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
-                    instr: "COMPARE",
+                    instr: Prim::COMPARE,
                     stack: stack.clone(),
                     reason: Some(e.into()),
                 },
@@ -381,7 +382,7 @@ fn typecheck_instruction(
             })?;
             if !t.is_comparable() {
                 return Err(TcError::NoMatchingOverload {
-                    instr: "COMPARE",
+                    instr: Prim::COMPARE,
                     stack: stack.clone(),
                     reason: Some(NoMatchingOverloadReason::TypeNotComparable(t.clone())),
                 });
@@ -516,7 +517,7 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
 
 /// Ensures type stack is at least of the required length, otherwise returns
 /// `Err(StackTooShort)`.
-fn ensure_stack_len(instr: &'static str, stack: &TypeStack, l: usize) -> Result<(), TcError> {
+fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcError> {
     if stack.len() >= l {
         Ok(())
     } else {
@@ -979,7 +980,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck(parse("{ CAR }").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
-                instr: "CAR",
+                instr: Prim::CAR,
                 stack: stk![Type::Unit],
                 reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Unit)),
             })
@@ -992,7 +993,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck(parse("{ CDR }").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
-                instr: "CDR",
+                instr: Prim::CDR,
                 stack: stk![Type::Unit],
                 reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Unit)),
             })
@@ -1061,7 +1062,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::NoMatchingOverload {
-                instr: "IF_NONE",
+                instr: Prim::IF_NONE,
                 stack: stk![Type::Int],
                 reason: Some(NoMatchingOverloadReason::ExpectedOption(Type::Int)),
             })
@@ -1102,7 +1103,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::NoMatchingOverload {
-                instr: "COMPARE",
+                instr: Prim::COMPARE,
                 stack: stk![Type::Int, Type::Nat],
                 reason: Some(TypesNotEqual(Type::Nat, Type::Int).into())
             })
