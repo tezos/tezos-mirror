@@ -142,15 +142,15 @@ val string_of_purpose : purpose -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run ?event_level ?event_sections_levels ?loser_mode ?wait_ready node
-    rollup_address arguments ] launches the given smart contract rollup node for
-    the rollup at [rollup_address] with the given extra arguments. [event_level]
-    and [event_sections_levels] allow to select which events we want the node to
-    emit (see {!Daemon}). [legacy] (by default [false]) must be set if we want
-    to use the legacy [run] command of the node (which requires a config file to
-    exist). If [wait_ready] is [false], tezt does not wait for the node to be
-    ready. If [restart] is [true], it will stop and restart the node if it is already
-    running. *)
+(** [run ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
+    ?wait_ready node rollup_address arguments ] launches the given smart
+    contract rollup node for the rollup at [rollup_address] with the given extra
+    arguments. [event_level] and [event_sections_levels] allow to select which
+    events we want the node to emit (see {!Daemon}). [legacy] (by default
+    [false]) must be set if we want to use the legacy [run] command of the node
+    (which requires a config file to exist). If [wait_ready] is [false], tezt
+    does not wait for the node to be ready. If [restart] is [true], it will stop
+    and restart the node if it is already running. *)
 val run :
   ?legacy:bool ->
   ?restart:bool ->
@@ -158,31 +158,38 @@ val run :
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?loser_mode:string ->
+  ?allow_degraded:bool ->
   ?wait_ready:bool ->
   t ->
   string ->
   string list ->
   unit Lwt.t
 
-(** [run_sequencer ?event_level ?event_sections_levels ?wait_ready node
-    rollup_address arguments] launches the sequencer node for
+(** [run_sequencer ?event_level ?event_sections_levels ?allow_degraded
+    ?wait_ready node rollup_address arguments] launches the sequencer node for
     the rollup at [rollup_address] with the given extra arguments.
     [event_level] and [event_sections_levels] allow to select which events we
-    want the node to emit (see {!Daemon}).
-    If [wait_ready] is [false], tezt does not wait for the node to be
-    ready. *)
+    want the node to emit (see {!Daemon}).  If [wait_ready] is [false], tezt
+    does not wait for the node to be ready. *)
 val run_sequencer :
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?allow_degraded:bool ->
   ?wait_ready:bool ->
   t ->
   string ->
   string list ->
   unit Lwt.t
 
-(** [spawn_run node rollup_address arguments] is a lightweight version of {!run}
-    that spawns a process. *)
-val spawn_run : t -> string -> string list -> Process.t
+(** [spawn_run ?loser_mode ?allow_degraded node rollup_address arguments] is a
+    lightweight version of {!run} that spawns a process. *)
+val spawn_run :
+  ?loser_mode:string ->
+  ?allow_degraded:bool ->
+  t ->
+  string ->
+  string list ->
+  Process.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
