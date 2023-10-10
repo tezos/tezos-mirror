@@ -572,9 +572,10 @@ let choose_and_inject_operations cctxt state prohibited_managers n =
      discarded@."
     nb_injected
     nb_erroneous ;
-  return (nb_injected, new_state)
+  return new_state
 
-let start_injector cctxt ~op_per_mempool ~operations_file_path =
+let start_injector cctxt ~op_per_mempool ~min_manager_queues
+    ~operations_file_path =
   let* state = init ~operations_file_path in
   Format.printf "Starting injector@." ;
   let* head_stream, _stopper = Monitor_services.heads cctxt `Main in
@@ -657,20 +658,25 @@ let start_injector cctxt ~op_per_mempool ~operations_file_path =
         Format.printf
           "Injecting %d new manager operations...@."
           nb_missing_operations ;
-        let* nb_injected, state =
+        let* state =
           choose_and_inject_operations
             cctxt
             state
             prohibited_managers
             nb_missing_operations
         in
+        let remaining_manager_queues =
+          ManagerMap.cardinal state.operation_queues
+        in
         Format.printf "Current state: %a@." pp_state state ;
-        (* Stop when there are not enough operations anymore to fill the mempool *)
-        if nb_injected < nb_missing_operations then (
+        (* Stop when there the number of manager operation queues left is lower
+           than `min_manager_queues`. *)
+        if remaining_manager_queues < min_manager_queues then (
           Format.printf
-            "Not enough operations left to fill the mempool up to %d. \
-             Terminating.@."
-            op_per_mempool ;
+            "Not enough manager operation queues left to continue the \
+             experiment (%d left, %d required). Terminating.@. "
+            remaining_manager_queues
+            min_manager_queues ;
           return_unit)
         else loop state header.shell.level
   in
