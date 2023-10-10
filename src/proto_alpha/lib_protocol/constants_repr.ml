@@ -239,28 +239,6 @@ let check_constants constants =
   in
   let* () =
     error_unless
-      Compare.Int.(
-        constants.percentage_of_frozen_deposits_slashed_per_double_baking >= 0
-        && constants.percentage_of_frozen_deposits_slashed_per_double_baking
-           <= 100)
-      (Invalid_protocol_constants
-         "The percentage of frozen deposits slashed per double baking must be \
-          between 0 and 100 included.")
-  in
-  let* () =
-    error_unless
-      Compare.Int.(
-        constants.percentage_of_frozen_deposits_slashed_per_double_attestation
-        >= 0
-        && constants
-             .percentage_of_frozen_deposits_slashed_per_double_attestation
-           <= 100)
-      (Invalid_protocol_constants
-         "The percentage of frozen deposits slashed per double attestation \
-          must be between 0 and 100 included.")
-  in
-  let* () =
-    error_unless
       (let snapshot_frequence =
          Int32.div
            constants.blocks_per_cycle

@@ -179,8 +179,10 @@ let constants_mainnet =
     minimal_participation_ratio = {numerator = 2; denominator = 3};
     max_slashing_period = 2;
     limit_of_delegation_over_baking = 9;
-    percentage_of_frozen_deposits_slashed_per_double_baking = 7;
-    percentage_of_frozen_deposits_slashed_per_double_attestation = 50;
+    percentage_of_frozen_deposits_slashed_per_double_baking =
+      Protocol.Int_percentage.p7;
+    percentage_of_frozen_deposits_slashed_per_double_attestation =
+      Protocol.Int_percentage.p50;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
     initial_seed = None;

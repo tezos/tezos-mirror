@@ -108,7 +108,7 @@ let test_valid_double_attestation_evidence () =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
   in
   let* () =
     Assert.equal_tez
@@ -579,7 +579,7 @@ let test_freeze_more_with_low_balance =
         preserved_cycles = 5;
         percentage_of_frozen_deposits_slashed_per_double_attestation =
           (* enforce that percentage is 50% in the test's params. *)
-          50;
+          Int_percentage.p50;
       }
     in
     let* genesis, (c1, c2) = Context.init_with_constants2 constants in
@@ -625,7 +625,9 @@ let test_freeze_more_with_low_balance =
     in
     let expected_frozen_deposits_after =
       Test_tez.(
-        info2.frozen_deposits *! Int64.of_int (100 - slash_percentage) /! 100L)
+        info2.frozen_deposits
+        *! Int64.of_int (100 - (slash_percentage :> int))
+        /! 100L)
     in
     let* () =
       Assert.equal_tez

@@ -84,6 +84,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   in
   assert (Compare.Bool.(already_slashed = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
+  let slashing_percentage = (slashing_percentage : Int_percentage.t :> int) in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let global_limit_of_staking_over_baking =
     Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking ctxt
