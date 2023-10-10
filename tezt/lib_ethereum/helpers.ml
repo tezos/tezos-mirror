@@ -47,3 +47,5 @@ let mapping_position index map_position =
     (Hex.to_bytes
        (`Hex (leftPad32 index ^ leftPad32 (string_of_int map_position))))
   |> Hex.of_bytes |> Hex.show |> add_0x
+
+let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int

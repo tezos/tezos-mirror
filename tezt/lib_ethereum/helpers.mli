@@ -44,3 +44,6 @@ val u16_to_bytes : int -> string
     https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
 *)
 val mapping_position : string -> int -> string
+
+(** Transform an hexadecimal string to an integer using {!Z.of_bits}. *)
+val hex_string_to_int : string -> int
