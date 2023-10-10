@@ -147,8 +147,11 @@ $(P2PDOCEXE): docexes
 api/errors.rst: $(ERRDOCEXE)
 	$(ERRDOCEXE) > api/errors.rst
 
+shell/rpc.rst: $(RPCDOCEXE)
+	$(RPCDOCEXE) index shell /shell/rpc_introduction.rst.inc > $@
+
 %/rpc.rst: $(RPCDOCEXE)
-	$(RPCDOCEXE) index $(@D) > $@
+	$(RPCDOCEXE) index $(@D) $($(@D)_long) /include/rpc_introduction.rst.inc > $@
 
 user/default-acl.json: $(RPCDOCEXE)
 	$(RPCDOCEXE) acl > $@

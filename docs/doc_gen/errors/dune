@@ -1,12 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
  (name error_doc)
- (libraries data-encoding
-            octez-shell-libs.shell
-            octez-protocol-alpha-libs.client)
- (flags (:standard -open Tezos_base
-                   -open Tezos_error_monad
-                   -open Data_encoding
-                   -open Tezos_client_alpha
-                   -safe-string
-                   -linkall
-                   (:include %{workspace_root}/macos-link-flags.sexp))))
+ (libraries
+  octez-libs.base
+  octez-libs.error-monad
+  data-encoding
+  octez-protocol-alpha-libs.client)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_error_monad
+  -open Data_encoding
+  -open Tezos_client_alpha))
