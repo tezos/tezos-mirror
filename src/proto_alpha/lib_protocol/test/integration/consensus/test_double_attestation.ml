@@ -233,6 +233,13 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
   in
   let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after in
+  let* is_forbidden =
+    Context.Delegate.is_forbidden
+      ~policy:(Block.By_account baker)
+      (B blk_with_evidence2)
+      delegate
+  in
+  let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
   (* a delegate with 0 frozen deposits cannot bake *)
   Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
