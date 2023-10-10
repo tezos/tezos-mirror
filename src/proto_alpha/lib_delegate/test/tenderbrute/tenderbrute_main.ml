@@ -68,6 +68,7 @@ let selection_encoding =
        (list (tup2 Round_repr.encoding delegate_encoding)))
 
 let mk_bootstrap_aliases bootstrap_accounts_json =
+  let open Lwt_result_syntax in
   let parameters = Mockup.Protocol_parameters.default_value in
   let open Alpha_context.Parameters in
   match bootstrap_accounts_json with
@@ -81,12 +82,13 @@ let mk_bootstrap_aliases bootstrap_accounts_json =
       let accounts = Json.destruct (list Mockup.Parsed_account.encoding) j in
       List.map_ep
         (fun a ->
-          Mockup.Parsed_account.to_bootstrap_account a >|=? fun acc ->
+          let+ acc = Mockup.Parsed_account.to_bootstrap_account a in
           (a.name, acc.public_key_hash))
         accounts
 
 let selection_to_pkhs bootstrap_accounts_json selection =
-  mk_bootstrap_aliases bootstrap_accounts_json >|=? fun bootstrap_aliases ->
+  let open Lwt_result_syntax in
+  let+ bootstrap_aliases = mk_bootstrap_aliases bootstrap_accounts_json in
   List.map
     (fun (level, l) ->
       ( level,
@@ -103,7 +105,9 @@ let selection_to_pkhs bootstrap_accounts_json selection =
     selection
 
 let parse_json_or_file s =
-  Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file s >|= function
+  let open Lwt_syntax in
+  let+ json_opt = Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file s in
+  match json_opt with
   | Ok json -> Ok json
   | Error errs -> (
       match Data_encoding.Json.from_string s with
@@ -111,21 +115,32 @@ let parse_json_or_file s =
       | Error e -> Error (Exn (Failure e) :: errs))
 
 let set_selection s =
+  let open Lwt_syntax in
   Lwt_main.run
-    ( parse_json_or_file s >|= report_err >|= fun json ->
-      selection := Data_encoding.Json.destruct selection_encoding json )
+    (let+ json =
+       let+ json = parse_json_or_file s in
+       report_err json
+     in
+     selection := Data_encoding.Json.destruct selection_encoding json)
 
 let main () =
+  let open Lwt_result_syntax in
   let thread =
-    (match !bootstrap_accounts with
-    | None -> return_none
-    | Some read -> read >|=? Option.some)
-    >>=? fun bootstrap_accounts_json ->
-    (match !constants_overrides with
-    | None -> return_none
-    | Some read -> read >|=? Option.some)
-    >>=? fun constants_overrides_json ->
-    selection_to_pkhs bootstrap_accounts_json !selection >>=? fun selection ->
+    let* bootstrap_accounts_json =
+      match !bootstrap_accounts with
+      | None -> return_none
+      | Some read ->
+          let+ json = read in
+          Option.some json
+    in
+    let* constants_overrides_json =
+      match !constants_overrides with
+      | None -> return_none
+      | Some read ->
+          let+ json = read in
+          Option.some json
+    in
+    let* selection = selection_to_pkhs bootstrap_accounts_json !selection in
     Tenderbrute.bruteforce
       ~show_progress:true
       ?max:!max
@@ -135,11 +150,14 @@ let main () =
       selection
   in
   Lwt_main.run
-    ( thread >|= report_err >|= fun seed ->
-      let seed_str =
-        match seed with None -> "None" | Some s -> State_hash.to_b58check s
-      in
-      Format.printf "%s@." seed_str )
+    (let*! seed =
+       let*! result = thread in
+       Lwt.return @@ report_err result
+     in
+     let seed_str =
+       match seed with None -> "None" | Some s -> State_hash.to_b58check s
+     in
+     Lwt.return @@ Format.printf "%s@." seed_str)
 
 let specs =
   [
