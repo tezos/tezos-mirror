@@ -130,6 +130,7 @@ let create ~comm_socket_path (config : Config_file.t) node_version events_config
         config;
         rpc_comm_socket_path = comm_socket_path;
         node_version;
+        dal_config = config.blockchain_network.dal_config;
       };
   }
 
