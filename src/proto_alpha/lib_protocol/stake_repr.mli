@@ -43,6 +43,3 @@ val ( +? ) : t -> t -> t tzresult
 val staking_weight : t -> int64
 
 val compare : t -> t -> int
-
-val migrate_stake_from_O_to_P :
-  edge_of_staking_over_delegation:int64 -> t -> t tzresult
