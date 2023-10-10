@@ -135,14 +135,6 @@ val find_selected_distribution :
    context. *)
 val prepare_stake_distribution : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-(** Migrating all stored stake using [compute_new_value] in all selected
-    distribution at cycles greater or equal to [from_cycle] *)
-val migrate_storage_to_weighted_value_for_O_to_P :
-  Raw_context.t ->
-  (Stake_repr.t -> Stake_repr.t tzresult) ->
-  from_cycle:Cycle_repr.t ->
-  Raw_context.t tzresult Lwt.t
-
 (** [get_total_active_stake ctxt cycle] retrieves the amount in Tez of the
     active stake at [cycle] from [ctxt]. *)
 val get_total_active_stake :

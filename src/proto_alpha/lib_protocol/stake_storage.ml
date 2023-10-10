@@ -71,33 +71,6 @@ module Selected_distribution_for_cycle = struct
     let id = identifier_of_cycle cycle in
     let*? ctxt = Cache.update ctxt id None in
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
-
-  (* updating [compute_new_value] to all stored stake in all selected distribution at
-     cycles greater or equal to [from_cycle] *)
-  let migrate_storage_to_weighted_value_for_O_to_P ctxt compute_new_value
-      ~from_cycle =
-    let open Lwt_result_syntax in
-    let*! cycles = Storage.Stake.Selected_distribution_for_cycle.keys ctxt in
-    let cycles =
-      List.filter (fun cycle -> Cycle_repr.(cycle >= from_cycle)) cycles
-    in
-    List.fold_left_es
-      (fun ctxt cycle ->
-        let* old_value = get ctxt cycle in
-        let*? new_value =
-          let open Result_syntax in
-          List.map_e
-            (fun (pkh, stake) ->
-              let* new_stake = compute_new_value stake in
-              return (pkh, new_stake))
-            old_value
-        in
-        Storage.Stake.Selected_distribution_for_cycle.update
-          ctxt
-          cycle
-          new_value)
-      ctxt
-      cycles
 end
 
 let get_full_staking_balance ctxt delegate =
@@ -358,9 +331,6 @@ let prepare_stake_distribution ctxt =
     (Raw_context.init_stake_distribution_for_current_cycle
        ctxt
        stake_distribution)
-
-let migrate_storage_to_weighted_value_for_O_to_P =
-  Selected_distribution_for_cycle.migrate_storage_to_weighted_value_for_O_to_P
 
 let get_total_active_stake = Storage.Stake.Total_active_stake.get
 
