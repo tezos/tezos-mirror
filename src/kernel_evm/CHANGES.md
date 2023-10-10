@@ -12,6 +12,8 @@
 
 ### EVM Node
 
+- Remove `mockup` mode previously used for internal testing only. (!10406)
+
 ### Bug fixes
 
 - The internal kernel version is now automatically updated at each upgrade. (!10321)

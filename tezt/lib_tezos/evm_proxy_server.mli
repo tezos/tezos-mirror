@@ -48,16 +48,6 @@ val create :
   Sc_rollup_node.t ->
   t
 
-(** [mockup ?runner ?mode ?rpc_addr ?rpc_port ()] is like [create] but doesn't
-    communicate with a [rollup_node] and serves mockup values. *)
-val mockup :
-  ?runner:Runner.t ->
-  ?mode:[< `Production | `Development] ->
-  ?rpc_addr:string ->
-  ?rpc_port:int ->
-  unit ->
-  t
-
 (** [run proxy_server] launches the EVM proxy server with the arguments
     given during {!create}. *)
 val run : t -> unit Lwt.t

@@ -429,11 +429,6 @@ let setup_past_genesis ?config ?with_administrator ?kernel_installee
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   return full_setup
 
-let setup_mockup () =
-  let evm_proxy_server = Evm_proxy_server.mockup () in
-  let* () = Evm_proxy_server.run evm_proxy_server in
-  return evm_proxy_server
-
 type contract = {label : string; abi : string; bin : string}
 
 let deploy ~contract ~sender full_evm_setup =
@@ -1291,8 +1286,8 @@ let test_rpc_txpool_content =
     ~__FILE__
     ~tags:["evm"; "txpool_content"]
     ~title:"Check RPC txpool_content is available"
-  @@ fun _protocol ->
-  let* evm_proxy_server = setup_mockup () in
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_evm_kernel ~admin:None protocol in
   (* The content of the txpool is not relevant for now, this test only checks
      the the RPC is correct, i.e. an object containing both the `pending` and
      `queued` fields, containing the correct objects: addresses pointing to a
@@ -1305,8 +1300,8 @@ let test_rpc_web3_clientVersion =
     ~__FILE__
     ~tags:["evm"; "client_version"]
     ~title:"Check RPC web3_clientVersion"
-  @@ fun _protocol ->
-  let* evm_proxy_server = setup_mockup () in
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_evm_kernel ~admin:None protocol in
   let* web3_clientVersion =
     Evm_proxy_server.(
       call_evm_rpc

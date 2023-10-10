@@ -32,7 +32,7 @@ module Parameters = struct
     mode : string;
     rpc_addr : string;
     rpc_port : int;
-    rollup_node : Sc_rollup_node.t option;
+    rollup_node : Sc_rollup_node.t;
     runner : Runner.t option;
   }
 
@@ -118,16 +118,11 @@ let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
   on_event proxy_server (handle_event proxy_server) ;
   proxy_server
 
-let mockup ?runner ?mode ?rpc_addr ?rpc_port () =
-  create ?runner ?mode ?rpc_addr ?rpc_port None
-
 let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
-  create ?runner ?mode ?rpc_addr ?rpc_port (Some rollup_node)
+  create ?runner ?mode ?rpc_addr ?rpc_port rollup_node
 
 let rollup_node_endpoint proxy_server =
-  match proxy_server.persistent_state.rollup_node with
-  | Some rollup_node -> Sc_rollup_node.endpoint rollup_node
-  | None -> "mockup"
+  Sc_rollup_node.endpoint proxy_server.persistent_state.rollup_node
 
 let run proxy_server =
   let* () =

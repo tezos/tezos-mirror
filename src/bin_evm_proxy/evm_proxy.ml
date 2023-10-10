@@ -27,13 +27,11 @@
 
 type mode = Prod | Dev
 
-type rollup_node_endpoint = Mockup | Endpoint of Uri.t
-
 type config = {
   rpc_addr : string;
   rpc_port : int;
   debug : bool;
-  rollup_node_endpoint : rollup_node_endpoint;
+  rollup_node_endpoint : Uri.t;
   mode : mode;
   cors_origins : string list;
   cors_headers : string list;
@@ -45,7 +43,7 @@ let default_config =
     rpc_addr = "127.0.0.1";
     rpc_port = 8545;
     debug = true;
-    rollup_node_endpoint = Mockup;
+    rollup_node_endpoint = Uri.empty;
     mode = Prod;
     cors_origins = [];
     cors_headers = [];
@@ -118,30 +116,20 @@ end
 let rollup_node_config_prod ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let open Evm_proxy_lib_prod in
-  match rollup_node_endpoint with
-  | Endpoint endpoint ->
-      let module Rollup_node_rpc = Rollup_node.Make (struct
-        let base = endpoint
-      end) in
-      let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
-      return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
-  | Mockup ->
-      let* smart_rollup_address = Mockup.smart_rollup_address in
-      return ((module Mockup : Rollup_node.S), smart_rollup_address)
+  let module Rollup_node_rpc = Rollup_node.Make (struct
+    let base = rollup_node_endpoint
+  end) in
+  let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+  return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
 
 let rollup_node_config_dev ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let open Evm_proxy_lib_dev in
-  match rollup_node_endpoint with
-  | Endpoint endpoint ->
-      let module Rollup_node_rpc = Rollup_node.Make (struct
-        let base = endpoint
-      end) in
-      let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
-      return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
-  | Mockup ->
-      let* smart_rollup_address = Mockup.smart_rollup_address in
-      return ((module Mockup : Rollup_node.S), smart_rollup_address)
+  let module Rollup_node_rpc = Rollup_node.Make (struct
+    let base = rollup_node_endpoint
+  end) in
+  let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+  return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
 
 let prod_directory ~verbose rollup_node_config =
   let open Lwt_result_syntax in
@@ -205,13 +193,7 @@ module Params = struct
         Lwt.return_ok mode)
 
   let rollup_node_endpoint =
-    Tezos_clic.parameter (fun _ s ->
-        let endpoint =
-          match s with
-          | "mockup" -> Mockup
-          | uri -> Endpoint (Uri.of_string uri)
-        in
-        Lwt.return_ok endpoint)
+    Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
   let string_list =
     Tezos_clic.parameter (fun _ s ->

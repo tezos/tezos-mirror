@@ -140,19 +140,11 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
             (module Rollup_node_rpc)
         in
         return (Get_block_by_number.Output (Ok block))
-    | Get_block_by_number.Input None ->
-        return
-          (Get_block_by_number.Output
-             (Ok Mockup.(block (TxHash [transaction_hash]))))
     | Get_block_by_hash.Input (Some (block_hash, full_transaction_object)) ->
         let* block =
           Rollup_node_rpc.block_by_hash ~full_transaction_object block_hash
         in
         return (Get_block_by_hash.Output (Ok block))
-    | Get_block_by_hash.Input None ->
-        return
-          (Get_block_by_hash.Output
-             (Ok Mockup.(block (TxHash [transaction_hash]))))
     | Get_code.Input (Some (address, _)) ->
         let* code = Rollup_node_rpc.code address in
         return (Get_code.Output (Ok code))
@@ -242,8 +234,6 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
               (Send_raw_transaction.Output
                  (Error {code = -32000; message = reason; data = None}))
         (* By default, the current dispatch handles the inputs *))
-    | Send_transaction.Input _ ->
-        return (Send_transaction.Output (Ok Mockup.transaction_hash))
     | Eth_call.Input (Some (call, _)) ->
         let* call_result = Rollup_node_rpc.simulate_call call in
         return (Eth_call.Output (Ok call_result))
