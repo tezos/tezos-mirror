@@ -114,11 +114,9 @@ let test_mint_deposit_withdraw_implicit_transfer () =
     Block.bake ~operation block
   in
   let make_ex_token ctxt ~ticketer ~ty ~content =
-    let*?@ res, ctxt =
-      Gas_monad.run ctxt @@ Script_ir_translator.parse_comparable_ty
-      @@ Micheline.root ty
+    let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
+      Script_ir_translator.parse_comparable_ty ctxt @@ Micheline.root ty
     in
-    let*?@ (Script_ir_translator.Ex_comparable_ty cty) = res in
     let*@ contents, ctxt =
       Script_ir_translator.parse_comparable_data ctxt cty
       @@ Micheline.root content
@@ -258,11 +256,9 @@ let test_contract_as_ticket_transfer_destination () =
     Block.bake ~operation block
   in
   let make_ex_token ctxt ~ticketer ~ty ~content =
-    let*?@ res, ctxt =
-      Gas_monad.run ctxt @@ Script_ir_translator.parse_comparable_ty
-      @@ Micheline.root ty
+    let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
+      Script_ir_translator.parse_comparable_ty ctxt @@ Micheline.root ty
     in
-    let*?@ (Script_ir_translator.Ex_comparable_ty cty) = res in
     let*@ contents, ctxt =
       Script_ir_translator.parse_comparable_data ctxt cty
       @@ Micheline.root content

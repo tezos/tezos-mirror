@@ -46,8 +46,6 @@ open Alpha_context
 
 type local_gas_counter = Local_gas_counter of int [@@ocaml.unboxed]
 
-let max_gas_counter = Local_gas_counter max_int
-
 (*
 
    The gas counter stored in the context is de-synchronized with the

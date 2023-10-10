@@ -47,11 +47,10 @@ let make_contract ticketer =
 
 let make_ex_token ctxt ~ticketer ~ty ~content =
   let open Lwt_result_wrap_syntax in
-  let*?@ res, ctxt =
+  let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
     let node = Micheline.root @@ Expr.from_string ty in
-    Gas_monad.run ctxt @@ Script_ir_translator.parse_comparable_ty node
+    Script_ir_translator.parse_comparable_ty ctxt node
   in
-  let*?@ (Script_ir_translator.Ex_comparable_ty cty) = res in
   let* ticketer = make_contract ticketer in
   let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content in

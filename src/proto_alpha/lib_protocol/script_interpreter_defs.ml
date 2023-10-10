@@ -479,9 +479,7 @@ let apply ctxt gas capture_ty capture lam =
   let open Lwt_result_syntax in
   let loc = Micheline.dummy_location in
   let ctxt = update_context gas ctxt in
-  let*? ty_expr, ctxt =
-    Gas_monad.run_pure ctxt @@ Script_ir_unparser.unparse_ty ~loc capture_ty
-  in
+  let*? ty_expr, ctxt = Script_ir_unparser.unparse_ty ~loc ctxt capture_ty in
   let* const_expr, ctxt = unparse_data ctxt Optimized capture_ty capture in
   let make_expr expr =
     Micheline.(
@@ -499,11 +497,10 @@ let apply ctxt gas capture_ty capture lam =
         in
         let (Item_t (ret_ty, Bot_t)) = descr.kaft in
         let*? arg_ty_expr, ctxt =
-          Gas_monad.run_pure ctxt
-          @@ Script_ir_unparser.unparse_ty ~loc full_arg_ty
+          Script_ir_unparser.unparse_ty ~loc ctxt full_arg_ty
         in
         let*? ret_ty_expr, ctxt =
-          Gas_monad.run_pure ctxt @@ Script_ir_unparser.unparse_ty ~loc ret_ty
+          Script_ir_unparser.unparse_ty ~loc ctxt ret_ty
         in
         match full_arg_ty with
         | Pair_t (capture_ty, arg_ty, _, _) ->

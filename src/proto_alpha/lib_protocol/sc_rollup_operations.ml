@@ -292,19 +292,17 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
      [parse_parameter_ty_and_entrypoints] restricts to [passable] types
      (everything but operations), which is OK since [validate_ty] constraints
      the type further. *)
-  let* res, ctxt =
-    Gas_monad.run ctxt
-    @@ Script_ir_translator.parse_parameter_ty_and_entrypoints
-         ~legacy:false
-         (Micheline.root parameters_ty)
-  in
-  let* (Ex_parameter_ty_and_entrypoints
-         {
-           arg_type;
-           entrypoints =
-             {Script_typed_ir.root = entrypoint; original_type_expr = _};
-         }) =
-    res
+  let* ( Ex_parameter_ty_and_entrypoints
+           {
+             arg_type;
+             entrypoints =
+               {Script_typed_ir.root = entrypoint; original_type_expr = _};
+           },
+         ctxt ) =
+    Script_ir_translator.parse_parameter_ty_and_entrypoints
+      ctxt
+      ~legacy:false
+      (Micheline.root parameters_ty)
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
      We currently don't support entrypoints as the entrypoint information

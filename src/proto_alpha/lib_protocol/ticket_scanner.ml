@@ -557,9 +557,7 @@ let ex_ticket_size ctxt (Ex_ticket (ty, ticket)) =
   (* type *)
   let open Lwt_result_syntax in
   let*? ty = Script_typed_ir.ticket_t Micheline.dummy_location ty in
-  let*? ty', ctxt =
-    Gas_monad.run_pure ctxt @@ Script_ir_unparser.unparse_ty ~loc:() ty
-  in
+  let*? ty', ctxt = Script_ir_unparser.unparse_ty ~loc:() ctxt ty in
   let ty_nodes, ty_size = Script_typed_ir_size.node_size ty' in
   let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
   let*? ctxt = Gas.consume ctxt ty_size_cost in

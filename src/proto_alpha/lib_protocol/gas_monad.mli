@@ -66,19 +66,6 @@ val run :
   ('a, 'trace) t ->
   (('a, 'trace) result * Alpha_context.context) tzresult
 
-type no_error
-
-(** [run_pure ctxt m] is a variant of [run ctxt m] expecting [m] to
-    always succeed. *)
-val run_pure :
-  Alpha_context.context ->
-  ('a, no_error) t ->
-  ('a * Alpha_context.context) tzresult
-
-(** [run_unaccounted m] is a context-free variant of [run] in which
-    gas consumptions are ignored. *)
-val run_unaccounted : ('a, error trace) t -> 'a tzresult
-
 (** [record_trace_level ~error_details f m] returns a new gas-monad value that
      when run, records trace levels using [f]. This function has no effect in
     the case of a gas-exhaustion error or if [error_details] is [Fast]. *)
@@ -88,11 +75,8 @@ val record_trace_eval :
   ('a, 'error_trace) t ->
   ('a, 'error_trace) t
 
-(** [fail e] is [of_result (Error e)] . *)
+(** [fail e] is [return (Error e)] . *)
 val fail : 'trace -> ('a, 'trace) t
-
-(** [tzfail e] is [of_result (Result_syntax.tzfail e)] . *)
-val tzfail : 'err -> ('a, 'err Error_monad.trace) t
 
 (** Syntax module for the {!Gas_monad}. This is intended to be opened locally in
     functions. Within the scope of this module, the code can include binding
@@ -120,11 +104,8 @@ module Syntax : sig
   (** [return_false] is [return false] . *)
   val return_false : (bool, 'trace) t
 
-  (** [fail e] is [of_result (Error e)] . *)
+  (** [fail e] is [return (Error e)] . *)
   val fail : 'trace -> ('a, 'trace) t
-
-  (** [tzfail e] is [of_result (Result_syntax.tzfail e)] . *)
-  val tzfail : 'err -> ('a, 'err Error_monad.trace) t
 
   (** [let*] is a binding operator alias for {!bind}. *)
   val ( let* ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
@@ -136,13 +117,4 @@ module Syntax : sig
       gas-monad. *)
   val ( let*? ) :
     ('a, 'trace) result -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
-
-  (** [let+?] is for mapping the value from result-only expressions into the
-      gas-monad. *)
-  val ( let+? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) t
-
-  val ( let*$ ) :
-    Alpha_context.Gas.cost -> (unit -> ('a, 'trace) t) -> ('a, 'trace) t
-
-  val ( let+$ ) : Alpha_context.Gas.cost -> (unit -> 'a) -> ('a, 'trace) t
 end

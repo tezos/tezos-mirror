@@ -34,11 +34,9 @@ let parse_ticket ~consume_deserialization_gas ~ticketer ~contents ~ty ctxt =
   let*? contents, ctxt =
     Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
   in
-  let*? res, ctxt =
-    Gas_monad.run ctxt
-    @@ Script_ir_translator.parse_comparable_ty (Micheline.root ty)
+  let*? Ex_comparable_ty contents_type, ctxt =
+    Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
   in
-  let*? (Ex_comparable_ty contents_type) = res in
   let* contents, ctxt =
     Script_ir_translator.parse_comparable_data
       ctxt

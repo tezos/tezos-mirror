@@ -86,7 +86,7 @@ module Value_size_benchmark : Tezos_benchmark.Benchmark.S = struct
     let open Translator_benchmarks in
     Lwt_main.run
       (let* ctxt, _ = Execution_context.make ~rng_state () in
-       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type in
+       let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
        match ex_ty with
        | Script_typed_ir.Ex_ty ty -> (
            match
@@ -204,7 +204,7 @@ module Kinstr_size_benchmark : Tezos_benchmark.Benchmark.S = struct
     Lwt_main.run
       (let* ctxt, _ = Execution_context.make ~rng_state () in
        let ex_stack_ty =
-         Type_helpers.michelson_type_list_to_ex_stack_ty stack
+         Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
        in
        let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
        let node = Micheline.root expr in

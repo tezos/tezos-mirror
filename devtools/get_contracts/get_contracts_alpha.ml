@@ -110,18 +110,14 @@ module Proto = struct
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ Script_typed_ir.Ex_ty ty, updated_ctxt =
         wrap_tzresult
-        @@ let* res, ctxt =
-             Gas_monad.run ctxt
-             @@ Script_ir_translator.parse_ty
-                  ~legacy:true
-                  ~allow_lazy_storage
-                  ~allow_operation
-                  ~allow_contract
-                  ~allow_ticket
-                  script
-           in
-           let+ res in
-           (res, ctxt)
+        @@ Script_ir_translator.parse_ty
+             ctxt
+             ~legacy:true
+             ~allow_lazy_storage
+             ~allow_operation
+             ~allow_contract
+             ~allow_ticket
+             script
       in
       let consumed =
         (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
@@ -164,9 +160,13 @@ module Proto = struct
       assert (consumed > 0) ;
       consumed
 
-    let unparse_ty (_raw_ctxt : Raw_context.t) (Ex_ty ty) =
-      wrap_tzresult @@ Gas_monad.run_unaccounted
-      @@ Script_ir_unparser.unparse_ty ~loc:0 ty
+    let unparse_ty (raw_ctxt : Raw_context.t) (Ex_ty ty) =
+      let open Result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
+      let+ expr, _ =
+        wrap_tzresult @@ Script_ir_unparser.unparse_ty ~loc:0 ctxt ty
+      in
+      expr
 
     let parse_toplevel (raw_ctxt : Raw_context.t) expr =
       let open Lwt_result_syntax in
@@ -291,11 +291,9 @@ module Proto = struct
       match parse_result with
       | Error _ -> acc
       | Ok (data, _cost) -> (
-          match
-            Gas_monad.run_unaccounted @@ Script_ir_unparser.unparse_ty ~loc:0 ty
-          with
+          match Script_ir_unparser.unparse_ty ~loc:0 (Obj.magic ctxt) ty with
           | Error _ -> assert false
-          | Ok ty_expr ->
+          | Ok (ty_expr, _) ->
               List.fold_left (fun acc g -> f acc ty_expr @@ g data) acc getters)
   end
 

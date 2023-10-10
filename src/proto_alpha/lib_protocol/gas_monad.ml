@@ -60,8 +60,6 @@ let map f m gas =
 
 let bind_result m f = bind (of_result m) f [@@ocaml.inline always]
 
-let map_result f m = map f (of_result m) [@@ocaml.inline always]
-
 let bind_recover m f gas = m gas >>?? fun (x, gas) -> f x gas
   [@@ocaml.inline always]
 
@@ -70,42 +68,23 @@ let consume_gas cost gas =
   | None -> None
   | Some gas -> Some (Ok (), gas)
 
-let run_on_gas_counter gas_counter m =
-  let open Result_syntax in
-  match m gas_counter with
-  | Some (res, new_gas_counter) -> return (res, new_gas_counter)
-  | None -> tzfail Gas.Operation_quota_exceeded
-
 let run ctxt m =
   let open Local_gas_counter in
   let open Result_syntax in
   match Gas.level ctxt with
-  | Gas.Unaccounted ->
-      let+ res, _new_gas_counter =
-        run_on_gas_counter Local_gas_counter.max_gas_counter m
-      in
-      (res, ctxt)
-  | Limited {remaining = _} ->
+  | Gas.Unaccounted -> (
+      match m (Local_gas_counter (Saturation_repr.saturated :> int)) with
+      | Some (res, _new_gas_counter) -> return (res, ctxt)
+      | None -> tzfail Gas.Operation_quota_exceeded)
+  | Limited {remaining = _} -> (
       let gas_counter, outdated_ctxt =
         local_gas_counter_and_outdated_context ctxt
       in
-      let+ res, new_gas_counter = run_on_gas_counter gas_counter m in
-      let ctxt = update_context new_gas_counter outdated_ctxt in
-      (res, ctxt)
-
-let run_unaccounted (m : ('a, error trace) t) : 'a tzresult =
-  let open Result_syntax in
-  let* res, _new_gas_counter =
-    run_on_gas_counter Local_gas_counter.max_gas_counter m
-  in
-  res
-
-type no_error = |
-
-let run_pure ctxt (m : ('a, no_error) t) : ('a * context) tzresult =
-  let open Result_syntax in
-  let* res, ctxt = run ctxt m in
-  match res with Ok x -> return (x, ctxt) | Error _ -> .
+      match m gas_counter with
+      | Some (res, new_gas_counter) ->
+          let ctxt = update_context new_gas_counter outdated_ctxt in
+          return (res, ctxt)
+      | None -> tzfail Gas.Operation_quota_exceeded)
 
 let record_trace_eval :
     type error_trace error_context.
@@ -122,8 +101,6 @@ let record_trace_eval :
         of_result (record_trace_eval (fun () -> f err_ctxt) x) gas
 
 let fail e = of_result (Error e) [@@ocaml.inline always]
-
-let tzfail e = of_result (Result_syntax.tzfail e) [@@ocaml.inline always]
 
 module Syntax = struct
   let return = return
@@ -142,17 +119,9 @@ module Syntax = struct
 
   let fail = fail
 
-  let tzfail = tzfail
-
   let ( let* ) = bind
 
   let ( let+ ) m f = map f m
 
   let ( let*? ) = bind_result
-
-  let ( let+? ) m f = map_result f m
-
-  let ( let*$ ) cost f = bind (consume_gas cost) f
-
-  let ( let+$ ) cost f = map f (consume_gas cost)
 end

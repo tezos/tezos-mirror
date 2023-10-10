@@ -76,11 +76,10 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
 
 let make_ex_token ctxt ~ticketer ~type_exp ~content_exp =
   let open Lwt_result_wrap_syntax in
-  let*?@ res, ctxt =
+  let*?@ Script_ir_translator.Ex_comparable_ty contents_type, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
-    Gas_monad.run ctxt @@ Script_ir_translator.parse_comparable_ty node
+    Script_ir_translator.parse_comparable_ty ctxt node
   in
-  let*?@ (Script_ir_translator.Ex_comparable_ty contents_type) = res in
   let*?@ ticketer = Contract.of_b58check ticketer in
   let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content_exp in
@@ -215,12 +214,15 @@ let setup ctxt ~key_type ~value_type entries =
       (List.map (fun (k, v) -> (k, Some v)) entries)
   in
   let*? key_type_node, ctxt =
-    Environment.wrap_tzresult @@ Gas_monad.run_pure ctxt
-    @@ Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location key_type
+    Environment.wrap_tzresult
+    @@ Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt key_type
   in
   let*? value_type_node, ctxt =
-    Environment.wrap_tzresult @@ Gas_monad.run_pure ctxt
-    @@ Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location value_type
+    Environment.wrap_tzresult
+    @@ Script_ir_unparser.unparse_ty
+         ~loc:Micheline.dummy_location
+         ctxt
+         value_type
   in
   let key_type = Micheline.strip_locations key_type_node in
   let value_type = Micheline.strip_locations value_type_node in

@@ -66,11 +66,10 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
 
 let make_ex_token ctxt ~ticketer ~type_exp ~content_exp =
   let open Lwt_result_wrap_syntax in
-  let*?@ res, ctxt =
+  let*?@ Script_ir_translator.Ex_comparable_ty contents_type, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
-    Gas_monad.run ctxt @@ Script_ir_translator.parse_comparable_ty node
+    Script_ir_translator.parse_comparable_ty ctxt node
   in
-  let*?@ (Script_ir_translator.Ex_comparable_ty contents_type) = res in
   let*@ ticketer = Lwt.return @@ Contract.of_b58check ticketer in
   let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content_exp in

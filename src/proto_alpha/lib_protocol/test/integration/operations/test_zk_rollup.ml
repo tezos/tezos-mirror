@@ -321,10 +321,9 @@ let make_ticket_key ctxt ~ty ~contents ~ticketer zk_rollup =
     | Context.I incr -> return incr
   in
   let ctxt = Incremental.alpha_ctxt incr in
-  let*?@ res, ctxt =
-    Gas_monad.run ctxt @@ Script_ir_translator.parse_comparable_ty ty
+  let*?@ Ex_comparable_ty contents_type, ctxt =
+    Script_ir_translator.parse_comparable_ty ctxt ty
   in
-  let*?@ (Ex_comparable_ty contents_type) = res in
   let*@ contents, ctxt =
     Script_ir_translator.parse_comparable_data ctxt contents_type contents
   in
