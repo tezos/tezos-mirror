@@ -150,3 +150,5 @@ val adaptive_issuance_rewards_params :
   Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params
 
 val adaptive_issuance_autostaking_enable : Raw_context.t -> bool
+
+val direct_ticket_spending_enable : Raw_context.t -> bool

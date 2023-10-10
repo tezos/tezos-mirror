@@ -922,6 +922,7 @@ module Constants : sig
       sc_rollup : sc_rollup;
       zk_rollup : zk_rollup;
       adaptive_issuance : adaptive_issuance;
+      direct_ticket_spending_enable : bool;
     }
 
     val encoding : t Data_encoding.t
@@ -1035,6 +1036,8 @@ module Constants : sig
   val adaptive_issuance_enable : context -> bool
 
   val zk_rollup_max_ticket_payload_size : context -> int
+
+  val direct_ticket_spending_enable : context -> bool
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}

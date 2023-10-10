@@ -199,6 +199,7 @@ type t = {
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
+  direct_ticket_spending_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding
