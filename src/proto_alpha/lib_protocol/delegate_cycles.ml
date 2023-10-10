@@ -140,7 +140,7 @@ let cycle_end ctxt last_cycle =
   let* ctxt, attesting_balance_updates =
     distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
   in
-  let* ctxt, slashing_balance_updates =
+  let* ctxt, _slashings, slashing_balance_updates =
     Delegate_slashed_deposits_storage
     .apply_and_clear_current_cycle_denunciations
       ctxt
