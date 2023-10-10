@@ -142,23 +142,13 @@ mv "${doc_index}.tmp" "$doc_index"
 find src/proto_${version}_${short_hash} -type f -path \*/test/\*.ml \
      -exec sed -i "s@Invocation:\(.*\)/proto_alpha/\(.*\)@Invocation:\1/proto_${version}_${short_hash}/\2@" \{\} \;
 
-# move daemons to a tmp directory to avoid editing lib_protocol
 cd src/proto_${version}_${short_hash}
-daemons=$(ls | grep -v lib_protocol)
-mkdir tmp
-mv $daemons tmp
-cd tmp
 
 # rename main_*.ml{,i} files of the binaries
-for file in $(find . -name main_\*.ml -or -name main_\*.mli)
+for file in $(find . -name main_\*_alpha.ml -or -name main_\*_alpha.mli)
 do
     mv "$file" $(echo "$file" | sed s/_alpha/_${version}_${short_hash}/g)
 done
-
-
-mv $daemons ..
-cd ..
-rmdir tmp
 
 cd lib_protocol
 
