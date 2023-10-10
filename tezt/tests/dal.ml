@@ -1878,81 +1878,7 @@ let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
       - Writes the downloaded slot contents to "/output" in durable storage.
    - At level N, publish a slot to the L1 and DAL.
    - Bake until [attestation_lag] blocks so the L1 attests the published slot.
-   - Confirm that the kernel downloaded the slot and wrote the content to "/output/slot-<index>".
-
-   For reference, this is the kernel used in this test:
-   ```
-   use tezos_smart_rollup::{kernel_entry, prelude::*, storage::path::OwnedPath};
-
-   fn process_slot(
-       host: &mut impl Runtime,
-       published_level: i32,
-       num_pages: usize,
-       page_size: usize,
-       slot_index: u8,
-   ) {
-       let mut buffer = vec![0u8; page_size * num_pages];
-
-       for page_index in 0..num_pages {
-           let result = host.reveal_dal_page(
-               published_level,
-               slot_index,
-               page_index.try_into().unwrap(),
-               &mut buffer[page_index * page_size..(page_index + 1) * page_size],
-           );
-
-           match result {
-               Ok(_) => {}
-               Err(err) => {
-                   debug_msg!(
-                       host,
-                       "Failed to retrieve one of the pages. Slot {} not processed. Error: {}",
-                       slot_index,
-                       &err.to_string()
-                   );
-                   // Stop fetching pages on error
-                   return;
-               }
-           }
-       }
-
-       let slot_path = format!("/output/slot-{}", slot_index);
-       let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
-       host.store_write(&path, &buffer, 0)
-           .map_err(|_| "Error writing to storage".to_string())
-           .unwrap_or_default();
-   }
-
-   pub fn entry(host: &mut impl Runtime) {
-       // we use the current sandbox parameters
-       let attestation_lag = 4;
-       let slot_size = 32768;
-       let page_size = 128;
-       let num_pages = slot_size / page_size;
-
-       match host.read_input() {
-           Ok(Some(message)) => {
-               let level = message.level;
-
-               let published_level = (level - attestation_lag) as i32;
-
-               let slot_indexes = vec![0u8];
-               for slot_index in slot_indexes {
-                   process_slot(host, published_level, num_pages, page_size, slot_index);
-               }
-           }
-           Ok(None) => {
-               debug_msg!(host, "Input message was empty");
-           }
-           Err(_) => {
-               debug_msg!(host, "Failed to read input message");
-           }
-       }
-   }
-
-   kernel_entry!(entry);
-   ```
-*)
+   - Confirm that the kernel downloaded the slot and wrote the content to "/output/slot-<index>". *)
 let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
     sc_rollup_node _sc_rollup_address node client pvm_name =
   Log.info "Assert attestation_lag value." ;
@@ -1975,6 +1901,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   Log.info "Originate rollup." ;
   let* boot_sector =
     Sc_rollup_helpers.prepare_installer_kernel
+      ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
       "dal_echo_kernel"
@@ -1990,7 +1917,9 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       client
   in
   let* () = Client.bake_for_and_wait client in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+  in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;

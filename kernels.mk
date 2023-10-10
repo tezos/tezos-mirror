@@ -1,4 +1,4 @@
-KERNELS = evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm
+KERNELS = evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm
 SDK_DIR=src/kernel_sdk
 EVM_DIR=src/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
@@ -66,6 +66,11 @@ tx_kernel_dal.wasm: tx_demo_collector
 	# There is an issue where `wasm-strip` fails for `tx_kernel.wasm`.
 	# Use `wasm-strip` once this issue is solved.
 	@cp src/kernel_tx_demo/target/wasm32-unknown-unknown/release/tx_kernel_dal.wasm $@
+
+dal_echo_kernel.wasm:
+	@make -C src/kernel_dal_echo build
+	@cp src/kernel_dal_echo/target/wasm32-unknown-unknown/release/dal_echo_kernel.wasm $@
+	@wasm-strip $@
 
 .PHONY: build
 build: ${KERNELS} kernel_sdk

@@ -14,5 +14,6 @@ build_kernels:
       - smart-rollup-installer
       - sequenced_kernel.wasm
       - tx_kernel_dal.wasm
+      - dal_echo_kernel.wasm
     expire_in: 1 day
     when: on_success
