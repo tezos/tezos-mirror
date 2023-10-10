@@ -19,8 +19,8 @@ For more information check the openmetrics specification: https://openmetrics.io
    :widths: 20, 20, 20, 10
 
 
-Usage
------
+Example
+-------
 
 In the following, we indicate a typical monitoring setup for Octez developers.
 For more details on setting up the node for monitoring see :doc:`../user/node-monitoring`.

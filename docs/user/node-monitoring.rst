@@ -52,9 +52,6 @@ A correct setup should write an entry in the logs similar to:
 Gathering data
 --------------
 
-This section focuses on access to the metrics and their uses.
-More details on the metrics specifications are available :doc:`here <../developer/openmetrics>`
-
 Scraping Octez Metrics
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -115,6 +112,14 @@ a `counter <https://github.com/OpenObservability/OpenMetrics/blob/main/specifica
 or a `histogram <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram>`_ used to track the size of events and how long they usually take (e.g., the time taken by an RPC call).
 
 The label value is sometimes used to store information that can't be described by the metric value (which can only be a float). This is used for example by the ``octez_version`` metric that provides the version within the labels.
+
+For the list of metrics provided by the node, and a typical monitoring setup, see the following page:
+
+.. toctree::
+   :maxdepth: 2
+
+   ../developer/openmetrics
+
 
 .. note::
 

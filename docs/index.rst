@@ -203,7 +203,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    developer/rpc
-   developer/openmetrics
    api/errors
    api/openapi
 
