@@ -90,8 +90,6 @@ Contracts that rely on linear or super-linear operations are vulnerable
 to malicious users supplying values until the contract cannot finish
 without running into fuel limits. This can deadlock your contract.
 
-.. _possible-issues-1:
-
 Possible issues:
 ~~~~~~~~~~~~~~~~
 
@@ -103,8 +101,6 @@ Possible issues:
 -  You may hit the slow case of an amortized algorithm or data structure
    at an inopportune time, using up all of your contract’s available
    gas.
-
-.. _alternativessolutions-1:
 
 Alternatives/Solutions:
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -132,14 +128,10 @@ sure that that piece of data is never again a valid message to the
 contract. If you do not do this, anyone else can call your contract with
 the same input and piggyback on the earlier approval.
 
-.. _possible-issues-2:
-
 Possible issues:
 ~~~~~~~~~~~~~~~~
 
 -  A previously approved action can be replayed.
-
-.. _alternativessolutions-2:
 
 Alternatives/Solutions
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -170,16 +162,12 @@ including that piece of information, anyone can see it. Furthermore,
 malicious nodes in the system can manipulate unsigned transactions by
 delaying, modifying, or reordering them.
 
-.. _possible-issues-3:
-
 Possible Issues
 ~~~~~~~~~~~~~~~
 
 -  If data is not signed, it can be modified
 -  Transactions can be delayed
 -  Secret information will become public
-
-.. _alternativessolutions-3:
 
 Alternatives/Solutions
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -202,15 +190,11 @@ and can make arbitrary further transfers, including back to the original
 contract. If state has not been updated before the transfer is made, a
 contract can call back in and execute actions based on old state.
 
-.. _possible-issues-4:
-
 Possible Issues
 ~~~~~~~~~~~~~~~
 
 -  Multiple withdrawals/actions
 -  Generating illegal state if state is updated twice later
-
-.. _alternativessolutions-4:
 
 Alternatives/Solutions
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -223,4 +207,3 @@ Alternatives/Solutions
    them. Before trusting a contract, make sure that its behavior cannot
    be modified and that you have an extremely high degree of confidence
    in it.
-

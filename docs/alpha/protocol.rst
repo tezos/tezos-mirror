@@ -69,6 +69,11 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   michelson_anti_patterns
+
+.. toctree::
+   :maxdepth: 2
+
    token_management
 
 .. toctree::
