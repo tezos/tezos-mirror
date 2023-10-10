@@ -49,6 +49,10 @@ function run_profiler(path) {
         var tx_status = [];
         var estimated_ticks = [];
         var estimated_ticks_per_tx = [];
+        var tx_size = [];
+        var bip_store = [];
+        var bip_read = [];
+        var receipt_size = [];
 
         var profiler_output_path = "";
 
@@ -73,11 +77,17 @@ function run_profiler(path) {
                 : null;
             if (profiler_output_path_result !== null) {
                 profiler_output_path = profiler_output_path_result;
+                console.log(`Flamechart: ${profiler_output_path}`)
             }
             push_match(output, gas_used, /\bgas_used:\s*(\d+)/g)
             push_match(output, tx_status, /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
             push_match(output, estimated_ticks, /\bEstimated ticks:\s*(\d+)/g)
             push_match(output, estimated_ticks_per_tx, /\bEstimated ticks after tx:\s*(\d+)/g)
+            push_match(output, tx_size, /\bStoring transaction object of size\s*(\d+)/g)
+            push_match(output, bip_store, /\bStoring Block in Progress of size\s*(\d+)/g)
+            push_match(output, bip_read, /\bReading Block in Progress of size\s*(\d+)/g)
+            push_match(output, receipt_size, /\bStoring receipt of size \s*(\d+)/g)
+
         });
         childProcess.on('close', _ => {
             if (profiler_output_path == "") {
@@ -92,7 +102,23 @@ function run_profiler(path) {
             if (tx_status.length != estimated_ticks_per_tx.length) {
                 console.log(new Error("Tx status array length (" + tx_status.length + ") != estimated ticks per tx array length (" + estimated_ticks_per_tx.length + ")"));
             }
-            resolve({ profiler_output_path, gas_costs: gas_used, tx_status, estimated_ticks, estimated_ticks_per_tx });
+            if (tx_status.length != tx_size.length) {
+                console.log(new Error("Missing transaction size data (expected: " + tx_status.length + ", actual: " + tx_size.length + ")"));
+            }
+            if (tx_status.length != receipt_size.length) {
+                console.log(new Error("Missing receipt size value (expected: " + tx_status.length + ", actual: " + receipt_size.length + ")"));
+            }
+            resolve({
+                profiler_output_path,
+                gas_costs: gas_used,
+                tx_status,
+                estimated_ticks,
+                estimated_ticks_per_tx,
+                tx_size,
+                bip_store,
+                bip_read,
+                receipt_size
+            });
         });
     })
     return profiler_result;
@@ -138,9 +164,11 @@ async function analyze_profiler_output(path) {
     signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
     sputnik_runtime_ticks = await get_ticks(path, "11evm_runtime7Runtime3run");
     store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
+    store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
     interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
     fetch_blueprint_ticks = await get_ticks(path, "blueprint5fetch");
+    block_finalize = await get_ticks(path, "store_current_block");
     return {
         kernel_run_ticks: kernel_run_ticks,
         run_transaction_ticks: run_transaction_ticks,
@@ -150,14 +178,18 @@ async function analyze_profiler_output(path) {
         interpreter_decode_ticks: interpreter_decode_ticks,
         fetch_blueprint_ticks: fetch_blueprint_ticks,
         sputnik_runtime_ticks: sputnik_runtime_ticks,
+        store_receipt_ticks,
+        block_finalize
     };
 }
 
 // Run given benchmark
 async function run_benchmark(path) {
+    var inbox_size = fs.statSync(path).size
     run_profiler_result = await run_profiler(path);
     profiler_output_analysis_result = await analyze_profiler_output(run_profiler_result.profiler_output_path);
     return {
+        inbox_size,
         ...profiler_output_analysis_result,
         ...run_profiler_result
     }
@@ -187,8 +219,10 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     tx_status = run_benchmark_result.tx_status;
     estimated_ticks = run_benchmark_result.estimated_ticks;
     estimated_ticks_per_tx = run_benchmark_result.estimated_ticks_per_tx;
+    tx_size = run_benchmark_result.tx_size;
+    bip_read = run_benchmark_result.bip_read;
+    bip_store = run_benchmark_result.bip_store;
 
-    unaccounted_ticks = sumArray(kernel_run_ticks) - sumArray(run_transaction_ticks) - sumArray(signature_verification_ticks) - sumArray(store_transaction_object_ticks) - sumArray(fetch_blueprint_ticks)
     console.log(`Number of transactions: ${tx_status.length}`)
     run_time_index = 0;
     gas_cost_index = 0;
@@ -221,6 +255,9 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
                     run_transaction_ticks: run_transaction_ticks[j],
                     sputnik_runtime_ticks: sputnik_runtime_tick,
                     store_transaction_object_ticks: store_transaction_object_ticks[j],
+                    store_receipt_ticks: run_benchmark_result.store_receipt_ticks[j],
+                    receipt_size: run_benchmark_result.receipt_size[j],
+                    tx_size: tx_size[j],
                     ...basic_info_row
                 });
             gas_cost_index += 1;
@@ -236,20 +273,50 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         console.log("Warning: runtime not matched with a transaction in: " + benchmark_name);
     }
 
-    // first kernel run and reboots
-    for (var j = 0; j < kernel_run_ticks.length; j++) {
+    // first kernel run
+    // the nb of tx correspond to the full inbox, not just those done in first run
+    rows.push({
+        benchmark_name: benchmark_name + "(all)",
+        interpreter_init_ticks: interpreter_init_ticks[0],
+        interpreter_decode_ticks: interpreter_decode_ticks[0],
+        fetch_blueprint_ticks: fetch_blueprint_ticks[0],
+        kernel_run_ticks: kernel_run_ticks[0],
+        estimated_ticks: estimated_ticks[0],
+        inbox_size: run_benchmark_result.inbox_size,
+        nb_tx: tx_status.length,
+        bip_store: bip_store[0] ? bip_store[0] : 0
+    });
+
+    //reboots
+    for (var j = 1; j < kernel_run_ticks.length; j++) {
         rows.push({
             benchmark_name: benchmark_name + "(all)",
             interpreter_init_ticks: interpreter_init_ticks[j],
             interpreter_decode_ticks: interpreter_decode_ticks[j],
             fetch_blueprint_ticks: fetch_blueprint_ticks[j],
             kernel_run_ticks: kernel_run_ticks[j],
-            estimated_ticks: estimated_ticks[j]
+            estimated_ticks: estimated_ticks[j],
+            bip_store: bip_store[j] ? bip_store[j] : 0,
+            bip_read: bip_read[j - 1] // the first read correspond to second run
         });
     }
+
+    // ticks that are not covered by identified area of interest
+    finalize_ticks = sumArray(run_benchmark_result.block_finalize)
+    unaccounted_ticks =
+        sumArray(kernel_run_ticks)
+        - sumArray(fetch_blueprint_ticks)
+        - sumArray(run_transaction_ticks)
+        - sumArray(signature_verification_ticks)
+        - sumArray(store_transaction_object_ticks)
+        - sumArray(run_benchmark_result.store_receipt_ticks)
+        - finalize_ticks
+
+    // row concerning all runs
     rows.push({
         benchmark_name: benchmark_name + "(all)",
         unaccounted_ticks,
+        block_finalize: finalize_ticks
     });
     return rows;
 }
@@ -264,18 +331,26 @@ async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Running benchmarks on: [${benchmark_scripts.join('\n  ')}]`);
     var fields = [
         "benchmark_name",
+        "status",
         "gas_cost",
-        "run_transaction_ticks",
-        "sputnik_runtime_ticks",
         "signature_verification_ticks",
+        "sputnik_runtime_ticks",
+        "run_transaction_ticks",
+        "tx_size",
         "store_transaction_object_ticks",
-        "interpreter_init_ticks",
+        "receipt_size",
+        "store_receipt_ticks",
+        "estimated_ticks",
         "interpreter_decode_ticks",
+        "interpreter_init_ticks",
+        "nb_tx",
+        "inbox_size",
         "fetch_blueprint_ticks",
+        "bip_read",
+        "bip_store",
+        "block_finalize",
         "kernel_run_ticks",
         "unaccounted_ticks",
-        "status",
-        "estimated_ticks"
     ];
     let output = output_filename();
     console.log(`Output in ${output}`);

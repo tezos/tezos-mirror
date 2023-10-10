@@ -339,7 +339,9 @@ pub fn store_transaction_receipt<Host: Runtime>(
     let mut transaction_hashes_index = init_transaction_hashes_index()?;
     index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
     let receipt_path = receipt_path(&receipt.hash)?;
-    host.store_write_all(&receipt_path, &receipt.rlp_bytes())?;
+    let src: &[u8] = &receipt.rlp_bytes();
+    log!(host, Debug, "Storing receipt of size {}", src.len());
+    host.store_write_all(&receipt_path, src)?;
     Ok(())
 }
 
@@ -348,7 +350,14 @@ pub fn store_transaction_object<Host: Runtime>(
     object: &TransactionObject,
 ) -> Result<(), Error> {
     let object_path = object_path(&object.hash)?;
-    host.store_write_all(&object_path, &object.rlp_bytes())?;
+    let encoded: &[u8] = &object.rlp_bytes();
+    log!(
+        host,
+        Debug,
+        "Storing transaction object of size {}",
+        encoded.len()
+    );
+    host.store_write_all(&object_path, encoded)?;
     Ok(())
 }
 
@@ -799,7 +808,14 @@ pub fn store_block_in_progress<Host: Runtime>(
     host: &mut Host,
     block: &BlockInProgress,
 ) -> Result<(), anyhow::Error> {
-    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, &block.rlp_bytes())
+    let bytes: &[u8] = &block.rlp_bytes();
+    log!(
+        host,
+        Debug,
+        "Storing Block in Progress of size {}",
+        bytes.len()
+    );
+    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, bytes)
         .context("Failed to store BlockInProgress")
 }
 
@@ -809,6 +825,12 @@ pub fn read_block_in_progress<Host: Runtime>(
     let bytes = host
         .store_read_all(&EVM_BLOCK_IN_PROGRESS)
         .context("Failed to read stored BlockInProgress")?;
+    log!(
+        host,
+        Debug,
+        "Reading Block in Progress of size {}",
+        bytes.len()
+    );
     let decoder = Rlp::new(bytes.as_slice());
     BlockInProgress::decode(&decoder).context("Failed to decode stored BlockInProgress")
 }
