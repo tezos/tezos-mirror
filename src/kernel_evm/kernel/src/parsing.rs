@@ -7,9 +7,11 @@
 
 use crate::inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent};
 use primitive_types::{H160, U256};
+use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::{
-    transaction::TransactionHash, tx_common::EthereumTransactionCommon,
+    transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
+    tx_common::EthereumTransactionCommon,
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::*};
@@ -62,7 +64,8 @@ pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 20 // Smart rollup address size (ExternalMessageFrame::Targetted)
             - 1  // Transaction chunk tag
             - 2  // Number of chunks (u16)
-            - 32; // Transaction hash size
+            - 32 // Transaction hash size
+            - 32; // Chunk hash size
 
 pub const UPGRADE_NONCE_SIZE: usize = 2;
 
@@ -74,10 +77,12 @@ pub enum Input {
     NewChunkedTransaction {
         tx_hash: TransactionHash,
         num_chunks: u16,
+        chunk_hashes: Vec<TransactionHash>,
     },
     TransactionChunk {
         tx_hash: TransactionHash,
         i: u16,
+        chunk_hash: TransactionHash,
         data: Vec<u8>,
     },
     Simulation,
@@ -103,8 +108,16 @@ pub type RollupType = MichelsonPair<
 impl InputResult {
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = parsable!(split_at(bytes, 32));
-        let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok()); // Remaining bytes is the rlp encoded transaction.
+        // Remaining bytes is the rlp encoded transaction.
+        let (tx_hash, remaining) = parsable!(split_at(bytes, TRANSACTION_HASH_SIZE));
+        let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
+        let produced_hash: [u8; TRANSACTION_HASH_SIZE] =
+            Keccak256::digest(remaining).into();
+        if tx_hash != produced_hash {
+            // The produced hash from the transaction data is not the same as the
+            // one sent, the message is ignored.
+            return InputResult::Unparsable;
+        }
         let tx: EthereumTransactionCommon = parsable!(remaining.try_into().ok());
         InputResult::Input(Input::SimpleTransaction(Box::new(Transaction {
             tx_hash,
@@ -114,31 +127,50 @@ impl InputResult {
 
     fn parse_new_chunked_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = parsable!(split_at(bytes, 32));
+        let (tx_hash, remaining) = parsable!(split_at(bytes, TRANSACTION_HASH_SIZE));
         let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
         // Next 2 bytes is the number of chunks.
         let (num_chunks, remaining) = parsable!(split_at(remaining, 2));
         let num_chunks = u16::from_le_bytes(num_chunks.try_into().unwrap());
-        if remaining.is_empty() {
-            Self::Input(Input::NewChunkedTransaction {
-                tx_hash,
-                num_chunks,
-            })
-        } else {
-            Self::Unparsable
+        if remaining.len() != (TRANSACTION_HASH_SIZE * usize::from(num_chunks)) {
+            return Self::Unparsable;
         }
+        let mut chunk_hashes = vec![];
+        let mut remaining = remaining;
+        for _ in 0..num_chunks {
+            let (chunk_hash, remaining_hashes) =
+                parsable!(split_at(remaining, TRANSACTION_HASH_SIZE));
+            let chunk_hash: TransactionHash = parsable!(chunk_hash.try_into().ok());
+            remaining = remaining_hashes;
+            chunk_hashes.push(chunk_hash)
+        }
+        Self::Input(Input::NewChunkedTransaction {
+            tx_hash,
+            num_chunks,
+            chunk_hashes,
+        })
     }
 
     fn parse_transaction_chunk(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
-        let (tx_hash, remaining) = parsable!(split_at(bytes, 32));
+        let (tx_hash, remaining) = parsable!(split_at(bytes, TRANSACTION_HASH_SIZE));
         let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
         // Next 2 bytes is the index.
         let (i, remaining) = parsable!(split_at(remaining, 2));
         let i = u16::from_le_bytes(i.try_into().unwrap());
+        // Next 32 bytes is the chunk hash.
+        let (chunk_hash, remaining) =
+            parsable!(split_at(remaining, TRANSACTION_HASH_SIZE));
+        let chunk_hash: TransactionHash = parsable!(chunk_hash.try_into().ok());
+        let data_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(remaining).into();
+        // Check if the produced hash from the data is the same as the chunk hash.
+        if chunk_hash != data_hash {
+            return Self::Unparsable;
+        }
         Self::Input(Input::TransactionChunk {
             tx_hash,
             i,
+            chunk_hash,
             data: remaining.to_vec(),
         })
     }

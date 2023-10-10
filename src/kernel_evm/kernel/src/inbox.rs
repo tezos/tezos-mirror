@@ -9,8 +9,11 @@ use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
 use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK, UPGRADE_NONCE_SIZE};
 use crate::simulation;
 use crate::storage::{
+    chunked_hash_transaction_path, chunked_transaction_num_chunks,
+    chunked_transaction_path, create_chunked_transaction,
     get_and_increment_deposit_nonce, read_kernel_upgrade_nonce,
-    store_last_info_per_level_timestamp,
+    remove_chunked_transaction, store_last_info_per_level_timestamp,
+    store_transaction_chunk,
 };
 use crate::tick_model;
 use crate::Error;
@@ -19,7 +22,7 @@ use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
-use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -188,41 +191,50 @@ fn handle_transaction_chunk<Host: Runtime>(
     host: &mut Host,
     tx_hash: TransactionHash,
     i: u16,
+    chunk_hash: TransactionHash,
     data: Vec<u8>,
 ) -> Result<Option<Transaction>, Error> {
     // If the number of chunks doesn't exist in the storage, the chunked
     // transaction wasn't created, so the chunk is ignored.
-    let num_chunks = match crate::storage::chunked_transaction_num_chunks(host, &tx_hash)
-    {
+    let num_chunks = match chunked_transaction_num_chunks(host, &tx_hash) {
         Ok(x) => x,
         Err(_) => {
             log!(
                 host,
                 Info,
-                "Ignoring chunk {} of unknown transaction {}\n",
+                "Ignoring chunk {} of unknown transaction {}",
                 i,
                 hex::encode(tx_hash)
             );
             return Ok(None);
         }
     };
-    // Checks that the transaction is not out of bounds
+    // Checks that the transaction is not out of bounds.
     if i >= num_chunks {
+        return Ok(None);
+    }
+    // Check if the chunk hash is part of the announced chunked hashes.
+    let chunked_transaction_path = chunked_transaction_path(&tx_hash)?;
+    let chunk_hash_path =
+        chunked_hash_transaction_path(&chunk_hash, &chunked_transaction_path)?;
+    if host.store_read(&chunk_hash_path, 0, 0).is_err() {
         return Ok(None);
     }
     // Sanity check to verify that the transaction chunk uses the maximum
     // space capacity allowed.
     if i != num_chunks - 1 && data.len() < MAX_SIZE_PER_CHUNK {
-        crate::storage::remove_chunked_transaction(host, &tx_hash)?;
+        remove_chunked_transaction(host, &tx_hash)?;
         return Ok(None);
     };
     // When the transaction is stored in the storage, it returns the full transaction
     // if `data` was the missing chunk.
-    if let Some(data) = crate::storage::store_transaction_chunk(host, &tx_hash, i, data)?
-    {
-        if let Ok(tx) = EthereumTransactionCommon::from_bytes(&data) {
-            let content = TransactionContent::Ethereum(tx);
-            return Ok(Some(Transaction { tx_hash, content }));
+    if let Some(data) = store_transaction_chunk(host, &tx_hash, i, data)? {
+        let full_data_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(&data).into();
+        if full_data_hash == tx_hash {
+            if let Ok(tx) = EthereumTransactionCommon::from_bytes(&data) {
+                let content = TransactionContent::Ethereum(tx);
+                return Ok(Some(Transaction { tx_hash, content }));
+            }
         }
     }
     Ok(None)
@@ -292,9 +304,17 @@ pub fn read_inbox<Host: Runtime>(
             InputResult::Input(Input::NewChunkedTransaction {
                 tx_hash,
                 num_chunks,
-            }) => crate::storage::create_chunked_transaction(host, &tx_hash, num_chunks)?,
-            InputResult::Input(Input::TransactionChunk { tx_hash, i, data }) => {
-                if let Some(tx) = handle_transaction_chunk(host, tx_hash, i, data)? {
+                chunk_hashes,
+            }) => create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?,
+            InputResult::Input(Input::TransactionChunk {
+                tx_hash,
+                i,
+                chunk_hash,
+                data,
+            }) => {
+                if let Some(tx) =
+                    handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
+                {
                     res.transactions.push(tx)
                 }
             }
@@ -378,17 +398,27 @@ mod tests {
             Input::NewChunkedTransaction {
                 tx_hash,
                 num_chunks,
+                chunk_hashes,
             } => {
                 // New chunked transaction tag
                 buffer.push(1);
                 buffer.extend_from_slice(&tx_hash);
-                buffer.extend_from_slice(&u16::to_le_bytes(num_chunks))
+                buffer.extend_from_slice(&u16::to_le_bytes(num_chunks));
+                for chunk_hash in chunk_hashes.iter() {
+                    buffer.extend_from_slice(chunk_hash)
+                }
             }
-            Input::TransactionChunk { tx_hash, i, data } => {
+            Input::TransactionChunk {
+                tx_hash,
+                i,
+                chunk_hash,
+                data,
+            } => {
                 // Transaction chunk tag
                 buffer.push(2);
                 buffer.extend_from_slice(&tx_hash);
                 buffer.extend_from_slice(&u16::to_le_bytes(i));
+                buffer.extend_from_slice(&chunk_hash);
                 buffer.extend_from_slice(&data);
             }
             _ => (),
@@ -397,13 +427,20 @@ mod tests {
     }
 
     fn make_chunked_transactions(tx_hash: TransactionHash, data: Vec<u8>) -> Vec<Input> {
+        let mut chunk_hashes = vec![];
         let mut chunks: Vec<Input> = data
             .chunks(MAX_SIZE_PER_CHUNK)
             .enumerate()
-            .map(|(i, bytes)| Input::TransactionChunk {
-                tx_hash,
-                i: i as u16,
-                data: bytes.to_vec(),
+            .map(|(i, bytes)| {
+                let data = bytes.to_vec();
+                let chunk_hash = Keccak256::digest(&data).try_into().unwrap();
+                chunk_hashes.push(chunk_hash);
+                Input::TransactionChunk {
+                    tx_hash,
+                    i: i as u16,
+                    chunk_hash,
+                    data,
+                }
             })
             .collect();
         let number_of_chunks = chunks.len() as u16;
@@ -411,6 +448,7 @@ mod tests {
         let new_chunked_transaction = Input::NewChunkedTransaction {
             tx_hash,
             num_chunks: number_of_chunks,
+            chunk_hashes,
         };
 
         let mut buffer = Vec::new();
@@ -429,10 +467,11 @@ mod tests {
     fn parse_valid_simple_transaction() {
         let mut host = MockHost::default();
 
-        let tx =
-            EthereumTransactionCommon::from_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+        let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap();
+        let tx = EthereumTransactionCommon::from_bytes(tx_bytes).unwrap();
+        let tx_hash = Keccak256::digest(tx_bytes).into();
         let input = Input::SimpleTransaction(Box::new(Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx.clone()),
         }));
 
@@ -441,7 +480,7 @@ mod tests {
         let inbox_content =
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
@@ -453,8 +492,9 @@ mod tests {
         let mut host = MockHost::with_address(&address);
 
         let (data, tx) = large_transaction();
+        let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
 
-        let inputs = make_chunked_transactions(ZERO_TX_HASH, data);
+        let inputs = make_chunked_transactions(tx_hash, data);
 
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
@@ -463,7 +503,7 @@ mod tests {
         let inbox_content =
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
@@ -519,14 +559,17 @@ mod tests {
     fn recreate_chunked_transaction() {
         let mut host = MockHost::default();
 
+        let chunk_hashes = vec![[1; TRANSACTION_HASH_SIZE], [2; TRANSACTION_HASH_SIZE]];
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let new_chunk1 = Input::NewChunkedTransaction {
             tx_hash,
             num_chunks: 2,
+            chunk_hashes: chunk_hashes.clone(),
         };
         let new_chunk2 = Input::NewChunkedTransaction {
             tx_hash,
             num_chunks: 42,
+            chunk_hashes,
         };
 
         host.add_external(Bytes::from(input_to_bytes(
@@ -569,10 +612,12 @@ mod tests {
             Input::TransactionChunk {
                 tx_hash,
                 i: _,
+                chunk_hash,
                 data,
             } => Input::TransactionChunk {
                 tx_hash,
                 i: out_of_bound_i,
+                chunk_hash,
                 data,
             },
             _ => panic!("Expected a transaction chunk"),
@@ -645,7 +690,7 @@ mod tests {
         let mut host = MockHost::default();
 
         let (data, tx) = large_transaction();
-        let tx_hash = ZERO_TX_HASH;
+        let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
 
         let inputs = make_chunked_transactions(tx_hash, data);
         // The test works if there are 3 inputs: new chunked of size 2, first and second
@@ -677,7 +722,7 @@ mod tests {
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
 
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
@@ -691,13 +736,14 @@ mod tests {
 
         let mut host = MockHost::with_address(&address);
 
-        let tx =
-            EthereumTransactionCommon::from_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
-e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
-fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+        let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
+        e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
+        fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap();
+        let tx_hash = Keccak256::digest(tx_bytes).into();
+        let tx = EthereumTransactionCommon::from_bytes(tx_bytes).unwrap();
 
         let input = Input::SimpleTransaction(Box::new(Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx.clone()),
         }));
 
@@ -729,7 +775,7 @@ fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwr
         let inbox_content =
             read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
-            tx_hash: ZERO_TX_HASH,
+            tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
