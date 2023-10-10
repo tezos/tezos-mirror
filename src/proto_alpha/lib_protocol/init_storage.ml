@@ -204,11 +204,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        let* ctxt =
-          Adaptive_issuance_storage
-          .migrate_adaptive_issuance_storages_from_O_to_P
-            ctxt
-        in
         return (ctxt, [])
   in
   let* ctxt =
