@@ -1021,6 +1021,7 @@ module Internal_for_tests = struct
           irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
           log_kernel_debug = false;
+          no_degraded = false;
         }
     in
     let* lockfile = lock ~data_dir in

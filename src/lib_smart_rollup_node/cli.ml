@@ -355,3 +355,11 @@ let log_kernel_debug_file_arg =
     ~placeholder:"file"
     ~doc:""
     string_parameter
+
+let no_degraded_arg : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"no-degraded"
+    ~doc:
+      "Prevent the rollup node from entering degraded mode on error. The \
+       rollup node will instead stop."
+    ()

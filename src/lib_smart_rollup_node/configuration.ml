@@ -103,6 +103,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  no_degraded : bool;
 }
 
 type error +=
@@ -704,6 +705,7 @@ let encoding : t Data_encoding.t =
            index_buffer_size;
            irmin_cache_size;
            log_kernel_debug;
+           no_degraded;
          } ->
       ( ( sc_rollup_address,
           boot_sector_file,
@@ -723,7 +725,8 @@ let encoding : t Data_encoding.t =
             l1_blocks_cache_size,
             l2_blocks_cache_size,
             prefetch_blocks ),
-          (index_buffer_size, irmin_cache_size, log_kernel_debug) ) ))
+          (index_buffer_size, irmin_cache_size, log_kernel_debug, no_degraded)
+        ) ))
     (fun ( ( sc_rollup_address,
              boot_sector_file,
              sc_rollup_node_operators,
@@ -742,7 +745,8 @@ let encoding : t Data_encoding.t =
                l1_blocks_cache_size,
                l2_blocks_cache_size,
                prefetch_blocks ),
-             (index_buffer_size, irmin_cache_size, log_kernel_debug) ) ) ->
+             (index_buffer_size, irmin_cache_size, log_kernel_debug, no_degraded)
+           ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -765,6 +769,7 @@ let encoding : t Data_encoding.t =
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        no_degraded;
       })
     (merge_objs
        (obj10
@@ -815,10 +820,11 @@ let encoding : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj3
+          (obj4
              (opt "index_buffer_size" int31)
              (opt "irmin_cache_size" int31)
-             (dft "log-kernel-debug" Data_encoding.bool false))))
+             (dft "log-kernel-debug" Data_encoding.bool false)
+             (dft "no-degraded" Data_encoding.bool false))))
 
 (* For each purpose, it returns a list of associated operation kinds *)
 let operation_kinds_of_purpose = function
@@ -950,7 +956,7 @@ module Cli = struct
       ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug =
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded =
     let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
     let config =
       {
@@ -986,6 +992,7 @@ module Cli = struct
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        no_degraded;
       }
     in
     check_mode config
@@ -995,7 +1002,7 @@ module Cli = struct
       ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~sc_rollup_node_operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug =
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded =
     let new_sc_rollup_node_operators =
       make_operators sc_rollup_node_operators
     in
@@ -1049,6 +1056,7 @@ module Cli = struct
         irmin_cache_size =
           Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
+        no_degraded = no_degraded || configuration.no_degraded;
       }
     in
     check_mode configuration
@@ -1057,7 +1065,7 @@ module Cli = struct
       ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
       ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
       ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug =
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -1098,6 +1106,7 @@ module Cli = struct
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~no_degraded
       in
       return configuration
     else
@@ -1140,6 +1149,7 @@ module Cli = struct
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~no_degraded
       in
       return config
 end

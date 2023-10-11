@@ -2996,7 +2996,9 @@ let test_reveals_fails_on_unknown_hash =
   let unknown_hash =
     "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
   in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~allow_degraded:true sc_rollup_node sc_rollup []
+  in
   let error_promise =
     Sc_rollup_node.wait_for
       sc_rollup_node
@@ -3253,11 +3255,13 @@ type refutation_scenario_parameters = {
   reset_honest_on : (string * int * Sc_rollup_node.mode option) list;
   bad_reveal_at : int list;
   priority : [`Priority_honest | `Priority_loser | `No_priority];
+  allow_degraded : bool;
 }
 
 let refutation_scenario_parameters ?(loser_modes = []) ~final_level
     ?(empty_levels = []) ?(stop_loser_at = []) ?(reset_honest_on = [])
-    ?(bad_reveal_at = []) ?(priority = `No_priority) inputs =
+    ?(bad_reveal_at = []) ?(priority = `No_priority) ?(allow_degraded = false)
+    inputs =
   {
     loser_modes;
     inputs;
@@ -3267,6 +3271,7 @@ let refutation_scenario_parameters ?(loser_modes = []) ~final_level
     reset_honest_on;
     bad_reveal_at;
     priority;
+    allow_degraded;
   }
 
 let remove_state_from_dissection dissection =
@@ -3304,6 +3309,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
       reset_honest_on;
       bad_reveal_at;
       priority;
+      allow_degraded;
     } protocol sc_rollup_node sc_client1 sc_rollup_address node client =
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   let loser_keys =
@@ -3376,7 +3382,12 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     if priority = `Priority_honest then
       prioritize_refute_operations sc_rollup_node ;
     let* () =
-      Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup_address []
+      Sc_rollup_node.run
+        ~event_level:`Debug
+        ~allow_degraded
+        sc_rollup_node
+        sc_rollup_address
+        []
     in
     return
       [
@@ -3413,7 +3424,12 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
         in
         if priority = `Priority_loser then
           prioritize_refute_operations loser_sc_rollup_node ;
-        Sc_rollup_node.run loser_sc_rollup_node ~loser_mode sc_rollup_address [])
+        Sc_rollup_node.run
+          loser_sc_rollup_node
+          ~loser_mode
+          ~allow_degraded
+          sc_rollup_address
+          [])
     @@ List.combine loser_modes loser_sc_rollup_nodes
   in
 
@@ -3737,6 +3753,7 @@ let test_refutation protocols ~kind =
                   (* Commitment for inbox 7 will be made at level 12 and published
                      at level 14 *);
                 ]
+              ~allow_degraded:true
               ~priority:`Priority_honest );
           ( "degraded_ongoing",
             refutation_scenario_parameters
@@ -3744,6 +3761,7 @@ let test_refutation protocols ~kind =
               (inputs_for 7)
               ~final_level:80
               ~bad_reveal_at:[21]
+              ~allow_degraded:true
               ~priority:`Priority_honest );
           ( "parallel_games_0",
             refutation_scenario_parameters

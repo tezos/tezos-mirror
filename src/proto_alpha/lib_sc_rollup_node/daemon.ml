@@ -425,7 +425,8 @@ let run node_ctxt configuration
   in
   let error_to_degraded_mode e =
     let*! () = Daemon_event.error e in
-    degraded_refutation_mode daemon_components node_ctxt
+    if node_ctxt.config.no_degraded then fatal_error_exit e
+    else degraded_refutation_mode daemon_components node_ctxt
   in
   let handle_preimage_not_found e =
     (* When running/initialising a rollup node with missing preimages
