@@ -52,9 +52,11 @@ impl Transaction {
             TransactionContent::Ethereum(transaction) => {
                 let priority_fee_per_gas = U256::min(
                     transaction.max_priority_fee_per_gas,
-                    transaction.max_fee_per_gas - block_base_fee_per_gas,
+                    transaction
+                        .max_fee_per_gas
+                        .saturating_sub(block_base_fee_per_gas),
                 );
-                priority_fee_per_gas + block_base_fee_per_gas
+                priority_fee_per_gas.saturating_add(block_base_fee_per_gas)
             }
         }
     }
