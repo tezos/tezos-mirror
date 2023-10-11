@@ -99,6 +99,25 @@ module Message : sig
   include ENCODABLE with type t := t
 end
 
+(** From the Gossipsub point of view, a peer is given by a cryptographic node
+    identity {!P2p_peer.Id.t}. It's up to the caller to associate the
+    {!P2p_peer.Id.t} to a {!P2p_point.Id.t} if needed (to e.g. implement peers
+    exchange, which needs addresses and ports instead of cryptographic
+    identities). *)
+module Peer : sig
+  type t = P2p_peer.Id.t
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+end
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
    Use a bitset instead, when available in the standard library. *)
 

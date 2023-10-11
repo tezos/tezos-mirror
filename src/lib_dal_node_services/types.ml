@@ -173,6 +173,24 @@ module Message = struct
          (req "shard_proof" Cryptobox.shard_proof_encoding))
 end
 
+module Peer = struct
+  type t = P2p_peer.Id.t
+
+  module Cmp = struct
+    type nonrec t = t
+
+    let compare p1 p2 = P2p_peer.Id.compare p1 p2
+  end
+
+  include Compare.Make (Cmp)
+  module Set = Set.Make (Cmp)
+  module Map = Map.Make (Cmp)
+
+  let pp = P2p_peer.Id.pp
+
+  let encoding = P2p_peer.Id.encoding
+end
+
 (* Declaration of types used as inputs and/or outputs. *)
 type slot_id = {slot_level : level; slot_index : slot_index}
 

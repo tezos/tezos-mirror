@@ -28,11 +28,6 @@
     libraries to be used by the DAL node to connect to and exchange data with
     peers. *)
 
-(** Below, we expose the main types needed for the integration with the existing
-    DAL node alongside their encodings. *)
-
-type peer = Gs_interface.peer
-
 (** The worker module exposes instantiation of the Gossipsub worker functor,
     alongside the config used to instantiate the functor and the default values
     of the GS parameters. *)
@@ -42,7 +37,7 @@ module Worker : sig
       with type GS.Topic.t = Types.Topic.t
        and type GS.Message_id.t = Types.Message_id.t
        and type GS.Message.t = Types.Message.t
-       and type GS.Peer.t = peer
+       and type GS.Peer.t = Types.Peer.t
        and module GS.Span = Gs_interface.Span
        and module Monad = Gs_interface.Monad
 
@@ -53,7 +48,7 @@ module Worker : sig
       with type GS.Topic.t = Types.Topic.t
        and type GS.Message_id.t = Types.Message_id.t
        and type GS.Message.t = Types.Message.t
-       and type GS.Peer.t = peer
+       and type GS.Peer.t = Types.Peer.t
        and module GS.Span = Config.GS.Span
 
   module Logging : sig

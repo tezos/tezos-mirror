@@ -43,22 +43,6 @@ end
 
 let message_valid msg msg_id = !Validate_message_hook.check msg msg_id
 
-module Peer = struct
-  type t = peer
-
-  module Cmp = struct
-    type nonrec t = t
-
-    let compare p1 p2 = P2p_peer.Id.compare p1 p2
-  end
-
-  include Compare.Make (Cmp)
-  module Set = Set.Make (Cmp)
-  module Map = Map.Make (Cmp)
-
-  let pp = P2p_peer.Id.pp
-end
-
 let get_value ~__LOC__ func =
   Option.value_f ~default:(fun () ->
       Stdlib.failwith
@@ -114,7 +98,7 @@ module Automaton_config :
   module Time = Time
 
   module Subconfig = struct
-    module Peer = Peer
+    module Peer = Types.Peer
     module Topic = Types.Topic
     module Message_id = Types.Message_id
 
@@ -142,7 +126,7 @@ module Worker_config :
     with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = Types.Message_id.t
      and type GS.Message.t = Types.Message.t
-     and type GS.Peer.t = peer
+     and type GS.Peer.t = Types.Peer.t
      and module GS.Span = Span
      and module Monad = Monad = struct
   module GS = Tezos_gossipsub.Make (Automaton_config)

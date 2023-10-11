@@ -27,13 +27,6 @@
 (** This module defines the relevant data structures to instantiate the
     gossipsub worker. *)
 
-(** From the Gossipsub point of view, a peer is given by a cryptographic node
-    identity {!P2p_peer.Id.t}. It's up to the caller to associate the
-    {!P2p_peer.Id.t} to a {!P2p_point.Id.t} if needed (to e.g. implement peers
-    exchange, which needs addresses and ports instead of cryptographic
-    identities). *)
-type peer = P2p_peer.Id.t
-
 module Span : Gossipsub_intf.SPAN
 
 (** Encodings for various types above. *)
@@ -55,7 +48,7 @@ module Worker_config :
     with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = Types.Message_id.t
      and type GS.Message.t = Types.Message.t
-     and type GS.Peer.t = peer
+     and type GS.Peer.t = Types.Peer.t
      and module GS.Span = Span
      and module Monad = Monad
 
@@ -64,7 +57,7 @@ module Worker_instance :
     with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = Types.Message_id.t
      and type GS.Message.t = Types.Message.t
-     and type GS.Peer.t = peer
+     and type GS.Peer.t = Types.Peer.t
      and module GS.Span = Span
      and module Monad = Monad
 
