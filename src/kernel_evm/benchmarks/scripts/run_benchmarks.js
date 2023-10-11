@@ -24,7 +24,7 @@ const { timestamp } = require("./lib/timestamp")
 const csv = require('csv-stringify/sync');
 
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
-const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_unstripped_installer.wasm');
+const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_installer.wasm');
 const PREIMAGE_DIR = external.ressource_dir('_evm_unstripped_installer_preimages');
 const OUTPUT_DIRECTORY = external.output()
 
@@ -162,7 +162,7 @@ async function analyze_profiler_output(path) {
     kernel_run_ticks = await get_ticks(path, "kernel_run");
     run_transaction_ticks = await get_ticks(path, "run_transaction");
     signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
-    sputnik_runtime_ticks = await get_ticks(path, "11evm_runtime7Runtime3run");
+    sputnik_runtime_ticks = await get_ticks(path, "EvmHandler$LT$Host$GT$7execute");
     store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
     store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
     interpreter_init_ticks = await get_ticks(path, "interpreter(init)");

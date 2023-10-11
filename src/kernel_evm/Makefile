@@ -8,7 +8,10 @@ all: build test check
 
 .PHONY: build
 build:
-	@cargo build --target wasm32-unknown-unknown --release
+ifdef EVM_KERNEL_FEATURES
+	$(eval FEATURES := --features ${EVM_KERNEL_FEATURES})
+endif
+	@cargo build --target wasm32-unknown-unknown --release ${FEATURES}
 
 .PHONY: build-deps
 build-deps:

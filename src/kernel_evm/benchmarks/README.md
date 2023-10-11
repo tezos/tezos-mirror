@@ -15,6 +15,12 @@ The image needs to be built from the tezos sources, but only requires the
 Let's assume `<WORKDIR>` as the working directory for the benchmark suite, and
 `<WORKDIR>/output` containing the results of the benchmarks.
 
+# Instrumentation
+
+A feature flag `benchmark` was added to the kernel, to activate the monitoring
+in the kernel. For the benchmarking to work, an unstripped version of the kernel,
+compiled with the benchmark flag, is necessary.
+
 # Procedure
 
 ## To initialize the repo
@@ -55,4 +61,3 @@ A script was created to help start the benchmark script:
 cd <WORKDIR>
 ./start_image.sh
 ```
-
