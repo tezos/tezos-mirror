@@ -109,7 +109,7 @@ module Handler = struct
   let gossipsub_app_messages_validation cryptobox message message_id =
     let open Gossipsub in
     let {share; shard_proof} = message in
-    let {commitment; shard_index; _} = message_id in
+    let Types.Message_id.{commitment; shard_index; _} = message_id in
     let shard = Cryptobox.{share; index = shard_index} in
     match Cryptobox.verify_shard cryptobox commitment shard shard_proof with
     | Ok () -> `Valid
@@ -406,7 +406,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
     let save_and_notify =
       Store.Shards.save_and_notify shard_store shards_watcher
     in
-    fun ({share; _} : message) ({commitment; shard_index; _} : message_id) ->
+    fun ({share; _} : message) Types.Message_id.{commitment; shard_index; _} ->
       Seq.return {Cryptobox.share; index = shard_index}
       |> save_and_notify commitment |> Errors.to_tzresult
   in

@@ -69,6 +69,88 @@ module Topic = struct
          (req "pkh" Signature.Public_key_hash.encoding))
 end
 
+module Message_id = struct
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5543
+
+     Refine the GS message_id to save bandwidth.
+
+     With the defintion below: commitment * level * slot_index * shard_index *
+     attester => BW = About 48 + 4 + 2 + 2 + 20 (non bls pkh) = 76 bytes.
+
+     However,
+
+      1. we could compute the pkh when needed from L1 information instead of
+      providing it;
+
+      2. we could give the payload round instead of the commitment. Together with
+      the level, it could identify the commitment (except if there is a double
+      baking);
+
+      3. we could also provide the first characters of the commitment.
+
+      With 1 and 2, we would get:
+      BW' = BW - 48 - 20 + 1 (Z.n on small numbers up 127) = 9 bytes
+  *)
+  type t = {
+    commitment : Cryptobox.Commitment.t;
+    level : int32;
+    slot_index : int;
+    shard_index : int;
+    pkh : Signature.Public_key_hash.t;
+  }
+
+  let compare id {level; slot_index; commitment; shard_index; pkh} =
+    let c = Int32.compare id.level level in
+    if c <> 0 then c
+    else
+      let c = Int.compare id.shard_index shard_index in
+      if c <> 0 then c
+      else
+        let c = Cryptobox.Commitment.compare id.commitment commitment in
+        if c <> 0 then c
+        else
+          Topic.compare
+            {slot_index = id.slot_index; pkh = id.pkh}
+            {slot_index; pkh}
+
+  module Cmp = struct
+    type nonrec t = t
+
+    let compare = compare
+  end
+
+  include Compare.Make (Cmp)
+  module Set = Set.Make (Cmp)
+  module Map = Map.Make (Cmp)
+
+  let pp fmt {level; slot_index; commitment; shard_index; pkh} =
+    Format.fprintf
+      fmt
+      "{ level=%ld; shard_index=%d; commitment=%a; topic=%a }"
+      level
+      shard_index
+      Cryptobox.Commitment.pp
+      commitment
+      Topic.pp
+      {slot_index; pkh}
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {level; slot_index; commitment; shard_index; pkh} ->
+        (level, slot_index, commitment, shard_index, pkh))
+      (fun (level, slot_index, commitment, shard_index, pkh) ->
+        {level; slot_index; commitment; shard_index; pkh})
+      (obj5
+         (req "level" int32)
+         (req "slot_index" uint8)
+         (req "commitment" Cryptobox.Commitment.encoding)
+         (req "shard_index" uint16)
+         (req "pkh" Signature.Public_key_hash.encoding))
+
+  let get_topic {slot_index; pkh; _} = Topic.{slot_index; pkh}
+end
+
 (* Declaration of types used as inputs and/or outputs. *)
 type slot_id = {slot_level : level; slot_index : slot_index}
 

@@ -69,7 +69,7 @@ val decoding_data_failed : Types.Store.kind t
 
 val loading_shard_data_failed : string t
 
-val message_validation_error : (Gossipsub.message_id * string) t
+val message_validation_error : (Types.Message_id.t * string) t
 
 val p2p_server_is_ready : P2p_point.Id.t t
 

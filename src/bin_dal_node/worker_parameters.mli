@@ -26,6 +26,8 @@
 
 open Gs_interface
 
-val limits : (Types.Topic.t, peer, message_id, Span.t) Gossipsub_intf.limits
+val limits :
+  (Types.Topic.t, peer, Types.Message_id.t, Span.t) Gossipsub_intf.limits
 
-val peer_filter_parameters : (peer, message_id) Gossipsub_intf.parameters
+val peer_filter_parameters :
+  (peer, Types.Message_id.t) Gossipsub_intf.parameters

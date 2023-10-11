@@ -54,14 +54,14 @@ type p2p_message =
       px : px_peer Seq.t;
       backoff : Gs_interface.Span.t;
     }
-  | IHave of {topic : Types.Topic.t; message_ids : Gs_interface.message_id list}
-  | IWant of {message_ids : Gs_interface.message_id list}
+  | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
+  | IWant of {message_ids : Types.Message_id.t list}
   | Subscribe of {topic : Types.Topic.t}
   | Unsubscribe of {topic : Types.Topic.t}
   | Message_with_header of {
       message : Gs_interface.message;
       topic : Types.Topic.t;
-      message_id : Gs_interface.message_id;
+      message_id : Types.Message_id.t;
     }
 
 (** {!peer_metadata} is not used. So, its value is [unit]. *)

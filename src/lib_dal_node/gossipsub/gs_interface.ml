@@ -27,52 +27,9 @@
 open Gossipsub_intf
 module Types = Tezos_dal_node_services.Types
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5543
-
-   Refine the GS message_id to save bandwidth.
-
-   With the defintion below: commitment * level * slot_index * shard_index *
-   attester => BW = About 48 + 4 + 2 + 2 + 20 (non bls pkh) = 76 bytes.
-
-   However,
-
-    1. we could compute the pkh when needed from L1 information instead of
-    providing it;
-
-    2. we could give the payload round instead of the commitment. Together with
-    the level, it could identify the commitment (except if there is a double
-    baking);
-
-    3. we could also provide the first characters of the commitment.
-
-    With 1 and 2, we would get:
-    BW' = BW - 48 - 20 + 1 (Z.n on small numbers up 127) = 9 bytes
-*)
-type message_id = {
-  commitment : Cryptobox.Commitment.t;
-  level : int32;
-  slot_index : int;
-  shard_index : int;
-  pkh : Signature.Public_key_hash.t;
-}
-
 type message = {share : Cryptobox.share; shard_proof : Cryptobox.shard_proof}
 
 type peer = P2p_peer.Id.t
-
-let message_id_encoding : message_id Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {level; slot_index; commitment; shard_index; pkh} ->
-      (level, slot_index, commitment, shard_index, pkh))
-    (fun (level, slot_index, commitment, shard_index, pkh) ->
-      {level; slot_index; commitment; shard_index; pkh})
-    (obj5
-       (req "level" int32)
-       (req "slot_index" uint8)
-       (req "commitment" Cryptobox.Commitment.encoding)
-       (req "shard_index" uint16)
-       (req "pkh" Signature.Public_key_hash.encoding))
 
 let message_encoding : message Data_encoding.t =
   let open Data_encoding in
@@ -82,47 +39,6 @@ let message_encoding : message Data_encoding.t =
     (obj2
        (req "share" Cryptobox.share_encoding)
        (req "shard_proof" Cryptobox.shard_proof_encoding))
-
-module Message_id = struct
-  type t = message_id
-
-  let compare id {level; slot_index; commitment; shard_index; pkh} =
-    let c = Int32.compare id.level level in
-    if c <> 0 then c
-    else
-      let c = Int.compare id.shard_index shard_index in
-      if c <> 0 then c
-      else
-        let c = Cryptobox.Commitment.compare id.commitment commitment in
-        if c <> 0 then c
-        else
-          Types.Topic.compare
-            {slot_index = id.slot_index; pkh = id.pkh}
-            {slot_index; pkh}
-
-  module Cmp = struct
-    type nonrec t = t
-
-    let compare = compare
-  end
-
-  include Compare.Make (Cmp)
-  module Set = Set.Make (Cmp)
-  module Map = Map.Make (Cmp)
-
-  let pp fmt {level; slot_index; commitment; shard_index; pkh} =
-    Format.fprintf
-      fmt
-      "{ level=%ld; shard_index=%d; commitment=%a; topic=%a }"
-      level
-      shard_index
-      Cryptobox.Commitment.pp
-      commitment
-      Types.Topic.pp
-      {slot_index; pkh}
-
-  let get_topic {slot_index; pkh; _} = Types.Topic.{slot_index; pkh}
-end
 
 module Validate_message_hook = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
@@ -216,7 +132,7 @@ module Automaton_config :
      and module Span = Span
      and type Subconfig.Peer.t = peer
      and type Subconfig.Topic.t = Types.Topic.t
-     and type Subconfig.Message_id.t = message_id
+     and type Subconfig.Message_id.t = Types.Message_id.t
      and type Subconfig.Message.t = message = struct
   module Span = Span
   module Time = Time
@@ -224,7 +140,7 @@ module Automaton_config :
   module Subconfig = struct
     module Peer = Peer
     module Topic = Types.Topic
-    module Message_id = Message_id
+    module Message_id = Types.Message_id
     module Message = Message
   end
 end
@@ -243,7 +159,7 @@ end
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
     with type GS.Topic.t = Types.Topic.t
-     and type GS.Message_id.t = message_id
+     and type GS.Message_id.t = Types.Message_id.t
      and type GS.Message.t = message
      and type GS.Peer.t = peer
      and module GS.Span = Span

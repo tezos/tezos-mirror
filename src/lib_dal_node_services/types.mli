@@ -56,6 +56,37 @@ module Topic : sig
   module Map : Map.S with type key = t
 end
 
+(** A message id uniquely identifies a share whose commitment is included in an
+    L1 block. It is defined by a tuple containing the commitment, the level at
+    which the commitment is successfully included in an L1 block, the
+    corresponding slot index, the shard index, as well as the public key hash
+    [pkh] of the delegate expected to attest it.
+
+    Note that [pkh] is used to be able to directly infer a topic from a message id. It
+    could be retrieved from L1 using the level. But, we decide to provide it
+    directly in this first version. *)
+module Message_id : sig
+  type t = {
+    commitment : Cryptobox.Commitment.t;
+    level : int32;
+    slot_index : int;
+    shard_index : int;
+    pkh : Signature.Public_key_hash.t;
+  }
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+
+  val get_topic : t -> Topic.t
+end
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
    Use a bitset instead, when available in the standard library. *)
 

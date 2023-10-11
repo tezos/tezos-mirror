@@ -54,7 +54,7 @@ module Events = struct
       ~pp1:GS.Topic.pp
       ~pp2:GS.Message_id.pp
       ("topic", Types.Topic.encoding)
-      ("message_id", message_id_encoding)
+      ("message_id", Types.Message_id.encoding)
 
   let join =
     declare_1
@@ -110,7 +110,7 @@ module Events = struct
       ~pp3:GS.Message_id.pp
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
-      ("message_id", message_id_encoding)
+      ("message_id", Types.Message_id.encoding)
 
   let subscribe =
     declare_2
@@ -172,7 +172,7 @@ module Events = struct
       ~pp3:(Format.pp_print_list GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
-      ("message_ids", list message_id_encoding)
+      ("message_ids", list Types.Message_id.encoding)
 
   let iwant =
     declare_2
@@ -183,7 +183,7 @@ module Events = struct
       ~pp1:P2p_peer.Id.pp
       ~pp2:(Format.pp_print_list GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)
-      ("message_ids", list message_id_encoding)
+      ("message_ids", list Types.Message_id.encoding)
 end
 
 let event =

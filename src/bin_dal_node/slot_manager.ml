@@ -237,7 +237,7 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
                      let message = Gossipsub.{share; shard_proof} in
                      let topic = Types.Topic.{slot_index; pkh} in
                      let message_id =
-                       Gossipsub.
+                       Types.Message_id.
                          {
                            commitment;
                            level = published_level;
