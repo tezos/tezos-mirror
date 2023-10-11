@@ -86,10 +86,7 @@ in
       # Make sure headers files are in scope.
       packageIncludeArgs;
 
-    hardeningDisable =
-      pkgs.lib.optionals
-      (pkgs.stdenv.isAarch64 && pkgs.stdenv.isDarwin)
-      ["stackprotector"];
+    hardeningDisable = ["stackprotector"];
 
     buildInputs = packages ++ [pkgs.makeWrapper];
 

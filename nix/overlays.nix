@@ -29,7 +29,7 @@
     class_group_vdf = prev.class_group_vdf.overrideAttrs (old: {
       hardeningDisable =
         (old.hardeningDisable or [])
-        ++ lib.optionals stdenv.isAarch64 ["stackprotector"];
+        ++ ["stackprotector"];
     });
 
     # This package makes no sense to build on MacOS. Some OPAM package
