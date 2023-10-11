@@ -19,6 +19,14 @@ too hard to switch away from such a basic component later in the project.
 We used the Lalrpop library because we had some experience with it, and it seemed
 to work well in our initial trials.
 
+##### Known differences between Octez and MIR parsers
+
+Currently, for the sake of simplicity, MIR parser is a bit more lenient wrt non-essential elements, specifically, unlike Octez parser, MIR parser allows:
+
+- Nested parentheses, i.e. `{ PUSH (((int))) (((((3))))) }` is accepted
+- Parentheses inside sequences, i.e. `{ (Unit) ; (Unit) }` is accepted
+- Arbitrary indentation
+
 #### Gas consumption
 
 Gas counter is represented as the type `Gas`, containing an `Option<u32>` with the current milligas amount (or `None` after gas exhaustion). A mutable reference to the gas counter is passed to typechecker and interpreter.
