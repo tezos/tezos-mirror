@@ -84,7 +84,6 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   in
   assert (Compare.Bool.(already_slashed = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
-  let slashing_percentage = (slashing_percentage : Int_percentage.t :> int) in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let global_limit_of_staking_over_baking =
     Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking ctxt
@@ -95,8 +94,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   let compute_reward_and_burn (frozen_deposits : Deposits_repr.t) =
     let open Result_syntax in
     let punish_value =
-      Tez_repr.(
-        div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
+      Tez_repr.mul_percentage frozen_deposits.initial_amount slashing_percentage
     in
     let should_forbid, punishing_amount =
       if Tez_repr.(punish_value >= frozen_deposits.current_amount) then
@@ -144,7 +142,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   let slash_history =
     Storage.Slashed_deposits_history.add
       level.cycle
-      slashing_percentage
+      (slashing_percentage :> int)
       slash_history
   in
   let*! ctxt =
