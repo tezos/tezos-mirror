@@ -22,6 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 type t = {frozen : Tez_repr.t; weighted_delegated : Tez_repr.t}
 
 let make ~frozen ~weighted_delegated = {frozen; weighted_delegated}
@@ -50,12 +51,3 @@ let staking_weight {frozen; weighted_delegated} =
   Int64.add frozen weighted_delegated
 
 let compare s1 s2 = Int64.compare (staking_weight s1) (staking_weight s2)
-
-let migrate_stake_from_O_to_P ~edge_of_staking_over_delegation
-    ({frozen; weighted_delegated = actually_unweighted_delegated} : t) :
-    t tzresult =
-  let open Result_syntax in
-  let* weighted_delegated =
-    Tez_repr.(actually_unweighted_delegated /? edge_of_staking_over_delegation)
-  in
-  return @@ {frozen; weighted_delegated}
