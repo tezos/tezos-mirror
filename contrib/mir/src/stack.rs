@@ -25,7 +25,10 @@ pub(crate) use stk;
 
 /// A stack abstraction based on `Vec`.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Stack<T>(Vec<T>);
+pub struct Stack<T> {
+    data: Vec<T>,
+    failed: bool,
+}
 
 impl<T> Stack<T> {
     /// Allocate a new empty stack.
@@ -37,7 +40,10 @@ impl<T> Stack<T> {
     /// directly. Last `Vec` element will end up on the top of the stack. O(1)
     /// complexity.
     fn stack_from_vec(data: Vec<T>) -> Self {
-        Stack(data)
+        Stack {
+            data,
+            failed: false,
+        }
     }
 
     /// Convert stack index to vec index.
@@ -46,19 +52,37 @@ impl<T> Stack<T> {
         len.checked_sub(i + 1).expect("out of bounds stack access")
     }
 
+    fn data(&self) -> &Vec<T> {
+        assert!(!self.failed);
+        &self.data
+    }
+
+    fn data_mut(&mut self) -> &mut Vec<T> {
+        assert!(!self.failed);
+        &mut self.data
+    }
+
+    pub fn is_failed(&self) -> bool {
+        self.failed
+    }
+
+    pub fn fail(&mut self) -> () {
+        self.failed = true;
+    }
+
     /// Push an element onto the top of the stack.
     pub fn push(&mut self, elt: T) {
-        self.0.push(elt)
+        self.data_mut().push(elt)
     }
 
     /// Pop an element off the top of the stack.
     pub fn pop(&mut self) -> Option<T> {
-        self.0.pop()
+        self.data_mut().pop()
     }
 
     /// Get the stack's element count.
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.data().len()
     }
 
     /// Removes the specified number of elements from the top of the stack in
@@ -67,20 +91,20 @@ impl<T> Stack<T> {
     /// Panics if the `size` is larger than length of the stack.
     pub fn drop_top(&mut self, size: usize) -> () {
         let len = self.len();
-        self.0
+        self.data_mut()
             .truncate(len.checked_sub(size).expect("size too large in drop_top"));
     }
 
     /// Borrow the stack content as an immutable slice. Note that stack top is
     /// the _rightmost_ element.
     pub fn as_slice(&self) -> &[T] {
-        self.0.as_slice()
+        self.data().as_slice()
     }
 
     /// Borrow the stack content as a mutable slice. Note that stack top is
     /// the _rightmost_ element.
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        self.0.as_mut_slice()
+        self.data_mut().as_mut_slice()
     }
 
     /// Split off the top `size` elements of the stack into a new `Stack`.
@@ -89,7 +113,7 @@ impl<T> Stack<T> {
     pub fn split_off(&mut self, size: usize) -> Stack<T> {
         let len = self.len();
         Self::stack_from_vec(
-            self.0
+            self.data_mut()
                 .split_off(len.checked_sub(size).expect("size too large in split_off")),
         )
     }
@@ -97,7 +121,7 @@ impl<T> Stack<T> {
     /// Move elements from `other` to the top of the stack. New stack top is the
     /// top of `other`. Note that elements are moved out of `other`.
     pub fn append(&mut self, other: &mut Stack<T>) -> () {
-        self.0.append(&mut other.0)
+        self.data_mut().append(other.data_mut())
     }
 
     /// Swap two elements in the stack, identified by their index from the top,
@@ -105,7 +129,12 @@ impl<T> Stack<T> {
     pub fn swap(&mut self, i1: usize, i2: usize) -> () {
         let i1v = self.vec_index(i1);
         let i2v = self.vec_index(i2);
-        self.0.swap(i1v, i2v)
+        self.data_mut().swap(i1v, i2v)
+    }
+
+    /// Iterator over the stack content, starting from the top.
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.data().iter().rev()
     }
 }
 
@@ -170,7 +199,7 @@ impl<T> Index<usize> for Stack<T> {
     /// Index into the stack. The top's index is `0`. Returns an immutable
     /// reference to the element.
     fn index(&self, index: usize) -> &Self::Output {
-        self.0.index(self.vec_index(index))
+        self.data().index(self.vec_index(index))
     }
 }
 
@@ -178,7 +207,8 @@ impl<T> IndexMut<usize> for Stack<T> {
     /// Index into the stack. The top's index is `0`. Returns a mutable
     /// reference to the element.
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.0.index_mut(self.vec_index(index))
+        let i = self.vec_index(index);
+        self.data_mut().index_mut(i)
     }
 }
 
@@ -344,5 +374,22 @@ mod tests {
         let mut stk = stk![1, 2, 3, 4, 5];
         stk[2] = 42;
         assert_eq!(stk, stk![1, 2, 42, 4, 5]);
+    }
+
+    #[test]
+    fn fail_stack() {
+        let mut stk = stk![1, 2, 3, 4, 5];
+        assert!(!stk.is_failed());
+        stk.fail();
+        assert!(stk.is_failed());
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed: !self.failed")]
+    fn fail_stack_access() {
+        let mut stk = stk![1, 2, 3, 4, 5];
+        stk.fail();
+        assert!(stk.is_failed());
+        stk.pop();
     }
 }

@@ -13,6 +13,7 @@ use crate::stack::*;
 pub enum InterpretError {
     OutOfGas,
     MutezOverflow,
+    FailedWith(Value),
 }
 
 impl From<OutOfGas> for InterpretError {
@@ -148,6 +149,10 @@ fn interpret_one(
             gas.consume(interpret_cost::SWAP)?;
             stack.swap(0, 1);
         }
+        Failwith => match stack.pop() {
+            Some(x) => return Err(InterpretError::FailedWith(x)),
+            None => unreachable_state(),
+        },
     }
     Ok(())
 }
@@ -386,5 +391,13 @@ mod interpreter_tests {
         let mut gas = Gas::default();
         assert!(interpret_one(&Swap, &mut gas, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_failwith() {
+        assert_eq!(
+            interpret_one(&Failwith, &mut Gas::default(), &mut stk![NumberValue(20)]),
+            Err(InterpretError::FailedWith(NumberValue(20)))
+        );
     }
 }

@@ -17,6 +17,7 @@ pub enum TcError {
     StackTooShort,
     StacksNotEqual,
     OutOfGas,
+    FailNotInTail,
 }
 
 impl From<OutOfGas> for TcError {
@@ -43,6 +44,10 @@ fn typecheck_instruction(
 ) -> Result<TypecheckedInstruction, TcError> {
     use Instruction as I;
     use Type as T;
+
+    if stack.is_failed() {
+        return Err(TcError::FailNotInTail);
+    }
 
     gas.consume(gas::tc_cost::INSTR_STEP)?;
 
@@ -72,6 +77,9 @@ fn typecheck_instruction(
             // remaining unprotected part, then append the protected portion back on top.
             let mut protected = stack.split_off(protected_height);
             let nested = typecheck(nested, gas, stack)?;
+            if stack.is_failed() {
+                return Err(TcError::FailNotInTail);
+            }
             stack.append(&mut protected);
             I::Dip(opt_height, nested)
         }
@@ -108,7 +116,12 @@ fn typecheck_instruction(
                 let nested_t = typecheck(nested_t, gas, &mut t_stack)?;
                 let nested_f = typecheck(nested_f, gas, stack)?;
                 // If both stacks are same after typecheck, all is good.
-                ensure_stacks_eq(gas, t_stack.as_slice(), stack.as_slice())?;
+                ensure_stacks_eq(gas, &t_stack, &stack)?;
+                // Replace stack with other branch's stack if it's failed, as
+                // one branch might've been successful.
+                if stack.is_failed() {
+                    *stack = t_stack;
+                }
                 I::If(nested_t, nested_f)
             }
             _ => return Err(TcError::GenericTcError),
@@ -129,7 +142,7 @@ fn typecheck_instruction(
                 // If the starting stack and result stack match
                 // then the typecheck is complete. pop the bool
                 // off the original stack to form the final result.
-                ensure_stacks_eq(gas, live.as_slice(), stack.as_slice())?;
+                ensure_stacks_eq(gas, &live, &stack)?;
                 stack.pop();
                 I::Loop(nested)
             }
@@ -144,6 +157,12 @@ fn typecheck_instruction(
             ensure_stack_len(stack, 2)?;
             stack.swap(0, 1);
             I::Swap
+        }
+        I::Failwith => {
+            ensure_stack_len(stack, 1)?;
+            stack.pop();
+            stack.fail();
+            I::Failwith
         }
     })
 }
@@ -175,7 +194,12 @@ fn ensure_stack_len(stack: &TypeStack, l: usize) -> Result<(), TcError> {
 
 /// Ensures two type stacks compare equal, otherwise returns
 /// `Err(StacksNotEqual)`. If runs out of gas, returns `Err(OutOfGas)` instead.
-fn ensure_stacks_eq(gas: &mut Gas, stack1: &[Type], stack2: &[Type]) -> Result<(), TcError> {
+///
+/// Failed stacks compare equal with anything.
+fn ensure_stacks_eq(gas: &mut Gas, stack1: &TypeStack, stack2: &TypeStack) -> Result<(), TcError> {
+    if stack1.is_failed() || stack2.is_failed() {
+        return Ok(());
+    }
     if stack1.len() != stack2.len() {
         return Err(TcError::StacksNotEqual);
     }
@@ -396,5 +420,37 @@ mod typecheck_tests {
             .unwrap_err(),
             TcError::StacksNotEqual
         );
+    }
+
+    #[test]
+    fn test_failwith() {
+        assert_eq!(
+            typecheck_instruction(Failwith, &mut Gas::default(), &mut stk![Type::Int]),
+            Ok(Failwith)
+        );
+    }
+
+    #[test]
+    fn test_failed_stacks() {
+        macro_rules! test_fail {
+            ($code:expr) => {
+                assert_eq!(
+                    typecheck(parse($code).unwrap(), &mut Gas::default(), &mut stk![]),
+                    Err(TcError::FailNotInTail)
+                );
+            };
+        }
+        test_fail!("{ PUSH int 1; FAILWITH; PUSH int 1 }");
+        test_fail!("{ PUSH int 1; DIP { PUSH int 1; FAILWITH } }");
+        test_fail!("{ PUSH bool True; IF { PUSH int 1; FAILWITH } { PUSH int 1; FAILWITH }; GT }");
+        macro_rules! test_ok {
+            ($code:expr) => {
+                assert!(typecheck(parse($code).unwrap(), &mut Gas::default(), &mut stk![]).is_ok());
+            };
+        }
+        test_ok!("{ PUSH bool True; IF { PUSH int 1; FAILWITH } { PUSH int 1 }; GT }");
+        test_ok!("{ PUSH bool True; IF { PUSH int 1 } { PUSH int 1; FAILWITH }; GT }");
+        test_ok!("{ PUSH bool True; IF { PUSH int 1; FAILWITH } { PUSH int 1; FAILWITH } }");
+        test_ok!("{ PUSH bool True; LOOP { PUSH int 1; FAILWITH }; PUSH int 1 }");
     }
 }
