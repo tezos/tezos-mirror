@@ -24,4 +24,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: arch != "arm32" & arch != "x86_32" & arch != "ppc32" & arch != "ppc64" & arch != "s390x"
 synopsis: "Implementation of the BLS12-381 curve (wrapper for the Blst library)"
