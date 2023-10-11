@@ -26,28 +26,12 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = [Protocol.name; "sc_rollup_node"; "inbox"]
-
-  let starting =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_inbox_starting"
-      ~msg:"Starting inbox tracker of the smart rollup node"
-      ~level:Notice
-      ()
-
-  let stopping =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_inbox_stopping"
-      ~msg:"Stopping inbox tracker of the smart rollup node"
-      ~level:Notice
-      ()
+  let section = [Protocol.name; "smart_rollup_node"; "inbox"]
 
   let get_messages =
     declare_3
       ~section
-      ~name:"sc_rollup_node_layer_1_get_messages"
+      ~name:"smart_rollup_node_layer_1_get_messages"
       ~msg:
         "Fetching {number_of_messages} messages from block {hash} at level \
          {level}"
@@ -56,10 +40,6 @@ module Simple = struct
       ("level", Data_encoding.int32)
       ("number_of_messages", Data_encoding.int32)
 end
-
-let starting = Simple.(emit starting)
-
-let stopping = Simple.(emit stopping)
 
 let get_messages hash level number_of_messages =
   Simple.(emit get_messages (hash, level, Int32.of_int number_of_messages))

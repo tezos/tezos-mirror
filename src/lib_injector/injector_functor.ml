@@ -358,7 +358,6 @@ module Make (Parameters : PARAMETERS) = struct
       emit_event_loaded "injected_operations"
       @@ Injected_operations.length injected_operations
     in
-
     let* included_operations =
       Included_operations.load_from_disk
         ~warn_unreadable
@@ -453,6 +452,11 @@ module Make (Parameters : PARAMETERS) = struct
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state oph ~injection_level operations =
     let open Lwt_result_syntax in
+    let*! () =
+      Event.(emit1 injected_ops)
+        state
+        (List.map (fun (_, o) -> o.Inj_operation.operation) operations)
+    in
     let infos =
       List.map
         (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))
@@ -1273,11 +1277,7 @@ module Make (Parameters : PARAMETERS) = struct
 
     let on_completion w r _ st =
       let state = Worker.state w in
-      match Request.view r with
-      | Request.View (Add_pending _ | New_tezos_head _) ->
-          Event.(emit2 request_completed_debug) state (Request.view r) st
-      | View Inject ->
-          Event.(emit2 request_completed_notice) state (Request.view r) st
+      Event.(emit2 request_completed_debug) state (Request.view r) st
 
     let on_no_request _ = Lwt.return_unit
 

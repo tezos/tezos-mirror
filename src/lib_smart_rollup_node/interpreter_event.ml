@@ -26,16 +26,16 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "interpreter"]
+  let section = ["smart_rollup_node"; "interpreter"]
 
   let transitioned_pvm =
     declare_4
       ~section
-      ~name:"sc_rollup_node_interpreter_transitioned_pvm"
+      ~name:"smart_rollup_node_interpreter_transitioned_pvm"
       ~msg:
         "Transitioned PVM at inbox level {inbox_level} to {state_hash} at tick \
          {ticks} with {num_messages} messages"
-      ~level:Notice
+      ~level:Info
       ("inbox_level", Data_encoding.int32)
       ("state_hash", State_hash.encoding)
       ("ticks", Data_encoding.z)
@@ -44,11 +44,11 @@ module Simple = struct
   let intended_failure =
     declare_4
       ~section
-      ~name:"sc_rollup_node_interpreter_intended_failure"
+      ~name:"smart_rollup_node_interpreter_intended_failure"
       ~msg:
         "Intended failure at level {level} for message indexed {message_index} \
          and at the tick {message_tick} of message processing (internal = \
-         {internal})."
+         {internal})"
       ~level:Notice
       ("level", Data_encoding.int31)
       ("message_index", Data_encoding.int31)

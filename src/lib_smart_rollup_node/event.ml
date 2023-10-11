@@ -60,41 +60,15 @@ module Simple = struct
       ~name:"smart_rollup_node_knows_its_rollup"
       ~msg:
         "The smart rollup node is interacting with rollup {addr} of kind {kind}"
-      ~level:Notice
+      ~level:Info
       ("addr", Octez_smart_rollup.Address.encoding)
       ("kind", Data_encoding.string)
-
-  let connection_lost =
-    declare_0
-      ~section
-      ~name:"smart_rollup_daemon_connection_lost"
-      ~msg:"connection to the node has been lost"
-      ~level:Warning
-      ()
-
-  let cannot_connect =
-    declare_2
-      ~section
-      ~name:"smart_rollup_daemon_cannot_connect"
-      ~msg:"cannot connect to Tezos node ({count}) {error}"
-      ~level:Warning
-      ("count", Data_encoding.int31)
-      ("error", trace_encoding)
-      ~pp2:pp_print_trace
-
-  let wait_reconnect =
-    declare_1
-      ~section
-      ~name:"smart_rollup_daemon_wait_reconnect"
-      ~msg:"Retrying to connect in {delay}s"
-      ~level:Warning
-      ("delay", Data_encoding.float)
 
   let starting_metrics_server =
     declare_2
       ~section
       ~name:"starting_metrics_server"
-      ~msg:"starting metrics server on {host}:{port}"
+      ~msg:"Starting metrics server on {host}:{port}"
       ~level:Notice
       ("host", Data_encoding.string)
       ("port", Data_encoding.uint16)
@@ -104,7 +78,7 @@ module Simple = struct
       ~section
       ~name:"metrics_ended"
       ~level:Error
-      ~msg:"metrics server ended with error {stacktrace}"
+      ~msg:"[Error]: Metrics server ended with error {stacktrace}"
       ("stacktrace", Data_encoding.string)
 
   let kernel_debug =
@@ -131,24 +105,24 @@ module Simple = struct
       ~name:"dal_enabled_no_node"
       ~level:Warning
       ~msg:
-        "Warning: DAL is enabled in the protocol but no DAL node was provided \
-         for the rollup node."
+        "[Warning]: DAL is enabled in the protocol but no DAL node was \
+         provided for the rollup node"
       ()
 
   let waiting_first_block =
     declare_1
       ~section
-      ~name:"waiting_first_block"
-      ~level:Notice
-      ~msg:"Waiting for first block of protocol {protocol} to appear."
+      ~name:"smart_rollup_node_waiting_first_block"
+      ~level:Info
+      ~msg:"Waiting for first block of protocol {protocol} to appear"
       ("protocol", Protocol_hash.encoding)
 
   let received_first_block =
     declare_2
       ~section
-      ~name:"received_first_block"
-      ~level:Notice
-      ~msg:"First block of protocol {protocol} received: {block}."
+      ~name:"smart_rollup_node_received_first_block"
+      ~level:Info
+      ~msg:"First block of protocol {protocol} received: {block}"
       ("block", Block_hash.encoding)
       ("protocol", Protocol_hash.encoding)
 
@@ -157,14 +131,14 @@ module Simple = struct
       ~section
       ~name:"detected_protocol_migration"
       ~level:Notice
-      ~msg:"Detected protocol migration, the rollup node will now stop."
+      ~msg:"Detected protocol migration, the rollup node will now stop"
       ()
 
   let acquiring_lock =
     declare_0
       ~section
       ~name:"acquiring_lock"
-      ~level:Notice
+      ~level:Info
       ~msg:"Acquiring lock on data directory."
       ()
 
@@ -192,7 +166,7 @@ module Simple = struct
       ~level:Info
       ~msg:
         "An attempt to launch context GC was made, but a previous GC run has \
-         not yet finished. No action was taken."
+         not yet finished. No action was taken"
       ()
 
   let ending_gc =
@@ -235,12 +209,6 @@ let node_is_ready ~rpc_addr ~rpc_port =
 let rollup_exists ~addr ~kind =
   let kind = Octez_smart_rollup.Kind.to_string kind in
   Simple.(emit rollup_exists (addr, kind))
-
-let connection_lost () = Simple.(emit connection_lost) ()
-
-let cannot_connect ~count error = Simple.(emit cannot_connect) (count, error)
-
-let wait_reconnect delay = Simple.(emit wait_reconnect) delay
 
 let starting_metrics_server ~host ~port =
   Simple.(emit starting_metrics_server) (host, port)
