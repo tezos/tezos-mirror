@@ -65,8 +65,6 @@ module Make_impl (PC : Kzg.Interfaces.Polynomial_commitment) = struct
   type verifier_public_parameters = PC.Public_parameters.verifier
   [@@deriving repr]
 
-  type transcript = Bytes.t [@@deriving repr]
-
   type proof = {
     cm_t : PC.Commitment.t;
     pc_proof : PC.proof;
@@ -216,9 +214,6 @@ module type S = sig
   type verifier_public_parameters = PC.Public_parameters.verifier
   [@@deriving repr]
 
-  (** The type for transcripts, used for applying the Fiat-Shamir heuristic *)
-  type transcript = PC.transcript [@@deriving repr]
-
   (** The type for proofs, containing a commitment to the polynomial T that
     asserts the satisfiability of the identities over the subset of interest,
     as well as a [PC] proof and a list of [PC] answers. *)
@@ -235,7 +230,7 @@ module type S = sig
   val setup :
     setup_params:PC.Public_parameters.setup_params ->
     srs:Srs.t * Srs.t ->
-    prover_public_parameters * verifier_public_parameters
+    prover_public_parameters * verifier_public_parameters * Transcript.t
 
   (** The prover function. Takes as input the [prover_public_parameters],
     an initial [transcript] (possibly including a context if this [prove] is
@@ -251,7 +246,7 @@ module type S = sig
     Outputs a proof and an updated transcript. *)
   val prove :
     prover_public_parameters ->
-    transcript ->
+    Transcript.t ->
     n:int ->
     generator:Scalar.t ->
     secrets:(Poly.t SMap.t * PC.Commitment.prover_aux) list ->
@@ -259,7 +254,7 @@ module type S = sig
     evaluations:Evaluations.t SMap.t ->
     identities:prover_identities ->
     nb_of_t_chunks:int ->
-    proof * transcript
+    proof * Transcript.t
 
   (** The verifier function. Takes as input the [verifier_public_parameters],
     an initial [transcript] (that should coincide with the initial transcript
@@ -270,14 +265,14 @@ module type S = sig
     Outputs a [bool] value representing acceptance or rejection. *)
   val verify :
     verifier_public_parameters ->
-    transcript ->
+    Transcript.t ->
     n:int ->
     generator:Scalar.t ->
     commitments:PC.Commitment.t list ->
     eval_points:eval_point list list ->
     identities:verifier_identities ->
     proof ->
-    bool * transcript
+    bool * Transcript.t
 end
 
 module Make : functor (PC : Kzg.Interfaces.Polynomial_commitment) ->

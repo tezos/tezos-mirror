@@ -34,21 +34,21 @@ module type Super_PC_sig = sig
 
   val prove_super_aggregation :
     Public_parameters.prover ->
-    transcript ->
+    Transcript.t ->
     Poly.t SMap.t list ->
     Commitment.prover_aux list ->
     query list ->
     Scalar.t SMap.t SMap.t list ->
-    (proof * prover_aux) * transcript
+    (proof * prover_aux) * Transcript.t
 
   val verify_super_aggregation :
     Public_parameters.verifier ->
-    transcript ->
+    Transcript.t ->
     Commitment.t list ->
     query list ->
     Scalar.t SMap.t list ->
     proof ->
-    bool * Scalar.t * transcript
+    bool * Scalar.t * Transcript.t
 end
 
 (** Extension of the KZG_pack implementation with additional
@@ -67,7 +67,7 @@ module Kzg_pack_impl = struct
 
   type main_prover_state =
     Public_parameters.prover
-    * transcript
+    * Transcript.t
     * Scalar.t
     * query list
     * Scalar.t SMap.t list

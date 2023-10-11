@@ -137,7 +137,7 @@ module type S = sig
       public parameters.
   *)
   val update_prover_public_parameters :
-    Bytes.t -> prover_public_parameters -> prover_public_parameters
+    'a Repr.ty -> 'a -> prover_public_parameters -> prover_public_parameters
 
   (** Enrich the [verifier_public_parameters] with extra application data to
       prevent replay attacks.
@@ -145,7 +145,7 @@ module type S = sig
       public parameters.
   *)
   val update_verifier_public_parameters :
-    Bytes.t -> verifier_public_parameters -> verifier_public_parameters
+    'a Repr.ty -> 'a -> verifier_public_parameters -> verifier_public_parameters
 
   (** [prove public_parameters ~inputs] produces a proof for the collection
       of statements implied by [inputs] and the circuits used for generating

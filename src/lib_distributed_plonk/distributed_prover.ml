@@ -293,7 +293,8 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     let pp = filter_prv_pp_circuits pp inputs in
     let pp =
       update_prover_public_parameters
-        (hash_verifier_inputs (to_verifier_inputs pp inputs))
+        verifier_inputs_t
+        (to_verifier_inputs pp inputs)
         pp
     in
     let* pp_proof, _transcript, (perm_and_plook, wires_cm, _, _, _) =

@@ -1,4 +1,5 @@
 open Bls
+open Utils
 
 module type Commitment = sig
   type t [@@deriving repr]
@@ -48,9 +49,7 @@ module type Public_parameters = sig
 
   type setup_params = int
 
-  val setup : setup_params -> Srs.t * Srs.t -> prover * verifier
-
-  val to_bytes : int -> prover -> Bytes.t
+  val setup : setup_params -> Srs.t * Srs.t -> prover * verifier * Transcript.t
 
   val get_commit_parameters : prover -> commitment
 end
@@ -67,8 +66,6 @@ module type Polynomial_commitment = sig
 
   type proof [@@deriving repr]
 
-  type transcript = Bytes.t
-
   module Commitment : Commitment
 
   module Public_parameters :
@@ -84,21 +81,21 @@ module type Polynomial_commitment = sig
 
   val prove :
     Public_parameters.prover ->
-    transcript ->
+    Transcript.t ->
     secret list ->
     Commitment.prover_aux list ->
     query list ->
     answer list ->
-    proof * transcript
+    proof * Transcript.t
 
   val verify :
     Public_parameters.verifier ->
-    transcript ->
+    Transcript.t ->
     Commitment.t list ->
     query list ->
     answer list ->
     proof ->
-    bool * transcript
+    bool * Transcript.t
 end
 
 module type DegreeCheck_proof = sig

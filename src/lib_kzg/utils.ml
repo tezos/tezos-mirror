@@ -23,21 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Hash : sig
-  type state
-
-  val init : unit -> state
-
-  val update : state -> bytes -> unit
-
-  val finish : state -> bytes
-
-  val hash_bytes : bytes list -> bytes
-
-  val bytes_to_seed : bytes -> int array * bytes
-end = struct
-  type state = Hacl_star.EverCrypt.Hash.t
-
+module Hash = struct
   let init () =
     Hacl_star.EverCrypt.Hash.init ~alg:Hacl_star.SharedDefs.HashDefs.BLAKE2b
 
@@ -79,6 +65,22 @@ end = struct
 end
 
 module Transcript = struct
+  type t = bytes [@@deriving repr]
+
+  let empty = Bytes.empty
+
+  let equal = Bytes.equal
+
+  let of_srs ~len1 ~len2 (srs1, srs2) =
+    let size1, size2 = Bls.(Srs_g1.size srs1, Srs_g2.size srs2) in
+    let open Hash in
+    let st = init () in
+    let srs1 = Bls.Srs_g1.to_array ~len:(min len1 size1) srs1 in
+    Array.iter (fun key -> update st (Bls.G1.to_bytes key)) srs1 ;
+    let srs2 = Bls.Srs_g2.to_array ~len:(min len2 size2) srs2 in
+    Array.iter (fun key -> update st (Bls.G2.to_bytes key)) srs2 ;
+    finish st
+
   (* expand a transcript with the elements of a list *)
   let list_expand repr list transcript =
     let open Hash in
@@ -92,53 +94,20 @@ module Transcript = struct
       list ;
     finish st
 
-  let expand : 'a Repr.t -> 'a -> bytes -> bytes =
-   fun repr x transcript -> list_expand repr [x] transcript
+  let expand repr x transcript = list_expand repr [x] transcript
 end
 
-module Array = struct
-  include Array
+module Fr_generation = struct
+  open Bls
 
-  (* Pad array to given size with the last element of the array *)
-  let pad array final_size =
-    let size = Array.length array in
-    Array.init final_size (fun i ->
-        if i < size then array.(i) else array.(size - 1))
-
-  (* Resize array: return the array, subarray or pad it with its last element *)
-  let resize array final_size =
-    let size = Array.length array in
-    if size = final_size then array
-    else if size > final_size then Array.sub array 0 final_size
-    else pad array final_size
-
-  let build init next len =
+  let build_array init next len =
     let xi = ref init in
     Array.init len (fun _ ->
         let i = !xi in
         xi := next !xi ;
         i)
-end
 
-module Fr_generation : sig
-  (* computes [| 1; x; x²; x³; ...; xᵈ⁻¹ |] *)
-  val powers : int -> Bls.Scalar.t -> Bls.Scalar.t array
-
-  (* [batch x l] adds the elements of l scaled by ascending powers of x *)
-  val batch : Bls.Scalar.t -> Bls.Scalar.t list -> Bls.Scalar.t
-
-  (* quadratic non-residues for Sid *)
-  val build_quadratic_non_residues : int -> Bls.Scalar.t array
-
-  (* generate several scalars based on seed transcript *)
-  val random_fr_list : Bytes.t -> int -> Bls.Scalar.t list * Bytes.t
-
-  (* generate a single scalars based on seed transcript *)
-  val random_fr : Bytes.t -> Bls.Scalar.t * Bytes.t
-end = struct
-  open Bls
-
-  let powers d x = Array.build Scalar.one Scalar.(mul x) d
+  let powers d x = build_array Scalar.one Scalar.(mul x) d
 
   let batch x l =
     List.fold_left
@@ -151,7 +120,7 @@ end = struct
     let rec next n =
       Scalar.(n + one) |> fun n -> if is_nonresidue n then n else next n
     in
-    Array.build Scalar.one next len
+    build_array Scalar.one next len
 
   (* a is the element to hash
    * to_bytes_func, add, one is the function of conversion to_bytes, the function of addition, the one compatible with a type
@@ -198,13 +167,7 @@ let is_power_of_two n =
   assert (n >= 0) ;
   n <> 0 && n land (n - 1) = 0
 
-module FFT : sig
-  val select_fft_domain : int -> int * int * int
-
-  val fft : Domain.t -> Bls.Poly.t -> Evaluations.t
-
-  val ifft_inplace : Domain.t -> Evaluations.t -> Bls.Poly.t
-end = struct
+module FFT = struct
   (* Return the powerset of {3,11,19}. *)
   let combinations_factors =
     let rec powerset = function
@@ -215,18 +178,7 @@ end = struct
     in
     powerset [3; 11; 19]
 
-  (* [select_fft_domain domain_size] selects a suitable domain for the FFT.
-
-     The domain size [domain_size] is expected to be strictly positive.
-     Return [(size, power_of_two, remainder)] such that:
-     * If [domain_size > 1], then [size] is the smallest integer greater or
-     equal to [domain_size] and is of the form 2^a * 3^b * 11^c * 19^d,
-     where a ∈ ⟦0, 32⟧, b ∈ {0, 1}, c ∈ {0, 1}, d ∈ {0, 1}.
-     * If [domain_size = 1], then [size = 2].
-     * [size = power_of_two * remainder], [power_of_two] is a power of two,
-     and [remainder] is not divisible by 2.
-
-     The function works as follows: each product of elements from
+  (* The function works as follows: each product of elements from
      an element of the powerset of {3,11,19} is multiplied by 2
      until the product is greater than [domain_size]. *)
   let select_fft_domain domain_size =
@@ -293,3 +245,16 @@ end = struct
       ~fft:Evaluations.interpolation_fft
       ~fft_pfa:Evaluations.interpolation_fft_prime_factor_algorithm
 end
+
+(* Pad array to given size with the last element of the array *)
+let pad_array array final_size =
+  let size = Array.length array in
+  Array.init final_size (fun i ->
+      if i < size then array.(i) else array.(size - 1))
+
+(* Resize array: return the array, subarray or pad it with its last element *)
+let resize_array array final_size =
+  let size = Array.length array in
+  if size = final_size then array
+  else if size > final_size then Array.sub array 0 final_size
+  else pad_array array final_size

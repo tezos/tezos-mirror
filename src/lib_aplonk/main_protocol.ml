@@ -181,19 +181,19 @@ struct
 
   (* We only need to modify the main circuit PP, since it rules them all
      (meta-circuits get their state updated after the main circuit proof) *)
-  let update_prover_public_parameters bytes (pp : prover_public_parameters) =
+  let update_prover_public_parameters repr x (pp : prover_public_parameters) =
     {
       pp with
-      main_pp = Main_Pack.update_prover_public_parameters bytes pp.main_pp;
+      main_pp = Main_Pack.update_prover_public_parameters repr x pp.main_pp;
     }
 
   (* We only need to modify the main circuit PP, since it rules them all
      (meta-circuits get their state updated after the main circuit proof) *)
-  let update_verifier_public_parameters bytes (pp : verifier_public_parameters)
+  let update_verifier_public_parameters repr x (pp : verifier_public_parameters)
       =
     {
       pp with
-      main_pp = Main_Pack.update_verifier_public_parameters bytes pp.main_pp;
+      main_pp = Main_Pack.update_verifier_public_parameters repr x pp.main_pp;
     }
 
   let filter_prv_pp_circuits (pp : prover_public_parameters) inputs =
@@ -338,7 +338,10 @@ struct
     assert (Plonk.Circuit.sat cs trace) ;
     let inputs = SMap.singleton ("meta_" ^ circuit_name) [secret] in
     let pp_aggreg_circuit =
-      Main_KZG.update_prover_public_parameters transcript prover_meta_pp.meta_pp
+      Main_KZG.update_prover_public_parameters
+        Kzg.Utils.Transcript.t
+        transcript
+        prover_meta_pp.meta_pp
     in
     try Main_KZG.prove pp_aggreg_circuit ~inputs
     with Main_KZG.Rest_not_null _ ->
@@ -350,9 +353,7 @@ struct
   let meta_proof (pp : prover_public_parameters) inputs
       (main_proof, (prover_aux : Main_Pack.prover_aux)) =
     let open Main_Pack in
-    let transcript =
-      Data_encoding.Binary.to_bytes_exn proof_encoding main_proof
-    in
+    let transcript = Kzg.Utils.Transcript.(expand proof_t main_proof empty) in
     let inner_pi_map = to_verifier_inputs pp.main_pp inputs in
     let batches =
       Aggreg_circuit.get_batches inputs prover_aux.answers prover_aux.r
@@ -423,7 +424,10 @@ struct
         pi
     in
     let pp_aggreg_circuit =
-      Main_KZG.update_verifier_public_parameters transcript pp.meta_pp
+      Main_KZG.update_verifier_public_parameters
+        Kzg.Utils.Transcript.t
+        transcript
+        pp.meta_pp
     in
     let inputs =
       SMap.singleton
@@ -445,9 +449,7 @@ struct
           proof.ids_batch )
     in
     let transcript =
-      Data_encoding.Binary.to_bytes_exn
-        Main_Pack.proof_encoding
-        proof.main_proof
+      Kzg.Utils.Transcript.(expand Main_Pack.proof_t proof.main_proof empty)
     in
     let batch_ok =
       Aggreg_circuit.verify_batch
