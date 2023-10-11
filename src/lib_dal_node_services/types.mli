@@ -87,6 +87,18 @@ module Message_id : sig
   val get_topic : t -> Topic.t
 end
 
+(** A message is a portion of an encoded slot's data. It's basically a shard
+    without the corresponding index. The proof that the corresponding shard
+    belong to the commitment (part of the message id) is also part of the
+    message. *)
+module Message : sig
+  type t = {share : Cryptobox.share; shard_proof : Cryptobox.shard_proof}
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+end
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
    Use a bitset instead, when available in the standard library. *)
 

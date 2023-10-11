@@ -44,7 +44,7 @@ module P2p_message_V1 = struct
     | Subscribe of {topic : Types.Topic.t}
     | Unsubscribe of {topic : Types.Topic.t}
     | Message_with_header of {
-        message : Gs_interface.message;
+        message : Types.Message.t;
         topic : Types.Topic.t;
         message_id : Types.Message_id.t;
       }
@@ -129,7 +129,7 @@ module P2p_message_V1 = struct
         ~title:"Message_with_header"
         (obj4
            (req "kind" (constant "message_with_header"))
-           (req "message" Gs_interface.message_encoding)
+           (req "message" Types.Message.encoding)
            (req "topic" Types.Topic.encoding)
            (req "message_id" Types.Message_id.encoding))
         (function

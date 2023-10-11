@@ -59,7 +59,7 @@ type p2p_message =
   | Subscribe of {topic : Types.Topic.t}
   | Unsubscribe of {topic : Types.Topic.t}
   | Message_with_header of {
-      message : Gs_interface.message;
+      message : Types.Message.t;
       topic : Types.Topic.t;
       message_id : Types.Message_id.t;
     }

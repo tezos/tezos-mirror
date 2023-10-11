@@ -31,14 +31,7 @@
 (** Below, we expose the main types needed for the integration with the existing
     DAL node alongside their encodings. *)
 
-type message = Gs_interface.message = {
-  share : Cryptobox.share;
-  shard_proof : Cryptobox.shard_proof;
-}
-
 type peer = Gs_interface.peer
-
-val message_encoding : message Data_encoding.t
 
 (** The worker module exposes instantiation of the Gossipsub worker functor,
     alongside the config used to instantiate the functor and the default values
@@ -48,7 +41,7 @@ module Worker : sig
     module type of Gs_interface.Worker_config
       with type GS.Topic.t = Types.Topic.t
        and type GS.Message_id.t = Types.Message_id.t
-       and type GS.Message.t = message
+       and type GS.Message.t = Types.Message.t
        and type GS.Peer.t = peer
        and module GS.Span = Gs_interface.Span
        and module Monad = Gs_interface.Monad
@@ -59,7 +52,7 @@ module Worker : sig
     Gossipsub_intf.WORKER
       with type GS.Topic.t = Types.Topic.t
        and type GS.Message_id.t = Types.Message_id.t
-       and type GS.Message.t = message
+       and type GS.Message.t = Types.Message.t
        and type GS.Peer.t = peer
        and module GS.Span = Config.GS.Span
 
@@ -71,7 +64,8 @@ module Worker : sig
     at startup and every time the DAL parameters change. *)
   module Validate_message_hook : sig
     val set :
-      (message -> Types.Message_id.t -> [`Invalid | `Unknown | `Valid]) -> unit
+      (Types.Message.t -> Types.Message_id.t -> [`Invalid | `Unknown | `Valid]) ->
+      unit
   end
 end
 
@@ -110,6 +104,6 @@ module Transport_layer_hooks : sig
     Worker.t ->
     Transport_layer.t ->
     app_messages_callback:
-      (Gs_interface.message -> Types.Message_id.t -> unit tzresult Lwt.t) ->
+      (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
     unit Lwt.t
 end

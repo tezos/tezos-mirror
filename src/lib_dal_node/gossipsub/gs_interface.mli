@@ -27,12 +27,6 @@
 (** This module defines the relevant data structures to instantiate the
     gossipsub worker. *)
 
-(** A message is a portion of an encoded slot's data. It's basically a shard
-    without the corresponding index. The proof that the corresponding shard
-    belong to the commitment (part of the message id) is also part of the
-    message. *)
-type message = {share : Cryptobox.share; shard_proof : Cryptobox.shard_proof}
-
 (** From the Gossipsub point of view, a peer is given by a cryptographic node
     identity {!P2p_peer.Id.t}. It's up to the caller to associate the
     {!P2p_peer.Id.t} to a {!P2p_point.Id.t} if needed (to e.g. implement peers
@@ -43,8 +37,6 @@ type peer = P2p_peer.Id.t
 module Span : Gossipsub_intf.SPAN
 
 (** Encodings for various types above. *)
-
-val message_encoding : message Data_encoding.t
 
 val span_encoding : Span.t Data_encoding.t
 
@@ -62,7 +54,7 @@ module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
     with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = Types.Message_id.t
-     and type GS.Message.t = message
+     and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = peer
      and module GS.Span = Span
      and module Monad = Monad
@@ -71,12 +63,13 @@ module Worker_instance :
   Gossipsub_intf.WORKER
     with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = Types.Message_id.t
-     and type GS.Message.t = message
+     and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = peer
      and module GS.Span = Span
      and module Monad = Monad
 
 module Validate_message_hook : sig
   val set :
-    (message -> Types.Message_id.t -> [`Invalid | `Unknown | `Valid]) -> unit
+    (Types.Message.t -> Types.Message_id.t -> [`Invalid | `Unknown | `Valid]) ->
+    unit
 end

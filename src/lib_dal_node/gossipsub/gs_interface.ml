@@ -27,18 +27,7 @@
 open Gossipsub_intf
 module Types = Tezos_dal_node_services.Types
 
-type message = {share : Cryptobox.share; shard_proof : Cryptobox.shard_proof}
-
 type peer = P2p_peer.Id.t
-
-let message_encoding : message Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {share; shard_proof} -> (share, shard_proof))
-    (fun (share, shard_proof) -> {share; shard_proof})
-    (obj2
-       (req "share" Cryptobox.share_encoding)
-       (req "shard_proof" Cryptobox.shard_proof_encoding))
 
 module Validate_message_hook = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
@@ -52,20 +41,7 @@ module Validate_message_hook = struct
   let set func = check := func
 end
 
-module Message = struct
-  type t = message
-
-  let pp fmt {share; shard_proof} =
-    Format.fprintf
-      fmt
-      "{ share=%s; shard_proof=%s }"
-      (Data_encoding.Binary.to_string_exn Cryptobox.share_encoding share)
-      (Data_encoding.Binary.to_string_exn
-         Cryptobox.shard_proof_encoding
-         shard_proof)
-
-  let valid msg msg_id = !Validate_message_hook.check msg msg_id
-end
+let message_valid msg msg_id = !Validate_message_hook.check msg msg_id
 
 module Peer = struct
   type t = peer
@@ -133,7 +109,7 @@ module Automaton_config :
      and type Subconfig.Peer.t = peer
      and type Subconfig.Topic.t = Types.Topic.t
      and type Subconfig.Message_id.t = Types.Message_id.t
-     and type Subconfig.Message.t = message = struct
+     and type Subconfig.Message.t = Types.Message.t = struct
   module Span = Span
   module Time = Time
 
@@ -141,7 +117,12 @@ module Automaton_config :
     module Peer = Peer
     module Topic = Types.Topic
     module Message_id = Types.Message_id
-    module Message = Message
+
+    module Message = struct
+      include Types.Message
+
+      let valid = message_valid
+    end
   end
 end
 
@@ -160,7 +141,7 @@ module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
     with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = Types.Message_id.t
-     and type GS.Message.t = message
+     and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = peer
      and module GS.Span = Span
      and module Monad = Monad = struct

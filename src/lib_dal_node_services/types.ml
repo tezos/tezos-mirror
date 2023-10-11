@@ -151,6 +151,28 @@ module Message_id = struct
   let get_topic {slot_index; pkh; _} = Topic.{slot_index; pkh}
 end
 
+module Message = struct
+  type t = {share : Cryptobox.share; shard_proof : Cryptobox.shard_proof}
+
+  let pp fmt {share; shard_proof} =
+    Format.fprintf
+      fmt
+      "{ share=%s; shard_proof=%s }"
+      (Data_encoding.Binary.to_string_exn Cryptobox.share_encoding share)
+      (Data_encoding.Binary.to_string_exn
+         Cryptobox.shard_proof_encoding
+         shard_proof)
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {share; shard_proof} -> (share, shard_proof))
+      (fun (share, shard_proof) -> {share; shard_proof})
+      (obj2
+         (req "share" Cryptobox.share_encoding)
+         (req "shard_proof" Cryptobox.shard_proof_encoding))
+end
+
 (* Declaration of types used as inputs and/or outputs. *)
 type slot_id = {slot_level : level; slot_index : slot_index}
 
