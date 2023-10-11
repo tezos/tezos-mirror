@@ -8499,18 +8499,18 @@ Tables            : 0 [0.00]
 Circuit Size      : 8 [3.00]
 
 Range-checks:
-Constraints       : 264 [8.04]
-Range-Checks-Total: 2455 [11.26]
-Range-Checks-Max  : 1231 [10.27]
+Constraints       : 12 [3.58]
+Range-Checks-Total: 31 [4.95]
+Range-Checks-Max  : 17 [4.09]
 Tables            : 0 [0.00]
-Circuit Size      : 1231 [10.27]
+Circuit Size      : 17 [4.09]
 
 Range-checks_optimized:
-Constraints       : 262 [8.03]
-Range-Checks-Total: 2455 [11.26]
-Range-Checks-Max  : 1629 [10.67]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 31 [4.95]
+Range-Checks-Max  : 18 [4.17]
 Tables            : 0 [0.00]
-Circuit Size      : 1629 [10.67]
+Circuit Size      : 18 [4.17]
 
 Optimizer.test_long_sum:
 Constraints       : 100 [6.64]
