@@ -168,6 +168,20 @@ fn typecheck_instruction(
             stack.push(T::Unit);
             I::Unit
         }
+        I::Car => {
+            match stack.pop() {
+                Some(T::Pair(l, _)) => stack.push(*l),
+                _ => return Err(TcError::GenericTcError),
+            }
+            I::Car
+        }
+        I::Cdr => {
+            match stack.pop() {
+                Some(T::Pair(_, r)) => stack.push(*r),
+                _ => return Err(TcError::GenericTcError),
+            }
+            I::Cdr
+        }
     })
 }
 
@@ -542,5 +556,51 @@ mod typecheck_tests {
                 Type::new_pair(Type::Nat, Type::Bool)
             )]
         );
+    }
+
+    #[test]
+    fn car() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (pair int nat bool) (Pair -5 3 False); CAR }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![
+                Push(
+                    Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
+                    Value::new_pair(
+                        Value::NumberValue(-5),
+                        Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                    )
+                ),
+                Car
+            ])
+        );
+        assert_eq!(stack, stk![Type::Int]);
+    }
+
+    #[test]
+    fn cdr() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (pair int nat bool) (Pair -5 3 False); CDR }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![
+                Push(
+                    Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
+                    Value::new_pair(
+                        Value::NumberValue(-5),
+                        Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                    )
+                ),
+                Cdr
+            ])
+        );
+        assert_eq!(stack, stk![Type::new_pair(Type::Nat, Type::Bool)]);
     }
 }

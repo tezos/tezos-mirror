@@ -101,6 +101,8 @@ instruction: ParsedInstruction = {
   "DUP" <n:u10?> => Dup(n),
   "FAILWITH" => Failwith,
   "UNIT" => Unit,
+  "CAR" => Car,
+  "CDR" => Cdr,
 }
 
 instructionSeq: Vec<ParsedInstruction> = {
