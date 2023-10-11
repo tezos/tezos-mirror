@@ -80,6 +80,9 @@ let apply_slashes ~preserved_plus_slashing slashing_history ~from_cycle amount =
   let amount =
     List.fold_left
       (fun amount (slashing_cycle, slashing_percentage) ->
+        let slashing_percentage =
+          (slashing_percentage : Int_percentage.t :> int)
+        in
         if
           Cycle_repr.(
             slashing_cycle >= first_cycle_to_apply_slash

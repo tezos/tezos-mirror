@@ -20,6 +20,10 @@ let encoding =
 let of_ratio_bounded Ratio_repr.{numerator; denominator} =
   of_int_bounded (100 * numerator / denominator)
 
+let add_bounded p1 p2 = Compare.Int.min 100 (p1 + p2)
+
+let p0 = 0
+
 let p7 = 7
 
 let p50 = 50

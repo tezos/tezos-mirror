@@ -142,7 +142,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   let slash_history =
     Storage.Slashed_deposits_history.add
       level.cycle
-      (slashing_percentage :> int)
+      slashing_percentage
       slash_history
   in
   let*! ctxt =
@@ -157,9 +157,12 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
       match Cycle_repr.pred current_cycle with
       | Some previous_cycle ->
           Storage.Slashed_deposits_history.get previous_cycle slash_history
-      | None -> 0
+      | None -> Int_percentage.p0
     in
-    Compare.Int.(slashed_this_cycle + slashed_previous_cycle >= 100)
+    let slashed_both_cycles =
+      Int_percentage.add_bounded slashed_this_cycle slashed_previous_cycle
+    in
+    Compare.Int.((slashed_both_cycles :> int) >= 100)
   in
   let*! ctxt =
     if should_forbid || should_forbid_from_history then
