@@ -182,45 +182,35 @@ let rec seq_field_of_data_encoding :
       (enums, types, [attr])
   | _ -> failwith "Not implemented"
 
-let rec from_data_encoding :
+let from_data_encoding :
     type a.
     encoding_name:string ->
     ?description:string ->
     a DataEncoding.t ->
     ClassSpec.t =
- fun ~encoding_name ?description {encoding; _} ->
+ fun ~encoding_name ?description encoding ->
   let encoding_name = escape_id encoding_name in
-  match encoding with
-  | Bool -> Ground.Class.bool ~encoding_name ?description ()
-  | Uint8 -> Ground.Class.uint8 ~encoding_name ?description ()
-  | Int8 -> Ground.Class.int8 ~encoding_name ?description ()
-  | Uint16 -> Ground.Class.uint16 ~encoding_name ?description ()
-  | Int16 -> Ground.Class.int16 ~encoding_name ?description ()
-  | Int32 -> Ground.Class.int32 ~encoding_name ?description ()
-  | Int64 -> Ground.Class.int64 ~encoding_name ?description ()
-  | Int31 -> Ground.Class.int31 ~encoding_name ?description ()
-  | Float -> Ground.Class.float ~encoding_name ?description ()
-  | Bytes (_kind_length, _) -> Ground.Class.bytes ~encoding_name ?description ()
-  | String (_kind_length, _) ->
-      Ground.Class.string ~encoding_name ?description ()
-  | N -> Ground.Class.n ~encoding_name ?description ()
-  | Z -> Ground.Class.z ~encoding_name ?description ()
-  | Tup e ->
-      (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
-      from_data_encoding ~encoding_name e
-  | Tups {kind = _; left; right} ->
-      let tid_gen = Some (Helpers.mk_tid_gen encoding_name) in
-      let enums, types, left =
-        seq_field_of_data_encoding [] [] left encoding_name tid_gen
+  match encoding.encoding with
+  | Describe {encoding; description; id; _} ->
+      (* TODO: accumulate descriptions rather than replace it *)
+      let enums, types, attrs =
+        seq_field_of_data_encoding [] [] encoding id None
       in
-      let enums, types, right =
-        seq_field_of_data_encoding enums types right encoding_name tid_gen
+      Helpers.class_spec_of_attrs
+        ~encoding_name
+        ?description
+        ~enums
+        ~types
+        ~instances:[]
+        attrs
+  | _ ->
+      let enums, types, attrs =
+        seq_field_of_data_encoding [] [] encoding encoding_name None
       in
-      let seq = left @ right in
-      {(Helpers.default_class_spec ~encoding_name ()) with seq; enums; types}
-  | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
-  | Describe {encoding; description; _} ->
-      from_data_encoding ~encoding_name ?description encoding
-  | Dynamic_size {kind = _; encoding} ->
-      from_data_encoding ~encoding_name encoding
-  | _ -> failwith "Not implemented"
+      Helpers.class_spec_of_attrs
+        ~encoding_name
+        ?description
+        ~enums
+        ~types
+        ~instances:[]
+        attrs

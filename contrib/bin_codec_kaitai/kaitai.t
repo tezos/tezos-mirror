@@ -90,30 +90,38 @@ ground.bytes test
     id: ground__bytes
     endian: be
   types:
-    fixed_bytes:
+    ground__bytes:
+      meta:
+        id: ground__bytes
+        endian: be
       seq:
-      - id: size
-        type: u4
-      - id: value
-        size: size
+      - id: ground__bytes
+        type: variable size bytes
   seq:
+  - id: len_ground__bytes
+    type: s4
   - id: ground__bytes
-    type: fixed_bytes
+    type: ground__bytes
+    size: len_ground__bytes
 ground.string test
   $ ./codec.exe dump kaitai for ground.string
   meta:
     id: ground__string
     endian: be
   types:
-    fixed_bytes:
+    ground__string:
+      meta:
+        id: ground__string
+        endian: be
       seq:
-      - id: size
-        type: u4
-      - id: value
-        size: size
+      - id: ground__string
+        type: variable size bytes
   seq:
+  - id: len_ground__string
+    type: s4
   - id: ground__string
-    type: fixed_bytes
+    type: ground__string
+    size: len_ground__string
 ground.N test
   $ ./codec.exe dump kaitai for ground.N
   meta:
@@ -141,7 +149,7 @@ ground.N test
         repeat: until
         repeat-until: not (_.has_next)
   seq:
-  - id: n
+  - id: ground__n
     type: n
 ground.Z test
   $ ./codec.exe dump kaitai for ground.Z
@@ -150,6 +158,28 @@ ground.Z test
     endian: be
   doc: Arbitrary precision integers
   types:
+    z:
+      meta:
+        id: z
+        endian: be
+      types:
+        n_group:
+          instances:
+            has_next:
+              value: ((b & 128) != 0)
+            value:
+              value: (b & 127)
+          seq:
+          - id: b
+            type: u1
+      instances:
+        is_negative:
+          value: (((groups[0].value) >> 6) == 1)
+      seq:
+      - id: n
+        type: n_group
+        repeat: until
+        repeat-until: not (_.has_next)
     n:
       meta:
         id: n
@@ -170,5 +200,5 @@ ground.Z test
         repeat: until
         repeat-until: not (_.has_next)
   seq:
-  - id: z
-    type: n
+  - id: ground__z
+    type: z

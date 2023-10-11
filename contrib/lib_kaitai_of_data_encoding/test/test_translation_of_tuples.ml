@@ -125,3 +125,53 @@ let%expect_test "test tuples with tup1 translation" =
       type: u1
     - id: tup1tup_field8
       type: u1 |}]
+
+let%expect_test "test tuples with n inside translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"tup1tup"
+      Data_encoding.(tup3 (tup1 bool) (tup2 n bool) (tup2 (tup1 n) n))
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: tup1tup
+      endian: be
+    types:
+      n:
+        meta:
+          id: n
+          endian: be
+        types:
+          n_group:
+            instances:
+              has_next:
+                value: ((b & 128) != 0)
+              value:
+                value: (b & 127)
+            seq:
+            - id: b
+              type: u1
+        seq:
+        - id: n
+          type: n_group
+          repeat: until
+          repeat-until: not (_.has_next)
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: tup1tup_field1
+      type: u1
+      enum: bool
+    - id: tup1tup_field3
+      type: n
+    - id: tup1tup_field4
+      type: u1
+      enum: bool
+    - id: tup1tup_field7
+      type: n
+    - id: tup1tup_field8
+      type: n |}]
