@@ -55,7 +55,7 @@ When the place of the future evolution is known in advance (e.g. a given functio
 
 .. code-block:: ocaml
 
-    (* TODO: <reference to issue>
+    (* TODO: <reference to issue or merge request>
        <one-line explanation>
        <Add long explanation if the issue description is not the right place.>
     *)
@@ -65,12 +65,13 @@ If the evolution is needed to fix some code that does *not* fully implement its 
 Thus, the difference between ``TODO`` and ``FIXME`` tags is a semantic one,  reflecting the full/partial implementation of the specification.
 Consequently, when the specification evolves to become more demanding, some ``TODO`` tags corresponding to *potential* evolutions may have to be recasted as ``FIXME`` tags, corresponding to *required* evolutions.
 
-Note that the reference to an existing issue on the first line is mandatory, to facilitate searches of evolutions corresponding to given issues, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
+Note that the reference to an existing issue or merge request on the first line is mandatory, to facilitate searches of evolutions corresponding to given issues, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
 The reference to an issue may be one of:
 
 - a URL such as ``https://gitlab.com/tezos/tezos/-/issues/1377``
-- a GitLab notation such as ``#123`` (implicitly under ``tezos/tezos``), ``michelson-reference#123`` (implicitly under ``tezos/michelson-reference``),
+- a GitLab notation for an issue such as ``#123`` (implicitly under ``tezos/tezos``), ``michelson-reference#123`` (implicitly under ``tezos/michelson-reference``),
   or ``oxheadalpha/merbocop#123`` (fully qualified).
+- a GitLab notation for a merge request such as ``!10990``.
 
 License
 -------
