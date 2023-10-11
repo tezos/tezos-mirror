@@ -2001,11 +2001,6 @@ let commands_rw () =
            source
            cctxt ->
         let contract = Contract.Implicit source in
-        let arg =
-          (* Is there a better printer? *)
-          Some (Int64.to_string (Tez.to_mutez amount))
-        in
-        let amount = Tez.zero in
         let entrypoint = Some Entrypoint.unstake in
         (* TODO #6162
            (unless --force)
@@ -2027,7 +2022,7 @@ let commands_rw () =
             gas_limit,
             storage_limit,
             counter,
-            arg,
+            None,
             no_print_source,
             fee_parameter,
             entrypoint,

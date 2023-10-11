@@ -411,12 +411,8 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       in
       return (ctxt, result, [])
 
-let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
-    ~before_operation =
+let apply_unstake ~ctxt ~sender ~amount ~destination ~before_operation =
   let open Lwt_result_syntax in
-  let*? () =
-    error_when Tez.(amount <> zero) (Invalid_nonzero_transaction_amount amount)
-  in
   let*? () =
     error_unless
       Signature.Public_key_hash.(sender = destination)
@@ -429,7 +425,7 @@ let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
   | None -> tzfail Stake_modification_with_no_delegate_set
   | Some delegate ->
       let* ctxt, balance_updates =
-        Staking.request_unstake ctxt ~sender_contract ~delegate requested_amount
+        Staking.request_unstake ctxt ~sender_contract ~delegate amount
       in
       let result =
         Transaction_to_contract_result
@@ -1058,19 +1054,15 @@ let apply_manager_operation :
                 ~destination:pkh
                 ~before_operation:ctxt_before_op
           | "unstake" ->
-              let* requested_amount, ctxt =
-                Script_ir_translator.parse_data
-                  ~elab_conf
-                  ctxt
-                  ~allow_forged:false
-                  Script_typed_ir.mutez_t
-                  (Micheline.root parameters)
+              let* () =
+                fail_unless
+                  (Script.is_unit parameters)
+                  (Script_interpreter.Bad_contract_parameter source_contract)
               in
               apply_unstake
                 ~ctxt
                 ~sender:source
                 ~amount
-                ~requested_amount
                 ~destination:pkh
                 ~before_operation:ctxt_before_op
           | "finalize_unstake" ->

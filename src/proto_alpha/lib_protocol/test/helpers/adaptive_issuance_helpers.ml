@@ -739,18 +739,13 @@ let set_delegate_parameters ctxt delegate
     Tez.zero
 
 let unstake ctxt contract amount =
-  let parameters =
-    Protocol.Alpha_context.Script.lazy_expr
-      (Expr.from_string (Printf.sprintf "%Ld" (Tez.to_mutez amount)))
-  in
   Op.transaction
     ctxt
     ~entrypoint:Protocol.Alpha_context.Entrypoint.unstake
-    ~parameters
     ~fee:Tez.zero
     contract
     contract
-    Tez.zero
+    amount
 
 let finalize_unstake ctxt ?(amount = Tez.zero) contract =
   Op.transaction
