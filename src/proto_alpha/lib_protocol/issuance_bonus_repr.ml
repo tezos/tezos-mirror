@@ -64,9 +64,3 @@ let max_bonus_parameter_of_Q_exn q =
   | Some max_bonus -> max_bonus
   | None ->
       failwith "Invalid parameter: max_bonus parameter must be between 0 and 1"
-
-let migrate_max_bonus_from_O_to_P i =
-  let open Result_syntax in
-  match of_int64_repr i with
-  | Some max_bonus -> return max_bonus
-  | None -> tzfail Out_of_bounds_bonus
