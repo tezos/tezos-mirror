@@ -184,6 +184,11 @@ fn typecheck_value(gas: &mut Gas, t: &Type, v: &Value) -> Result<(), TcError> {
         (Mutez, NumberValue(n)) if *n >= 0 && *n <= MAX_TEZ => Ok(()),
         (String, StringValue(_)) => Ok(()),
         (Unit, UnitValue) => Ok(()),
+        (Pair(tl, tr), PairValue(vl, vr)) => {
+            typecheck_value(gas, tl, vl)?;
+            typecheck_value(gas, tr, vr)?;
+            Ok(())
+        }
         _ => Err(TcError::GenericTcError),
     }
 }
@@ -511,5 +516,31 @@ mod typecheck_tests {
             Ok(vec![Unit])
         );
         assert_eq!(stack, stk![Type::Unit]);
+    }
+
+    #[test]
+    fn push_pair_value() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (pair int nat bool) (Pair -5 3 False) }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(
+                Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
+                Value::new_pair(
+                    Value::NumberValue(-5),
+                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                )
+            )])
+        );
+        assert_eq!(
+            stack,
+            stk![Type::new_pair(
+                Type::Int,
+                Type::new_pair(Type::Nat, Type::Bool)
+            )]
+        );
     }
 }

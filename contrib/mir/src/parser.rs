@@ -89,4 +89,76 @@ mod tests {
         assert_parse!(r#"""#, Err("Invalid token at 0".to_owned()));
         assert_parse!(r#""\""#, Err("Invalid token at 0".to_owned()));
     }
+
+    #[test]
+    fn pair_type() {
+        assert_eq!(
+            parse("{ PUSH (pair int nat) Unit }").unwrap(),
+            vec![Instruction::Push(
+                Type::new_pair(Type::Int, Type::Nat),
+                Value::UnitValue
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH (pair int nat unit) Unit }").unwrap(),
+            vec![Instruction::Push(
+                Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Unit)),
+                Value::UnitValue
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH (pair (pair int nat) unit) Unit }").unwrap(),
+            vec![Instruction::Push(
+                Type::new_pair(Type::new_pair(Type::Int, Type::Nat), Type::Unit),
+                Value::UnitValue
+            )]
+        );
+    }
+
+    #[test]
+    fn pair_value() {
+        assert_eq!(
+            parse("{ PUSH unit (Pair 3 4) }").unwrap(),
+            vec![Instruction::Push(
+                Type::Unit,
+                Value::new_pair(Value::NumberValue(3), Value::NumberValue(4)),
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH unit (Pair 3 4 5) }").unwrap(),
+            vec![Instruction::Push(
+                Type::Unit,
+                Value::new_pair(
+                    Value::NumberValue(3),
+                    Value::new_pair(Value::NumberValue(4), Value::NumberValue(5)),
+                ),
+            )]
+        );
+        assert_eq!(
+            parse("{ PUSH unit (Pair (Pair 3 4) 5) }").unwrap(),
+            vec![Instruction::Push(
+                Type::Unit,
+                Value::new_pair(
+                    Value::new_pair(Value::NumberValue(3), Value::NumberValue(4)),
+                    Value::NumberValue(5),
+                ),
+            )]
+        );
+        assert!(parse("{ PUSH pair unit unit Pair Unit Unit }")
+            .unwrap_err()
+            .to_string()
+            .starts_with("Unrecognized token `pair` found at 7:11"));
+        assert!(parse("{ PUSH (pair unit unit) Pair Unit Unit }")
+            .unwrap_err()
+            .to_string()
+            .starts_with("Unrecognized token `Pair` found at 24:28\n"));
+    }
+
+    #[test]
+    fn value_parens() {
+        assert_eq!(
+            parse("{ PUSH unit (Unit) }").unwrap(),
+            vec![Instruction::Push(Type::Unit, Value::UnitValue)]
+        );
+    }
 }

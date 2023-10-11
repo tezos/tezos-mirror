@@ -19,6 +19,7 @@ pub enum Type {
     Mutez,
     String,
     Unit,
+    Pair(Box<Type>, Box<Type>),
 }
 
 impl Type {
@@ -32,7 +33,12 @@ impl Type {
             Type::Mutez => 1,
             Type::String => 1,
             Type::Unit => 1,
+            Type::Pair(l, r) => 1 + l.size_for_gas() + r.size_for_gas(),
         }
+    }
+
+    pub fn new_pair(l: Self, r: Self) -> Self {
+        Self::Pair(Box::new(l), Box::new(r))
     }
 }
 
@@ -42,6 +48,13 @@ pub enum Value {
     BooleanValue(bool),
     StringValue(String),
     UnitValue,
+    PairValue(Box<Value>, Box<Value>),
+}
+
+impl Value {
+    pub fn new_pair(l: Self, r: Self) -> Self {
+        Self::PairValue(Box::new(l), Box::new(r))
+    }
 }
 
 pub type ParsedInstructionBlock = Vec<ParsedInstruction>;

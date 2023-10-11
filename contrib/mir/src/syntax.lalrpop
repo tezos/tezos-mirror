@@ -35,7 +35,7 @@ u10: u16 = <s:r"([+-]?)[0-9]+"> =>? {
 
 pub string: String = <r#""(?:\\.|[^\\"])*""#> =>? validate_unescape_string(<>);
 
-type_: Type = {
+atomic_type: Type = {
   "int"  => Type::Int,
   "nat"  => Type::Nat,
   "bool" => Type::Bool,
@@ -44,22 +44,52 @@ type_: Type = {
   "unit" => Type::Unit,
 }
 
+pair_args: Type = {
+    type_expr => <>,
+    type_expr pair_args => Type::new_pair(<>)
+}
+
+composite_type: Type = {
+    r"pair" <type_expr> <pair_args> => Type::new_pair(<>),
+}
+
+type_expr: Type = {
+    atomic_type => <>,
+    "(" <composite_type> ")" => <>,
+    "(" <type_expr> ")" => <>,
+}
+
 boolean: bool = {
   "True" => true,
   "False" => false,
 }
 
 use Value::*;
-value: Value = {
+atomic_value: Value = {
   <n:number> => NumberValue(n),
   <b:boolean> => BooleanValue(b),
   <string> => StringValue(<>),
   "Unit" => UnitValue,
 }
 
+pair_val_args: Value = {
+  value_expr => <>,
+  value_expr pair_val_args => Value::new_pair(<>)
+}
+
+composite_value: Value = {
+  "Pair" <value_expr> <pair_val_args> => Value::new_pair(<>),
+}
+
+value_expr: Value = {
+  atomic_value => <>,
+  "(" <composite_value> ")" => <>,
+  "(" <value_expr> ")" => <>,
+}
+
 use Instruction::*;
 instruction: ParsedInstruction = {
-  "PUSH" <t:type_> <v:value> => Push(t, v),
+  "PUSH" <type_expr> <value_expr> => Push(<>),
   "INT" => Int,
   "GT" => Gt,
   "LOOP" <ib: instructionBlock> => Loop(ib),
