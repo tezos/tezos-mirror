@@ -400,4 +400,18 @@ mod interpreter_tests {
             Err(InterpretError::FailedWith(NumberValue(20)))
         );
     }
+
+    #[test]
+    fn push_string_value() {
+        let mut stack = stk![];
+        assert_eq!(
+            interpret(
+                &vec![Push(Type::String, Value::StringValue("foo".to_owned()))],
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![Value::StringValue("foo".to_owned())]);
+    }
 }

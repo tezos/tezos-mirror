@@ -10,6 +10,7 @@ use std::str::FromStr;
 use lalrpop_util::ParseError;
 
 use crate::ast::*;
+use crate::parser::validate_unescape_string;
 
 grammar;
 
@@ -32,11 +33,14 @@ u10: u16 = <s:r"([+-]?)[0-9]+"> =>? {
     Ok(res)
   };
 
+pub string: String = <r#""(?:\\.|[^\\"])*""#> =>? validate_unescape_string(<>);
+
 type_: Type = {
   "int"  => Type::Int,
   "nat"  => Type::Nat,
   "bool" => Type::Bool,
   "mutez" => Type::Mutez,
+  "string" => Type::String,
 }
 
 boolean: bool = {
@@ -47,7 +51,8 @@ boolean: bool = {
 use Value::*;
 value: Value = {
   <n:number> => NumberValue(n),
-  <b:boolean> => BooleanValue(b)
+  <b:boolean> => BooleanValue(b),
+  <string> => StringValue(<>),
 }
 
 use Instruction::*;
