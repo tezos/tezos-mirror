@@ -135,3 +135,9 @@ val fetch_assigned_shard_indices :
     [level] as the key with FIFO strategy. *)
 val fetch_committee :
   t -> level:int32 -> Committee_cache.committee tzresult Lwt.t
+
+(** Module for P2P-related accessors.  *)
+module P2P : sig
+  (** [get_topics t] returns the list of topics the node is subscribed to. *)
+  val get_topics : t -> Gossipsub.Topic.t list
+end

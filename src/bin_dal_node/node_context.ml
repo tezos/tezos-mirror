@@ -185,3 +185,9 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
          Consider returning some abstract representation of [(s, n)]
          instead of [int list] *)
       Stdlib.List.init offset (fun i -> start_index + i)
+
+module P2P = struct
+  let get_topics {gs_worker; _} =
+    let state = Gossipsub.Worker.state gs_worker in
+    Gossipsub.Worker.GS.Topic.Map.bindings state.mesh |> List.rev_map fst
+end

@@ -42,6 +42,20 @@ module Types = struct
 
   type slot_index = int
 
+  type topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5607
+
+     Bound / add checks for bounds of these encodings *)
+  let topic_encoding : topic Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun ({slot_index; pkh} : topic) -> (slot_index, pkh))
+      (fun (slot_index, pkh) -> {slot_index; pkh})
+      (obj2
+         (req "slot_index" uint8)
+         (req "pkh" Signature.Public_key_hash.encoding))
+
   (* Declaration of types used as inputs and/or outputs. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
@@ -455,3 +469,27 @@ let monitor_shards :
     ~query:Tezos_rpc.Query.empty
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(open_root / "monitor_shards")
+
+module P2P = struct
+  open Tezos_rpc.Path
+
+  let open_root = open_root / "p2p"
+
+  module Gossipsub = struct
+    let open_root = open_root / "gossipsub"
+
+    let get_topics :
+        < meth : [`GET]
+        ; input : unit
+        ; output : Types.topic list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:"get the topics this node is currently subscribed to"
+        ~query:Tezos_rpc.Query.empty
+        ~output:(Data_encoding.list Types.topic_encoding)
+        (open_root / "topics")
+  end
+end

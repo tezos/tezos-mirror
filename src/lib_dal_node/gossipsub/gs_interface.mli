@@ -34,7 +34,14 @@
     - A slot consumer tracks topics associated to a given slot index and enough
     public key-hashes so that the number of covered shards is enough to recover
     the slot data. *)
-type topic = {slot_index : int; pkh : Signature.Public_key_hash.t}
+
+module Topic : sig
+  include
+    Gossipsub_intf.ITERABLE
+      with type t = Tezos_dal_node_services.Services.Types.topic
+end
+
+val topic_encoding : Topic.t Data_encoding.t
 
 (** A message id uniquely identifies a share whose commitment is included in an
     L1 block. It is defined by a tuple containing the commitment, the level at
@@ -70,8 +77,6 @@ module Span : Gossipsub_intf.SPAN
 
 (** Encodings for various types above. *)
 
-val topic_encoding : topic Data_encoding.t
-
 val message_id_encoding : message_id Data_encoding.t
 
 val message_encoding : message Data_encoding.t
@@ -90,7 +95,7 @@ end
 
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
-    with type GS.Topic.t = topic
+    with type GS.Topic.t = Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer
@@ -99,7 +104,7 @@ module Worker_config :
 
 module Worker_instance :
   Gossipsub_intf.WORKER
-    with type GS.Topic.t = topic
+    with type GS.Topic.t = Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer

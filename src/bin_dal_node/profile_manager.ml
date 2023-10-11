@@ -42,7 +42,7 @@ let init_attester operator_sets number_of_slots gs_worker pkh =
   else (
     List.iter
       (fun slot_index ->
-        Join Gossipsub.{slot_index; pkh}
+        Join Tezos_dal_node_services.Services.Types.{slot_index; pkh}
         |> Gossipsub.Worker.(app_input gs_worker))
       Utils.Infix.(0 -- (number_of_slots - 1)) ;
     {operator_sets with attesters = Pkh_set.add pkh operator_sets.attesters})
@@ -93,7 +93,9 @@ let join_topics_for_producer gs_worker committee producers =
     (fun slot_index ->
       Signature.Public_key_hash.Map.iter
         (fun pkh _shards ->
-          let topic = Gossipsub.{slot_index; pkh} in
+          let topic =
+            Tezos_dal_node_services.Services.Types.{slot_index; pkh}
+          in
           if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
             Join topic |> Gossipsub.Worker.(app_input gs_worker))
         committee)
@@ -107,7 +109,7 @@ let join_topics_for_bootstrap proto_parameters gs_worker committee =
   for slot_index = 0 to proto_parameters.Dal_plugin.number_of_slots - 1 do
     Signature.Public_key_hash.Map.iter
       (fun pkh _shards ->
-        let topic = Gossipsub.{slot_index; pkh} in
+        let topic = Tezos_dal_node_services.Services.Types.{slot_index; pkh} in
         if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
           Join topic |> Gossipsub.Worker.(app_input gs_worker))
       committee
