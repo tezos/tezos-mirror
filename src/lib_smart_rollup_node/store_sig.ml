@@ -68,4 +68,8 @@ module type S = sig
   (** [gc store ~level] asynchronously garbage collects everything from the
       store that concerns blocks for levels below [level]. *)
   val gc : rw -> level:int32 -> unit tzresult Lwt.t
+
+  (** [wait_gc_completion store] returns a blocking thread if a GC run is
+      currently ongoing. *)
+  val wait_gc_completion : 'a t -> unit Lwt.t
 end

@@ -572,3 +572,29 @@ let gc
           ]
       in
       return_unit
+
+let wait_gc_completion
+    ({
+       l2_blocks;
+       messages;
+       inboxes;
+       commitments;
+       commitments_published_at_level;
+       l2_head = _;
+       last_finalized_level = _;
+       levels_to_hashes;
+       irmin_store = _;
+       protocols = _;
+       gc_levels = _;
+     } :
+      _ t) =
+  let open Lwt_syntax in
+  let* () = L2_blocks.wait_gc_completion l2_blocks
+  and* () = Messages.wait_gc_completion messages
+  and* () = Inboxes.wait_gc_completion inboxes
+  and* () = Commitments.wait_gc_completion commitments
+  and* () =
+    Commitments_published_at_level.wait_gc_completion
+      commitments_published_at_level
+  and* () = Levels_to_hashes.wait_gc_completion levels_to_hashes in
+  return_unit
