@@ -121,6 +121,9 @@ module type INDEXABLE_STORE = sig
       ongoing this new request is ignored and this call is a no-op. *)
   val gc :
     ?async:bool -> rw t -> (key, value) gc_iterator -> unit tzresult Lwt.t
+
+  (** [wait_gc_completion t] returns a blocking thread if a GC run is ongoing. *)
+  val wait_gc_completion : 'a t -> unit Lwt.t
 end
 
 (** An index store mapping keys to values. Keys are associated to optional
@@ -196,6 +199,10 @@ module type INDEXED_FILE = sig
     rw t ->
     (key, value * header) gc_iterator ->
     unit tzresult Lwt.t
+
+  (** [wait_gc_completion t] returns a blocking thread if a GC run is currently
+      ongoing. *)
+  val wait_gc_completion : 'a t -> unit Lwt.t
 end
 
 (** Same as {!INDEXED_FILE} but where headers are extracted from values. *)
