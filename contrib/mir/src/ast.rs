@@ -18,6 +18,7 @@ pub enum Type {
     Bool,
     Mutez,
     String,
+    Unit,
 }
 
 impl Type {
@@ -30,6 +31,7 @@ impl Type {
             Type::Bool => 1,
             Type::Mutez => 1,
             Type::String => 1,
+            Type::Unit => 1,
         }
     }
 }
@@ -39,6 +41,7 @@ pub enum Value {
     NumberValue(i128),
     BooleanValue(bool),
     StringValue(String),
+    UnitValue,
 }
 
 pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
@@ -60,6 +63,7 @@ pub enum Instruction<T: Stage> {
     Push(Type, Value),
     Swap,
     Failwith,
+    Unit,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
