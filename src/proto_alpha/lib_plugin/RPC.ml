@@ -236,7 +236,7 @@ module Scripts = struct
     let extra_big_maps_encoding =
       list
         (obj4
-           (req "id" Script.expr_encoding)
+           (req "id" Big_map.Id.encoding)
            (req "key_type" Script.expr_encoding)
            (req "val_type" Script.expr_encoding)
            (req "map_literal" Script.expr_encoding))
@@ -1225,16 +1225,6 @@ module Scripts = struct
             let init =
               Lazy_storage.(Alloc Big_map.{key_type = kty; value_type = vty})
             in
-            let id = Micheline.root id in
-            let* id, ctxt =
-              parse_data
-                ctxt
-                ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-                ~allow_forged:false
-                Script_typed_ir.nat_t
-                id
-            in
-            let id = Script_int.to_zint id in
             let*? Ex_comparable_ty key_comparable_type, ctxt =
               parse_comparable_ty ctxt (Micheline.root kty)
             in
@@ -1282,10 +1272,7 @@ module Scripts = struct
             in
             ( ctxt,
               Lazy_storage.(
-                make
-                  Big_map
-                  (Big_map.Id.parse_z id)
-                  (Update {init; updates = List.rev updates}))
+                make Big_map id (Update {init; updates = List.rev updates}))
               :: big_map_diff_tl ))
           (ctxt, [])
           big_maps

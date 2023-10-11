@@ -220,8 +220,15 @@ let parse_other_contract_item ~source =
 let parse_extra_big_map_item ~source =
   let open Result_syntax in
   function
-  | Micheline.Prim (_loc, "Big_map", [i; kty; vty; map], _annot) ->
+  | Micheline.Prim (_loc, "Big_map", [i; kty; vty; map], _annot) as e ->
       let* i = parse_expression ~source i in
+      let* i =
+        match Micheline.root i with
+        | Micheline.Int (_loc, i) -> return (Big_map.Id.parse_z i)
+        | _ ->
+            tzfail
+              (Wrong_other_contracts_item (Micheline.location e, printable e))
+      in
       let* kty = parse_expression ~source kty in
       let* vty = parse_expression ~source vty in
       let* map = parse_expression ~source map in

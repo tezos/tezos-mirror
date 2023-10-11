@@ -43,7 +43,7 @@ type simulation_params = {
   gas : Gas.Arith.integral option;
   other_contracts : (Contract_hash.t * Script.expr) list option;
   extra_big_maps :
-    (Script.expr * Script.expr * Script.expr * Script.expr) list option;
+    (Big_map.Id.t * Script.expr * Script.expr * Script.expr) list option;
 }
 
 (* Parameters specific to simulations of TZIP4 views *)

@@ -242,7 +242,7 @@ val other_contracts_arg :
   ((Contract_hash.t * Script.expr) list option, full) Tezos_clic.arg
 
 val extra_big_maps_arg :
-  ( (Script.expr * Script.expr * Script.expr * Script.expr) list option,
+  ( (Big_map.Id.t * Script.expr * Script.expr * Script.expr) list option,
     full )
   Tezos_clic.arg
 
