@@ -26,9 +26,15 @@
 
 type 'a known = Unknown | Known of 'a
 
-type purpose = Operating | Batching | Cementing
+type purpose = Operating | Batching | Cementing | Recovering
 
-type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
+type operation_kind =
+  | Publish
+  | Add_messages
+  | Cement
+  | Timeout
+  | Refute
+  | Recover
 
 type mode =
   | Batcher
@@ -73,6 +79,7 @@ let string_of_operation_kind = function
   | Cement -> "cement"
   | Timeout -> "timeout"
   | Refute -> "refute"
+  | Recover -> "recover"
 
 let operation_kind_of_string = function
   | "publish" -> Some Publish
@@ -80,6 +87,7 @@ let operation_kind_of_string = function
   | "cement" -> Some Cement
   | "timeout" -> Some Timeout
   | "refute" -> Some Refute
+  | "recover" -> Some Recover
   | _ -> None
 
 let operation_kind_of_string_exn s =
@@ -157,18 +165,20 @@ let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let base_dir sc_node = sc_node.persistent_state.base_dir
 
-let purposes = [Operating; Batching; Cementing]
+let purposes = [Operating; Batching; Cementing; Recovering]
 
 let string_of_purpose = function
   | Operating -> "operating"
   | Batching -> "batching"
   | Cementing -> "cementing"
+  | Recovering -> "recovering"
 
 (* For each purpose, it returns a list of associated operation kinds *)
 let operation_kinds_of_purpose = function
   | Batching -> [Add_messages]
   | Cementing -> [Cement]
   | Operating -> [Publish; Refute; Timeout]
+  | Recovering -> [Recover]
 
 (* Map a list of operation kinds to their corresponding purposes,
    based on their presence in the input list. *)

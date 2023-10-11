@@ -32,9 +32,15 @@
 (** Smart contract rollup node states. *)
 type t
 
-type purpose = Operating | Batching | Cementing
+type purpose = Operating | Batching | Cementing | Recovering
 
-type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
+type operation_kind =
+  | Publish
+  | Add_messages
+  | Cement
+  | Timeout
+  | Refute
+  | Recover
 
 type mode =
   | Batcher
