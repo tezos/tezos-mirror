@@ -27,22 +27,6 @@
 (** This module defines the relevant data structures to instantiate the
     gossipsub worker. *)
 
-(** A topic is defined by a public key hash of an attester and a slot index.
-    - A slot producer tracks the topic associated to a given slot index for all
-    the public key-hashes;
-    - The attester tracks its own public key hash for all the slot indices;
-    - A slot consumer tracks topics associated to a given slot index and enough
-    public key-hashes so that the number of covered shards is enough to recover
-    the slot data. *)
-
-module Topic : sig
-  include
-    Gossipsub_intf.ITERABLE
-      with type t = Tezos_dal_node_services.Services.Types.topic
-end
-
-val topic_encoding : Topic.t Data_encoding.t
-
 (** A message id uniquely identifies a share whose commitment is included in an
     L1 block. It is defined by a tuple containing the commitment, the level at
     which the commitment is successfully included in an L1 block, the
@@ -95,7 +79,7 @@ end
 
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
-    with type GS.Topic.t = Topic.t
+    with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer
@@ -104,7 +88,7 @@ module Worker_config :
 
 module Worker_instance :
   Gossipsub_intf.WORKER
-    with type GS.Topic.t = Topic.t
+    with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer

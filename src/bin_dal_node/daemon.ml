@@ -502,7 +502,7 @@ let run ~data_dir configuration_override =
     let open Worker_parameters in
     let limits =
       match profiles with
-      | Services.Types.Bootstrap ->
+      | Types.Bootstrap ->
           (* Bootstrap nodes should always have a mesh size of zero.
              so all grafts are responded with prunes with PX. See:
              https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
@@ -534,7 +534,7 @@ let run ~data_dir configuration_override =
     let* p2p_config = p2p_config config in
     Gossipsub.Transport_layer.create
       ~public_addr
-      ~is_bootstrap_peer:(profiles = Services.Types.Bootstrap)
+      ~is_bootstrap_peer:(profiles = Types.Bootstrap)
       p2p_config
       p2p_limits
       ~network_name

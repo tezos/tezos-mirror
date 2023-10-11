@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 open Gossipsub_intf
+module Types = Tezos_dal_node_services.Types
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5543
 
@@ -82,63 +83,32 @@ let message_encoding : message Data_encoding.t =
        (req "share" Cryptobox.share_encoding)
        (req "shard_proof" Cryptobox.shard_proof_encoding))
 
-(* Modules needed to instantiate the Gossipsub worker. *)
-module Iterable (Cmp : sig
-  type t
-
-  val compare : t -> t -> int
-end) =
-struct
-  include Compare.Make (Cmp)
-  module Set = Set.Make (Cmp)
-  module Map = Map.Make (Cmp)
-end
-
-module Topic = struct
-  type t = Tezos_dal_node_services.Services.Types.topic = {
-    slot_index : int;
-    pkh : Signature.Public_key_hash.t;
-  }
-
-  include Iterable (struct
-    type nonrec t = t
-
-    let compare topic {slot_index; pkh} =
-      let c = Int.compare topic.slot_index slot_index in
-      if c <> 0 then c else Signature.Public_key_hash.compare topic.pkh pkh
-  end)
-
-  let pp fmt {pkh; slot_index} =
-    Format.fprintf
-      fmt
-      "{ pkh=%a; slot_index=%d }"
-      Signature.Public_key_hash.pp
-      pkh
-      slot_index
-end
-
-let topic_encoding = Tezos_dal_node_services.Services.Types.topic_encoding
-
 module Message_id = struct
   type t = message_id
 
-  include Iterable (struct
-    type nonrec t = t
-
-    let compare id {level; slot_index; commitment; shard_index; pkh} =
-      let c = Int32.compare id.level level in
+  let compare id {level; slot_index; commitment; shard_index; pkh} =
+    let c = Int32.compare id.level level in
+    if c <> 0 then c
+    else
+      let c = Int.compare id.shard_index shard_index in
       if c <> 0 then c
       else
-        let c = Int.compare id.shard_index shard_index in
+        let c = Cryptobox.Commitment.compare id.commitment commitment in
         if c <> 0 then c
         else
-          let c = Cryptobox.Commitment.compare id.commitment commitment in
-          if c <> 0 then c
-          else
-            Topic.compare
-              {slot_index = id.slot_index; pkh = id.pkh}
-              {slot_index; pkh}
-  end)
+          Types.Topic.compare
+            {slot_index = id.slot_index; pkh = id.pkh}
+            {slot_index; pkh}
+
+  module Cmp = struct
+    type nonrec t = t
+
+    let compare = compare
+  end
+
+  include Compare.Make (Cmp)
+  module Set = Set.Make (Cmp)
+  module Map = Map.Make (Cmp)
 
   let pp fmt {level; slot_index; commitment; shard_index; pkh} =
     Format.fprintf
@@ -148,10 +118,10 @@ module Message_id = struct
       shard_index
       Cryptobox.Commitment.pp
       commitment
-      Topic.pp
+      Types.Topic.pp
       {slot_index; pkh}
 
-  let get_topic {slot_index; pkh; _} = Topic.{slot_index; pkh}
+  let get_topic {slot_index; pkh; _} = Types.Topic.{slot_index; pkh}
 end
 
 module Validate_message_hook = struct
@@ -184,11 +154,15 @@ end
 module Peer = struct
   type t = peer
 
-  include Iterable (struct
+  module Cmp = struct
     type nonrec t = t
 
     let compare p1 p2 = P2p_peer.Id.compare p1 p2
-  end)
+  end
+
+  include Compare.Make (Cmp)
+  module Set = Set.Make (Cmp)
+  module Map = Map.Make (Cmp)
 
   let pp = P2p_peer.Id.pp
 end
@@ -241,7 +215,7 @@ module Automaton_config :
     with type Time.t = Ptime.t
      and module Span = Span
      and type Subconfig.Peer.t = peer
-     and type Subconfig.Topic.t = Topic.t
+     and type Subconfig.Topic.t = Types.Topic.t
      and type Subconfig.Message_id.t = message_id
      and type Subconfig.Message.t = message = struct
   module Span = Span
@@ -249,7 +223,7 @@ module Automaton_config :
 
   module Subconfig = struct
     module Peer = Peer
-    module Topic = Topic
+    module Topic = Types.Topic
     module Message_id = Message_id
     module Message = Message
   end
@@ -268,7 +242,7 @@ end
 (** Instantiate the worker functor *)
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
-    with type GS.Topic.t = Topic.t
+    with type GS.Topic.t = Types.Topic.t
      and type GS.Message_id.t = message_id
      and type GS.Message.t = message
      and type GS.Peer.t = peer

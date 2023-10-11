@@ -301,8 +301,7 @@ let register_dal_profiles dal_node_rpc_ctxt delegates =
   let profiles =
     List.map
       (fun consensus_key ->
-        Tezos_dal_node_services.Services.Types.Attester
-          consensus_key.public_key_hash)
+        Tezos_dal_node_services.Types.Attester consensus_key.public_key_hash)
       delegates
   in
   Tezos_rpc.Context.make_call

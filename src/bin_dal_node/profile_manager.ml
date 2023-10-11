@@ -42,8 +42,7 @@ let init_attester operator_sets number_of_slots gs_worker pkh =
   else (
     List.iter
       (fun slot_index ->
-        Join Tezos_dal_node_services.Services.Types.{slot_index; pkh}
-        |> Gossipsub.Worker.(app_input gs_worker))
+        Join {slot_index; pkh} |> Gossipsub.Worker.(app_input gs_worker))
       Utils.Infix.(0 -- (number_of_slots - 1)) ;
     {operator_sets with attesters = Pkh_set.add pkh operator_sets.attesters})
 
@@ -54,7 +53,7 @@ let init_producer operator_sets slot_index =
   }
 
 let add_operator_profiles t proto_parameters gs_worker
-    (operator_profiles : Services.Types.operator_profiles) =
+    (operator_profiles : Types.operator_profiles) =
   match t with
   | Bootstrap -> None
   | Operator operator_sets ->
@@ -62,7 +61,7 @@ let add_operator_profiles t proto_parameters gs_worker
         List.fold_left
           (fun operator_sets operator ->
             match operator with
-            | Services.Types.Attester pkh ->
+            | Types.Attester pkh ->
                 init_attester
                   operator_sets
                   proto_parameters.Dal_plugin.number_of_slots
@@ -93,9 +92,7 @@ let join_topics_for_producer gs_worker committee producers =
     (fun slot_index ->
       Signature.Public_key_hash.Map.iter
         (fun pkh _shards ->
-          let topic =
-            Tezos_dal_node_services.Services.Types.{slot_index; pkh}
-          in
+          let topic = Types.Topic.{slot_index; pkh} in
           if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
             Join topic |> Gossipsub.Worker.(app_input gs_worker))
         committee)
@@ -109,7 +106,7 @@ let join_topics_for_bootstrap proto_parameters gs_worker committee =
   for slot_index = 0 to proto_parameters.Dal_plugin.number_of_slots - 1 do
     Signature.Public_key_hash.Map.iter
       (fun pkh _shards ->
-        let topic = Tezos_dal_node_services.Services.Types.{slot_index; pkh} in
+        let topic = Types.Topic.{slot_index; pkh} in
         if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
           Join topic |> Gossipsub.Worker.(app_input gs_worker))
       committee
@@ -123,26 +120,26 @@ let on_new_head t proto_parameters gs_worker committee =
 
 let get_profiles t =
   match t with
-  | Bootstrap -> Services.Types.Bootstrap
+  | Bootstrap -> Types.Bootstrap
   | Operator {producers; attesters} ->
       let producer_profiles =
         Slot_set.fold
-          (fun slot_index acc -> Services.Types.Producer {slot_index} :: acc)
+          (fun slot_index acc -> Types.Producer {slot_index} :: acc)
           producers
           []
       in
       let attester_profiles =
         Pkh_set.fold
-          (fun pkh acc -> Services.Types.Attester pkh :: acc)
+          (fun pkh acc -> Types.Attester pkh :: acc)
           attesters
           producer_profiles
       in
-      Services.Types.Operator (attester_profiles @ producer_profiles)
+      Types.Operator (attester_profiles @ producer_profiles)
 
 let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in
   let expected_number_of_shards = List.length shard_indices in
-  if expected_number_of_shards = 0 then return Services.Types.Not_in_committee
+  if expected_number_of_shards = 0 then return Types.Not_in_committee
   else
     let published_level =
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
@@ -175,4 +172,4 @@ let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
       Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
     in
     let* flags = List.map_es are_shards_stored all_slot_indexes in
-    return (Services.Types.Attestable_slots {slots = flags; published_level})
+    return (Types.Attestable_slots {slots = flags; published_level})

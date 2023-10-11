@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Types = Tezos_dal_node_services.Types
+
 (** This module defines the data structures used to instantiate the Octez P2P
     library. More exactly, it exposes:
 
@@ -46,22 +48,19 @@ type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
     {!P2p_peer.Id.t} elements in [px] are augmented by their {!P2p_point.Id.t}
     counterpart. *)
 type p2p_message =
-  | Graft of {topic : Gs_interface.Topic.t}
+  | Graft of {topic : Types.Topic.t}
   | Prune of {
-      topic : Gs_interface.Topic.t;
+      topic : Types.Topic.t;
       px : px_peer Seq.t;
       backoff : Gs_interface.Span.t;
     }
-  | IHave of {
-      topic : Gs_interface.Topic.t;
-      message_ids : Gs_interface.message_id list;
-    }
+  | IHave of {topic : Types.Topic.t; message_ids : Gs_interface.message_id list}
   | IWant of {message_ids : Gs_interface.message_id list}
-  | Subscribe of {topic : Gs_interface.Topic.t}
-  | Unsubscribe of {topic : Gs_interface.Topic.t}
+  | Subscribe of {topic : Types.Topic.t}
+  | Unsubscribe of {topic : Types.Topic.t}
   | Message_with_header of {
       message : Gs_interface.message;
-      topic : Gs_interface.Topic.t;
+      topic : Types.Topic.t;
       message_id : Gs_interface.message_id;
     }
 

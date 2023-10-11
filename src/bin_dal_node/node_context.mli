@@ -139,5 +139,5 @@ val fetch_committee :
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [get_topics t] returns the list of topics the node is subscribed to. *)
-  val get_topics : t -> Gossipsub.Topic.t list
+  val get_topics : t -> Types.Topic.t list
 end

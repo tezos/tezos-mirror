@@ -26,7 +26,7 @@
 (** Extention of the open type [error] with the errors that could be raised by
     the DAL node. *)
 type error +=
-  | Decoding_failed of Types.kind
+  | Decoding_failed of Types.Store.kind
   | Profile_incompatibility
   | Invalid_slot_index of {slot_index : int; number_of_slots : int}
 
@@ -38,7 +38,7 @@ type error +=
     catch and handle them. On the other hand, encoding errors only happen in
     unexpected circumstances (e.g. out of memory) so we don't expect callers to
     catch and handle them. *)
-type decoding = [`Decoding_failed of Types.kind * tztrace]
+type decoding = [`Decoding_failed of Types.Store.kind * tztrace]
 
 (** We would like to match [`Not_found] as we would want to return 404 HTTP code
     to clients. *)

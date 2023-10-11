@@ -193,31 +193,31 @@ let encode_commitment = Cryptobox.Commitment.to_b58check
 
 let decode_commitment v =
   trace_decoding_error
-    ~data_kind:Types.Commitment
+    ~data_kind:Types.Store.Commitment
     ~tztrace_of_error:(fun tztrace -> tztrace)
   @@ Cryptobox.Commitment.of_b58check v
 
 let encode_header_status =
-  Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
+  Data_encoding.Binary.to_string_exn Types.header_status_encoding
 
 let decode_header_status v =
   trace_decoding_error
-    ~data_kind:Types.Header_status
+    ~data_kind:Types.Store.Header_status
     ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Services.Types.header_status_encoding v
+  @@ Data_encoding.Binary.of_string Types.header_status_encoding v
 
 let decode_slot_id v =
   trace_decoding_error
-    ~data_kind:Types.Slot_id
+    ~data_kind:Types.Store.Slot_id
     ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Services.Types.slot_id_encoding v
+  @@ Data_encoding.Binary.of_string Types.slot_id_encoding v
 
 let encode_slot slot_size =
   Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
 
 let decode_slot slot_size v =
   trace_decoding_error
-    ~data_kind:Types.Slot
+    ~data_kind:Types.Store.Slot
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
 
@@ -236,7 +236,7 @@ module Legacy = struct
 
       val headers : Cryptobox.commitment -> Path.t
 
-      val header : Cryptobox.commitment -> Services.Types.slot_id -> Path.t
+      val header : Cryptobox.commitment -> Types.slot_id -> Path.t
 
       val shards : Cryptobox.commitment -> Path.t
 
@@ -261,16 +261,15 @@ module Legacy = struct
          "Others" path(s) are used to store information of slots headers when
          their statuses are [`Not_selected] or [`Unseen_or_not_finalized]. *)
 
-      val slots_indices : Services.Types.level -> Path.t
+      val slots_indices : Types.level -> Path.t
 
-      val accepted_header_commitment : Services.Types.slot_id -> Path.t
+      val accepted_header_commitment : Types.slot_id -> Path.t
 
-      val accepted_header_status : Services.Types.slot_id -> Path.t
+      val accepted_header_status : Types.slot_id -> Path.t
 
-      val others : Services.Types.slot_id -> Path.t
+      val others : Types.slot_id -> Path.t
 
-      val other_header_status :
-        Services.Types.slot_id -> Cryptobox.commitment -> Path.t
+      val other_header_status : Types.slot_id -> Cryptobox.commitment -> Path.t
     end
   end = struct
     type t = string list
@@ -295,7 +294,7 @@ module Legacy = struct
         root / commitment_repr / "headers"
 
       let header commitment index =
-        let open Services.Types in
+        let open Types in
         let prefix = headers commitment in
         prefix / Data_encoding.Binary.to_string_exn slot_id_encoding index
 
@@ -317,7 +316,7 @@ module Legacy = struct
       let slots_indices slot_level = root / Int32.to_string slot_level
 
       let headers index =
-        let open Services.Types in
+        let open Types in
         slots_indices index.slot_level / Int.to_string index.slot_index
 
       let accepted_header index =
@@ -417,7 +416,7 @@ module Legacy = struct
         in
         (* This invariant should hold. *)
         assert (Int32.equal published_level block_level) ;
-        let index = Services.Types.{slot_level = published_level; slot_index} in
+        let index = Types.{slot_level = published_level; slot_index} in
         let header_path = Path.Commitment.header commitment index in
         let*! () =
           set
@@ -477,7 +476,7 @@ module Legacy = struct
     let unattested_str = encode_header_status `Unattested in
     List.iter_s
       (fun slot_index ->
-        let index = Services.Types.{slot_level = published_level; slot_index} in
+        let index = Types.{slot_level = published_level; slot_index} in
         let status_path = Path.Level.accepted_header_status index in
         let msg =
           Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
@@ -508,7 +507,7 @@ module Legacy = struct
   let get_commitment_by_published_level_and_index ~level ~slot_index node_store
       =
     let open Lwt_result_syntax in
-    let index = Services.Types.{slot_level = level; slot_index} in
+    let index = Types.{slot_level = level; slot_index} in
     let*! commitment_str_opt =
       find node_store.store @@ Path.Level.accepted_header_commitment index
     in
@@ -527,7 +526,7 @@ module Legacy = struct
         List.map_e (fun (slot_id, _) -> decode_slot_id slot_id) indexes
       in
       List.filter
-        (fun {Services.Types.slot_level = l; slot_index = i} ->
+        (fun {Types.slot_level = l; slot_index = i} ->
           keep_field l slot_level && keep_field i slot_index)
         indexes
       |> return
@@ -555,9 +554,9 @@ module Legacy = struct
                     let*? status = decode_header_status status_str in
                     return
                     @@ {
-                         Services.Types.slot_id;
+                         Types.slot_id;
                          commitment;
-                         status = (status :> Services.Types.header_status);
+                         status = (status :> Types.header_status);
                        }
                        :: acc)))
       accu
@@ -586,7 +585,7 @@ module Legacy = struct
     | None -> return acc
     | Some status_str ->
         let*? status = decode_header_status status_str in
-        return @@ ({Services.Types.slot_id; commitment; status} :: acc)
+        return @@ ({Types.slot_id; commitment; status} :: acc)
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
      header. *)
@@ -643,10 +642,7 @@ module Legacy = struct
     let slot_ids =
       List.rev_map
         (fun (index, _tree) ->
-          {
-            Services.Types.slot_level = published_level;
-            slot_index = int_of_string index;
-          })
+          {Types.slot_level = published_level; slot_index = int_of_string index})
         slots_indices
     in
     let* accu = get_other_headers slot_ids store [] in
@@ -668,8 +664,7 @@ module Legacy = struct
     | None -> accu
     | Some hs ->
         List.filter_map
-          (fun header ->
-            if header.Services.Types.status = hs then Some header else None)
+          (fun header -> if header.Types.status = hs then Some header else None)
           accu
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641

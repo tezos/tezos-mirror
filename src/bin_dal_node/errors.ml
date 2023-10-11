@@ -26,7 +26,7 @@
 (** Extention of the open type [error] with the errors that could be raised by
     the DAL node. *)
 type error +=
-  | Decoding_failed of Types.kind
+  | Decoding_failed of Types.Store.kind
   | Profile_incompatibility
   | Invalid_slot_index of {slot_index : int; number_of_slots : int}
 
@@ -45,8 +45,8 @@ let () =
       Format.fprintf
         ppf
         "Error while decoding a %s value"
-        (Types.kind_to_string data_kind))
-    Data_encoding.(obj1 (req "data_kind" Types.kind_encoding))
+        (Types.Store.to_string data_kind))
+    Data_encoding.(obj1 (req "data_kind" Types.Store.encoding))
     (function Decoding_failed data_kind -> Some data_kind | _ -> None)
     (fun data_kind -> Decoding_failed data_kind) ;
   register_error_kind
@@ -83,7 +83,7 @@ let () =
 
 (* Specialized errors defined as polymorphic variants. *)
 
-type decoding = [`Decoding_failed of Types.kind * tztrace]
+type decoding = [`Decoding_failed of Types.Store.kind * tztrace]
 
 type not_found = [`Not_found]
 

@@ -84,7 +84,7 @@ module Slots_handlers = struct
                 | Error _ -> assert false
                 | Ok proof -> return_some proof)))
 
-  let put_commitment_shards ctxt commitment () Services.Types.{with_proof} =
+  let put_commitment_shards ctxt commitment () Types.{with_proof} =
     call_handler2
       ctxt
       (fun store {cryptobox; shards_proofs_precomputation; _} ->
