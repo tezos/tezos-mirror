@@ -8114,6 +8114,7 @@ let _octez_smart_rollup_node_lib_tests =
            qcheck_core;
            logs_lwt;
            alcotezt;
+           tezt_lib;
            octez_client_base_unix |> open_;
            octez_smart_rollup_lib |> open_;
            octez_smart_rollup_node_lib |> open_;
