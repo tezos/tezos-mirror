@@ -117,7 +117,8 @@ type t = {
   external_process_parameters : Parameters.t;
 }
 
-let create ~comm_socket_path (config : Config_file.t) events_config =
+let create ~comm_socket_path (config : Config_file.t) node_version events_config
+    =
   let stop, stopper = Lwt.wait () in
   {
     server = None;
@@ -128,6 +129,7 @@ let create ~comm_socket_path (config : Config_file.t) events_config =
         internal_events = events_config;
         rpc = config.rpc;
         rpc_comm_socket_path = comm_socket_path;
+        node_version;
       };
   }
 

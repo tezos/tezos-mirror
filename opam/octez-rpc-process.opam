@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" & < "3.11" }
   "ocaml" { >= "4.14" }
   "octez-libs"
+  "octez-shell-libs"
   "octez-node-config"
   "lwt" { >= "5.7.0" }
   "lwt-exit"
