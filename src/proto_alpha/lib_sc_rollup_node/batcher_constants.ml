@@ -52,5 +52,5 @@ let protocol_max_batch_size =
   in
   Protocol.Constants_repr.max_operation_data_length
   - Data_encoding.Binary.length
-      Operation.encoding
+      Operation.encoding_with_legacy_attestation_name
       (Operation.pack empty_message_op)
