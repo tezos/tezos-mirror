@@ -158,9 +158,13 @@ let on_transaction state tx_raw =
   let open Lwt_result_syntax in
   let open Types in
   let {rollup_node = (module Rollup_node); pool; _} = state in
+  Format.printf "[tx-pool] Incoming transaction.\n%!" ;
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
   match is_valid with
-  | Error err -> return (Error err)
+  | Error err ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+      Format.printf "[tx-pool] Transaction is not valid.\n%!" ;
+      return (Error err)
   | Ok pkey ->
       (* Add the tx to the pool*)
       let pool = Pool.add pool pkey tx_raw in
@@ -170,6 +174,10 @@ let on_transaction state tx_raw =
       let hash =
         Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
       in
+      Format.printf
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+        "[tx-pool] Transaction %s added to the tx-pool.\n%!"
+        (Ethereum_types.hash_to_string hash) ;
       state.pool <- pool ;
       return (Ok hash)
 
@@ -237,10 +245,18 @@ let on_head state block_height =
     Lwt_list.iter_s
       (fun raw_tx ->
         let open Lwt_syntax in
-        let* _hash =
+        let+ hash_result =
           Rollup_node.inject_raw_transaction ~smart_rollup_address raw_tx
         in
-        return_unit)
+        match hash_result with
+        | Error _ ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+            Format.printf "[tx-pool] Error when sending transaction.\n%!"
+        | Ok _ ->
+            Format.printf
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+              "[tx-pool] Transaction %s sent to the rollup.\n%!"
+              (Ethereum_types.hex_to_string raw_tx))
       txs
   in
   (* update the pool *)
@@ -346,7 +362,13 @@ let start ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
       ((module Rollup_node_rpc), smart_rollup_address)
       (module Handlers)
   in
-  let () = Lwt.dont_wait (fun () -> subscribe_l2_block worker) (fun _ -> ()) in
+  let () =
+    Lwt.dont_wait
+      (fun () -> subscribe_l2_block worker)
+      (fun _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+        Format.printf "[tx-pool] Pool has been stopped.\n%!")
+  in
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
