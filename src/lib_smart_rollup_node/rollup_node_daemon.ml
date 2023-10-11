@@ -106,7 +106,9 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
     Plugin.Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
   in
-  let* () = Plugin.L1_processing.process_l1_block_operations node_ctxt head in
+  let* () =
+    Plugin.L1_processing.process_l1_block_operations ~catching_up node_ctxt head
+  in
   (* Avoid storing and publishing commitments if the head is not final. *)
   (* Avoid triggering the pvm execution if this has been done before for
      this head. *)

@@ -336,7 +336,8 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
         (* No action for non successful operations  *)
         return_unit
 
-let process_l1_block_operations node_ctxt (head : Layer1.header) =
+let process_l1_block_operations ~catching_up:_ node_ctxt (head : Layer1.header)
+    =
   let open Lwt_result_syntax in
   let* block =
     Layer1_helpers.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash

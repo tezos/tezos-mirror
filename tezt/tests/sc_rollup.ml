@@ -6143,7 +6143,7 @@ let test_rollup_whitelist_update ~kind =
     ~commitment_period
     ~challenge_window
     ~operator:Constant.bootstrap1.public_key_hash
-  @@ fun _protocol rollup_node rollup_client rollup_addr _node client ->
+  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
   let encode_whitelist_msg whitelist =
     Sc_rollup_client.encode_json_outbox_msg rollup_client
     @@ `O [("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist))]
@@ -6243,6 +6243,18 @@ let test_rollup_whitelist_update ~kind =
       rollup_addr
   in
   let* () = Client.bake_for_and_wait client in
+  Log.info
+    "Start a new rollup node with an operator that was not in the whitelist to \
+     ensure it can catch up" ;
+  let rollup_node2 =
+    Sc_rollup_node.create
+      Operator
+      node
+      ~base_dir:(Client.base_dir client)
+      ~default_operator:Constant.bootstrap3.alias
+  in
+  let* () = Sc_rollup_node.run rollup_node2 rollup_addr [] in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. rollup_node2 in
   unit
 
 let test_rollup_whitelist_outdated_update ~kind =

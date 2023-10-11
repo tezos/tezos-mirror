@@ -129,8 +129,9 @@ let maybe_recover_bond node_ctxt =
 (** Process an L1 SCORU operation (for the node's rollup) which is included
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
-let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
-    (head : Layer1.header) ~source (operation : kind manager_operation)
+let process_included_l1_operation (type kind) ~catching_up
+    (node_ctxt : Node_context.rw) (head : Layer1.header) ~source
+    (operation : kind manager_operation)
     (result : kind successful_manager_operation_result) =
   let open Lwt_result_syntax in
   match (operation, result) with
@@ -316,18 +317,23 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
                      }))
               node_ctxt.private_info
           in
-          let*? () =
-            Node_context.check_op_in_whitelist_or_bailout_mode
-              node_ctxt
-              whitelist_update
-          in
-          return_unit)
+          if
+            catching_up
+            (* No need to check whitelist updates for historical data. *)
+          then return_unit
+          else
+            let*? () =
+              Node_context.check_op_in_whitelist_or_bailout_mode
+                node_ctxt
+                whitelist_update
+            in
+            return_unit)
   | _, _ ->
       (* Other manager operations *)
       return_unit
 
-let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
-    (operation : kind manager_operation)
+let process_l1_operation (type kind) ~catching_up node_ctxt
+    (head : Layer1.header) ~source (operation : kind manager_operation)
     (result : kind Apply_results.manager_operation_result) =
   let open Lwt_result_syntax in
   let is_for_my_rollup : type kind. kind manager_operation -> bool = function
@@ -367,6 +373,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
     match result with
     | Applied success_result ->
         process_included_l1_operation
+          ~catching_up
           node_ctxt
           head
           ~source
@@ -376,7 +383,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
         (* No action for non successful operations  *)
         return_unit
 
-let process_l1_block_operations node_ctxt (head : Layer1.header) =
+let process_l1_block_operations ~catching_up node_ctxt (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* block =
     Layer1_helpers.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash
@@ -385,7 +392,7 @@ let process_l1_block_operations node_ctxt (head : Layer1.header) =
       =
     let open Lwt_result_syntax in
     let* () = accu in
-    process_l1_operation node_ctxt head ~source operation result
+    process_l1_operation ~catching_up node_ctxt head ~source operation result
   in
   let apply_internal (type kind) accu ~source:_
       (_operation : kind Apply_internal_results.internal_operation)
