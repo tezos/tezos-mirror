@@ -239,7 +239,7 @@ val edge_of_baking_over_staking_billionth_arg :
   (int option, full) Tezos_clic.arg
 
 val other_contracts_arg :
-  ((Script.expr * Script.expr) list option, full) Tezos_clic.arg
+  ((Contract_hash.t * Script.expr) list option, full) Tezos_clic.arg
 
 val extra_big_maps_arg :
   ( (Script.expr * Script.expr * Script.expr * Script.expr) list option,

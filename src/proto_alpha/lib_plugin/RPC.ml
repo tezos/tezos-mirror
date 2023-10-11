@@ -230,7 +230,7 @@ module Scripts = struct
     let other_contracts_encoding =
       list
         (obj2
-           (req "address" Script.expr_encoding)
+           (req "address" Contract_hash.encoding)
            (req "type" Script.expr_encoding))
 
     let extra_big_maps_encoding =
@@ -1205,27 +1205,15 @@ module Scripts = struct
     let originate_dummy_contracts ctxt =
       List.fold_left_es
         (fun ctxt (address, ty) ->
-          let* address =
-            Script_ir_translator.parse_data
-              ctxt
-              ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-              ~allow_forged:false
-              Script_typed_ir.address_t
-              (Micheline.root address)
-          in
-          match address with
-          | {destination = Contract (Originated address); entrypoint = _}, _ctxt
-            ->
-              Contract.raw_originate
-                ctxt
-                ~prepaid_bootstrap_storage:false
-                address
-                (* We reuse the default script from View_helpers because
-                   the purpose is the same; we only care about having a
-                   script declaring the correct parameter type but we will
-                   never actually run the script. *)
-                ~script:(View_helpers.make_tzip4_viewer_script ty, None)
-          | _ -> return ctxt)
+          Contract.raw_originate
+            ctxt
+            ~prepaid_bootstrap_storage:false
+            address
+            (* We reuse the default script from View_helpers because
+               the purpose is the same; we only care about having a
+               script declaring the correct parameter type but we will
+               never actually run the script. *)
+            ~script:(View_helpers.make_tzip4_viewer_script ty, None))
         ctxt
     in
     let initialize_big_maps ctxt big_maps =

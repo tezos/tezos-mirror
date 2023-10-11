@@ -36,6 +36,7 @@ type error +=
   | Wrong_extra_big_maps_item of
       Micheline_parser.location * Micheline_printer.node
   | Wrong_extra_big_maps of Micheline_parser.location * Micheline_printer.node
+  | Invalid_address_for_smart_contract of string
 
 let micheline_printer_location_encoding :
     Micheline_printer.location Data_encoding.encoding =
@@ -160,7 +161,23 @@ let () =
        (req "node" micheline_printer_node_encoding))
     (function
       | Wrong_extra_big_maps (loc, node) -> Some (loc, node) | _ -> None)
-    (fun (loc, node) -> Wrong_extra_big_maps (loc, node))
+    (fun (loc, node) -> Wrong_extra_big_maps (loc, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"InvalidAddressForSmartContract"
+    ~title:"Invalid address for smart contract"
+    ~description:
+      "Invalid input, expected a smart contract address in base58 check \
+       notation (KT1...)"
+    Data_encoding.(obj1 (req "invalid_address" string))
+    ~pp:(fun ppf literal ->
+      Format.fprintf
+        ppf
+        "Bad argument value for a smart contract address. Expected an address \
+         in base58 checked notation starting with 'KT1', but given '%s'"
+        literal)
+    (function Invalid_address_for_smart_contract str -> Some str | _ -> None)
+    (fun str -> Invalid_address_for_smart_contract str)
 
 let parse_expression ~source (node : Micheline_parser.node) :
     Script.expr tzresult =
@@ -184,8 +201,18 @@ let parse_stack_item ~source =
 let parse_other_contract_item ~source =
   let open Result_syntax in
   function
-  | Micheline.Prim (_loc, "Contract", [addr; ty], _annot) ->
+  | Micheline.Prim (_loc, "Contract", [addr; ty], _annot) as e ->
       let* addr = parse_expression ~source addr in
+      let* addr =
+        match Micheline.root addr with
+        | Micheline.String (_loc, s) -> (
+            match Environment.Base58.decode s with
+            | Some (Contract_hash.Data h) -> return h
+            | Some _ | None -> tzfail (Invalid_address_for_smart_contract s))
+        | _ ->
+            tzfail
+              (Wrong_other_contracts_item (Micheline.location e, printable e))
+      in
       let* ty = parse_expression ~source ty in
       return (addr, ty)
   | e -> tzfail (Wrong_other_contracts_item (Micheline.location e, printable e))
