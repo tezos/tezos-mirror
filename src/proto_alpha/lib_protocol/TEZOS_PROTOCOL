@@ -20,6 +20,7 @@
         "Context_binary_proof",
         "Misbehaviour",
         "Ratio_repr",
+        "Int_percentage",
 
 
         "Michelson_v1_primitives",

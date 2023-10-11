@@ -50,6 +50,7 @@
   Context_binary_proof
   Misbehaviour
   Ratio_repr
+  Int_percentage
   Michelson_v1_primitives
   Slot_repr
   Cycle_repr
@@ -338,6 +339,7 @@
   context_binary_proof.ml context_binary_proof.mli
   misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
+  int_percentage.ml int_percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -631,6 +633,7 @@
   context_binary_proof.ml context_binary_proof.mli
   misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
+  int_percentage.ml int_percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -908,6 +911,7 @@
   context_binary_proof.ml context_binary_proof.mli
   misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
+  int_percentage.ml int_percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
