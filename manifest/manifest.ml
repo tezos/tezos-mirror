@@ -567,6 +567,26 @@ end
 (*                                  OPAM                                     *)
 (*****************************************************************************)
 
+type available =
+  | Always
+  | Never
+  | No_32
+  | No_x86
+  | No_ppc
+  | No_arm
+  | No_s390x
+  | N_ary_and of available list
+
+let string_of_available = function
+  | Always -> "Always"
+  | Never -> "Never"
+  | No_32 -> "No_32"
+  | No_x86 -> "No_x86"
+  | No_ppc -> "No_ppc"
+  | No_arm -> "No_arm"
+  | No_s390x -> "No_s390x"
+  | N_ary_and _ -> "N_ary_and"
+
 type with_test = Always | Never | Only_on_64_arch
 
 let show_with_test = function
@@ -599,6 +619,7 @@ module Opam = struct
     depends : dependency list;
     conflicts : dependency list;
     build : build_instruction list;
+    available : available;
     synopsis : string;
     url : url option;
     description : string option;
@@ -617,6 +638,7 @@ module Opam = struct
         depends;
         conflicts;
         build;
+        available;
         synopsis;
         url;
         description;
@@ -780,6 +802,23 @@ module Opam = struct
       | Only_on_64_arch ->
           ["with-test"; "arch != \"arm32\""; "arch != \"x86_32\""]
     in
+    let available =
+      let rec condition_of_available = function
+        | No_32 ->
+            ["arch != \"arm32\""; "arch != \"x86_32\""; "arch != \"ppc32\""]
+        | No_x86 -> ["arch != \"x86_32\""; "arch != \"x86_64\""]
+        | No_arm -> ["arch != \"arm32\""; "arch != \"arm64\""]
+        | No_ppc -> ["arch != \"ppc64\""; "arch != \"ppc64\""]
+        | No_s390x -> ["arch != \"s390x\""]
+        | Always -> []
+        | Never -> ["false"]
+        | N_ary_and available_list ->
+            List.map condition_of_available available_list
+            |> List.flatten
+            |> deduplicate_list (fun s -> s)
+      in
+      condition_of_available available
+    in
     let pp_condition fmt = function
       | [] -> ()
       | ["with-test"] -> Format.pp_print_string fmt " {with-test}"
@@ -857,6 +896,13 @@ module Opam = struct
         (pp_list ~v:true ~prefix:"conflicts: " pp_dependency)
         conflicts ;
     pp_line "%a" (pp_list ~prefix:"build: " pp_build_instruction) build ;
+    if available <> [] then
+      pp_line
+        "available: %a"
+        (Format.pp_print_list
+           ~pp_sep:(fun fmt () -> Format.pp_print_string fmt " & ")
+           Format.pp_print_string)
+        available ;
     pp_line "synopsis: %a" pp_string synopsis ;
     Option.iter pp_url url ;
     Option.iter (pp_line "description: %a" pp_string) description
@@ -1166,6 +1212,7 @@ module Target = struct
     static : bool;
     synopsis : string option;
     description : string option;
+    available : available;
     virtual_modules : string list;
     default_implementation : string option;
     npm_deps : Npm.t list;
@@ -1348,6 +1395,7 @@ module Target = struct
     ?synopsis:string ->
     ?description:string ->
     ?time_measurement_ppx:bool ->
+    ?available:available ->
     ?virtual_modules:string list ->
     (* A note on [default_implementation]. In the .mli,  this argument is
        given type [string] instead of [target]. This is because one can't
@@ -1418,9 +1466,9 @@ module Target = struct
       ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
       ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
       ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
-      ?(extra_authors = []) ?(with_macos_security_framework = false) ~path names
-      =
+      ?(available : available = Always) ?(virtual_modules = [])
+      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
+      ?(with_macos_security_framework = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1754,6 +1802,7 @@ module Target = struct
         synopsis;
         description;
         npm_deps;
+        available;
         virtual_modules;
         default_implementation;
         cram;
@@ -2261,6 +2310,7 @@ module Sub_lib = struct
        ?synopsis
        ?description
        ?time_measurement_ppx
+       ?available
        ?virtual_modules
        ?default_implementation
        ?cram
@@ -2338,6 +2388,7 @@ module Sub_lib = struct
       ?static
       ?description
       ?time_measurement_ppx
+      ?available
       ?virtual_modules
       ?default_implementation
       ?cram
@@ -2996,6 +3047,30 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     in
     deduplicate_list ~merge (fun {Opam.package; _} -> package) depends
   in
+  let merge_available a b =
+    match (a, b) with
+    | No_32, No_32 -> No_32
+    | No_arm, No_arm -> No_arm
+    | No_x86, No_x86 -> No_x86
+    | No_ppc, No_ppc -> No_ppc
+    | Never, _ | _, Never -> Never
+    | Always, Always -> Always
+    | N_ary_and available_list_1, N_ary_and available_list_2 ->
+        N_ary_and
+          (deduplicate_list
+             string_of_available
+             (available_list_1 @ available_list_2))
+    | N_ary_and available_list, a | a, N_ary_and available_list ->
+        N_ary_and (deduplicate_list string_of_available (a :: available_list))
+    | a1, a2 -> N_ary_and [a1; a2]
+  in
+  let available =
+    List.fold_left
+      (fun (available : available) (internal : Target.internal) ->
+        merge_available available internal.available)
+      Always
+      internals
+  in
   let conflicts =
     List.of_seq @@ Opam_dependency_set.to_seq
     @@ List.fold_left
@@ -3140,6 +3215,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     depends;
     conflicts;
     build;
+    available;
     synopsis = get_consistent_value ~name:"synopsis" (fun x -> x.synopsis);
     url = Option.map (fun {url; _} -> url) release;
     description;
@@ -3190,6 +3266,7 @@ let generate_opam_meta_package opam_release_graph add_to_meta_package : Opam.t =
     depends = depends1 @ depends2;
     conflicts = [];
     build = [];
+    available = Always;
     synopsis = "Main virtual package for Octez, an implementation of Tezos";
     url = None;
     description = None;
@@ -3827,6 +3904,7 @@ let generate_profiles ~default_profile =
         depends;
         conflicts;
         build = [];
+        available = Always;
         synopsis =
           Printf.sprintf
             "Virtual package depending on Octez dependencies (profile: %s)"

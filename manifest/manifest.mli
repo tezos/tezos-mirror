@@ -572,6 +572,28 @@ type inline_tests
 (** Declare an inline_tests backend. *)
 val inline_tests_backend : target -> inline_tests
 
+(** Used to specify the availability of an opam package.
+
+    - [Always]: The package is always available.
+      No entry will be added to the opam file.
+    - [Never]: The package will be marked as unavailable.
+    - [No_32]: The package is marked as unavailable on all 32-bits architectures.
+    - [No_x86]: The package is marked as unavailable on x86 architectures.
+    - [No_ppc]: The package is marked as unavailable on ppc architectures.
+    - [No_arm]: The package is marked as unavailable on arm architectures.
+    - [N_ary_and [a1;...;an]]: The package availability is [a1] & ... & [an].
+
+*)
+type available =
+  | Always
+  | Never
+  | No_32
+  | No_x86
+  | No_ppc
+  | No_arm
+  | No_s390x
+  | N_ary_and of available list
+
 (** Whether to add the [dune runtest] command in the [.opam] file.
 
     - [Never]: do not add it.
@@ -826,6 +848,7 @@ type 'a maker =
   ?synopsis:string ->
   ?description:string ->
   ?time_measurement_ppx:bool ->
+  ?available:available ->
   ?virtual_modules:string list ->
   ?default_implementation:string ->
   ?cram:bool ->
