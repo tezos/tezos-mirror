@@ -1,0 +1,18 @@
+{
+    "infrastructure": {
+        "tags": [],
+        "path_prefixes": []
+    },
+    "layer1": {
+        "tags": [],
+        "path_prefixes": []
+    },
+    "tezos2": {
+        "tags": [],
+        "path_prefixes": []
+    },
+    "etherlink": {
+        "tags": [],
+        "path_prefixes": []
+    }
+}

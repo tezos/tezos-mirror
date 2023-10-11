@@ -82,3 +82,61 @@ much as possible, a test in this testsuite should avoid the use of timeouts
 and instead, should rely on `events` if possible.
 
 The implementation of the `tezt` library is detailed in its own documentation in the `lib/README.md` file.
+
+## Declaring test ownership with `TESTOWNERS.json`
+
+`TESTOWNERS.json` is a JSON file mapping 'products' to tests. It's
+used to declare test ownership by attaching tests to products.
+Through this file, developers and automated tooling can know what
+product team is responsible for the maintenance of which test.
+
+In pseudo-TypeScript, the schema of `TESTOWNERS.json` is:
+
+```typescript
+type TESTOWNERS = [PRODUCT_NAME: string]: PRODUCT_SPEC;
+type PRODUCT_SPEC = {
+  tags: string[];
+  path_prefixes: string[];
+};
+```
+
+where the top-level element of `TESTOWNERS.json` has the type `TESTOWNERS`.
+                                   
+Semantically, each `PRODUCT_NAME` - `PRODUCT_SPEC` association in
+`TESTOWNERS` corresponds to a product and a set of Tezt test tags and
+path prefixes to associated with the product. Path prefixes are
+interpreted such that a prefix `F` matches all tests for which `F` is
+a prefix of its `~__FILE__`. Tags match all the tests with the given
+tag. The full set of tests associated to a product is the union of all
+tests matched by any of the tags or the path prefixes associated to
+the test.
+
+
+For instance, a valid `TESTOWNERS.json` is:
+
+```json
+{
+    "layer1": {
+        "tags": ["michelson"],
+        "path_prefixes": [
+            "src/proto_alpha/lib_protocol/"
+        ]
+    }
+}
+```
+
+This file defines one product `layer1` and declares that all tests
+tagged `michelson` or which are registered with `~__FILE__` in
+`src/proto_alpha/lib_protocol/` belong to that product. Or in other
+words, the union of the results returned by:
+
+```
+tezt --match "^src/proto_alpha/lib_protocol/"
+tezt michelson
+```
+
+To see all the tests associated with a product, run:
+
+```shell
+scripts/tests_of_product.sh PRODUCT
+```
