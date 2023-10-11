@@ -27,8 +27,6 @@ pub struct BlockConstants {
     /// Unix date/time of the current block - when was the previous block finished
     pub timestamp: U256,
     /// Mining difficulty of the current block. This relates to PoW, and we can set
-    /// the value to an arbitrary value.
-    pub difficulty: U256,
     /// Gas limit for the current block.
     pub gas_limit: u64,
     /// The base fee per gas for doing a transaction.
@@ -48,7 +46,6 @@ impl BlockConstants {
             number: U256::zero(),
             coinbase: H160::zero(),
             timestamp,
-            difficulty: U256::zero(),
             gas_limit: 1u64,
             base_fee_per_gas,
             chain_id,
@@ -64,21 +61,16 @@ pub struct L2Block {
     pub number: U256,
     pub hash: H256,
     pub parent_hash: H256,
-    pub nonce: U256,
-    pub sha3_uncles: OwnedHash,
     pub logs_bloom: Option<OwnedHash>,
     pub transactions_root: OwnedHash,
     pub state_root: OwnedHash,
     pub receipts_root: OwnedHash,
     pub miner: OwnedHash,
-    pub difficulty: U256,
-    pub total_difficulty: U256,
     pub extra_data: OwnedHash,
     pub gas_limit: u64,
     pub gas_used: U256,
     pub timestamp: Timestamp,
     pub transactions: Vec<TransactionHash>,
-    pub uncles: Vec<OwnedHash>,
 }
 
 impl L2Block {
@@ -116,7 +108,6 @@ impl L2Block {
             number: self.number,
             coinbase: H160::zero(),
             timestamp,
-            difficulty: self.difficulty,
             gas_limit: self.gas_limit,
             base_fee_per_gas,
             chain_id,
@@ -130,21 +121,16 @@ impl Default for L2Block {
             number: U256::default(),
             hash: H256::default(),
             parent_hash: L2Block::dummy_block_hash(),
-            nonce: U256::zero(),
-            sha3_uncles: L2Block::dummy_hash(),
             logs_bloom: None,
             transactions_root: L2Block::dummy_hash(),
             state_root: L2Block::dummy_hash(),
             receipts_root: L2Block::dummy_hash(),
             miner: L2Block::dummy_hash(),
-            difficulty: U256::zero(),
-            total_difficulty: U256::zero(),
             extra_data: L2Block::dummy_hash(),
             gas_limit: 1u64,
             gas_used: U256::zero(),
             timestamp: Timestamp::from(0),
             transactions: Vec::new(),
-            uncles: Vec::new(),
         }
     }
 }

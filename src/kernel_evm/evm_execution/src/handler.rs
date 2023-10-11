@@ -1424,7 +1424,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn block_difficulty(&self) -> U256 {
-        self.block.difficulty
+        // There's no difficulty in the blocks
+        // A default value is returned here
+        U256::zero()
     }
 
     fn block_gas_limit(&self) -> U256 {
