@@ -1367,10 +1367,7 @@ let test_simulate =
       in
       let simulated_block_number =
         match simulation_result.insights with
-        | [insight] ->
-            Option.map
-              (fun hex -> `Hex hex |> Hex.to_string |> Z.of_bits |> Z.to_int)
-              insight
+        | [insight] -> Option.map Helpers.hex_string_to_int insight
         | _ -> None
       in
       Check.((simulated_block_number = Some (block_number + 1)) (option int))
@@ -3105,6 +3102,39 @@ let test_rpc_getStorageAt =
     ~error_msg:"Expected %R, but got %L" ;
   unit
 
+let test_accounts_double_indexing =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "accounts"; "index"]
+    ~title:"Accounts have a unique index"
+  @@ fun protocol ->
+  let* ({sc_rollup_client; _} as full_evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let check_accounts_length expected_length =
+    let*! length =
+      Sc_rollup_client.inspect_durable_state_value
+        sc_rollup_client
+        ~pvm_kind:"wasm_2_0_0"
+        ~operation:Sc_rollup_client.Value
+        ~key:"/evm/indexes/accounts/length"
+    in
+    let length = Option.map Helpers.hex_string_to_int length in
+    Check.((length = Some expected_length) (option int))
+      ~error_msg:"Expected %R accounts, got %L" ;
+    unit
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  (* Send a first transaction, there must be 2 indexes. *)
+  let* _tx_hash = send ~sender ~receiver ~value:Wei.one full_evm_setup in
+  let* () = check_accounts_length 2 in
+  (* After a second transaction with the same accounts, there still must
+     be 2 indexes. *)
+  let* _tx_hash = send ~sender ~receiver ~value:Wei.one full_evm_setup in
+  let* () = check_accounts_length 2 in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -3161,7 +3191,8 @@ let register_evm_proxy_server ~protocols =
   test_simulation_eip2200 protocols ;
   test_cover_fees protocols ;
   test_rpc_gasPrice protocols ;
-  test_rpc_getStorageAt protocols
+  test_rpc_getStorageAt protocols ;
+  test_accounts_double_indexing protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
