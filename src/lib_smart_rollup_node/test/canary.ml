@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:  Smart rollup node library
-    Invocation: dune exec src/lib_smart_rollup_node/tests/main.exe \
-                -- -f src/lib_smart_rollup_node/tests/canary.ml
+    Invocation: dune exec src/lib_smart_rollup_node/test/main.exe \
+                -- -f src/lib_smart_rollup_node/test/canary.ml
     Subject:    Canary unit tests to make sure the test helpers work as intended
 *)
 
