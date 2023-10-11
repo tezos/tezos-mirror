@@ -130,7 +130,7 @@ let rec process_l1_block (daemon_components : (module Daemon_components.S))
                 node_ctxt
                 (Layer1.head_of_header head)
             in
-            let* () = process_l1_block_operations node_ctxt head in
+            let* () = process_l1_block_operations ~catching_up node_ctxt head in
             (* Avoid storing and publishing commitments if the head is not final. *)
             (* Avoid triggering the pvm execution if this has been done before for
                this head. *)
