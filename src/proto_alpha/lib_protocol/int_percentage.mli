@@ -12,6 +12,9 @@ val encoding : t Data_encoding.t
 
 val of_ratio_bounded : Ratio_repr.t -> t
 
+(** [neg p] is [100 - p]. *)
+val neg : t -> t
+
 val add_bounded : t -> t -> t
 
 (** Constants *)
