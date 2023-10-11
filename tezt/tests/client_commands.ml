@@ -269,7 +269,10 @@ module Transfer = struct
     let* malicious = Client.gen_and_show_keys ~alias:"malicious" client2 in
     let malicious = {malicious with Account.alias = victim.public_key_hash} in
     Log.info "Importing malicious account whose alias is victim's public key" ;
-    let* () = Client.import_secret_key client malicious in
+    let* () =
+      let Account.{alias; secret_key; _} = malicious in
+      Client.import_secret_key client ~alias secret_key
+    in
     let amount = Tez.of_int 2 in
     Log.info
       "Transferring to victim's public key hash should not transfer to \
@@ -303,7 +306,10 @@ module Transfer = struct
     let* victim = Client.gen_and_show_keys ~alias:"victim" client2 in
     let victim = {victim with Account.alias = malicious.public_key_hash} in
     Log.info "Importing victim account whose alias is malicious's public key" ;
-    let* () = Client.import_secret_key client victim in
+    let* () =
+      let Account.{alias; secret_key; _} = victim in
+      Client.import_secret_key client ~alias secret_key
+    in
     Log.info "Giving some tokens to victim" ;
     let* () =
       Client.transfer
@@ -470,7 +476,10 @@ module Transfer = struct
       ~tags:["client"; "set_delegate"; "bls"; "tz4"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
-    let* () = Client.import_secret_key client Constant.tz4_account in
+    let* () =
+      let Account.{alias; secret_key; _} = Constant.tz4_account in
+      Client.import_secret_key client ~alias secret_key
+    in
     let* () = airdrop_and_reveal client [Constant.tz4_account] in
     let*? set_delegate_process =
       Client.set_delegate

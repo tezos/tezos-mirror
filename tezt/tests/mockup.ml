@@ -530,14 +530,9 @@ let test_origination_from_unrevealed_fees =
   let* () =
     Client.import_secret_key
       client
-      {
-        alias = "originator";
-        public_key_hash = "";
-        public_key = "";
-        secret_key =
-          Unencrypted
-            "edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
-      }
+      ~alias:"originator"
+      (Unencrypted
+         "edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy")
   in
   let* () =
     Client.transfer
