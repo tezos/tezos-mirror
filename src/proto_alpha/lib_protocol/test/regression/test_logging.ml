@@ -162,7 +162,6 @@ let logger () :
       end)
   in
   let assemble_log () =
-    let open Environment.Error_monad in
     let+ l =
       List.map_es
         (function

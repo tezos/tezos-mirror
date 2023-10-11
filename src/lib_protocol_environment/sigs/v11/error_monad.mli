@@ -100,31 +100,6 @@ val trace_of_error : 'err -> 'err trace
 
 val tzfail : 'err -> ('a, 'err trace) result Lwt.t
 
-val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
-
-val ( >>? ) :
-  ('a, 'trace) result -> ('a -> ('b, 'trace) result) -> ('b, 'trace) result
-
-val ( >|? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) result
-
-val ( >>=? ) :
-  ('a, 'trace) result Lwt.t ->
-  ('a -> ('b, 'trace) result Lwt.t) ->
-  ('b, 'trace) result Lwt.t
-
-val ( >|=? ) :
-  ('a, 'trace) result Lwt.t -> ('a -> 'b) -> ('b, 'trace) result Lwt.t
-
-val ( >>?= ) :
-  ('a, 'trace) result ->
-  ('a -> ('b, 'trace) result Lwt.t) ->
-  ('b, 'trace) result Lwt.t
-
-val ( >|?= ) :
-  ('a, 'trace) result -> ('a -> 'b Lwt.t) -> ('b, 'trace) result Lwt.t
-
 val record_trace : 'err -> ('a, 'err trace) result -> ('a, 'err trace) result
 
 val trace :

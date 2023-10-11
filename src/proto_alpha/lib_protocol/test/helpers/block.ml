@@ -829,7 +829,6 @@ let detect_manager_failure :
 let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     ~allow_manager_failures header ?(operations = []) pred =
   let open Lwt_result_wrap_syntax in
-  let open Environment.Error_monad in
   let* context, result =
     let* vstate =
       match baking_mode with
