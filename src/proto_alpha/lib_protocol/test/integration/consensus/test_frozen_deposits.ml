@@ -403,7 +403,7 @@ let test_set_limit balance_percentage () =
     Context.Delegate.current_frozen_deposits (B genesis) account1
   in
   let expected_deposits =
-    full_balance /! Int64.of_int (constants.delegation_over_baking_limit + 1)
+    full_balance /! Int64.of_int (constants.limit_of_delegation_over_baking + 1)
   in
   let* () = Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_deposits in
   (* Bake until end of first cycle *)
@@ -413,7 +413,7 @@ let test_set_limit balance_percentage () =
     Context.Delegate.current_frozen_deposits (B genesis) account1
   in
   let expected_deposits =
-    full_balance /! Int64.of_int (constants.delegation_over_baking_limit + 1)
+    full_balance /! Int64.of_int (constants.limit_of_delegation_over_baking + 1)
   in
   let* () = Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_deposits in
   (* set deposits limit to balance_percentage out of the balance *)
@@ -885,7 +885,7 @@ let test_frozen_deposits_with_overdelegation () =
   return_unit
 
 let test_set_limit_with_overdelegation () =
-  let constants = {constants with delegation_over_baking_limit = 9} in
+  let constants = {constants with limit_of_delegation_over_baking = 9} in
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts
