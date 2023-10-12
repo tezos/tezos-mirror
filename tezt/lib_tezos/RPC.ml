@@ -1173,6 +1173,38 @@ let get_chain_block_context_delegate_stakers ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; "stakers"]
     Fun.id
 
+let get_chain_block_context_delegate_total_delegated_stake ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "total_delegated_stake";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_staking_denominator ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "staking_denominator";
+    ]
+    Fun.id
+
 let get_chain_block_context_delegate_frozen_deposits ?(chain = "main")
     ?(block = "head") pkh =
   make
