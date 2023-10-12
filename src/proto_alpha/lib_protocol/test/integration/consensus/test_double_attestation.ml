@@ -233,8 +233,158 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
   in
   let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after in
+  let* is_forbidden =
+    Context.Delegate.is_forbidden
+      ~policy:(Block.By_account baker)
+      (B blk_with_evidence2)
+      delegate
+  in
+  let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
   (* a delegate with 0 frozen deposits cannot bake *)
+  Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
+
+(** Say a delegate double-attests twice in a cycle,
+    and say the 2 evidences are included in different (valid) cycles.
+    Then the delegate is forbidden and can no longer bake. *)
+let test_two_double_attestation_evidences_staggered () =
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* blk_1, blk_2 = block_fork genesis in
+  let* blk_a = Block.bake blk_1 in
+  let* blk_b = Block.bake blk_2 in
+  let* delegate, _ = Context.get_attester (B blk_a) in
+  let* attestation_a = Op.raw_attestation blk_a in
+  let* attestation_b = Op.raw_attestation blk_b in
+  let operation = double_attestation (B genesis) attestation_a attestation_b in
+  let* bakers = Context.get_bakers (B blk_a) in
+  let baker = Context.get_first_different_baker delegate bakers in
+  let* (_full_balance : Tez.t) =
+    Context.Delegate.full_balance (B blk_a) baker
+  in
+  let* blk_with_evidence1 =
+    Block.bake ~policy:(By_account baker) ~operation blk_a
+  in
+
+  let* blk_30, blk_40 = block_fork blk_with_evidence1 in
+  let* blk_3 = Block.bake blk_30 in
+  let* blk_4 = Block.bake blk_40 in
+  let* attestation_3 = Op.raw_attestation ~delegate blk_3 in
+  let* attestation_4 = Op.raw_attestation ~delegate blk_4 in
+  let operation_evidence2 =
+    double_attestation (B blk_with_evidence1) attestation_3 attestation_4
+  in
+
+  let* operation =
+    Adaptive_issuance_helpers.stake
+      (B blk_with_evidence1)
+      (Protocol.Alpha_context.Contract.Implicit delegate)
+      (Tez.of_mutez_exn 1_000_000_000L)
+  in
+  let* blk_with_stake =
+    Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
+  in
+  let* blk_new_cycle =
+    Block.bake_until_cycle_end ~policy:(By_account baker) blk_with_stake
+  in
+  let* blk_with_evidence2 =
+    Block.bake
+      ~policy:(By_account baker)
+      ~operation:operation_evidence2
+      blk_new_cycle
+  in
+  (* Check that NOT all the frozen deposits are slashed *)
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
+  in
+  let* frozen_deposits_before =
+    Context.Delegate.current_frozen_deposits (B blk_new_cycle) delegate
+  in
+  Log.info
+    "Tez before slashing: %a @.After slashing %a @."
+    Tez.pp
+    frozen_deposits_before
+    Tez.pp
+    frozen_deposits_after ;
+  let* () = Assert.not_equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after in
+  let* is_forbidden =
+    Context.Delegate.is_forbidden
+      ~policy:(Block.By_account baker)
+      (B blk_with_evidence2)
+      delegate
+  in
+  let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
+  let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
+  (* A forbidden delegate cannot bake *)
+  Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
+
+(** Say a delegate double-attests twice in two consecutive cycles,
+    and say the 2 evidences are timely included. Then the delegate
+    is forbidden and can no longer bake. *)
+let test_two_double_attestation_evidences_consecutive_cycles () =
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* blk_1, blk_2 = block_fork genesis in
+  let* blk_a = Block.bake blk_1 in
+  let* blk_b = Block.bake blk_2 in
+  let* delegate, _ = Context.get_attester (B blk_a) in
+  let* attestation_a = Op.raw_attestation blk_a in
+  let* attestation_b = Op.raw_attestation blk_b in
+  let operation = double_attestation (B genesis) attestation_a attestation_b in
+  let* bakers = Context.get_bakers (B blk_a) in
+  let baker = Context.get_first_different_baker delegate bakers in
+  let* (_full_balance : Tez.t) =
+    Context.Delegate.full_balance (B blk_a) baker
+  in
+  let* blk_with_evidence1 =
+    Block.bake ~policy:(By_account baker) ~operation blk_a
+  in
+  let* operation =
+    Adaptive_issuance_helpers.stake
+      (B blk_with_evidence1)
+      (Protocol.Alpha_context.Contract.Implicit delegate)
+      (Tez.of_mutez_exn 1_000_000_000L)
+  in
+  let* blk_with_stake =
+    Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
+  in
+  let* blk_new_cycle =
+    Block.bake_until_cycle_end ~policy:(By_account baker) blk_with_stake
+  in
+  let* blk_30, blk_40 = block_fork blk_new_cycle in
+  let* blk_3 = Block.bake blk_30 in
+  let* blk_4 = Block.bake blk_40 in
+  let* attestation_3 = Op.raw_attestation ~delegate blk_3 in
+  let* attestation_4 = Op.raw_attestation ~delegate blk_4 in
+  let operation =
+    double_attestation (B blk_new_cycle) attestation_3 attestation_4
+  in
+  let* blk_with_evidence2 =
+    Block.bake ~policy:(By_account baker) ~operation blk_3
+  in
+  (* Check that NOT all the frozen deposits are slashed *)
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
+  in
+  let* frozen_deposits_before =
+    Context.Delegate.current_frozen_deposits (B blk_3) delegate
+  in
+  Log.info
+    "Tez before slashing: %a @.After slashing %a @."
+    Tez.pp
+    frozen_deposits_before
+    Tez.pp
+    frozen_deposits_after ;
+  let* () = Assert.not_equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after in
+  let* is_forbidden =
+    Context.Delegate.is_forbidden
+      ~policy:(Block.By_account baker)
+      (B blk_with_evidence2)
+      delegate
+  in
+  let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
+  let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
+  (* A forbidden delegate cannot bake *)
   Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
 
 (****************************************************************)
@@ -583,6 +733,16 @@ let tests =
       "2 valid double attestation evidences lead to not being able to bake"
       `Quick
       test_two_double_attestation_evidences_leadsto_no_bake;
+    Tztest.tztest
+      "2 valid double attestation evidences for double signings in consecutive \
+       cycles lead to forbidding"
+      `Quick
+      test_two_double_attestation_evidences_consecutive_cycles;
+    Tztest.tztest
+      "2 valid double attestation evidences in consecutive cycles for double \
+       signing in same cycle lead to forbidding"
+      `Quick
+      test_two_double_attestation_evidences_staggered;
     Tztest.tztest
       "valid double attestation injected multiple time"
       `Quick

@@ -256,6 +256,11 @@ module Delegate : sig
 
   val participation :
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
+
+  (** This function might begin constructing a block. Use [policy] to
+      specify a valid baker for the new block (default [By_round 0]) *)
+  val is_forbidden :
+    ?policy:Block.baker_policy -> t -> public_key_hash -> bool tzresult Lwt.t
 end
 
 module Sc_rollup : sig

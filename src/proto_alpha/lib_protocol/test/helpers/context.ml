@@ -29,6 +29,14 @@ open Alpha_context
 
 type t = B of Block.t | I of Incremental.t
 
+let get_alpha_ctxt ?(policy = Block.By_round 0) c =
+  let open Lwt_result_syntax in
+  match c with
+  | I i -> return (Incremental.alpha_ctxt i)
+  | B b ->
+      let* i = Incremental.begin_construction ~policy b in
+      return (Incremental.alpha_ctxt i)
+
 let branch = function B b -> b.hash | I i -> (Incremental.predecessor i).hash
 
 let pred_branch = function
@@ -467,6 +475,11 @@ module Delegate = struct
   let consensus_key ctxt pkh = Delegate_services.consensus_key rpc_ctxt ctxt pkh
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
+
+  let is_forbidden ?policy ctxt pkh =
+    let open Lwt_result_syntax in
+    let* ctxt = get_alpha_ctxt ?policy ctxt in
+    return (Delegate.is_forbidden_delegate ctxt pkh)
 end
 
 module Sc_rollup = struct

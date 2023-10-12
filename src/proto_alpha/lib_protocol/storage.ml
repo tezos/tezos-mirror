@@ -182,6 +182,11 @@ module Slashed_deposits_history = struct
           List.rev_append rev_prefix ((cycle, percentage) :: suffix)
     in
     loop [] history
+
+  let rec get cycle = function
+    | (c, p) :: _ when Cycle_repr.(cycle = c) -> p
+    | (c, _) :: tl when Cycle_repr.(cycle > c) -> get cycle tl
+    | _ -> 0
 end
 
 module Unstake_request = struct
