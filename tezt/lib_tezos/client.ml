@@ -541,23 +541,29 @@ let spawn_version client = spawn_command client ["--version"]
 let version client = spawn_version client |> Process.check
 
 let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
-    (key : Account.key) =
+    (secret_key : Account.secret_key) ~alias =
   let sk_uri =
-    match key.secret_key with
-    | Encrypted _ -> Account.uri_of_secret_key key.secret_key
+    match secret_key with
+    | Encrypted _ -> Account.uri_of_secret_key secret_key
     | Unencrypted _ -> Test.fail "Unencrypted key"
   in
   spawn_command_with_stdin
     ?hooks
     ?endpoint
     client
-    (["import"; "secret"; "key"; key.alias; sk_uri]
+    (["import"; "secret"; "key"; alias; sk_uri]
     @ if force then ["--force"] else [])
 
 let import_encrypted_secret_key ?hooks ?force ?endpoint client
-    (key : Account.key) ~password =
+    (secret_key : Account.secret_key) ~alias ~password =
   let process, output_channel =
-    spawn_import_encrypted_secret_key ?hooks ?force ?endpoint client key
+    spawn_import_encrypted_secret_key
+      ?hooks
+      ?force
+      ?endpoint
+      client
+      secret_key
+      ~alias
   in
   let* () = Lwt_io.write_line output_channel password in
   let* () = Lwt_io.close output_channel in

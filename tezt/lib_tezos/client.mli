@@ -417,7 +417,8 @@ val import_encrypted_secret_key :
   ?force:bool ->
   ?endpoint:endpoint ->
   t ->
-  Account.key ->
+  Account.secret_key ->
+  alias:string ->
   password:string ->
   unit Lwt.t
 
@@ -427,7 +428,8 @@ val spawn_import_encrypted_secret_key :
   ?force:bool ->
   ?endpoint:endpoint ->
   t ->
-  Account.key ->
+  Account.secret_key ->
+  alias:string ->
   Process.t * Lwt_io.output_channel
 
 (** Run [octez-client import secret key]. *)

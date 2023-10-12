@@ -50,9 +50,11 @@ let test_client =
     }
   in
   let* () =
+    let Account.{alias; secret_key; _} = encrypted_account in
     Client.import_encrypted_secret_key
       client
-      encrypted_account
+      ~alias
+      secret_key
       ~password:"password"
   in
   let* () =
