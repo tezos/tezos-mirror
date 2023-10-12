@@ -198,13 +198,6 @@ let set_active ctxt delegate =
       return ctxt
     else return ctxt
 
-let snapshot ctxt =
-  let open Lwt_result_syntax in
-  let* index = Storage.Stake.Last_snapshot.get ctxt in
-  let* ctxt = Storage.Stake.Last_snapshot.update ctxt (index + 1) in
-  let* ctxt = Storage.Stake.Staking_balance.snapshot ctxt index in
-  Storage.Stake.Active_delegates_with_minimal_stake.snapshot ctxt index
-
 let max_snapshot_index = Storage.Stake.Last_snapshot.get
 
 let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =

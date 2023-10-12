@@ -74,8 +74,6 @@ val set_inactive :
 val set_active :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
 (** [fold ctxt ~f ~order init] folds [f] on the list of active delegates having the
     minimal required stake. The folding process starts with [init]. Each element of the
     list is the public key hash of a delegate. *)

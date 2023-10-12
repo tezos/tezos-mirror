@@ -572,8 +572,6 @@ module Delegate = struct
 end
 
 module Stake_distribution = struct
-  let snapshot = Stake_storage.snapshot
-
   let compute_snapshot_index = Delegate_sampler.compute_snapshot_index
 
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
