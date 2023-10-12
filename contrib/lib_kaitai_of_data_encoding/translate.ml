@@ -196,11 +196,8 @@ let rec seq_field_of_data_encoding :
   | _ -> failwith "Not implemented"
 
 let from_data_encoding :
-    type a.
-    id:string ->
-    ?description:string ->
-    a DataEncoding.t ->
-    ClassSpec.t =
+    type a. id:string -> ?description:string -> a DataEncoding.t -> ClassSpec.t
+    =
  fun ~id ?description encoding ->
   let encoding_name = escape_id id in
   match encoding.encoding with
@@ -209,6 +206,7 @@ let from_data_encoding :
         seq_field_of_data_encoding [] [] encoding id None
       in
       Helpers.class_spec_of_attrs
+        ~top_level:true
         ~id:encoding_name
         ?description
         ~enums
@@ -220,6 +218,7 @@ let from_data_encoding :
         seq_field_of_data_encoding [] [] encoding encoding_name None
       in
       Helpers.class_spec_of_attrs
+        ~top_level:true
         ~id:encoding_name
         ?description
         ~enums
