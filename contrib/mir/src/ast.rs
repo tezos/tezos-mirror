@@ -57,6 +57,23 @@ impl Value {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum TypedValue {
+    Int(i128),
+    Nat(u128),
+    Mutez(i64),
+    Bool(bool),
+    String(String),
+    Unit,
+    Pair(Box<TypedValue>, Box<TypedValue>),
+}
+
+impl TypedValue {
+    pub fn new_pair(l: Self, r: Self) -> Self {
+        Self::Pair(Box::new(l), Box::new(r))
+    }
+}
+
 pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
 
 pub trait Stage {
