@@ -270,15 +270,16 @@ let gas_estimation json =
 
 let decode_is_valid bytes =
   match bytes with
-  | [Some b; error_msg] -> (
+  | [Some b; Some payload] ->
       let is_valid =
         b |> Data_encoding.Binary.of_bytes_exn Data_encoding.bool
       in
-      let error_msg = error_msg |> Option.map Bytes.to_string in
-      match (is_valid, error_msg) with
-      | true, None -> Some (Ok ())
-      | false, Some reason -> Some (Error reason)
-      | _, _ -> None)
+      if is_valid then
+        let address = Ethereum_types.decode_address payload in
+        Some (Ok address)
+      else
+        let error_msg = Bytes.to_string payload in
+        Some (Error error_msg)
   | _ -> None
 
 let is_tx_valid json =
