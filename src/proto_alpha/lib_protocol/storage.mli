@@ -512,13 +512,10 @@ module Stake : sig
        and type value = Full_staking_balance_repr.t
        and type t := Raw_context.t
 
-  (** This is a set, encoded in a map with value unit. This should be
-     fairly small compared to staking balance *)
+  (** This should be fairly small compared to staking balance *)
   module Active_delegates_with_minimal_stake :
-    Indexed_data_snapshotable_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = unit
-       and type snapshot = int
+    Data_set_storage
+      with type elt = Signature.Public_key_hash.t
        and type t := Raw_context.t
 
   (** Counter of stake storage snapshots taken since last cycle *)

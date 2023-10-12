@@ -35,7 +35,7 @@ let update_activity ctxt last_cycle =
         ctxt
         ~order:`Sorted
         ~init:(Ok (ctxt, []))
-        ~f:(fun delegate () acc ->
+        ~f:(fun delegate acc ->
           let*? ctxt, deactivated = acc in
           let* cycle =
             Delegate_activation_storage.last_cycle_before_deactivation

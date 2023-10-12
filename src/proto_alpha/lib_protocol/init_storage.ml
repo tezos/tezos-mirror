@@ -135,14 +135,25 @@ let migrate_already_denounced_from_Oxford ctxt =
   | Some previous_cycle -> migrate_cycle ctxt previous_cycle
 
 (* This removes snapshots and moves the current [staking_balance] one level
-   up. *)
-let migrate_staking_balance_for_p ctxt =
+   up. Same thing for active delegates with minimal stake but renames the key
+   at the same time. *)
+let migrate_staking_balance_and_active_delegates_for_p ctxt =
   let open Lwt_result_syntax in
   let* staking_balance_tree =
     Raw_context.get_tree ctxt ["staking_balance"; "current"]
   in
   let*! ctxt =
     Raw_context.add_tree ctxt ["staking_balance"] staking_balance_tree
+  in
+  let* active_delegates_tree =
+    Raw_context.get_tree ctxt ["active_delegate_with_one_roll"; "current"]
+  in
+  let*! ctxt = Raw_context.remove ctxt ["active_delegate_with_one_roll"] in
+  let*! ctxt =
+    Raw_context.add_tree
+      ctxt
+      ["active_delegates_with_minimal_stake"]
+      active_delegates_tree
   in
   return ctxt
 
@@ -245,7 +256,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
            that are not slashed whereas unstake_requests are slashed. *)
         let*! ctxt = Storage.Pending_denunciations.clear ctxt in
         let*! ctxt = migrate_already_denounced_from_Oxford ctxt in
-        let* ctxt = migrate_staking_balance_for_p ctxt in
+        let* ctxt = migrate_staking_balance_and_active_delegates_for_p ctxt in
         return (ctxt, [])
   in
   let* ctxt =

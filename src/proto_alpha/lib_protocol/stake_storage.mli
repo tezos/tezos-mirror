@@ -105,7 +105,7 @@ val fold_on_active_delegates_with_minimal_stake_s :
   Raw_context.t ->
   order:[`Sorted | `Undefined] ->
   init:'a ->
-  f:(Signature.Public_key_hash.t -> unit -> 'a -> 'a Lwt.t) ->
+  f:(Signature.Public_key_hash.t -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
 val get_selected_distribution :

@@ -1296,20 +1296,12 @@ module Stake = struct
       (Full_staking_balance_repr)
 
   module Active_delegates_with_minimal_stake =
-    Make_indexed_data_snapshotable_storage
+    Make_data_set_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
-           (* This name is for historical reasons, when the stake was
-              expressed in rolls (that is, pre-Ithaca). *)
-           let name = ["active_delegate_with_one_roll"]
+           let name = ["active_delegates_with_minimal_stake"]
          end))
-         (Int31_index)
-      (Public_key_hash_index)
-      (struct
-        type t = unit
-
-        let encoding = Data_encoding.unit
-      end)
+         (Public_key_hash_index)
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
   module Total_active_stake = Cycle.Total_active_stake
