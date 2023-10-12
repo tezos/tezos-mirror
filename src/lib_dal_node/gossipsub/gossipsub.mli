@@ -38,7 +38,7 @@ module Worker : sig
        and type GS.Message_id.t = Types.Message_id.t
        and type GS.Message.t = Types.Message.t
        and type GS.Peer.t = Types.Peer.t
-       and module GS.Span = Gs_interface.Span
+       and type GS.Span.t = Types.Span.t
        and module Monad = Gs_interface.Monad
 
   module Default_parameters : module type of Gs_default_parameters
@@ -49,7 +49,7 @@ module Worker : sig
        and type GS.Message_id.t = Types.Message_id.t
        and type GS.Message.t = Types.Message.t
        and type GS.Peer.t = Types.Peer.t
-       and module GS.Span = Config.GS.Span
+       and type GS.Span.t = Types.Span.t
 
   module Logging : sig
     val event : event -> unit Monad.t

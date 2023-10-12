@@ -118,6 +118,29 @@ module Peer : sig
   module Map : Map.S with type key = t
 end
 
+module Span : sig
+  type t = Ptime.Span.t
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  val zero : t
+
+  val of_int_s : int -> t
+
+  val to_int_s : t -> int
+
+  val of_float_s : float -> t
+
+  val to_float_s : t -> float
+
+  (** [mul s n] returns [n * s]. *)
+  val mul : t -> int -> t
+end
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
    Use a bitset instead, when available in the standard library. *)
 

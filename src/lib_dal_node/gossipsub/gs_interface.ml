@@ -48,28 +48,8 @@ let get_value ~__LOC__ func =
       Stdlib.failwith
         (Format.sprintf "%s: Unexpected overflow in %s" __LOC__ func))
 
-module Span : Gossipsub_intf.SPAN with type t = Ptime.Span.t = struct
-  type t = Ptime.Span.t
-
-  include Compare.Make (Ptime.Span)
-
-  let zero = Ptime.Span.zero
-
-  let to_int_s t = Ptime.Span.to_int_s t |> get_value ~__LOC__ __FUNCTION__
-
-  let to_float_s t = Ptime.Span.to_float_s t
-
-  let of_int_s = Ptime.Span.of_int_s
-
-  let of_float_s f = Ptime.Span.of_float_s f |> get_value ~__LOC__ __FUNCTION__
-
-  let mul span n = to_float_s span *. float n |> of_float_s
-
-  let pp = Ptime.Span.pp
-end
-
 module Time = struct
-  type span = Span.t
+  type span = Types.Span.t
 
   type t = Ptime.t
 
@@ -89,12 +69,13 @@ end
 module Automaton_config :
   AUTOMATON_CONFIG
     with type Time.t = Ptime.t
-     and module Span = Span
+     and type Span.t = Types.Span.t
+     and type Time.span = Types.Span.t
      and type Subconfig.Peer.t = peer
      and type Subconfig.Topic.t = Types.Topic.t
      and type Subconfig.Message_id.t = Types.Message_id.t
      and type Subconfig.Message.t = Types.Message.t = struct
-  module Span = Span
+  module Span = Types.Span
   module Time = Time
 
   module Subconfig = struct
@@ -117,7 +98,7 @@ module Monad = struct
 
   let return = Lwt.return
 
-  let sleep (span : Span.t) = Lwt_unix.sleep @@ Span.to_float_s span
+  let sleep (span : Types.Span.t) = Lwt_unix.sleep @@ Types.Span.to_float_s span
 end
 
 (** Instantiate the worker functor *)
@@ -127,7 +108,7 @@ module Worker_config :
      and type GS.Message_id.t = Types.Message_id.t
      and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = Types.Peer.t
-     and module GS.Span = Span
+     and type GS.Span.t = Types.Span.t
      and module Monad = Monad = struct
   module GS = Tezos_gossipsub.Make (Automaton_config)
   module Monad = Monad
@@ -156,17 +137,5 @@ module Worker_config :
     let get_available t = Lwt_stream.get_available t.stream
   end
 end
-
-let span_encoding : Span.t Data_encoding.t =
-  let open Data_encoding in
-  (* We limit the size of a {!Span.t} value to 2 bytes. It is sufficient for the
-     spans sent via the network by Gossipsub, while avoiding overflows when
-     adding them to values of type {!Time.t}. *)
-  let span_size = 2 in
-  check_size span_size
-  @@ conv
-       (fun span -> Span.to_int_s span)
-       (fun span -> Span.of_int_s span)
-       (obj1 (req "span" int16))
 
 module Worker_instance = Tezos_gossipsub.Worker (Worker_config)

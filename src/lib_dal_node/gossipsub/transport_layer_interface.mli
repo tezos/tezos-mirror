@@ -49,11 +49,7 @@ type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
     counterpart. *)
 type p2p_message =
   | Graft of {topic : Types.Topic.t}
-  | Prune of {
-      topic : Types.Topic.t;
-      px : px_peer Seq.t;
-      backoff : Gs_interface.Span.t;
-    }
+  | Prune of {topic : Types.Topic.t; px : px_peer Seq.t; backoff : Types.Span.t}
   | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
   | IWant of {message_ids : Types.Message_id.t list}
   | Subscribe of {topic : Types.Topic.t}

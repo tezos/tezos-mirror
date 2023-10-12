@@ -191,6 +191,43 @@ module Peer = struct
   let encoding = P2p_peer.Id.encoding
 end
 
+let get_value ~__LOC__ func =
+  Option.value_f ~default:(fun () ->
+      Stdlib.failwith
+        (Format.sprintf "%s: Unexpected overflow in %s" __LOC__ func))
+
+module Span = struct
+  type t = Ptime.Span.t
+
+  include Compare.Make (Ptime.Span)
+
+  let zero = Ptime.Span.zero
+
+  let to_int_s t = Ptime.Span.to_int_s t |> get_value ~__LOC__ __FUNCTION__
+
+  let to_float_s t = Ptime.Span.to_float_s t
+
+  let of_int_s = Ptime.Span.of_int_s
+
+  let of_float_s f = Ptime.Span.of_float_s f |> get_value ~__LOC__ __FUNCTION__
+
+  let mul span n = to_float_s span *. float n |> of_float_s
+
+  let pp = Ptime.Span.pp
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    (* We limit the size of a {!Span.t} value to 2 bytes. It is sufficient for the
+       spans sent via the network by Gossipsub, while avoiding overflows when
+       adding them to values of type {!Time.t}. *)
+    let span_size = 2 in
+    check_size span_size
+    @@ conv
+         (fun span -> to_int_s span)
+         (fun span -> of_int_s span)
+         (obj1 (req "span" int16))
+end
+
 (* Declaration of types used as inputs and/or outputs. *)
 type slot_id = {slot_level : level; slot_index : slot_index}
 

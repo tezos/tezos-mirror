@@ -37,7 +37,7 @@ module P2p_message_V1 = struct
     | Prune of {
         topic : Types.Topic.t;
         px : px_peer Seq.t;
-        backoff : Gs_interface.Span.t;
+        backoff : Types.Span.t;
       }
     | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
     | IWant of {message_ids : Types.Message_id.t list}
@@ -82,7 +82,7 @@ module P2p_message_V1 = struct
            (req "kind" (constant "prune"))
            (req "topic" Types.Topic.encoding)
            (req "px" (list px_peer_encoding))
-           (req "backoff" Gs_interface.span_encoding))
+           (req "backoff" Types.Span.encoding))
         (function
           | Prune {topic; px; backoff} ->
               Some ((), topic, List.of_seq px, backoff)
