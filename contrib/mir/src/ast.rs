@@ -61,6 +61,7 @@ pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
 
 pub trait Stage {
     type AddMeta;
+    type PushValue;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -73,7 +74,7 @@ pub enum Instruction<T: Stage> {
     If(Vec<Instruction<T>>, Vec<Instruction<T>>),
     Int,
     Loop(Vec<Instruction<T>>),
-    Push(Type, Value),
+    Push(T::PushValue),
     Swap,
     Failwith,
     Unit,

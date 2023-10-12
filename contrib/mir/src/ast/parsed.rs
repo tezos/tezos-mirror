@@ -5,13 +5,14 @@
 /*                                                                            */
 /******************************************************************************/
 
-use super::{Instruction, Stage};
+use super::{Instruction, Stage, Type, Value};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParsedStage {}
 
 impl Stage for ParsedStage {
     type AddMeta = ();
+    type PushValue = (Type, Value);
 }
 
 pub type ParsedInstruction = Instruction<ParsedStage>;

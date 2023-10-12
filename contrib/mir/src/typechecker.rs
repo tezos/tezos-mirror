@@ -148,10 +148,10 @@ fn typecheck_instruction(
             }
             _ => return Err(TcError::GenericTcError),
         },
-        I::Push(t, v) => {
+        I::Push((t, v)) => {
             typecheck_value(gas, &t, &v)?;
             stack.push(t.to_owned());
-            I::Push(t, v)
+            I::Push(v)
         }
         I::Swap => {
             ensure_stack_len(stack, 2)?;
@@ -337,8 +337,12 @@ mod typecheck_tests {
         let expected_stack = stk![Type::Nat, Type::Int];
         let mut gas = Gas::new(10000);
         assert_eq!(
-            typecheck_instruction(Push(Type::Int, Value::NumberValue(1)), &mut gas, &mut stack),
-            Ok(Push(Type::Int, Value::NumberValue(1)))
+            typecheck_instruction(
+                Push((Type::Int, Value::NumberValue(1))),
+                &mut gas,
+                &mut stack
+            ),
+            Ok(Push(Value::NumberValue(1)))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440 - 100);
@@ -365,7 +369,7 @@ mod typecheck_tests {
                 &mut gas,
                 &mut stack,
             ),
-            Ok(Dip(Some(1), vec![Push(Type::Nat, Value::NumberValue(6))]))
+            Ok(Dip(Some(1), vec![Push(Value::NumberValue(6))]))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440 - 440 - 100 - 50);
@@ -421,7 +425,7 @@ mod typecheck_tests {
                 &mut gas,
                 &mut stack
             ),
-            Ok(Loop(vec![Push(Type::Bool, Value::BooleanValue(true))]))
+            Ok(Loop(vec![Push(Value::BooleanValue(true))]))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(gas.milligas(), 10000 - 440 - 440 - 100 - 60 * 2);
@@ -510,10 +514,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(vec![Push(
-                Type::String,
-                Value::StringValue("foo".to_owned())
-            )])
+            Ok(vec![Push(Value::StringValue("foo".to_owned()))])
         );
         assert_eq!(stack, stk![Type::String]);
     }
@@ -527,7 +528,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(vec![Push(Type::Unit, Value::UnitValue)])
+            Ok(vec![Push(Value::UnitValue)])
         );
         assert_eq!(stack, stk![Type::Unit]);
     }
@@ -551,13 +552,10 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(vec![Push(
-                Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
-                Value::new_pair(
-                    Value::NumberValue(-5),
-                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
-                )
-            )])
+            Ok(vec![Push(Value::new_pair(
+                Value::NumberValue(-5),
+                Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+            ))])
         );
         assert_eq!(
             stack,
@@ -578,13 +576,10 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(vec![
-                Push(
-                    Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
-                    Value::new_pair(
-                        Value::NumberValue(-5),
-                        Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
-                    )
-                ),
+                Push(Value::new_pair(
+                    Value::NumberValue(-5),
+                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                )),
                 Car
             ])
         );
@@ -601,13 +596,10 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(vec![
-                Push(
-                    Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Bool)),
-                    Value::new_pair(
-                        Value::NumberValue(-5),
-                        Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
-                    )
-                ),
+                Push(Value::new_pair(
+                    Value::NumberValue(-5),
+                    Value::new_pair(Value::NumberValue(3), Value::BooleanValue(false))
+                )),
                 Cdr
             ])
         );

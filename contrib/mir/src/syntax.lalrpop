@@ -89,7 +89,7 @@ value_expr: Value = {
 
 use Instruction::*;
 instruction: ParsedInstruction = {
-  "PUSH" <type_expr> <value_expr> => Push(<>),
+  "PUSH" <type_expr> <value_expr> => Push((<>)),
   "INT" => Int,
   "GT" => Gt,
   "LOOP" <ib: instructionBlock> => Loop(ib),
