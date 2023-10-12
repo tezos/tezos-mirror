@@ -443,15 +443,14 @@ or more conveniently::
    octez-client stake <amount> for <staker>
 
 To *unstake* funds, a staker first submits an unstake request with the
-``unstake`` pseudo-operation. This is implemented by transferring 0 tez
-to their ``unstake`` entry-point, while passing the chosen amount as a
-parameter::
+``unstake`` pseudo-operation. This is implemented by transferring the
+chosen amount in tez to their ``unstake`` entry-point::
 
-   octez-client transfer 0 from <staker> to <staker> --entrypoint unstake --arg <amount_in_mutez>
+   octez-client transfer <amount> from <staker> to <staker> --entrypoint unstake
 
 or more conveniently::
 
-   octez-client unstake <amount_in_tez|"everything"> for <staker>
+   octez-client unstake <amount|"everything"> for <staker>
 
 The requested amount will be **unstaked** but will remain **frozen**.
 After 7 cycles, unstaked frozen tokens are no longer considered at stake
