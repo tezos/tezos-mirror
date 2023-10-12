@@ -74,6 +74,12 @@ __pycache__
 *.install
 .merlin
 
+*.deb
+*.rpm
+scripts/pkg-common/baker-binaries
+scripts/pkg-common/smartrollup-binaries
+scripts/pkg-common/client-binaries
+
 *~
 \#*\#
 .\#*

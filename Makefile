@@ -434,6 +434,15 @@ fmt-ocaml:
 fmt-python:
 	@$(MAKE) -C docs fmt
 
+.PHONY: dpkg
+dpkg:	all
+	@./scripts/dpkg/make_dpkg.sh
+
+.PHONY: rpm
+rpm:	all
+	@./scripts/rpm/make_rpm.sh
+
+
 .PHONY: build-deps
 build-deps:
 	@./scripts/install_build_deps.sh
@@ -527,8 +536,20 @@ uninstall:
 coverage-clean:
 	@-rm -Rf ${COVERAGE_OUTPUT}/*.coverage ${COVERAGE_REPORT}
 
+.PHONY: pkg-common-clean
+pkg-common-clean:
+	@-rm -rf scripts/pkg-common/{baker,client,smartrollup}-binaries
+
+.PHONY: dpkg-clean
+dpkg-clean: pkg-common-clean
+	@-rm -rf _dpkgstage *.deb
+
+.PHONY: rpm-clean
+rpm-clean: pkg-common-clean
+	@-rm -rf _rpmbuild *.rpm
+
 .PHONY: clean
-clean: coverage-clean clean-old-names
+clean: coverage-clean clean-old-names dpkg-clean rpm-clean
 	@-dune clean
 	@-rm -f ${ALL_EXECUTABLES}
 	@-${MAKE} -C docs clean

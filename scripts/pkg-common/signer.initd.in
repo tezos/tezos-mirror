@@ -1,0 +1,132 @@
+#!/bin/bash
+# Start/stop the Octez Remote Signer
+#
+### BEGIN INIT INFO
+# Provides:          octez-signer
+# Required-Start:
+# Required-Stop:
+# Should-Start:      $network $named
+# Should-Stop:       $network $named
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: The Octez Remote Signer
+# Description:       The Octez Remote Signer provides a layer between
+#		     the key and the Baker.
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DESC="octez signer"
+NAME=octez-signer
+DAEMON=/usr/bin/octez-signer
+PIDDIR=/var/run/tzsigner
+PIDFILE=${PIDDIR}/octez-signer.pid
+SCRIPTNAME=/etc/init.d/"$NAME"
+
+if [ -f "/lib/lsb/init-functions" ]; then
+	. /lib/lsb/init-functions
+else
+	. /etc/rc.d/init.d/functions
+fi
+
+# Defaults
+user=tzsigner
+group=tzsigner
+datadir=~${user}/.tezos-signer
+logdir=/var/log/tzsigner
+rotateonstart=yes
+port=6732
+address=""
+auth="no"
+socket_file=/var/tzsigner/sock
+
+othercliopts_signer=""
+
+httpsdir=/etc/octez-certs
+https_cert=${httpsdir}/certificate
+https_key=${httpsdir}/key
+
+[ -r /etc/octez/signer.conf ] && . /etc/octez/signer.conf
+[ -z "$logfile" ] && logfile=${logdir}/signer.log
+
+logfile="${logdir}/signer.log"
+
+https_cli=""
+magic_cli=""
+port_cli="-p $port"
+hwm_cli=""
+address_cli=""
+auth_cli=""
+
+[ ! -z "$magic_bytes" ] && magic_cli="-M $magic_bytes"
+[ "$hwm_check" = "yes" ] && hwm_cli="-W"
+[ "$auth" = "yes" ] && auth_cli="-A"
+[ ! -z "$address" ] && address_cli="-a $address"
+
+initial_checks()
+{
+	mkdir -p ${logdir} ${PIDDIR}
+	chown ${user}:${group} ${logdir} ${PIDDIR}
+	if [ -z "$type" ]; then
+		echo "type must be set in /etc/octez/signer.conf" >&2
+		exit 3
+	fi
+
+	case $type in
+	https)
+		[ ! -f "$https_cert" ] && \
+			echo "Cannot find TLS certificate for https" >&2 \
+			&& exit 3
+		[ ! -f "$https_key" ] && \
+			echo "Cannot find TLS key for https" >&2 \
+			&& exit 3
+		https_cli="\"$https_cert\" \"$https_key\""
+		;;
+	http)
+		;;
+	socket)
+		;;
+	local)
+		address_cli=""
+		port_cli="-s \"$socket_file\""
+		;;
+	*)
+		echo "type must be one of http, https, local or socket" >&2
+		exit 3
+	esac
+}
+
+rotate_logs ()
+{
+	if [ ${rotateonstart} = "yes" ]; then
+		mv -f "${logfile}" "${logfile}.1"
+	fi
+}
+
+case "$1" in
+start)
+	initial_checks
+	rotate_logs
+	su $user -c "${DAEMON} -d ${datadir} ${auth_cli} \
+			launch ${type} signer \
+			${https_cli} \
+			-P ${PIDFILE} \
+			${magic_cli} ${port_cli} ${hwm_cli} \
+			${address_cli} ${othercliopts_signer} > ${logfile} 2>&1 &"
+	;;
+stop)
+    kill  `cat ${PIDFILE}`
+	rm -f ${PIDFILE}
+    ;;
+restart|reload|force-reload)
+    $0 stop
+    $0 start
+    ;;
+status)
+    status_of_proc -p ${PIDFILE} ${DAEMON} $NAME || exit $?
+	exit 0
+    ;;
+*)	echo "Usage: $0 {start|stop|status|restart|reload|force-reload}" >&2
+    exit 2
+    ;;
+esac
+exit 0

@@ -1,0 +1,26 @@
+Name:		@PKG@
+Version:	@VERSION@
+Release:	@REVISION@
+Summary:	The Octez Experimental Binaries
+
+Packager:       @MAINT@
+License:	MIT
+URL:		http://tezos.gitlab.io
+
+Requires:	@DPKG@-baker
+Source0:	@FAKESRC@
+
+%prep
+%setup -q
+
+%install
+tar cpf - . | (cd $RPM_BUILD_ROOT && tar xpf -)
+
+%description
+The Octez Experimental Binaries
+
+%files
+%{_bindir}/octez-*
+
+%post 
+systemctl daemon-reload
