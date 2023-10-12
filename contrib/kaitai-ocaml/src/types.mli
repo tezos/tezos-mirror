@@ -96,7 +96,7 @@ type processExpr =
   | ProcessCustom
 
 module BitEndianness : sig
-  type t = LittleBitEndian | BigBitEndidan
+  type t = LittleBitEndian | BigBitEndian
 end
 
 module Endianness : sig

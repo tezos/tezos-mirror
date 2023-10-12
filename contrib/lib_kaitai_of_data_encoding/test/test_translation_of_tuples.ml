@@ -140,24 +140,17 @@ let%expect_test "test tuples with n inside translation" =
       endian: be
     types:
       n:
-        meta:
-          id: n
-          endian: be
-        types:
-          n_group:
-            instances:
-              has_next:
-                value: ((b & 128) != 0)
-              value:
-                value: (b & 127)
-            seq:
-            - id: b
-              type: u1
         seq:
         - id: n
-          type: n_group
+          type: n_chunk
           repeat: until
-          repeat-until: not (_.has_next)
+          repeat-until: not (_.has_more).as<bool>
+      n_chunk:
+        seq:
+        - id: has_more
+          type: b1be
+        - id: payload
+          type: b7be
     enums:
       bool:
         0: false

@@ -43,113 +43,145 @@ module Enum = struct
         } )
 end
 
-let n_group =
+(* Defining a few types now to break circular dependencies. *)
+
+let n_chunk_type =
   {
     (* TODO/nice to have: Add a docstring, i.e. [?description]
                           to custom defined class spec. *)
-    (Helpers.default_class_spec ~encoding_name:"n_group" ())
+    (Helpers.default_class_spec ~encoding_name:"n_chunk" ())
     with
     seq =
       [
         {
           Helpers.default_attr_spec with
-          id = "b";
+          id = "has_more";
           dataType =
-            DataType.(NumericType (Int_type (Int1Type {signed = false})));
+            DataType.(
+              NumericType
+                (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
         };
-      ];
-    instances =
-      [
-        ( "has_next",
-          Helpers.default_instance_spec
-            ~id:"has_next"
-            Ast.(
-              Compare
-                {
-                  left = BinOp {left = Name "b"; op = BitAnd; right = IntNum 128};
-                  ops = NotEq;
-                  right = IntNum 0;
-                }) );
-        ( "value",
-          Helpers.default_instance_spec
-            ~id:"value"
-            (BinOp {left = Name "b"; op = BitAnd; right = IntNum 127}) );
+        {
+          Helpers.default_attr_spec with
+          id = "payload";
+          dataType =
+            DataType.(
+              NumericType
+                (Int_type (BitsType {width = 7; bit_endian = BigBitEndian})));
+        };
       ];
     isTopLevel = false;
   }
 
-let n_attr =
-  (* defining this here to break circular dependencies *)
+let n_seq_attr =
   {
     Helpers.default_attr_spec with
     id = "n";
-    dataType = DataType.(ComplexDataType (UserType n_group));
+    dataType = DataType.(ComplexDataType (UserType n_chunk_type));
     cond =
-      AttrSpec.ConditionalSpec.
+      {
+        Helpers.cond_no_cond with
+        repeat =
+          RepeatUntil
+            (UnaryOp
+               {
+                 op = Not;
+                 operand =
+                   CastToType
+                     {
+                       value = Attribute {value = Name "_"; attr = "has_more"};
+                       typeName =
+                         {absolute = true; names = ["bool"]; isArray = false};
+                     };
+               });
+      };
+  }
+
+let n_type =
+  {
+    (* TODO/nice to have: Add a docstring, i.e. [?description]
+                          to custom defined class spec. *)
+    (Helpers.default_class_spec ~encoding_name:"n" ())
+    with
+    seq = [n_seq_attr];
+    isTopLevel = false;
+  }
+
+let z_type =
+  {
+    (Helpers.default_class_spec ~encoding_name:"z" ()) with
+    seq =
+      [
         {
-          ifExpr = None;
-          repeat =
-            RepeatSpec.RepeatUntil
-              Ast.(
-                UnaryOp
-                  {
-                    op = Not;
-                    operand = Attribute {value = Name "_"; attr = "has_next"};
-                  });
+          Helpers.default_attr_spec with
+          id = "has_tail";
+          dataType =
+            DataType.(
+              NumericType
+                (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
         };
+        {
+          Helpers.default_attr_spec with
+          id = "sign";
+          dataType =
+            DataType.(
+              NumericType
+                (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
+        };
+        {
+          Helpers.default_attr_spec with
+          id = "payload";
+          dataType =
+            DataType.(
+              NumericType
+                (Int_type (BitsType {width = 6; bit_endian = BigBitEndian})));
+        };
+        {
+          Helpers.default_attr_spec with
+          AttrSpec.id = "tail";
+          dataType = DataType.(ComplexDataType (UserType n_chunk_type));
+          cond =
+            {
+              ifExpr =
+                Some
+                  (CastToType
+                     {
+                       value = Name "has_tail";
+                       typeName =
+                         {absolute = true; names = ["bool"]; isArray = false};
+                     });
+              repeat =
+                RepeatUntil
+                  (UnaryOp
+                     {
+                       op = Not;
+                       operand =
+                         CastToType
+                           {
+                             value =
+                               Attribute {value = Name "_"; attr = "has_more"};
+                             typeName =
+                               {
+                                 absolute = true;
+                                 names = ["bool"];
+                                 isArray = false;
+                               };
+                           };
+                     });
+            };
+        };
+      ];
+    isTopLevel = false;
   }
 
 module Type = struct
   type assoc = (string * Kaitai.Types.ClassSpec.t) list
 
-  let n =
-    let class_spec =
-      Helpers.class_spec_of_attrs
-        ~encoding_name:"n"
-        ~enums:[]
-        ~types:[("n_group", n_group)]
-        ~instances:[]
-        [n_attr]
-    in
-    ("n", class_spec)
+  let n_chunk = ("n_chunk", n_chunk_type)
 
-  let z =
-    let class_spec =
-      let instances =
-        [
-          ( "is_negative",
-            Helpers.default_instance_spec
-              ~id:"is_negative"
-              Ast.(
-                Compare
-                  {
-                    left =
-                      BinOp
-                        {
-                          left =
-                            Attribute
-                              {
-                                value =
-                                  Subscript
-                                    {value = Name "groups"; idx = IntNum 0};
-                                attr = "value";
-                              };
-                          op = RShift;
-                          right = IntNum 6;
-                        };
-                    ops = Eq;
-                    right = IntNum 1;
-                  }) );
-        ]
-      in
-      Helpers.class_spec_of_attrs
-        ~encoding_name:"z"
-        ~enums:[]
-        ~types:[("n_group", n_group)]
-        ~instances
-        [n_attr]
-    in
-    ("z", class_spec)
+  let n = ("n", n_type)
+
+  let z = ("z", z_type)
 end
 
 module Attr = struct

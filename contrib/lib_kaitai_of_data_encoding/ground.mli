@@ -46,8 +46,16 @@ module Type : sig
       See [Helpers.add_uniq_assoc] for handling helper. *)
   type assoc = (string * ClassSpec.t) list
 
-  (** [n] is an association for n (arbitrarily large integers) type. *)
+  (** [n_chunk] is an association for the chunks that compose [n]. *)
+  val n_chunk : string * ClassSpec.t
+
+  (** [n] is an association for n (arbitrarily large natural) type. Requires to
+      also assoc [n_chunk]. *)
   val n : string * ClassSpec.t
+
+  (** [z] is an association for z (arbitrarily large integer) type. Requires to
+      also assoc [n] and [n_chunk]. *)
+  val z : string * ClassSpec.t
 end
 
 (** [Attr] is module for getting [AttrSpec.t] of ground types.

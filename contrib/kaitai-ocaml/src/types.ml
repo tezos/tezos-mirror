@@ -33,6 +33,10 @@ module Ast = struct
 
   type typeId = {absolute : bool; names : string list; isArray : bool}
 
+  let typeId_to_string {absolute; names; isArray} =
+    if isArray || not absolute then failwith "not implemented (typeId)" ;
+    String.concat "." names
+
   type operator =
     | Add
     | Sub
@@ -109,7 +113,13 @@ module Ast = struct
     | Attribute {value; attr} -> Format.sprintf "(%s.%s)" (to_string value) attr
     | Subscript {value; idx} ->
         Format.sprintf "%s[%s]" (to_string value) (to_string idx)
-    | _ -> failwith "not implemented"
+    | CastToType {value; typeName} ->
+        Format.sprintf "%s.as<%s>" (to_string value) (typeId_to_string typeName)
+    | EnumByLabel {enumName; label; inType} ->
+        (* TODO: don't ignore inType *)
+        ignore inType ;
+        Format.sprintf "%s::%s" enumName label
+    | _ -> failwith "not implemented (ast)"
 end
 
 type processExpr =
@@ -119,7 +129,9 @@ type processExpr =
   | ProcessCustom
 
 module BitEndianness = struct
-  type t = LittleBitEndian | BigBitEndidan
+  type t = LittleBitEndian | BigBitEndian
+
+  let to_string = function LittleBitEndian -> "le" | BigBitEndian -> "be"
 end
 
 module Endianness = struct
@@ -351,6 +363,8 @@ end = struct
               (endian
               |> Option.map Endianness.to_string
               |> Option.value ~default:"")
+        | BitsType {width; bit_endian} ->
+            Printf.sprintf "b%d%s" width (BitEndianness.to_string bit_endian)
         | _ -> failwith "not supported")
     | NumericType (Float_type (FloatMultiType {width = _; endian = _})) -> "f8"
     | BytesType (BytesLimitType _) -> "fixed size bytes"
