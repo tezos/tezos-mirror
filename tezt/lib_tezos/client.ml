@@ -942,7 +942,7 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
 
 let id = ref 0
 
-let spawn_gen_keys ?alias ?sig_alg client =
+let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
   let alias =
     match alias with
     | None ->
@@ -950,12 +950,13 @@ let spawn_gen_keys ?alias ?sig_alg client =
         sf "tezt_%d" !id
     | Some alias -> alias
   in
-  ( spawn_command client @@ ["gen"; "keys"; alias]
+  let force = if force then ["--force"] else [] in
+  ( spawn_command client @@ ["gen"; "keys"; alias] @ force
     @ optional_arg "sig" Fun.id sig_alg,
     alias )
 
-let gen_keys ?alias ?sig_alg client =
-  let p, alias = spawn_gen_keys ?alias ?sig_alg client in
+let gen_keys ?force ?alias ?sig_alg client =
+  let p, alias = spawn_gen_keys ?force ?alias ?sig_alg client in
   let* () = Process.check p in
   return alias
 

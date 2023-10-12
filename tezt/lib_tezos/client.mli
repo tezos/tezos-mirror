@@ -733,7 +733,8 @@ val spawn_list_known_addresses : t -> Process.t
 (** Run [octez-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
-val gen_keys : ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
+val gen_keys :
+  ?force:bool -> ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
 
 (** A helper to run [octez-client gen keys] followed by
     [octez-client show address] to get the generated key. *)
