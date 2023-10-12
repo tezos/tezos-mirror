@@ -11,7 +11,7 @@ type t = private {
   delegated : Tez_repr.t;
 }
 
-val make :
+val init :
   own_frozen:Tez_repr.t -> staked_frozen:Tez_repr.t -> delegated:Tez_repr.t -> t
 
 val encoding : t Data_encoding.t
@@ -20,3 +20,15 @@ val encoding : t Data_encoding.t
 val voting_weight : t -> Int64.t tzresult
 
 val apply_slashing : percentage:Int_percentage.t -> t -> t
+
+val remove_delegated : amount:Tez_repr.t -> t -> t tzresult
+
+val remove_own_frozen : amount:Tez_repr.t -> t -> t tzresult
+
+val remove_staked_frozen : amount:Tez_repr.t -> t -> t tzresult
+
+val add_delegated : amount:Tez_repr.t -> t -> t tzresult
+
+val add_own_frozen : amount:Tez_repr.t -> t -> t tzresult
+
+val add_staked_frozen : amount:Tez_repr.t -> t -> t tzresult

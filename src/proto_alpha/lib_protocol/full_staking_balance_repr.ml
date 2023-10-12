@@ -11,7 +11,7 @@ type t = {
   delegated : Tez_repr.t;
 }
 
-let make ~own_frozen ~staked_frozen ~delegated =
+let init ~own_frozen ~staked_frozen ~delegated =
   {own_frozen; staked_frozen; delegated}
 
 let encoding =
@@ -40,4 +40,34 @@ let apply_slashing ~percentage {own_frozen; staked_frozen; delegated} =
   let staked_frozen =
     Tez_repr.mul_percentage ~rounding:`Down staked_frozen remaining_percentage
   in
+  {own_frozen; staked_frozen; delegated}
+
+let remove_delegated ~amount {own_frozen; staked_frozen; delegated} =
+  let open Result_syntax in
+  let+ delegated = Tez_repr.(delegated -? amount) in
+  {own_frozen; staked_frozen; delegated}
+
+let remove_own_frozen ~amount {own_frozen; staked_frozen; delegated} =
+  let open Result_syntax in
+  let+ own_frozen = Tez_repr.(own_frozen -? amount) in
+  {own_frozen; staked_frozen; delegated}
+
+let remove_staked_frozen ~amount {own_frozen; staked_frozen; delegated} =
+  let open Result_syntax in
+  let+ staked_frozen = Tez_repr.(staked_frozen -? amount) in
+  {own_frozen; staked_frozen; delegated}
+
+let add_delegated ~amount {own_frozen; staked_frozen; delegated} =
+  let open Result_syntax in
+  let+ delegated = Tez_repr.(delegated +? amount) in
+  {own_frozen; staked_frozen; delegated}
+
+let add_own_frozen ~amount {own_frozen; staked_frozen; delegated} =
+  let open Result_syntax in
+  let+ own_frozen = Tez_repr.(own_frozen +? amount) in
+  {own_frozen; staked_frozen; delegated}
+
+let add_staked_frozen ~amount {own_frozen; staked_frozen; delegated} =
+  let open Result_syntax in
+  let+ staked_frozen = Tez_repr.(staked_frozen +? amount) in
   {own_frozen; staked_frozen; delegated}
