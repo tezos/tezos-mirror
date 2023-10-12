@@ -141,6 +141,10 @@ val get_ai_current_yearly_rate_exact : t -> Q.t tzresult Lwt.t
 val get_ai_expected_issuance :
   t -> Adaptive_issuance_services.expected_rewards list tzresult Lwt.t
 
+val get_denunciations :
+  t ->
+  (Signature.Public_key_hash.t * Denunciations_repr.item) list tzresult Lwt.t
+
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 

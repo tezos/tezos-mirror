@@ -46,6 +46,24 @@ let block_fork b =
   let+ blk_b = Block.bake ~policy:(By_account baker_2) b in
   (blk_a, blk_b)
 
+(* Checks that there is exactly one denunciation for the given delegate *)
+let check_denunciations ~(cycle : Denunciations_repr.misbehaviour_cycle) b
+    delegate =
+  let open Lwt_result_syntax in
+  let* denunciations = Context.get_denunciations (B b) in
+  match denunciations with
+  | [(d, item)] when Signature.Public_key_hash.equal d delegate ->
+      assert (
+        item.Denunciations_repr.misbehaviour = Misbehaviour.Double_attesting) ;
+      assert (item.Denunciations_repr.misbehaviour_cycle = cycle) ;
+      return_unit
+  | _ -> assert false
+
+let check_empty_denunciations b =
+  let open Lwt_result_syntax in
+  let* denunciations = Context.get_denunciations (B b) in
+  match denunciations with [] -> return_unit | _ -> assert false
+
 (****************************************************************)
 (*                        Tests                                 *)
 (****************************************************************)
@@ -95,8 +113,10 @@ let test_valid_double_attestation_evidence () =
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
   let* full_balance = Context.Delegate.full_balance (B blk_a) baker in
+  let* () = check_empty_denunciations blk_a in
   let* blk_final = Block.bake ~policy:(By_account baker) ~operation blk_a in
   (* Check that parts of the frozen deposits are slashed *)
+  let* () = check_denunciations ~cycle:Current blk_final delegate in
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_a) delegate
   in
