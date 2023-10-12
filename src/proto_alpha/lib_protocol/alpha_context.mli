@@ -2159,14 +2159,9 @@ module Delegate : sig
     unstaked : (Cycle.t * reward_and_burn) list;
   }
 
-  val punish_double_attesting :
+  val punish_double_signing :
     context ->
-    public_key_hash ->
-    Level.t ->
-    (context * punishing_amounts) tzresult Lwt.t
-
-  val punish_double_baking :
-    context ->
+    Misbehaviour.t ->
     public_key_hash ->
     Level.t ->
     (context * punishing_amounts) tzresult Lwt.t

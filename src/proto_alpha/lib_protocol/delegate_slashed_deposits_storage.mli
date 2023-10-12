@@ -58,29 +58,16 @@ type punishing_amounts = {
 }
 
 (** Record in the context that the given delegate has now been slashed
-    for double attesting for the given level and return the amounts to
+    for double signing for the given misbehaviour for the given level and return the amounts to
     burn and to reward. If the delegate has no remaining frozen
     deposits, this will also forbid it to bake or attest until a new
     deposit is frozen.
 
     Fails with [Unrequired_denunciation] if the given delegate has
-    already been slashed for double attesting for the given level.  *)
-val punish_double_attesting :
+    already been slashed for the same misbehaviour for the given level.  *)
+val punish_double_signing :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Level_repr.t ->
-  (Raw_context.t * punishing_amounts) tzresult Lwt.t
-
-(** Record in the context that the given delegate has now been slashed
-    for double baking for the given level and returns the amounts to
-    burn and to reward. If the delegate has no remaining frozen
-    deposits, this will also forbid it to bake or attest until a new
-    deposit is frozen.
-
-    Fails with [Unrequired_denunciation] if the given delegate has
-    already been slashed for double baking for the given level.  *)
-val punish_double_baking :
-  Raw_context.t ->
+  Misbehaviour.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
   (Raw_context.t * punishing_amounts) tzresult Lwt.t

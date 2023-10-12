@@ -18,6 +18,7 @@
         "Bitset",
         "Bounded_history_repr",
         "Context_binary_proof",
+        "Misbehaviour",
 
 
         "Michelson_v1_primitives",

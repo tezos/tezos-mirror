@@ -50,17 +50,14 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-(** [punish_double_signing ~get ~set ~get_percentage ctxt delegate level] record
+(** [punish_double_signing ctxt misbehaviour delegate level] record
     in the context that the given [delegate] has now been slashed for the
-    double signing event for the given [level] and return the amounts of the
+    double signing event [misbehaviour] for the given [level] and return the amounts of the
     frozen deposits to burn and to reward the denuncer.
 
-    The double signing event corresponds to a field in {!Storage.slashed_level},
-    retrieved with [get] and set to true with [set].
-
-    The part to burn is retrieved with [get_percentage].
+    The double signing event corresponds to a field in {!Storage.slashed_level}.
 *)
-let punish_double_signing ~get ~set ~get_percentage ctxt delegate
+let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
     (level : Level_repr.t) =
   let open Lwt_result_syntax in
   let* slashed_opt =
@@ -69,10 +66,24 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let slashed =
     Option.value slashed_opt ~default:Storage.default_slashed_level
   in
-  assert (Compare.Bool.(get slashed = false)) ;
-  let updated_slashed = set slashed in
+  let already_slashed, updated_slashed, slashing_percentage =
+    let Storage.{for_double_baking; for_double_attesting} = slashed in
+    match misbehaviour with
+    | Double_baking ->
+        ( for_double_baking,
+          {slashed with for_double_baking = true},
+          Constants_storage
+          .percentage_of_frozen_deposits_slashed_per_double_baking
+            ctxt )
+    | Double_attesting ->
+        ( for_double_attesting,
+          {slashed with for_double_attesting = true},
+          Constants_storage
+          .percentage_of_frozen_deposits_slashed_per_double_attestation
+            ctxt )
+  in
+  assert (Compare.Bool.(already_slashed = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
-  let slashing_percentage = get_percentage ctxt in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let global_limit_of_staking_over_baking =
     Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking ctxt
@@ -157,23 +168,6 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
     else Lwt.return ctxt
   in
   return (ctxt, {staked; unstaked})
-
-let punish_double_attesting =
-  let get Storage.{for_double_attesting; _} = for_double_attesting in
-  let set slashed = Storage.{slashed with for_double_attesting = true} in
-  let get_percentage =
-    Constants_storage
-    .percentage_of_frozen_deposits_slashed_per_double_attestation
-  in
-  punish_double_signing ~get ~set ~get_percentage
-
-let punish_double_baking =
-  let get Storage.{for_double_baking; _} = for_double_baking in
-  let set slashed = Storage.{slashed with for_double_baking = true} in
-  let get_percentage =
-    Constants_storage.percentage_of_frozen_deposits_slashed_per_double_baking
-  in
-  punish_double_signing ~get ~set ~get_percentage
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
   let max_slashable_period = Constants_storage.max_slashing_period ctxt in
