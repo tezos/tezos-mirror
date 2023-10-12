@@ -220,6 +220,7 @@ let create_from_endpoint ?(path = Constant.dal_node) ?name ?color ?data_dir
   on_event dal_node (handle_event dal_node) ;
   dal_node
 
+(* TODO: have rpc_addr here, like for others. *)
 let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?public_addr ?metrics_addr
     ~node () =
