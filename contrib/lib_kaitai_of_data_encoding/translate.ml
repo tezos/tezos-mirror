@@ -57,6 +57,12 @@ open Kaitai.Types
    than the public module [Data_encoding.Encoding]. *)
 module DataEncoding = Data_encoding__Encoding
 
+let summary ~title ~description =
+  match (title, description) with
+  | None, None -> None
+  | None, (Some _ as s) | (Some _ as s), None -> s
+  | Some t, Some d -> Some (t ^ ": " ^ d)
+
 let rec seq_field_of_data_encoding :
     type a.
     Ground.Enum.assoc ->
@@ -159,35 +165,34 @@ let rec seq_field_of_data_encoding :
         | `Uint8 -> Ground.Attr.uint8 ~id:len_id
       in
       (enums, types, [len_attr; attr])
-  | Describe {encoding; id; description; title} ->
+  | Describe {encoding; id; description; title} -> (
       let id = escape_id id in
-      let description =
-        match (title, description) with
-        | None, None -> None
-        | None, (Some _ as s) | (Some _ as s), None -> s
-        | Some t, Some d -> Some (t ^ ": " ^ d)
-      in
+      let description = summary ~title ~description in
       let enums, types, attrs =
         seq_field_of_data_encoding enums types encoding id tid_gen
       in
-      let attr =
-        {
-          Helpers.default_attr_spec with
-          id;
-          dataType =
-            DataType.(
-              ComplexDataType
-                (UserType
-                   (Helpers.class_spec_of_attrs
-                      ~encoding_name:id
-                      ?description
-                      ~enums:[]
-                      ~types:[]
-                      ~instances:[]
-                      attrs)));
-        }
-      in
-      (enums, types, [attr])
+      match attrs with
+      | [] -> failwith "Not supported"
+      | [attr] -> (enums, types, [Helpers.merge_summaries attr description])
+      | _ :: _ :: _ as attrs ->
+          let attr =
+            {
+              Helpers.default_attr_spec with
+              id;
+              dataType =
+                DataType.(
+                  ComplexDataType
+                    (UserType
+                       (Helpers.class_spec_of_attrs
+                          ~encoding_name:id
+                          ?description
+                          ~enums:[]
+                          ~types:[]
+                          ~instances:[]
+                          attrs)));
+            }
+          in
+          (enums, types, [attr]))
   | _ -> failwith "Not implemented"
 
 let from_data_encoding :
@@ -200,7 +205,6 @@ let from_data_encoding :
   let encoding_name = escape_id encoding_name in
   match encoding.encoding with
   | Describe {encoding; description; id; _} ->
-      (* TODO: accumulate descriptions rather than replace it *)
       let enums, types, attrs =
         seq_field_of_data_encoding [] [] encoding id None
       in
