@@ -63,6 +63,35 @@ let summary ~title ~description =
   | None, (Some _ as s) | (Some _ as s), None -> s
   | Some t, Some d -> Some (t ^ ": " ^ d)
 
+(* in kaitai-struct, some fields can be added to single attributes but not to a
+   group of them. When we want to attach a field to a group of attributes, we
+   need to create an indirection to a named type. [redirect_if_many] is a
+   function for adding a field which, on a by-need basis, introduces an
+   intermediate type. *)
+let redirect_if_many :
+    Ground.Type.assoc ->
+    AttrSpec.t list ->
+    (AttrSpec.t -> AttrSpec.t) ->
+    string ->
+    Ground.Type.assoc * AttrSpec.t =
+ fun types attrs fattr id ->
+  match attrs with
+  | [] -> failwith "Not supported"
+  | [attr] -> (types, {(fattr attr) with id})
+  | _ :: _ :: _ as attrs ->
+      let ((_, user_type) as type_) =
+        (id, Helpers.class_spec_of_attrs ~id attrs)
+      in
+      let types = Helpers.add_uniq_assoc types type_ in
+      let attr =
+        fattr
+          {
+            (Helpers.default_attr_spec ~id) with
+            dataType = DataType.(ComplexDataType (UserType user_type));
+          }
+      in
+      (types, attr)
+
 let rec seq_field_of_data_encoding :
     type a.
     Ground.Enum.assoc ->
@@ -137,33 +166,23 @@ let rec seq_field_of_data_encoding :
       let seq = left @ right in
       (enums, types, seq)
   | Dynamic_size {kind; encoding} ->
-      (* TODO: special case for [encoding=Bytes] and [encoding=String] *)
       let len_id = "len_" ^ id in
-      let enums, types, attrs =
-        seq_field_of_data_encoding enums types encoding id tid_gen
-      in
-      let attr =
-        {
-          (Helpers.default_attr_spec ~id) with
-          dataType =
-            DataType.(
-              ComplexDataType
-                (UserType
-                   (Helpers.class_spec_of_attrs
-                      ~id
-                      ~enums:[]
-                      ~types:[]
-                      ~instances:[]
-                      attrs)));
-          size = Some (Ast.Name len_id);
-        }
-      in
       let len_attr =
         match kind with
         | `N -> failwith "Not implemented"
         | `Uint30 -> Ground.Attr.uint30 ~id:len_id
         | `Uint16 -> Ground.Attr.uint16 ~id:len_id
         | `Uint8 -> Ground.Attr.uint8 ~id:len_id
+      in
+      let enums, types, attrs =
+        seq_field_of_data_encoding enums types encoding id tid_gen
+      in
+      let types, attr =
+        redirect_if_many
+          types
+          attrs
+          (fun attr -> {attr with size = Some (Ast.Name len_id)})
+          id
       in
       (enums, types, [len_attr; attr])
   | Describe {encoding; id; description; title} -> (
