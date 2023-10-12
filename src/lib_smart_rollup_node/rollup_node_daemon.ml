@@ -95,6 +95,8 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
 let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     (head : Layer1.header) =
   let open Lwt_result_syntax in
+  let level = head.level in
+  let* () = Node_context.gc node_ctxt ~level in
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
@@ -134,7 +136,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
     Plugin.Inbox.same_as_layer_1 node_ctxt head.hash inbox
   in
-  let level = head.level in
   let* previous_commitment_hash =
     if level = node_ctxt.genesis_info.level then
       (* Previous commitment for rollup genesis is itself. *)

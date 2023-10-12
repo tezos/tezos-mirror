@@ -92,7 +92,8 @@ val is_empty : _ t -> bool
 
 (** [gc index ?callback hash] removes all data older than [hash] from disk.
     If passed, [callback] will be executed when garbage collection finishes. *)
-val gc : [> `Write] index -> ?callback:(unit -> unit) -> hash -> unit Lwt.t
+val gc :
+  [> `Write] index -> ?callback:(unit -> unit Lwt.t) -> hash -> unit Lwt.t
 
 (** [is_gc_finished index] returns true if a GC is finished (or idle) and false
     if a GC is running for [index]. *)

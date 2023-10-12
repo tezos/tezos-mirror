@@ -878,6 +878,14 @@ let args20 a b c d e f g h i j k l m n o p q r s t =
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args4 q r s t))
 
+let args21 a b c d e f g h i j k l m n o p q r s t u =
+  map_arg
+    ~f:
+      (fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u)) ->
+      Lwt_result_syntax.return
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u))
+    (args2 (args16 a b c d e f g h i j k l m n o p) (args5 q r s t u))
+
 let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
 (* Argument parsing *)

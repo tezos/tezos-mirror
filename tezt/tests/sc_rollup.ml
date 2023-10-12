@@ -1339,6 +1339,96 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   check_batcher_message_status status_msg1 "committed" ;
   unit
 
+let rec check_can_get_all_state_hash rollup_client first_available_level level =
+  if level >= first_available_level then
+    let*! _l2_block =
+      Sc_rollup_client.rpc_get
+        rollup_client
+        ["global"; "block"; string_of_int level; "state_hash"]
+    in
+    check_can_get_all_state_hash rollup_client first_available_level (level - 1)
+  else unit
+
+let test_context_gc ~challenge_window ~commitment_period =
+  test_full_scenario
+    {
+      tags = ["gc"];
+      variant = None;
+      description =
+        "context garbage collection is triggered and finishes correctly";
+    }
+    ~challenge_window
+    ~commitment_period
+  @@ fun _protocol sc_rollup_node rollup_client sc_rollup _node client ->
+  (* GC will be invoked at every available opportunity, i.e. after every new lcc *)
+  let gc_frequency = 1 in
+  let expected_level = 5 * challenge_window in
+  let* _config =
+    Sc_rollup_node.config_init ~gc_frequency sc_rollup_node sc_rollup
+  in
+  (* On each [calling_gc] event, record the level for which it was called *)
+  let gc_levels_started = ref [] in
+  Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; value; _} ->
+      if name = "calling_gc.v0" then
+        gc_levels_started := JSON.(value |> as_int) :: !gc_levels_started) ;
+  (* On each [ending_gc] event, increment a counter *)
+  let gc_finalisations = ref 0 in
+  Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; _} ->
+      if name = "ending_gc.v0" then gc_finalisations := !gc_finalisations + 1) ;
+
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  (* We start at level 2, bake until the expected level *)
+  let* () = bake_levels (expected_level - 2) client in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
+  in
+
+  let gc_levels_started = List.rev !gc_levels_started in
+  let first_gc_level = List.hd gc_levels_started in
+  let expected_gc_levels =
+    List.init
+      (((expected_level - first_gc_level) / commitment_period) + 1)
+      (fun i -> first_gc_level + (i * commitment_period))
+  in
+  (* Check that GC was launched at least the expected number of times,
+   * at or after the expected level. This check is not an equality in order
+   * to avoid flakiness due to GC being launched slightly later than
+   * the expected level. *)
+  Check.(
+    (gc_levels_started >= expected_gc_levels)
+      (list int)
+      ~error_msg:
+        "Expected GC to start at levels %R, instead started at levels %L") ;
+  Check.(
+    (!gc_finalisations = List.length gc_levels_started)
+      int
+      ~error_msg:
+        "Not all GC calls finished (GC called %R times, finished %L times") ;
+
+  (* We expect the first available level to be the one corresponding
+   * to the lcc *)
+  let* _, first_available_level =
+    Sc_rollup_helpers.last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
+  (* Check that RPC calls for blocks which were not GC'ed still return *)
+  let* () =
+    check_can_get_all_state_hash rollup_client first_available_level level
+  in
+  (* Check that RPC calls for blocks which were GC'ed fail *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6416
+   * Adapt RPC to take into account [first_available_level] *)
+  let*? rpc_call =
+    Sc_rollup_client.rpc_get
+      rollup_client
+      [
+        "global";
+        "block";
+        string_of_int (first_available_level - 1);
+        "state_hash";
+      ]
+  in
+  Process.check_error ~exit_code:1 rpc_call
+
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
@@ -6489,6 +6579,7 @@ let register ~kind ~protocols =
     ~variant:"basic"
     basic_scenario
     protocols ;
+  test_context_gc ~kind ~challenge_window:10 ~commitment_period:5 protocols ;
   test_rpcs ~kind protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind

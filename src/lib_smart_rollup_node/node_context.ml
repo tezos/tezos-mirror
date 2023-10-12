@@ -986,6 +986,55 @@ let find_confirmed_slots_histories {store; _} block =
 let save_confirmed_slots_histories {store; _} block hist =
   Store.Dal_confirmed_slots_histories.add store.irmin_store block hist
 
+let get_gc_levels node_ctxt =
+  let open Lwt_result_syntax in
+  let* gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in
+  let last_gc_level, first_available_level =
+    match gc_levels with
+    | Some {last_gc_level; first_available_level} ->
+        (last_gc_level, first_available_level)
+    | None -> (node_ctxt.genesis_info.level, node_ctxt.genesis_info.level)
+  in
+  Lwt_result.return (last_gc_level, first_available_level)
+
+let gc node_ctxt ~(level : int32) =
+  let open Lwt_result_syntax in
+  let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
+  let* last_gc_level, first_available_level = get_gc_levels node_ctxt in
+  (* [gc_level] is the level corresponding to the hash on which
+   * GC will be called, which is defined as the lcc. *)
+  let gc_level = (Reference.get node_ctxt.lcc).level in
+  if
+    gc_level > first_available_level
+    && Int32.(sub level last_gc_level >= frequency)
+    && Context.is_gc_finished node_ctxt.context
+  then
+    let* hash = hash_of_level node_ctxt gc_level in
+    let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
+    match header with
+    | Some {context; _} ->
+        let*! () = Event.calling_gc level in
+        (* Note: Setting the `first_available_level` before GC succeeds
+         * simplifies the code but will be temporarily innacurate if the GC
+         * run spans over several levels or if it fails. This is not foreseen to
+         * cause any issues, but should more accuracy be required,
+         * `first_available_level` can be set when GC finishes via a callback. *)
+        let*! res =
+          Store.Gc_levels.write
+            node_ctxt.store.gc_levels
+            {last_gc_level = level; first_available_level = gc_level}
+        in
+        let*! () =
+          match res with
+          | Error _ -> Event.gc_levels_storage_failure ()
+          | Ok () -> Lwt.return_unit
+        in
+        let*! () = Context.gc node_ctxt.context context in
+        return_unit
+    | None ->
+        failwith "Could not retrieve L2 block header for %a" Block_hash.pp hash
+  else return_unit
+
 module Internal_for_tests = struct
   let create_node_context cctxt (current_protocol : current_protocol) ~data_dir
       kind =
@@ -1022,6 +1071,7 @@ module Internal_for_tests = struct
           prefetch_blocks = None;
           log_kernel_debug = false;
           no_degraded = false;
+          gc_parameters = Configuration.default_gc_parameters;
         }
     in
     let* lockfile = lock ~data_dir in

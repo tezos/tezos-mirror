@@ -104,3 +104,8 @@ val gc_failure : string -> unit Lwt.t
 
 (** [gc_launch_failure err] emits an event which indicates a GC launch error. *)
 val gc_launch_failure : string -> unit Lwt.t
+
+(** [gc_levels_storage_failure ()] emits an event which indicates that GC level
+    values ([last_gc_level], [first_available_level]) could not be written to
+    storage. *)
+val gc_levels_storage_failure : unit -> unit Lwt.t
