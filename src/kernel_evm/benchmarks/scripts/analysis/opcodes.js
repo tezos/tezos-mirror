@@ -266,3 +266,109 @@ function create_model_template(results, opcodes_complete_list, file) {
     fs.appendFileSync(file, constants.join("\n") + "\n");
     fs.appendFileSync(file, opcode_fn(branches) + "\n");
 }
+
+/// Return [start, start + 1, ..., end - 1, end]
+function range(start, end) {
+    if (end < start) {
+        return []
+    } else {
+        return [...Array(end - start + 1).keys()].map((k) => k + start)
+    }
+}
+
+/// See https://ethereum.org/fr/developers/docs/evm/opcodes/
+const invalid_opcodes = [
+    ...range(0x0c, 0x0f),
+    ...range(0x1e, 0x1f),
+    ...range(0x21, 0x2f),
+    ...range(0x49, 0x4f),
+    ...range(0x5c, 0x5e),
+    ...range(0xa5, 0xef),
+    ...range(0xf6, 0xf9),
+    ...range(0xfb, 0xfc),
+]
+
+/// Generates the list of all opcodes of EVM.
+function build_opcodes_list() {
+    let opcodes = [];
+
+    // Opcodes are represented by a single byte, hence the list can be built by
+    // ranging between 0x00 and 0xff.
+    for (let candidate = 0x00; candidate <= 0xff; candidate++) {
+        // Some values are not opcodes (see
+        // https://ethereum.org/fr/developers/docs/evm/opcodes/)
+        if (!invalid_opcodes.includes(candidate)) { opcodes.push(opcode_to_string(candidate)) }
+    }
+
+    return opcodes
+}
+
+function build_missing_opcodes(opcodes, opcodes_complete_list) {
+    let missing_opcodes = [];
+
+    for (const candidate of opcodes_complete_list) {
+        let found = false;
+        for (const model in opcodes) {
+            if (Number(model) == Number(candidate)) {
+                found = true;
+            }
+        }
+        if (!found) {
+            missing_opcodes.push(candidate)
+        }
+    }
+
+    return missing_opcodes
+}
+
+/// Utility to warn about the opcodes that haven't be covered during the
+/// benchmarks.
+function warn_for_missing_opcodes(opcodes, opcodes_complete_list) {
+    let missing_opcodes = build_missing_opcodes(opcodes, opcodes_complete_list);
+    console.log(`These opcodes are missing a model: ${missing_opcodes.map((op) => `${op}`)}.`)
+}
+
+function extract_timestamp(filename) {
+    const filename_regex = /(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}.\d+Z)/g;
+    for (const match of filename.matchAll(filename_regex)) {
+        return match[0];
+    }
+
+}
+
+function analysis_filename(input) {
+    let timestamp = extract_timestamp(input);
+    return `opcodes_analysis_${timestamp}.csv`
+}
+
+function model_rs_filename(input) {
+    let timestamp = extract_timestamp(input);
+    return `tick_model_${timestamp}.rs`
+}
+
+/// Entrypoint on the script
+function generate_model() {
+    let filename = undefined;
+    if (process.argv.length < 3) {
+        console.log("Script expects an argument");
+        exit(2);
+    } else {
+        filename = process.argv[2];
+    }
+
+    let analysis_output = analysis_filename(filename);
+    let model_rs_output = model_rs_filename(filename);
+    let output = fs.readFileSync(filename);
+    let all_bench_opcodes = JSON.parse(output);
+    let opcodes = merge_all_benchmark_opcodes(all_bench_opcodes);
+    let analysis = compute_opcodes_analysis_results(opcodes);
+
+    console.log(`The opcodes analysis is in ${analysis_output}`);
+    produce_opcodes_csv(analysis, analysis_output);
+    var opcodes_complete_list = build_opcodes_list();
+    console.log(`The template for the tick model is in ${model_rs_output}`);
+    create_model_template(analysis, opcodes_complete_list, model_rs_output);
+    warn_for_missing_opcodes(analysis, opcodes_complete_list);
+}
+
+generate_model()
