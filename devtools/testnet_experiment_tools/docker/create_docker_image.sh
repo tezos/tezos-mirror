@@ -44,19 +44,19 @@ done
 echo "### Building tezos..."
 
 docker build \
-  -t "$build_image_name:$image_version" \
-  -f "$dockerfile" \
-  --target "$docker_target" \
-  --cache-from "$build_image_name:$image_version" \
-  --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies--$build_deps_image_version" \
-  --build-arg "OCTEZ_EXECUTABLES=${executables}" \
-  --build-arg "GIT_SHORTREF=${commit_short_sha}" \
-  --build-arg "GIT_DATETIME=${commit_datetime}" \
-  --build-arg "GIT_VERSION=${commit_tag}" \
-  --build-arg "RUST_TOOLCHAIN_IMAGE=$rust_toolchain_image" \
-  --build-arg "RUST_TOOLCHAIN_IMAGE_VERSION=$rust_toolchain_image_version" \
-  "$src_dir"
+ -t "$build_image_name:$image_version" \
+ -f "$dockerfile" \
+ --target "$docker_target" \
+ --cache-from "$build_image_name:$image_version" \
+ --build-arg "BASE_IMAGE=$build_deps_image_name" \
+ --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies--$build_deps_image_version" \
+ --build-arg "OCTEZ_EXECUTABLES=${executables}" \
+ --build-arg "GIT_SHORTREF=${commit_short_sha}" \
+ --build-arg "GIT_DATETIME=${commit_datetime}" \
+ --build-arg "GIT_VERSION=${commit_tag}" \
+ --build-arg "RUST_TOOLCHAIN_IMAGE=$rust_toolchain_image" \
+ --build-arg "RUST_TOOLCHAIN_IMAGE_VERSION=$rust_toolchain_image_version" \
+ "$src_dir"
 
 echo "### Successfully built docker image: $build_image_name:$image_version"
 

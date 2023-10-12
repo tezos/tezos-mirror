@@ -9,7 +9,7 @@ FROM ${BUILD_IMAGE}:${BUILD_IMAGE_VERSION} as builder
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as intermediate
 # Pull in built binaries
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin/* /home/tezos/bin/
+COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin /home/tezos/bin
 # Add parameters for active protocols
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/parameters /home/tezos/scripts/
 # Add EVM kernel artifacts
@@ -23,12 +23,10 @@ COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 COPY --chown=tezos:nogroup scripts/alphanet_version src/bin_client/bash-completion.sh script-inputs/active_protocol_versions /home/tezos/scripts/
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION_NON_MIN} as stripper
-COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/octez-* /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/simulation-scenario /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/safety-checker /home/tezos/bin
-RUN chmod +rw /home/tezos/bin/octez* && strip /home/tezos/bin/octez*
-RUN chmod +rw /home/tezos/bin/simulation-scenario && strip /home/tezos/bin/simulation-scenario
-RUN chmod +rw /home/tezos/bin/safety-checker && strip /home/tezos/bin/safety-checker
+COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin /home/tezos/bin
+# Remove scripts and symlinks pointing to potentially non-existing smart-rollup-node
+RUN rm /home/tezos/bin/*.sh && rm /home/tezos/bin/octez-smart-rollup-node-*
+RUN chmod +rw /home/tezos/bin/* && strip /home/tezos/bin/*
 # hadolint ignore=DL3003,DL4006,SC2046
 RUN cd /home/tezos/bin && for b in $(ls octez*); do ln -s "$b" $(echo "$b" | sed 's/^octez/tezos/'); done
 
