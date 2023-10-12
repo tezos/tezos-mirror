@@ -109,7 +109,7 @@ module Worker_config :
      and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = Types.Peer.t
      and type GS.Span.t = Types.Span.t
-     and module Monad = Monad = struct
+     and type 'a Monad.t = 'a Lwt.t = struct
   module GS = Tezos_gossipsub.Make (Automaton_config)
   module Monad = Monad
 

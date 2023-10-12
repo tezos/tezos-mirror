@@ -27,16 +27,6 @@
 (** This module defines the relevant data structures to instantiate the
     gossipsub worker. *)
 
-module Monad : sig
-  type 'a t = 'a Lwt.t
-
-  val return : 'a -> 'a t
-
-  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
-
-  val sleep : Types.Span.t -> unit t
-end
-
 module Worker_config :
   Gossipsub_intf.WORKER_CONFIGURATION
     with type GS.Topic.t = Types.Topic.t
@@ -44,7 +34,7 @@ module Worker_config :
      and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = Types.Peer.t
      and type GS.Span.t = Types.Span.t
-     and module Monad = Monad
+     and type 'a Monad.t = 'a Lwt.t
 
 module Worker_instance :
   Gossipsub_intf.WORKER
@@ -53,7 +43,7 @@ module Worker_instance :
      and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = Types.Peer.t
      and type GS.Span.t = Types.Span.t
-     and module Monad = Monad
+     and type 'a Monad.t = 'a Lwt.t
 
 module Validate_message_hook : sig
   val set :
