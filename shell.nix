@@ -78,6 +78,23 @@ let
       )
     ]
   );
+
+  clangNoArch =
+    if pkgs.stdenv.isDarwin
+    then
+      pkgs.clang.overrideAttrs (old: {
+        postFixup = ''
+          ${old.postFixup or ""}
+
+          # On macOS this contains '-march' and '-mcpu' flags. These flags
+          # would be used for any invocation of Clang.
+          # Removing those makes the resulting Clang wrapper usable when
+          # cross-compiling where passing '-march' and '-mcpu' would not
+          # make sense.
+          echo > $out/nix-support/cc-cflags-before
+        '';
+      })
+    else pkgs.clang;
 in
   pkgs.mkShell {
     name = "tezos-shell";
@@ -110,4 +127,10 @@ in
           inotify-tools
         ]
       );
+
+    # This tells the 'cc' Rust crate to build using this C compiler when
+    # targeting other architectures.
+    CC_wasm32_unknown_unknown = "${clangNoArch}/bin/clang";
+    CC_riscv64gc_unknown_linux_gnu = "${clangNoArch}/bin/clang";
+    CC_riscv64gc_unknown_none_elf = "${clangNoArch}/bin/clang";
   }
