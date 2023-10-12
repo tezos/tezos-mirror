@@ -278,7 +278,7 @@ fn typecheck_instruction(
 
         (I::IfNone(when_none, when_some), [.., T::Option(..)]) => {
             // Extract option type
-            pop!(T::Option, ty);
+            let ty = pop!(T::Option);
             // Clone the some_stack as we need to push a type on top of it
             let mut some_stack: TypeStack = stack.clone();
             some_stack.push(*ty);
@@ -342,16 +342,16 @@ fn typecheck_instruction(
         }
 
         (I::Car, [.., T::Pair(..)]) => {
-            pop!(T::Pair, l, _r);
-            stack.push(*l);
+            let (l, _) = *pop!(T::Pair);
+            stack.push(l);
             I::Car
         }
         (I::Car, [.., ty]) => no_overload!(CAR, NMOR::ExpectedPair(ty.clone())),
         (I::Car, []) => no_overload!(CAR, len 1),
 
         (I::Cdr, [.., T::Pair(..)]) => {
-            pop!(T::Pair, _l, r);
-            stack.push(*r);
+            let (_, r) = *pop!(T::Pair);
+            stack.push(r);
             I::Cdr
         }
         (I::Cdr, [.., ty]) => no_overload!(CDR, NMOR::ExpectedPair(ty.clone())),
@@ -405,18 +405,19 @@ fn typecheck_instruction(
 
         (I::Get(..), [.., T::Map(..), _]) => {
             let kty_ = pop!();
-            pop!(T::Map, kty, vty);
+            let (kty, vty) = *pop!(T::Map);
             ensure_ty_eq(ctx, &kty, &kty_)?;
             // can only fail if the typechecker is invoked on invalid types,
             // i.e. where `map` key is non-comparable
             ensure_comparable(&kty)?;
-            stack.push(T::new_option(*vty));
+            stack.push(T::new_option(vty));
             I::Get(overloads::Get::Map)
         }
         (I::Get(..), [.., _, _]) => no_overload!(GET),
         (I::Get(..), [] | [_]) => no_overload!(GET, len 2),
 
-        (I::Update(..), [.., T::Map(kty, vty), T::Option(vty_new), kty_]) => {
+        (I::Update(..), [.., T::Map(m), T::Option(vty_new), kty_]) => {
+            let (kty, vty) = m.as_ref();
             ensure_ty_eq(ctx, kty, kty_)?;
             ensure_ty_eq(ctx, vty, vty_new)?;
             // can only fail if the typechecker is invoked on invalid types,
@@ -451,9 +452,11 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
         (Mutez, V::Number(n)) if n >= 0 => TV::Mutez(n.try_into()?),
         (String, V::String(s)) => TV::String(s),
         (Unit, V::Unit) => TV::Unit,
-        (Pair(tl, tr), V::Pair(vl, vr)) => {
-            let l = typecheck_value(ctx, tl, *vl)?;
-            let r = typecheck_value(ctx, tr, *vr)?;
+        (Pair(pt), V::Pair(pv)) => {
+            let (tl, tr) = pt.as_ref();
+            let (vl, vr) = *pv;
+            let l = typecheck_value(ctx, tl, vl)?;
+            let r = typecheck_value(ctx, tr, vr)?;
             TV::new_pair(l, r)
         }
         (Option(ty), V::Option(v)) => match v {
@@ -470,15 +473,17 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
                 .collect();
             TV::List(lst?)
         }
-        (Map(tk, tv), V::Seq(vs)) => {
+        (Map(m), V::Seq(vs)) => {
+            let (tk, tv) = m.as_ref();
             // can only fail if the typechecker is invoked on invalid
             // types, i.e. where `map` key is non-comparable
             ensure_comparable(tk)?;
             let tc_elt = |v: Value| -> Result<(TypedValue, TypedValue), TcError> {
                 match v {
-                    Value::Elt(k, v) => {
-                        let k = typecheck_value(ctx, tk, *k)?;
-                        let v = typecheck_value(ctx, tv, *v)?;
+                    Value::Elt(e) => {
+                        let (k, v) = *e;
+                        let k = typecheck_value(ctx, tk, k)?;
+                        let v = typecheck_value(ctx, tv, v)?;
                         Ok((k, v))
                     }
                     _ => Err(TcError::InvalidEltForMap(v, t.clone())),

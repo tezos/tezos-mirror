@@ -46,9 +46,9 @@ impl ContractScript<TypecheckedStage> {
         self.code.interpret(ctx, &mut stack)?;
         use TypedValue as V;
         match stack.pop().expect("empty execution stack") {
-            V::Pair(bx, storage) => match *bx {
-                V::List(vec) => Ok((vec, *storage)),
-                v => panic!("expected `list operation`, got {:?}", v),
+            V::Pair(p) => match *p {
+                (V::List(vec), storage) => Ok((vec, storage)),
+                (v, _) => panic!("expected `list operation`, got {:?}", v),
             },
             v => panic!("expected `pair 'a 'b`, got {:?}", v),
         }
@@ -228,13 +228,13 @@ fn interpret_one(
         }
         I::Car => {
             ctx.gas.consume(interpret_cost::CAR)?;
-            pop!(V::Pair, l, _r);
-            stack.push(*l);
+            let (l, _) = *pop!(V::Pair);
+            stack.push(l);
         }
         I::Cdr => {
             ctx.gas.consume(interpret_cost::CDR)?;
-            pop!(V::Pair, _l, r);
-            stack.push(*r);
+            let (_, r) = *pop!(V::Pair);
+            stack.push(r);
         }
         I::Pair => {
             ctx.gas.consume(interpret_cost::PAIR)?;

@@ -211,9 +211,9 @@ pub mod interpret_cost {
             let v = Checked::from(std::cmp::min(s1, s2));
             (35 + (v >> 6) + (v >> 7)).as_gas_cost()
         };
-        let cmp_pair = |l1, r1, l2, r2| {
+        let cmp_pair = |l: &(_, _), r: &(_, _)| {
             let c = Checked::from(10u32);
-            (c + compare(l1, r1)? + compare(l2, r2)?).as_gas_cost()
+            (c + compare(&l.0, &r.0)? + compare(&l.1, &r.1)?).as_gas_cost()
         };
         let cmp_option = Checked::from(10u32);
         Ok(match (v1, v2) {
@@ -229,7 +229,7 @@ pub mod interpret_cost {
             (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
             (V::String(l), V::String(r)) => cmp_bytes(l.len(), r.len())?,
             (V::Unit, V::Unit) => 10,
-            (V::Pair(l1, r1), V::Pair(l2, r2)) => cmp_pair(l1, r1, l2, r2)?,
+            (V::Pair(l), V::Pair(r)) => cmp_pair(l.as_ref(), r.as_ref())?,
             (V::Option(l), V::Option(r)) => match (l, r) {
                 (None, None) => cmp_option,
                 (None, Some(_)) => cmp_option,
