@@ -55,3 +55,12 @@ null
 ./octez-client --mode light rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate_details
 { "static": { "numerator": "44680105987200", "denominator": "200000010001" },
   "dynamic": { "numerator": "0", "denominator": "1" } }
+
+./octez-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/total_delegated_stake'
+"0"
+
+./octez-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_denominator'
+"0"
+
+./octez-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/staking_numerator'
+"0"
