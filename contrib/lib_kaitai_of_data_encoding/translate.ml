@@ -144,14 +144,13 @@ let rec seq_field_of_data_encoding :
       in
       let attr =
         {
-          Helpers.default_attr_spec with
-          id;
+          (Helpers.default_attr_spec ~id) with
           dataType =
             DataType.(
               ComplexDataType
                 (UserType
                    (Helpers.class_spec_of_attrs
-                      ~encoding_name:id
+                      ~id
                       ~enums:[]
                       ~types:[]
                       ~instances:[]
@@ -179,14 +178,13 @@ let rec seq_field_of_data_encoding :
       | _ :: _ :: _ as attrs ->
           let attr =
             {
-              Helpers.default_attr_spec with
-              id;
+              (Helpers.default_attr_spec ~id) with
               dataType =
                 DataType.(
                   ComplexDataType
                     (UserType
                        (Helpers.class_spec_of_attrs
-                          ~encoding_name:id
+                          ~id
                           ?description
                           ~enums:[]
                           ~types:[]
@@ -199,19 +197,19 @@ let rec seq_field_of_data_encoding :
 
 let from_data_encoding :
     type a.
-    encoding_name:string ->
+    id:string ->
     ?description:string ->
     a DataEncoding.t ->
     ClassSpec.t =
- fun ~encoding_name ?description encoding ->
-  let encoding_name = escape_id encoding_name in
+ fun ~id ?description encoding ->
+  let encoding_name = escape_id id in
   match encoding.encoding with
   | Describe {encoding; description; id; _} ->
       let enums, types, attrs =
         seq_field_of_data_encoding [] [] encoding id None
       in
       Helpers.class_spec_of_attrs
-        ~encoding_name
+        ~id:encoding_name
         ?description
         ~enums
         ~types
@@ -222,7 +220,7 @@ let from_data_encoding :
         seq_field_of_data_encoding [] [] encoding encoding_name None
       in
       Helpers.class_spec_of_attrs
-        ~encoding_name
+        ~id:encoding_name
         ?description
         ~enums
         ~types

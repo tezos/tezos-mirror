@@ -23,11 +23,11 @@ let default_doc_spec = DocSpec.{summary = None; refs = []}
 let cond_no_cond =
   AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
 
-let default_attr_spec =
+let default_attr_spec ~id =
   AttrSpec.
     {
       path = [];
-      id = "";
+      id;
       dataType = DataType.AnyType;
       cond = cond_no_cond;
       valid = None;
@@ -36,12 +36,12 @@ let default_attr_spec =
       size = None;
     }
 
-let default_meta_spec ~encoding_name =
+let default_meta_spec ~id =
   MetaSpec.
     {
       path = [];
       isOpaque = false;
-      id = Some encoding_name;
+      id = Some id;
       endian = Some `BE;
       bitEndian = None;
       encoding = None;
@@ -51,12 +51,12 @@ let default_meta_spec ~encoding_name =
       imports = [];
     }
 
-let default_class_spec ~encoding_name ?description () =
+let default_class_spec ~id ?description () =
   ClassSpec.
     {
       fileName = None;
       path = [];
-      meta = default_meta_spec ~encoding_name;
+      meta = default_meta_spec ~id;
       isTopLevel = true;
       doc = {default_doc_spec with summary = description};
       toStringExpr = None;
@@ -88,11 +88,11 @@ let types_field_from_attr_seq base attributes =
   in
   List.fold_left add_uniq_assoc base types
 
-let class_spec_of_attrs ~encoding_name ?description ?(enums = []) ?(types = [])
+let class_spec_of_attrs ~id ?description ?(enums = []) ?(types = [])
     ?(instances = []) attrs =
   let types = types_field_from_attr_seq types attrs in
   {
-    (default_class_spec ~encoding_name ?description ()) with
+    (default_class_spec ~id ?description ()) with
     seq = attrs;
     enums;
     types;

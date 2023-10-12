@@ -27,7 +27,7 @@
 let%expect_test "test tuple translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"simple_tuple"
+      ~id:"simple_tuple"
       Data_encoding.(tup2 bool uint8)
   in
   print_endline (Kaitai.Print.print s) ;
@@ -51,7 +51,7 @@ let%expect_test "test tuple translation" =
 let%expect_test "test long tuple translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"simple_tuple"
+      ~id:"simple_tuple"
       Data_encoding.(tup5 bool uint8 bool uint8 uint8)
   in
   print_endline (Kaitai.Print.print s) ;
@@ -81,7 +81,7 @@ let%expect_test "test long tuple translation" =
 let%expect_test "test tup1 tuple translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"tup1"
+      ~id:"tup1"
       Data_encoding.(tup1 uint8)
   in
   print_endline (Kaitai.Print.print s) ;
@@ -98,7 +98,7 @@ let%expect_test "test tup1 tuple translation" =
 let%expect_test "test tuples with tup1 translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"tup1tup"
+      ~id:"tup1tup"
       Data_encoding.(
         tup3 (tup1 bool) (tup2 uint8 bool) (tup2 (tup1 uint8) uint8))
   in
@@ -129,7 +129,7 @@ let%expect_test "test tuples with tup1 translation" =
 let%expect_test "test tuples with n inside translation" =
   let s =
     Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"tup1tup"
+      ~id:"tup1tup"
       Data_encoding.(tup3 (tup1 bool) (tup2 n bool) (tup2 (tup1 n) n))
   in
   print_endline (Kaitai.Print.print s) ;

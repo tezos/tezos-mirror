@@ -443,7 +443,7 @@ let commands () =
               in
               return
               @@ Kaitai_of_data_encoding.Translate.from_data_encoding
-                   ~encoding_name:(escape_encoding_id encoding_id)
+                   ~id:(escape_encoding_id encoding_id)
                    encoding
         in
         let* () =
@@ -480,7 +480,7 @@ let commands () =
               | Some (Any e) -> (
                   match
                     Kaitai_of_data_encoding.Translate.from_data_encoding
-                      ~encoding_name:(escape_encoding_id id)
+                      ~id:(escape_encoding_id id)
                       e
                   with
                   | exception _ ->
