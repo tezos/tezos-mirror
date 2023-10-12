@@ -294,7 +294,7 @@ module For_RPC = struct
   let get_staking_balance ctxt delegate =
     let open Lwt_result_syntax in
     let* staking_balance = Storage.Stake.Staking_balance.get ctxt delegate in
-    Lwt.return (Full_staking_balance_repr.total staking_balance)
+    Lwt.return (Full_staking_balance_repr.current_total staking_balance)
 end
 
 module Internal_for_tests = struct

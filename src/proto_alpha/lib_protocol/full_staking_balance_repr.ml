@@ -129,7 +129,7 @@ let total_frozen
     } =
   Tez_repr.(own_frozen +? staked_frozen)
 
-let delegated
+let current_delegated
     {
       own_frozen = _;
       staked_frozen = _;
@@ -139,7 +139,20 @@ let delegated
     } =
   delegated
 
-let total
+let min_delegated_in_cycle ~current_cycle
+    {
+      own_frozen = _;
+      staked_frozen = _;
+      delegated;
+      min_delegated_in_cycle;
+      cycle_of_min_delegated;
+    } =
+  if Cycle_repr.(cycle_of_min_delegated < current_cycle) then delegated
+  else (
+    assert (Cycle_repr.(cycle_of_min_delegated = current_cycle)) ;
+    min_delegated_in_cycle)
+
+let current_total
     {
       own_frozen;
       staked_frozen;
@@ -171,7 +184,7 @@ let has_minimal_frozen_stake ~minimal_frozen_stake full_staking_balance =
   Tez_repr.(own_frozen >= minimal_frozen_stake)
 
 let has_minimal_stake_to_be_considered ~minimal_stake full_staking_balance =
-  match total full_staking_balance with
+  match current_total full_staking_balance with
   | Error _total_overflows ->
       true
       (* If the total overflows, we are definitely over the minimal stake. *)

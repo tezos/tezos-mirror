@@ -25,13 +25,15 @@ val own_frozen : t -> Tez_repr.t
 
 val staked_frozen : t -> Tez_repr.t
 
-val delegated : t -> Tez_repr.t
+val current_delegated : t -> Tez_repr.t
+
+val min_delegated_in_cycle : current_cycle:Cycle_repr.t -> t -> Tez_repr.t
 
 (** Sum of [own_frozen] and [staked_frozen]. *)
 val total_frozen : t -> Tez_repr.t tzresult
 
-(** Sum of [own_frozen], [staked_frozen], and [delegated]. *)
-val total : t -> Tez_repr.t tzresult
+(** Sum of [own_frozen], [staked_frozen], and [current_delegated]. *)
+val current_total : t -> Tez_repr.t tzresult
 
 (** [own_ratio full_staking_balance] returns [(num, den)] representing the
 ratio of [own_frozen] over [total_frozen] for [full_staking_balance].

@@ -25,9 +25,14 @@
 
 let apply_limits ctxt staking_parameters staking_balance =
   let open Result_syntax in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
   let own_frozen = Full_staking_balance_repr.own_frozen staking_balance in
   let staked_frozen = Full_staking_balance_repr.staked_frozen staking_balance in
-  let delegated = Full_staking_balance_repr.delegated staking_balance in
+  let delegated =
+    Full_staking_balance_repr.min_delegated_in_cycle
+      ~current_cycle
+      staking_balance
+  in
   let limit_of_delegation_over_baking =
     Int64.of_int (Constants_storage.limit_of_delegation_over_baking ctxt)
   in
@@ -97,7 +102,9 @@ let optimal_frozen_wrt_delegated_without_ai ctxt full_staking_balance =
 
      With AI the optimum is to freeze as much as possible, this computation
      would make no sense. *)
-  let delegated = Full_staking_balance_repr.delegated full_staking_balance in
+  let delegated =
+    Full_staking_balance_repr.current_delegated full_staking_balance
+  in
   let own_frozen = Full_staking_balance_repr.own_frozen full_staking_balance in
   let* power = Tez_repr.(delegated +? own_frozen) in
   let* opti_frozen =
