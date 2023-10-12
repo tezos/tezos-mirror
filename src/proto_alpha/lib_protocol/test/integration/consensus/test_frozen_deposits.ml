@@ -387,7 +387,7 @@ let test_may_not_bake_again_after_full_deposit_slash () =
 
 let test_set_limit balance_percentage () =
   let open Lwt_result_syntax in
-  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let* genesis, contracts = Context.init_with_constants2 constants in
   let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
@@ -457,7 +457,7 @@ let test_set_limit balance_percentage () =
 
 let test_unset_limit () =
   let open Lwt_result_syntax in
-  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let* genesis, contracts = Context.init_with_constants2 constants in
   let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
@@ -467,7 +467,7 @@ let test_unset_limit () =
   in
   let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
   let* () =
-    let frozen_deposits_limit =
+    let* frozen_deposits_limit =
       Context.Delegate.frozen_deposits_limit (B b) account1
     in
     match frozen_deposits_limit with
@@ -483,7 +483,7 @@ let test_unset_limit () =
       expected_number_of_cycles_with_previous_deposit
       b
   in
-  let frozen_deposits_at_b =
+  let* frozen_deposits_at_b =
     Context.Delegate.current_frozen_deposits (B b) account1
   in
   (* after [expected_number_of_cycles_with_previous_deposit] cycles
@@ -511,7 +511,8 @@ let test_unset_limit () =
   return_unit
 
 let test_cannot_bake_with_zero_deposits_limit () =
-  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let open Lwt_result_syntax in
+  let* genesis, contracts = Context.init_with_constants2 constants in
   let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
@@ -519,28 +520,30 @@ let test_cannot_bake_with_zero_deposits_limit () =
      even with a small deposit one can still bake, though with a smaller probability
      (because the frozen deposits value impacts the active stake and the active
      stake is the one used to determine baking/endorsing rights. *)
-  Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
-  >>=? fun operation ->
-  Block.bake ~policy:(By_account account2) ~operation genesis >>=? fun b ->
+  let* operation =
+    Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
+  in
+  let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
   let expected_number_of_cycles_with_previous_deposit =
     constants.preserved_cycles + Constants.max_slashing_period - 1
   in
-  Block.bake_until_n_cycle_end
-    ~policy:(By_account account2)
-    expected_number_of_cycles_with_previous_deposit
-    b
-  >>=? fun b ->
-  Block.bake ~policy:(By_account account1) b >>= fun b1 ->
+  let* b =
+    Block.bake_until_n_cycle_end
+      ~policy:(By_account account2)
+      expected_number_of_cycles_with_previous_deposit
+      b
+  in
+  let*! b1 = Block.bake ~policy:(By_account account1) b in
   (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
      cannot be a proposer, thus it cannot bake. Precisely, bake fails because
      get_next_baker_by_account fails with "No slots found" *)
-  Assert.error ~loc:__LOC__ b1 (fun _ -> true) >>=? fun () ->
-  Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
+  let* () = Assert.error ~loc:__LOC__ b1 (fun _ -> true) in
+  let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
   (* after one cycle is passed, the frozen deposit window has passed
      and the frozen deposits should now be effectively 0. *)
-  Context.Delegate.current_frozen_deposits (B b) account1 >>=? fun fd ->
-  Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
-  Block.bake ~policy:(By_account account1) b >>= fun b1 ->
+  let* fd = Context.Delegate.current_frozen_deposits (B b) account1 in
+  let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
+  let*! b1 = Block.bake ~policy:(By_account account1) b in
   (* don't know why the zero frozen deposits error is not caught here *)
   (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
   Assert.error ~loc:__LOC__ b1 (fun _ -> true)
