@@ -31,8 +31,7 @@ pub enum TztTestError {
     ExpectedDifferentError(ErrorExpectation, TestError),
 }
 
-/// Represent one Tzt test. The output attribute is a Result to include
-/// expectation of failure.
+/// Represent one Tzt test.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TztTest {
     pub code: ParsedInstructionBlock,
@@ -73,7 +72,6 @@ use std::error::Error;
 impl TryFrom<Vec<TztEntity>> for TztTest {
     type Error = Box<dyn Error>;
     fn try_from(tzt: Vec<TztEntity>) -> Result<Self, Self::Error> {
-        use ErrorExpectation::*;
         use TestExpectation::*;
         use TztEntity::*;
         use TztOutput::*;
@@ -90,19 +88,11 @@ impl TryFrom<Vec<TztEntity>> for TztTest {
                     "output",
                     &mut m_output,
                     match tzt_output {
-                        Success(stk) => {
+                        TztSuccess(stk) => {
                             typecheck_stack(stk.clone())?;
                             ExpectSuccess(stk)
                         }
-                        Fail(v) => ExpectError(InterpreterError(
-                            InterpreterErrorExpectation::FailedWith(v),
-                        )),
-                        TztOutput::MutezOverflow(v1, v2) => ExpectError(InterpreterError(
-                            InterpreterErrorExpectation::MutezOverflow(v1, v2),
-                        )),
-                        TztOutput::GeneralOverflow(_, _) => {
-                            todo!("General overflow is not implemented!")
-                        }
+                        TztError(error_exp) => ExpectError(error_exp),
                     },
                 )?,
                 Amount(m) => set_tzt_field("amount", &mut m_amount, m)?,
@@ -136,10 +126,9 @@ pub enum TestExpectation {
     ExpectError(ErrorExpectation),
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ErrorExpectation {
-    TypecheckerError(TcError),
+    TypecheckerError(Option<String>),
     InterpreterError(InterpreterErrorExpectation),
 }
 
@@ -160,12 +149,10 @@ pub enum TztEntity {
     Amount(i64),
 }
 
-/// Possible values for the "output" field in a Tzt test
+/// Possible values for the "output" expectation field in a Tzt test
 pub enum TztOutput {
-    Success(Vec<(Type, Value)>),
-    Fail(Value),
-    MutezOverflow(i64, i64),
-    GeneralOverflow(i128, i128),
+    TztSuccess(Vec<(Type, Value)>),
+    TztError(ErrorExpectation),
 }
 
 fn execute_tzt_test_code(
