@@ -89,3 +89,7 @@ val class_spec_of_attrs :
 (** [default_instance_spec ~id expr] returns a default instance specification for
     of a given [id] and [expr]. *)
 val default_instance_spec : id:string -> Ast.t -> InstanceSpec.t
+
+(** [merge_summaries a s] adds the summary [s] to the doc of [a] preserving the
+    existing doc if any. *)
+val merge_summaries : AttrSpec.t -> string option -> AttrSpec.t

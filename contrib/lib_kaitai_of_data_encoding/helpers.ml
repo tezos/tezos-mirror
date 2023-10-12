@@ -107,3 +107,11 @@ let default_instance_spec ~id value =
         InstanceSpec.ValueInstanceSpec
           {id; path = []; value; ifExpr = None; dataTypeOpt = None};
     }
+
+let merge_summaries attr summary =
+  match (attr.AttrSpec.doc.summary, summary) with
+  | _, None -> attr
+  | None, Some _ -> {attr with doc = {default_doc_spec with summary}}
+  | Some sumsum, Some s ->
+      let summary = Some (sumsum ^ "\n\n" ^ s) in
+      {attr with doc = {default_doc_spec with summary}}
