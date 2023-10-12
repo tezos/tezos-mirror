@@ -507,10 +507,9 @@ module Stake : sig
       less than {!Constants_parametric_repr.minimal_stake}. It might
       be large. *)
   module Staking_balance :
-    Indexed_data_snapshotable_storage
+    Indexed_data_storage
       with type key = Signature.Public_key_hash.t
        and type value = Full_staking_balance_repr.t
-       and type snapshot = int
        and type t := Raw_context.t
 
   (** This is a set, encoded in a map with value unit. This should be

@@ -134,6 +134,18 @@ let migrate_already_denounced_from_Oxford ctxt =
   | None -> return ctxt
   | Some previous_cycle -> migrate_cycle ctxt previous_cycle
 
+(* This removes snapshots and moves the current [staking_balance] one level
+   up. *)
+let migrate_staking_balance_for_p ctxt =
+  let open Lwt_result_syntax in
+  let* staking_balance_tree =
+    Raw_context.get_tree ctxt ["staking_balance"; "current"]
+  in
+  let*! ctxt =
+    Raw_context.add_tree ctxt ["staking_balance"] staking_balance_tree
+  in
+  return ctxt
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
@@ -233,6 +245,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
            that are not slashed whereas unstake_requests are slashed. *)
         let*! ctxt = Storage.Pending_denunciations.clear ctxt in
         let*! ctxt = migrate_already_denounced_from_Oxford ctxt in
+        let* ctxt = migrate_staking_balance_for_p ctxt in
         return (ctxt, [])
   in
   let* ctxt =
