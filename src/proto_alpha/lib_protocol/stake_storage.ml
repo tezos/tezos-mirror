@@ -212,11 +212,6 @@ let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   let stakes = List.sort (fun (_, x) (_, y) -> Stake_repr.compare y x) stakes in
   let* ctxt = Selected_distribution_for_cycle.init ctxt cycle stakes in
   let*! ctxt = Storage.Stake.Total_active_stake.add ctxt cycle total_stake in
-  (* cleanup snapshots *)
-  let*! ctxt = Storage.Stake.Staking_balance.Snapshot.clear ctxt in
-  let*! ctxt =
-    Storage.Stake.Active_delegates_with_minimal_stake.Snapshot.clear ctxt
-  in
   Storage.Stake.Last_snapshot.update ctxt 0
 
 let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
