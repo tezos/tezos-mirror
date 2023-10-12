@@ -219,6 +219,13 @@ fn typecheck_instruction(
                 _ => return Err(TcError::GenericTcError),
             }
         }
+        I::ISome => match stack.pop() {
+            Some(ty) => {
+                stack.push(T::new_option(ty));
+                I::ISome
+            }
+            _ => return Err(TcError::StackTooShort),
+        },
     })
 }
 
@@ -703,5 +710,15 @@ mod typecheck_tests {
             Ok(vec![IfNone(vec![Push(TypedValue::Int(5))], vec![])])
         );
         assert_eq!(stack, stk![Type::Int]);
+    }
+
+    #[test]
+    fn some() {
+        let mut stack = stk![Type::Int];
+        assert_eq!(
+            typecheck(parse("{ SOME }").unwrap(), &mut Gas::default(), &mut stack),
+            Ok(vec![ISome])
+        );
+        assert_eq!(stack, stk![Type::new_option(Type::Int)]);
     }
 }

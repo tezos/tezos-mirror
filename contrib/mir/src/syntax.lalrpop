@@ -108,6 +108,7 @@ instruction: ParsedInstruction = {
   "CDR" => Cdr,
   "PAIR" => Pair,
   "IF_NONE" <instructionBlock> <instructionBlock> => IfNone(<>),
+  "SOME" => ISome,
 }
 
 instructionSeq: Vec<ParsedInstruction> = {
