@@ -53,7 +53,9 @@ let signer_test protocol ~keys =
     (* tell the baker to ask the signer for the bootstrap keys *)
     let uri = Signer.uri signer in
     Lwt_list.iter_s
-      (fun account -> Client.import_signer_key client account uri)
+      (fun account ->
+        let Account.{alias; public_key_hash; _} = account in
+        Client.import_signer_key client ~alias ~public_key_hash uri)
       keys
   in
   let level_2_promise = Node.wait_for_level node 2 in
@@ -86,7 +88,8 @@ let signer_bls_test =
   let* signer = Signer.init ~keys:[Constant.tz4_account] () in
   let* () =
     let uri = Signer.uri signer in
-    Client.import_signer_key client Constant.tz4_account uri
+    let Account.{alias; public_key_hash; _} = Constant.tz4_account in
+    Client.import_signer_key client ~alias ~public_key_hash uri
   in
   let* () =
     Client.transfer

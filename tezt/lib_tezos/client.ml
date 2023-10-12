@@ -580,17 +580,24 @@ let spawn_import_secret_key ?(force = false) ?endpoint client
     client
     (["import"; "secret"; "key"; alias; sk_uri] @ force)
 
-let spawn_import_signer_key ?endpoint ?(force = false) client
-    (key : Account.key) signer_uri =
-  let uri = Uri.with_path signer_uri key.public_key_hash in
+let spawn_import_signer_key ?endpoint ?(force = false) client ~public_key_hash
+    ~alias signer_uri =
+  let uri = Uri.with_path signer_uri public_key_hash in
   spawn_command
     ?endpoint
     client
-    (["import"; "secret"; "key"; key.alias; Uri.to_string uri]
+    (["import"; "secret"; "key"; alias; Uri.to_string uri]
     @ if force then ["--force"] else [])
 
-let import_signer_key ?endpoint ?force client key signer_uri =
-  spawn_import_signer_key ?endpoint ?force client key signer_uri
+let import_signer_key ?endpoint ?force client ~public_key_hash ~alias signer_uri
+    =
+  spawn_import_signer_key
+    ?endpoint
+    ?force
+    client
+    ~public_key_hash
+    ~alias
+    signer_uri
   |> Process.check
 
 let import_secret_key ?force ?endpoint client secret_key ~alias =
