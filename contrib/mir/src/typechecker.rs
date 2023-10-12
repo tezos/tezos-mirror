@@ -134,6 +134,25 @@ fn typecheck_instruction(
             }
             _ => return Err(TcError::GenericTcError),
         },
+        I::IfNone(when_none, when_some) => match stack.pop() {
+            // Check if top is option 'ty
+            Some(T::Option(ty)) => {
+                // Clone the some_stack as we need to push a type on top of it
+                let mut some_stack: TypeStack = stack.clone();
+                some_stack.push(*ty);
+                let when_none = typecheck(when_none, gas, stack)?;
+                let when_some = typecheck(when_some, gas, &mut some_stack)?;
+                // If both stacks are same after typecheck, all is good.
+                ensure_stacks_eq(gas, &some_stack, &stack)?;
+                // Replace stack with other branche's stack if it's failed, as
+                // one branch might've been successful.
+                if stack.is_failed() {
+                    *stack = some_stack;
+                }
+                I::IfNone(when_none, when_some)
+            }
+            _ => return Err(TcError::GenericTcError),
+        },
         I::Int => match stack.pop() {
             Some(T::Nat) => {
                 stack.push(Type::Int);
@@ -668,6 +687,20 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(vec![Pair, Cdr])
+        );
+        assert_eq!(stack, stk![Type::Int]);
+    }
+
+    #[test]
+    fn if_none() {
+        let mut stack = stk![Type::new_option(Type::Int)];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_NONE { PUSH int 5; } {} }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![IfNone(vec![Push(TypedValue::Int(5))], vec![])])
         );
         assert_eq!(stack, stk![Type::Int]);
     }
