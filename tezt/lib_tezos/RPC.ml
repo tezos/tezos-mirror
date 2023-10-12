@@ -1573,3 +1573,7 @@ let get_monitor_validated_blocks =
   make GET ["monitor"; "validated_blocks"] Fun.id
 
 let nonexistent_path = make GET ["nonexistent"; "path"] Fun.id
+
+let get_chain_block_context_denunciations ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "context"; "denunciations"] Fun.id

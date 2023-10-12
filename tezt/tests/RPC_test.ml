@@ -719,7 +719,12 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
              ()
       in
       unit
-    else unit
+    else
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_context_denunciations ()
+      in
+      unit
   in
   let* () =
     let* _ =

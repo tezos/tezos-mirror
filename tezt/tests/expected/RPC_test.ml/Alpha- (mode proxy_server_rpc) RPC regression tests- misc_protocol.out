@@ -95,6 +95,9 @@
 { "level": 2, "level_position": 1, "cycle": 0, "cycle_position": 1,
   "expected_commitment": false }
 
+./octez-client rpc get /chains/main/blocks/head/context/denunciations
+[]
+
 ./octez-client rpc get /chains/main/blocks/head/helpers/attestation_rights
 [ { "level": 2,
     "delegates":
