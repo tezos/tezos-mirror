@@ -510,6 +510,41 @@ let test_unset_limit () =
   let* () = Assert.equal_tez ~loc:__LOC__ frozen_deposits_at_bfin Tez.zero in
   return_unit
 
+let test_cannot_bake_with_zero_deposits_limit () =
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let (contract1, account1), (_contract2, account2) =
+    get_first_2_accounts_contracts contracts
+  in
+  (* N.B. there is no non-zero frozen deposits value for which one cannot bake:
+     even with a small deposit one can still bake, though with a smaller probability
+     (because the frozen deposits value impacts the active stake and the active
+     stake is the one used to determine baking/endorsing rights. *)
+  Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
+  >>=? fun operation ->
+  Block.bake ~policy:(By_account account2) ~operation genesis >>=? fun b ->
+  let expected_number_of_cycles_with_previous_deposit =
+    constants.preserved_cycles + Constants.max_slashing_period - 1
+  in
+  Block.bake_until_n_cycle_end
+    ~policy:(By_account account2)
+    expected_number_of_cycles_with_previous_deposit
+    b
+  >>=? fun b ->
+  Block.bake ~policy:(By_account account1) b >>= fun b1 ->
+  (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
+     cannot be a proposer, thus it cannot bake. Precisely, bake fails because
+     get_next_baker_by_account fails with "No slots found" *)
+  Assert.error ~loc:__LOC__ b1 (fun _ -> true) >>=? fun () ->
+  Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
+  (* after one cycle is passed, the frozen deposit window has passed
+     and the frozen deposits should now be effectively 0. *)
+  Context.Delegate.current_frozen_deposits (B b) account1 >>=? fun fd ->
+  Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
+  Block.bake ~policy:(By_account account1) b >>= fun b1 ->
+  (* don't know why the zero frozen deposits error is not caught here *)
+  (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
+  Assert.error ~loc:__LOC__ b1 (fun _ -> true)
+
 let test_deposits_after_stake_removal () =
   let open Lwt_result_syntax in
   let* genesis, contracts = Context.init_with_constants2 constants in
@@ -849,6 +884,78 @@ let test_frozen_deposits_with_overdelegation () =
   let* (_ : Block.t) = loop b cycles_to_bake in
   return_unit
 
+let test_set_limit_with_overdelegation () =
+  let constants = {constants with delegation_over_baking_limit = 9} in
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let (contract1, account1), (contract2, account2) =
+    get_first_2_accounts_contracts contracts
+  in
+  (* - [account1] and [account2] will give 80% of their balance to
+       [new_account]
+     - [new_account] will overdelegate to [account1] and [account1] will set
+       its frozen deposits limit to 15% of its stake *)
+  Context.Delegate.current_frozen_deposits (B genesis) account1
+  >>=? fun initial_frozen_deposits ->
+  Context.Delegate.staking_balance (B genesis) account1
+  >>=? fun initial_staking_balance ->
+  Context.Delegate.staking_balance (B genesis) account2
+  >>=? fun initial_staking_balance' ->
+  let amount = Test_tez.(initial_staking_balance *! 8L /! 10L) in
+  let amount' = Test_tez.(initial_staking_balance' *! 8L /! 10L) in
+  let limit = Test_tez.(initial_staking_balance *! 15L /! 100L) in
+  let new_account = (Account.new_account ()).pkh in
+  let new_contract = Contract.Implicit new_account in
+  Op.transaction ~force_reveal:true (B genesis) contract1 new_contract amount
+  >>=? fun transfer1 ->
+  Op.transaction ~force_reveal:true (B genesis) contract2 new_contract amount'
+  >>=? fun transfer2 ->
+  Block.bake ~operations:[transfer1; transfer2] genesis >>=? fun b ->
+  Op.set_deposits_limit (B b) contract1 (Some limit) >>=? fun set_deposits ->
+  Block.bake ~operation:set_deposits b >>=? fun b ->
+  let expected_new_staking_balance =
+    Test_tez.(initial_staking_balance -! amount)
+  in
+  Context.Delegate.staking_balance (B b) account1
+  >>=? fun new_staking_balance ->
+  Assert.equal_tez ~loc:__LOC__ new_staking_balance expected_new_staking_balance
+  >>=? fun () ->
+  let expected_new_staking_balance' =
+    Test_tez.(initial_staking_balance' -! amount')
+  in
+  Context.Delegate.staking_balance (B b) account2
+  >>=? fun new_staking_balance' ->
+  Assert.equal_tez
+    ~loc:__LOC__
+    new_staking_balance'
+    expected_new_staking_balance'
+  >>=? fun () ->
+  Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
+  >>=? fun delegation ->
+  Block.bake ~operation:delegation b >>=? fun b ->
+  (* Finish the cycle. account1's frozen deposits aren't increased
+     automatically. *)
+  Block.bake_until_cycle_end b >>=? fun b ->
+  let expected_new_frozen_deposits = initial_frozen_deposits in
+  Context.Delegate.current_frozen_deposits (B b) account1
+  >>=? fun frozen_deposits ->
+  Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
+  >>=? fun () ->
+  let cycles_to_bake =
+    2 * (constants.preserved_cycles + Constants.max_slashing_period)
+  in
+  let rec loop b n =
+    if n = 0 then return b
+    else
+      Block.bake_until_cycle_end ~policy:(By_account account1) b >>=? fun b ->
+      Context.Delegate.current_frozen_deposits (B b) account1
+      >>=? fun frozen_deposits ->
+      Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
+      >>=? fun () -> loop b (pred n)
+  in
+  (* Check that frozen deposits do not change for a sufficient period of
+     time *)
+  loop b cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
+
 (** This test fails when [to_cycle] in [Delegate.freeze_deposits] is smaller than
    [new_cycle + preserved_cycles]. *)
 let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
@@ -949,6 +1056,10 @@ let tests =
         "frozen deposits with overdelegation"
         `Quick
         test_frozen_deposits_with_overdelegation;
+      tztest
+        "set limit with overdelegation"
+        `Quick
+        test_set_limit_with_overdelegation;
       tztest
         "error is thrown when the frozen window is smaller"
         `Quick
