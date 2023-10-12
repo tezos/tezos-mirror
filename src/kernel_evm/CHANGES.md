@@ -13,6 +13,8 @@
 ### EVM Node
 
 - Remove `mockup` mode previously used for internal testing only. (!10406)
+- RPCs related to blocks now return default values for the POW fields instead of
+  mockup. (!10427)
 
 ### Bug fixes
 

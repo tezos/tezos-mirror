@@ -626,16 +626,25 @@ let block_from_rlp bytes =
         number = Some (Block_height number);
         hash = Some hash;
         parent = parent_hash;
-        nonce = Hex (String.make 16 'a');
-        sha3Uncles = Hash (Hex (String.make 64 'a'));
+        (* Post merge: always 0. *)
+        nonce = Hex "0000000000000000";
+        (* Post merge: uncles are always empty, therefore this is the "empty" hash
+           of these uncles. *)
+        sha3Uncles =
+          Hash
+            (Hex
+               "1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
         logsBloom = Some (Hex (String.make 512 'a'));
         transactionRoot = Hash (Hex (String.make 64 'a'));
         stateRoot = Hash (Hex (String.make 64 'a'));
         receiptRoot = Hash (Hex (String.make 64 'a'));
-        (* We need the following dummy value otherwise eth-cli will complain
-           that miner's address is not a valid Ethereum address. *)
-        miner = Hex "6471A723296395CF1Dcc568941AFFd7A390f94CE";
+        (* Post merge: this field is now used for the "fee recipient". We don't
+           have that, potentially this could be the sequencer. *)
+        miner = Hex "0000000000000000000000000000000000000000";
+        (* Post merge: always zero. *)
         difficulty = Qty Z.zero;
+        (* Post merge: sum of difficulty will always be zero because difficulty
+           has and will always be zero. *)
         totalDifficulty = Qty Z.zero;
         extraData = "";
         size = Qty (Z.of_int (Bytes.length bytes));
@@ -643,6 +652,7 @@ let block_from_rlp bytes =
         gasUsed = gas_used;
         timestamp;
         transactions;
+        (* Post merge: always empty. *)
         uncles = [];
       }
   | _ -> raise (Invalid_argument "Expected a List of 6 elements")
