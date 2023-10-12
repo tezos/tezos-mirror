@@ -220,6 +220,13 @@ fn typecheck_value(gas: &mut Gas, t: &Type, v: Value) -> Result<TypedValue, TcEr
             let r = typecheck_value(gas, tr, *vr)?;
             TV::new_pair(l, r)
         }
+        (Option(ty), OptionValue(v)) => match v {
+            Some(v) => {
+                let v = typecheck_value(gas, ty, *v)?;
+                TV::new_option(Some(v))
+            }
+            None => TV::new_option(None),
+        },
         _ => return Err(TcError::GenericTcError),
     })
 }
@@ -571,6 +578,20 @@ mod typecheck_tests {
                 Type::new_pair(Type::Nat, Type::Bool)
             )]
         );
+    }
+
+    #[test]
+    fn push_option_value() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (option nat) (Some 3) }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(TypedValue::new_option(Some(TypedValue::Nat(3))))])
+        );
+        assert_eq!(stack, stk![Type::new_option(Type::Nat)]);
     }
 
     #[test]
