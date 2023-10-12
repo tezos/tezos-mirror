@@ -32,7 +32,7 @@ let to_json_and_bytes branch message =
     ( Environment.Operation.{branch},
       Contents_list (Single (Failing_noop message)) )
   in
-  let encoding = Operation.unsigned_encoding in
+  let encoding = Operation.unsigned_encoding_with_legacy_attestation_name in
   ( Data_encoding.Json.construct encoding op,
     Data_encoding.Binary.to_bytes_exn encoding op )
 

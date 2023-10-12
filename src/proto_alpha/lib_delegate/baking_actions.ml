@@ -37,7 +37,8 @@ module Operations_source = struct
       }
 
   let operations_encoding =
-    Data_encoding.(list (dynamic_size Operation.encoding))
+    Data_encoding.(
+      list (dynamic_size Operation.encoding_with_legacy_attestation_name))
 
   let retrieve =
     let open Lwt_result_syntax in
@@ -475,7 +476,7 @@ let inject_preattestations state ~preattestations =
             in
             let unsigned_operation_bytes =
               Data_encoding.Binary.to_bytes_exn
-                Operation.unsigned_encoding
+                Operation.unsigned_encoding_with_legacy_attestation_name
                 unsigned_operation
             in
             Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -570,7 +571,7 @@ let sign_attestations state attestations =
           let unsigned_operation = (shell, Contents_list contents) in
           let unsigned_operation_bytes =
             Data_encoding.Binary.to_bytes_exn
-              Operation.unsigned_encoding
+              Operation.unsigned_encoding_with_legacy_attestation_name
               unsigned_operation
           in
           Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -610,7 +611,7 @@ let sign_dal_attestations state attestations =
       let unsigned_operation = (shell, Contents_list contents) in
       let unsigned_operation_bytes =
         Data_encoding.Binary.to_bytes_exn
-          Operation.unsigned_encoding
+          Operation.unsigned_encoding_with_legacy_attestation_name
           unsigned_operation
       in
       let*! signature =
@@ -671,7 +672,9 @@ let inject_dal_attestations state attestations =
            (attestation : Dal.Attestation.t),
            published_level ) ->
       let encoded_op =
-        Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
+        Data_encoding.Binary.to_bytes_exn
+          Operation.encoding_with_legacy_attestation_name
+          signed_operation
       in
       let* oph =
         Shell_services.Injection.operation

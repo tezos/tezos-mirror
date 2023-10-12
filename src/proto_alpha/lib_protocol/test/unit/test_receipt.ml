@@ -54,10 +54,14 @@ let test_encodings balance =
   let r8 = Receipt.(balance, Credited am, Block_application) in
   let coded =
     Json.construct
-      Receipt.balance_updates_encoding
+      Receipt.balance_updates_encoding_with_legacy_attestation_name
       [r1; r2; r3; r4; r5; r6; r7; r8]
   in
-  let decoded = Json.destruct Receipt.balance_updates_encoding coded in
+  let decoded =
+    Json.destruct
+      Receipt.balance_updates_encoding_with_legacy_attestation_name
+      coded
+  in
   match decoded with
   | [r1'; r2'; r3'; r4'; r5'; r6'; r7'; r8'] ->
       assert (

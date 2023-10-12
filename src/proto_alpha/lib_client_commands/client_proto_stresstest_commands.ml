@@ -494,7 +494,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
 let inject_contents (cctxt : Protocol_client_context.full) branch sk contents =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding
+      Operation.unsigned_encoding_with_legacy_attestation_name
       ({branch}, Contents_list contents)
   in
   let signature =
@@ -504,7 +504,9 @@ let inject_contents (cctxt : Protocol_client_context.full) branch sk contents =
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let bytes =
-    Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
+    Data_encoding.Binary.to_bytes_exn
+      Operation.encoding_with_legacy_attestation_name
+      (Operation.pack op)
   in
   Shell_services.Injection.operation cctxt bytes
 
