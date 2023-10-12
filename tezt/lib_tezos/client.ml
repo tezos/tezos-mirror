@@ -563,12 +563,16 @@ let import_encrypted_secret_key ?hooks ?force ?endpoint client
   let* () = Lwt_io.close output_channel in
   Process.check process
 
-let spawn_import_secret_key ?endpoint client (secret_key : Account.secret_key)
-    ~alias =
+let spawn_import_secret_key ?(force = false) ?endpoint client
+    (secret_key : Account.secret_key) ~alias =
   let sk_uri =
     "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ secret_key
   in
-  spawn_command ?endpoint client ["import"; "secret"; "key"; alias; sk_uri]
+  let force = if force then ["--force"] else [] in
+  spawn_command
+    ?endpoint
+    client
+    (["import"; "secret"; "key"; alias; sk_uri] @ force)
 
 let spawn_import_signer_key ?endpoint ?(force = false) client
     (key : Account.key) signer_uri =
@@ -583,8 +587,9 @@ let import_signer_key ?endpoint ?force client key signer_uri =
   spawn_import_signer_key ?endpoint ?force client key signer_uri
   |> Process.check
 
-let import_secret_key ?endpoint client secret_key ~alias =
-  spawn_import_secret_key ?endpoint client secret_key ~alias |> Process.check
+let import_secret_key ?force ?endpoint client secret_key ~alias =
+  spawn_import_secret_key ?force ?endpoint client secret_key ~alias
+  |> Process.check
 
 let spawn_import_keys_from_mnemonic ?endpoint ?(force = false)
     ?(encrypt = false) client ~alias =

@@ -432,7 +432,12 @@ val spawn_import_encrypted_secret_key :
 
 (** Run [octez-client import secret key]. *)
 val import_secret_key :
-  ?endpoint:endpoint -> t -> Account.secret_key -> alias:string -> unit Lwt.t
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.secret_key ->
+  alias:string ->
+  unit Lwt.t
 
 (** Run [octez-client import secret key] for remote signer. *)
 val import_signer_key :
@@ -445,7 +450,12 @@ val spawn_import_signer_key :
 
 (** Same as [import_secret_key], but do not wait for the process to exit. *)
 val spawn_import_secret_key :
-  ?endpoint:endpoint -> t -> Account.secret_key -> alias:string -> Process.t
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.secret_key ->
+  alias:string ->
+  Process.t
 
 (** Run [octez-client activate protocol].
 
