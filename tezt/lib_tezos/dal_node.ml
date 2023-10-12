@@ -30,6 +30,7 @@ module Parameters = struct
     rpc_port : int;
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
+    public_addr : string;
     metrics_addr : string;
     l1_node_endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
@@ -69,6 +70,8 @@ let rpc_endpoint dal_node =
 
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
 
+let public_addr dal_node = dal_node.persistent_state.public_addr
+
 let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 
 let data_dir dal_node = dal_node.persistent_state.data_dir
@@ -91,6 +94,8 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
          Some "--net-addr";
          Some (listen_addr dal_node);
+         Some "--public-addr";
+         Some (public_addr dal_node);
          Some "--metrics-addr";
          Some (metrics_addr dal_node);
          Some "--expected-pow";
@@ -173,8 +178,8 @@ let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create_from_endpoint ?(path = Constant.dal_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr
-    ~l1_node_endpoint () =
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?public_addr
+    ?metrics_addr ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -186,6 +191,9 @@ let create_from_endpoint ?(path = Constant.dal_node) ?name ?color ?data_dir
     match listen_addr with
     | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
     | Some addr -> addr
+  in
+  let public_addr =
+    match public_addr with None -> listen_addr | Some addr -> addr
   in
   let metrics_addr =
     match metrics_addr with
@@ -203,6 +211,7 @@ let create_from_endpoint ?(path = Constant.dal_node) ?name ?color ?data_dir
         rpc_host;
         rpc_port;
         listen_addr;
+        public_addr;
         metrics_addr;
         pending_ready = [];
         l1_node_endpoint;
@@ -212,7 +221,8 @@ let create_from_endpoint ?(path = Constant.dal_node) ?name ?color ?data_dir
   dal_node
 
 let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr ~node () =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?public_addr ?metrics_addr
+    ~node () =
   create_from_endpoint
     ~path
     ?name
@@ -222,6 +232,7 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
     ~rpc_host
     ?rpc_port
     ?listen_addr
+    ?public_addr
     ?metrics_addr
     ~l1_node_endpoint:(Client.Node node)
     ()
@@ -237,6 +248,8 @@ let make_arguments node =
     Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
     "--net-addr";
     listen_addr node;
+    "--public-addr";
+    public_addr node;
     "--metrics-addr";
     metrics_addr node;
   ]
