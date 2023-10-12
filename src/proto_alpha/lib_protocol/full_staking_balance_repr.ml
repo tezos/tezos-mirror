@@ -13,13 +13,13 @@ type t = {
   cycle_of_min_delegated : Cycle_repr.t;
 }
 
-let init ~own_frozen ~staked_frozen ~delegated =
+let init ~own_frozen ~staked_frozen ~delegated ~current_cycle =
   {
     own_frozen;
     staked_frozen;
     delegated;
     min_delegated_in_cycle = delegated;
-    cycle_of_min_delegated = Cycle_repr.root;
+    cycle_of_min_delegated = current_cycle;
   }
 
 let encoding =
@@ -177,7 +177,7 @@ let has_minimal_stake_to_be_considered ~minimal_stake full_staking_balance =
       (* If the total overflows, we are definitely over the minimal stake. *)
   | Ok staking_balance -> Tez_repr.(staking_balance >= minimal_stake)
 
-let remove_delegated ~amount
+let remove_delegated ~current_cycle ~amount
     {
       own_frozen;
       staked_frozen;
@@ -187,12 +187,19 @@ let remove_delegated ~amount
     } =
   let open Result_syntax in
   let+ delegated = Tez_repr.(delegated -? amount) in
+  let min_delegated_in_cycle =
+    if Cycle_repr.(cycle_of_min_delegated < current_cycle) then
+      (* after decrease *) delegated
+    else (
+      assert (Cycle_repr.(cycle_of_min_delegated = current_cycle)) ;
+      Tez_repr.min delegated min_delegated_in_cycle)
+  in
   {
     own_frozen;
     staked_frozen;
     delegated;
     min_delegated_in_cycle;
-    cycle_of_min_delegated;
+    cycle_of_min_delegated = current_cycle;
   }
 
 let remove_own_frozen ~amount
@@ -231,7 +238,7 @@ let remove_staked_frozen ~amount
     cycle_of_min_delegated;
   }
 
-let add_delegated ~amount
+let add_delegated ~current_cycle ~amount
     {
       own_frozen;
       staked_frozen;
@@ -240,13 +247,20 @@ let add_delegated ~amount
       cycle_of_min_delegated;
     } =
   let open Result_syntax in
+  let min_delegated_in_cycle =
+    if Cycle_repr.(cycle_of_min_delegated < current_cycle) then
+      (* before increase *) delegated
+    else (
+      assert (Cycle_repr.(cycle_of_min_delegated = current_cycle)) ;
+      min_delegated_in_cycle)
+  in
   let+ delegated = Tez_repr.(delegated +? amount) in
   {
     own_frozen;
     staked_frozen;
     delegated;
     min_delegated_in_cycle;
-    cycle_of_min_delegated;
+    cycle_of_min_delegated = current_cycle;
   }
 
 let add_own_frozen ~amount

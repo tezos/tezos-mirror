@@ -83,11 +83,13 @@ let has_minimal_stake ctxt staking_balance =
 
 let initialize_delegate ctxt delegate ~delegated =
   let open Lwt_result_syntax in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
   let balance =
     Full_staking_balance_repr.init
       ~own_frozen:Tez_repr.zero
       ~staked_frozen:Tez_repr.zero
       ~delegated
+      ~current_cycle
   in
   let* ctxt = Storage.Stake.Staking_balance.init ctxt delegate balance in
   if has_minimal_stake ctxt balance then
@@ -139,7 +141,8 @@ let update_stake ~f ctxt delegate =
   | false, false | true, true -> return ctxt
 
 let remove_delegated_stake ctxt delegate amount =
-  let f = Full_staking_balance_repr.remove_delegated ~amount in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let f = Full_staking_balance_repr.remove_delegated ~current_cycle ~amount in
   update_stake ctxt delegate ~f
 
 let remove_own_frozen_stake ctxt delegate amount =
@@ -158,7 +161,8 @@ let remove_frozen_stake_only_call_from_token ctxt staker amount =
       remove_staked_frozen_stake ctxt delegate amount
 
 let add_delegated_stake ctxt delegate amount =
-  let f = Full_staking_balance_repr.add_delegated ~amount in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let f = Full_staking_balance_repr.add_delegated ~current_cycle ~amount in
   update_stake ctxt delegate ~f
 
 let add_own_frozen_stake ctxt delegate amount =

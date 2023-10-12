@@ -8,7 +8,11 @@
 type t
 
 val init :
-  own_frozen:Tez_repr.t -> staked_frozen:Tez_repr.t -> delegated:Tez_repr.t -> t
+  own_frozen:Tez_repr.t ->
+  staked_frozen:Tez_repr.t ->
+  delegated:Tez_repr.t ->
+  current_cycle:Cycle_repr.t ->
+  t
 
 val encoding : t Data_encoding.t
 
@@ -38,13 +42,15 @@ val has_minimal_frozen_stake : minimal_frozen_stake:Tez_repr.t -> t -> bool
 
 val has_minimal_stake_to_be_considered : minimal_stake:Tez_repr.t -> t -> bool
 
-val remove_delegated : amount:Tez_repr.t -> t -> t tzresult
+val remove_delegated :
+  current_cycle:Cycle_repr.t -> amount:Tez_repr.t -> t -> t tzresult
 
 val remove_own_frozen : amount:Tez_repr.t -> t -> t tzresult
 
 val remove_staked_frozen : amount:Tez_repr.t -> t -> t tzresult
 
-val add_delegated : amount:Tez_repr.t -> t -> t tzresult
+val add_delegated :
+  current_cycle:Cycle_repr.t -> amount:Tez_repr.t -> t -> t tzresult
 
 val add_own_frozen : amount:Tez_repr.t -> t -> t tzresult
 
