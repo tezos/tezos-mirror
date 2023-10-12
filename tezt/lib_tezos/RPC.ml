@@ -713,6 +713,22 @@ let get_chain_block_context_contract_storage_paid_space ?(chain = "main")
     ]
     JSON.as_int
 
+let get_chain_block_context_contract_staking_numerator ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "staking_numerator";
+    ]
+    JSON.as_int
+
 let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
     ?delegate ?level () =
   let query_string =
