@@ -9,7 +9,7 @@
 #![allow(clippy::all)]
 
 use crate::ast::*;
-use crate::parser::{ParserError, ContractScriptEntity};
+use crate::parser::{ParserError, ContractScriptEntity, validate_u10};
 use crate::lexer::{Prim, Tok};
 
 grammar;
@@ -73,14 +73,7 @@ extern {
     }
 }
 
-u10: u16 = <n:number> =>? {
-    let res = u16::try_from(n)
-      .map_err(|_| ParserError::ExpectedU10(n) )?;
-    if res >= 1024 {
-      return Err(ParserError::ExpectedU10(n).into());
-    }
-    Ok(res)
-  };
+u10: u16 = number =>? validate_u10(<>).map_err(Into::into);
 
 anns: () = ann* => ();
 
@@ -204,10 +197,14 @@ semicolonSepSeq<T>: Vec<T> = {
   }
 }
 
-pub instructionBlock: ParsedInstructionBlock = {
+instructionBlock: ParsedInstructionBlock = {
   "{" <is:instructionSeq> "}" => is,
 }
 
+// synonym for consistent type naming
+pub InstructionBlock = instructionBlock;
+
+// synonym for consistent type naming
 pub Type: Type = type_expr;
 
 code_content: ParsedInstruction = {
