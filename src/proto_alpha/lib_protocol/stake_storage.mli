@@ -86,21 +86,6 @@ val fold_on_active_delegates_with_minimal_stake_es :
   init:'a ->
   'a tzresult Lwt.t
 
-(** [fold_snapshot ctxt ~index ~f ~init] folds [f] on the list of active
-    delegates having the minimal required stake for the given snapshot [index]. The folding
-    process starts with [init]. Each element of the list is a pair [pkh, stake],
-    where [pkh] is the public key hash of the delegate and [stake] is the staking
-    balance of the delegate for the given snapshot [index]. *)
-val fold_snapshot :
-  Raw_context.t ->
-  index:int ->
-  f:
-    (Signature.Public_key_hash.t * Full_staking_balance_repr.t ->
-    'a ->
-    'a tzresult Lwt.t) ->
-  init:'a ->
-  'a tzresult Lwt.t
-
 (** [max_snapshot_index ctxt] returns the index of the last snapshot taken of
     staking balances and active delegates. *)
 val max_snapshot_index : Raw_context.t -> int tzresult Lwt.t

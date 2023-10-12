@@ -224,19 +224,6 @@ let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
       let*? acc in
       f delegate acc)
 
-let fold_snapshot ctxt ~index ~f ~init =
-  let open Lwt_result_syntax in
-  Storage.Stake.Active_delegates_with_minimal_stake.fold_snapshot
-    ctxt
-    index
-    ~order:`Sorted
-    ~init
-    ~f:(fun delegate () acc ->
-      let* stake =
-        Storage.Stake.Staking_balance.Snapshot.get ctxt (index, delegate)
-      in
-      f (delegate, stake) acc)
-
 let clear_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
   let max_slashing_period = Constants_repr.max_slashing_period in
