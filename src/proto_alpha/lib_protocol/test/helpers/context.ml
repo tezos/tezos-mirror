@@ -456,6 +456,7 @@ module Delegate = struct
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
     staking_balance : Tez.t;
+    frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     total_delegated_stake : Tez.t;
@@ -486,6 +487,9 @@ module Delegate = struct
       Delegate_services.staking_denominator rpc_ctxt ctxt pkh
     in
     Staking_pseudotoken.Internal_for_tests.to_z pseudotokens
+
+  let frozen_deposits_limit ctxt pkh =
+    Delegate_services.frozen_deposits_limit rpc_ctxt ctxt pkh
 
   let deactivated ctxt pkh = Delegate_services.deactivated rpc_ctxt ctxt pkh
 
