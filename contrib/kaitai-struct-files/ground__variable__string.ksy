@@ -3,4 +3,4 @@ meta:
   endian: be
 seq:
 - id: ground__variable__string
-  type: variable size bytes
+  size-eos: true
