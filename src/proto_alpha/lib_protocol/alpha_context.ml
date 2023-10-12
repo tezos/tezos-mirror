@@ -534,6 +534,18 @@ module Delegate = struct
   end
 
   module Staking_parameters = Delegate_staking_parameters
+
+  module For_RPC = struct
+    include For_RPC
+
+    let current_cycle_denunciations_list ctxt =
+      let open Lwt_syntax in
+      let* r = Storage.Current_cycle_denunciations.bindings ctxt in
+      let r =
+        List.map (fun (x, l) -> List.map (fun y -> (x, y)) l) r |> List.flatten
+      in
+      return r
+  end
 end
 
 module Stake_distribution = struct
