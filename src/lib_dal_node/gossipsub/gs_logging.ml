@@ -29,7 +29,6 @@ open Gs_interface.Worker_instance
 module Events = struct
   include Internal_event.Simple
   open Data_encoding
-  open Gs_interface
 
   let section = ["gossipsub"; "worker"; "event"]
 
@@ -54,7 +53,7 @@ module Events = struct
       ~pp1:GS.Topic.pp
       ~pp2:GS.Message_id.pp
       ("topic", Types.Topic.encoding)
-      ("message_id", message_id_encoding)
+      ("message_id", Types.Message_id.encoding)
 
   let join =
     declare_1
@@ -110,7 +109,7 @@ module Events = struct
       ~pp3:GS.Message_id.pp
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
-      ("message_id", message_id_encoding)
+      ("message_id", Types.Message_id.encoding)
 
   let subscribe =
     declare_2
@@ -153,11 +152,11 @@ module Events = struct
       ~level:Info
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
-      ~pp3:Span.pp
+      ~pp3:Types.Span.pp
       ~pp4:(Format.pp_print_list P2p_peer.Id.pp)
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
-      ("backoff", span_encoding)
+      ("backoff", Types.Span.encoding)
       ("px", list P2p_peer.Id.encoding)
 
   let ihave =
@@ -172,7 +171,7 @@ module Events = struct
       ~pp3:(Format.pp_print_list GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
-      ("message_ids", list message_id_encoding)
+      ("message_ids", list Types.Message_id.encoding)
 
   let iwant =
     declare_2
@@ -183,7 +182,7 @@ module Events = struct
       ~pp1:P2p_peer.Id.pp
       ~pp2:(Format.pp_print_list GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)
-      ("message_ids", list message_id_encoding)
+      ("message_ids", list Types.Message_id.encoding)
 end
 
 let event =

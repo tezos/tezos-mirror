@@ -207,7 +207,7 @@ let message_validation_error =
        {validation_error}"
     ~level:Warning
     ~pp1:Gossipsub.Worker.GS.Message_id.pp
-    ("message_id", Gossipsub.message_id_encoding)
+    ("message_id", Types.Message_id.encoding)
     ("validation_error", Data_encoding.string)
 
 let p2p_server_is_ready =

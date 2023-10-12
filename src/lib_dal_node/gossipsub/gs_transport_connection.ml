@@ -52,7 +52,7 @@ module Events = struct
       ~msg:"Successfully notified message id {message_id} to the application"
       ~level:Info
       ~pp1:Worker.GS.Message_id.pp
-      ("message_id", Gs_interface.message_id_encoding)
+      ("message_id", Types.Message_id.encoding)
 
   let app_message_callback_failed =
     declare_2
@@ -62,7 +62,7 @@ module Events = struct
       ~level:Warning
       ~pp1:Worker.GS.Message_id.pp
       ~pp2:pp_print_trace
-      ("message_id", Gs_interface.message_id_encoding)
+      ("message_id", Types.Message_id.encoding)
       ("failure", trace_encoding)
 
   let send_p2p_message_failed =

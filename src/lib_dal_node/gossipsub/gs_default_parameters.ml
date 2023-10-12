@@ -28,8 +28,6 @@
     limits. These values are used or re-defined in the DAL node before
     instantiating the Gossipsub worker. *)
 
-module Span = Gs_interface.Span
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5559
 
    Document why we choose these default values for GS parameters.
@@ -41,7 +39,7 @@ module Topic_score = struct
 
   let time_in_mesh_cap = 3600.0
 
-  let time_in_mesh_quantum = Span.of_float_s 1.0
+  let time_in_mesh_quantum = Types.Span.of_float_s 1.0
 
   let first_message_deliveries_weight = 1.0
 
@@ -53,9 +51,9 @@ module Topic_score = struct
      delivery weight. *)
   let mesh_message_deliveries_weight = 0.
 
-  let mesh_message_deliveries_window = Span.of_float_s 0.01
+  let mesh_message_deliveries_window = Types.Span.of_float_s 0.01
 
-  let mesh_message_deliveries_activation = Span.of_int_s 5
+  let mesh_message_deliveries_activation = Types.Span.of_int_s 5
 
   let mesh_message_deliveries_cap = 100
 
@@ -107,17 +105,17 @@ module Limits = struct
 
   let accept_px_threshold = 0.
 
-  let unsubscribe_backoff = Span.of_int_s 10
+  let unsubscribe_backoff = Types.Span.of_int_s 10
 
-  let graft_flood_threshold = Span.of_int_s 10
+  let graft_flood_threshold = Types.Span.of_int_s 10
 
-  let prune_backoff = Span.of_int_s 60
+  let prune_backoff = Types.Span.of_int_s 60
 
-  let retain_duration = Span.of_int_s 10
+  let retain_duration = Types.Span.of_int_s 10
 
-  let fanout_ttl = Span.of_int_s 60
+  let fanout_ttl = Types.Span.of_int_s 60
 
-  let heartbeat_interval = Span.of_int_s 1
+  let heartbeat_interval = Types.Span.of_int_s 1
 
   let backoff_cleanup_ticks = 15
 

@@ -56,6 +56,91 @@ module Topic : sig
   module Map : Map.S with type key = t
 end
 
+(** A message id uniquely identifies a share whose commitment is included in an
+    L1 block. It is defined by a tuple containing the commitment, the level at
+    which the commitment is successfully included in an L1 block, the
+    corresponding slot index, the shard index, as well as the public key hash
+    [pkh] of the delegate expected to attest it.
+
+    Note that [pkh] is used to be able to directly infer a topic from a message id. It
+    could be retrieved from L1 using the level. But, we decide to provide it
+    directly in this first version. *)
+module Message_id : sig
+  type t = {
+    commitment : Cryptobox.Commitment.t;
+    level : int32;
+    slot_index : int;
+    shard_index : int;
+    pkh : Signature.Public_key_hash.t;
+  }
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+
+  val get_topic : t -> Topic.t
+end
+
+(** A message is a portion of an encoded slot's data. It's basically a shard
+    without the corresponding index. The proof that the corresponding shard
+    belong to the commitment (part of the message id) is also part of the
+    message. *)
+module Message : sig
+  type t = {share : Cryptobox.share; shard_proof : Cryptobox.shard_proof}
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+end
+
+(** From the Gossipsub point of view, a peer is given by a cryptographic node
+    identity {!P2p_peer.Id.t}. It's up to the caller to associate the
+    {!P2p_peer.Id.t} to a {!P2p_point.Id.t} if needed (to e.g. implement peers
+    exchange, which needs addresses and ports instead of cryptographic
+    identities). *)
+module Peer : sig
+  type t = P2p_peer.Id.t
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+end
+
+module Span : sig
+  type t = Ptime.Span.t
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  val zero : t
+
+  val of_int_s : int -> t
+
+  val to_int_s : t -> int
+
+  val of_float_s : float -> t
+
+  val to_float_s : t -> float
+
+  (** [mul s n] returns [n * s]. *)
+  val mul : t -> int -> t
+end
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
    Use a bitset instead, when available in the standard library. *)
 

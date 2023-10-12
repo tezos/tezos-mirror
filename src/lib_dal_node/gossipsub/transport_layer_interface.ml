@@ -37,19 +37,16 @@ module P2p_message_V1 = struct
     | Prune of {
         topic : Types.Topic.t;
         px : px_peer Seq.t;
-        backoff : Gs_interface.Span.t;
+        backoff : Types.Span.t;
       }
-    | IHave of {
-        topic : Types.Topic.t;
-        message_ids : Gs_interface.message_id list;
-      }
-    | IWant of {message_ids : Gs_interface.message_id list}
+    | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
+    | IWant of {message_ids : Types.Message_id.t list}
     | Subscribe of {topic : Types.Topic.t}
     | Unsubscribe of {topic : Types.Topic.t}
     | Message_with_header of {
-        message : Gs_interface.message;
+        message : Types.Message.t;
         topic : Types.Topic.t;
-        message_id : Gs_interface.message_id;
+        message_id : Types.Message_id.t;
       }
 
   let px_peer_encoding =
@@ -85,7 +82,7 @@ module P2p_message_V1 = struct
            (req "kind" (constant "prune"))
            (req "topic" Types.Topic.encoding)
            (req "px" (list px_peer_encoding))
-           (req "backoff" Gs_interface.span_encoding))
+           (req "backoff" Types.Span.encoding))
         (function
           | Prune {topic; px; backoff} ->
               Some ((), topic, List.of_seq px, backoff)
@@ -98,7 +95,7 @@ module P2p_message_V1 = struct
         (obj3
            (req "kind" (constant "ihave"))
            (req "topic" Types.Topic.encoding)
-           (req "message_ids" (list Gs_interface.message_id_encoding)))
+           (req "message_ids" (list Types.Message_id.encoding)))
         (function
           | IHave {topic; message_ids} -> Some ((), topic, message_ids)
           | _ -> None)
@@ -108,7 +105,7 @@ module P2p_message_V1 = struct
         ~title:"IWant"
         (obj2
            (req "kind" (constant "iwant"))
-           (req "message_ids" (list Gs_interface.message_id_encoding)))
+           (req "message_ids" (list Types.Message_id.encoding)))
         (function IWant {message_ids} -> Some ((), message_ids) | _ -> None)
         (fun ((), message_ids) -> IWant {message_ids});
       case
@@ -132,9 +129,9 @@ module P2p_message_V1 = struct
         ~title:"Message_with_header"
         (obj4
            (req "kind" (constant "message_with_header"))
-           (req "message" Gs_interface.message_encoding)
+           (req "message" Types.Message.encoding)
            (req "topic" Types.Topic.encoding)
-           (req "message_id" Gs_interface.message_id_encoding))
+           (req "message_id" Types.Message_id.encoding))
         (function
           | Message_with_header {message; topic; message_id} ->
               Some ((), message, topic, message_id)

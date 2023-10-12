@@ -28,28 +28,6 @@
     libraries to be used by the DAL node to connect to and exchange data with
     peers. *)
 
-(** Below, we expose the main types needed for the integration with the existing
-    DAL node alongside their encodings. *)
-
-type message_id = Gs_interface.message_id = {
-  commitment : Cryptobox.Commitment.t;
-  level : int32;
-  slot_index : int;
-  shard_index : int;
-  pkh : Signature.Public_key_hash.t;
-}
-
-type message = Gs_interface.message = {
-  share : Cryptobox.share;
-  shard_proof : Cryptobox.shard_proof;
-}
-
-type peer = Gs_interface.peer
-
-val message_id_encoding : message_id Data_encoding.t
-
-val message_encoding : message Data_encoding.t
-
 (** The worker module exposes instantiation of the Gossipsub worker functor,
     alongside the config used to instantiate the functor and the default values
     of the GS parameters. *)
@@ -57,21 +35,21 @@ module Worker : sig
   module Config :
     module type of Gs_interface.Worker_config
       with type GS.Topic.t = Types.Topic.t
-       and type GS.Message_id.t = message_id
-       and type GS.Message.t = message
-       and type GS.Peer.t = peer
-       and module GS.Span = Gs_interface.Span
-       and module Monad = Gs_interface.Monad
+       and type GS.Message_id.t = Types.Message_id.t
+       and type GS.Message.t = Types.Message.t
+       and type GS.Peer.t = Types.Peer.t
+       and type GS.Span.t = Types.Span.t
+       and type 'a Monad.t = 'a Lwt.t
 
   module Default_parameters : module type of Gs_default_parameters
 
   include
     Gossipsub_intf.WORKER
       with type GS.Topic.t = Types.Topic.t
-       and type GS.Message_id.t = message_id
-       and type GS.Message.t = message
-       and type GS.Peer.t = peer
-       and module GS.Span = Config.GS.Span
+       and type GS.Message_id.t = Types.Message_id.t
+       and type GS.Message.t = Types.Message.t
+       and type GS.Peer.t = Types.Peer.t
+       and type GS.Span.t = Types.Span.t
 
   module Logging : sig
     val event : event -> unit Monad.t
@@ -80,7 +58,9 @@ module Worker : sig
   (** A hook to set or update messages validation function. Should be called once
     at startup and every time the DAL parameters change. *)
   module Validate_message_hook : sig
-    val set : (message -> message_id -> [`Invalid | `Unknown | `Valid]) -> unit
+    val set :
+      (Types.Message.t -> Types.Message_id.t -> [`Invalid | `Unknown | `Valid]) ->
+      unit
   end
 end
 
@@ -119,6 +99,6 @@ module Transport_layer_hooks : sig
     Worker.t ->
     Transport_layer.t ->
     app_messages_callback:
-      (Gs_interface.message -> Gs_interface.message_id -> unit tzresult Lwt.t) ->
+      (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
     unit Lwt.t
 end
