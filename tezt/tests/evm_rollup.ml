@@ -600,24 +600,34 @@ let test_rpc_getBlockByNumber =
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   unit
 
+let get_block_by_hash ?(full_tx_objects = false) evm_setup block_hash =
+  let* block =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_setup.evm_proxy_server
+        {
+          method_ = "eth_getBlockByHash";
+          parameters = `A [`String block_hash; `Bool full_tx_objects];
+        })
+  in
+  return @@ (block |> Evm_proxy_server.extract_result |> Block.of_json)
+
 let test_rpc_getBlockByHash =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_block_by_hash"]
     ~title:"RPC method eth_getBlockByHash"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* ({evm_proxy_server; _} as evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* block =
     Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
   in
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
-  let* block' =
-    Eth_cli.get_block
-      ~block_id:(Option.get block.hash)
-      ~endpoint:evm_proxy_server_endpoint
-  in
+  let* block' = get_block_by_hash evm_setup (Option.get block.hash) in
   assert (block = block') ;
   unit
 
@@ -3054,10 +3064,9 @@ let test_rpc_getBlockTransactionCountBy =
   let config =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
-  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+  let* ({evm_proxy_server; sc_rollup_node; node; client; _} as evm_setup) =
     setup_past_genesis ~config ~admin:None protocol
   in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
   let* _, receipt, _ =
     send_n_transactions
@@ -3067,11 +3076,7 @@ let test_rpc_getBlockTransactionCountBy =
       ~evm_proxy_server
       (List.map fst txs)
   in
-  let* block =
-    Eth_cli.get_block
-      ~block_id:receipt.blockHash
-      ~endpoint:evm_proxy_server_endpoint
-  in
+  let* block = get_block_by_hash evm_setup receipt.blockHash in
   let expected_count =
     match block.transactions with
     | Empty -> 0L
