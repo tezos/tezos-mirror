@@ -2371,7 +2371,9 @@ module Delegate : sig
       context ->
       Signature.Public_key_hash.t ->
       (Cycle.t * Staking_parameters_repr.t) list tzresult Lwt.t
+  end
 
+  module Shared_stake : sig
     val pay_rewards :
       context ->
       ?active_stake:Stake_repr.t ->

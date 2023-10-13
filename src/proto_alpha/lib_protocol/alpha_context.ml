@@ -548,6 +548,7 @@ module Delegate = struct
   end
 
   module Staking_parameters = Delegate_staking_parameters
+  module Shared_stake = Shared_stake
 
   module For_RPC = struct
     include For_RPC

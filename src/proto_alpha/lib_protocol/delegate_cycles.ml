@@ -112,7 +112,7 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
       if sufficient_participation && has_revealed_nonces then
         (* Sufficient participation: we pay the rewards *)
         let+ ctxt, payed_rewards_receipts =
-          Delegate_staking_parameters.pay_rewards
+          Shared_stake.pay_rewards
             ctxt
             ~active_stake
             ~source:`Attesting_rewards
