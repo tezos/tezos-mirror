@@ -200,17 +200,6 @@ let get_stakes ctxt =
       else return acc)
     ~init:([], Stake_repr.zero)
 
-let compute_snapshot_index_for_seed ~max_snapshot_index seed =
-  let rd = Seed_repr.initialize_new seed [Bytes.of_string "stake_snapshot"] in
-  let seq = Seed_repr.sequence rd 0l in
-  Seed_repr.take_int32 seq (Int32.of_int max_snapshot_index)
-  |> fst |> Int32.to_int |> return
-
-let compute_snapshot_index ctxt cycle ~max_snapshot_index =
-  let open Lwt_result_syntax in
-  let* seed = Seed_storage.for_cycle ctxt cycle in
-  compute_snapshot_index_for_seed ~max_snapshot_index seed
-
 let select_distribution_for_cycle ctxt cycle =
   let open Lwt_result_syntax in
   let* seed = Seed_storage.raw_for_cycle ctxt cycle in
