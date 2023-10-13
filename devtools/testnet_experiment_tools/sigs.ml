@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 module type PROTO_TOOL = sig
+  val extract_client_context : Client_context.full -> unit tzresult Lwt.t
+
   val start_injector :
     Client_context.full ->
     op_per_mempool:int ->

@@ -269,6 +269,15 @@ let find_proto_tool protocol =
         Protocol_hash.pp
         protocol
 
+let extract_yes_wallet (cctxt : Client_context.full) =
+  let open Lwt_result_syntax in
+  let* {current_protocol; _} =
+    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
+  in
+  let* (module Tool) = find_proto_tool current_protocol in
+  let*! () = cctxt#message "Extracting yes-wallet with consensus keys." in
+  Tool.extract_client_context cctxt
+
 let sync_node (cctxt : Client_context.full) round_duration_target =
   let open Lwt_result_syntax in
   let* {current_protocol; _} =
@@ -391,6 +400,15 @@ let commands =
     command
       ~group
       ~desc:
+        "Extract a yes-wallet (including consensus keys) directory from a \
+         running node using RPCs. The newly created yes-wallet uses the -d \
+         option as path. Defaults to $HOME/.tezos-client."
+      no_options
+      (fixed ["extract"; "yes-wallet"])
+      (fun () (cctxt : Client_context.full) -> extract_yes_wallet cctxt);
+    command
+      ~group
+      ~desc:
         "Synchronize a yes-node so that the current head round's duration is \
          low enough in order for yes-bakers to activate without having to wait \
          a significant amount of time."
@@ -436,12 +454,12 @@ let commands =
   ]
 
 module Custom_client_config : Client_main_run.M = struct
-  type t = Uri.t
+  type t = Uri.t * string
 
   let default_base_dir = "/tmp"
 
   let global_options () =
-    args1
+    args2
       (default_arg
          ~long:"endpoint"
          ~short:'E'
@@ -449,14 +467,23 @@ module Custom_client_config : Client_main_run.M = struct
          ~doc:"HTTP(S) endpoint of the node RPC interface"
          ~default:"http://localhost:8732"
          (Client_config.endpoint_parameter ()))
+      (default_arg
+         ~long:"base-dir"
+         ~short:'d'
+         ~default:Client_config.default_base_dir
+         ~placeholder:"path"
+         ~doc:"client base directory path"
+         (Client_config.string_parameter ()))
 
   let parse_config_args ctx argv =
     let open Lwt_result_syntax in
-    let* endpoint, remaining =
+    let* (endpoint, base_dir), remaining =
       Tezos_clic.parse_global_options (global_options ()) ctx argv
     in
     let open Client_config in
-    let cfg : Cfg_file.t = {Cfg_file.default with endpoint = Some endpoint} in
+    let cfg : Cfg_file.t =
+      {Cfg_file.default with base_dir; endpoint = Some endpoint}
+    in
     Lwt.return_ok
       ( {default_parsed_config_args with parsed_config_file = Some cfg},
         remaining )
