@@ -84,10 +84,6 @@ val fold_on_active_delegates_with_minimal_stake_es :
   init:'a ->
   'a tzresult Lwt.t
 
-(** [max_snapshot_index ctxt] returns the index of the last snapshot taken of
-    staking balances and active delegates. *)
-val max_snapshot_index : Raw_context.t -> int tzresult Lwt.t
-
 (** [set_selected_distribution_for_cycle ctxt cycle distrib total_stake] saves
     the selected distribution [distrib] of the [total_stake] for the given
     [cycle]. *)

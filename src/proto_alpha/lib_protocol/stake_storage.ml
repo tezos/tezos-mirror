@@ -198,8 +198,6 @@ let set_active ctxt delegate =
       return ctxt
     else return ctxt
 
-let max_snapshot_index = Storage.Stake.Last_snapshot.get
-
 let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   let open Lwt_result_syntax in
   let stakes = List.sort (fun (_, x) (_, y) -> Stake_repr.compare y x) stakes in
