@@ -190,6 +190,7 @@
   Adaptive_issuance_costs
   Adaptive_issuance_storage
   Delegate_staking_parameters
+  Shared_stake
   Delegate_consensus_key
   Delegate_storage
   Delegate_sampler
@@ -485,6 +486,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
+  shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
@@ -782,6 +784,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
+  shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
@@ -1063,6 +1066,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
+  shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
