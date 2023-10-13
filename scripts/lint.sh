@@ -188,16 +188,6 @@ check_gitlab_ci_yml () {
     fi
 }
 
-check_coq_attributes () {
-    coq_attributes=$(find src/ \( -name "proto_0*" -prune \) -o -type f -exec grep -E "(\@|\@\@|\@\@\@)coq(.*)" {} \;)
-    if [ -n "$coq_attributes" ]; then
-        echo "coq attributes found, please remove them:";
-        echo "$coq_attributes";
-        exit 1
-    fi
-    echo "No coq attributes found."
-}
-
 check_licenses_git_new () {
     # Check that new ml(i) files have a valid license header.
     if ! git diff-tree --no-commit-id --name-only -r --diff-filter=A \
@@ -238,8 +228,6 @@ case "$action" in
         action=check_scripts ;;
     "--check-redirects" )
         action=check_redirects ;;
-    "--check-coq-attributes" )
-        action=check_coq_attributes ;;
     "--check-rust-toolchain" )
         action=check_rust_toolchain_files ;;
     "--check-licenses-git-new" )
