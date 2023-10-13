@@ -213,11 +213,7 @@ let compute_snapshot_index ctxt cycle ~max_snapshot_index =
 
 let select_distribution_for_cycle ctxt ~slashings cycle =
   let open Lwt_result_syntax in
-  let* max_snapshot_index = Stake_storage.max_snapshot_index ctxt in
   let* seed = Seed_storage.raw_for_cycle ctxt cycle in
-  let* _selected_index =
-    compute_snapshot_index_for_seed ~max_snapshot_index seed
-  in
   let* stakes, total_stake = get_stakes ctxt ~slashings in
   let* ctxt =
     Stake_storage.set_selected_distribution_for_cycle
