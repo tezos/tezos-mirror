@@ -2,7 +2,6 @@ scripts/baker-version-stats.sh
 scripts/ci/docker_registry_delete.sh
 scripts/ci/docker_registry.inc.sh
 scripts/create_docker_image.sh
-scripts/snapshot_alpha.sh
 scripts/user_activated_upgrade.sh
 src/bin_snoop/bash-completion.sh
 src/bin_client/bash-completion.sh
