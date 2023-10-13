@@ -29,6 +29,10 @@ open Kaitai.Types
 module Enum = struct
   type assoc = (string * Kaitai.Types.EnumSpec.t) list
 
+  let bool_false_name = "false"
+
+  let bool_true_name = "true"
+
   let bool =
     ( "bool",
       EnumSpec.
@@ -36,9 +40,12 @@ module Enum = struct
           path = [];
           map =
             [
-              (0, EnumValueSpec.{name = "false"; doc = Helpers.default_doc_spec});
+              ( 0,
+                EnumValueSpec.
+                  {name = bool_false_name; doc = Helpers.default_doc_spec} );
               ( 255,
-                EnumValueSpec.{name = "true"; doc = Helpers.default_doc_spec} );
+                EnumValueSpec.
+                  {name = bool_true_name; doc = Helpers.default_doc_spec} );
             ];
         } )
 end

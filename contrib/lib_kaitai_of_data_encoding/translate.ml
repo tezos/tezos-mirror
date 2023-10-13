@@ -165,6 +165,16 @@ let rec seq_field_of_data_encoding :
       in
       let seq = left @ right in
       (enums, types, seq)
+  | Obj f -> seq_field_of_field enums types f
+  | Objs {kind = _; left; right} ->
+      let enums, types, left =
+        seq_field_of_data_encoding enums types left id None
+      in
+      let enums, types, right =
+        seq_field_of_data_encoding enums types right id None
+      in
+      let seq = left @ right in
+      (enums, types, seq)
   | Dynamic_size {kind; encoding} ->
       let len_id = "len_" ^ id in
       let len_attr =
@@ -215,6 +225,86 @@ let rec seq_field_of_data_encoding :
           in
           (enums, types, [attr]))
   | _ -> failwith "Not implemented"
+
+and seq_field_of_field :
+    type a.
+    Ground.Enum.assoc ->
+    Ground.Type.assoc ->
+    a DataEncoding.field ->
+    Ground.Enum.assoc * Ground.Type.assoc * AttrSpec.t list =
+ fun enums types f ->
+  match f with
+  | Req {name; encoding; title; description} ->
+      let id = escape_id name in
+      let enums, types, attrs =
+        seq_field_of_data_encoding enums types encoding id None
+      in
+      let summary = summary ~title ~description in
+      let types, attr =
+        redirect_if_many
+          types
+          attrs
+          (fun attr -> Helpers.merge_summaries attr summary)
+          id
+      in
+      (enums, types, [attr])
+  | Opt {name; kind = _; encoding; title; description} ->
+      let cond_id = escape_id (name ^ "_tag") in
+      let enums = Helpers.add_uniq_assoc enums Ground.Enum.bool in
+      let cond_attr = Ground.Attr.bool ~id:cond_id in
+      let cond =
+        {
+          Helpers.cond_no_cond with
+          ifExpr =
+            Some
+              Ast.(
+                Compare
+                  {
+                    left = Name cond_id;
+                    ops = Eq;
+                    right =
+                      EnumByLabel
+                        {
+                          enumName = fst Ground.Enum.bool;
+                          label = Ground.Enum.bool_true_name;
+                          inType =
+                            {
+                              absolute = true;
+                              names = [fst Ground.Enum.bool];
+                              isArray = false;
+                            };
+                        };
+                  });
+        }
+      in
+      let id = escape_id name in
+      let enums, types, attrs =
+        seq_field_of_data_encoding enums types encoding id None
+      in
+      let summary = summary ~title ~description in
+      let types, attr =
+        redirect_if_many
+          types
+          attrs
+          (fun attr -> {(Helpers.merge_summaries attr summary) with cond})
+          id
+      in
+      (enums, types, [cond_attr; attr])
+  | Dft {name; encoding; default = _; title; description} ->
+      (* NOTE: in binary format Dft is the same as Req *)
+      let id = escape_id name in
+      let enums, types, attrs =
+        seq_field_of_data_encoding enums types encoding id None
+      in
+      let summary = summary ~title ~description in
+      let types, attr =
+        redirect_if_many
+          types
+          attrs
+          (fun attr -> Helpers.merge_summaries attr summary)
+          id
+      in
+      (enums, types, [attr])
 
 let from_data_encoding :
     type a. id:string -> ?description:string -> a DataEncoding.t -> ClassSpec.t

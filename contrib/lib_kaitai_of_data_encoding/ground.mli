@@ -34,6 +34,14 @@ module Enum : sig
       See [Helpers.add_uniq_assoc] for handling helper. *)
   type assoc = (string * EnumSpec.t) list
 
+  (** [bool_false_name] is the string used in the bool enum to represent the
+      value [false]. *)
+  val bool_false_name : string
+
+  (** [bool_true_name] is the string used in the bool enum to represent the
+      value [true]. *)
+  val bool_true_name : string
+
   (** [bool] is an association for boolean type. *)
   val bool : string * EnumSpec.t
 end
