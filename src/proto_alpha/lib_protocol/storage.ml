@@ -1305,31 +1305,6 @@ module Stake = struct
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
   module Total_active_stake = Cycle.Total_active_stake
-
-  (* This is an index that is set to 0 by calls to
-     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and
-     incremented (by 1) by calls to {!val:Stake_storage.snapshot}.
-
-     {!val:Stake_storage.snapshot} is called in relation with constant
-     [blocks_per_stake_snapshot] in
-     {!val:Level_storage.may_snapshot_stake_distribution}.
-
-     That is, the increment is done every [blocks_per_stake_snaphot]
-     blocks and reset at the end of cycles. So, it goes up to
-     [blocks_per_cycle / blocks_per_stake_snaphot], which is currently
-     16 (= 24576/1536 -- the concrete values can be found in
-     {!val:Default_parameters.constants_mainnet}), then comes back to
-     0, so that a UInt16 is big enough.
-
-     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is
-     checked in {!val:Constants_repr.check_constants} to fit in a
-     UInt16. *)
-  module Last_snapshot =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["last_snapshot"]
-      end)
-      (Encoding.UInt16)
 end
 
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
