@@ -24,8 +24,6 @@
 
 open Tezos_clic
 
-let block_finality = 2
-
 (* Data Structures. *)
 
 module Canonical_chain_map = Map.Make (Int)
@@ -45,7 +43,7 @@ let () =
     ~title:"Teztale database path provided was invalid"
     ~description:"Teztale database path must be valid"
     ~pp:(fun ppf s ->
-      Format.fprintf ppf "Expected valid path to teztale db, got %s" s)
+      Format.fprintf ppf "%s is not a valid path to a teztale db" s)
     Data_encoding.(obj1 (req "arg" string))
     (function Db_path s -> Some s | _ -> None)
     (fun s -> Db_path s) ;
@@ -83,19 +81,19 @@ let () =
 let add_canonical_chain_row (id, predecessor) acc =
   Canonical_chain_map.add id predecessor acc
 
-let add_max_level level acc =
-  acc := Some level ;
+let add_head_id id acc =
+  acc := Some id ;
   acc
 
 (* Queries *)
 
-let get_canonical_chain db_pool max_level =
+let get_canonical_chain db_pool head_id =
   let open Lwt_result_syntax in
   let query =
     {| WITH canonical_chain AS (
           SELECT id, predecessor
           FROM blocks
-          WHERE level = ?
+          WHERE id = ?
 
           UNION ALL
 
@@ -118,7 +116,7 @@ let get_canonical_chain db_pool max_level =
         Db.fold
           canonical_chain_request
           add_canonical_chain_row
-          max_level
+          head_id
           Canonical_chain_map.empty)
       db_pool
   in
@@ -164,22 +162,33 @@ let insert_canonical_chain_entry db_pool counter id predecessor =
   | Error e -> tzfail (Canonical_chain_query (Caqti_error.show e))
   | Ok () -> return_unit
 
-let get_head_level db_pool =
+let get_head_id db_pool =
   let open Lwt_result_syntax in
-  let query = {| SELECT MAX(level)
-                 FROM blocks |} in
-  let get_head_level_request =
+  let query =
+    {| SELECT predecessor
+       FROM blocks
+       WHERE id = (
+         SELECT predecessor
+         FROM blocks
+         WHERE level = (
+           SELECT MAX(level)
+           FROM blocks
+         )
+         LIMIT 1
+       ) |}
+  in
+  let get_head_id_request =
     Caqti_request.Infix.(Caqti_type.unit ->* Caqti_type.int) query
   in
-  let*! head_level_ref =
+  let*! head_id_ref =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.fold get_head_level_request add_max_level () (ref None))
+        Db.fold get_head_id_request add_head_id () (ref None))
       db_pool
   in
-  match head_level_ref with
+  match head_id_ref with
   | Error e -> tzfail (Canonical_chain_head (Caqti_error.show e))
-  | Ok head_level_ref -> return !head_level_ref
+  | Ok head_id_ref -> return !head_id_ref
 
 (* Printing. *)
 
@@ -215,15 +224,12 @@ let canonical_chain_command db_path print_result =
       (* 1. Create canonical_table in teztale db *)
       let* () = create_canonical_chain_table db_pool in
 
-      (* 2. Obtain the head level of the canonical chain *)
-      let* head_level = get_head_level db_pool in
+      (* 2. Obtain the head id of the canonical chain *)
+      let* head_id = get_head_id db_pool in
 
-      (* 3. Retrieve the entries which form the canonical chain
-            Use head_level - 2 because the blockchain has finality 2 *)
+      (* 3. Retrieve the entries which form the canonical chain *)
       let* map =
-        get_canonical_chain
-          db_pool
-          (Option.value ~default:0 head_level - block_finality)
+        get_canonical_chain db_pool (Option.value ~default:0 head_id)
       in
 
       (* 4. Populate the canonical_chain table *)
