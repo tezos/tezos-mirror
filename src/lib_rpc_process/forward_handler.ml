@@ -43,9 +43,12 @@ let callback server socket_path =
   let on_forwarding req =
     Rpc_process_event.(emit forwarding_rpc (Cohttp.Request.resource req))
   in
+  let on_locally_handled req =
+    Rpc_process_event.(emit locally_handled_rpc (Cohttp.Request.resource req))
+  in
   let ctx = build_socket_redirection_ctx socket_path in
   RPC_middleware.proxy_server_query_forwarder
     ~ctx
-    ~on_forwarding
+    ~forwarder_events:{on_forwarding; on_locally_handled}
     forwarding_endpoint
     callback
