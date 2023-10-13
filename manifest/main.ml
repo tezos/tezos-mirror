@@ -7451,6 +7451,26 @@ let _safety_checker =
     ~bisect_ppx:No
     ~linkall:true
 
+let _get_teztale_data =
+  private_exe
+    "get_teztale_data"
+    ~path:("devtools" // "testnet_experiment_tools")
+    ~synopsis:"Script to obtain missed attestations from experiment"
+    ~bisect_ppx:No
+    ~with_macos_security_framework:true
+    ~release_status:Unreleased
+    ~opam:""
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_clic;
+        caqti_lwt;
+        caqti_dynload;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
+      ]
+    ~modules:["get_teztale_data"]
+
 let simdal_lib =
   private_lib
     "simdal"
