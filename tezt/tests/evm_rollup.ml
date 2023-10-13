@@ -2468,13 +2468,26 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
 let test_validation_result =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "simulate"]
+    ~tags:["evm"; "simulate"; "tmp"]
     ~title:
       "Ensure validation returns appropriate address for a given transaction."
   @@ fun protocol ->
   let* {sc_rollup_client; _} = setup_past_genesis ~admin:None protocol in
+  (* tx is a signed legacy transaction obtained with the following data, using
+     the following private key:
+        data = {
+            "nonce": "0x00",
+            "gasPrice": "0x5208",
+            "gasLimit": "0x00",
+            "to": "0x0000000000000000000000000000000000000000",
+            "value": "0x00",
+            "data": "0x",
+            "chainId": 1337
+        }
+        private key=0x84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502
+  *)
   let tx =
-    "f867808080940000000000000000000000000000000000000000880de0b6b3a764000080820a95a0ed19fdcb200e950226eec84d2790bed3af7339c4be1a272023ddddfcc00d2db0a04fb15e1c4d2826e0d53431262a1b8d3e7accfce1325f632eb127db8a1b6d5f41"
+    "f86180825208809400000000000000000000000000000000000000008080820a95a0f47140763cf73d6d9b342727e5a0809f7997bb62375060932af9bbc2e74b6212a03a018079a2fd7fefb625451ce2fafcdf873b892ff9d4e3e1f2ada5650012f072"
   in
   let simulation_msg = "ff0101" ^ tx in
   let*! simulation_result =
@@ -2488,7 +2501,7 @@ let test_validation_result =
       [Hex.to_string @@ `Hex "ff"; Hex.to_string @@ `Hex simulation_msg]
   in
   let expected_insights =
-    [Some "01"; Some "9dcb74adb59a1eb4590a5aa4f71455c35e0933a0"]
+    [Some "01"; Some "f0affc80a5f69f4a9a3ee01a640873b6ba53e539"]
   in
   Check.(
     (simulation_result.insights = expected_insights) (list @@ option string))

@@ -27,7 +27,7 @@ let create_data = contract.bytecode;
 
 const TOO_MANY_TXS = 100;
 const NB_LOOP = 100;
-const FUNDS_PER_ACCOUNT = 10000000;
+const FUNDS_PER_ACCOUNT = 10000000000000;
 
 // create call data with different values
 let call_data_prefix = "0x0b7d796e00000000000000000000000000000000"
