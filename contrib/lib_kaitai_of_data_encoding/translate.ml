@@ -117,6 +117,31 @@ let rec seq_field_of_data_encoding :
   | Int32 -> (enums, types, [Ground.Attr.int32 ~id])
   | Int64 -> (enums, types, [Ground.Attr.int64 ~id])
   | Int31 -> (enums, types, [Ground.Attr.int31 ~id])
+  | RangedInt {minimum; maximum} -> (
+      (* TODO: support shifted RangedInt
+         - make the de/serialiser shift the value
+         - make the [valid] field check the shifted value *)
+      if minimum > 0 then failwith "Not supported (shifted range)" ;
+      let size = Data_encoding__Binary_size.range_to_size ~minimum ~maximum in
+      let valid =
+        Some
+          (ValidationSpec.ValidationRange
+             {min = Ast.IntNum minimum; max = Ast.IntNum maximum})
+      in
+      let uvalid =
+        if minimum = 0 then
+          Some (ValidationSpec.ValidationMax (Ast.IntNum maximum))
+        else valid
+      in
+      match size with
+      | `Uint8 -> (enums, types, [{(Ground.Attr.uint8 ~id) with valid = uvalid}])
+      | `Uint16 ->
+          (enums, types, [{(Ground.Attr.uint16 ~id) with valid = uvalid}])
+      | `Uint30 ->
+          (enums, types, [{(Ground.Attr.uint30 ~id) with valid = uvalid}])
+      | `Int8 -> (enums, types, [{(Ground.Attr.int8 ~id) with valid}])
+      | `Int16 -> (enums, types, [{(Ground.Attr.int16 ~id) with valid}])
+      | `Int31 -> (enums, types, [{(Ground.Attr.int31 ~id) with valid}]))
   | Float -> (enums, types, [Ground.Attr.float ~id])
   | Bytes (`Fixed n, _) -> (enums, types, [Ground.Attr.bytes ~id (Fixed n)])
   | Bytes (`Variable, _) -> (enums, types, [Ground.Attr.bytes ~id Variable])
