@@ -200,6 +200,21 @@ check_coq_attributes () {
     echo "No coq attributes found."
 }
 
+check_licenses_git_new () {
+    # Check that new ml(i) files have a valid license header.
+    if ! git diff-tree --no-commit-id --name-only -r --diff-filter=A \
+         "${CHECK_LICENSES_DIFF_BASE:-$(git merge-base master HEAD)}" HEAD |
+            grep '\.ml\(i\|\)$' |
+            xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
+
+        echo "/!\\ Some files .ml(i) does not have a correct license header /!\\" ;
+        echo "/!\\ See https://tezos.gitlab.io/developer/guidelines.html#license /!\\" ;
+        exit 1 ;
+    else
+        echo "OCaml file license headers OK!"
+    fi
+}
+
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
     say "provide one action (see --help)"
     exit 1
@@ -230,6 +245,8 @@ case "$action" in
         action=check_coq_attributes ;;
     "--check-rust-toolchain" )
         action=check_rust_toolchain_files ;;
+    "--check-licenses-git-new" )
+        action=check_licenses_git_new ;;
     "help" | "-help" | "--help" | "-h" )
         usage
         exit 0 ;;
