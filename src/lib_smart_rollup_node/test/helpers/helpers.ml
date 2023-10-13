@@ -125,23 +125,20 @@ let initialize_node_context protocol ?(constants = default_constants) kind
   let open Lwt_result_syntax in
   incr uid ;
   (* To avoid any conflict with previous runs of this test. *)
-  let pid = Unix.getpid () in
   let data_dir =
-    Filename.(concat @@ get_temp_dir_name ())
+    Tezt.Temp.dir
       (Format.asprintf
-         "sc-rollup-node-test-%a-%d-%d"
+         "sc-rollup-node-test-%a-%d"
          Protocol_hash.pp_short
          protocol
-         pid
          !uid)
   in
   let base_dir =
-    Filename.(concat @@ get_temp_dir_name ())
+    Tezt.Temp.dir
       (Format.asprintf
-         "sc-rollup-node-test-%a-base-%d-%d"
+         "sc-rollup-node-test-%a-base-%d"
          Protocol_hash.pp_short
          protocol
-         pid
          !uid)
   in
   let filesystem = String.Hashtbl.create 10 in
@@ -163,19 +160,16 @@ let initialize_node_context protocol ?(constants = default_constants) kind
   let ctxt =
     {ctxt with genesis_info = {ctxt.genesis_info with commitment_hash}}
   in
-  return (ctxt, genesis, [data_dir; base_dir])
+  return (ctxt, genesis)
 
 let with_node_context ?constants kind protocol ~boot_sector f =
   let open Lwt_result_syntax in
-  let* node_ctxt, genesis, dirs_to_clean =
+  let* node_ctxt, genesis =
     initialize_node_context protocol ?constants kind ~boot_sector
   in
   Lwt.finalize (fun () -> f node_ctxt ~genesis) @@ fun () ->
   let open Lwt_syntax in
   let* _ = Node_context.close node_ctxt in
-  let* () =
-    List.iter_s Tezos_stdlib_unix.Lwt_utils_unix.remove_dir dirs_to_clean
-  in
   return_unit
 
 let head_of_level ~predecessor level =

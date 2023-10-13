@@ -531,4 +531,9 @@ module Internal_for_tests : sig
     data_dir:string ->
     Kind.t ->
     Store_sigs.rw t tzresult Lwt.t
+
+  (** Extract the underlying store from the node context. This function is
+      unsafe to use outside of tests as it breaks the abstraction barrier
+      provided by the [Node_context]. *)
+  val unsafe_get_store : 'a t -> 'a Store.t
 end

@@ -42,8 +42,8 @@ module type S = sig
   (** [close store] closes the store. *)
   val close : _ t -> unit tzresult Lwt.t
 
-  (** [load mode ~index_buffer_size ~l2_blocks_cache_size directory] loads a 
-      store from the data persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, 
+  (** [load mode ~index_buffer_size ~l2_blocks_cache_size directory] loads a
+      store from the data persisted in [directory]. If [mode] is {!Store_sigs.Read_only},
       then the indexes and irmin store will be opened in readonly mode and only read
       operations will be permitted. This allows to open a store for read access
       that is already opened in {!Store_sigs.Read_write} mode in another
@@ -64,4 +64,12 @@ module type S = sig
       head, from newest to oldest.  *)
   val iter_l2_blocks :
     _ t -> (Sc_rollup_block.t -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+
+  (** [gc store ~level] asynchronously garbage collects everything from the
+      store that concerns blocks for levels below [level]. *)
+  val gc : rw -> level:int32 -> unit tzresult Lwt.t
+
+  (** [wait_gc_completion store] returns a blocking thread if a GC run is
+      currently ongoing. *)
+  val wait_gc_completion : 'a t -> unit Lwt.t
 end

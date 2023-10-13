@@ -8114,6 +8114,7 @@ let _octez_smart_rollup_node_lib_tests =
            qcheck_core;
            logs_lwt;
            alcotezt;
+           tezt_lib;
            octez_client_base_unix |> open_;
            octez_smart_rollup_lib |> open_;
            octez_smart_rollup_node_lib |> open_;
@@ -8121,7 +8122,7 @@ let _octez_smart_rollup_node_lib_tests =
         @ protocol_deps)
   in
   tezt
-    ["canary"; "test_context_gc"]
+    ["canary"; "test_context_gc"; "test_store_gc"]
     ~path:"src/lib_smart_rollup_node/test/"
     ~opam:"tezos-smart-rollup-node-lib-test"
     ~synopsis:"Tests for the smart rollup node library"

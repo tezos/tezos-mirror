@@ -1128,4 +1128,6 @@ module Internal_for_tests = struct
         finaliser = (fun () -> Lwt.return_unit);
         global_block_watcher;
       }
+
+  let unsafe_get_store node_ctxt = node_ctxt.store
 end

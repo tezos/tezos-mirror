@@ -104,6 +104,8 @@ module type INDEXABLE_STORE = sig
 
   val gc :
     ?async:bool -> rw t -> (key, value) gc_iterator -> unit tzresult Lwt.t
+
+  val wait_gc_completion : 'a t -> unit Lwt.t
 end
 
 module type INDEXABLE_REMOVABLE_STORE = sig
@@ -151,6 +153,8 @@ module type INDEXED_FILE = sig
     rw t ->
     (key, value * header) gc_iterator ->
     unit tzresult Lwt.t
+
+  val wait_gc_completion : 'a t -> unit Lwt.t
 end
 
 module type SIMPLE_INDEXED_FILE = sig
@@ -518,6 +522,11 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ fun () ->
     let*! () = gc_internal ~async store gc_iter (fun _ -> true) in
     return_unit
+
+  let wait_gc_completion store =
+    match store.gc_status with
+    | No_gc -> Lwt.return_unit
+    | Ongoing {promise; _} -> promise
 end
 
 module Make_indexable_removable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) =
@@ -1124,6 +1133,11 @@ struct
 
   let gc ?(async = true) store gc_iter =
     trace (Gc_failed N.name) @@ gc_internal ~async store gc_iter
+
+  let wait_gc_completion store =
+    match store.gc_status with
+    | No_gc -> Lwt.return_unit
+    | Ongoing {promise; _} -> promise
 end
 
 module Make_simple_indexed_file
