@@ -33,15 +33,17 @@ module Validate_message_hook = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
 
      Refactor gossipsub integration to avoid this mutable hook in the lib. *)
-  let check =
-    ref (fun _msg _msg_id ->
-        Format.eprintf "Gs interface: messages validate function is not set@." ;
+  let check_message =
+    ref (fun ?message:_ ~message_id:_ () ->
+        Format.eprintf
+          "Gs interface: messages validatation function is not set@." ;
         `Unknown)
 
-  let set func = check := func
+  let set func = check_message := func
 end
 
-let message_valid msg msg_id = !Validate_message_hook.check msg msg_id
+let message_valid ?message ~message_id () =
+  !Validate_message_hook.check_message ?message ~message_id ()
 
 let get_value ~__LOC__ func =
   Option.value_f ~default:(fun () ->

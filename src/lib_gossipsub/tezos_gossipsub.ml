@@ -1097,12 +1097,9 @@ module Make (C : AUTOMATON_CONFIG) :
   module Receive_message = struct
     let check_valid sender topic message message_id =
       let open Monad.Syntax in
-      match Message.valid message message_id with
+      match Message.valid ~message ~message_id () with
       | `Valid -> unit
-      | `Unknown ->
-          (* FIXME https://gitlab.com/tezos/tezos/-/issues/5486
-             It is not clear yet what we should do here. *)
-          fail Unknown_validity
+      | `Unknown | `Outdated -> fail Unknown_validity
       | `Invalid ->
           let* () =
             update_score sender (fun stats ->

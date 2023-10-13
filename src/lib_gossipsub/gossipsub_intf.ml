@@ -53,8 +53,20 @@ module type AUTOMATON_SUBCONFIG = sig
   module Message : sig
     include PRINTABLE
 
-    (** [valid] performs an application layer-level validity check on a message. *)
-    val valid : t -> Message_id.t -> [`Valid | `Unknown | `Invalid]
+    (** [valid] performs an application layer-level validity check on a message
+        id and a message if given.
+
+        The message id (and message if any) could either be [`Valid] in the
+        current contex or [`Invalid], meaning that it is/they are not valid (in
+        the present time, in the past and in the future. The application layer
+        could also return [`Outdated] or [`Unknown] if the message id is
+        outdated or if the application doesn't care about validity. In this
+        case, the application might omit some costly validity checks. *)
+    val valid :
+      ?message:t ->
+      message_id:Message_id.t ->
+      unit ->
+      [`Valid | `Unknown | `Outdated | `Invalid]
   end
 end
 

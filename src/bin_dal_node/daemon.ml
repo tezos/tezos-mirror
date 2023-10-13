@@ -106,39 +106,42 @@ module Handler = struct
      with the current [cryptobox] parameters. The validity check is done by
      verifying that the shard in the message effectively belongs to the
      commitment given by [message_id]. *)
-  let gossipsub_app_messages_validation cryptobox message message_id =
-    let Types.Message.{share; shard_proof} = message in
-    let Types.Message_id.{commitment; shard_index; _} = message_id in
-    let shard = Cryptobox.{share; index = shard_index} in
-    match Cryptobox.verify_shard cryptobox commitment shard shard_proof with
-    | Ok () -> `Valid
-    | Error err ->
-        let err =
-          match err with
-          | `Invalid_degree_strictly_less_than_expected {given; expected} ->
-              Format.sprintf
-                "Invalid_degree_strictly_less_than_expected. Given: %d, \
-                 expected: %d"
-                given
-                expected
-          | `Invalid_shard -> "Invalid_shard"
-          | `Shard_index_out_of_range s ->
-              Format.sprintf "Shard_index_out_of_range(%s)" s
-          | `Shard_length_mismatch -> "Shard_length_mismatch"
-        in
-        Event.(
-          emit__dont_wait__use_with_care
-            message_validation_error
-            (message_id, err)) ;
-        `Invalid
-    | exception exn ->
-        (* Don't crash if crypto raised an exception. *)
-        let err = Printexc.to_string exn in
-        Event.(
-          emit__dont_wait__use_with_care
-            message_validation_error
-            (message_id, err)) ;
-        `Invalid
+  let gossipsub_app_messages_validation cryptobox ?message ~message_id () =
+    match message with
+    | None -> `Unknown
+    | Some message -> (
+        let Types.Message.{share; shard_proof} = message in
+        let Types.Message_id.{commitment; shard_index; _} = message_id in
+        let shard = Cryptobox.{share; index = shard_index} in
+        match Cryptobox.verify_shard cryptobox commitment shard shard_proof with
+        | Ok () -> `Valid
+        | Error err ->
+            let err =
+              match err with
+              | `Invalid_degree_strictly_less_than_expected {given; expected} ->
+                  Format.sprintf
+                    "Invalid_degree_strictly_less_than_expected. Given: %d, \
+                     expected: %d"
+                    given
+                    expected
+              | `Invalid_shard -> "Invalid_shard"
+              | `Shard_index_out_of_range s ->
+                  Format.sprintf "Shard_index_out_of_range(%s)" s
+              | `Shard_length_mismatch -> "Shard_length_mismatch"
+            in
+            Event.(
+              emit__dont_wait__use_with_care
+                message_validation_error
+                (message_id, err)) ;
+            `Invalid
+        | exception exn ->
+            (* Don't crash if crypto raised an exception. *)
+            let err = Printexc.to_string exn in
+            Event.(
+              emit__dont_wait__use_with_care
+                message_validation_error
+                (message_id, err)) ;
+            `Invalid)
 
   let resolve_plugin_and_set_ready config dal_config ctxt cctxt =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
