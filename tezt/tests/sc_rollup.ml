@@ -1371,10 +1371,11 @@ let test_context_gc ~challenge_window ~commitment_period =
   Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; value; _} ->
       if name = "calling_gc.v0" then
         gc_levels_started := JSON.(value |> as_int) :: !gc_levels_started) ;
-  (* On each [ending_gc] event, increment a counter *)
+  (* On each [ending_context_gc] event, increment a counter *)
   let gc_finalisations = ref 0 in
   Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; _} ->
-      if name = "ending_gc.v0" then gc_finalisations := !gc_finalisations + 1) ;
+      if name = "ending_context_gc.v0" then
+        gc_finalisations := !gc_finalisations + 1) ;
 
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   (* We start at level 2, bake until the expected level *)

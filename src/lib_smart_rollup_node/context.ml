@@ -167,17 +167,17 @@ let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
               Irmin_pack_unix.Stats.Latest_gc.finalise_duration stats
             in
             let* () = callback () in
-            Event.ending_gc
+            Event.ending_context_gc
               ( Time.System.Span.of_seconds_exn total_duration,
                 Time.System.Span.of_seconds_exn finalise_duration )
-        | Error (`Msg err) -> Event.gc_failure err
+        | Error (`Msg err) -> Event.context_gc_failure err
       in
       let commit_key = IStore.Commit.key commit in
       let* launch_result = IStore.Gc.run ~finished repo commit_key in
       match launch_result with
-      | Error (`Msg err) -> Event.gc_launch_failure err
-      | Ok false -> Event.gc_already_launched ()
-      | Ok true -> Event.starting_gc hash)
+      | Error (`Msg err) -> Event.context_gc_launch_failure err
+      | Ok false -> Event.context_gc_already_launched ()
+      | Ok true -> Event.starting_context_gc hash)
 
 let wait_gc_completion index =
   let open Lwt_syntax in
