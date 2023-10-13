@@ -53,6 +53,21 @@ class wrap_silent_memory_client (t : Client_context.full) :
     method! with_lock f = f ()
   end
 
+module Sorted_baker_map = Map.Make (struct
+  type t = Signature.Public_key_hash.t * Tez.t
+
+  let compare (h, x) (h', x') =
+    (* Descending order *)
+    let v = Tez.compare x' x in
+    if v <> 0 then v else Signature.Public_key_hash.compare h h'
+end)
+
+module Consensus_key_set = Set.Make (struct
+  type t = Signature.Public_key.t * Signature.Public_key_hash.t
+
+  let compare = compare
+end)
+
 let load_client_context (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
   let open Protocol_client_context in
@@ -85,6 +100,43 @@ let load_client_context (cctxt : Protocol_client_context.full) =
     | _ -> assert false
   in
   let delegates = get_pkhs (fun _ -> assert false) b [] |> List.rev in
+  let* sorted_bakers =
+    List.fold_left_es
+      (fun acc delegate ->
+        let*! r =
+          Alpha_services.Delegate.consensus_key cctxt (`Main, `Head 0) delegate
+        in
+        let* delegate_frozen_deposits =
+          Alpha_services.Delegate.frozen_deposits
+            cctxt
+            (`Main, `Head 0)
+            delegate
+        in
+        let k = (delegate, delegate_frozen_deposits) in
+        match r with
+        | Error _ -> return (Sorted_baker_map.add k Consensus_key_set.empty acc)
+        | Ok ck_info ->
+            let open Alpha_services.Delegate in
+            let cks =
+              let pendings =
+                List.map
+                  (fun (_, ck) -> (ck.consensus_key_pk, ck.consensus_key_pkh))
+                  ck_info.pendings
+              in
+              if
+                Signature.Public_key_hash.(
+                  ck_info.active.consensus_key_pkh = delegate)
+              then pendings
+              else
+                ( ck_info.active.consensus_key_pk,
+                  ck_info.active.consensus_key_pkh )
+                :: pendings
+            in
+            let cks_set = Consensus_key_set.of_list cks in
+            return (Sorted_baker_map.add k cks_set acc))
+      Sorted_baker_map.empty
+      delegates
+  in
   let mk_unencrypted f x =
     Uri.of_string (Format.sprintf "unencrypted:%s" (f x))
   in
@@ -104,28 +156,45 @@ let load_client_context (cctxt : Protocol_client_context.full) =
       let _, _, sk = V_latest.generate_key ~algo ~seed:b () in
       sk
   in
-  let* delegates =
+  let* delegates_l =
     List.mapi_es
-      (fun i pkh ->
+      (fun i ((pkh, _), cks) ->
         let alias = Format.sprintf "baker_%d" i in
-        let* pk_opt =
-          Alpha_services.Contract.manager_key cctxt (`Main, `Head 0) pkh
+        let make ?pk alias pkh =
+          let* pk_opt =
+            match pk with
+            | None ->
+                Alpha_services.Contract.manager_key cctxt (`Main, `Head 0) pkh
+            | Some pk -> return_some pk
+          in
+          let pk = WithExceptions.Option.get ~loc:__LOC__ pk_opt in
+          let pk_uri =
+            WithExceptions.Result.get_ok ~loc:__LOC__
+            @@ Client_keys.make_pk_uri
+                 (mk_unencrypted Signature.Public_key.to_b58check pk)
+          in
+          let sk_uri =
+            WithExceptions.Result.get_ok ~loc:__LOC__
+            @@ Client_keys.make_sk_uri
+                 (mk_unencrypted
+                    Signature.Secret_key.to_b58check
+                    (random_sk pk))
+          in
+          return (alias, pkh, pk, pk_uri, sk_uri)
         in
-        let pk = WithExceptions.Option.get ~loc:__LOC__ pk_opt in
-        let pk_uri =
-          WithExceptions.Result.get_ok ~loc:__LOC__
-          @@ Client_keys.make_pk_uri
-               (mk_unencrypted Signature.Public_key.to_b58check pk)
+        let* baker = make alias pkh in
+        let* cks =
+          List.mapi_es
+            (fun i (ck_pk, ck_pkh) ->
+              make ~pk:ck_pk (Printf.sprintf "%s_ck_%d" alias i) ck_pkh)
+            (Consensus_key_set.elements cks)
         in
-        let sk_uri =
-          WithExceptions.Result.get_ok ~loc:__LOC__
-          @@ Client_keys.make_sk_uri
-               (mk_unencrypted Signature.Secret_key.to_b58check (random_sk pk))
-        in
-        return (alias, pkh, pk, pk_uri, sk_uri))
-      delegates
+        return (baker :: cks))
+      (Sorted_baker_map.bindings sorted_bakers)
   in
-  Client_keys.register_keys cctxt delegates
+  let delegates = List.flatten delegates_l in
+  let* () = Client_keys.register_keys cctxt delegates in
+  return_unit
 
 let get_delegates (cctxt : Protocol_client_context.full) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
@@ -908,3 +977,5 @@ module Tool : Sigs.PROTO_TOOL = struct
 
   let patch_block_time = patch_block_time
 end
+
+let () = Sigs.register Protocol.hash (module Tool)

@@ -53,38 +53,91 @@ class wrap_silent_memory_client (t : Client_context.full) :
     method! with_lock f = f ()
   end
 
+module Sorted_baker_map = Map.Make (struct
+  type t = Signature.Public_key_hash.t * Tez.t
+
+  let compare (h, x) (h', x') =
+    (* Descending order *)
+    let v = Tez.compare x' x in
+    if v <> 0 then v else Signature.Public_key_hash.compare h h'
+end)
+
+module Consensus_key_set = Set.Make (struct
+  type t = Signature.Public_key.t * Signature.Public_key_hash.t
+
+  let compare = compare
+end)
+
 let load_client_context (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
   let open Protocol_client_context in
-  let* (b : Tezos_shell_services.Block_services.Proof.raw_context) =
-    Alpha_block_services.Context.read
-      cctxt
-      ["active_delegate_with_one_roll"; "current"]
+  let* (cycles_raw : Tezos_shell_services.Block_services.Proof.raw_context) =
+    Alpha_block_services.Context.read cctxt ["cycle"]
   in
-  let rec get_pkhs (p : string -> Signature.Public_key_hash.t)
-      (d : Tezos_shell_services.Block_services.Proof.raw_context) acc =
-    match d with
-    | Key _b -> assert false
-    | Dir m ->
-        String.Map.fold
-          (function
-            | "ed25519" ->
-                get_pkhs (fun s ->
-                    Signature.(
-                      Ed25519 (Ed25519.Public_key_hash.of_hex_exn (`Hex s))))
-            | "p256" ->
-                get_pkhs (fun s ->
-                    Signature.(P256 (P256.Public_key_hash.of_hex_exn (`Hex s))))
-            | "secp256k1" ->
-                get_pkhs (fun s ->
-                    Signature.(
-                      Secp256k1 (Secp256k1.Public_key_hash.of_hex_exn (`Hex s))))
-            | s -> fun _v acc -> p s :: acc)
-          m
-          acc
+  let cycles =
+    match cycles_raw with
+    | Dir m -> String.Map.bindings m |> List.map fst
     | _ -> assert false
   in
-  let delegates = get_pkhs (fun _ -> assert false) b [] |> List.rev in
+  let* all_delegates_and_ck =
+    let process_delegate_sampler_state acc = function
+      | Tezos_shell_services.Block_services.Proof.Key sampler_state ->
+          let sampler_state =
+            Data_encoding.Binary.of_bytes_exn
+              (Sampler.encoding Raw_context.consensus_pk_encoding)
+              sampler_state
+          in
+          let support : Raw_context.consensus_pk Environment.FallbackArray.t =
+            (* Bypass sampler state's inner structure abstraction *)
+            Obj.(field (repr sampler_state) 1 |> obj)
+          in
+          Environment.FallbackArray.fold
+            (fun acc {Raw_context.consensus_pk; consensus_pkh; delegate} ->
+              if Signature.Public_key_hash.(consensus_pkh = delegate) then
+                Signature.Public_key_hash.Map.update
+                  delegate
+                  (function
+                    | None -> Some Consensus_key_set.empty | Some x -> Some x)
+                  acc
+              else
+                Signature.Public_key_hash.Map.update
+                  delegate
+                  (function
+                    | None ->
+                        Some
+                          (Consensus_key_set.singleton
+                             (consensus_pk, consensus_pkh))
+                    | Some s ->
+                        Some
+                          (Consensus_key_set.add
+                             (consensus_pk, consensus_pkh)
+                             s))
+                  acc)
+            support
+            acc
+      | _ -> assert false
+    in
+    List.fold_left_es
+      (fun acc cycle ->
+        let* raw_delegate_sampler_state =
+          Alpha_block_services.Context.read
+            cctxt
+            ["cycle"; cycle; "delegate_sampler_state"]
+        in
+        return (process_delegate_sampler_state acc raw_delegate_sampler_state))
+      Signature.Public_key_hash.Map.empty
+      cycles
+  in
+  let* sorted_bakers =
+    Signature.Public_key_hash.Map.fold_es
+      (fun h s acc ->
+        let* frozen_deposits =
+          Alpha_services.Delegate.frozen_deposits cctxt (`Main, `Head 0) h
+        in
+        Sorted_baker_map.add (h, frozen_deposits) s acc |> return)
+      all_delegates_and_ck
+      Sorted_baker_map.empty
+  in
   let mk_unencrypted f x =
     Uri.of_string (Format.sprintf "unencrypted:%s" (f x))
   in
@@ -104,28 +157,45 @@ let load_client_context (cctxt : Protocol_client_context.full) =
       let _, _, sk = V_latest.generate_key ~algo ~seed:b () in
       sk
   in
-  let* delegates =
+  let* delegates_l =
     List.mapi_es
-      (fun i pkh ->
+      (fun i ((pkh, _), cks) ->
         let alias = Format.sprintf "baker_%d" i in
-        let* pk_opt =
-          Alpha_services.Contract.manager_key cctxt (`Main, `Head 0) pkh
+        let make ?pk alias pkh =
+          let* pk_opt =
+            match pk with
+            | None ->
+                Alpha_services.Contract.manager_key cctxt (`Main, `Head 0) pkh
+            | Some pk -> return_some pk
+          in
+          let pk = WithExceptions.Option.get ~loc:__LOC__ pk_opt in
+          let pk_uri =
+            WithExceptions.Result.get_ok ~loc:__LOC__
+            @@ Client_keys.make_pk_uri
+                 (mk_unencrypted Signature.Public_key.to_b58check pk)
+          in
+          let sk_uri =
+            WithExceptions.Result.get_ok ~loc:__LOC__
+            @@ Client_keys.make_sk_uri
+                 (mk_unencrypted
+                    Signature.Secret_key.to_b58check
+                    (random_sk pk))
+          in
+          return (alias, pkh, pk, pk_uri, sk_uri)
         in
-        let pk = WithExceptions.Option.get ~loc:__LOC__ pk_opt in
-        let pk_uri =
-          WithExceptions.Result.get_ok ~loc:__LOC__
-          @@ Client_keys.make_pk_uri
-               (mk_unencrypted Signature.Public_key.to_b58check pk)
+        let* baker = make alias pkh in
+        let* cks =
+          List.mapi_es
+            (fun i (ck_pk, ck_pkh) ->
+              make ~pk:ck_pk (Printf.sprintf "%s_ck_%d" alias i) ck_pkh)
+            (Consensus_key_set.elements cks)
         in
-        let sk_uri =
-          WithExceptions.Result.get_ok ~loc:__LOC__
-          @@ Client_keys.make_sk_uri
-               (mk_unencrypted Signature.Secret_key.to_b58check (random_sk pk))
-        in
-        return (alias, pkh, pk, pk_uri, sk_uri))
-      delegates
+        return (baker :: cks))
+      (Sorted_baker_map.bindings sorted_bakers)
   in
-  Client_keys.register_keys cctxt delegates
+  let delegates = List.flatten delegates_l in
+  let* () = Client_keys.register_keys cctxt delegates in
+  return_unit
 
 let get_delegates (cctxt : Protocol_client_context.full) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
