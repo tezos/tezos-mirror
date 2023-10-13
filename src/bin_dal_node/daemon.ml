@@ -101,47 +101,106 @@ module Handler = struct
     in
     return (go (), stopper)
 
-  (* [gossipsub_app_messages_validation cryptobox message message_id] allows
-     checking whether the given [message] identified by [message_id] is valid
-     with the current [cryptobox] parameters. The validity check is done by
-     verifying that the shard in the message effectively belongs to the
+  (* [gossipsub_app_message_payload_validation cryptobox message message_id]
+     allows checking whether the given [message] identified by [message_id] is
+     valid with the current [cryptobox] parameters. The validity check is done
+     by verifying that the shard in the message effectively belongs to the
      commitment given by [message_id]. *)
-  let gossipsub_app_messages_validation cryptobox ?message ~message_id () =
-    match message with
-    | None -> `Unknown
-    | Some message -> (
-        let Types.Message.{share; shard_proof} = message in
-        let Types.Message_id.{commitment; shard_index; _} = message_id in
-        let shard = Cryptobox.{share; index = shard_index} in
-        match Cryptobox.verify_shard cryptobox commitment shard shard_proof with
-        | Ok () -> `Valid
-        | Error err ->
-            let err =
-              match err with
-              | `Invalid_degree_strictly_less_than_expected {given; expected} ->
-                  Format.sprintf
-                    "Invalid_degree_strictly_less_than_expected. Given: %d, \
-                     expected: %d"
-                    given
-                    expected
-              | `Invalid_shard -> "Invalid_shard"
-              | `Shard_index_out_of_range s ->
-                  Format.sprintf "Shard_index_out_of_range(%s)" s
-              | `Shard_length_mismatch -> "Shard_length_mismatch"
-            in
-            Event.(
-              emit__dont_wait__use_with_care
-                message_validation_error
-                (message_id, err)) ;
-            `Invalid
-        | exception exn ->
-            (* Don't crash if crypto raised an exception. *)
-            let err = Printexc.to_string exn in
-            Event.(
-              emit__dont_wait__use_with_care
-                message_validation_error
-                (message_id, err)) ;
-            `Invalid)
+  let gossipsub_app_message_payload_validation cryptobox message_id message =
+    let Types.Message.{share; shard_proof} = message in
+    let Types.Message_id.{commitment; shard_index; _} = message_id in
+    let shard = Cryptobox.{share; index = shard_index} in
+    match Cryptobox.verify_shard cryptobox commitment shard shard_proof with
+    | Ok () -> `Valid
+    | Error err ->
+        let err =
+          match err with
+          | `Invalid_degree_strictly_less_than_expected {given; expected} ->
+              Format.sprintf
+                "Invalid_degree_strictly_less_than_expected. Given: %d, \
+                 expected: %d"
+                given
+                expected
+          | `Invalid_shard -> "Invalid_shard"
+          | `Shard_index_out_of_range s ->
+              Format.sprintf "Shard_index_out_of_range(%s)" s
+          | `Shard_length_mismatch -> "Shard_length_mismatch"
+        in
+        Event.(
+          emit__dont_wait__use_with_care
+            message_validation_error
+            (message_id, err)) ;
+        `Invalid
+    | exception exn ->
+        (* Don't crash if crypto raised an exception. *)
+        let err = Printexc.to_string exn in
+        Event.(
+          emit__dont_wait__use_with_care
+            message_validation_error
+            (message_id, err)) ;
+        `Invalid
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
+
+     - That the commitment (slot index for the given level if the commitment
+     field is dropped from message id) is waiting for attestation;
+
+     - That the included shard index is indeed assigned to the included pkh;
+
+     - That the bounds on the slot/shard indexes are respected.
+  *)
+  let gossipsub_message_id_validation _ctxt _cryptobox _message_id = `Valid
+
+  (* [gossipsub_app_messages_validation ctxt cryptobox head_level
+     attestation_lag ?message ~message_id ()] checks for the validity of the
+     given message (if any) and message id.
+
+     First, the message id's validity is checked if the application cares about
+     it and is not outdated (Otherwise `Unknown or `Outdated is returned,
+     respectively). This is done thanks to
+     {!gossipsub_message_id_validation}. Then, if a message is given,
+     {!gossipsub_app_message_payload_validation} is used to check its
+     validity. *)
+  let gossipsub_app_messages_validation ctxt cryptobox head_level
+      attestation_lag ?message ~message_id () =
+    if
+      Node_context.get_profile_ctxt ctxt |> Profile_manager.is_bootstrap_profile
+    then
+      (* 1. As bootstrap nodes advertise their profiles to attester and producer
+         nodes, they shouldn't receive messages or messages ids. If this
+         happens, received data are considered as spam (invalid), and the remote
+         peer might be punished, depending on the Gossipsub implementation. *)
+      `Invalid
+    else
+      (* Have some slack for outdated messages. *)
+      let slack = 4 in
+      if
+        Int32.(
+          sub head_level message_id.Types.Message_id.level
+          > of_int (attestation_lag + slack))
+      then
+        (* 2. Nodes don't care about messages whose ids are too old.  Gossipsub
+           should only be used for the dissemination of fresh data. Old data could
+           be retrieved using another method. *)
+        `Outdated
+      else
+        match gossipsub_message_id_validation ctxt cryptobox message_id with
+        | `Valid ->
+            (* 3. Only check for message validity if the message_id is valid. *)
+            Option.fold
+              message
+              ~none:`Valid
+              ~some:
+                (gossipsub_app_message_payload_validation cryptobox message_id)
+        | other ->
+            (* 4. In the case the message id is not Valid.
+
+               FIXME: https://gitlab.com/tezos/tezos/-/issues/6460
+
+               This probably include cases where the message is in the future, in
+               which case we might return `Unknown for the moment. But then, when is
+               the message revalidated? *)
+            other
 
   let resolve_plugin_and_set_ready config dal_config ctxt cctxt =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
@@ -186,12 +245,6 @@ module Handler = struct
               proto_parameters
               block_header.Block_header.shell.proto_level
           in
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4441
-
-             The hook below should be called each time cryptobox parameters
-             change. *)
-          Gossipsub.Worker.Validate_message_hook.set
-            (gossipsub_app_messages_validation cryptobox) ;
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
@@ -252,6 +305,13 @@ module Handler = struct
                 } =
             ready_ctxt
           in
+          Gossipsub.Worker.Validate_message_hook.set
+            (gossipsub_app_messages_validation
+               ctxt
+               cryptobox
+               head_level
+               proto_parameters.attestation_lag) ;
+
           let process_block block_proto block_level =
             let block = `Level block_level in
             let* block_info =
