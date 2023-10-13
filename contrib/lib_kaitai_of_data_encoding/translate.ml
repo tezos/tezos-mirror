@@ -143,6 +143,13 @@ let rec seq_field_of_data_encoding :
       | `Int16 -> (enums, types, [{(Ground.Attr.int16 ~id) with valid}])
       | `Int31 -> (enums, types, [{(Ground.Attr.int31 ~id) with valid}]))
   | Float -> (enums, types, [Ground.Attr.float ~id])
+  | RangedFloat {minimum; maximum} ->
+      let valid =
+        Some
+          (ValidationSpec.ValidationRange
+             {min = Ast.FloatNum minimum; max = Ast.FloatNum maximum})
+      in
+      (enums, types, [{(Ground.Attr.float ~id) with valid}])
   | Bytes (`Fixed n, _) -> (enums, types, [Ground.Attr.bytes ~id (Fixed n)])
   | Bytes (`Variable, _) -> (enums, types, [Ground.Attr.bytes ~id Variable])
   | Dynamic_size {kind; encoding = {encoding = Bytes (`Variable, _); _}} ->

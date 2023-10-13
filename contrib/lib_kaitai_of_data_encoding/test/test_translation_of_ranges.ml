@@ -81,3 +81,23 @@ let%expect_test "test biggest range" =
         min: -22299
         max: 29290
   |}]
+
+let%expect_test "test float range" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~id:"float_range"
+      Data_encoding.(ranged_float (-22299.01) 3333333.33333)
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: float_range
+      endian: be
+    seq:
+    - id: float_range
+      type: f8
+      valid:
+        min: -22299.01
+        max: 3333333.33333
+  |}]

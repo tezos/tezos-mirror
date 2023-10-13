@@ -93,6 +93,7 @@ module Ast = struct
 
   let rec to_string = function
     | IntNum n -> Int.to_string n
+    | FloatNum f -> Float.to_string f
     | Name name -> name
     | UnaryOp {op; operand} -> (
         match op with
