@@ -27,10 +27,6 @@
 
 type seed = B of State_hash.t
 
-type t = T of State_hash.t
-
-type sequence = S of State_hash.t
-
 type nonce = bytes
 
 type vdf_setup = Vdf.discriminant * Vdf.challenge
@@ -116,70 +112,6 @@ let seed_encoding =
 
 let update_seed (B state) nonce =
   B (State_hash.hash_bytes [State_hash.to_bytes state; nonce])
-
-let initialize_new (B state) append =
-  T (State_hash.hash_bytes (State_hash.to_bytes state :: zero_bytes :: append))
-
-let xor_higher_bits i b =
-  let higher = TzEndian.get_int32 b 0 in
-  let r = Int32.logxor higher i in
-  let res = Bytes.copy b in
-  TzEndian.set_int32 res 0 r ;
-  res
-
-let sequence (T state) n =
-  State_hash.to_bytes state |> xor_higher_bits n |> fun b ->
-  S (State_hash.hash_bytes [b])
-
-let take (S state) =
-  let b = State_hash.to_bytes state in
-  let h = State_hash.hash_bytes [b] in
-  (State_hash.to_bytes h, S h)
-
-let take_int32 s bound =
-  if Compare.Int32.(bound <= 0l) then invalid_arg "Seed_repr.take_int32"
-    (* FIXME *)
-  else
-    let drop_if_over =
-      Int32.sub Int32.max_int (Int32.rem Int32.max_int bound)
-    in
-    let rec loop s =
-      let bytes, s = take s in
-      let r = TzEndian.get_int32 bytes 0 in
-      (* The absolute value of min_int is min_int.  Also, every
-           positive integer is represented twice (positive and negative),
-           but zero is only represented once.  We fix both problems at
-           once. *)
-      let r = if Compare.Int32.(r = Int32.min_int) then 0l else Int32.abs r in
-      if Compare.Int32.(r >= drop_if_over) then loop s
-      else
-        let v = Int32.rem r bound in
-        (v, s)
-    in
-    loop s
-
-let take_int64 s bound =
-  if Compare.Int64.(bound <= 0L) then invalid_arg "Seed_repr.take_int64"
-    (* FIXME *)
-  else
-    let drop_if_over =
-      Int64.sub Int64.max_int (Int64.rem Int64.max_int bound)
-    in
-
-    let rec loop s =
-      let bytes, s = take s in
-      let r = TzEndian.get_int64 bytes 0 in
-      (* The absolute value of min_int is min_int.  Also, every
-           positive integer is represented twice (positive and negative),
-           but zero is only represented once.  We fix both problems at
-           once. *)
-      let r = if Compare.Int64.(r = Int64.min_int) then 0L else Int64.abs r in
-      if Compare.Int64.(r >= drop_if_over) then loop s
-      else
-        let v = Int64.rem r bound in
-        (v, s)
-    in
-    loop s
 
 type error += Unexpected_nonce_length (* `Permanent *)
 

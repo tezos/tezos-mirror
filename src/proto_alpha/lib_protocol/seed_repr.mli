@@ -34,14 +34,8 @@
 
 (** {2 Random Generation} *)
 
-(** The state of the random number generator *)
-type t
-
 (** A random seed, to derive random sequences from *)
 type seed
-
-(** A random sequence, to derive random values from *)
-type sequence
 
 (** A VDF discriminant and challenge *)
 type vdf_setup = Vdf.discriminant * Vdf.challenge
@@ -61,29 +55,6 @@ val generate_vdf_setup :
 val verify : vdf_setup -> Int64.t -> vdf_solution -> bool option
 
 val vdf_to_seed : seed -> vdf_solution -> seed
-
-(** [initialize_new state ident] returns a new generator *)
-val initialize_new : seed -> bytes list -> t
-
-(** [sequence state n] prepares the n-th sequence of a state  *)
-val sequence : t -> int32 -> sequence
-
-(** Generates the next random value in the sequence *)
-val take : sequence -> bytes * sequence
-
-(** [take_int32 s bound] generates the next random value as a bounded [int32]
-
-    @param bound must be a positive integer
-    @raise Invalid_argument "Seed_repr.take_int32" if [bound] <= 0
- *)
-val take_int32 : sequence -> int32 -> int32 * sequence
-
-(** [take_int64 s bound] generates the next random value as a bounded [int64]
-
-    @param bound must be a positive integer
-    @raise Invalid_argument "Seed_repr.take_int64" if [bound] <= 0
- *)
-val take_int64 : sequence -> int64 -> int64 * sequence
 
 (** {2 Entropy} *)
 
