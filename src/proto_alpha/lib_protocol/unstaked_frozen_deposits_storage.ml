@@ -26,7 +26,7 @@
 let current_unslashable_cycle ctxt =
   let cycle = (Raw_context.current_level ctxt).cycle in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let max_slashing_period = Constants_storage.max_slashing_period ctxt in
+  let max_slashing_period = Constants_repr.max_slashing_period in
   Cycle_repr.sub cycle (preserved_cycles + max_slashing_period - 1)
 
 let get_all ctxt contract =

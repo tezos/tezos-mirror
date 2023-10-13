@@ -64,6 +64,8 @@ let michelson_maximum_type_size = 2001
    mechanism (see {Context.Cache}). *)
 let cache_layout_size = 3
 
+let max_slashing_period = 2
+
 (* The {!Sc_rollups.wrapped_proof_encoding} uses unbounded sub-encodings.
    To avoid attacks through too large proofs and long decoding times on public
    nodes, we put another layer of security by restricting the maximum_size
@@ -117,7 +119,8 @@ let fixed_encoding =
           max_allowed_global_constant_depth,
           cache_layout_size,
           michelson_maximum_type_size ),
-        ( sc_max_wrapped_proof_binary_size,
+        ( max_slashing_period,
+          sc_max_wrapped_proof_binary_size,
           sc_rollup_message_size_limit,
           sc_rollup_max_number_of_messages_per_level ) ))
     (fun ( ( _proof_of_work_nonce_size,
@@ -130,7 +133,8 @@ let fixed_encoding =
              _max_allowed_global_constant_depth,
              _cache_layout_size,
              _michelson_maximum_type_size ),
-           ( _sc_max_wrapped_proof_binary_size,
+           ( _max_slashing_period,
+             _sc_max_wrapped_proof_binary_size,
              _sc_rollup_message_size_limit,
              _sc_rollup_number_of_messages_per_level ) ) -> ())
     (merge_objs
@@ -145,7 +149,8 @@ let fixed_encoding =
           (req "max_allowed_global_constants_depth" int31)
           (req "cache_layout_size" uint8)
           (req "michelson_maximum_type_size" uint16))
-       (obj3
+       (obj4
+          (req "max_slashing_period" uint8)
           (req "smart_rollup_max_wrapped_proof_binary_size" int31)
           (req "smart_rollup_message_size_limit" int31)
           (req "smart_rollup_max_number_of_messages_per_level" n)))
@@ -223,12 +228,6 @@ let check_constants constants =
         <= constants.minimal_participation_ratio.denominator)
       (Invalid_protocol_constants
          "The minimal participation ratio must be less than or equal to 100%.")
-  in
-  let* () =
-    error_unless
-      Compare.Int.(constants.max_slashing_period > 0)
-      (Invalid_protocol_constants
-         "The unfreeze delay must be strictly greater than 0.")
   in
   (* The [limit_of_delegation_over_baking] should be non-negative. *)
   let* () =

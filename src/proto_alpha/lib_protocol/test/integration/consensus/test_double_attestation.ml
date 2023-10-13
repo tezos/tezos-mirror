@@ -454,7 +454,8 @@ let test_too_early_double_attestation_evidence () =
 let test_too_late_double_attestation_evidence () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
-  let* Constants.{parametric = {max_slashing_period; blocks_per_cycle; _}; _} =
+  let max_slashing_period = Constants.max_slashing_period in
+  let* Constants.{parametric = {blocks_per_cycle; _}; _} =
     Context.get_constants (B genesis)
   in
   let* blk_1, blk_2 = block_fork genesis in

@@ -377,10 +377,8 @@ let test_too_early_double_baking_evidence () =
    --, it is not possible to create a double baking operation anymore. *)
 let test_too_late_double_baking_evidence () =
   let open Lwt_result_syntax in
+  let max_slashing_period = Constants.max_slashing_period in
   let* b, contracts = Context.init2 ~consensus_threshold:0 () in
-  let* Constants.{parametric = {max_slashing_period; _}; _} =
-    Context.get_constants (B b)
-  in
   let* blk_a, blk_b = block_fork ~policy:(By_round 0) contracts b in
   let* blk = Block.bake_until_n_cycle_end max_slashing_period blk_a in
   double_baking (B blk) blk_a.header blk_b.header |> fun operation ->
@@ -391,7 +389,7 @@ let test_too_late_double_baking_evidence () =
           true
       | _ -> false)
 
-(** Check that before [max_slashing_period * blocks_per_cycle] blocks
+(** Check that before [blocks_per_cycle] blocks
    -- corresponding to 2 cycles --, it is still possible to create a
    double baking operation. *)
 let test_just_in_time_double_baking_evidence () =

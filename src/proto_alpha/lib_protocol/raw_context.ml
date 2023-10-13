@@ -1153,7 +1153,6 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               consensus_committee_size = c.consensus_committee_size;
               consensus_threshold = c.consensus_threshold;
               minimal_participation_ratio = c.minimal_participation_ratio;
-              max_slashing_period = c.max_slashing_period;
               limit_of_delegation_over_baking =
                 c.limit_of_delegation_over_baking;
               percentage_of_frozen_deposits_slashed_per_double_baking;

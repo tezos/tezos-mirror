@@ -188,7 +188,6 @@ type t = {
   minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   consensus_threshold : int;
-  max_slashing_period : int;
   limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : Int_percentage.t;
   percentage_of_frozen_deposits_slashed_per_double_attestation :
@@ -499,7 +498,6 @@ let encoding =
               c.consensus_committee_size,
               c.consensus_threshold ),
             ( ( c.minimal_participation_ratio,
-                c.max_slashing_period,
                 c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_attestation,
@@ -536,7 +534,6 @@ let encoding =
                  consensus_committee_size,
                  consensus_threshold ),
                ( ( minimal_participation_ratio,
-                   max_slashing_period,
                    limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
                    percentage_of_frozen_deposits_slashed_per_double_attestation,
@@ -571,7 +568,6 @@ let encoding =
         minimal_block_delay;
         delay_increment_per_round;
         minimal_participation_ratio;
-        max_slashing_period;
         consensus_committee_size;
         consensus_threshold;
         limit_of_delegation_over_baking;
@@ -623,9 +619,8 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj7
+                (obj6
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
-                   (req "max_slashing_period" int31)
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"

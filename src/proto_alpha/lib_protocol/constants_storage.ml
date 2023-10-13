@@ -128,10 +128,6 @@ let minimal_participation_ratio c =
   let constants = Raw_context.constants c in
   constants.minimal_participation_ratio
 
-let max_slashing_period c =
-  let constants = Raw_context.constants c in
-  constants.max_slashing_period
-
 let limit_of_delegation_over_baking c =
   let constants = Raw_context.constants c in
   constants.limit_of_delegation_over_baking

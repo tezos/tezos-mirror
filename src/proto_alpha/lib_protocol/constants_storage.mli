@@ -81,8 +81,6 @@ val consensus_threshold : Raw_context.t -> int
 
 val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 
-val max_slashing_period : Raw_context.t -> int
-
 val limit_of_delegation_over_baking : Raw_context.t -> int
 
 val percentage_of_frozen_deposits_slashed_per_double_baking :

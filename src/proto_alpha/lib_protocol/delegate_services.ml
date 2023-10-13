@@ -608,7 +608,7 @@ let register () =
         Option.value ~default:Cycle.root
         @@ Cycle.sub
              ctxt_cycle
-             (csts.preserved_cycles + csts.max_slashing_period)
+             (csts.preserved_cycles + Constants_repr.max_slashing_period)
       in
       let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
       let* requests =

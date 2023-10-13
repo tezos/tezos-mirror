@@ -415,7 +415,7 @@ let double_consensus_descriptor =
 let double_baking_descriptor =
   {
     parameters = Fun.id;
-    required_cycle = (fun params -> params.constants.max_slashing_period);
+    required_cycle = (fun _params -> Constants_repr.max_slashing_period);
     required_block = (fun _ -> 0);
     prelude =
       ( From 2,

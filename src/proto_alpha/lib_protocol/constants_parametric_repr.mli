@@ -176,8 +176,6 @@ type t = {
   (* in slots *)
   consensus_threshold : int;
   (* in slots *)
-  max_slashing_period : int;
-  (* in cycles *)
   limit_of_delegation_over_baking : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
   percentage_of_frozen_deposits_slashed_per_double_baking : Int_percentage.t;

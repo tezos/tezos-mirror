@@ -89,7 +89,7 @@ let apply_slashes ~preserved_plus_slashing slashing_history ~from_cycle amount =
 let prepare_finalize_unstake ctxt contract =
   let open Lwt_result_syntax in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let max_slashing_period = Constants_storage.max_slashing_period ctxt in
+  let max_slashing_period = Constants_repr.max_slashing_period in
   let preserved_plus_slashing = preserved_cycles + max_slashing_period in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
@@ -153,7 +153,7 @@ module For_RPC = struct
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
     let open Lwt_result_syntax in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-    let max_slashing_period = Constants_storage.max_slashing_period ctxt in
+    let max_slashing_period = Constants_repr.max_slashing_period in
     let preserved_plus_slashing = preserved_cycles + max_slashing_period in
     let* slashing_history_opt =
       Storage.Contract.Slashed_deposits.find

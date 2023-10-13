@@ -155,7 +155,7 @@ let test_cannot_bake_with_zero_deposits () =
   in
   let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
   let expected_number_of_cycles_with_previous_deposit =
-    constants.preserved_cycles + constants.max_slashing_period - 1
+    constants.preserved_cycles + Constants.max_slashing_period - 1
   in
   let* b =
     Block.bake_until_n_cycle_end
@@ -280,7 +280,7 @@ let test_limit_with_overdelegation () =
     Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.preserved_cycles + constants.max_slashing_period)
+    2 * (constants.preserved_cycles + Constants.max_slashing_period)
   in
   let rec loop b n =
     if n = 0 then return b
@@ -441,7 +441,7 @@ let test_deposits_after_stake_removal () =
   (* the frozen deposits for account1 do not change until [preserved cycles +
      max_slashing_period] are baked (-1 because we already baked a cycle) *)
   let* b =
-    loop b (constants.preserved_cycles + constants.max_slashing_period - 1)
+    loop b (constants.preserved_cycles + Constants.max_slashing_period - 1)
   in
   (* and still after preserved cycles + max_slashing_period, the frozen_deposits
      for account1 won't reflect the decrease in account1's active stake
@@ -476,7 +476,7 @@ let test_deposits_not_unfrozen_after_deactivation () =
   in
   let last_cycle_with_deposits =
     last_active_cycle + constants.preserved_cycles
-    + constants.max_slashing_period
+    + Constants.max_slashing_period
     (* according to [Delegate_storage.freeze_deposits] *)
   in
   let cycles_to_bake = last_cycle_with_deposits + constants.preserved_cycles in
@@ -566,7 +566,7 @@ let test_frozen_deposits_with_delegation () =
       expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.preserved_cycles + constants.max_slashing_period)
+    2 * (constants.preserved_cycles + Constants.max_slashing_period)
   in
   let rec loop b n =
     if n = 0 then return b
@@ -668,7 +668,7 @@ let test_frozen_deposits_with_overdelegation () =
       expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.preserved_cycles + constants.max_slashing_period)
+    2 * (constants.preserved_cycles + Constants.max_slashing_period)
   in
   let* frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) account1
