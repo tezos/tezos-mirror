@@ -1515,3 +1515,13 @@ let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "dal"; "shards"]
     ~query_string
     Fun.id
+
+let get_monitor_applied_blocks = make GET ["monitor"; "applied_blocks"] Fun.id
+
+let get_monitor_heads_chain ?(chain = "main") () =
+  make GET ["monitor"; "heads"; chain] Fun.id
+
+let get_monitor_validated_blocks =
+  make GET ["monitor"; "validated_blocks"] Fun.id
+
+let nonexistent_path = make GET ["nonexistent"; "path"] Fun.id

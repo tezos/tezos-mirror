@@ -1221,3 +1221,17 @@ val get_chain_block_votes_total_voting_power :
 (** RPC: [GET /chains/[chain]/blocks/[block]/context/dal/shards?level=[level]] *)
 val get_chain_block_context_dal_shards :
   ?chain:string -> ?block:string -> ?level:int -> unit -> JSON.t t
+
+(** RPC: [GET /monitor/applied_blocks] *)
+val get_monitor_applied_blocks : JSON.t t
+
+(** RPC: [GET /monitor/heads/<chain>]
+
+    [chain] defaults to ["main"]. *)
+val get_monitor_heads_chain : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /monitor/validated_blocks] *)
+val get_monitor_validated_blocks : JSON.t t
+
+(** A nonexistent RPC. *)
+val nonexistent_path : JSON.t t
