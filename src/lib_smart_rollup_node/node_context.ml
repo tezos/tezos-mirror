@@ -1033,7 +1033,9 @@ let gc node_ctxt ~(level : int32) =
   | Some {context; _} ->
       let*! () = Event.calling_gc level in
       let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
+      (* Start both node and context gc asynchronously *)
       let*! () = Context.gc node_ctxt.context context in
+      let* () = Store.gc node_ctxt.store ~level:gc_level in
       return_unit
 
 module Internal_for_tests = struct
