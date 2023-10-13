@@ -955,7 +955,6 @@ let update_block_time_related_constants (c : Constants_parametric_repr.t) =
   let blocks_per_cycle = half_more c.blocks_per_cycle in
   let blocks_per_commitment = half_more c.blocks_per_commitment in
   let nonce_revelation_threshold = half_more c.nonce_revelation_threshold in
-  let blocks_per_stake_snapshot = half_more c.blocks_per_stake_snapshot in
   let max_operations_time_to_live = 3 * c.max_operations_time_to_live / 2 in
   let block_time = Int64.to_int (Period_repr.to_seconds minimal_block_delay) in
   let sc_rollup =
@@ -967,7 +966,6 @@ let update_block_time_related_constants (c : Constants_parametric_repr.t) =
     blocks_per_cycle;
     blocks_per_commitment;
     nonce_revelation_threshold;
-    blocks_per_stake_snapshot;
     max_operations_time_to_live;
     minimal_block_delay;
     delay_increment_per_round;
@@ -1202,7 +1200,6 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               blocks_per_cycle = c.blocks_per_cycle;
               blocks_per_commitment = c.blocks_per_commitment;
               nonce_revelation_threshold = c.nonce_revelation_threshold;
-              blocks_per_stake_snapshot = c.blocks_per_stake_snapshot;
               cycles_per_voting_period = c.cycles_per_voting_period;
               hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
               hard_gas_limit_per_block = c.hard_gas_limit_per_block;

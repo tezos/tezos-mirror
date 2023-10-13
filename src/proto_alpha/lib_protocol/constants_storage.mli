@@ -43,8 +43,6 @@ val blocks_per_commitment : Raw_context.t -> int32
 
 val nonce_revelation_threshold : Raw_context.t -> int32
 
-val blocks_per_stake_snapshot : Raw_context.t -> int32
-
 val cycles_per_voting_period : Raw_context.t -> int32
 
 val hard_gas_limit_per_operation :

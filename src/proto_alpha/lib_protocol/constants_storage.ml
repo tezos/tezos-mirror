@@ -88,10 +88,6 @@ let nonce_revelation_threshold c =
   let constants = Raw_context.constants c in
   constants.nonce_revelation_threshold
 
-let blocks_per_stake_snapshot c =
-  let constants = Raw_context.constants c in
-  constants.blocks_per_stake_snapshot
-
 let cycles_per_voting_period c =
   let constants = Raw_context.constants c in
   constants.cycles_per_voting_period

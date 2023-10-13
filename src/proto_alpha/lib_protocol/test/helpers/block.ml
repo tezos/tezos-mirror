@@ -369,13 +369,7 @@ let protocol_param_key = ["protocol_parameters"]
 let check_constants_consistency constants =
   let open Lwt_result_syntax in
   let open Constants.Parametric in
-  let {
-    blocks_per_cycle;
-    blocks_per_commitment;
-    nonce_revelation_threshold;
-    blocks_per_stake_snapshot;
-    _;
-  } =
+  let {blocks_per_cycle; blocks_per_commitment; nonce_revelation_threshold; _} =
     constants
   in
   let* () =
@@ -384,18 +378,10 @@ let check_constants_consistency constants =
           "Inconsistent constants : blocks_per_commitment must be less than \
            blocks_per_cycle")
   in
-  let* () =
-    Error_monad.unless
-      (nonce_revelation_threshold <= blocks_per_cycle)
-      (fun () ->
-        failwith
-          "Inconsistent constants : nonce_revelation_threshold must be less \
-           than blocks_per_cycle")
-  in
-  Error_monad.unless (blocks_per_cycle >= blocks_per_stake_snapshot) (fun () ->
+  Error_monad.unless (nonce_revelation_threshold <= blocks_per_cycle) (fun () ->
       failwith
-        "Inconsistent constants : blocks_per_cycle must be superior than \
-         blocks_per_stake_snapshot")
+        "Inconsistent constants : nonce_revelation_threshold must be less than \
+         blocks_per_cycle")
 
 let prepare_main_init_params ?bootstrap_contracts commitments constants
     bootstrap_accounts =
