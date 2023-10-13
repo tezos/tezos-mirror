@@ -166,11 +166,9 @@ check_rust_toolchain_files () {
     done
 }
 
-update_gitlab_ci_yml () {
+check_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
-    # one being ignored. Gitlab linter doesn't warn for it
-    # Job key `unified_coverage` is allowed to be duplicated because we use a conditional include
-    # on files `.gitlab/ci/coverage/coverage.yml` and `.gitlab/ci/jobs/coverage_default.yml`
+    # one being ignored. Gitlab linter doesn't warn for it.
     find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml | \
         while read -r filename; do
             repeated=$(grep '^[^ #-]' "$filename" \
@@ -235,8 +233,7 @@ case "$action" in
         action=update_all_dot_ocamlformats
         check_clean=true ;;
     "--check-gitlab-ci-yml" )
-        action=update_gitlab_ci_yml
-        check_clean=true ;;
+        action=check_gitlab_ci_yml ;;
     "--check-scripts" )
         action=check_scripts ;;
     "--check-redirects" )
