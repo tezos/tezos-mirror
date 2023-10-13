@@ -1127,6 +1127,8 @@ opam:tezos-proxy-server-config:
 
 # Ignoring unreleased package tezt-ethereum.
 
+# Ignoring unreleased package tezt-risc-v-sandbox.
+
 opam:tezt-tezos:
   extends:
     - .opam_template
