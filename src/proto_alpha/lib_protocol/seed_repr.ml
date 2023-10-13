@@ -214,8 +214,6 @@ let nonce_hash_key_part = Nonce_hash.to_path
 
 let initial_nonce_0 = zero_bytes
 
-let initial_nonce_hash_0 = hash initial_nonce_0
-
 let deterministic_seed seed = update_seed seed zero_bytes
 
 let initial_seeds ?initial_seed n =
