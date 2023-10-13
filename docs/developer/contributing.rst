@@ -109,7 +109,7 @@ Then use ``push -f`` in your branch to rewrite the history.
 Being proficient with interactive rebases is mandatory to avoid
 mistakes and wasting time.
 
-This Git strategy is a variant of the `git rebase workflow <https://www.atlassian.com/git/articles/git-team-workflows-merge-or-rebase>`_.
+This Git strategy is a variant of the `git rebase workflow <https://www.atlassian.com/git/tutorials/merging-vs-rebasing>`_.
 
 .. _mr_workflow:
 
