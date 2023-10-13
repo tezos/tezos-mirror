@@ -80,6 +80,13 @@ let test_mul_percentage () =
       (of_mutez_exn tz)
       (mul_percentage (of_mutez_exn tz) (pct_of_int 200))
   in
+  (* no overflow *)
+  let* () =
+    assert_equal_tez
+      ~loc:__LOC__
+      (of_mutez_exn 9131138316486228048L)
+      (mul_percentage Tez_repr.max_mutez (pct_of_int 99))
+  in
   return_unit
 
 let tests =
