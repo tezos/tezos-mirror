@@ -114,6 +114,10 @@ module Gc_levels : sig
   include SINGLETON_STORE with type value = levels
 end
 
+(** History mode of the rollup node. *)
+module History_mode :
+  SINGLETON_STORE with type value := Configuration.history_mode
+
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
@@ -126,6 +130,7 @@ type +'a store = {
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
   gc_levels : 'a Gc_levels.t;
+  history_mode : 'a History_mode.t;
 }
 
 include Store_sig.S with type 'a store := 'a store

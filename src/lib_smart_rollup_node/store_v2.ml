@@ -278,6 +278,14 @@ module Gc_levels = struct
   end)
 end
 
+module History_mode = Indexed_store.Make_singleton (struct
+  type t = Configuration.history_mode
+
+  let name = "history_mode"
+
+  let encoding = Configuration.history_mode_encoding
+end)
+
 type 'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
@@ -290,6 +298,7 @@ type 'a store = {
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
   gc_levels : 'a Gc_levels.t;
+  history_mode : 'a History_mode.t;
 }
 
 type 'a t = ([< `Read | `Write > `Read] as 'a) store
@@ -311,6 +320,7 @@ let readonly
        protocols;
        irmin_store;
        gc_levels;
+       history_mode;
      } :
       _ t) : ro =
   {
@@ -326,6 +336,7 @@ let readonly
     protocols = Protocols.readonly protocols;
     irmin_store = Irmin_store.readonly irmin_store;
     gc_levels = Gc_levels.readonly gc_levels;
+    history_mode = History_mode.readonly history_mode;
   }
 
 let close
@@ -341,6 +352,7 @@ let close
        protocols = _;
        irmin_store;
        gc_levels = _;
+       history_mode = _;
      } :
       _ t) =
   let open Lwt_result_syntax in
@@ -392,6 +404,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
   in
   let* protocols = Protocols.load mode ~path:(path "protocols") in
   let* gc_levels = Gc_levels.load mode ~path:(path "gc_levels") in
+  let* history_mode = History_mode.load mode ~path:(path "history_mode") in
   let+ irmin_store = Irmin_store.load mode (path "irmin_store") in
   {
     l2_blocks;
@@ -405,6 +418,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     protocols;
     irmin_store;
     gc_levels;
+    history_mode;
   }
 
 let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
@@ -541,6 +555,7 @@ let gc
        irmin_store = _;
        protocols = _;
        gc_levels = _;
+       history_mode = _;
      } :
       _ t) ~level =
   let open Lwt_result_syntax in
@@ -581,6 +596,7 @@ let wait_gc_completion
        irmin_store = _;
        protocols = _;
        gc_levels = _;
+       history_mode = _;
      } :
       _ t) =
   let open Lwt_syntax in

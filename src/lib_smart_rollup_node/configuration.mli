@@ -224,6 +224,8 @@ val default_gc_parameters : gc_parameters
     ({!Full}).  *)
 val default_history_mode : history_mode
 
+val history_mode_encoding : history_mode Data_encoding.t
+
 (** [max_injector_retention_period] is the maximum allowed value for
     [injector_retention_period]. *)
 val max_injector_retention_period : int
