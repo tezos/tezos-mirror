@@ -438,12 +438,9 @@ let commands () =
           match introspectable with
           | None -> cctxt#error "Error retrieving introspectable"
           | Some (Any encoding) ->
-              let escape_encoding_id id =
-                id |> String.split '.' |> String.concat "__"
-              in
               return
               @@ Kaitai_of_data_encoding.Translate.from_data_encoding
-                   ~encoding_name:(escape_encoding_id encoding_id)
+                   ~id:encoding_id
                    encoding
         in
         let* () =
@@ -469,9 +466,6 @@ let commands () =
         let* () =
           List.iter_s
             (fun (id, _registered) ->
-              let escape_encoding_id id =
-                id |> String.split '.' |> String.concat "__"
-              in
               (* TODO: avoid this lookup by exporting `t -> introspectable` *)
               match Data_encoding.Registration.find_introspectable id with
               | None ->
@@ -479,9 +473,7 @@ let commands () =
                   assert false
               | Some (Any e) -> (
                   match
-                    Kaitai_of_data_encoding.Translate.from_data_encoding
-                      ~encoding_name:(escape_encoding_id id)
-                      e
+                    Kaitai_of_data_encoding.Translate.from_data_encoding ~id e
                   with
                   | exception _ ->
                       (* TODO: offer a [result] variant of conversion function *)
@@ -490,7 +482,9 @@ let commands () =
                       let yml = Kaitai.Print.print spec in
                       Lwt_io.with_file
                         ~mode:Output
-                        (dir ^ "/" ^ escape_encoding_id id ^ ".ksy")
+                        (dir ^ "/"
+                        ^ Kaitai_of_data_encoding.Translate.escape_id id
+                        ^ ".ksy")
                         (fun oc -> Lwt_io.write oc yml)))
             (Data_encoding.Registration.list ())
         in

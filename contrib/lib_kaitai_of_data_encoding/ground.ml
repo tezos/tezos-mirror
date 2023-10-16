@@ -49,34 +49,30 @@ let n_chunk_type =
   {
     (* TODO/nice to have: Add a docstring, i.e. [?description]
                           to custom defined class spec. *)
-    (Helpers.default_class_spec ~encoding_name:"n_chunk" ())
+    (Helpers.default_class_spec ~id:"n_chunk" ())
     with
     seq =
       [
         {
-          Helpers.default_attr_spec with
-          id = "has_more";
+          (Helpers.default_attr_spec ~id:"has_more") with
           dataType =
             DataType.(
               NumericType
                 (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
         };
         {
-          Helpers.default_attr_spec with
-          id = "payload";
+          (Helpers.default_attr_spec ~id:"payload") with
           dataType =
             DataType.(
               NumericType
                 (Int_type (BitsType {width = 7; bit_endian = BigBitEndian})));
         };
       ];
-    isTopLevel = false;
   }
 
 let n_seq_attr =
   {
-    Helpers.default_attr_spec with
-    id = "n";
+    (Helpers.default_attr_spec ~id:"n") with
     dataType = DataType.(ComplexDataType (UserType n_chunk_type));
     cond =
       {
@@ -101,44 +97,39 @@ let n_type =
   {
     (* TODO/nice to have: Add a docstring, i.e. [?description]
                           to custom defined class spec. *)
-    (Helpers.default_class_spec ~encoding_name:"n" ())
+    (Helpers.default_class_spec ~id:"n" ())
     with
     seq = [n_seq_attr];
-    isTopLevel = false;
   }
 
 let z_type =
   {
-    (Helpers.default_class_spec ~encoding_name:"z" ()) with
+    (Helpers.default_class_spec ~id:"z" ()) with
     seq =
       [
         {
-          Helpers.default_attr_spec with
-          id = "has_tail";
+          (Helpers.default_attr_spec ~id:"has_tail") with
           dataType =
             DataType.(
               NumericType
                 (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
         };
         {
-          Helpers.default_attr_spec with
-          id = "sign";
+          (Helpers.default_attr_spec ~id:"sign") with
           dataType =
             DataType.(
               NumericType
                 (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
         };
         {
-          Helpers.default_attr_spec with
-          id = "payload";
+          (Helpers.default_attr_spec ~id:"payload") with
           dataType =
             DataType.(
               NumericType
                 (Int_type (BitsType {width = 6; bit_endian = BigBitEndian})));
         };
         {
-          Helpers.default_attr_spec with
-          AttrSpec.id = "tail";
+          (Helpers.default_attr_spec ~id:"tail") with
           dataType = DataType.(ComplexDataType (UserType n_chunk_type));
           cond =
             {
@@ -171,7 +162,6 @@ let z_type =
             };
         };
       ];
-    isTopLevel = false;
   }
 
 module Type = struct
@@ -187,8 +177,7 @@ end
 module Attr = struct
   let bool ~id =
     {
-      Helpers.default_attr_spec with
-      id;
+      (Helpers.default_attr_spec ~id) with
       dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
       valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
       enum = Some (fst Enum.bool);
@@ -196,15 +185,13 @@ module Attr = struct
 
   let int1_type_attr_spec ~id ~signed =
     {
-      Helpers.default_attr_spec with
-      id;
+      (Helpers.default_attr_spec ~id) with
       dataType = DataType.(NumericType (Int_type (Int1Type {signed})));
     }
 
   let int_multi_type_atrr_spec ~id ~signed width =
     {
-      Helpers.default_attr_spec with
-      id;
+      (Helpers.default_attr_spec ~id) with
       dataType =
         DataType.(
           NumericType (Int_type (IntMultiType {signed; width; endian = None})));
@@ -212,8 +199,7 @@ module Attr = struct
 
   let float_multi_type_attr_spec ~id =
     {
-      Helpers.default_attr_spec with
-      id;
+      (Helpers.default_attr_spec ~id) with
       dataType =
         DataType.(
           NumericType
@@ -260,8 +246,7 @@ module Attr = struct
   let bytes ~id = function
     | Fixed n ->
         {
-          Helpers.default_attr_spec with
-          id;
+          (Helpers.default_attr_spec ~id) with
           dataType =
             DataType.(
               BytesType
@@ -277,8 +262,7 @@ module Attr = struct
         }
     | Dynamic size_id ->
         {
-          Helpers.default_attr_spec with
-          id;
+          (Helpers.default_attr_spec ~id) with
           dataType =
             DataType.(
               BytesType
@@ -294,8 +278,7 @@ module Attr = struct
         }
     | Variable ->
         {
-          Helpers.default_attr_spec with
-          id;
+          (Helpers.default_attr_spec ~id) with
           dataType =
             DataType.(
               BytesType
@@ -312,15 +295,13 @@ module Attr = struct
 
   let n ~id =
     {
-      Helpers.default_attr_spec with
-      id;
+      (Helpers.default_attr_spec ~id) with
       dataType = DataType.(ComplexDataType (UserType (snd Type.n)));
     }
 
   let z ~id =
     {
-      Helpers.default_attr_spec with
-      id;
+      (Helpers.default_attr_spec ~id) with
       dataType = DataType.(ComplexDataType (UserType (snd Type.z)));
     }
 

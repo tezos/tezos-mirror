@@ -42,23 +42,23 @@ val default_doc_spec : DocSpec.t
     expression and no repetition. *)
 val cond_no_cond : AttrSpec.ConditionalSpec.t
 
-(** [default_attr_spec] is initialized with default (empty) values. *)
-val default_attr_spec : AttrSpec.t
+(** [default_attr_spec ~id] is initialized with default (empty) values except
+    [id] set to [~id]. *)
+val default_attr_spec : id:string -> AttrSpec.t
 
-(** [default_meta_spec ~encoding_name] returns default [MetaSpec.t].
+(** [default_meta_spec ~id] returns default [MetaSpec.t].
 
     The following meta section properties are set:
     - [endian] is set to [BE] (as per data-encoding default).
-    - [id] is set to [~encoding_name].
+    - [id] is set to [~id].
     - Other fields are [[]] or [None]. *)
-val default_meta_spec : encoding_name:string -> MetaSpec.t
+val default_meta_spec : id:string -> MetaSpec.t
 
-(** [default_class_spec ~encoding_name] builds an default (empty) [ClassSpec.t].
+(** [default_class_spec ~id] builds an default (empty) [ClassSpec.t].
 
-    @param ~encoding_name is added to meta section as [id].
+    @param [~id] is added to meta section as [id].
     @param [?description] is added into [doc] section as [summary]. *)
-val default_class_spec :
-  encoding_name:string -> ?description:string -> unit -> ClassSpec.t
+val default_class_spec : id:string -> ?description:string -> unit -> ClassSpec.t
 
 (** [add_uniq_assoc kvs kv] returns an association list with associations from
     [kvs] as well as [kv].
@@ -69,17 +69,19 @@ val default_class_spec :
     as but a different value than [kv]. *)
 val add_uniq_assoc : (string * 'a) list -> string * 'a -> (string * 'a) list
 
-(** [class_spec_of_attrs ~encoding_name ?description ?enums ?instances attrs]
+(** [class_spec_of_attrs ~id ?description ?enums ?instances attrs]
     returns a [ClassSpec.t] for the seq [attrs].
 
-    @param [~encoding_name] is added to meta section as [id].
+    @param [~id] is added to meta section as [id].
     @param [?description] is used as [doc] section [summary].
+    @param [?top_level] is used as [isTopLevel] (defaults to [false]).
     @param [?enums] is added to class specification if present.
     @param [?types] is added to class specification if present.
     @param [?instances] is added to class specification if present. *)
 val class_spec_of_attrs :
-  encoding_name:string ->
+  id:string ->
   ?description:string ->
+  ?top_level:bool ->
   ?enums:(string * EnumSpec.t) list ->
   ?types:(string * ClassSpec.t) list ->
   ?instances:(string * InstanceSpec.t) list ->
