@@ -104,6 +104,17 @@ type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 
 let is_zero_update = function Debited t | Credited t -> Tez_repr.(t = zero)
 
+let conv_balance_update encoding =
+  Data_encoding.conv
+    (function Credited v -> `Credited v | Debited v -> `Debited v)
+    (function `Credited v -> Credited v | `Debited v -> Debited v)
+    encoding
+
+let balance_update_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.balance_update"
+  @@ obj1 (req "change" (conv_balance_update Tez_repr.balance_update_encoding))
+
 let balance_encoding ~use_legacy_attestation_name =
   let open Data_encoding in
   let case = function
@@ -327,17 +338,6 @@ let balance_encoding_with_legacy_attestation_name =
   balance_encoding ~use_legacy_attestation_name:true
 
 let balance_encoding = balance_encoding ~use_legacy_attestation_name:false
-
-let conv_balance_update encoding =
-  Data_encoding.conv
-    (function Credited v -> `Credited v | Debited v -> `Debited v)
-    (function `Credited v -> Credited v | `Debited v -> Debited v)
-    encoding
-
-let balance_update_encoding =
-  let open Data_encoding in
-  def "operation_metadata.alpha.balance_update"
-  @@ obj1 (req "change" (conv_balance_update Tez_repr.balance_update_encoding))
 
 type update_origin =
   | Block_application
