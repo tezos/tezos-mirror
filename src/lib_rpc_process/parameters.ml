@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type t = {
-  rpc : Config_file.rpc;
+  config : Config_file.t;
   rpc_comm_socket_path : string;
   internal_events : Tezos_base.Internal_event_config.t;
   node_version : Tezos_version.Node_version.t;
@@ -33,12 +33,12 @@ type t = {
 let parameters_encoding =
   let open Data_encoding in
   conv
-    (fun {rpc; rpc_comm_socket_path; internal_events; node_version} ->
-      (rpc, rpc_comm_socket_path, internal_events, node_version))
-    (fun (rpc, rpc_comm_socket_path, internal_events, node_version) ->
-      {rpc; rpc_comm_socket_path; internal_events; node_version})
+    (fun {config; rpc_comm_socket_path; internal_events; node_version} ->
+      (config, rpc_comm_socket_path, internal_events, node_version))
+    (fun (config, rpc_comm_socket_path, internal_events, node_version) ->
+      {config; rpc_comm_socket_path; internal_events; node_version})
     (obj4
-       (req "rpc" Config_file.rpc_encoding)
+       (req "config" Config_file.encoding)
        (req "rpc_comm_socket_path" Data_encoding.string)
        (req "internal_events" Tezos_base.Internal_event_config.encoding)
        (req "node_version" Tezos_version.Node_version.encoding))

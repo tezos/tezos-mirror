@@ -66,15 +66,18 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (config : Parameters.t) (addr, port) =
+let launch_rpc_server (params : Parameters.t) (addr, port) =
+  let open Config_file in
   let open Lwt_result_syntax in
-  let media_types = config.rpc.media_type in
-  let*! acl_policy = RPC_server.Acl.resolve_domain_names config.rpc.acl in
+  let media_types = params.config.rpc.media_type in
+  let*! acl_policy =
+    RPC_server.Acl.resolve_domain_names params.config.rpc.acl
+  in
   let host = Ipaddr.V6.to_string addr in
   let mode =
-    match config.rpc.tls with
+    match params.config.rpc.tls with
     | None -> `TCP (`Port port)
-    | Some {Config_file.cert; key} ->
+    | Some {cert; key} ->
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
   let acl =
@@ -84,19 +87,21 @@ let launch_rpc_server (config : Parameters.t) (addr, port) =
   in
   let*! () =
     Rpc_process_event.(emit starting_rpc_server)
-      (host, port, config.rpc.tls <> None, RPC_server.Acl.policy_type acl)
+      (host, port, params.config.rpc.tls <> None, RPC_server.Acl.policy_type acl)
   in
   let cors_headers =
-    sanitize_cors_headers ~default:["Content-Type"] config.rpc.cors_headers
+    sanitize_cors_headers
+      ~default:["Content-Type"]
+      params.config.rpc.cors_headers
   in
   let cors =
     Resto_cohttp.Cors.
       {
-        allowed_origins = config.rpc.cors_origins;
+        allowed_origins = params.config.rpc.cors_origins;
         allowed_headers = cors_headers;
       }
   in
-  let dir = Directory.build_rpc_directory config.node_version in
+  let dir = Directory.build_rpc_directory params.node_version params.config in
   let server =
     RPC_server.init_server
       ~cors
@@ -104,7 +109,7 @@ let launch_rpc_server (config : Parameters.t) (addr, port) =
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
-  let callback = Forward_handler.callback server config.rpc_comm_socket_path in
+  let callback = Forward_handler.callback server params.rpc_comm_socket_path in
   Lwt.catch
     (fun () ->
       let*! () = RPC_server.launch ~host server ~callback mode in
@@ -121,7 +126,7 @@ let init_rpc parameters =
   let open Lwt_result_syntax in
   let* server =
     let* p2p_point =
-      match parameters.Parameters.rpc.Config_file.listen_addrs with
+      match parameters.Parameters.config.Config_file.rpc.listen_addrs with
       | [addr] -> Config_file.resolve_rpc_listening_addrs addr
       | _ ->
           (* We assume that the config contains only one listening
@@ -171,11 +176,11 @@ let run socket_dir =
   let* parameters = Socket.recv init_socket_fd Parameters.parameters_encoding in
   let*! () =
     Tezos_base_unix.Internal_event_unix.init
-      ~config:parameters.internal_events
+      ~config:parameters.Parameters.internal_events
       ()
   in
   let* () = init_rpc parameters in
-  (* Send the config ack as synchronization barrier for the init_rpc
+  (* Send the params ack as synchronization barrier for the init_rpc
      phase. *)
   let* () = Socket.send init_socket_fd Data_encoding.unit () in
   let*! () = Lwt_unix.close init_socket_fd in

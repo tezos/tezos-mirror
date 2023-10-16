@@ -127,7 +127,7 @@ let create ~comm_socket_path (config : Config_file.t) node_version events_config
     external_process_parameters =
       {
         internal_events = events_config;
-        rpc = config.rpc;
+        config;
         rpc_comm_socket_path = comm_socket_path;
         node_version;
       };

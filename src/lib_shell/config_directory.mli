@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [build_rpc_directory_for_rpc_process] builds a directory containing
+    read-only and store-independant related config for the rpc process *)
+val build_rpc_directory_for_rpc_process :
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
+  dal_config:Dal_config.t ->
+  unit Tezos_rpc.Directory.t ->
+  unit Tezos_rpc.Directory.t
+
+(** [build_rpc_directory] builds the complete config directory *)
 val build_rpc_directory :
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
