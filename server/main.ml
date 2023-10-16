@@ -399,7 +399,6 @@ let block_callback =
     let out =
       Caqti_lwt.Pool.use
         (fun (module Db : Caqti_lwt.CONNECTION) ->
-          let* () = Db.exec Sql_requests.maybe_insert_source source in
           let* () =
             may_handle_block @@ fun () ->
             Db.exec Sql_requests.maybe_insert_delegate delegate
@@ -472,7 +471,6 @@ let operations_callback =
       let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
       Caqti_lwt.Pool.use
         (fun (module Db : Caqti_lwt.CONNECTION) ->
-          let* () = Db.exec Sql_requests.maybe_insert_source source in
           let* () =
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
               (fun (right, _) ->
