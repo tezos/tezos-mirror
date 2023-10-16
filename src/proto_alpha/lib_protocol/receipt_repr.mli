@@ -57,8 +57,8 @@ type 'token balance =
 (** Compares two balances. *)
 val compare_balance : Tez_repr.t balance -> Tez_repr.t balance -> int
 
-(** A credit or debit of tez to a balance. *)
-type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
+(** A credit or debit of token to a balance. *)
+type 'token balance_update = Debited of 'token | Credited of 'token
 
 (** An origin of a balance update *)
 type update_origin =
@@ -76,12 +76,15 @@ val compare_update_origin : update_origin -> update_origin -> int
     [c]. *)
 type balance_update_item = private
   | Balance_update_item :
-      Tez_repr.t balance * balance_update * update_origin
+      Tez_repr.t balance * Tez_repr.t balance_update * update_origin
       -> balance_update_item
 
 (** Smart constructor for [balance_update_item]. *)
 val item :
-  Tez_repr.t balance -> balance_update -> update_origin -> balance_update_item
+  Tez_repr.t balance ->
+  Tez_repr.t balance_update ->
+  update_origin ->
+  balance_update_item
 
 (** A list of balance updates. Duplicates may happen. *)
 type balance_updates = balance_update_item list

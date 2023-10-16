@@ -102,7 +102,7 @@ let compare_balance ba bb =
       in
       Compare.Int.compare (index ba) (index bb)
 
-type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
+type 'token balance_update = Debited of 'token | Credited of 'token
 
 let is_zero_update = function Debited t | Credited t -> Tez_repr.(t = zero)
 
@@ -400,7 +400,7 @@ let update_origin_encoding =
 
 type balance_update_item =
   | Balance_update_item :
-      Tez_repr.t balance * balance_update * update_origin
+      Tez_repr.t balance * Tez_repr.t balance_update * update_origin
       -> balance_update_item
 
 let item balance balance_update update_origin =

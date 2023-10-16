@@ -2067,7 +2067,7 @@ module Receipt : sig
     | Sc_rollup_refutation_punishments : Tez.t balance
     | Sc_rollup_refutation_rewards : Tez.t balance
 
-  type balance_update = Debited of Tez.t | Credited of Tez.t
+  type 'token balance_update = Debited of 'token | Credited of 'token
 
   type update_origin =
     | Block_application
@@ -2077,11 +2077,14 @@ module Receipt : sig
 
   type balance_update_item = private
     | Balance_update_item :
-        Tez.t balance * balance_update * update_origin
+        Tez.t balance * Tez.t balance_update * update_origin
         -> balance_update_item
 
   val item :
-    Tez.t balance -> balance_update -> update_origin -> balance_update_item
+    Tez.t balance ->
+    Tez.t balance_update ->
+    update_origin ->
+    balance_update_item
 
   type balance_updates = balance_update_item list
 
