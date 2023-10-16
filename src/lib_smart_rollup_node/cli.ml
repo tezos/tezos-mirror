@@ -386,3 +386,19 @@ let gc_frequency_arg =
           Default value is %ld."
          Configuration.default_gc_parameters.frequency_in_blocks)
     positive_int32_parameter
+
+let history_mode_parameter =
+  Tezos_clic.parameter
+    ~autocomplete:(fun (_cctxt : Client_context.full) ->
+      Lwt_result.return ["archive"; "full"])
+    (fun _ m -> Lwt_result.return (Configuration.history_mode_of_string m))
+
+let history_mode_arg =
+  Tezos_clic.arg
+    ~long:"history-mode"
+    ~placeholder:"history_mode"
+    ~doc:
+      (Format.sprintf
+         "The history mode for the rollup node (archive, full) (default is %s)"
+         Configuration.(string_of_history_mode default_history_mode))
+    history_mode_parameter
