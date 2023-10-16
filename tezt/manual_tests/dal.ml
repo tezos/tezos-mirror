@@ -143,7 +143,12 @@ let scenario_on_teztnet =
           dir)
         a_opt
   in
-  fun ~network ?producer_profiles ?attester_profiles ~main_scenario () ->
+  fun ~network
+      ?(dal_bootstrap_peers = [])
+      ?producer_profiles
+      ?attester_profiles
+      ~main_scenario
+      () ->
     (* Parse CLI arguments *)
     let working_dir = Cli.get_string_opt "working-dir" in
     let public_ip_addr = Cli.get_string_opt "public-ip-addr" in
@@ -183,7 +188,7 @@ let scenario_on_teztnet =
     let peer = sf "dal.%s-%s.teztnets.xyz:11732" network teztnet_network_day in
     let* dal_node =
       start_dal_node
-        ~peers:[peer]
+        ~peers:(peer :: dal_bootstrap_peers)
         ?data_dir:dal_producer
         ?producer_profiles
         ?attester_profiles
@@ -333,7 +338,12 @@ let slots_injector_test ~network =
   @@ fun () ->
   let slot_index = Cli.get_int "slot-index" in
   let publisher_sk = Cli.get_string_opt "publisher-sk" in
+  let dal_bootstrap_peers =
+    Cli.get_string_opt "dal-bootstrap-peers"
+    |> Option.map (String.split_on_char ',')
+  in
   scenario_on_teztnet
+    ?dal_bootstrap_peers
     ~network
     ~main_scenario:(slots_injector_scenario ~slot_index ?publisher_sk)
     ~producer_profiles:[slot_index]
@@ -347,7 +357,15 @@ let baker_test ~network =
     ~tags:["dal"; "baker"; network]
   @@ fun () ->
   let baker_sk = Cli.get_string_opt "baker-sk" in
-  scenario_on_teztnet ~network ~main_scenario:(baker_scenario ?baker_sk) ()
+  let dal_bootstrap_peers =
+    Cli.get_string_opt "dal-bootstrap-peers"
+    |> Option.map (String.split_on_char ',')
+  in
+  scenario_on_teztnet
+    ?dal_bootstrap_peers
+    ~network
+    ~main_scenario:(baker_scenario ?baker_sk)
+    ()
 
 let register () =
   dal_distribution () ;
