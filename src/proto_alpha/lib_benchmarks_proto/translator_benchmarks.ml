@@ -655,7 +655,7 @@ module Ty_eq : Benchmark.S = struct
         sample_in_interval ~range:{min = 1; max = cfg.max_size} rng_state)
     in
     let ty =
-      Michelson_generation.Samplers.Random_type.m_type ~size:nodes rng_state
+      Michelson_generation.Samplers.Random_type.m_type ~size:nodes () rng_state
     in
     ty_eq_benchmark rng_state nodes ty
 end

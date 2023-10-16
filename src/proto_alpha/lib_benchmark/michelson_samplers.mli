@@ -25,6 +25,8 @@
 
 (** Sampling various Michelson values. *)
 
+exception SamplingError of string
+
 open Protocol
 open Base_samplers
 
@@ -59,6 +61,38 @@ type parameters = {
 (** Encoding for sampler prameters. *)
 val parameters_encoding : parameters Data_encoding.t
 
+type type_name =
+  [ `TUnit
+  | `TInt
+  | `TNat
+  | `TSignature
+  | `TString
+  | `TBytes
+  | `TMutez
+  | `TKey_hash
+  | `TKey
+  | `TTimestamp
+  | `TAddress
+  | `TBool
+  | `TPair
+  | `TOr
+  | `TLambda
+  | `TOption
+  | `TList
+  | `TSet
+  | `TMap
+  | `TBig_map
+  | `TContract
+  | `TSapling_transaction
+  | `TSapling_transaction_deprecated
+  | `TSapling_state
+  | `TOperation
+  | `TChain_id
+  | `TBls12_381_g1
+  | `TBls12_381_g2
+  | `TBls12_381_fr
+  | `TTicket ]
+
 (** The module type produced by the [Make] functor. *)
 module type S = sig
   (** Basic Michelson samplers, re-exported for convenience by the functor. *)
@@ -66,8 +100,14 @@ module type S = sig
 
   (** Samplers for random Michelson types. *)
   module Random_type : sig
-    (** [m_type ~size] samples a type containing exactly [size] constructors. *)
-    val m_type : size:int -> Script_typed_ir.ex_ty sampler
+    (** [m_type ~size ?blacklist] samples a type containing exactly
+        [size] constructors. The [blacklist] is a predicate which can
+        be used to discard some unwanted cases. *)
+    val m_type :
+      size:int ->
+      ?blacklist:(type_name -> bool) ->
+      unit ->
+      Script_typed_ir.ex_ty sampler
 
     (** [m_comparable_type ~size] samples a comparable type containing
         exactly [size] constructors. *)

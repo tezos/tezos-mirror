@@ -22,6 +22,40 @@ open Qcheck2_helpers
 
 type ex_data = Ex_data : ('a, _) ty * 'a -> ex_data
 
+(* We use the Michelson samplers from lib_benchmark. They are later turned into
+   QCheck2 generators (see [data_generator]). *)
+module Parameters = struct
+  let atom_size_range : Tezos_benchmark.Base_samplers.range =
+    {min = 0; max = 10}
+
+  let other_size : Tezos_benchmark.Base_samplers.range = {min = 0; max = 2}
+  (* Anything larger than max=2 leads to rare very large values which
+     cannot be packed within Data_encoding limits. *)
+
+  let parameters : Michelson_samplers.parameters =
+    {
+      base_parameters =
+        {
+          int_size = atom_size_range;
+          string_size = atom_size_range;
+          bytes_size = atom_size_range;
+        };
+      list_size = other_size;
+      set_size = other_size;
+      map_size = other_size;
+    }
+end
+
+module Crypto_samplers =
+Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
+  let size = 1000
+
+  let algo = `Default
+end)
+
+module Samplers : Michelson_samplers.S =
+  Michelson_samplers.Make (Parameters) (Crypto_samplers)
+
 let assert_some = function Some x -> x | None -> assert false
 
 let assert_ok = function Ok x -> x | Error _ -> assert false
@@ -41,12 +75,30 @@ let ctxt =
     return (Incremental.alpha_ctxt v))
 
 let ex_data_sampler : ex_data Tezos_benchmark.Base_samplers.sampler =
- fun _random_state ->
-  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/9541
-
-     cover non-trivial types *)
-  let ty = unit_t in
-  let x = () in
+ fun random_state ->
+  let size =
+    Tezos_benchmark.Base_samplers.sample_in_interval
+      ~range:{min = 1; max = 20}
+      random_state
+  in
+  let blacklist = function
+    | `TUnit | `TInt | `TNat | `TSignature | `TString | `TBytes | `TMutez
+    | `TKey_hash | `TKey | `TTimestamp | `TAddress | `TBool | `TPair | `TOr
+    | `TOption | `TList | `TSet | `TMap | `TChain_id | `TBls12_381_g1
+    | `TBls12_381_g2 | `TBls12_381_fr | `TBig_map | `TTicket ->
+        false
+    | `TOperation (* Forbidden in storage *)
+    | `TContract (* Forbidden in storage *)
+    | `TSapling_transaction (* Not yet supported *)
+    | `TSapling_transaction_deprecated (* Not yet supported *)
+    | `TSapling_state (* Not yet supported *)
+    | `TLambda (* Not yet supported *) ->
+        true
+  in
+  let (Ex_ty ty) =
+    Samplers.Random_type.m_type ~size ~blacklist () random_state
+  in
+  let x = Samplers.Random_value.value ty random_state in
   Ex_data (ty, x)
 
 (* There is no particular reason not to define a proper shrinker here,

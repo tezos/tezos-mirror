@@ -123,7 +123,7 @@ include
 
 let random_state = Random.State.make [|37; 73; 17; 71; 42|]
 
-let sample_ty size = Random_type.m_type ~size random_state
+let sample_ty size = Random_type.m_type ~size () random_state
 
 let sample_value ty = Random_value.value ty random_state
 
