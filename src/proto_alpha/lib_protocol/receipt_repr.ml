@@ -386,19 +386,22 @@ let update_origin_encoding =
            (fun () -> Simulation);
        ]
 
-type balance_update_item = balance * balance_update * update_origin
+type balance_update_item =
+  | Balance_update_item :
+      balance * balance_update * update_origin
+      -> balance_update_item
 
 let item balance balance_update update_origin =
-  (balance, balance_update, update_origin)
+  Balance_update_item (balance, balance_update, update_origin)
 
 let item_encoding_with_legacy_attestation_name =
   let open Data_encoding in
   conv
     (function
-      | balance, balance_update, update_origin ->
+      | Balance_update_item (balance, balance_update, update_origin) ->
           ((balance, balance_update), update_origin))
     (fun ((balance, balance_update), update_origin) ->
-      (balance, balance_update, update_origin))
+      Balance_update_item (balance, balance_update, update_origin))
     (merge_objs
        (merge_objs
           balance_encoding_with_legacy_attestation_name
@@ -409,10 +412,10 @@ let item_encoding =
   let open Data_encoding in
   conv
     (function
-      | balance, balance_update, update_origin ->
+      | Balance_update_item (balance, balance_update, update_origin) ->
           ((balance, balance_update), update_origin))
     (fun ((balance, balance_update), update_origin) ->
-      (balance, balance_update, update_origin))
+      Balance_update_item (balance, balance_update, update_origin))
     (merge_objs
        (merge_objs balance_encoding balance_update_encoding)
        update_origin_encoding)
@@ -449,7 +452,7 @@ let group_balance_updates balance_updates =
   let open Result_syntax in
   let* map =
     List.fold_left_e
-      (fun acc (b, update, o) ->
+      (fun acc (Balance_update_item (b, update, o)) ->
         (* Do not do anything if the update is zero *)
         if is_zero_update update then return acc
         else
@@ -478,4 +481,8 @@ let group_balance_updates balance_updates =
       BalanceMap.empty
       balance_updates
   in
-  return (BalanceMap.fold (fun (b, o) u acc -> (b, u, o) :: acc) map [])
+  return
+    (BalanceMap.fold
+       (fun (b, o) u acc -> Balance_update_item (b, u, o) :: acc)
+       map
+       [])

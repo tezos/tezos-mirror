@@ -137,7 +137,8 @@ let eq balance_updates1 balance_updates2 =
   let res =
     List.for_all2
       ~when_different_lengths:()
-      (fun (b1, bu1, uo1) (b2, bu2, uo2) ->
+      (fun (Balance_update_item (b1, bu1, uo1))
+           (Balance_update_item (b2, bu2, uo2)) ->
         compare b1 b2 = 0
         && (match (bu1, bu2) with
            | Debited tz1, Debited tz2 | Credited tz1, Credited tz2 ->

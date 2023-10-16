@@ -614,23 +614,23 @@ let test_all_combinations_of_givers_and_receivers () =
     Fails if bu1 and bu2 have different accounts or different origins, or
     if one is a credit while the other is a debit. *)
 let coalesce_balance_updates bu1 bu2 =
-  match (bu1, bu2) with
-  | (bu1_bal, bu1_balupd, bu1_origin), (bu2_bal, bu2_balupd, bu2_origin) -> (
-      assert (bu1_bal = bu2_bal) ;
-      assert (bu1_origin = bu2_origin) ;
-      let open Receipt in
-      match (bu1_balupd, bu2_balupd) with
-      | Credited bu1_am, Credited bu2_am ->
-          let bu_am =
-            match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
-          in
-          Receipt.item bu1_bal (Credited bu_am) bu1_origin
-      | Debited bu1_am, Debited bu2_am ->
-          let bu_am =
-            match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
-          in
-          Receipt.item bu1_bal (Debited bu_am) bu1_origin
-      | Credited _, Debited _ | Debited _, Credited _ -> assert false)
+  let open Receipt in
+  let (Balance_update_item (bu1_bal, bu1_balupd, bu1_origin)) = bu1 in
+  let (Balance_update_item (bu2_bal, bu2_balupd, bu2_origin)) = bu2 in
+  assert (bu1_bal = bu2_bal) ;
+  assert (bu1_origin = bu2_origin) ;
+  match (bu1_balupd, bu2_balupd) with
+  | Credited bu1_am, Credited bu2_am ->
+      let bu_am =
+        match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
+      in
+      Receipt.item bu1_bal (Credited bu_am) bu1_origin
+  | Debited bu1_am, Debited bu2_am ->
+      let bu_am =
+        match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
+      in
+      Receipt.item bu1_bal (Debited bu_am) bu1_origin
+  | Credited _, Debited _ | Debited _, Credited _ -> assert false
 
 (** Check that elt has the same balance in ctxt1 and ctxt2. *)
 let check_balances_are_consistent ctxt1 ctxt2 elt =
@@ -663,7 +663,10 @@ let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
   (* remove burning balance updates *)
   let debit_logs =
     List.filter
-      (fun b -> match b with Receipt.Burned, _, _ -> false | _ -> true)
+      (fun b ->
+        match b with
+        | Receipt.Balance_update_item (Burned, _, _) -> false
+        | _ -> true)
       debit_logs
   in
   (* Credit the receiver for each giver. *)
@@ -678,7 +681,10 @@ let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
   (* remove minting balance updates *)
   let credit_logs =
     List.filter
-      (fun b -> match b with Receipt.Minted, _, _ -> false | _ -> true)
+      (fun b ->
+        match b with
+        | Receipt.Balance_update_item (Minted, _, _) -> false
+        | _ -> true)
       credit_logs
   in
   (* Check equivalence of balance updates. *)

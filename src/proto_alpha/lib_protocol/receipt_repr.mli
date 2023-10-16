@@ -72,7 +72,10 @@ val compare_update_origin : update_origin -> update_origin -> int
     An item of the form [(Rewards (b,c), Credited am, ...)] indicates that the
     balance of frozen rewards has been increased by [am] for baker [b] and cycle
     [c]. *)
-type balance_update_item = balance * balance_update * update_origin
+type balance_update_item = private
+  | Balance_update_item :
+      balance * balance_update * update_origin
+      -> balance_update_item
 
 (** Smart constructor for [balance_update_item]. *)
 val item : balance -> balance_update -> update_origin -> balance_update_item

@@ -2075,7 +2075,10 @@ module Receipt : sig
     | Subsidy
     | Simulation
 
-  type balance_update_item = balance * balance_update * update_origin
+  type balance_update_item = private
+    | Balance_update_item :
+        balance * balance_update * update_origin
+        -> balance_update_item
 
   val item : balance -> balance_update -> update_origin -> balance_update_item
 
