@@ -1339,14 +1339,14 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   check_batcher_message_status status_msg1 "committed" ;
   unit
 
-let rec check_can_get_all_state_hash rollup_client first_available_level level =
-  if level >= first_available_level then
+let rec check_can_get_between_blocks rollup_client ~first ~last path =
+  if last >= first then
     let*! _l2_block =
       Sc_rollup_client.rpc_get
         rollup_client
-        ["global"; "block"; string_of_int level; "state_hash"]
+        (["global"; "block"; string_of_int last] @ path)
     in
-    check_can_get_all_state_hash rollup_client first_available_level (level - 1)
+    check_can_get_between_blocks rollup_client ~first ~last:(last - 1) path
   else unit
 
 let test_context_gc ~challenge_window ~commitment_period =
@@ -1366,16 +1366,20 @@ let test_context_gc ~challenge_window ~commitment_period =
   let* _config =
     Sc_rollup_node.config_init ~gc_frequency sc_rollup_node sc_rollup
   in
-  (* On each [calling_gc] event, record the level for which it was called *)
   let gc_levels_started = ref [] in
+  let context_gc_finalisations = ref 0 in
   Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; value; _} ->
-      if name = "calling_gc.v0" then
-        gc_levels_started := JSON.(value |> as_int) :: !gc_levels_started) ;
-  (* On each [ending_gc] event, increment a counter *)
-  let gc_finalisations = ref 0 in
-  Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; _} ->
-      if name = "ending_gc.v0" then gc_finalisations := !gc_finalisations + 1) ;
-
+      match name with
+      | "calling_gc.v0" ->
+          (* On each [calling_gc] event, record the level for which it was
+             called *)
+          let level = JSON.(value |> as_int) in
+          Log.info "Calling GC at level %d@." level ;
+          gc_levels_started := level :: !gc_levels_started
+      | "ending_context_gc.v0" ->
+          (* On each [ending_context_gc] event, increment a counter *)
+          context_gc_finalisations := !context_gc_finalisations + 1
+      | _ -> ()) ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   (* We start at level 2, bake until the expected level *)
   let* () = bake_levels (expected_level - 2) client in
@@ -1399,12 +1403,10 @@ let test_context_gc ~challenge_window ~commitment_period =
       (list int)
       ~error_msg:
         "Expected GC to start at levels %R, instead started at levels %L") ;
-  Check.(
-    (!gc_finalisations = List.length gc_levels_started)
-      int
-      ~error_msg:
-        "Not all GC calls finished (GC called %R times, finished %L times") ;
-
+  Check.((!context_gc_finalisations = List.length gc_levels_started) int)
+    ~error_msg:
+      "Not all context GC calls finished (GC called %R times, finished %L \
+       times)" ;
   (* We expect the first available level to be the one corresponding
    * to the lcc *)
   let* _, first_available_level =
@@ -1412,22 +1414,29 @@ let test_context_gc ~challenge_window ~commitment_period =
   in
   (* Check that RPC calls for blocks which were not GC'ed still return *)
   let* () =
-    check_can_get_all_state_hash rollup_client first_available_level level
+    check_can_get_between_blocks
+      rollup_client
+      ~first:first_available_level
+      ~last:level
+      ["state_hash"]
+  in
+  let* () =
+    check_can_get_between_blocks
+      rollup_client
+      ~first:first_available_level
+      ~last:level
+      []
   in
   (* Check that RPC calls for blocks which were GC'ed fail *)
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6416
    * Adapt RPC to take into account [first_available_level] *)
-  let*? rpc_call =
+  let*? rpc_call_err =
     Sc_rollup_client.rpc_get
       rollup_client
-      [
-        "global";
-        "block";
-        string_of_int (first_available_level - 1);
-        "state_hash";
-      ]
+      ["global"; "block"; string_of_int (first_available_level - 1)]
   in
-  Process.check_error ~exit_code:1 rpc_call
+  let* () = Process.check_error ~exit_code:1 rpc_call_err in
+  unit
 
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------

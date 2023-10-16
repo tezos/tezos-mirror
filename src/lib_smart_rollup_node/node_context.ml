@@ -997,6 +997,22 @@ let get_gc_levels node_ctxt =
   in
   Lwt_result.return (last_gc_level, first_available_level)
 
+let save_gc_info node_ctxt ~at_level ~gc_level =
+  let open Lwt_syntax in
+  (* Note: Setting the `first_available_level` before GC succeeds simplifies the
+     code. However, it may be temporarily inaccurate if the GC run spans over
+     several levels or if it fails. This is not foreseen to cause any issues,
+     but if greater accuracy is needed, the `first_available_level` can be set
+     after the GC finishes via a callback. *)
+  let* res =
+    Store.Gc_levels.write
+      node_ctxt.store.gc_levels
+      {last_gc_level = at_level; first_available_level = gc_level}
+  in
+  match res with
+  | Error _ -> Event.gc_levels_storage_failure ()
+  | Ok () -> return_unit
+
 let gc node_ctxt ~(level : int32) =
   let open Lwt_result_syntax in
   let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
@@ -1004,36 +1020,23 @@ let gc node_ctxt ~(level : int32) =
   (* [gc_level] is the level corresponding to the hash on which
    * GC will be called, which is defined as the lcc. *)
   let gc_level = (Reference.get node_ctxt.lcc).level in
-  if
-    gc_level > first_available_level
+  when_
+    (gc_level > first_available_level
     && Int32.(sub level last_gc_level >= frequency)
-    && Context.is_gc_finished node_ctxt.context
-  then
-    let* hash = hash_of_level node_ctxt gc_level in
-    let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
-    match header with
-    | Some {context; _} ->
-        let*! () = Event.calling_gc level in
-        (* Note: Setting the `first_available_level` before GC succeeds
-         * simplifies the code but will be temporarily innacurate if the GC
-         * run spans over several levels or if it fails. This is not foreseen to
-         * cause any issues, but should more accuracy be required,
-         * `first_available_level` can be set when GC finishes via a callback. *)
-        let*! res =
-          Store.Gc_levels.write
-            node_ctxt.store.gc_levels
-            {last_gc_level = level; first_available_level = gc_level}
-        in
-        let*! () =
-          match res with
-          | Error _ -> Event.gc_levels_storage_failure ()
-          | Ok () -> Lwt.return_unit
-        in
-        let*! () = Context.gc node_ctxt.context context in
-        return_unit
-    | None ->
-        failwith "Could not retrieve L2 block header for %a" Block_hash.pp hash
-  else return_unit
+    && Context.is_gc_finished node_ctxt.context)
+  @@ fun () ->
+  let* hash = hash_of_level node_ctxt gc_level in
+  let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
+  match header with
+  | None ->
+      failwith "Could not retrieve L2 block header for %a" Block_hash.pp hash
+  | Some {context; _} ->
+      let*! () = Event.calling_gc level in
+      let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
+      (* Start both node and context gc asynchronously *)
+      let*! () = Context.gc node_ctxt.context context in
+      let* () = Store.gc node_ctxt.store ~level:gc_level in
+      return_unit
 
 module Internal_for_tests = struct
   let create_node_context cctxt (current_protocol : current_protocol) ~data_dir

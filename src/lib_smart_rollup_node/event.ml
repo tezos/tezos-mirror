@@ -147,19 +147,19 @@ module Simple = struct
       ~section
       ~name:"calling_gc"
       ~level:Info
-      ~msg:"A call to garbage collect the context was made at level {level}"
+      ~msg:"Garbage collection initiated at level {level}"
       ("level", Data_encoding.int32)
 
-  let starting_gc =
+  let starting_context_gc =
     declare_1
       ~section
-      ~name:"starting_gc"
+      ~name:"starting_context_gc"
       ~level:Info
       ~msg:"Starting context garbage collection for commit {context_hash}"
       ("context_hash", Smart_rollup_context_hash.encoding)
       ~pp1:Smart_rollup_context_hash.pp
 
-  let gc_already_launched =
+  let context_gc_already_launched =
     declare_0
       ~section
       ~name:"gc_already_launched"
@@ -169,10 +169,10 @@ module Simple = struct
          not yet finished. No action was taken"
       ()
 
-  let ending_gc =
+  let ending_context_gc =
     declare_2
       ~section
-      ~name:"ending_gc"
+      ~name:"ending_context_gc"
       ~level:Info
       ~msg:
         "Context garbage collection finished in {duration} (finalised in \
@@ -182,7 +182,7 @@ module Simple = struct
       ~pp2:Time.System.Span.pp_hum
       ("finalisation", Time.System.Span.encoding)
 
-  let gc_failure =
+  let context_gc_failure =
     declare_1
       ~section
       ~name:"gc_failure"
@@ -190,10 +190,10 @@ module Simple = struct
       ~msg:"[Warning] Context garbage collection failed: {error}"
       ("error", Data_encoding.string)
 
-  let gc_launch_failure =
+  let context_gc_launch_failure =
     declare_1
       ~section
-      ~name:"gc_launch_failure"
+      ~name:"context_gc_launch_failure"
       ~level:Warning
       ~msg:"[Warning] Context garbage collection launch failed: {error}"
       ("error", Data_encoding.string)
@@ -246,14 +246,15 @@ let acquiring_lock () = Simple.(emit acquiring_lock) ()
 
 let calling_gc level = Simple.(emit calling_gc) level
 
-let starting_gc hash = Simple.(emit starting_gc) hash
+let starting_context_gc hash = Simple.(emit starting_context_gc) hash
 
-let gc_already_launched () = Simple.(emit gc_already_launched) ()
+let context_gc_already_launched () =
+  Simple.(emit context_gc_already_launched) ()
 
-let ending_gc t = Simple.(emit ending_gc) t
+let ending_context_gc t = Simple.(emit ending_context_gc) t
 
-let gc_failure msg = Simple.(emit gc_failure) msg
+let context_gc_failure msg = Simple.(emit context_gc_failure) msg
 
-let gc_launch_failure msg = Simple.(emit gc_launch_failure) msg
+let context_gc_launch_failure msg = Simple.(emit context_gc_launch_failure) msg
 
 let gc_levels_storage_failure () = Simple.(emit gc_levels_storage_failure) ()
