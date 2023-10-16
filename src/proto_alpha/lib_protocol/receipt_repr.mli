@@ -24,6 +24,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Token : sig
+  type 'token t = Tez : Tez_repr.t t
+
+  val eq :
+    'token1 t -> 'token2 t -> ('token1, 'token2) Equality_witness.eq option
+
+  val equal : 'token t -> 'token -> 'token -> bool
+
+  val is_zero : 'token t -> 'token -> bool
+
+  val add : 'token t -> 'token -> 'token -> 'token tzresult
+
+  val pp : 'token t -> Format.formatter -> 'token -> unit
+end
+
 type staker = Staker_repr.staker =
   | Single of Contract_repr.t * Signature.public_key_hash
   | Shared of Signature.public_key_hash
@@ -54,6 +69,8 @@ type 'token balance =
   | Sc_rollup_refutation_punishments : Tez_repr.t balance
   | Sc_rollup_refutation_rewards : Tez_repr.t balance
 
+val token_of_balance : 'token balance -> 'token Token.t
+
 (** Compares two balances. *)
 val compare_balance : 'token1 balance -> 'token2 balance -> int
 
@@ -76,13 +93,13 @@ val compare_update_origin : update_origin -> update_origin -> int
     [c]. *)
 type balance_update_item = private
   | Balance_update_item :
-      Tez_repr.t balance * Tez_repr.t balance_update * update_origin
+      'token balance * 'token balance_update * update_origin
       -> balance_update_item
 
 (** Smart constructor for [balance_update_item]. *)
 val item :
-  Tez_repr.t balance ->
-  Tez_repr.t balance_update ->
+  'token balance ->
+  'token balance_update ->
   update_origin ->
   balance_update_item
 

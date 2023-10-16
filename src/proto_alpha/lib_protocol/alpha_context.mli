@@ -2040,6 +2040,17 @@ end
 
 (** This module re-exports definitions from {!Receipt_repr}. *)
 module Receipt : sig
+  module Token : sig
+    type 'token t = Tez : Tez.t t
+
+    val eq :
+      'token1 t -> 'token2 t -> ('token1, 'token2) Equality_witness.eq option
+
+    val add : 'token t -> 'token -> 'token -> 'token tzresult
+
+    val pp : 'token t -> Format.formatter -> 'token -> unit
+  end
+
   type staker =
     | Single of Contract.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
@@ -2067,6 +2078,8 @@ module Receipt : sig
     | Sc_rollup_refutation_punishments : Tez.t balance
     | Sc_rollup_refutation_rewards : Tez.t balance
 
+  val token_of_balance : 'token balance -> 'token Token.t
+
   type 'token balance_update = Debited of 'token | Credited of 'token
 
   type update_origin =
@@ -2077,12 +2090,12 @@ module Receipt : sig
 
   type balance_update_item = private
     | Balance_update_item :
-        Tez.t balance * Tez.t balance_update * update_origin
+        'token balance * 'token balance_update * update_origin
         -> balance_update_item
 
   val item :
-    Tez.t balance ->
-    Tez.t balance_update ->
+    'token balance ->
+    'token balance_update ->
     update_origin ->
     balance_update_item
 

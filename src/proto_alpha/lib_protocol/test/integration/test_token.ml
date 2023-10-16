@@ -617,19 +617,30 @@ let coalesce_balance_updates bu1 bu2 =
   let open Receipt in
   let (Balance_update_item (bu1_bal, bu1_balupd, bu1_origin)) = bu1 in
   let (Balance_update_item (bu2_bal, bu2_balupd, bu2_origin)) = bu2 in
-  assert (bu1_bal = bu2_bal) ;
   assert (bu1_origin = bu2_origin) ;
+  let token1 = token_of_balance bu1_bal in
+  let token2 = token_of_balance bu2_bal in
+  let Refl =
+    match Receipt.Token.eq token1 token2 with
+    | None -> assert false
+    | Some refl -> refl
+  in
+  assert (bu1_bal = bu2_bal) ;
   match (bu1_balupd, bu2_balupd) with
   | Credited bu1_am, Credited bu2_am ->
       let bu_am =
-        match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
+        match Receipt.Token.add token1 bu1_am bu2_am with
+        | Ok am -> am
+        | _ -> assert false
       in
-      Receipt.item bu1_bal (Credited bu_am) bu1_origin
+      item bu1_bal (Credited bu_am) bu1_origin
   | Debited bu1_am, Debited bu2_am ->
       let bu_am =
-        match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
+        match Receipt.Token.add token1 bu1_am bu2_am with
+        | Ok am -> am
+        | _ -> assert false
       in
-      Receipt.item bu1_bal (Debited bu_am) bu1_origin
+      item bu1_bal (Debited bu_am) bu1_origin
   | Credited _, Debited _ | Debited _, Credited _ -> assert false
 
 (** Check that elt has the same balance in ctxt1 and ctxt2. *)
