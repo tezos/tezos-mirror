@@ -63,13 +63,14 @@ let balance_encoding ~use_legacy_attestation_name =
         case (Tag tag)
     | _ as c -> case c
   in
+  let tez_case ~title tag enc proj inj = case ~title tag enc proj inj in
   def
     (if use_legacy_attestation_name then
      "operation_metadata_with_legacy_attestation_name.alpha.balance"
     else "operation_metadata.alpha.balance")
   @@ union
        [
-         case
+         tez_case
            (Tag 0)
            ~title:"Contract"
            (obj2
@@ -77,7 +78,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "contract" Contract_repr.encoding))
            (function Contract c -> Some ((), c) | _ -> None)
            (fun ((), c) -> Contract c);
-         case
+         tez_case
            (Tag 2)
            ~title:"Block_fees"
            (obj2
@@ -85,7 +86,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "block fees")))
            (function Block_fees -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Block_fees);
-         case
+         tez_case
            (Tag 4)
            ~title:"Deposits"
            (obj3
@@ -94,7 +95,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "staker" Staker_repr.staker_encoding))
            (function Deposits staker -> Some ((), (), staker) | _ -> None)
            (fun ((), (), staker) -> Deposits staker);
-         case
+         tez_case
            (Tag 5)
            ~title:"Nonce_revelation_rewards"
            (obj2
@@ -104,7 +105,7 @@ let balance_encoding ~use_legacy_attestation_name =
            (fun ((), ()) -> Nonce_revelation_rewards);
          (* 6 was for Double_signing_evidence_rewards that has been removed.
             https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
-         case
+         tez_case
            (Tag 7)
            ~title:
              (if use_legacy_attestation_name then "Endorsing_rewards"
@@ -118,7 +119,7 @@ let balance_encoding ~use_legacy_attestation_name =
                     else "attesting rewards"))))
            (function Attesting_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Attesting_rewards);
-         case
+         tez_case
            (Tag 8)
            ~title:"Baking_rewards"
            (obj2
@@ -126,7 +127,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "baking rewards")))
            (function Baking_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Baking_rewards);
-         case
+         tez_case
            (Tag 9)
            ~title:"Baking_bonuses"
            (obj2
@@ -134,7 +135,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "baking bonuses")))
            (function Baking_bonuses -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Baking_bonuses);
-         case
+         tez_case
            (Tag 11)
            ~title:"Storage_fees"
            (obj2
@@ -142,7 +143,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "storage fees")))
            (function Storage_fees -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Storage_fees);
-         case
+         tez_case
            (Tag 12)
            ~title:"Double_signing_punishments"
            (obj2
@@ -150,7 +151,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "punishments")))
            (function Double_signing_punishments -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Double_signing_punishments);
-         case
+         tez_case
            (Tag 13)
            ~title:
              (if use_legacy_attestation_name then "Lost_endorsing_rewards"
@@ -170,7 +171,7 @@ let balance_encoding ~use_legacy_attestation_name =
              | Lost_attesting_rewards (d, p, r) -> Some ((), (), d, p, r)
              | _ -> None)
            (fun ((), (), d, p, r) -> Lost_attesting_rewards (d, p, r));
-         case
+         tez_case
            (Tag 14)
            ~title:"Liquidity_baking_subsidies"
            (obj2
@@ -178,7 +179,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "subsidy")))
            (function Liquidity_baking_subsidies -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Liquidity_baking_subsidies);
-         case
+         tez_case
            (Tag 15)
            ~title:"Burned"
            (obj2
@@ -186,7 +187,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "burned")))
            (function Burned -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Burned);
-         case
+         tez_case
            (Tag 16)
            ~title:"Commitments"
            (obj3
@@ -195,7 +196,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "committer" Blinded_public_key_hash.encoding))
            (function Commitments bpkh -> Some ((), (), bpkh) | _ -> None)
            (fun ((), (), bpkh) -> Commitments bpkh);
-         case
+         tez_case
            (Tag 17)
            ~title:"Bootstrap"
            (obj2
@@ -203,7 +204,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "bootstrap")))
            (function Bootstrap -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Bootstrap);
-         case
+         tez_case
            (Tag 18)
            ~title:"Invoice"
            (obj2
@@ -211,7 +212,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "invoice")))
            (function Invoice -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Invoice);
-         case
+         tez_case
            (Tag 19)
            ~title:"Initial_commitments"
            (obj2
@@ -219,7 +220,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "commitment")))
            (function Initial_commitments -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Initial_commitments);
-         case
+         tez_case
            (Tag 20)
            ~title:"Minted"
            (obj2
@@ -227,7 +228,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "category" (constant "minted")))
            (function Minted -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Minted);
-         case
+         tez_case
            (Tag 21)
            ~title:"Frozen_bonds"
            (obj4
@@ -237,7 +238,7 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "bond_id" Bond_id_repr.encoding))
            (function Frozen_bonds (c, r) -> Some ((), (), c, r) | _ -> None)
            (fun ((), (), c, r) -> Frozen_bonds (c, r));
-         case
+         tez_case
            (Tag 24)
            ~title:"Smart_rollup_refutation_punishments"
            (obj2
@@ -246,7 +247,7 @@ let balance_encoding ~use_legacy_attestation_name =
            (function
              | Sc_rollup_refutation_punishments -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Sc_rollup_refutation_punishments);
-         case
+         tez_case
            (Tag 25)
            ~title:"Smart_rollup_refutation_rewards"
            (obj2
@@ -255,7 +256,7 @@ let balance_encoding ~use_legacy_attestation_name =
            (function
              | Sc_rollup_refutation_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Sc_rollup_refutation_rewards);
-         case
+         tez_case
            (Tag 26)
            ~title:"Unstaked_deposits"
            (obj4
