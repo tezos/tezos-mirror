@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use anyhow::Context;
+use block::ComputationResult;
 use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
@@ -133,14 +134,27 @@ fn produce_and_upgrade<Host: Runtime>(
     // Since a kernel upgrade was detected, in case an error is thrown
     // by the block production, we exceptionally "recover" from it and
     // still process the kernel upgrade.
-    if let Err(e) = block::produce(host, queue, chain_id, base_fee_per_gas) {
-        log!(
+    // In case of a reboot request, the upgrade is delayed.
+    match block::produce(host, queue, chain_id, base_fee_per_gas) {
+        Ok(ComputationResult::RebootNeeded) => Ok(()),
+        Err(e) => {
+            log!(
             host,
             Error,
             "{:?} happened during block production but a kernel upgrade was detected.",
-            e
-        );
+            e);
+            upgrade(host, kernel_upgrade)
+        }
+        Ok(ComputationResult::Finished) => upgrade(host, kernel_upgrade),
     }
+}
+
+fn upgrade<Host: Runtime>(
+    host: &mut Host,
+    kernel_upgrade: KernelUpgrade,
+) -> Result<(), anyhow::Error> {
+    // TODO: #5873
+    // reboot before upgrade just in case
     let upgrade_status = upgrade_kernel(host, kernel_upgrade.preimage_hash)
         .context("Failed to upgrade kernel");
     if upgrade_status.is_ok() {
@@ -162,7 +176,7 @@ pub fn stage_two<Host: Runtime>(
     if let Some(kernel_upgrade) = kernel_upgrade {
         produce_and_upgrade(host, queue, kernel_upgrade, chain_id, base_fee_per_gas)
     } else {
-        block::produce(host, queue, chain_id, base_fee_per_gas)
+        block::produce(host, queue, chain_id, base_fee_per_gas).map(|_| ())
     }
 }
 
@@ -220,18 +234,6 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
     }
 }
 
-fn fetch_queue_left<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error> {
-    let mut queue = Queue::new();
-    // fetch rest of queue
-    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-    // reload the queue
-
-    // fetch Bip
-    let bip = storage::read_block_in_progress(host)?;
-    queue.proposals = vec![blueprint::QueueElement::BlockInProgress(Box::new(bip))];
-    Ok(queue)
-}
-
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
     let queue = if storage::was_rebooted(host)? {
@@ -244,7 +246,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         );
         storage::delete_reboot_flag(host)?;
         log!(host, Info, "Read queue.");
-        fetch_queue_left(host)?
+        storage::read_queue(host)?
     } else {
         // first kernel run of the level
         match stage_zero(host)? {
@@ -262,6 +264,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             MigrationStatus::InProgress => return Ok(()),
         }
     };
+
     let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
     stage_two(host, queue, chain_id, base_fee_per_gas).context("Failed during stage 2")
 }
@@ -337,3 +340,164 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
 }
 
 kernel_entry!(kernel_loop);
+
+#[cfg(test)]
+mod tests {
+    use std::{ops::Rem, str::FromStr};
+
+    use crate::{
+        blueprint::{Blueprint, Queue, QueueElement},
+        inbox::{KernelUpgrade, Transaction, TransactionContent},
+        parsing::UPGRADE_NONCE_SIZE,
+        stage_two, storage,
+    };
+    use evm_execution::account_storage::{self, EthereumAccountStorage};
+    use primitive_types::{H160, U256};
+    use tezos_ethereum::{
+        transaction::{TransactionHash, TransactionType},
+        tx_common::EthereumTransactionCommon,
+    };
+    use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    use tezos_smart_rollup_mock::MockHost;
+
+    const DUMMY_CHAIN_ID: U256 = U256::one();
+    const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
+    const TOO_MANY_TRANSACTIONS: u64 = 500;
+
+    fn set_balance(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+        balance: U256,
+    ) {
+        let mut account = evm_account_storage
+            .get_or_create(host, &account_storage::account_path(address).unwrap())
+            .unwrap();
+        let current_balance = account.balance(host).unwrap();
+        if current_balance > balance {
+            account
+                .balance_remove(host, current_balance - balance)
+                .unwrap();
+        } else {
+            account
+                .balance_add(host, balance - current_balance)
+                .unwrap();
+        }
+    }
+
+    fn address_from_str(s: &str) -> Option<H160> {
+        let data = &hex::decode(s).unwrap();
+        Some(H160::from_slice(data))
+    }
+
+    fn dummy_eth(nonce: u64) -> EthereumTransactionCommon {
+        let nonce = U256::from(nonce);
+        let gas_price = U256::from(40000000000u64);
+        let gas_limit = 21000;
+        let value = U256::from(1);
+        let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
+        let tx = EthereumTransactionCommon {
+            type_: TransactionType::Legacy,
+            chain_id: U256::one(),
+            nonce,
+            max_fee_per_gas: gas_price,
+            max_priority_fee_per_gas: gas_price,
+            gas_limit,
+            to,
+            value,
+            data: vec![],
+            access_list: vec![],
+            signature: None,
+        };
+
+        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+        tx.sign_transaction(
+            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                .to_string(),
+        )
+        .unwrap()
+    }
+
+    fn hash_from_nonce(nonce: u64) -> TransactionHash {
+        let nonce = u64::to_le_bytes(nonce);
+        let mut hash = [0; 32];
+        hash[..8].copy_from_slice(&nonce);
+        hash
+    }
+
+    fn dummy_transaction(nonce: u64) -> Transaction {
+        Transaction {
+            tx_hash: hash_from_nonce(nonce),
+            content: TransactionContent::Ethereum(dummy_eth(nonce)),
+        }
+    }
+
+    fn blueprint(transactions: Vec<Transaction>) -> QueueElement {
+        QueueElement::Blueprint(Blueprint { transactions })
+    }
+
+    #[test]
+    fn test_reboot_during_block_production() {
+        // init host
+        let mut host = MockHost::default();
+
+        // sanity check: no current block
+        assert!(
+            storage::read_current_block_number(&mut host).is_err(),
+            "Should not have found current block number"
+        );
+
+        //provision sender account
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender_initial_balance = U256::from(10000000000000000000u64);
+        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            sender_initial_balance,
+        );
+
+        let mut transactions = vec![];
+        let mut proposals = vec![];
+        for n in 0..TOO_MANY_TRANSACTIONS {
+            transactions.push(dummy_transaction(n));
+            if n.rem(80) == 0 {
+                proposals.push(blueprint(transactions));
+                transactions = vec![];
+            }
+        }
+        // the upgrade mechanism should not start otherwise it will fail
+        let broken_kernel_upgrade = KernelUpgrade {
+            nonce: [0u8; UPGRADE_NONCE_SIZE],
+            preimage_hash: [0u8; PREIMAGE_HASH_SIZE],
+        };
+        let queue = Queue {
+            proposals,
+            kernel_upgrade: Some(broken_kernel_upgrade),
+        };
+
+        // If the upgrade is started, it should raise an error
+        stage_two(
+            &mut host,
+            queue,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .expect("Should have produced");
+
+        // test there is a new block
+        assert!(
+            storage::read_current_block_number(&mut host)
+                .expect("should have found a block number")
+                > U256::zero(),
+            "There should have been multiple blocks registered"
+        );
+
+        // test reboot is set
+        assert!(
+            storage::was_rebooted(&mut host).expect("Should have found flag"),
+            "Flag should be set"
+        );
+    }
+}

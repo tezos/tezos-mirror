@@ -21,7 +21,7 @@ use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
+use tezos_ethereum::rlp_helpers::{decode_array, decode_field, decode_tx_hash, next};
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
@@ -159,6 +159,35 @@ impl Decodable for Transaction {
 pub struct KernelUpgrade {
     pub nonce: [u8; UPGRADE_NONCE_SIZE],
     pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
+}
+
+impl Decodable for KernelUpgrade {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let mut nonce = [0u8; UPGRADE_NONCE_SIZE];
+        let mut preimage_hash = [0u8; PREIMAGE_HASH_SIZE];
+
+        let mut it = decoder.iter();
+        decode_array(next(&mut it)?, UPGRADE_NONCE_SIZE, &mut nonce)?;
+        decode_array(next(&mut it)?, PREIMAGE_HASH_SIZE, &mut preimage_hash)?;
+        Ok(Self {
+            nonce,
+            preimage_hash,
+        })
+    }
+}
+
+impl Encodable for KernelUpgrade {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append_iter(self.nonce);
+        stream.append_iter(self.preimage_hash);
+    }
 }
 
 #[derive(Debug, PartialEq)]
