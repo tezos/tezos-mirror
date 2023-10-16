@@ -367,6 +367,10 @@ let pp_balance_updates ppf balance_updates =
     | Receipt.Shared delegate ->
         Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
   in
+  let pp_update ppf = function
+    | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
+    | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
+  in
   let balance_updates =
     List.map
       (fun (balance, update, origin) ->
@@ -431,10 +435,6 @@ let pp_balance_updates ppf balance_updates =
       (fun acc (balance, _) -> Compare.Int.max acc (String.length balance))
       0
       balance_updates
-  in
-  let pp_update ppf = function
-    | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
-    | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
   in
   let pp_one ppf (balance, update) =
     let to_fill = column_size + 3 - String.length balance in
