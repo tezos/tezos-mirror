@@ -1036,7 +1036,7 @@ module Cli = struct
       ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~sc_rollup_node_operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded =
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
     let new_sc_rollup_node_operators =
       make_operators sc_rollup_node_operators
     in
@@ -1091,6 +1091,13 @@ module Cli = struct
           Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
         no_degraded = no_degraded || configuration.no_degraded;
+        gc_parameters =
+          {
+            frequency_in_blocks =
+              Option.value
+                ~default:configuration.gc_parameters.frequency_in_blocks
+                gc_frequency;
+          };
       }
     in
     check_mode configuration
@@ -1142,6 +1149,7 @@ module Cli = struct
           ~irmin_cache_size
           ~log_kernel_debug
           ~no_degraded
+          ~gc_frequency
       in
       return configuration
     else
