@@ -382,6 +382,7 @@ module Block_lru_cache =
 
 let block_callback =
   let block_cache = Block_lru_cache.create 100 in
+  let block_operations_cache = Block_lru_cache.create 100 in
   fun db_pool
       g
       source
@@ -390,26 +391,28 @@ let block_callback =
         cycle_info,
         (endorsements, preendorsements) ) ->
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-    let is_already_treated = Block_lru_cache.mem block_cache hash in
+    let block_already_treated = Block_lru_cache.mem block_cache hash in
     Block_lru_cache.add block_cache hash ;
-    let may_handle f = if is_already_treated then return_unit else f () in
+    let may_handle_block f =
+      if block_already_treated then return_unit else f ()
+    in
     let out =
       Caqti_lwt.Pool.use
         (fun (module Db : Caqti_lwt.CONNECTION) ->
           let* () = Db.exec Sql_requests.maybe_insert_source source in
           let* () =
-            may_handle @@ fun () ->
+            may_handle_block @@ fun () ->
             Db.exec Sql_requests.maybe_insert_delegate delegate
           in
           let level = Int32.of_string (Re.Group.get g 1) in
           let* () =
-            may_handle @@ fun () ->
+            may_handle_block @@ fun () ->
             Db.exec
               Sql_requests.maybe_insert_block
               ((level, timestamp, hash, round), (predecessor, delegate))
           in
           let* () =
-            may_handle @@ fun () ->
+            may_handle_block @@ fun () ->
             match cycle_info with
             | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size} ->
                 Db.exec
@@ -427,15 +430,25 @@ let block_callback =
                   (r.application_time, r.validation_time, hash, source))
               reception_times
           in
+          (* Validated blocks do not provide operations only applied
+             one does so we need a second cache *)
+          let operations_already_treated =
+            Block_lru_cache.mem block_operations_cache hash
+          in
+          if endorsements <> [] then
+            Block_lru_cache.add block_operations_cache hash ;
+          let may_handle_operations f =
+            if operations_already_treated then return_unit else f ()
+          in
           let* () =
-            may_handle @@ fun () ->
+            may_handle_operations @@ fun () ->
             insert_operations_from_block
               (module Db)
               (Int32.pred level)
               hash
               endorsements
           in
-          may_handle @@ fun () ->
+          may_handle_operations @@ fun () ->
           insert_operations_from_block (module Db) level hash preendorsements)
         db_pool
     in
