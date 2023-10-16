@@ -469,7 +469,6 @@ let item_encoding_with_legacy_attestation_name =
       | Balance_update_item (balance, balance_update, update_origin) ->
           (Ex_token (balance, balance_update), update_origin))
     (fun (Ex_token (balance, balance_update), update_origin) ->
-      let Tez = token_of_balance balance in
       Balance_update_item (balance, balance_update, update_origin))
     (merge_objs
        balance_and_update_encoding_with_legacy_attestation_name
@@ -482,7 +481,6 @@ let item_encoding =
       | Balance_update_item (balance, balance_update, update_origin) ->
           (Ex_token (balance, balance_update), update_origin))
     (fun (Ex_token (balance, balance_update), update_origin) ->
-      let Tez = token_of_balance balance in
       Balance_update_item (balance, balance_update, update_origin))
     (merge_objs balance_and_update_encoding update_origin_encoding)
 
