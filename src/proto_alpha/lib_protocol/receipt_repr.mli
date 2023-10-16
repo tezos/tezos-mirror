@@ -25,7 +25,9 @@
 (*****************************************************************************)
 
 module Token : sig
-  type 'token t = Tez : Tez_repr.t t
+  type 'token t =
+    | Tez : Tez_repr.t t
+    | Staking_pseudotoken : Staking_pseudotoken_repr.t t
 
   val eq :
     'token1 t -> 'token2 t -> ('token1, 'token2) Equality_witness.eq option

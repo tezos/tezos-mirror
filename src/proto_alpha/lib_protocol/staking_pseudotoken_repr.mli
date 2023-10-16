@@ -40,3 +40,5 @@ val init_of_tez : Tez_repr.t -> t
 val ( +? ) : t -> t -> t tzresult
 
 val ( -? ) : t -> t -> t tzresult
+
+val pp : Format.formatter -> t -> unit

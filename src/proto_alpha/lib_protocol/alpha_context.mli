@@ -2051,7 +2051,9 @@ end
 (** This module re-exports definitions from {!Receipt_repr}. *)
 module Receipt : sig
   module Token : sig
-    type 'token t = Tez : Tez.t t
+    type 'token t =
+      | Tez : Tez.t t
+      | Staking_pseudotoken : Staking_pseudotoken.t t
 
     val eq :
       'token1 t -> 'token2 t -> ('token1, 'token2) Equality_witness.eq option

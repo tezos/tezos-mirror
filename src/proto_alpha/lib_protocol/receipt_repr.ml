@@ -25,30 +25,44 @@
 (*****************************************************************************)
 
 module Token = struct
-  type 'token t = Tez : Tez_repr.t t
+  type 'token t =
+    | Tez : Tez_repr.t t
+    | Staking_pseudotoken : Staking_pseudotoken_repr.t t
 
   let eq :
       type token1 token2.
       token1 t -> token2 t -> (token1, token2) Equality_witness.eq option =
-   fun t1 t2 -> match (t1, t2) with Tez, Tez -> Some Refl
+   fun t1 t2 ->
+    match (t1, t2) with
+    | Tez, Tez -> Some Refl
+    | Tez, _ | _, Tez -> None
+    | Staking_pseudotoken, Staking_pseudotoken -> Some Refl
 
   let equal : type token. token t -> token -> token -> bool = function
     | Tez -> Tez_repr.( = )
+    | Staking_pseudotoken -> Staking_pseudotoken_repr.( = )
 
   let is_zero : type token. token t -> token -> bool =
-   fun token t -> match token with Tez -> Tez_repr.(t = zero)
+   fun token t ->
+    match token with
+    | Tez -> Tez_repr.(t = zero)
+    | Staking_pseudotoken -> Staking_pseudotoken_repr.(t = zero)
 
   let le : type token. token t -> token -> token -> bool = function
     | Tez -> Tez_repr.( <= )
+    | Staking_pseudotoken -> Staking_pseudotoken_repr.( <= )
 
   let add : type token. token t -> token -> token -> token tzresult = function
     | Tez -> Tez_repr.( +? )
+    | Staking_pseudotoken -> Staking_pseudotoken_repr.( +? )
 
   let sub : type token. token t -> token -> token -> token tzresult = function
     | Tez -> Tez_repr.( -? )
+    | Staking_pseudotoken -> Staking_pseudotoken_repr.( -? )
 
   let pp : type token. token t -> Format.formatter -> token -> unit = function
     | Tez -> Tez_repr.pp
+    | Staking_pseudotoken -> Staking_pseudotoken_repr.pp
 end
 
 type staker = Staker_repr.staker =
@@ -190,8 +204,9 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
       tag
       (merge_objs enc tez_balance_update_encoding)
       (fun (Ex_token (balance, update)) ->
-        let Tez = token_of_balance balance in
-        proj balance |> Option.map (fun x -> (x, update)))
+        match token_of_balance balance with
+        | Tez -> proj balance |> Option.map (fun x -> (x, update))
+        | _ -> None)
       (fun (x, update) -> Ex_token (inj x, update))
   in
   def
@@ -519,7 +534,14 @@ module TezBalanceMap = MakeBalanceMap (struct
   type token = Tez_repr.t
 end)
 
-type 'a balance_maps = {tez : Tez_repr.t balance_update TezBalanceMap.t}
+module StakingPseudotokenMap = MakeBalanceMap (struct
+  type token = Staking_pseudotoken_repr.t
+end)
+
+type 'a balance_maps = {
+  tez : Tez_repr.t balance_update TezBalanceMap.t;
+  staking_pt : Staking_pseudotoken_repr.t balance_update StakingPseudotokenMap.t;
+}
 
 let group_balance_updates balance_updates =
   let open Result_syntax in
@@ -547,7 +569,7 @@ let group_balance_updates balance_updates =
                 return_some (Debited update)))
       map
   in
-  let* {tez} =
+  let* {tez; staking_pt} =
     List.fold_left_e
       (fun acc (Balance_update_item (b, update, o)) ->
         (* Do not do anything if the update is zero *)
@@ -559,12 +581,25 @@ let group_balance_updates balance_updates =
               let+ tez =
                 update_map token TezBalanceMap.update_r (b, o) update acc.tez
               in
-              {tez})
-      {tez = TezBalanceMap.empty}
+              {acc with tez}
+          | Staking_pseudotoken ->
+              let+ staking_pt =
+                update_map
+                  token
+                  StakingPseudotokenMap.update_r
+                  (b, o)
+                  update
+                  acc.staking_pt
+              in
+              {acc with staking_pt})
+      {tez = TezBalanceMap.empty; staking_pt = StakingPseudotokenMap.empty}
       balance_updates
   in
   return
-    (TezBalanceMap.fold
+    (StakingPseudotokenMap.fold
        (fun (b, o) u acc -> Balance_update_item (b, u, o) :: acc)
-       tez
-       [])
+       staking_pt
+       (TezBalanceMap.fold
+          (fun (b, o) u acc -> Balance_update_item (b, u, o) :: acc)
+          tez
+          []))
