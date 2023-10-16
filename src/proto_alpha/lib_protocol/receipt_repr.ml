@@ -115,7 +115,7 @@ let balance_update_encoding =
   def "operation_metadata.alpha.balance_update"
   @@ obj1 (req "change" (conv_balance_update Tez_repr.balance_update_encoding))
 
-let balance_encoding ~use_legacy_attestation_name =
+let balance_and_update_encoding ~use_legacy_attestation_name =
   let open Data_encoding in
   let case = function
     | Tag tag ->
@@ -127,11 +127,19 @@ let balance_encoding ~use_legacy_attestation_name =
         case (Tag tag)
     | _ as c -> case c
   in
-  let tez_case ~title tag enc proj inj = case ~title tag enc proj inj in
+  let tez_case ~title tag enc proj inj =
+    case
+      ~title
+      tag
+      (merge_objs enc balance_update_encoding)
+      (fun (balance, update) ->
+        proj balance |> Option.map (fun x -> (x, update)))
+      (fun (x, update) -> (inj x, update))
+  in
   def
     (if use_legacy_attestation_name then
-     "operation_metadata_with_legacy_attestation_name.alpha.balance"
-    else "operation_metadata.alpha.balance")
+     "operation_metadata_with_legacy_attestation_name.alpha.balance_and_update"
+    else "operation_metadata.alpha.balance_and_update")
   @@ union
        [
          tez_case
@@ -334,10 +342,11 @@ let balance_encoding ~use_legacy_attestation_name =
            (fun ((), (), staker, cycle) -> Unstaked_deposits (staker, cycle));
        ]
 
-let balance_encoding_with_legacy_attestation_name =
-  balance_encoding ~use_legacy_attestation_name:true
+let balance_and_update_encoding_with_legacy_attestation_name =
+  balance_and_update_encoding ~use_legacy_attestation_name:true
 
-let balance_encoding = balance_encoding ~use_legacy_attestation_name:false
+let balance_and_update_encoding =
+  balance_and_update_encoding ~use_legacy_attestation_name:false
 
 type update_origin =
   | Block_application
@@ -404,9 +413,7 @@ let item_encoding_with_legacy_attestation_name =
     (fun ((balance, balance_update), update_origin) ->
       Balance_update_item (balance, balance_update, update_origin))
     (merge_objs
-       (merge_objs
-          balance_encoding_with_legacy_attestation_name
-          balance_update_encoding)
+       balance_and_update_encoding_with_legacy_attestation_name
        update_origin_encoding)
 
 let item_encoding =
@@ -417,9 +424,7 @@ let item_encoding =
           ((balance, balance_update), update_origin))
     (fun ((balance, balance_update), update_origin) ->
       Balance_update_item (balance, balance_update, update_origin))
-    (merge_objs
-       (merge_objs balance_encoding balance_update_encoding)
-       update_origin_encoding)
+    (merge_objs balance_and_update_encoding update_origin_encoding)
 
 type balance_updates = balance_update_item list
 
