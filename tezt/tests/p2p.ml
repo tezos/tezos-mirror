@@ -345,21 +345,11 @@ module Maintenance = struct
       max_target
       max_threshold
       max_connections ;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6442
-       This test launches 10 nodes and consumes a large amount of memory.
-       To reduce memory consumption each node launches its RPC server locally.
-       A better way to reduce memory consumption would be to use nodes that
-       only have the p2p layer. *)
-    let* target_node =
-      Node.init ~rpc_local:true [Connections expected_connections]
-    in
+    let* target_node = Node.init [Connections expected_connections] in
     let* target_client = Client.init ~endpoint:(Node target_node) () in
     Log.info "Target created." ;
     let nodes =
-      Cluster.create
-        max_connections
-        ~rpc_local:true
-        [Connections (max_connections - 1)]
+      Cluster.create max_connections [Connections (max_connections - 1)]
     in
     Cluster.clique nodes ;
     let* () = Cluster.start ~public:true nodes in
