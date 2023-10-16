@@ -2075,7 +2075,9 @@ module Receipt : sig
     | Subsidy
     | Simulation
 
-  type balance_updates = (balance * balance_update * update_origin) list
+  type balance_update_item = balance * balance_update * update_origin
+
+  type balance_updates = balance_update_item list
 
   val balance_updates_encoding : balance_updates Data_encoding.t
 

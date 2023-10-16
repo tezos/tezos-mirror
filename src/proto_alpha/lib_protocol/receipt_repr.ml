@@ -386,37 +386,44 @@ let update_origin_encoding =
            (fun () -> Simulation);
        ]
 
-type balance_updates = (balance * balance_update * update_origin) list
+type balance_update_item = balance * balance_update * update_origin
+
+let item_encoding_with_legacy_attestation_name =
+  let open Data_encoding in
+  conv
+    (function
+      | balance, balance_update, update_origin ->
+          ((balance, balance_update), update_origin))
+    (fun ((balance, balance_update), update_origin) ->
+      (balance, balance_update, update_origin))
+    (merge_objs
+       (merge_objs
+          balance_encoding_with_legacy_attestation_name
+          balance_update_encoding)
+       update_origin_encoding)
+
+let item_encoding =
+  let open Data_encoding in
+  conv
+    (function
+      | balance, balance_update, update_origin ->
+          ((balance, balance_update), update_origin))
+    (fun ((balance, balance_update), update_origin) ->
+      (balance, balance_update, update_origin))
+    (merge_objs
+       (merge_objs balance_encoding balance_update_encoding)
+       update_origin_encoding)
+
+type balance_updates = balance_update_item list
 
 let balance_updates_encoding_with_legacy_attestation_name =
   let open Data_encoding in
   def "operation_metadata_with_legacy_attestation_name.alpha.balance_updates"
-  @@ list
-       (conv
-          (function
-            | balance, balance_update, update_origin ->
-                ((balance, balance_update), update_origin))
-          (fun ((balance, balance_update), update_origin) ->
-            (balance, balance_update, update_origin))
-          (merge_objs
-             (merge_objs
-                balance_encoding_with_legacy_attestation_name
-                balance_update_encoding)
-             update_origin_encoding))
+  @@ list item_encoding_with_legacy_attestation_name
 
 let balance_updates_encoding =
   let open Data_encoding in
-  def "operation_metadata.alpha.balance_updates"
-  @@ list
-       (conv
-          (function
-            | balance, balance_update, update_origin ->
-                ((balance, balance_update), update_origin))
-          (fun ((balance, balance_update), update_origin) ->
-            (balance, balance_update, update_origin))
-          (merge_objs
-             (merge_objs balance_encoding balance_update_encoding)
-             update_origin_encoding))
+  def "operation_metadata.alpha.balance_updates" @@ list item_encoding
 
 module BalanceMap = struct
   include Map.Make (struct
