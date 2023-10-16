@@ -39,6 +39,8 @@ type mode =
   | Accuser
   | Bailout
 
+type history_mode = Archive | Full
+
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
@@ -116,6 +118,8 @@ let mode_of_string s =
       | "operator" -> Operator
       | "custom" -> Custom []
       | _ -> invalid_arg (Format.sprintf "%S is not an existing mode" s))
+
+let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
 let check_error ?exit_code ?msg sc_node =
   match sc_node.status with
@@ -239,18 +243,22 @@ let common_node_args ~loser_mode ~allow_degraded sc_node =
       in
       ["--dal-node"; endpoint]
 
-let optional_args ?gc_frequency () =
-  match gc_frequency with
+let optional_arg arg to_string = function
   | None -> []
-  | Some frequency -> ["--gc-frequency"; Int.to_string frequency]
+  | Some v -> [arg; to_string v]
 
-let node_args ~loser_mode ~allow_degraded ?gc_frequency sc_node rollup_address =
+let optional_args ?gc_frequency ?history_mode () =
+  optional_arg "--gc-frequency" Int.to_string gc_frequency
+  @ optional_arg "--history-mode" string_of_history_mode history_mode
+
+let node_args ~loser_mode ~allow_degraded ?gc_frequency ?history_mode sc_node
+    rollup_address =
   let mode = string_of_mode sc_node.persistent_state.mode in
   ( mode,
     ["for"; rollup_address; "with"; "operators"]
     @ operators_params sc_node
     @ common_node_args ~loser_mode ~allow_degraded sc_node
-    @ optional_args ?gc_frequency () )
+    @ optional_args ?gc_frequency ?history_mode () )
 
 let legacy_node_args ~loser_mode ~allow_degraded sc_node rollup_address =
   let mode = string_of_mode sc_node.persistent_state.mode in
@@ -258,21 +266,29 @@ let legacy_node_args ~loser_mode ~allow_degraded sc_node rollup_address =
   @ common_node_args ~loser_mode ~allow_degraded sc_node
 
 let spawn_config_init sc_node ?(force = false) ?loser_mode ?gc_frequency
-    rollup_address =
+    ?history_mode rollup_address =
   let mode, args =
     node_args
       ~loser_mode
       ~allow_degraded:true
       ?gc_frequency
+      ?history_mode
       sc_node
       rollup_address
   in
   spawn_command sc_node @@ ["init"; mode; "config"] @ args
   @ if force then ["--force"] else []
 
-let config_init sc_node ?force ?loser_mode ?gc_frequency rollup_address =
+let config_init sc_node ?force ?loser_mode ?gc_frequency ?history_mode
+    rollup_address =
   let process =
-    spawn_config_init sc_node ?force ?loser_mode ?gc_frequency rollup_address
+    spawn_config_init
+      sc_node
+      ?force
+      ?loser_mode
+      ?gc_frequency
+      ?history_mode
+      rollup_address
   in
   let* output = Process.check_and_read_stdout process in
   match
