@@ -333,6 +333,7 @@ let directory node_ctxt =
         let* level =
           Block_directory_helpers.block_level_of_id node_ctxt block_id
         in
+        let* () = Node_context.check_level_available node_ctxt level in
         let+ (module Plugin) = get_proto_plugin_of_level node_ctxt level in
         Plugin.RPC_directory.block_directory node_ctxt
       in

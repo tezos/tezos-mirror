@@ -1038,6 +1038,14 @@ let gc node_ctxt ~(level : int32) =
       let* () = Store.gc node_ctxt.store ~level:gc_level in
       return_unit
 
+let check_level_available node_ctxt accessed_level =
+  let open Lwt_result_syntax in
+  let* _, first_available_level = get_gc_levels node_ctxt in
+  fail_when
+    (accessed_level < first_available_level)
+    (Rollup_node_errors.Access_below_first_available_level
+       {first_available_level; accessed_level})
+
 module Internal_for_tests = struct
   let create_node_context cctxt (current_protocol : current_protocol) ~data_dir
       kind =

@@ -258,12 +258,7 @@ module Protocols = struct
 end
 
 module Gc_levels = struct
-  type levels = {
-    last_gc_level : int32;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6416
-     * Adapt RPC to take into account [first_available_level] *)
-    first_available_level : int32;
-  }
+  type levels = {last_gc_level : int32; first_available_level : int32}
 
   type value = levels
 
