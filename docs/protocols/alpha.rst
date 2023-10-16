@@ -32,6 +32,8 @@ Smart Rollups
 - Added the updated whitelist for private rollups in the receipt of
   the outbox message execution receipt. (MR :gl:`!10095`)
 
+- Add private rollups: smart rollup with an updatable whitelist stakers. Only stakers on the whitelist can publish commitment and participate in a refutation game. (MRs :gl:`!9823`, :gl:`!10104`, :gl:`!9823`, :gl:`!9572`, :gl:`!9427`, :gl:`!9472`, :gl:`!9439`, :gl:`!9401`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
