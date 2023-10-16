@@ -51,6 +51,59 @@ type balance =
   | Sc_rollup_refutation_punishments
   | Sc_rollup_refutation_rewards
 
+let is_not_zero c = not (Compare.Int.equal c 0)
+
+let compare_balance ba bb =
+  match (ba, bb) with
+  | Contract ca, Contract cb -> Contract_repr.compare ca cb
+  | Deposits sa, Deposits sb -> Staker_repr.compare_staker sa sb
+  | Unstaked_deposits (sa, ca), Unstaked_deposits (sb, cb) ->
+      Compare.or_else (Staker_repr.compare_staker sa sb) (fun () ->
+          Cycle_repr.compare ca cb)
+  | Lost_attesting_rewards (pkha, pa, ra), Lost_attesting_rewards (pkhb, pb, rb)
+    ->
+      let c = Signature.Public_key_hash.compare pkha pkhb in
+      if is_not_zero c then c
+      else
+        let c = Compare.Bool.compare pa pb in
+        if is_not_zero c then c else Compare.Bool.compare ra rb
+  | Commitments bpkha, Commitments bpkhb ->
+      Blinded_public_key_hash.compare bpkha bpkhb
+  | Frozen_bonds (ca, ra), Frozen_bonds (cb, rb) ->
+      let c = Contract_repr.compare ca cb in
+      if is_not_zero c then c else Bond_id_repr.compare ra rb
+  | _, _ ->
+      let index b =
+        match b with
+        | Contract _ -> 0
+        | Block_fees -> 1
+        | Deposits _ -> 2
+        | Unstaked_deposits _ -> 3
+        | Nonce_revelation_rewards -> 4
+        | Attesting_rewards -> 5
+        | Baking_rewards -> 6
+        | Baking_bonuses -> 7
+        | Storage_fees -> 8
+        | Double_signing_punishments -> 9
+        | Lost_attesting_rewards _ -> 10
+        | Liquidity_baking_subsidies -> 11
+        | Burned -> 12
+        | Commitments _ -> 13
+        | Bootstrap -> 14
+        | Invoice -> 15
+        | Initial_commitments -> 16
+        | Minted -> 17
+        | Frozen_bonds _ -> 18
+        | Sc_rollup_refutation_punishments -> 19
+        | Sc_rollup_refutation_rewards -> 20
+        (* don't forget to add parameterized cases in the first part of the function *)
+      in
+      Compare.Int.compare (index ba) (index bb)
+
+type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
+
+let is_zero_update = function Debited t | Credited t -> Tez_repr.(t = zero)
+
 let balance_encoding ~use_legacy_attestation_name =
   let open Data_encoding in
   let case = function
@@ -274,59 +327,6 @@ let balance_encoding_with_legacy_attestation_name =
   balance_encoding ~use_legacy_attestation_name:true
 
 let balance_encoding = balance_encoding ~use_legacy_attestation_name:false
-
-let is_not_zero c = not (Compare.Int.equal c 0)
-
-let compare_balance ba bb =
-  match (ba, bb) with
-  | Contract ca, Contract cb -> Contract_repr.compare ca cb
-  | Deposits sa, Deposits sb -> Staker_repr.compare_staker sa sb
-  | Unstaked_deposits (sa, ca), Unstaked_deposits (sb, cb) ->
-      Compare.or_else (Staker_repr.compare_staker sa sb) (fun () ->
-          Cycle_repr.compare ca cb)
-  | Lost_attesting_rewards (pkha, pa, ra), Lost_attesting_rewards (pkhb, pb, rb)
-    ->
-      let c = Signature.Public_key_hash.compare pkha pkhb in
-      if is_not_zero c then c
-      else
-        let c = Compare.Bool.compare pa pb in
-        if is_not_zero c then c else Compare.Bool.compare ra rb
-  | Commitments bpkha, Commitments bpkhb ->
-      Blinded_public_key_hash.compare bpkha bpkhb
-  | Frozen_bonds (ca, ra), Frozen_bonds (cb, rb) ->
-      let c = Contract_repr.compare ca cb in
-      if is_not_zero c then c else Bond_id_repr.compare ra rb
-  | _, _ ->
-      let index b =
-        match b with
-        | Contract _ -> 0
-        | Block_fees -> 1
-        | Deposits _ -> 2
-        | Unstaked_deposits _ -> 3
-        | Nonce_revelation_rewards -> 4
-        | Attesting_rewards -> 5
-        | Baking_rewards -> 6
-        | Baking_bonuses -> 7
-        | Storage_fees -> 8
-        | Double_signing_punishments -> 9
-        | Lost_attesting_rewards _ -> 10
-        | Liquidity_baking_subsidies -> 11
-        | Burned -> 12
-        | Commitments _ -> 13
-        | Bootstrap -> 14
-        | Invoice -> 15
-        | Initial_commitments -> 16
-        | Minted -> 17
-        | Frozen_bonds _ -> 18
-        | Sc_rollup_refutation_punishments -> 19
-        | Sc_rollup_refutation_rewards -> 20
-        (* don't forget to add parameterized cases in the first part of the function *)
-      in
-      Compare.Int.compare (index ba) (index bb)
-
-type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
-
-let is_zero_update = function Debited t | Credited t -> Tez_repr.(t = zero)
 
 let conv_balance_update encoding =
   Data_encoding.conv
