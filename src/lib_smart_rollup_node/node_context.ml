@@ -1038,28 +1038,41 @@ let save_gc_info node_ctxt ~at_level ~gc_level =
 
 let gc node_ctxt ~(level : int32) =
   let open Lwt_result_syntax in
+  (* [gc_level] is the level corresponding to the hash on which GC will be
+     called. *)
+  let gc_level =
+    match node_ctxt.config.history_mode with
+    | Archive ->
+        (* Never call GC in archive mode *)
+        None
+    | Full ->
+        (* GC up to LCC in full mode *)
+        Some (Reference.get node_ctxt.lcc).level
+  in
   let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
   let* last_gc_level, first_available_level = get_gc_levels node_ctxt in
-  (* [gc_level] is the level corresponding to the hash on which
-   * GC will be called, which is defined as the lcc. *)
-  let gc_level = (Reference.get node_ctxt.lcc).level in
-  when_
-    (gc_level > first_available_level
-    && Int32.(sub level last_gc_level >= frequency)
-    && Context.is_gc_finished node_ctxt.context)
-  @@ fun () ->
-  let* hash = hash_of_level node_ctxt gc_level in
-  let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
-  match header with
-  | None ->
-      failwith "Could not retrieve L2 block header for %a" Block_hash.pp hash
-  | Some {context; _} ->
-      let*! () = Event.calling_gc level in
-      let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
-      (* Start both node and context gc asynchronously *)
-      let*! () = Context.gc node_ctxt.context context in
-      let* () = Store.gc node_ctxt.store ~level:gc_level in
-      return_unit
+  match gc_level with
+  | None -> return_unit
+  | Some gc_level
+    when gc_level > first_available_level
+         && Int32.(sub level last_gc_level >= frequency)
+         && Context.is_gc_finished node_ctxt.context -> (
+      let* hash = hash_of_level node_ctxt gc_level in
+      let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
+      match header with
+      | None ->
+          failwith
+            "Could not retrieve L2 block header for %a"
+            Block_hash.pp
+            hash
+      | Some {context; _} ->
+          let*! () = Event.calling_gc level in
+          let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
+          (* Start both node and context gc asynchronously *)
+          let*! () = Context.gc node_ctxt.context context in
+          let* () = Store.gc node_ctxt.store ~level:gc_level in
+          return_unit)
+  | _ -> return_unit
 
 let check_level_available node_ctxt accessed_level =
   let open Lwt_result_syntax in
