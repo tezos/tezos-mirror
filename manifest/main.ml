@@ -27,8 +27,7 @@
 
 open Manifest
 
-let warnings_disabled_by_default =
-  [4; 40; 41; 42; 44; 45; 48; 58; 60; 67; 69; 70]
+let warnings_disabled_by_default = [4; 40; 41; 42; 44; 45; 48; 60; 67; 69; 70]
 (*
    4 [fragile-match]
   40 [name-out-of-scope]
@@ -37,7 +36,6 @@ let warnings_disabled_by_default =
   44 [open-shadow-identifier]
   45 [open-shadow-label-constructor]
   48 [eliminated-optional-arguments]
-  58 [no-cmx-file] (flambda specific, necessary as long as Zarith_version.cmx is not installed)
   60 [unused-module]
   67 [unused-functor-parameter]
   69 [unused-field]

@@ -67,7 +67,7 @@
  (action
   (write-file
    %{targets}
-   "let warnings = \"+a-4-40..42-44-45-48-58-60-67-69-70\"")))
+   "let warnings = \"+a-4-40..42-44-45-48-60-67-69-70\"")))
 
 (library
  (name octez_protocol_compiler_native)

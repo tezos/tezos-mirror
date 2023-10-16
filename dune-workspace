@@ -2,7 +2,7 @@
 
 (env
  (dev
-  (flags (:standard -w @1..72-4-40..42-44-45-48-58-60-67-69-70))
+  (flags (:standard -w @1..72-4-40..42-44-45-48-60-67-69-70))
   (js_of_ocaml (runtest_alias runtest_js)))
  (release
   (js_of_ocaml (runtest_alias runtest_js))
