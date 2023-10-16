@@ -2044,28 +2044,28 @@ module Receipt : sig
     | Single of Contract.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
 
-  type balance =
-    | Contract of Contract.t
-    | Block_fees
-    | Deposits of staker
-    | Unstaked_deposits of staker * Cycle.t
-    | Nonce_revelation_rewards
-    | Attesting_rewards
-    | Baking_rewards
-    | Baking_bonuses
-    | Storage_fees
-    | Double_signing_punishments
-    | Lost_attesting_rewards of public_key_hash * bool * bool
-    | Liquidity_baking_subsidies
-    | Burned
-    | Commitments of Blinded_public_key_hash.t
-    | Bootstrap
-    | Invoice
-    | Initial_commitments
-    | Minted
-    | Frozen_bonds of Contract.t * Bond_id.t
-    | Sc_rollup_refutation_punishments
-    | Sc_rollup_refutation_rewards
+  type 'token balance =
+    | Contract : Contract.t -> Tez.t balance
+    | Block_fees : Tez.t balance
+    | Deposits : staker -> Tez.t balance
+    | Unstaked_deposits : staker * Cycle.t -> Tez.t balance
+    | Nonce_revelation_rewards : Tez.t balance
+    | Attesting_rewards : Tez.t balance
+    | Baking_rewards : Tez.t balance
+    | Baking_bonuses : Tez.t balance
+    | Storage_fees : Tez.t balance
+    | Double_signing_punishments : Tez.t balance
+    | Lost_attesting_rewards : public_key_hash * bool * bool -> Tez.t balance
+    | Liquidity_baking_subsidies : Tez.t balance
+    | Burned : Tez.t balance
+    | Commitments : Blinded_public_key_hash.t -> Tez.t balance
+    | Bootstrap : Tez.t balance
+    | Invoice : Tez.t balance
+    | Initial_commitments : Tez.t balance
+    | Minted : Tez.t balance
+    | Frozen_bonds : Contract.t * Bond_id.t -> Tez.t balance
+    | Sc_rollup_refutation_punishments : Tez.t balance
+    | Sc_rollup_refutation_rewards : Tez.t balance
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
@@ -2077,10 +2077,11 @@ module Receipt : sig
 
   type balance_update_item = private
     | Balance_update_item :
-        balance * balance_update * update_origin
+        Tez.t balance * balance_update * update_origin
         -> balance_update_item
 
-  val item : balance -> balance_update -> update_origin -> balance_update_item
+  val item :
+    Tez.t balance -> balance_update -> update_origin -> balance_update_item
 
   type balance_updates = balance_update_item list
 

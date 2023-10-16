@@ -28,28 +28,30 @@ type staker = Staker_repr.staker =
   | Single of Contract_repr.t * Signature.public_key_hash
   | Shared of Signature.public_key_hash
 
-type balance =
-  | Contract of Contract_repr.t
-  | Block_fees
-  | Deposits of staker
-  | Unstaked_deposits of staker * Cycle_repr.t
-  | Nonce_revelation_rewards
-  | Attesting_rewards
-  | Baking_rewards
-  | Baking_bonuses
-  | Storage_fees
-  | Double_signing_punishments
-  | Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
-  | Liquidity_baking_subsidies
-  | Burned
-  | Commitments of Blinded_public_key_hash.t
-  | Bootstrap
-  | Invoice
-  | Initial_commitments
-  | Minted
-  | Frozen_bonds of Contract_repr.t * Bond_id_repr.t
-  | Sc_rollup_refutation_punishments
-  | Sc_rollup_refutation_rewards
+type 'token balance =
+  | Contract : Contract_repr.t -> Tez_repr.t balance
+  | Block_fees : Tez_repr.t balance
+  | Deposits : staker -> Tez_repr.t balance
+  | Unstaked_deposits : staker * Cycle_repr.t -> Tez_repr.t balance
+  | Nonce_revelation_rewards : Tez_repr.t balance
+  | Attesting_rewards : Tez_repr.t balance
+  | Baking_rewards : Tez_repr.t balance
+  | Baking_bonuses : Tez_repr.t balance
+  | Storage_fees : Tez_repr.t balance
+  | Double_signing_punishments : Tez_repr.t balance
+  | Lost_attesting_rewards :
+      Signature.Public_key_hash.t * bool * bool
+      -> Tez_repr.t balance
+  | Liquidity_baking_subsidies : Tez_repr.t balance
+  | Burned : Tez_repr.t balance
+  | Commitments : Blinded_public_key_hash.t -> Tez_repr.t balance
+  | Bootstrap : Tez_repr.t balance
+  | Invoice : Tez_repr.t balance
+  | Initial_commitments : Tez_repr.t balance
+  | Minted : Tez_repr.t balance
+  | Frozen_bonds : Contract_repr.t * Bond_id_repr.t -> Tez_repr.t balance
+  | Sc_rollup_refutation_punishments : Tez_repr.t balance
+  | Sc_rollup_refutation_rewards : Tez_repr.t balance
 
 let is_not_zero c = not (Compare.Int.equal c 0)
 
@@ -398,7 +400,7 @@ let update_origin_encoding =
 
 type balance_update_item =
   | Balance_update_item :
-      balance * balance_update * update_origin
+      Tez_repr.t balance * balance_update * update_origin
       -> balance_update_item
 
 let item balance balance_update update_origin =
@@ -439,7 +441,7 @@ let balance_updates_encoding =
 
 module BalanceMap = struct
   include Map.Make (struct
-    type t = balance * update_origin
+    type t = Tez_repr.t balance * update_origin
 
     let compare (ba, ua) (bb, ub) =
       let c = compare_balance ba bb in
