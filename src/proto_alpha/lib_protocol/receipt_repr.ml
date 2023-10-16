@@ -55,7 +55,9 @@ type 'token balance =
 
 let is_not_zero c = not (Compare.Int.equal c 0)
 
-let compare_balance ba bb =
+let compare_balance :
+    type token1 token2. token1 balance -> token2 balance -> int =
+ fun ba bb ->
   match (ba, bb) with
   | Contract ca, Contract cb -> Contract_repr.compare ca cb
   | Deposits sa, Deposits sb -> Staker_repr.compare_staker sa sb
@@ -75,8 +77,7 @@ let compare_balance ba bb =
       let c = Contract_repr.compare ca cb in
       if is_not_zero c then c else Bond_id_repr.compare ra rb
   | _, _ ->
-      let index b =
-        match b with
+      let index : type token. token balance -> int = function
         | Contract _ -> 0
         | Block_fees -> 1
         | Deposits _ -> 2

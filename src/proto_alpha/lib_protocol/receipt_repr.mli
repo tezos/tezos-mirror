@@ -55,7 +55,7 @@ type 'token balance =
   | Sc_rollup_refutation_rewards : Tez_repr.t balance
 
 (** Compares two balances. *)
-val compare_balance : Tez_repr.t balance -> Tez_repr.t balance -> int
+val compare_balance : 'token1 balance -> 'token2 balance -> int
 
 (** A credit or debit of token to a balance. *)
 type 'token balance_update = Debited of 'token | Credited of 'token
