@@ -48,18 +48,62 @@ fn process_slot(
         .unwrap_or_default();
 }
 
-pub fn entry(host: &mut impl Runtime) {
-    // we use the current sandbox parameters
-    let attestation_lag = 4;
-    let slot_size = 32768;
-    let page_size = 128;
-    let num_pages = slot_size / page_size;
+#[derive(Debug)]
+struct Parameters {
+    attestation_lag: u32,
+    slot_size: usize,
+    page_size: usize,
+    slot_indexes: Vec<u8>,
+}
 
+fn get_parameters() -> Parameters {
+    // By default use the current sandbox parameters.
+    let default_attestation_lag = 4;
+    let default_slot_size = 32768;
+    let default_page_size = 128;
+    // By default track slot index 0.
+    let default_slot_indexes = vec![0];
+
+    let attestation_lag = option_env!("ATTESTATION_LAG")
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(default_attestation_lag);
+    let slot_size = option_env!("SLOT_SIZE")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(default_slot_size);
+    let page_size = option_env!("PAGE_SIZE")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(default_page_size);
+    let slot_indexes = match option_env!("SLOT_INDEXES") {
+        None => default_slot_indexes,
+        Some(s) => s
+            .split(',')
+            .map(|s| s.parse::<u8>())
+            .collect::<Result<Vec<u8>, _>>()
+            .unwrap_or(default_slot_indexes),
+    };
+
+    Parameters {
+        attestation_lag,
+        slot_size,
+        page_size,
+        slot_indexes,
+    }
+}
+
+pub fn entry(host: &mut impl Runtime) {
+    let parameters = get_parameters();
+    debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);
+    let Parameters {
+        attestation_lag,
+        slot_size,
+        page_size,
+        slot_indexes,
+    } = parameters;
     match host.read_input() {
         Ok(Some(message)) => {
             let level = message.level;
             let published_level = (level - attestation_lag) as i32;
-            let slot_indexes = vec![0u8];
+            let num_pages = slot_size / page_size;
             for slot_index in slot_indexes {
                 process_slot(host, published_level, num_pages, page_size, slot_index);
             }
