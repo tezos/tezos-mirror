@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Token = struct
+  type 'token t = Tez : Tez_repr.t t
+end
+
 type staker = Staker_repr.staker =
   | Single of Contract_repr.t * Signature.public_key_hash
   | Shared of Signature.public_key_hash
@@ -52,6 +56,29 @@ type 'token balance =
   | Frozen_bonds : Contract_repr.t * Bond_id_repr.t -> Tez_repr.t balance
   | Sc_rollup_refutation_punishments : Tez_repr.t balance
   | Sc_rollup_refutation_rewards : Tez_repr.t balance
+
+let token_of_balance : type token. token balance -> token Token.t = function
+  | Contract _ -> Token.Tez
+  | Block_fees -> Token.Tez
+  | Deposits _ -> Token.Tez
+  | Unstaked_deposits _ -> Token.Tez
+  | Nonce_revelation_rewards -> Token.Tez
+  | Attesting_rewards -> Token.Tez
+  | Baking_rewards -> Token.Tez
+  | Baking_bonuses -> Token.Tez
+  | Storage_fees -> Token.Tez
+  | Double_signing_punishments -> Token.Tez
+  | Lost_attesting_rewards _ -> Token.Tez
+  | Liquidity_baking_subsidies -> Token.Tez
+  | Burned -> Token.Tez
+  | Commitments _ -> Token.Tez
+  | Bootstrap -> Token.Tez
+  | Invoice -> Token.Tez
+  | Initial_commitments -> Token.Tez
+  | Minted -> Token.Tez
+  | Frozen_bonds _ -> Token.Tez
+  | Sc_rollup_refutation_punishments -> Token.Tez
+  | Sc_rollup_refutation_rewards -> Token.Tez
 
 let is_not_zero c = not (Compare.Int.equal c 0)
 
@@ -105,6 +132,9 @@ let compare_balance :
 
 type 'token balance_update = Debited of 'token | Credited of 'token
 
+type balance_and_update =
+  | Ex_token : 'token balance * 'token balance_update -> balance_and_update
+
 let is_zero_update = function Debited t | Credited t -> Tez_repr.(t = zero)
 
 let conv_balance_update encoding =
@@ -130,14 +160,15 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
         case (Tag tag)
     | _ as c -> case c
   in
-  let tez_case ~title tag enc proj inj =
+  let tez_case ~title tag enc (proj : Tez_repr.t balance -> _ option) inj =
     case
       ~title
       tag
       (merge_objs enc tez_balance_update_encoding)
-      (fun (balance, update) ->
+      (fun (Ex_token (balance, update)) ->
+        let Tez = token_of_balance balance in
         proj balance |> Option.map (fun x -> (x, update)))
-      (fun (x, update) -> (inj x, update))
+      (fun (x, update) -> Ex_token (inj x, update))
   in
   def
     (if use_legacy_attestation_name then
@@ -412,8 +443,9 @@ let item_encoding_with_legacy_attestation_name =
   conv
     (function
       | Balance_update_item (balance, balance_update, update_origin) ->
-          ((balance, balance_update), update_origin))
-    (fun ((balance, balance_update), update_origin) ->
+          (Ex_token (balance, balance_update), update_origin))
+    (fun (Ex_token (balance, balance_update), update_origin) ->
+      let Tez = token_of_balance balance in
       Balance_update_item (balance, balance_update, update_origin))
     (merge_objs
        balance_and_update_encoding_with_legacy_attestation_name
@@ -424,8 +456,9 @@ let item_encoding =
   conv
     (function
       | Balance_update_item (balance, balance_update, update_origin) ->
-          ((balance, balance_update), update_origin))
-    (fun ((balance, balance_update), update_origin) ->
+          (Ex_token (balance, balance_update), update_origin))
+    (fun (Ex_token (balance, balance_update), update_origin) ->
+      let Tez = token_of_balance balance in
       Balance_update_item (balance, balance_update, update_origin))
     (merge_objs balance_and_update_encoding update_origin_encoding)
 
