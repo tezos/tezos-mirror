@@ -142,9 +142,8 @@ let span state lod d ids =
         | [] -> StringMap.empty
         | (id, d) :: tids ->
             let children = build_node tids in
-            StringMap.singleton
-              id
-              {count = 1; total = d; children; node_lod = lod}
+            let count, total = if tids = [] then (1, d) else (0, zero_time) in
+            StringMap.singleton id {count; total; children; node_lod = lod}
       in
       inc state {recorded = []; aggregated = build_node tids}
 
