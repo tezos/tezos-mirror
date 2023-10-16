@@ -164,6 +164,28 @@ let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   in
   return (kernel_debug, fun () -> Lwt_io.close chan)
 
+let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
+    (store : a Store.store) (history_mode : Configuration.history_mode) =
+  let open Lwt_result_syntax in
+  let* stored_history_mode =
+    match mode with
+    | Read_only -> Store.History_mode.read store.history_mode
+    | Read_write -> Store.History_mode.read store.history_mode
+  in
+  let save_when_rw () =
+    match mode with
+    | Read_only -> return_unit
+    | Read_write -> Store.History_mode.write store.history_mode history_mode
+  in
+  match (stored_history_mode, history_mode) with
+  | None, _ -> save_when_rw ()
+  | Some Archive, Archive | Some Full, Full -> return_unit
+  | Some Archive, Full ->
+      (* Data will be cleaned at next GC, just save new mode *)
+      save_when_rw ()
+  | Some Full, Archive ->
+      failwith "Cannot transform a full rollup node into an archive one."
+
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
     l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
@@ -198,6 +220,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       (Configuration.default_context_dir data_dir)
   in
   let* () = Context.Rollup.check_or_set_address mode context rollup_address in
+  let* () = check_and_set_history_mode mode store configuration.history_mode in
   let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
   let*! () =
     if dal_cctxt = None && current_protocol.constants.dal.feature_enable then
