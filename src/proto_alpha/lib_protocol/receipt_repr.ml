@@ -388,6 +388,9 @@ let update_origin_encoding =
 
 type balance_update_item = balance * balance_update * update_origin
 
+let item balance balance_update update_origin =
+  (balance, balance_update, update_origin)
+
 let item_encoding_with_legacy_attestation_name =
   let open Data_encoding in
   conv

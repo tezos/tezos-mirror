@@ -74,6 +74,9 @@ val compare_update_origin : update_origin -> update_origin -> int
     [c]. *)
 type balance_update_item = balance * balance_update * update_origin
 
+(** Smart constructor for [balance_update_item]. *)
+val item : balance -> balance_update -> update_origin -> balance_update_item
+
 (** A list of balance updates. Duplicates may happen. *)
 type balance_updates = balance_update_item list
 

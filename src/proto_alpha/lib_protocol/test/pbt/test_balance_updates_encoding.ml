@@ -123,7 +123,13 @@ let generate_update_origin =
 
 let generate_balance_updates : Receipt_repr.balance_updates Gen.t =
   Gen.list
-    (Gen.tup3 generate_balance generate_balance_update generate_update_origin)
+    (Gen.map
+       (fun (balance, balance_update, update_origin) ->
+         Receipt_repr.item balance balance_update update_origin)
+       (Gen.tup3
+          generate_balance
+          generate_balance_update
+          generate_update_origin))
 
 (** {2 Tests} *)
 let eq balance_updates1 balance_updates2 =

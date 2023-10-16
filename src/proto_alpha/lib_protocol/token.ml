@@ -130,7 +130,7 @@ let credit ctxt receiver amount origin =
             in
             return (ctxt, Frozen_bonds (contract, bond_id)))
   in
-  (ctxt, (balance, Credited amount, origin))
+  (ctxt, item balance (Credited amount) origin)
 
 let spend ctxt giver amount origin =
   let open Lwt_result_syntax in
@@ -204,7 +204,7 @@ let spend ctxt giver amount origin =
             in
             return (ctxt, Frozen_bonds (contract, bond_id)))
   in
-  (ctxt, (balance, Debited amount, origin))
+  (ctxt, item balance (Debited amount) origin)
 
 let transfer_n ?(origin = Receipt_repr.Block_application) ctxt givers receiver =
   let open Lwt_result_syntax in

@@ -2077,6 +2077,8 @@ module Receipt : sig
 
   type balance_update_item = balance * balance_update * update_origin
 
+  val item : balance -> balance_update -> update_origin -> balance_update_item
+
   type balance_updates = balance_update_item list
 
   val balance_updates_encoding : balance_updates Data_encoding.t
