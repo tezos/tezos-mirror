@@ -307,22 +307,25 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         false
   in
+  (* Only look at operations that are for the node's rollup *)
   if not (is_for_my_rollup operation) then return_unit
   else
-    (* Only look at operations that are for the node's rollup *)
     let*! () =
-      match Sc_rollup_injector.injector_operation_of_manager operation with
-      | None -> Lwt.return_unit
-      | Some op ->
-          let status, errors =
-            match result with
-            | Applied _ -> (`Applied, None)
-            | Backtracked (_, e) ->
-                (`Backtracked, Option.map Environment.wrap_tztrace e)
-            | Failed (_, e) -> (`Failed, Some (Environment.wrap_tztrace e))
-            | Skipped _ -> (`Skipped, None)
-          in
-          Daemon_event.included_operation ?errors status op
+      (* Only event for rollup node's own operations *)
+      if not (Node_context.is_operator node_ctxt source) then Lwt.return_unit
+      else
+        match Sc_rollup_injector.injector_operation_of_manager operation with
+        | None -> Lwt.return_unit
+        | Some op ->
+            let status, errors =
+              match result with
+              | Applied _ -> (`Applied, None)
+              | Backtracked (_, e) ->
+                  (`Backtracked, Option.map Environment.wrap_tztrace e)
+              | Failed (_, e) -> (`Failed, Some (Environment.wrap_tztrace e))
+              | Skipped _ -> (`Skipped, None)
+            in
+            Daemon_event.included_operation ?errors status op
     in
     match result with
     | Applied success_result ->
