@@ -107,7 +107,7 @@ depends: [
   "uri" { >= "3.1.0" }
   "uutf"
   "yaml" { >= "3.1.0" }
-  "zarith" { >= "1.12" & < "1.13" }
+  "zarith" { >= "1.13" & < "1.14" }
   "zarith_stubs_js"
 ]
 conflicts: [

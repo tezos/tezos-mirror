@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "zarith" { >= "1.12" & < "1.13" }
+  "zarith" { >= "1.13" & < "1.14" }
   "zarith_stubs_js"
   "octez-libs"
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }

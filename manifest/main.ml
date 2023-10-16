@@ -361,7 +361,7 @@ let zarith =
   external_lib
     ~js_compatible:true
     "zarith"
-    V.(at_least "1.12" && less_than "1.13")
+    V.(at_least "1.13" && less_than "1.14")
 
 let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
