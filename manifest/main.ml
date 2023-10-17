@@ -8196,6 +8196,7 @@ let _octez_scoru_wasm_debugger =
         octez_webassembly_interpreter_extra |> open_;
         octez_version_value;
         octez_scoru_wasm_debugger_plugin;
+        dynlink;
         lambda_term;
       ]
 
