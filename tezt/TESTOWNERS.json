@@ -6,7 +6,9 @@
   "layer1": {
     "tags": [
       "protocol",
-      "protocol_table"
+      "protocol_table",
+      "transaction",
+      "transfer"
     ],
     "path_prefixes": []
   },
