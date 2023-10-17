@@ -4,7 +4,10 @@
     "path_prefixes": []
   },
   "layer1": {
-    "tags": [],
+    "tags": [
+      "protocol",
+      "table"
+    ],
     "path_prefixes": []
   },
   "tezos2": {
