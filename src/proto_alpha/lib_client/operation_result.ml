@@ -427,6 +427,11 @@ let pp_balance_updates ppf balance_updates =
                 "staking delegator numerator(%a)"
                 Contract.pp
                 delegator
+          | Staking_delegate_denominator {delegate} ->
+              Format.asprintf
+                "staking delegate denominator(%a)"
+                Signature.Public_key_hash.pp
+                delegate
         in
         let balance =
           match origin with

@@ -97,6 +97,10 @@ type 'token balance =
       delegator : Contract_repr.t;
     }
       -> Staking_pseudotoken_repr.t balance
+  | Staking_delegate_denominator : {
+      delegate : Signature.public_key_hash;
+    }
+      -> Staking_pseudotoken_repr.t balance
 
 let token_of_balance : type token. token balance -> token Token.t = function
   | Contract _ -> Token.Tez
@@ -121,6 +125,7 @@ let token_of_balance : type token. token balance -> token Token.t = function
   | Sc_rollup_refutation_punishments -> Token.Tez
   | Sc_rollup_refutation_rewards -> Token.Tez
   | Staking_delegator_numerator _ -> Token.Staking_pseudotoken
+  | Staking_delegate_denominator _ -> Token.Staking_pseudotoken
 
 let is_not_zero c = not (Compare.Int.equal c 0)
 
@@ -148,6 +153,9 @@ let compare_balance :
   | ( Staking_delegator_numerator {delegator = ca},
       Staking_delegator_numerator {delegator = cb} ) ->
       Contract_repr.compare ca cb
+  | ( Staking_delegate_denominator {delegate = pkha},
+      Staking_delegate_denominator {delegate = pkhb} ) ->
+      Signature.Public_key_hash.compare pkha pkhb
   | _, _ ->
       let index : type token. token balance -> int = function
         | Contract _ -> 0
@@ -172,6 +180,7 @@ let compare_balance :
         | Sc_rollup_refutation_punishments -> 19
         | Sc_rollup_refutation_rewards -> 20
         | Staking_delegator_numerator _ -> 21
+        | Staking_delegate_denominator _ -> 22
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)
@@ -455,6 +464,17 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
                  Some ((), (), delegator)
              | _ -> None)
            (fun ((), (), delegator) -> Staking_delegator_numerator {delegator});
+         staking_pseudotoken_case
+           (Tag 28)
+           ~title:"Staking_delegate_denominator"
+           (obj3
+              (req "kind" (constant "staking"))
+              (req "category" (constant "delegate_denominator"))
+              (req "delegate" Signature.Public_key_hash.encoding))
+           (function
+             | Staking_delegate_denominator {delegate} -> Some ((), (), delegate)
+             | _ -> None)
+           (fun ((), (), delegate) -> Staking_delegate_denominator {delegate});
        ]
 
 let balance_and_update_encoding_with_legacy_attestation_name =

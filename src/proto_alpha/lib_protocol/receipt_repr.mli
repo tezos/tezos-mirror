@@ -74,6 +74,10 @@ type 'token balance =
       delegator : Contract_repr.t;
     }
       -> Staking_pseudotoken_repr.t balance
+  | Staking_delegate_denominator : {
+      delegate : Signature.public_key_hash;
+    }
+      -> Staking_pseudotoken_repr.t balance
 
 val token_of_balance : 'token balance -> 'token Token.t
 
