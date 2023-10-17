@@ -83,7 +83,7 @@ let register_protocol_migration_tests () =
     ~from_protocol:migrate_to
     ~to_protocol:Demo
     ~loser_protocols:[migrate_from] ;
-  Sc_rollup.register_migration ~migrate_from ~migrate_to ;
+  Sc_rollup_migration.register ~migrate_from ~migrate_to ;
   Dal.register_migration ~migrate_from ~migrate_to
 
 let register_old_protocol_migration_tests () =
@@ -93,7 +93,7 @@ let register_old_protocol_migration_tests () =
       | _, Some Alpha -> () (* Already in register_protocol_migration_tests *)
       | _, None -> ()
       | migrate_from, Some migrate_to ->
-          Sc_rollup.register_migration ~migrate_from ~migrate_to)
+          Sc_rollup_migration.register ~migrate_from ~migrate_to)
     Protocol.all
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
