@@ -79,6 +79,10 @@ val div2_sub : t -> t * t
     when [tez * num] overflows. *)
 val mul_ratio : t -> num:int64 -> den:int64 -> t tzresult
 
+(** [mul_percentage tez percentage] returns [tez * percentage / 100].
+    No errors can happen. *)
+val mul_percentage : t -> Int_percentage.t -> t
+
 val to_mutez : t -> int64
 
 (** [of_mutez n] (micro tez) is None if n is negative *)

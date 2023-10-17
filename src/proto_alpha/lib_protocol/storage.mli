@@ -52,7 +52,7 @@ module Block_round : Simple_single_data_storage with type value = Round_repr.t
 type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
 module Slashed_deposits_history : sig
-  type slashed_percentage = int
+  type slashed_percentage = Int_percentage.t
 
   type t = (Cycle_repr.t * slashed_percentage) list
 

@@ -94,8 +94,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   let compute_reward_and_burn (frozen_deposits : Deposits_repr.t) =
     let open Result_syntax in
     let punish_value =
-      Tez_repr.(
-        div_exn (mul_exn frozen_deposits.initial_amount slashing_percentage) 100)
+      Tez_repr.mul_percentage frozen_deposits.initial_amount slashing_percentage
     in
     let should_forbid, punishing_amount =
       if Tez_repr.(punish_value >= frozen_deposits.current_amount) then
@@ -158,9 +157,12 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
       match Cycle_repr.pred current_cycle with
       | Some previous_cycle ->
           Storage.Slashed_deposits_history.get previous_cycle slash_history
-      | None -> 0
+      | None -> Int_percentage.p0
     in
-    Compare.Int.(slashed_this_cycle + slashed_previous_cycle >= 100)
+    let slashed_both_cycles =
+      Int_percentage.add_bounded slashed_this_cycle slashed_previous_cycle
+    in
+    Compare.Int.((slashed_both_cycles :> int) >= 100)
   in
   let*! ctxt =
     if should_forbid || should_forbid_from_history then

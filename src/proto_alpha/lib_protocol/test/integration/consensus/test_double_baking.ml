@@ -90,7 +90,7 @@ let test_valid_double_baking_evidence () =
     Context.Delegate.current_frozen_deposits (B blk_final) baker1
   in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
   in
   let* () =
     Assert.equal_tez
@@ -154,7 +154,10 @@ let test_valid_double_baking_followed_by_double_attesting () =
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  let p = p_de + p_db (* assuming the sum doesn't exceed 100% *) in
+  let p =
+    (p_de :> int) + (p_db :> int)
+    (* assuming the sum doesn't exceed 100% *)
+  in
   let expected_frozen_deposits_after =
     Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
   in
@@ -209,7 +212,10 @@ let test_valid_double_attesting_followed_by_double_baking () =
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
-  let p = p_de + p_db (* assuming the sum doesn't exceed 100% *) in
+  let p =
+    (p_de :> int) + (p_db :> int)
+    (* assuming the sum doesn't exceed 100% *)
+  in
   let expected_frozen_deposits_after =
     Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
   in
@@ -271,7 +277,7 @@ let test_payload_producer_gets_evidence_rewards () =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
   in
   let* () =
     Assert.equal_tez

@@ -19,6 +19,8 @@
         "Bounded_history_repr",
         "Context_binary_proof",
         "Misbehaviour",
+        "Ratio_repr",
+        "Int_percentage",
 
 
         "Michelson_v1_primitives",
@@ -30,7 +32,6 @@
         "Staking_pseudotoken_repr",
         "Period_repr",
         "Time_repr",
-        "Ratio_repr",
         "Round_repr",
         "Block_payload_repr",
         "Fixed_point_repr",

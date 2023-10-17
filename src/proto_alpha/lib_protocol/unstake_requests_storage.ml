@@ -68,28 +68,23 @@ let prepared_finalize_unstake_encoding :
        (req "finalizable" finalizable_encoding)
        (req "unfinalizable" stored_requests_encoding))
 
-let z100 = Z.of_int 100
-
 let apply_slashes ~preserved_plus_slashing slashing_history ~from_cycle amount =
   let first_cycle_to_apply_slash = from_cycle in
   let last_cycle_to_apply_slash =
     Cycle_repr.add from_cycle (preserved_plus_slashing - 1)
   in
   (* [slashing_history] is sorted so slashings always happen in the same order. *)
-  let amount = Z.of_int64 (Tez_repr.to_mutez amount) in
-  let amount =
-    List.fold_left
-      (fun amount (slashing_cycle, slashing_percentage) ->
-        if
-          Cycle_repr.(
-            slashing_cycle >= first_cycle_to_apply_slash
-            && slashing_cycle <= last_cycle_to_apply_slash)
-        then Z.div (Z.mul amount (Z.of_int (100 - slashing_percentage))) z100
-        else amount)
-      amount
-      slashing_history
-  in
-  Tez_repr.of_mutez_exn (Z.to_int64 amount)
+  List.fold_left
+    (fun amount (slashing_cycle, slashing_percentage) ->
+      if
+        Cycle_repr.(
+          slashing_cycle >= first_cycle_to_apply_slash
+          && slashing_cycle <= last_cycle_to_apply_slash)
+      then
+        Tez_repr.mul_percentage amount (Int_percentage.neg slashing_percentage)
+      else amount)
+    amount
+    slashing_history
 
 let prepare_finalize_unstake ctxt contract =
   let open Lwt_result_syntax in

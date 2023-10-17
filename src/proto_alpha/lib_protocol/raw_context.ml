@@ -1111,7 +1111,17 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             }
         in
 
-        let percentage_of_frozen_deposits_slashed_per_double_baking = 7 in
+        let percentage_of_frozen_deposits_slashed_per_double_baking =
+          Int_percentage.p7
+        in
+        let percentage_of_frozen_deposits_slashed_per_double_attestation =
+          Int_percentage.of_ratio_bounded
+            {
+              numerator =
+                c.percentage_of_frozen_deposits_slashed_per_double_attestation;
+              denominator = 100;
+            }
+        in
         let constants =
           Constants_parametric_repr.
             {
@@ -1147,8 +1157,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               limit_of_delegation_over_baking =
                 c.limit_of_delegation_over_baking;
               percentage_of_frozen_deposits_slashed_per_double_baking;
-              percentage_of_frozen_deposits_slashed_per_double_attestation =
-                c.percentage_of_frozen_deposits_slashed_per_double_attestation;
+              percentage_of_frozen_deposits_slashed_per_double_attestation;
               (* The `testnet_dictator` should absolutely be None on mainnet *)
               testnet_dictator = c.testnet_dictator;
               initial_seed = c.initial_seed;
