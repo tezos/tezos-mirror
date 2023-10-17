@@ -11,7 +11,8 @@
       "transfer"
     ],
     "path_prefixes": [
-      "src/lib_requester"
+      "src/lib_requester",
+      "src/proto_alpha/lib_delegate"
     ]
   },
   "tezos2": {
