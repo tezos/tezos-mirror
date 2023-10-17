@@ -41,7 +41,7 @@ val stake :
   contract:Contract_repr.t ->
   delegate:Signature.Public_key_hash.t ->
   Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** [request_unstake ctxt ~contract ~delegate amount] debits the [contract]'s
     staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by

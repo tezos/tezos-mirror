@@ -273,7 +273,7 @@ let mint_pseudotokens ctxt (delegator_balances_before : delegator_balances)
       (Implicit delegator_balances_before.delegate_balances.delegate)
       new_delegate_total_frozen_deposits_pseudotokens
   in
-  return ctxt
+  return (ctxt, [])
 
 (** [burn_pseudotokens ctxt delegator_balances_before
     pseudotokens_to_burn] burns [pseudotokens_to_burn] pseudotokens
@@ -408,7 +408,7 @@ let stake ctxt ~delegator ~delegate tez_amount =
 let stake ctxt ~contract ~delegate tez_amount =
   if Contract_repr.(contract = Implicit delegate) then
     (* No pseudotokens for delegates. *)
-    Lwt_result_syntax.return ctxt
+    Lwt_result_syntax.return (ctxt, [])
   else stake ctxt ~delegator:contract ~delegate tez_amount
 
 let request_unstake ctxt ~delegator ~delegate requested_amount =
