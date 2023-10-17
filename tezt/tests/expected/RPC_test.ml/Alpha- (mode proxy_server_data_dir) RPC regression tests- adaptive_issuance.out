@@ -56,3 +56,12 @@ null
 { "static":
     { "numerator": "744668433120000", "denominator": "3333333569461" },
   "dynamic": { "numerator": "0", "denominator": "1" } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/total_delegated_stake'
+"0"
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_denominator'
+"0"
+
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/staking_numerator'
+"0"

@@ -713,6 +713,22 @@ let get_chain_block_context_contract_storage_paid_space ?(chain = "main")
     ]
     JSON.as_int
 
+let get_chain_block_context_contract_staking_numerator ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "staking_numerator";
+    ]
+    JSON.as_int
+
 let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
     ?delegate ?level () =
   let query_string =
@@ -1171,6 +1187,38 @@ let get_chain_block_context_delegate_stakers ?(chain = "main") ?(block = "head")
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; "stakers"]
+    Fun.id
+
+let get_chain_block_context_delegate_total_delegated_stake ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "total_delegated_stake";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_staking_denominator ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "staking_denominator";
+    ]
     Fun.id
 
 let get_chain_block_context_delegate_frozen_deposits ?(chain = "main")

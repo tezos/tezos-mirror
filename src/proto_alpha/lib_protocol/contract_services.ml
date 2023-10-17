@@ -93,6 +93,15 @@ module S = struct
       ~output:(option Tez.encoding)
       RPC_path.(custom_root /: Contract.rpc_arg / "staked_balance")
 
+  let staking_numerator =
+    RPC_service.get_service
+      ~description:
+        "Returns an abstract representation of the contract's \
+         total_delegated_stake."
+      ~query:RPC_query.empty
+      ~output:Staking_pseudotokens.For_RPC.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "staking_numerator")
+
   let unstaked_frozen_balance =
     RPC_service.get_service
       ~description:
@@ -470,6 +479,8 @@ let register () =
     ~chunked:false
     S.staked_balance
     Contract.For_RPC.get_staked_balance ;
+  register_field ~chunked:false S.staking_numerator (fun ctxt delegator ->
+      Staking_pseudotokens.For_RPC.staking_pseudotokens_balance ctxt ~delegator) ;
   register_field
     ~chunked:false
     S.unstaked_frozen_balance
@@ -715,6 +726,9 @@ let balance_and_frozen_bonds ctxt block contract =
 
 let staked_balance ctxt block contract =
   RPC_context.make_call1 S.staked_balance ctxt block contract () ()
+
+let staking_numerator ctxt block contract =
+  RPC_context.make_call1 S.staking_numerator ctxt block contract () ()
 
 let unstaked_frozen_balance ctxt block contract =
   RPC_context.make_call1 S.unstaked_frozen_balance ctxt block contract () ()

@@ -443,10 +443,23 @@ let test_adaptive_issuance_on_oxford ~contracts ?endpoint client =
   in
   unit
 
-let test_adaptive_issuance_after_oxford ~contracts:_ ?endpoint client =
+let test_adaptive_issuance_after_oxford ~contracts ?endpoint client =
   let* _ =
     Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_issuance_current_yearly_rate_details ()
+  in
+  let bootstrap = List.hd contracts in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_total_delegated_stake bootstrap
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_staking_denominator bootstrap
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_staking_numerator bootstrap
   in
   unit
 

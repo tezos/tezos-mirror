@@ -115,6 +115,8 @@ type info = {
   staking_balance : Tez.t;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
+  total_delegated_stake : Tez.t;
+  staking_denominator : Staking_pseudotokens.For_RPC.t;
   deactivated : bool;
   grace_period : Cycle.t;
   voting_info : Vote.delegate_info;
@@ -132,6 +134,8 @@ let info_encoding =
            staking_balance;
            delegated_contracts;
            delegated_balance;
+           total_delegated_stake;
+           staking_denominator;
            deactivated;
            grace_period;
            voting_info;
@@ -144,6 +148,8 @@ let info_encoding =
           staking_balance,
           delegated_contracts,
           delegated_balance,
+          total_delegated_stake,
+          staking_denominator,
           deactivated,
           grace_period ),
         (voting_info, (active_consensus_key, pending_consensus_keys)) ))
@@ -153,6 +159,8 @@ let info_encoding =
              staking_balance,
              delegated_contracts,
              delegated_balance,
+             total_delegated_stake,
+             staking_denominator,
              deactivated,
              grace_period ),
            (voting_info, (active_consensus_key, pending_consensus_keys)) ) ->
@@ -163,6 +171,8 @@ let info_encoding =
         staking_balance;
         delegated_contracts;
         delegated_balance;
+        total_delegated_stake;
+        staking_denominator;
         deactivated;
         grace_period;
         voting_info;
@@ -170,13 +180,15 @@ let info_encoding =
         pending_consensus_keys;
       })
     (merge_objs
-       (obj8
+       (obj10
           (req "full_balance" Tez.encoding)
           (req "current_frozen_deposits" Tez.encoding)
           (req "frozen_deposits" Tez.encoding)
           (req "staking_balance" Tez.encoding)
           (req "delegated_contracts" (list Contract.encoding))
           (req "delegated_balance" Tez.encoding)
+          (req "total_delegated_stake" Tez.encoding)
+          (req "staking_denominator" Staking_pseudotokens.For_RPC.encoding)
           (req "deactivated" bool)
           (req "grace_period" Cycle.encoding))
        (merge_objs
@@ -351,6 +363,23 @@ module S = struct
       ~output:(list Contract.encoding)
       RPC_path.(path / "delegated_contracts")
 
+  let total_delegated_stake =
+    RPC_service.get_service
+      ~description:
+        "Returns the sum (in mutez) of all tokens staked by the delegators of \
+         a given delegate. This excludes the delegate's own staked tokens."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "total_delegated_stake")
+
+  let staking_denominator =
+    RPC_service.get_service
+      ~description:
+        "Returns an abstract representation of the total delegated stake."
+      ~query:RPC_query.empty
+      ~output:Staking_pseudotokens.For_RPC.encoding
+      RPC_path.(path / "staking_denominator")
+
   let delegated_balance =
     RPC_service.get_service
       ~description:
@@ -523,6 +552,16 @@ let register () =
       let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
       let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
       let* delegated_balance = Delegate.For_RPC.delegated_balance ctxt pkh in
+      let* total_delegated_stake =
+        Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+          ctxt
+          ~delegate:pkh
+      in
+      let* staking_denominator =
+        Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+          ctxt
+          ~delegate:pkh
+      in
       let* deactivated = Delegate.deactivated ctxt pkh in
       let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
       let* voting_info = Vote.get_delegate_info ctxt pkh in
@@ -538,6 +577,8 @@ let register () =
         staking_balance;
         delegated_contracts;
         delegated_balance;
+        total_delegated_stake;
+        staking_denominator;
         deactivated;
         grace_period;
         voting_info;
@@ -597,6 +638,16 @@ let register () =
   register1 ~chunked:false S.delegated_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.delegated_balance ctxt pkh) ;
+  register1 ~chunked:false S.total_delegated_stake (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+        ctxt
+        ~delegate:pkh) ;
+  register1 ~chunked:false S.staking_denominator (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+        ctxt
+        ~delegate:pkh) ;
   register1 ~chunked:false S.deactivated (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.deactivated ctxt pkh) ;
@@ -670,6 +721,12 @@ let delegated_contracts ctxt block pkh =
 
 let delegated_balance ctxt block pkh =
   RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
+
+let total_delegated_stake ctxt block pkh =
+  RPC_context.make_call1 S.total_delegated_stake ctxt block pkh () ()
+
+let staking_denominator ctxt block pkh =
+  RPC_context.make_call1 S.staking_denominator ctxt block pkh () ()
 
 let deactivated ctxt block pkh =
   RPC_context.make_call1 S.deactivated ctxt block pkh () ()

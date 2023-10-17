@@ -699,6 +699,14 @@ val get_chain_block_context_contract_storage_used_space :
 val get_chain_block_context_contract_storage_paid_space :
   ?chain:string -> ?block:string -> string -> int t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/storage/staking_numerator]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_staking_numerator :
+  ?chain:string -> ?block:string -> string -> int t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/baking_rights]
 
     [chain] defaults to ["main"].
@@ -1020,6 +1028,20 @@ val get_chain_block_context_delegate_delegated_contracts :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_stakers :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/total_delegated_stake]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_total_delegated_stake :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/staking_denominator]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_staking_denominator :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/frozen_deposits]
