@@ -55,11 +55,15 @@ module Worker : sig
     val event : event -> unit Monad.t
   end
 
-  (** A hook to set or update messages validation function. Should be called once
-    at startup and every time the DAL parameters change. *)
+  (** A hook to set or update messages and messages IDs validation
+      function. Should be called once at startup and every time the DAL
+      parameters change. *)
   module Validate_message_hook : sig
     val set :
-      (Types.Message.t -> Types.Message_id.t -> [`Invalid | `Unknown | `Valid]) ->
+      (?message:GS.Message.t ->
+      message_id:GS.Message_id.t ->
+      unit ->
+      [`Valid | `Unknown | `Outdated | `Invalid]) ->
       unit
   end
 end

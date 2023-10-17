@@ -53,8 +53,20 @@ module type AUTOMATON_SUBCONFIG = sig
   module Message : sig
     include PRINTABLE
 
-    (** [valid] performs an application layer-level validity check on a message. *)
-    val valid : t -> Message_id.t -> [`Valid | `Unknown | `Invalid]
+    (** [valid] performs an application layer-level validity check on a message
+        id and a message if given.
+
+        The message id (and message if any) could either be [`Valid] in the
+        current context or [`Invalid], meaning that it is/they are not valid (in
+        the present time, in the past and in the future). The application layer
+        could also return [`Outdated] or [`Unknown] if the message id is
+        outdated or if the application doesn't care about validity. In this
+        case, the application might omit some costly validity checks. *)
+    val valid :
+      ?message:t ->
+      message_id:Message_id.t ->
+      unit ->
+      [`Valid | `Unknown | `Outdated | `Invalid]
   end
 end
 
@@ -603,6 +615,8 @@ module type AUTOMATON = sig
         (** The messages ids we want to request from the peer which sent us an
             IHave message. The implementation honors the
             [max_sent_iwant_per_heartbeat] limit. *)
+    | Invalid_message_id : [`IHave] output
+        (** A message id received via IHave message is invalid. *)
     | Iwant_from_peer_with_low_score : {
         score : Score.t;
         threshold : float;

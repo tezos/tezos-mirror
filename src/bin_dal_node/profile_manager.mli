@@ -28,6 +28,9 @@
 (** A profile manager context stores profile-specific data used by the daemon.  *)
 type t
 
+(** [is_bootstrap_profile t] returns [true] if the node has a bootstrap profile. *)
+val is_bootstrap_profile : t -> bool
+
 (** The empty profile manager context. *)
 val empty : t
 

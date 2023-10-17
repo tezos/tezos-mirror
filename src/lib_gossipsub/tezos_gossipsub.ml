@@ -111,6 +111,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Too_many_sent_iwant_messages : {count : int; max : int} -> [`IHave] output
     | Message_topic_not_tracked : [`IHave] output
     | Message_requested_message_ids : Message_id.t list -> [`IHave] output
+    | Invalid_message_id : [`IHave] output
     | Iwant_from_peer_with_low_score : {
         score : Score.t;
         threshold : float;
@@ -838,7 +839,8 @@ module Make (C : AUTOMATON_CONFIG) :
       fail_if (List.is_empty iwant_message_ids)
       @@ Message_requested_message_ids []
 
-    let filter peer message_ids : Message_id.t list Monad.t =
+    let filter sender topic peer message_ids :
+        (Message_id.t list, [`IHave] output) Monad.check =
       let open Monad.Syntax in
       let*! peer_filter in
       let*! message_cache in
@@ -846,7 +848,23 @@ module Make (C : AUTOMATON_CONFIG) :
         (not (Message_cache.seen_message message_id message_cache))
         && peer_filter peer (`IHave message_id)
       in
-      List.filter should_handle_message_id message_ids |> return
+      let filtered_message_ids =
+        List.filter_e
+          (fun message_id ->
+            match Message.valid ~message_id () with
+            | `Valid -> Ok (should_handle_message_id message_id)
+            | `Unknown | `Outdated -> Ok false
+            | `Invalid -> Error ())
+          message_ids
+      in
+      match filtered_message_ids with
+      | Ok filtered_message_ids -> pass filtered_message_ids
+      | Error () ->
+          let* () =
+            update_score sender (fun stats ->
+                Score.invalid_message_delivered stats topic)
+          in
+          fail Invalid_message_id
 
     let shuffle_and_trunc message_ids ~limit : (int * Message_id.t list) Monad.t
         =
@@ -876,7 +894,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*! count_iwant_sent = find_iwant_per_heartbeat peer in
       let*? () = check_too_many_sent_iwant_message count_iwant_sent in
       let*? () = check_topic_tracked topic in
-      let* iwant_message_ids = filter peer message_ids in
+      let*? iwant_message_ids = filter peer topic peer message_ids in
       let*? () = check_not_empty iwant_message_ids in
       let*! max_sent_iwant_per_heartbeat in
       let limit = max_sent_iwant_per_heartbeat - count_iwant_sent in
@@ -1096,12 +1114,9 @@ module Make (C : AUTOMATON_CONFIG) :
   module Receive_message = struct
     let check_valid sender topic message message_id =
       let open Monad.Syntax in
-      match Message.valid message message_id with
+      match Message.valid ~message ~message_id () with
       | `Valid -> unit
-      | `Unknown ->
-          (* FIXME https://gitlab.com/tezos/tezos/-/issues/5486
-             It is not clear yet what we should do here. *)
-          fail Unknown_validity
+      | `Unknown | `Outdated -> fail Unknown_validity
       | `Invalid ->
           let* () =
             update_score sender (fun stats ->
@@ -2302,6 +2317,7 @@ module Make (C : AUTOMATON_CONFIG) :
           count
           max
     | Message_topic_not_tracked -> fprintf fmtr "Message_topic_not_tracked"
+    | Invalid_message_id -> fprintf fmtr "Invalid_message_id"
     | Message_requested_message_ids ids ->
         fprintf
           fmtr

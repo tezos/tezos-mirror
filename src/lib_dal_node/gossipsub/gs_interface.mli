@@ -47,6 +47,9 @@ module Worker_instance :
 
 module Validate_message_hook : sig
   val set :
-    (Types.Message.t -> Types.Message_id.t -> [`Invalid | `Unknown | `Valid]) ->
+    (?message:Worker_instance.GS.Message.t ->
+    message_id:Worker_instance.GS.Message_id.t ->
+    unit ->
+    [`Valid | `Unknown | `Outdated | `Invalid]) ->
     unit
 end

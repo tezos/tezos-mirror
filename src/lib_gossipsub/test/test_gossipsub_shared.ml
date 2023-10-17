@@ -164,7 +164,7 @@ module Automaton_config :
     module Message = struct
       include String_iterable
 
-      let valid msg msg_id = Validity_hook.apply msg msg_id
+      let valid ?message ~message_id () = Validity_hook.apply message message_id
     end
   end
 end
