@@ -142,8 +142,10 @@ module Handler = struct
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
 
+     We should check:
+
      - That the commitment (slot index for the given level if the commitment
-     field is dropped from message id) is waiting for attestation;
+       field is dropped from message id) is waiting for attestation;
 
      - That the included shard index is indeed assigned to the included pkh;
 

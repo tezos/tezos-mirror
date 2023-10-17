@@ -57,8 +57,8 @@ module type AUTOMATON_SUBCONFIG = sig
         id and a message if given.
 
         The message id (and message if any) could either be [`Valid] in the
-        current contex or [`Invalid], meaning that it is/they are not valid (in
-        the present time, in the past and in the future. The application layer
+        current context or [`Invalid], meaning that it is/they are not valid (in
+        the present time, in the past and in the future). The application layer
         could also return [`Outdated] or [`Unknown] if the message id is
         outdated or if the application doesn't care about validity. In this
         case, the application might omit some costly validity checks. *)
