@@ -422,6 +422,11 @@ let pp_balance_updates ppf balance_updates =
           | Sc_rollup_refutation_punishments ->
               "smart rollup refutation punishments"
           | Sc_rollup_refutation_rewards -> "smart rollup refutation rewards"
+          | Staking_delegator_numerator {delegator} ->
+              Format.asprintf
+                "staking delegator numerator(%a)"
+                Contract.pp
+                delegator
         in
         let balance =
           match origin with

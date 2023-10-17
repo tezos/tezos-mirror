@@ -2089,6 +2089,10 @@ module Receipt : sig
     | Frozen_bonds : Contract.t * Bond_id.t -> Tez.t balance
     | Sc_rollup_refutation_punishments : Tez.t balance
     | Sc_rollup_refutation_rewards : Tez.t balance
+    | Staking_delegator_numerator : {
+        delegator : Contract.t;
+      }
+        -> Staking_pseudotoken.t balance
 
   val token_of_balance : 'token balance -> 'token Token.t
 

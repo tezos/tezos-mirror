@@ -93,6 +93,10 @@ type 'token balance =
   | Frozen_bonds : Contract_repr.t * Bond_id_repr.t -> Tez_repr.t balance
   | Sc_rollup_refutation_punishments : Tez_repr.t balance
   | Sc_rollup_refutation_rewards : Tez_repr.t balance
+  | Staking_delegator_numerator : {
+      delegator : Contract_repr.t;
+    }
+      -> Staking_pseudotoken_repr.t balance
 
 let token_of_balance : type token. token balance -> token Token.t = function
   | Contract _ -> Token.Tez
@@ -116,6 +120,7 @@ let token_of_balance : type token. token balance -> token Token.t = function
   | Frozen_bonds _ -> Token.Tez
   | Sc_rollup_refutation_punishments -> Token.Tez
   | Sc_rollup_refutation_rewards -> Token.Tez
+  | Staking_delegator_numerator _ -> Token.Staking_pseudotoken
 
 let is_not_zero c = not (Compare.Int.equal c 0)
 
@@ -140,6 +145,9 @@ let compare_balance :
   | Frozen_bonds (ca, ra), Frozen_bonds (cb, rb) ->
       let c = Contract_repr.compare ca cb in
       if is_not_zero c then c else Bond_id_repr.compare ra rb
+  | ( Staking_delegator_numerator {delegator = ca},
+      Staking_delegator_numerator {delegator = cb} ) ->
+      Contract_repr.compare ca cb
   | _, _ ->
       let index : type token. token balance -> int = function
         | Contract _ -> 0
@@ -163,6 +171,7 @@ let compare_balance :
         | Frozen_bonds _ -> 18
         | Sc_rollup_refutation_punishments -> 19
         | Sc_rollup_refutation_rewards -> 20
+        | Staking_delegator_numerator _ -> 21
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)
@@ -186,6 +195,14 @@ let tez_balance_update_encoding =
   def "operation_metadata.alpha.tez_balance_update"
   @@ obj1 (req "change" (conv_balance_update Tez_repr.balance_update_encoding))
 
+let staking_pseudotoken_balance_update_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.staking_abstract_quantity"
+  @@ obj1
+       (req
+          "change"
+          (conv_balance_update Staking_pseudotoken_repr.balance_update_encoding))
+
 let balance_and_update_encoding ~use_legacy_attestation_name =
   let open Data_encoding in
   let case = function
@@ -206,6 +223,19 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
       (fun (Ex_token (balance, update)) ->
         match token_of_balance balance with
         | Tez -> proj balance |> Option.map (fun x -> (x, update))
+        | _ -> None)
+      (fun (x, update) -> Ex_token (inj x, update))
+  in
+  let staking_pseudotoken_case ~title tag enc
+      (proj : Staking_pseudotoken_repr.t balance -> _ option) inj =
+    case
+      ~title
+      tag
+      (merge_objs enc staking_pseudotoken_balance_update_encoding)
+      (fun (Ex_token (balance, update)) ->
+        match token_of_balance balance with
+        | Staking_pseudotoken ->
+            proj balance |> Option.map (fun x -> (x, update))
         | _ -> None)
       (fun (x, update) -> Ex_token (inj x, update))
   in
@@ -413,6 +443,18 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
              | Unstaked_deposits (staker, cycle) -> Some ((), (), staker, cycle)
              | _ -> None)
            (fun ((), (), staker, cycle) -> Unstaked_deposits (staker, cycle));
+         staking_pseudotoken_case
+           (Tag 27)
+           ~title:"Staking_delegator_numerator"
+           (obj3
+              (req "kind" (constant "staking"))
+              (req "category" (constant "delegator_numerator"))
+              (req "delegator" Contract_repr.encoding))
+           (function
+             | Staking_delegator_numerator {delegator} ->
+                 Some ((), (), delegator)
+             | _ -> None)
+           (fun ((), (), delegator) -> Staking_delegator_numerator {delegator});
        ]
 
 let balance_and_update_encoding_with_legacy_attestation_name =
