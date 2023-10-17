@@ -204,6 +204,18 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       ~storage_dir:(Configuration.default_storage_dir data_dir)
       ~index_buffer_size:Configuration.default_index_buffer_size
   in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+  let* () =
+    match metadata with
+    | Some {rollup_address = saved_address; context_version} ->
+        let*? () = Context.Version.check context_version in
+        fail_unless Address.(rollup_address = saved_address)
+        @@ Rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
+    | None ->
+        Metadata.write_metadata_file
+          ~dir:data_dir
+          {rollup_address; context_version = Context.Version.version}
+  in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
   in
@@ -220,7 +232,6 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       mode
       (Configuration.default_context_dir data_dir)
   in
-  let* () = Context.Rollup.check_or_set_address mode context rollup_address in
   let* () = check_and_set_history_mode mode store configuration.history_mode in
   let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
   let*! () =
