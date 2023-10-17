@@ -11,7 +11,8 @@
         "rlp": "^2.2.7",
         "solc": "^0.8.21",
         "csv-parse": "5.5.0",
-        "csv-stringify": "^6.4.2"
+        "csv-stringify": "^6.4.2",
+        "commander": "^11.0.0"
     },
     "optionalDependencies": {
         "chartjs-node-canvas": "^4.1.6",

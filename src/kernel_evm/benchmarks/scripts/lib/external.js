@@ -15,21 +15,28 @@ const in_prod = function () {
 }
 
 /**
- * When in production, binaries are searched in the $PATH
+ * When in production, binaries are searched in the $PATH,
+ * else in TEZOS_DIR,
+ * else the argument is used.
  * @param filepath
  * @returns
  */
 const bin = function (filepath) {
+
     if (in_prod()) {
         return path.basename(filepath)
+    } else if (process.env.TEZOS_DIR) {
+        return path.resolve(process.env.TEZOS_DIR, filepath)
     } else {
-        return filepath
+        return path.resolve(filepath)
     }
 }
 
 /**
  * When in production, the ressources are searched for in directory
  * configurable using the env variable $EXTERNAL_RESSOURCES
+ * else in TEZOS_DIR,
+ * else the argument is used.
  * @param filepath
  * @returns
  */
@@ -37,6 +44,11 @@ const resource = function (filepath) {
     if (in_prod() && process.env.EXTERNAL_RESSOURCES) {
         return path.format({
             dir: process.env.EXTERNAL_RESSOURCES,
+            base: path.basename(filepath)
+        })
+    } else if (process.env.TEZOS_DIR) {
+        return path.format({
+            dir: process.env.TEZOS_DIR,
             base: path.basename(filepath)
         })
     } else {
