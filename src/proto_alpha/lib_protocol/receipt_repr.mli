@@ -68,11 +68,20 @@ type update_origin =
 (** Compares two origins. *)
 val compare_update_origin : update_origin -> update_origin -> int
 
-(** A list of balance updates. Duplicates may happen.
-    For example, an entry of the form [(Rewards (b,c), Credited am, ...)]
-    indicates that the balance of frozen rewards has been increased by [am]
-    for baker [b] and cycle [c]. *)
-type balance_updates = (balance * balance_update * update_origin) list
+(** An item in a list of balance updates. 
+    An item of the form [(Rewards (b,c), Credited am, ...)] indicates that the
+    balance of frozen rewards has been increased by [am] for baker [b] and cycle
+    [c]. *)
+type balance_update_item = private
+  | Balance_update_item :
+      balance * balance_update * update_origin
+      -> balance_update_item
+
+(** Smart constructor for [balance_update_item]. *)
+val item : balance -> balance_update -> update_origin -> balance_update_item
+
+(** A list of balance updates. Duplicates may happen. *)
+type balance_updates = balance_update_item list
 
 (** The property [Json.destruct (Json.construct balance_updates) = balance_updates]
     does not always hold for [balance_updates_encoding] when [balance_updates]

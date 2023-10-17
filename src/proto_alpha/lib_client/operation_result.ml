@@ -373,7 +373,7 @@ let pp_balance_updates ppf balance_updates =
   in
   let balance_updates =
     List.map
-      (fun (balance, update, origin) ->
+      (fun (Balance_update_item (balance, update, origin)) ->
         let balance =
           match balance with
           | Contract c -> Format.asprintf "%a" Contract.pp c

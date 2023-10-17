@@ -91,7 +91,7 @@ let test_simple_balance_updates () =
       "Missing balance update for giver contract."
       (List.mem
          ~equal:( = )
-         Receipt.(Contract giver, Debited amount, Block_application)
+         (Receipt.item (Contract giver) (Debited amount) Block_application)
          bal_updates)
       true) ;
   Alcotest.(
@@ -100,7 +100,7 @@ let test_simple_balance_updates () =
       "Missing balance update for receiver contract."
       (List.mem
          ~equal:( = )
-         Receipt.(Contract receiver, Credited amount, Block_application)
+         (Receipt.item (Contract receiver) (Credited amount) Block_application)
          bal_updates)
       true) ;
   return_unit
@@ -173,7 +173,7 @@ let test_transferring_to_receiver ctxt receiver amount expected_bupds =
   let*@ ctxt', bupds = Token.transfer ctxt `Minted receiver amount in
   let* () = check_receiver_balances ctxt ctxt' receiver amount in
   let expected_bupds =
-    Receipt.(Minted, Debited amount, Block_application) :: expected_bupds
+    Receipt.item Minted (Debited amount) Block_application :: expected_bupds
   in
   Alcotest.(
     check bool "Balance updates do not match." (bupds = expected_bupds) true) ;
@@ -191,7 +191,7 @@ let test_transferring_to_contract ctxt =
     ctxt
     (`Contract receiver)
     amount
-    [(Contract receiver, Credited amount, Block_application)]
+    Receipt.[item (Contract receiver) (Credited amount) Block_application]
 
 let test_transferring_to_collected_commitments ctxt =
   let amount = random_amount () in
@@ -200,7 +200,7 @@ let test_transferring_to_collected_commitments ctxt =
     ctxt
     (`Collected_commitments bpkh)
     amount
-    [(Commitments bpkh, Credited amount, Block_application)]
+    Receipt.[item (Commitments bpkh) (Credited amount) Block_application]
 
 let test_transferring_to_collected_fees ctxt =
   let amount = random_amount () in
@@ -208,24 +208,27 @@ let test_transferring_to_collected_fees ctxt =
     ctxt
     `Block_fees
     amount
-    [(Block_fees, Credited amount, Block_application)]
+    Receipt.[item Block_fees (Credited amount) Block_application]
 
 let test_transferring_to_burned ctxt =
   let open Lwt_result_wrap_syntax in
   let amount = random_amount () in
-  let minted_bupd = Receipt.(Minted, Debited amount, Block_application) in
+  let minted_bupd = Receipt.item Minted (Debited amount) Block_application in
   let*@ _, bupds = Token.transfer ctxt `Minted `Burned amount in
   let* () =
     Assert.equal_bool
       ~loc:__LOC__
-      (bupds = [minted_bupd; (Burned, Credited amount, Block_application)])
+      (bupds
+      = Receipt.[minted_bupd; item Burned (Credited amount) Block_application])
       true
   in
   let*@ _, bupds = Token.transfer ctxt `Minted `Storage_fees amount in
   let* () =
     Assert.equal_bool
       ~loc:__LOC__
-      (bupds = [minted_bupd; (Storage_fees, Credited amount, Block_application)])
+      (bupds
+      = Receipt.
+          [minted_bupd; item Storage_fees (Credited amount) Block_application])
       true
   in
   let*@ _, bupds =
@@ -235,10 +238,11 @@ let test_transferring_to_burned ctxt =
     Assert.equal_bool
       ~loc:__LOC__
       (bupds
-      = [
-          minted_bupd;
-          (Double_signing_punishments, Credited amount, Block_application);
-        ])
+      = Receipt.
+          [
+            minted_bupd;
+            item Double_signing_punishments (Credited amount) Block_application;
+          ])
       true
   in
   let pkh = Signature.Public_key_hash.zero in
@@ -250,12 +254,14 @@ let test_transferring_to_burned ctxt =
     Assert.equal_bool
       ~loc:__LOC__
       (bupds
-      = [
-          minted_bupd;
-          ( Lost_attesting_rewards (pkh, p, r),
-            Credited amount,
-            Block_application );
-        ])
+      = Receipt.
+          [
+            minted_bupd;
+            item
+              (Lost_attesting_rewards (pkh, p, r))
+              (Credited amount)
+              Block_application;
+          ])
       true
   in
   let*@ _, bupds =
@@ -264,10 +270,14 @@ let test_transferring_to_burned ctxt =
   Assert.equal_bool
     ~loc:__LOC__
     (bupds
-    = [
-        minted_bupd;
-        (Sc_rollup_refutation_punishments, Credited amount, Block_application);
-      ])
+    = Receipt.
+        [
+          minted_bupd;
+          item
+            Sc_rollup_refutation_punishments
+            (Credited amount)
+            Block_application;
+        ])
     true
 
 let test_transferring_to_frozen_bonds ctxt =
@@ -280,7 +290,13 @@ let test_transferring_to_frozen_bonds ctxt =
     ctxt
     (`Frozen_bonds (contract, bond_id))
     amount
-    [(Frozen_bonds (contract, bond_id), Credited amount, Block_application)]
+    Receipt.
+      [
+        item
+          (Frozen_bonds (contract, bond_id))
+          (Credited amount)
+          Block_application;
+      ]
 
 let test_transferring_to_receiver () =
   let open Lwt_result_syntax in
@@ -309,7 +325,7 @@ let test_transferring_from_infinite_source ctxt giver expected_bupds =
   let*@ _, bupds = Token.transfer ctxt giver `Burned amount in
   let expected_bupds =
     expected_bupds amount
-    @ Receipt.[(Burned, Credited amount, Block_application)]
+    @ Receipt.[item Burned (Credited amount) Block_application]
   in
   let* () = Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true in
   return_unit
@@ -345,7 +361,7 @@ let test_transferring_from_container ctxt giver amount expected_bupds =
   let*@ ctxt', bupds = Token.transfer ctxt giver `Burned amount in
   let* () = check_giver_balances ctxt ctxt' giver amount in
   let expected_bupds =
-    expected_bupds @ Receipt.[(Burned, Credited amount, Block_application)]
+    expected_bupds @ Receipt.[item Burned (Credited amount) Block_application]
   in
   let* () = Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true in
   (* Test transferring a smaller amount. *)
@@ -380,7 +396,7 @@ let test_transferring_from_contract ctxt =
     ctxt
     (`Contract giver)
     amount
-    [(Contract giver, Debited amount, Block_application)]
+    Receipt.[item (Contract giver) (Debited amount) Block_application]
 
 let test_transferring_from_collected_commitments ctxt =
   let amount = random_amount () in
@@ -389,7 +405,7 @@ let test_transferring_from_collected_commitments ctxt =
     ctxt
     (`Collected_commitments bpkh)
     amount
-    [(Commitments bpkh, Debited amount, Block_application)]
+    Receipt.[item (Commitments bpkh) (Debited amount) Block_application]
 
 let test_transferring_from_collected_fees ctxt =
   let amount = random_amount () in
@@ -397,7 +413,7 @@ let test_transferring_from_collected_fees ctxt =
     ctxt
     `Block_fees
     amount
-    [(Block_fees, Debited amount, Block_application)]
+    Receipt.[item Block_fees (Debited amount) Block_application]
 
 let test_transferring_from_frozen_bonds ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
@@ -409,7 +425,13 @@ let test_transferring_from_frozen_bonds ctxt =
     ctxt
     (`Frozen_bonds (contract, bond_id))
     amount
-    [(Frozen_bonds (contract, bond_id), Debited amount, Block_application)]
+    Receipt.
+      [
+        item
+          (Frozen_bonds (contract, bond_id))
+          (Debited amount)
+          Block_application;
+      ]
 
 let test_transferring_from_giver () =
   let open Lwt_result_wrap_syntax in
@@ -417,41 +439,42 @@ let test_transferring_from_giver () =
   let* ctxt, _ = create_context () in
   let* () =
     test_transferring_from_infinite_source ctxt `Invoice (fun am ->
-        [(Invoice, Debited am, Block_application)])
+        Receipt.[item Invoice (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source ctxt `Bootstrap (fun am ->
-        [(Bootstrap, Debited am, Block_application)])
+        Receipt.[item Bootstrap (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source ctxt `Initial_commitments (fun am ->
-        [(Initial_commitments, Debited am, Block_application)])
+        Receipt.[item Initial_commitments (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source ctxt `Revelation_rewards (fun am ->
-        [(Nonce_revelation_rewards, Debited am, Block_application)])
+        Receipt.[item Nonce_revelation_rewards (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source ctxt `Attesting_rewards (fun am ->
-        [(Attesting_rewards, Debited am, Block_application)])
+        Receipt.[item Attesting_rewards (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source ctxt `Baking_rewards (fun am ->
-        [(Baking_rewards, Debited am, Block_application)])
+        Receipt.[item Baking_rewards (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source ctxt `Baking_bonuses (fun am ->
-        [(Baking_bonuses, Debited am, Block_application)])
+        Receipt.[item Baking_bonuses (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source ctxt `Minted (fun am ->
-        [(Minted, Debited am, Block_application)])
+        Receipt.[item Minted (Debited am) Block_application])
   in
   let* () =
     test_transferring_from_infinite_source
       ctxt
       `Liquidity_baking_subsidies
-      (fun am -> [(Liquidity_baking_subsidies, Debited am, Block_application)])
+      (fun am ->
+        Receipt.[item Liquidity_baking_subsidies (Debited am) Block_application])
   in
   let* () = test_transferring_from_contract ctxt in
   let* () = test_transferring_from_collected_commitments ctxt in
@@ -591,23 +614,23 @@ let test_all_combinations_of_givers_and_receivers () =
     Fails if bu1 and bu2 have different accounts or different origins, or
     if one is a credit while the other is a debit. *)
 let coalesce_balance_updates bu1 bu2 =
-  match (bu1, bu2) with
-  | (bu1_bal, bu1_balupd, bu1_origin), (bu2_bal, bu2_balupd, bu2_origin) -> (
-      assert (bu1_bal = bu2_bal) ;
-      assert (bu1_origin = bu2_origin) ;
-      let open Receipt in
-      match (bu1_balupd, bu2_balupd) with
-      | Credited bu1_am, Credited bu2_am ->
-          let bu_am =
-            match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
-          in
-          (bu1_bal, Credited bu_am, bu1_origin)
-      | Debited bu1_am, Debited bu2_am ->
-          let bu_am =
-            match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
-          in
-          (bu1_bal, Debited bu_am, bu1_origin)
-      | Credited _, Debited _ | Debited _, Credited _ -> assert false)
+  let open Receipt in
+  let (Balance_update_item (bu1_bal, bu1_balupd, bu1_origin)) = bu1 in
+  let (Balance_update_item (bu2_bal, bu2_balupd, bu2_origin)) = bu2 in
+  assert (bu1_bal = bu2_bal) ;
+  assert (bu1_origin = bu2_origin) ;
+  match (bu1_balupd, bu2_balupd) with
+  | Credited bu1_am, Credited bu2_am ->
+      let bu_am =
+        match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
+      in
+      Receipt.item bu1_bal (Credited bu_am) bu1_origin
+  | Debited bu1_am, Debited bu2_am ->
+      let bu_am =
+        match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
+      in
+      Receipt.item bu1_bal (Debited bu_am) bu1_origin
+  | Credited _, Debited _ | Debited _, Credited _ -> assert false
 
 (** Check that elt has the same balance in ctxt1 and ctxt2. *)
 let check_balances_are_consistent ctxt1 ctxt2 elt =
@@ -640,7 +663,10 @@ let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
   (* remove burning balance updates *)
   let debit_logs =
     List.filter
-      (fun b -> match b with Receipt.Burned, _, _ -> false | _ -> true)
+      (fun b ->
+        match b with
+        | Receipt.Balance_update_item (Burned, _, _) -> false
+        | _ -> true)
       debit_logs
   in
   (* Credit the receiver for each giver. *)
@@ -655,7 +681,10 @@ let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
   (* remove minting balance updates *)
   let credit_logs =
     List.filter
-      (fun b -> match b with Receipt.Minted, _, _ -> false | _ -> true)
+      (fun b ->
+        match b with
+        | Receipt.Balance_update_item (Minted, _, _) -> false
+        | _ -> true)
       credit_logs
   in
   (* Check equivalence of balance updates. *)

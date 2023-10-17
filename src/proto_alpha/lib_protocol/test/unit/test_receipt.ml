@@ -44,14 +44,14 @@ let random_amount () =
 let test_encodings balance =
   Random.init 0 ;
   let am = random_amount () in
-  let r1 = Receipt.(balance, Debited am, Protocol_migration) in
-  let r2 = Receipt.(balance, Credited am, Protocol_migration) in
-  let r3 = Receipt.(balance, Debited am, Subsidy) in
-  let r4 = Receipt.(balance, Credited am, Subsidy) in
-  let r5 = Receipt.(balance, Debited am, Simulation) in
-  let r6 = Receipt.(balance, Credited am, Simulation) in
-  let r7 = Receipt.(balance, Debited am, Block_application) in
-  let r8 = Receipt.(balance, Credited am, Block_application) in
+  let r1 = Receipt.item balance (Debited am) Protocol_migration in
+  let r2 = Receipt.item balance (Credited am) Protocol_migration in
+  let r3 = Receipt.item balance (Debited am) Subsidy in
+  let r4 = Receipt.item balance (Credited am) Subsidy in
+  let r5 = Receipt.item balance (Debited am) Simulation in
+  let r6 = Receipt.item balance (Credited am) Simulation in
+  let r7 = Receipt.item balance (Debited am) Block_application in
+  let r8 = Receipt.item balance (Credited am) Block_application in
   let coded =
     Json.construct
       Receipt.balance_updates_encoding_with_legacy_attestation_name

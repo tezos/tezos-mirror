@@ -376,19 +376,16 @@ let liquidity_baking_balance_update () =
     List.filter
       (fun el ->
         match el with
-        | ( Alpha_context.Receipt.Contract (Originated contract),
-            Alpha_context.Receipt.Credited _,
-            Alpha_context.Receipt.Subsidy ) ->
+        | Alpha_context.Receipt.Balance_update_item
+            (Contract (Originated contract), Credited _, Subsidy) ->
             Contract_hash.(contract = liquidity_baking)
         | _ -> false)
       balance_updates
   in
   let*? credits =
     List.fold_left_e
-      (fun accum (_, update, _) ->
-        match update with
-        | Alpha_context.Receipt.Credited x -> accum +? x
-        | Alpha_context.Receipt.Debited _ -> assert false)
+      (fun accum (Alpha_context.Receipt.Balance_update_item (_, update, _)) ->
+        match update with Credited x -> accum +? x | Debited _ -> assert false)
       (of_int 0)
       liquidity_baking_updates
   in
@@ -421,8 +418,16 @@ let get_balance_updates_in_result result =
 
 let get_balance_update_in_result result =
   match get_balance_updates_in_result result with
-  | [(Contract _, Credited balance, Protocol_migration)] -> balance
-  | [_; _; _; _; _; (Contract _, Credited balance, Protocol_migration)] ->
+  | [Balance_update_item (Contract _, Credited balance, Protocol_migration)] ->
+      balance
+  | [
+   _;
+   _;
+   _;
+   _;
+   _;
+   Balance_update_item (Contract _, Credited balance, Protocol_migration);
+  ] ->
       balance
   | _ -> assert false
 
@@ -488,10 +493,12 @@ let liquidity_baking_origination_result_lqt_balance () =
   let balance_updates = get_balance_updates_in_result result in
   match balance_updates with
   | [
-   (Liquidity_baking_subsidies, Debited am1, Protocol_migration);
-   (Storage_fees, Credited am2, Protocol_migration);
-   (Liquidity_baking_subsidies, Debited am3, Protocol_migration);
-   (Storage_fees, Credited am4, Protocol_migration);
+   Balance_update_item
+     (Liquidity_baking_subsidies, Debited am1, Protocol_migration);
+   Balance_update_item (Storage_fees, Credited am2, Protocol_migration);
+   Balance_update_item
+     (Liquidity_baking_subsidies, Debited am3, Protocol_migration);
+   Balance_update_item (Storage_fees, Credited am4, Protocol_migration);
   ] ->
       let* () = Assert.equal_tez ~loc:__LOC__ am1 am2 in
       let* () = Assert.equal_tez ~loc:__LOC__ am3 am4 in
