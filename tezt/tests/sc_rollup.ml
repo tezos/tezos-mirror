@@ -1435,7 +1435,12 @@ let test_context_gc ~challenge_window ~commitment_period =
       rollup_client
       ["global"; "block"; string_of_int (first_available_level - 1)]
   in
-  let* () = Process.check_error ~exit_code:1 rpc_call_err in
+  let* () =
+    Process.check_error
+      ~exit_code:1
+      ~msg:(rex "Attempting to access data for level")
+      rpc_call_err
+  in
   unit
 
 (* One can retrieve the list of originated SCORUs.

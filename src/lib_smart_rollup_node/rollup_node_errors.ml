@@ -78,6 +78,12 @@ type error += Operator_not_in_whitelist
 
 type error += Exit_bond_recovered_bailout_mode
 
+type error +=
+  | Access_below_first_available_level of {
+      first_available_level : int32;
+      accessed_level : int32;
+    }
+
 let () =
   register_error_kind
     `Permanent
@@ -418,4 +424,27 @@ let () =
     `Permanent
     Data_encoding.unit
     (function Exit_bond_recovered_bailout_mode -> Some () | _ -> None)
-    (fun () -> Exit_bond_recovered_bailout_mode)
+    (fun () -> Exit_bond_recovered_bailout_mode) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup.node.access_below_first_available_level"
+    ~title:"Rollup node access data that is garbage collected"
+    ~description:
+      "The rollup node attempts to access data that is garbage collected."
+    ~pp:(fun ppf (first, access) ->
+      Format.fprintf
+        ppf
+        "Attempting to access data for level %ld, which is before the first \
+         available level %ld"
+        access
+        first)
+    Data_encoding.(
+      obj2 (req "first_available_level" int32) (req "accessed_level" int32))
+    (function
+      | Access_below_first_available_level
+          {first_available_level; accessed_level} ->
+          Some (first_available_level, accessed_level)
+      | _ -> None)
+    (fun (first_available_level, accessed_level) ->
+      Access_below_first_available_level {first_available_level; accessed_level})
