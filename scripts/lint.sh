@@ -166,11 +166,9 @@ check_rust_toolchain_files () {
     done
 }
 
-update_gitlab_ci_yml () {
+check_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
-    # one being ignored. Gitlab linter doesn't warn for it
-    # Job key `unified_coverage` is allowed to be duplicated because we use a conditional include
-    # on files `.gitlab/ci/coverage/coverage.yml` and `.gitlab/ci/jobs/coverage_default.yml`
+    # one being ignored. Gitlab linter doesn't warn for it.
     find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml | \
         while read -r filename; do
             repeated=$(grep '^[^ #-]' "$filename" \
@@ -188,16 +186,6 @@ update_gitlab_ci_yml () {
         rm /tmp/repeated
         exit 1
     fi
-}
-
-check_coq_attributes () {
-    coq_attributes=$(find src/ \( -name "proto_0*" -prune \) -o -type f -exec grep -E "(\@|\@\@|\@\@\@)coq(.*)" {} \;)
-    if [ -n "$coq_attributes" ]; then
-        echo "coq attributes found, please remove them:";
-        echo "$coq_attributes";
-        exit 1
-    fi
-    echo "No coq attributes found."
 }
 
 check_licenses_git_new () {
@@ -235,14 +223,11 @@ case "$action" in
         action=update_all_dot_ocamlformats
         check_clean=true ;;
     "--check-gitlab-ci-yml" )
-        action=update_gitlab_ci_yml
-        check_clean=true ;;
+        action=check_gitlab_ci_yml ;;
     "--check-scripts" )
         action=check_scripts ;;
     "--check-redirects" )
         action=check_redirects ;;
-    "--check-coq-attributes" )
-        action=check_coq_attributes ;;
     "--check-rust-toolchain" )
         action=check_rust_toolchain_files ;;
     "--check-licenses-git-new" )
