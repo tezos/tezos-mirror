@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type lcc = {commitment : Commitment.Hash.t; level : int32}
+type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
 
 type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
 
@@ -646,6 +646,16 @@ let commitment_was_published {store; _} ~source commitment_hash =
       match info with
       | Some {published_at_level = Some _; _} -> true
       | _ -> false)
+
+let set_lcc node_ctxt lcc =
+  let open Lwt_result_syntax in
+  let lcc_l1 = Reference.get node_ctxt.lcc in
+  let* () = Store.Lcc.write node_ctxt.store.lcc lcc in
+  if lcc.level > lcc_l1.level then Reference.set node_ctxt.lcc lcc ;
+  let*! () =
+    Commitment_event.last_cemented_commitment_updated lcc.commitment lcc.level
+  in
+  return_unit
 
 let find_inbox {store; _} inbox_hash =
   let open Lwt_result_syntax in

@@ -228,16 +228,10 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
           (Sc_rollup_node_errors.Disagree_with_cemented
              {inbox_level; ours = our_commitment_hash; on_l1 = commitment_hash})
       in
-      let lcc = Reference.get node_ctxt.lcc in
-      let*! () =
-        if inbox_level > lcc.level then (
-          Reference.set
-            node_ctxt.lcc
-            {commitment = commitment_hash; level = inbox_level} ;
-          Commitment_event.last_cemented_commitment_updated
-            commitment_hash
-            inbox_level)
-        else Lwt.return_unit
+      let* () =
+        Node_context.set_lcc
+          node_ctxt
+          {commitment = commitment_hash; level = inbox_level}
       in
       let* () = maybe_recover_bond node_ctxt in
       return_unit
