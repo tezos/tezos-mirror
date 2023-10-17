@@ -284,7 +284,7 @@ let clear_cycle ctxt cycle =
   let* ctxt = Storage.Stake.Total_active_stake.remove_existing ctxt cycle in
   Selected_distribution_for_cycle.remove_existing ctxt cycle
 
-let fold ctxt ~f ~order init =
+let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
   let open Lwt_result_syntax in
   Storage.Stake.Active_delegates_with_minimal_stake.fold
     ctxt
@@ -313,7 +313,7 @@ let clear_at_cycle_end ctxt ~new_cycle =
   | None -> return ctxt
   | Some cycle_to_clear -> clear_cycle ctxt cycle_to_clear
 
-let fold_on_active_delegates_with_minimal_stake =
+let fold_on_active_delegates_with_minimal_stake_s =
   Storage.Stake.Active_delegates_with_minimal_stake.fold
 
 let get_selected_distribution = Selected_distribution_for_cycle.get

@@ -77,11 +77,11 @@ val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
 (** [fold ctxt ~f ~order init] folds [f] on the list of active delegates having the
     minimal required stake. The folding process starts with [init]. Each element of the
     list is the public key hash of a delegate. *)
-val fold :
+val fold_on_active_delegates_with_minimal_stake_es :
   Raw_context.t ->
   f:(Signature.Public_key_hash.t -> 'a -> 'a tzresult Lwt.t) ->
   order:[`Sorted | `Undefined] ->
-  'a ->
+  init:'a ->
   'a tzresult Lwt.t
 
 (** [fold_snapshot ctxt ~index ~f ~init] folds [f] on the list of active
@@ -116,7 +116,7 @@ val set_selected_distribution_for_cycle :
 val clear_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
-val fold_on_active_delegates_with_minimal_stake :
+val fold_on_active_delegates_with_minimal_stake_s :
   Raw_context.t ->
   order:[`Sorted | `Undefined] ->
   init:'a ->

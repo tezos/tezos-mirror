@@ -117,9 +117,9 @@ let update_listings ctxt =
   let open Lwt_result_syntax in
   let*! ctxt = Storage.Vote.Listings.clear ctxt in
   let* ctxt, total =
-    Stake_storage.fold
+    Stake_storage.fold_on_active_delegates_with_minimal_stake_es
       ctxt
-      (ctxt, 0L)
+      ~init:(ctxt, 0L)
       ~order:`Sorted
       ~f:(fun delegate (ctxt, total) ->
         let* weight = get_current_voting_power_free ctxt delegate in
