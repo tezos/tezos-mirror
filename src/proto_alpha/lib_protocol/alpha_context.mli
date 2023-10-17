@@ -2129,6 +2129,7 @@ module Receipt : sig
     | Protocol_migration
     | Subsidy
     | Simulation
+    | Delayed_operation of {operation_hash : Operation_hash.t}
 
   type balance_update_item = private
     | Balance_update_item :
