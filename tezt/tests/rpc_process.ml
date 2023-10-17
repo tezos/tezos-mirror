@@ -89,13 +89,17 @@ let test_kill =
   let* (_ : bool) = head_can_be_requested ~expected_level:1 client in
   unit
 
+type expected_behavior = Forward | Handle
+
 let test_forward =
   Protocol.register_test
     ~__FILE__
     ~title:"RPC process forward"
     ~tags:["rpc"; "process"; "forward"]
   @@ fun protocol ->
-  Log.info "Test that some specific RPCs are still forwarded to the node." ;
+  Log.info
+    "Test whether some specific RPCs are handled directly by the RPC process \
+     or forwarded to the node." ;
   let* node, client =
     Client.init_with_protocol
       ~event_sections_levels:[("rpc-process", `Debug)]
@@ -103,18 +107,23 @@ let test_forward =
       `Client
       ()
   in
-  let wait_for_forwarding ~rpc_prefix =
+  let wait_for expected_behavior ~rpc_prefix =
     let filter json =
       if String.starts_with ~prefix:rpc_prefix (JSON.as_string json) then
         Some ()
       else None
     in
     let where = sf "rpc_prefix = %s" rpc_prefix in
-    Node.wait_for ~where node "forwarding_rpc.v0" filter
+    let event_name =
+      match expected_behavior with
+      | Forward -> "forwarding_rpc.v0"
+      | Handle -> "locally_handled_rpc.v0"
+    in
+    Node.wait_for ~where node event_name filter
   in
-  let test_rpc ?error ~rpc_prefix rpc =
+  let test_rpc expected_behavior ?error ~rpc_prefix rpc =
     Log.info "Test %s" rpc_prefix ;
-    let waiter = wait_for_forwarding ~rpc_prefix in
+    let waiter = wait_for expected_behavior ~rpc_prefix in
     let* () =
       match error with
       | None ->
@@ -126,35 +135,44 @@ let test_forward =
     in
     waiter
   in
+  let* () = test_rpc Handle RPC.get_version ~rpc_prefix:"/version" in
+  let* () = test_rpc Handle RPC.get_config ~rpc_prefix:"/config" in
   let* () =
-    test_rpc (RPC.get_chain_chain_id ()) ~rpc_prefix:"/chains/main/chain_id"
+    test_rpc
+      Forward
+      (RPC.get_chain_chain_id ())
+      ~rpc_prefix:"/chains/main/chain_id"
   in
   let* () =
     test_rpc
+      Forward
       (RPC.get_chain_chain_id ~chain:"test" ())
       ~rpc_prefix:"/chains/test/chain_id"
       ~error:"No service found at this URL"
   in
   let* () =
     test_rpc
+      Forward
       (RPC.get_chain_chain_id ~chain:"nonexistent" ())
       ~rpc_prefix:"/chains/nonexistent/chain_id"
       ~error:"Cannot parse chain identifier"
   in
   let* () =
     test_rpc
+      Forward
       (RPC.post_chain_mempool_filter ~data:(Data (Ezjsonm.from_string "{}")) ())
       ~rpc_prefix:"/chains/main/mempool/filter"
   in
   let* () =
     test_rpc
+      Forward
       RPC.nonexistent_path
       ~rpc_prefix:"/nonexistent/path"
       ~error:"No service found at this URL"
   in
   let test_streaming_rpc ~rpc_prefix rpc =
     Log.info "Test streaming RPC: %s" rpc_prefix ;
-    let waiter = wait_for_forwarding ~rpc_prefix in
+    let waiter = wait_for Forward ~rpc_prefix in
     let url =
       RPC_core.make_uri (Node.as_rpc_endpoint node) rpc |> Uri.to_string
     in

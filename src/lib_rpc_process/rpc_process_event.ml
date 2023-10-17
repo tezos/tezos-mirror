@@ -42,6 +42,14 @@ let forwarding_rpc =
   declare_1
     ~section
     ~name:"forwarding_rpc"
-    ~msg:"forwarding to the node : {uri}"
+    ~msg:"forwarding to the node: {uri}"
+    ~level:Debug
+    ("uri", Data_encoding.string)
+
+let locally_handled_rpc =
+  declare_1
+    ~section
+    ~name:"locally_handled_rpc"
+    ~msg:"locally handled: {uri}"
     ~level:Debug
     ("uri", Data_encoding.string)

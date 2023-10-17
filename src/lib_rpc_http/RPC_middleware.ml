@@ -23,7 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let make_transform_callback ?ctx ?on_forwarding forwarding_endpoint callback
+type forwarder_events = {
+  on_forwarding : Cohttp.Request.t -> unit Lwt.t;
+  on_locally_handled : Cohttp.Request.t -> unit Lwt.t;
+}
+
+let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
     conn req body =
   let open Lwt_syntax in
   let open Cohttp in
@@ -39,7 +44,9 @@ let make_transform_callback ?ctx ?on_forwarding forwarding_endpoint callback
   in
   if answer_has_not_found_status answer then
     let* () =
-      match on_forwarding with Some f -> f req | None -> Lwt.return_unit
+      match forwarder_events with
+      | Some {on_forwarding; _} -> on_forwarding req
+      | None -> Lwt.return_unit
     in
     let uri = Request.uri req in
     let uri =
@@ -80,7 +87,13 @@ let make_transform_callback ?ctx ?on_forwarding forwarding_endpoint callback
     in
     let* answer = Cohttp_lwt_unix.Server.respond ~headers ~status ~body () in
     Lwt.return (`Response answer)
-  else Lwt.return answer
+  else
+    let* () =
+      match forwarder_events with
+      | Some {on_locally_handled; _} -> on_locally_handled req
+      | None -> Lwt.return_unit
+    in
+    Lwt.return answer
 
 let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
   let open Lwt_result_syntax in
@@ -109,5 +122,5 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
       (* Otherwise, the call must be done anyway. *)
       do_call ()
 
-let proxy_server_query_forwarder ?ctx ?on_forwarding forwarding_endpoint =
-  make_transform_callback ?ctx ?on_forwarding forwarding_endpoint
+let proxy_server_query_forwarder ?ctx ?forwarder_events forwarding_endpoint =
+  make_transform_callback ?ctx ?forwarder_events forwarding_endpoint
