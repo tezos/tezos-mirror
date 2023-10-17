@@ -31,6 +31,3 @@
 *)
 
 val register : protocols:Protocol.t list -> unit
-
-val register_migration :
-  migrate_from:Protocol.t -> migrate_to:Protocol.t -> unit
