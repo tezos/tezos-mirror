@@ -89,7 +89,9 @@ let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
   in
   {path; repo}
 
-let close ctxt = IStore.Repo.close ctxt.repo
+let close ctxt =
+  let _interrupted_gc = IStore.Gc.cancel ctxt.repo in
+  IStore.Repo.close ctxt.repo
 
 let readonly (index : [> `Read] index) = (index :> [`Read] index)
 
