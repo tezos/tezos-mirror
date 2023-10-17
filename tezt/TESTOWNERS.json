@@ -10,7 +10,9 @@
       "transaction",
       "transfer"
     ],
-    "path_prefixes": []
+    "path_prefixes": [
+      "src/lib_requester"
+    ]
   },
   "tezos2": {
     "tags": [],
