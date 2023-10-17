@@ -208,7 +208,13 @@ let apply_and_clear_current_cycle_denunciations ctxt =
         let+ ctxt, percentage, balance_updates =
           List.fold_left_es
             (fun (ctxt, percentage, balance_updates)
-                 Denunciations_repr.{rewarded; misbehaviour; misbehaviour_cycle} ->
+                 Denunciations_repr.
+                   {
+                     operation_hash = _;
+                     rewarded;
+                     misbehaviour;
+                     misbehaviour_cycle;
+                   } ->
               let slashing_percentage =
                 match misbehaviour with
                 | Double_baking ->

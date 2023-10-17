@@ -11,6 +11,7 @@
 type misbehaviour_cycle = Current | Previous
 
 type item = {
+  operation_hash : Operation_hash.t;
   rewarded : Signature.public_key_hash;
   misbehaviour : Misbehaviour.t;
   misbehaviour_cycle : misbehaviour_cycle;
