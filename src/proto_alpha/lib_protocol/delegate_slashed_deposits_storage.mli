@@ -27,7 +27,8 @@
 
 (** This module maintains the storage related to slashing of delegates for
    double signing. In particular, it is responsible for maintaining the
-   {!Storage.Slashed_deposits} and {!Storage.Contract.Slashed_deposits} tables.
+   {!Storage.Slashed_deposits}, {!Storage.Contract.Slashed_deposits}, and
+   {!Storage.Current_cycle_denunciations} tables.
 *)
 
 (** Returns true if the given delegate has already been slashed
@@ -70,7 +71,10 @@ val punish_double_signing :
   Misbehaviour.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
+  rewarded:Signature.public_key_hash ->
   (Raw_context.t * punishing_amounts) tzresult Lwt.t
 
 val clear_outdated_slashed_deposits :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
+
+val clear_current_cycle_denunciations : Raw_context.t -> Raw_context.t Lwt.t

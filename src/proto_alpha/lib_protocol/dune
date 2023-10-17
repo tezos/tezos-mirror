@@ -148,6 +148,7 @@
   Carbonated_map_costs
   Carbonated_map
   Staking_parameters_repr
+  Denunciations_repr
   Raw_context_intf
   Raw_context
   Storage_costs_generated
@@ -440,6 +441,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs_generated.ml
@@ -734,6 +736,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs_generated.ml
@@ -1012,6 +1015,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs_generated.ml
