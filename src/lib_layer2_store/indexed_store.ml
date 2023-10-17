@@ -168,6 +168,12 @@ module type SIMPLE_INDEXED_FILE = sig
     ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
 end
 
+module type INDEX_KEY = sig
+  include Index.Key.S
+
+  val pp : Format.formatter -> t -> unit
+end
+
 module type ENCODABLE_VALUE = sig
   type t
 
@@ -222,7 +228,7 @@ module Make_index_key (E : sig
   include FIXED_ENCODABLE_VALUE
 
   val equal : t -> t -> bool
-end) : Index.Key.S with type t = E.t = struct
+end) : INDEX_KEY with type t = E.t = struct
   include Make_index_value (E)
 
   let equal = E.equal
@@ -231,6 +237,13 @@ end) : Index.Key.S with type t = E.t = struct
 
   (* {!Stdlib.Hashtbl.hash} is 30 bits *)
   let hash_size = 30 (* in bits *)
+
+  let pp ppf k =
+    Format.fprintf
+      ppf
+      "%a"
+      Data_encoding.Json.pp
+      (Data_encoding.Json.construct E.encoding k)
 end
 
 let gc_reachable_of_iter =
@@ -243,7 +256,7 @@ let gc_reachable_of_iter =
       let first = dispenser () in
       (first, fun _k _v -> return (dispenser ()))
 
-module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
+module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
   module I = Index_unix.Make (K) (V) (Index.Cache.Unbounded)
 
   type internal_index = {index : I.t; index_path : string}
@@ -448,7 +461,8 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     let value = unsafe_find ~only_stale:true store k in
     let* () =
       match value with
-      | None -> Store_events.missing_value_gc N.name (K.encode k)
+      | None ->
+          Store_events.missing_value_gc N.name (Format.asprintf "%a" K.pp k)
       | Some v ->
           if filter v then I.replace tmp_index.index k v ;
           return_unit
@@ -693,10 +707,7 @@ end) : SINGLETON_STORE with type value := S.t = struct
   let readonly x = (x :> [`Read] t)
 end
 
-module Make_indexed_file
-    (N : NAME)
-    (K : Index.Key.S)
-    (V : ENCODABLE_VALUE_HEADER) =
+module Make_indexed_file (N : NAME) (K : INDEX_KEY) (V : ENCODABLE_VALUE_HEADER) =
 struct
   module Cache =
     Aches_lwt.Lache.Make_result (Aches.Rache.Transfer (Aches.Rache.LRU) (K))
@@ -1061,7 +1072,9 @@ struct
     let* () =
       match v with
       | None ->
-          let*! () = Store_events.missing_value_gc N.name (K.encode key) in
+          let*! () =
+            Store_events.missing_value_gc N.name (Format.asprintf "%a" K.pp key)
+          in
           return_unit
       | Some (value, header) ->
           unsafe_append_internal tmp_store ~key ~header ~value
@@ -1152,7 +1165,7 @@ end
 
 module Make_simple_indexed_file
     (N : NAME)
-    (K : Index.Key.S) (V : sig
+    (K : INDEX_KEY) (V : sig
       include ENCODABLE_VALUE_HEADER
 
       val header : t -> Header.t

@@ -225,6 +225,13 @@ module type NAME = sig
   val name : string
 end
 
+(** Values that can be used as keys for indices. *)
+module type INDEX_KEY = sig
+  include Index.Key.S
+
+  val pp : Format.formatter -> t -> unit
+end
+
 (** Values that can be encoded. *)
 module type ENCODABLE_VALUE = sig
   type t
@@ -253,16 +260,13 @@ end
 module Make_singleton (S : ENCODABLE_VALUE) :
   SINGLETON_STORE with type value := S.t
 
-module Make_indexable (_ : NAME) (K : Index.Key.S) (V : Index.Value.S) :
+module Make_indexable (_ : NAME) (K : INDEX_KEY) (V : Index.Value.S) :
   INDEXABLE_STORE with type key := K.t and type value := V.t
 
-module Make_indexable_removable (_ : NAME) (K : Index.Key.S) (V : Index.Value.S) :
+module Make_indexable_removable (_ : NAME) (K : INDEX_KEY) (V : Index.Value.S) :
   INDEXABLE_REMOVABLE_STORE with type key := K.t and type value := V.t
 
-module Make_indexed_file
-    (_ : NAME)
-    (K : Index.Key.S)
-    (V : ENCODABLE_VALUE_HEADER) :
+module Make_indexed_file (_ : NAME) (K : INDEX_KEY) (V : ENCODABLE_VALUE_HEADER) :
   INDEXED_FILE
     with type key := K.t
      and type value := V.t
@@ -270,7 +274,7 @@ module Make_indexed_file
 
 module Make_simple_indexed_file
     (_ : NAME)
-    (K : Index.Key.S) (V : sig
+    (K : INDEX_KEY) (V : sig
       include ENCODABLE_VALUE_HEADER
 
       val header : t -> Header.t
@@ -292,4 +296,4 @@ module Make_index_key (E : sig
   include FIXED_ENCODABLE_VALUE
 
   val equal : t -> t -> bool
-end) : Index.Key.S with type t = E.t
+end) : INDEX_KEY with type t = E.t
