@@ -2223,6 +2223,7 @@ module Delegate : sig
 
   val punish_double_signing :
     context ->
+    operation_hash:Operation_hash.t ->
     Misbehaviour.t ->
     public_key_hash ->
     Level.t ->
