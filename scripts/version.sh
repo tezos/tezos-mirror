@@ -15,7 +15,7 @@
 
 export ocaml_version=4.14.1
 export opam_version=2
-export recommended_rust_version=1.64.0
+export recommended_rust_version=1.65.0
 export recommended_node_version=16.18.1
 
 # The Alpine minor version used to build the opam-repository images
