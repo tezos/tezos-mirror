@@ -252,6 +252,8 @@ let get_delegator_balances ctxt ~delegator ~delegate_balances =
 let mint_pseudotokens ctxt (delegator_balances_before : delegator_balances)
     pseudotokens_to_mint =
   let open Lwt_result_syntax in
+  let delegator = delegator_balances_before.delegator in
+  let delegate = delegator_balances_before.delegate_balances.delegate in
   let*? new_pseudotoken_balance =
     Staking_pseudotoken_repr.(
       delegator_balances_before.pseudotoken_balance +? pseudotokens_to_mint)
@@ -264,16 +266,29 @@ let mint_pseudotokens ctxt (delegator_balances_before : delegator_balances)
   let*! ctxt =
     Storage.Contract.Staking_pseudotokens.add
       ctxt
-      delegator_balances_before.delegator
+      delegator
       new_pseudotoken_balance
   in
   let*! ctxt =
     Storage.Contract.Frozen_deposits_pseudotokens.add
       ctxt
-      (Implicit delegator_balances_before.delegate_balances.delegate)
+      (Implicit delegate)
       new_delegate_total_frozen_deposits_pseudotokens
   in
-  return (ctxt, [])
+  let balance_updates =
+    Receipt_repr.
+      [
+        item
+          (Staking_delegator_numerator {delegator})
+          (Credited pseudotokens_to_mint)
+          Block_application;
+        item
+          (Staking_delegate_denominator {delegate})
+          (Credited pseudotokens_to_mint)
+          Block_application;
+      ]
+  in
+  return (ctxt, balance_updates)
 
 (** [burn_pseudotokens ctxt delegator_balances_before
     pseudotokens_to_burn] burns [pseudotokens_to_burn] pseudotokens
@@ -293,6 +308,8 @@ let mint_pseudotokens ctxt (delegator_balances_before : delegator_balances)
 let burn_pseudotokens ctxt (delegator_balances_before : delegator_balances)
     pseudotokens_to_burn =
   let open Lwt_result_syntax in
+  let delegator = delegator_balances_before.delegator in
+  let delegate = delegator_balances_before.delegate_balances.delegate in
   let*? new_pseudotoken_balance =
     Staking_pseudotoken_repr.(
       delegator_balances_before.pseudotoken_balance -? pseudotokens_to_burn)
@@ -305,16 +322,29 @@ let burn_pseudotokens ctxt (delegator_balances_before : delegator_balances)
   let*! ctxt =
     Storage.Contract.Staking_pseudotokens.add
       ctxt
-      delegator_balances_before.delegator
+      delegator
       new_pseudotoken_balance
   in
   let*! ctxt =
     Storage.Contract.Frozen_deposits_pseudotokens.add
       ctxt
-      (Implicit delegator_balances_before.delegate_balances.delegate)
+      (Implicit delegate)
       new_delegate_total_frozen_deposits_pseudotokens
   in
-  return (ctxt, [])
+  let balance_updates =
+    Receipt_repr.
+      [
+        item
+          (Staking_delegate_denominator {delegate})
+          (Debited pseudotokens_to_burn)
+          Block_application;
+        item
+          (Staking_delegator_numerator {delegator})
+          (Debited pseudotokens_to_burn)
+          Block_application;
+      ]
+  in
+  return (ctxt, balance_updates)
 
 (** {0} Conversion between tez and pseudotokens *)
 
