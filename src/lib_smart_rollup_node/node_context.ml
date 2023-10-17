@@ -657,6 +657,14 @@ let set_lcc node_ctxt lcc =
   in
   return_unit
 
+let last_seen_lcc {store; genesis_info; _} =
+  let open Lwt_result_syntax in
+  let+ lcc = Store.Lcc.read store.lcc in
+  match lcc with
+  | Some lcc -> lcc
+  | None ->
+      {commitment = genesis_info.commitment_hash; level = genesis_info.level}
+
 let find_inbox {store; _} inbox_hash =
   let open Lwt_result_syntax in
   let+ inbox = Store.Inboxes.read store.inboxes inbox_hash in
@@ -1061,19 +1069,22 @@ let save_gc_info node_ctxt ~at_level ~gc_level =
   | Error _ -> Event.gc_levels_storage_failure ()
   | Ok () -> return_unit
 
+let get_gc_level node_ctxt =
+  let open Lwt_result_syntax in
+  match node_ctxt.config.history_mode with
+  | Archive ->
+      (* Never call GC in archive mode *)
+      return_none
+  | Full ->
+      (* GC up to LCC in full mode *)
+      let+ lcc = last_seen_lcc node_ctxt in
+      Some lcc.level
+
 let gc node_ctxt ~(level : int32) =
   let open Lwt_result_syntax in
   (* [gc_level] is the level corresponding to the hash on which GC will be
      called. *)
-  let gc_level =
-    match node_ctxt.config.history_mode with
-    | Archive ->
-        (* Never call GC in archive mode *)
-        None
-    | Full ->
-        (* GC up to LCC in full mode *)
-        Some (Reference.get node_ctxt.lcc).level
-  in
+  let* gc_level = get_gc_level node_ctxt in
   let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
   let* last_gc_level, first_available_level = get_gc_levels node_ctxt in
   match gc_level with
