@@ -58,6 +58,12 @@ RPC Changes
 Operation receipts
 ------------------
 
+Protocol parameters
+-------------------
+
+- The protocol constant ``max_slashing_period`` has been moved from parametric
+  constants to fixed constants. (MR :gl:`!10451`)
+
 Bug Fixes
 ---------
 
