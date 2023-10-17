@@ -1,18 +1,23 @@
 {
-    "infrastructure": {
-        "tags": [],
-        "path_prefixes": []
-    },
-    "layer1": {
-        "tags": [],
-        "path_prefixes": []
-    },
-    "tezos2": {
-        "tags": [],
-        "path_prefixes": []
-    },
-    "etherlink": {
-        "tags": [],
-        "path_prefixes": []
-    }
+  "infrastructure": {
+    "tags": [],
+    "path_prefixes": []
+  },
+  "layer1": {
+    "tags": [],
+    "path_prefixes": []
+  },
+  "tezos2": {
+    "tags": [],
+    "path_prefixes": []
+  },
+  "etherlink": {
+    "tags": [
+      "sc_rollup",
+      "rollup_node",
+      "refutation",
+      "commitment"
+    ],
+    "path_prefixes": []
+  }
 }
