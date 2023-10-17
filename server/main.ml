@@ -324,6 +324,18 @@ let maybe_alter_and_create_tables db_pool =
       | Error e -> Lwt.return_error e
       | Ok () -> maybe_create_tables db_pool)
 
+let may_insert_delegate =
+  let open
+    Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
+      (Tezos_base.TzPervasives.Signature.Public_key_hash) in
+  let delegate_cache = create 1_000 in
+  fun (module Db : Caqti_lwt.CONNECTION) address ->
+    let already_treated = mem delegate_cache address in
+    add delegate_cache address ;
+    if already_treated then
+      Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax.return_unit
+    else Db.exec Sql_requests.maybe_insert_delegate address
+
 let endorsing_rights_callback db_pool g rights =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
@@ -333,8 +345,8 @@ let endorsing_rights_callback db_pool g rights =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun right ->
-              Db.exec
-                Sql_requests.maybe_insert_delegate
+              may_insert_delegate
+                (module Db)
                 right.Teztale_lib.Consensus_ops.address)
             rights
         in
@@ -414,7 +426,7 @@ let block_callback =
         (fun (module Db : Caqti_lwt.CONNECTION) ->
           let* () =
             may_handle_block @@ fun () ->
-            Db.exec Sql_requests.maybe_insert_delegate delegate
+            may_insert_delegate (module Db) delegate
           in
           let level = Int32.of_string (Re.Group.get g 1) in
           let* () =
@@ -481,8 +493,8 @@ let operations_callback db_pool g source operations =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, _) ->
-              Db.exec
-                Sql_requests.maybe_insert_delegate
+              may_insert_delegate
+                (module Db)
                 right.Teztale_lib.Consensus_ops.address)
             operations
         in
@@ -537,16 +549,16 @@ let import_callback db_pool g data =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun slot ->
-              Db.exec
-                Sql_requests.maybe_insert_delegate
+              may_insert_delegate
+                (module Db)
                 slot.Teztale_lib.Data.Delegate_operations.delegate)
             data.Teztale_lib.Data.delegate_operations
         in
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun block ->
-              Db.exec
-                Sql_requests.maybe_insert_delegate
+              may_insert_delegate
+                (module Db)
                 block.Teztale_lib.Data.Block.delegate)
             data.Teztale_lib.Data.blocks
         in
