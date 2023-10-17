@@ -65,27 +65,26 @@ let check_cementing_highwatermark ~cementing_highwatermark block_store =
       return_unit
   | None, None -> return_unit
 
-let is_block_stored block_store (descriptor, expected_metadata, block_name) =
+let is_block_stored block_store ((hash, level), expected_metadata, block_name) =
   let open Lwt_result_syntax in
   let* o =
     Block_store.read_block
       ~read_metadata:expected_metadata
       block_store
-      (Block (fst descriptor, 0))
+      (Block (hash, 0))
   in
   match o with
-  | None -> tzfail (Unexpected_missing_block {block_name})
+  | None -> tzfail (Unexpected_missing_block {block_name; level; hash})
   | Some _block ->
       if expected_metadata then
         (* Force read the metadata of a block to avoid false negatives
            due to the cache.*)
         let* o =
-          Block_store.read_block_metadata
-            block_store
-            (Block (fst descriptor, 0))
+          Block_store.read_block_metadata block_store (Block (hash, 0))
         in
         match o with
-        | None -> tzfail (Unexpected_missing_block_metadata {block_name})
+        | None ->
+            tzfail (Unexpected_missing_block_metadata {block_name; level; hash})
         | Some _ -> return_unit
       else return_unit
 

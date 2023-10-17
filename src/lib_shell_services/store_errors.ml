@@ -973,8 +973,16 @@ let () =
 
 (* Consistency errors: *)
 type error +=
-  | Unexpected_missing_block of {block_name : string}
-  | Unexpected_missing_block_metadata of {block_name : string}
+  | Unexpected_missing_block of {
+      block_name : string;
+      level : Int32.t;
+      hash : Block_hash.t;
+    }
+  | Unexpected_missing_block_metadata of {
+      block_name : string;
+      level : Int32.t;
+      hash : Block_hash.t;
+    }
   | Unexpected_missing_activation_block of {
       block : Block_hash.t;
       protocol : Protocol_hash.t;
@@ -1001,30 +1009,50 @@ let () =
     ~id:"store.unexpected_missing_block"
     ~title:"Unexpected missing block"
     ~description:"A block is unexpectedly missing from the store."
-    ~pp:(fun ppf block_name ->
+    ~pp:(fun ppf (block_name, level, hash) ->
       Format.fprintf
         ppf
-        "The block '%s' is unexpectedly missing from the store."
-        block_name)
-    Data_encoding.(obj1 (req "missing_block" string))
+        "The block '%s' (%ld, %a) is unexpectedly missing from the store."
+        block_name
+        level
+        Block_hash.pp_short
+        hash)
+    Data_encoding.(
+      obj3
+        (req "missing_block" string)
+        (req "level" int32)
+        (req "hash" Block_hash.encoding))
     (function
-      | Unexpected_missing_block {block_name} -> Some block_name | _ -> None)
-    (fun block_name -> Unexpected_missing_block {block_name}) ;
+      | Unexpected_missing_block {block_name; level; hash} ->
+          Some (block_name, level, hash)
+      | _ -> None)
+    (fun (block_name, level, hash) ->
+      Unexpected_missing_block {block_name; level; hash}) ;
   register_error_kind
     `Permanent
     ~id:"store.unexpected_missing_block_metadata"
     ~title:"Unexpected missing block metadata"
     ~description:"A block's metadata is unexpectedly missing from the store."
-    ~pp:(fun ppf block_name ->
+    ~pp:(fun ppf (block_name, level, hash) ->
       Format.fprintf
         ppf
-        "The block '%s' metadata is unexpectedly missing from the store."
-        block_name)
-    Data_encoding.(obj1 (req "missing_block_metadata" string))
+        "The block '%s' (%ld, %a) metadata is unexpectedly missing from the \
+         store."
+        block_name
+        level
+        Block_hash.pp_short
+        hash)
+    Data_encoding.(
+      obj3
+        (req "missing_block_metadata" string)
+        (req "level" int32)
+        (req "hash" Block_hash.encoding))
     (function
-      | Unexpected_missing_block_metadata {block_name} -> Some block_name
+      | Unexpected_missing_block_metadata {block_name; level; hash} ->
+          Some (block_name, level, hash)
       | _ -> None)
-    (fun block_name -> Unexpected_missing_block_metadata {block_name}) ;
+    (fun (block_name, level, hash) ->
+      Unexpected_missing_block_metadata {block_name; level; hash}) ;
   register_error_kind
     `Permanent
     ~id:"store.unexpected_missing_activation_block"
