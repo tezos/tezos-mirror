@@ -9,7 +9,10 @@ use evm_execution::account_storage::AccountStorageError;
 use evm_execution::{DurableStorageError, EthereumError};
 use primitive_types::U256;
 use rlp::DecoderError;
+use tezos_data_encoding::enc::BinError;
 use tezos_ethereum::tx_common::SigError;
+use tezos_smart_rollup_encoding::entrypoint::EntrypointError;
+use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
@@ -65,6 +68,16 @@ pub enum UpgradeProcessError {
 }
 
 #[derive(Error, Debug)]
+pub enum EncodingError {
+    #[error("Invalid ticket")]
+    Ticket(TicketError),
+    #[error("Invalid entrypoint")]
+    Entrypoint(EntrypointError),
+    #[error("Invalid serialization")]
+    Bin(BinError),
+}
+
+#[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
     Transfer(TransferError),
@@ -86,6 +99,8 @@ pub enum Error {
     InvalidSignatureCheck,
     #[error("Issue during reboot")]
     Reboot,
+    #[error(transparent)]
+    Encoding(EncodingError),
 }
 
 impl From<PathError> for StorageError {
@@ -154,5 +169,23 @@ impl From<tezos_smart_rollup_storage::StorageError> for Error {
 impl From<AccountStorageError> for Error {
     fn from(e: AccountStorageError) -> Self {
         Self::Storage(StorageError::AccountStorage(e))
+    }
+}
+
+impl From<TicketError> for Error {
+    fn from(e: TicketError) -> Self {
+        Self::Encoding(EncodingError::Ticket(e))
+    }
+}
+
+impl From<EntrypointError> for Error {
+    fn from(e: EntrypointError) -> Self {
+        Self::Encoding(EncodingError::Entrypoint(e))
+    }
+}
+
+impl From<BinError> for Error {
+    fn from(e: BinError) -> Self {
+        Self::Encoding(EncodingError::Bin(e))
     }
 }

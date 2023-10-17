@@ -12,17 +12,28 @@ use evm_execution::handler::ExecutionOutcome;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
 use primitive_types::{H160, U256};
+use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
+use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_core::MAX_OUTPUT_SIZE;
+use tezos_smart_rollup_encoding::contract::Contract;
+use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
+use tezos_smart_rollup_encoding::michelson::ticket::UnitTicket;
+use tezos_smart_rollup_encoding::michelson::{
+    MichelsonContract, MichelsonPair, MichelsonUnit,
+};
+use tezos_smart_rollup_encoding::outbox::OutboxMessage;
+use tezos_smart_rollup_encoding::outbox::OutboxMessageTransaction;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
-use crate::storage::index_account;
+use crate::storage::{index_account, read_ticketer};
 use crate::CONFIG;
 
 // This implementation of `Transaction` is used to share the logic of
@@ -325,6 +336,62 @@ fn apply_deposit<Host: Runtime>(
     Ok(Some((caller, Some(execution_outcome), gas_used.into())))
 }
 
+fn post_withdrawals<Host: Runtime>(
+    host: &mut Host,
+    withdrawals: &Vec<Withdrawal>,
+) -> Result<(), Error> {
+    if withdrawals.is_empty() {
+        return Ok(());
+    };
+
+    let destination = match read_ticketer(host) {
+        Some(x) => Contract::Originated(x),
+        None => return Err(Error::InvalidParsing),
+    };
+    let entrypoint = Entrypoint::try_from(String::from("burn"))?;
+
+    for withdrawal in withdrawals {
+        // Wei is 10^18, whereas mutez is 10^6.
+        let amount: U256 =
+            U256::checked_div(withdrawal.amount, U256::from(10).pow(U256::from(12)))
+                // If we reach the unwrap_or it will fail at the next step because
+                // we cannot create a ticket with no amount. But by construction
+                // it should not happen, we do not divide by 0.
+                .unwrap_or(U256::zero());
+
+        let amount = if amount < U256::from(u64::max_value()) {
+            amount.as_u64()
+        } else {
+            // Users can withdraw only mutez, converted to ETH, thus the
+            // maximum value of `amount` is `Int64.max_int` which fit
+            // in a u64.
+            return Err(Error::InvalidConversion);
+        };
+
+        let ticket = UnitTicket::new(destination.clone(), MichelsonUnit, amount)?;
+        let parameters = MichelsonPair::<MichelsonContract, UnitTicket>(
+            MichelsonContract(withdrawal.target.clone()),
+            ticket,
+        );
+
+        let withdrawal = OutboxMessageTransaction {
+            parameters,
+            entrypoint: entrypoint.clone(),
+            destination: destination.clone(),
+        };
+        let outbox_message =
+            OutboxMessage::AtomicTransactionBatch(vec![withdrawal].into());
+
+        let mut encoded = Vec::with_capacity(MAX_OUTPUT_SIZE);
+
+        outbox_message.bin_write(&mut encoded)?;
+
+        host.write_output(&encoded)?;
+    }
+
+    Ok(())
+}
+
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
@@ -354,6 +421,10 @@ pub fn apply_transaction<Host: Runtime>(
                 log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
             }
 
+            if let Some(ref execution_outcome) = execution_outcome {
+                post_withdrawals(host, &execution_outcome.withdrawals)?
+            }
+
             let receipt_info = make_receipt_info(
                 transaction.tx_hash,
                 index,
@@ -361,6 +432,7 @@ pub fn apply_transaction<Host: Runtime>(
                 caller,
                 to,
             );
+
             let object_info = make_object_info(
                 transaction,
                 caller,
@@ -368,6 +440,7 @@ pub fn apply_transaction<Host: Runtime>(
                 gas_used,
                 block_constants.base_fee_per_gas,
             );
+
             index_new_accounts(host, accounts_index, &receipt_info)?;
             Ok(Some((receipt_info, object_info)))
         }
