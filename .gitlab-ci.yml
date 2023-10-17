@@ -30,6 +30,7 @@ build:
     - sudo apt update
   script:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
+    - opam-2.1 pin add -n dune 3.10.0 # workaround! to be erased when octez v18.0 is out
     - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
     - opam-2.1 install -y caqti-lwt caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass --criteria="-changed,-removed"
     - dune build archiver/main.exe server/main.exe
