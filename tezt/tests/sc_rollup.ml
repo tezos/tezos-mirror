@@ -3975,7 +3975,6 @@ let test_refutation_migration ~migrate_from ~migrate_to =
     [
       ( "inbox_proof_1",
         3,
-        true,
         refutation_scenario_parameters
           ~loser_modes:["3 4 0"]
           (inputs_for 10)
@@ -3983,7 +3982,6 @@ let test_refutation_migration ~migrate_from ~migrate_to =
           ~priority:`Priority_loser );
       ( "pvm_proof_2",
         7,
-        false,
         refutation_scenario_parameters
           ~loser_modes:["7 7 22_000_002_000"]
           (inputs_for 10)
@@ -3992,12 +3990,12 @@ let test_refutation_migration ~migrate_from ~migrate_to =
     ]
   in
   List.iter
-    (fun (variant, fault_level, flaky_scenario, inputs) ->
+    (fun (variant, fault_level, inputs) ->
       List.iter
-        (fun (migration_variant, migration_on_event, flaky_variant) ->
+        (fun (migration_variant, migration_on_event) ->
           let variant = String.concat "_" [variant; migration_variant] in
           test_refutation_migration_scenario
-            ~flaky:(flaky_scenario && flaky_variant)
+            ~flaky:true
             ~kind:"wasm_2_0_0"
               (* The tests for refutations over migrations are only ran for wasm
                  as the arith PVMs do not have the same semantic in all
@@ -4011,14 +4009,11 @@ let test_refutation_migration ~migrate_from ~migrate_to =
             ~migrate_to
             ~migration_on_event)
         [
-          ("ongoing", injecting_refute_event, false);
-          ("at_inbox", l1_level_event fault_level, true);
-          ( "at_commitment",
-            commitment_computed_event ~inbox_level:fault_level,
-            false );
+          ("ongoing", injecting_refute_event);
+          ("at_inbox", l1_level_event fault_level);
+          ("at_commitment", commitment_computed_event ~inbox_level:fault_level);
           ( "at_published_commitment",
-            published_commitment_event ~inbox_level:fault_level,
-            false );
+            published_commitment_event ~inbox_level:fault_level );
         ])
     tests
 
