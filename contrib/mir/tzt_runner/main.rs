@@ -14,7 +14,7 @@ fn run_test(file: &str) -> Result<(), String> {
     let contents = read_to_string(file).map_err(|e| e.to_string())?;
     let tzt_test = parse_tzt_test(&contents).map_err(|e| e.to_string())?;
 
-    run_tzt_test(tzt_test).map_err(|e| format!("{:?}", e))
+    run_tzt_test(tzt_test).map_err(|e| format!("{}", e))
 }
 
 fn main() {
@@ -121,7 +121,10 @@ mod tztrunner_tests {
     #[test]
     fn test_runner_interpreter_unexpected_success() {
         let tzt_test = parse_tzt_test(TZT_SAMPLE_EXP_FAIL_BUT_SUCCEED).unwrap();
-        assert!(matches!(run_tzt_test(tzt_test), Err(UnexpectedSuccess(_))));
+        assert!(matches!(
+            run_tzt_test(tzt_test),
+            Err(UnexpectedSuccess(_, _))
+        ));
     }
 
     #[test]

@@ -98,10 +98,10 @@ pub fn check_expectation(
             // a success, fail the test with appropriate error..
             Err(UnexpectedError(e))
         }
-        (ExpectError(_), Ok((_, i_stack))) => {
+        (ExpectError(e), Ok((_, i_stack))) => {
             // If the run was success, but the expectation expected
             // a failure, fail the test.
-            Err(UnexpectedSuccess(i_stack))
+            Err(UnexpectedSuccess(e, i_stack))
         }
         (ExpectError(err_exp), Err(t_error)) => check_error_expectation(ctx, err_exp, t_error),
     }
