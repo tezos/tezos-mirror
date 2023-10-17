@@ -314,7 +314,7 @@ let burn_pseudotokens ctxt (delegator_balances_before : delegator_balances)
       (Implicit delegator_balances_before.delegate_balances.delegate)
       new_delegate_total_frozen_deposits_pseudotokens
   in
-  return ctxt
+  return (ctxt, [])
 
 (** {0} Conversion between tez and pseudotokens *)
 
@@ -415,13 +415,13 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* delegate_balances = get_delegate_balances ctxt ~delegate in
   if Tez_repr.(delegate_balances.frozen_deposits_staked_tez = zero) then
-    return (ctxt, Tez_repr.zero)
+    return (ctxt, Tez_repr.zero, [])
   else
     let* delegator_balances =
       get_delegator_balances ctxt ~delegator ~delegate_balances
     in
     if Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)
-    then return (ctxt, Tez_repr.zero)
+    then return (ctxt, Tez_repr.zero, [])
     else (
       assert (
         Staking_pseudotoken_repr.(
@@ -457,19 +457,19 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
             ( delegator_balances.pseudotoken_balance,
               tez_of delegate_balances delegator_balances.pseudotoken_balance )
       in
-      let+ ctxt =
+      let+ ctxt, balance_updates =
         burn_pseudotokens ctxt delegator_balances pseudotokens_to_unstake
       in
-      (ctxt, tez_to_unstake))
+      (ctxt, tez_to_unstake, balance_updates))
 
 let request_unstake ctxt ~contract ~delegate requested_amount =
   let open Lwt_result_syntax in
-  if Tez_repr.(requested_amount = zero) then return (ctxt, Tez_repr.zero)
+  if Tez_repr.(requested_amount = zero) then return (ctxt, Tez_repr.zero, [])
   else if Contract_repr.(contract = Implicit delegate) then
     let+ delegate_own_frozen_deposits =
       get_own_frozen_deposits ctxt ~delegate
     in
-    (ctxt, Tez_repr.min delegate_own_frozen_deposits requested_amount)
+    (ctxt, Tez_repr.min delegate_own_frozen_deposits requested_amount, [])
   else request_unstake ctxt ~delegator:contract ~delegate requested_amount
 
 module For_RPC = struct

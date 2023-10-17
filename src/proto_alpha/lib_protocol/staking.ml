@@ -176,14 +176,15 @@ let stake ctxt ~sender ~delegate amount =
 
 let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
-  let* ctxt, tez_to_unstake =
+  let* ctxt, tez_to_unstake, request_unstake_balance_updates =
     Staking_pseudotokens_storage.request_unstake
       ctxt
       ~contract:sender_contract
       ~delegate
       requested_amount
   in
-  if Tez_repr.(tez_to_unstake = zero) then return (ctxt, [])
+  if Tez_repr.(tez_to_unstake = zero) then
+    return (ctxt, request_unstake_balance_updates)
   else
     let*? ctxt =
       Raw_context.consume_gas ctxt Adaptive_issuance_costs.request_unstake_cost
@@ -208,4 +209,6 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
         current_cycle
         tez_to_unstake
     in
-    (ctxt, balance_updates @ finalize_balance_updates)
+    ( ctxt,
+      request_unstake_balance_updates @ balance_updates
+      @ finalize_balance_updates )
