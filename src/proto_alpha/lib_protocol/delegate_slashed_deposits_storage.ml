@@ -209,12 +209,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
           List.fold_left_es
             (fun (ctxt, percentage, balance_updates)
                  Denunciations_repr.
-                   {
-                     operation_hash = _;
-                     rewarded;
-                     misbehaviour;
-                     misbehaviour_cycle;
-                   } ->
+                   {operation_hash; rewarded; misbehaviour; misbehaviour_cycle} ->
               let slashing_percentage =
                 match misbehaviour with
                 | Double_baking ->
@@ -309,12 +304,18 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                   init_to_burn_to_reward
                   slashable_cycles
               in
+              let origin = Receipt_repr.Delayed_operation {operation_hash} in
               let* ctxt, punish_balance_updates =
-                Token.transfer_n ctxt to_burn `Double_signing_punishments
+                Token.transfer_n
+                  ctxt
+                  ~origin
+                  to_burn
+                  `Double_signing_punishments
               in
               let+ ctxt, reward_balance_updates =
                 Token.transfer_n
                   ctxt
+                  ~origin
                   to_reward
                   (`Contract (Contract_repr.Implicit rewarded))
               in
