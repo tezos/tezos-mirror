@@ -100,6 +100,8 @@ val div_exn : t -> int -> t
 
 val encoding : t Data_encoding.t
 
+val balance_update_encoding : [`Credited of t | `Debited of t] Data_encoding.t
+
 include Compare.S with type t := t
 
 val pp : Format.formatter -> t -> unit

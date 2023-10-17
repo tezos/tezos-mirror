@@ -327,26 +327,16 @@ type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 
 let is_zero_update = function Debited t | Credited t -> Tez_repr.(t = zero)
 
+let conv_balance_update encoding =
+  Data_encoding.conv
+    (function Credited v -> `Credited v | Debited v -> `Debited v)
+    (function `Credited v -> Credited v | `Debited v -> Debited v)
+    encoding
+
 let balance_update_encoding =
   let open Data_encoding in
   def "operation_metadata.alpha.balance_update"
-  @@ obj1
-       (req
-          "change"
-          (conv
-             (function
-               | Credited v -> Tez_repr.to_mutez v
-               | Debited v -> Int64.neg (Tez_repr.to_mutez v))
-             ( Json.wrap_error @@ fun v ->
-               if Compare.Int64.(v < 0L) then
-                 match Tez_repr.of_mutez (Int64.neg v) with
-                 | Some v -> Debited v
-                 | None -> assert false (* [of_mutez z] is [None] iff [z < 0] *)
-               else
-                 match Tez_repr.of_mutez v with
-                 | Some v -> Credited v
-                 | None -> assert false (* same *) )
-             int64))
+  @@ obj1 (req "change" (conv_balance_update Tez_repr.balance_update_encoding))
 
 type update_origin =
   | Block_application
