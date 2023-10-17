@@ -73,7 +73,7 @@ let () =
     ~pp:(fun ppf _ ->
       Format.fprintf
         ppf
-        "Expected a valid path to profiling directory, nothing provided.")
+        "Expected a valid path for profiling output, nothing provided.")
     Data_encoding.empty
     (function No_output_directory -> Some () | _ -> None)
     (fun () -> No_output_directory) ;
@@ -154,6 +154,9 @@ let split_lines_starting_with_b input_str =
   let lines = List.map (fun line -> "B" ^ line) lines in
   lines
 
+let mkdir dirname =
+  try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
+
 let create_files_from_lines input_file searched_block output_directory =
   (* Get only file name. *)
   let output_file_prefix = String.split_on_char '/' input_file in
@@ -186,11 +189,10 @@ let create_files_from_lines input_file searched_block output_directory =
                String.starts_with ~prefix:"B" first_line
                && String.equal block_name searched_block
              then (
-               let file_name =
-                 Printf.sprintf "%s_%s.txt" output_file_prefix block_name
-               in
+               let file_name = Printf.sprintf "%s_.txt" output_file_prefix in
+               let () = mkdir @@ output_directory ^ "/" ^ block_name in
                let out_channel =
-                 open_out (output_directory ^ "/" ^ file_name)
+                 open_out (output_directory ^ "/" ^ block_name ^ "/" ^ file_name)
                in
                output_string out_channel line ;
                close_out out_channel))
