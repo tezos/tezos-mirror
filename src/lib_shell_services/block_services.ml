@@ -797,7 +797,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       mk_version_informations
         ~supported:[version_0; version_1]
         ~latest:Version_1
-        ~default:Version_1
+        ~default:Version_0
         ()
 
     let metadata_query =
@@ -806,11 +806,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           object
             method version = version
           end)
-      |+ field
-           "version"
-           (version_arg metadata_versions)
-           metadata_versions.default
-           (fun t -> t#version)
+      |+ field "version" (version_arg metadata_versions) Version_0 (fun t ->
+             t#version)
       |> seal
 
     let metadata =
@@ -879,7 +876,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       mk_version_informations
         ~supported:[version_0; version_1]
         ~latest:Version_1
-        ~default:Version_1
+        ~default:Version_0
         ()
 
     let force_operation_metadata_query =
@@ -1154,7 +1151,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           mk_version_informations
             ~supported:[version_0; version_1]
             ~latest:Version_1
-            ~default:Version_1
+            ~default:Version_0
             ()
 
         let operations_query =
@@ -1487,7 +1484,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               {version = Version_2; use_legacy_attestation_name = false};
             ]
           ~latest:Version_2
-          ~default:Version_2
+          ~default:Version_1
           ()
 
       let pending_query =
@@ -1621,7 +1618,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         mk_version_informations
           ~supported:[version_0; version_1]
           ~latest:Version_1
-          ~default:Version_1
+          ~default:Version_0
           ()
 
       let mempool_query =
@@ -1828,7 +1825,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let f = make_call0 S.raw_header ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
 
-  let metadata ctxt ?(version = S.metadata_versions.default) =
+  let metadata ctxt ?(version = Version_0) =
     let open Lwt_result_syntax in
     let f = make_call0 S.metadata ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () ->
