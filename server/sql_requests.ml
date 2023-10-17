@@ -25,7 +25,7 @@
 
 let env driver_info s =
   match (Caqti_driver_info.dialect_tag driver_info, s) with
-  | `Pgsql, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "SERIAL"
+  | `Pgsql, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "BIGSERIAL"
   | `Sqlite, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "INTEGER"
   | `Pgsql, "BYTES" -> Caqti_query.L "BYTEA"
   | `Sqlite, "BYTES" -> Caqti_query.L "BLOB"
@@ -52,7 +52,7 @@ let create_blocks =
   \  hash $(BYTES) UNIQUE NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
   \  round INTEGER NOT NULL,\n\
-  \  baker INTEGER NOT NULL,\n\
+  \  baker BIGINT NOT NULL,\n\
   \  FOREIGN KEY (baker) REFERENCES delegates(id))"
 
 let create_blocks_reception =
@@ -60,8 +60,8 @@ let create_blocks_reception =
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  application_timestamp TEXT, -- ISO8601 string\n\
   \  validation_timestamp TEXT, -- ISO8601 string\n\
-  \  block INTEGER NOT NULL,\n\
-  \  source INTEGER NOT NULL,\n\
+  \  block BIGINT NOT NULL,\n\
+  \  source BIGINT NOT NULL,\n\
   \  FOREIGN KEY (block) REFERENCES blocks(id),\n\
   \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
   \  UNIQUE (block, source))"
@@ -71,7 +71,7 @@ let create_operations =
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  hash $(BYTES) UNIQUE NOT NULL,\n\
   \  endorsement BOOLEAN NOT NULL,\n\
-  \  endorser INTEGER NOT NULL,\n\
+  \  endorser BIGINT NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
   \  round INTEGER,\n\
   \  FOREIGN KEY (endorser) REFERENCES delegates(id))"
@@ -80,8 +80,8 @@ let create_operations_reception =
   "CREATE TABLE IF NOT EXISTS operations_reception(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  timestamp TEXT NOT NULL, -- ISO8601 string\n\
-  \  operation INTEGER NOT NULL,\n\
-  \  source INTEGER NOT NULL,\n\
+  \  operation BIGINT NOT NULL,\n\
+  \  source BIGINT NOT NULL,\n\
   \  errors $(BYTES),\n\
   \  FOREIGN KEY (operation) REFERENCES operations(id),\n\
   \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
@@ -90,8 +90,8 @@ let create_operations_reception =
 let create_operations_inclusion =
   "CREATE TABLE IF NOT EXISTS operations_inclusion(\n\
   \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \   block INTEGER NOT NULL,\n\
-  \   operation INTEGER NOT NULL,\n\
+  \   block BIGINT NOT NULL,\n\
+  \   operation BIGINT NOT NULL,\n\
   \   FOREIGN KEY (block) REFERENCES blocks(id),\n\
   \   FOREIGN KEY (operation) REFERENCES operations(id),\n\
   \   UNIQUE (block, operation))"
@@ -100,7 +100,7 @@ let create_endorsing_rights =
   "CREATE TABLE IF NOT EXISTS endorsing_rights(\n\
   \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \   level INTEGER NOT NULL,\n\
-  \   delegate INTEGER NOT NULL,\n\
+  \   delegate BIGINT NOT NULL,\n\
   \   first_slot INTEGER NOT NULL,\n\
   \   endorsing_power INTEGER NOT NULL,\n\
   \   FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
