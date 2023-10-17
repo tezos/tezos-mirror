@@ -66,12 +66,6 @@ Node
 Client
 ------
 
-- For the protocols that support it, added an
-  ``operation_with_legacy_attestation_name`` and
-  ``operation_with_legacy_attestation_name.unsigned`` registered encodings that
-  support legacy ``endorsement`` kind instead of ``attestation``. (MR
-  :gl:`!9832`)
-
 - Fixed indentation of the stacks outputted by the ``normalize stack``
   command. (MR :gl:`!9944`)
 
