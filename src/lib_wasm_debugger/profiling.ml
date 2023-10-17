@@ -60,7 +60,7 @@ module Vector = Lazy_vector.Int32Vector
     4. return N_prev, continuation
 
     Let's take an example:
-    call: f () { ...... g () { .... h () { ...... } .......... } ......... }
+    call: f () \{ ...... g () \{ .... h () \{ ...... \} .......... \} ......... \}
     tick: 0 ----------> 10 -------> 30 ---------> 60 --------> 100 -----> 160
           [  10 ticks  ] [ 20 ticks ] [ 30 ticks ] [ 40 ticks ] [ 60 ticks ]
 
@@ -75,17 +75,17 @@ module Vector = Lazy_vector.Int32Vector
     N, K |- exec
 
     Start:
-    T, [] |- f () { g () { h () { } } }
+    T, [] |- f () \{ g () \{ h () \{ \} \} \}
     ==> at tick 0
-    N (f, 0, []), [T] |- g () { h () { } } }
+    N (f, 0, []), [T] |- g () \{ h () \{ \} \} \}
     ==> at tick 10
-    N (g, 10, []), [N (f, 10 - 0 = 10, []); T] |- h () { } } }
+    N (g, 10, []), [N (f, 10 - 0 = 10, []); T] |- h () \{ \} \} \}
     ==> at tick 30
-    N (h, 30, []), [N (g, 30 - 10 = 20, []); N(f); T] |- } } }
+    N (h, 30, []), [N (g, 30 - 10 = 20, []); N(f); T] |- \} \} \}
     ==> at tick 60
-    N (g, 60 - 20 = 40, [N (h, 60 - 30 = 30, [])]), [N(f); T] |- } }
+    N (g, 60 - 20 = 40, [N (h, 60 - 30 = 30, [])]), [N(f); T] |- \} \}
     ==> at tick 100
-    N (f, 100 - 10 = 90, [N (g, 100 - 40 = 60, [N(h)])]), [T] |- }
+    N (f, 100 - 10 = 90, [N (g, 100 - 40 = 60, [N(h)])]), [T] |- \}
     ==> at tick 160
     T [N (f, 160 - 90 = 70, [N(g, 60, [N(h, 30, [])])])], [] |- _
 
@@ -179,7 +179,7 @@ let pp_call ppf = function
 let initial_eval_call = Function Constants.wasm_entrypoint
 
 (** [update_on_decode current_tick current_call_state] starts and stop
-    `internal` calls related to the {Decode} step of the PVM. *)
+    `internal` calls related to the {b Decode} step of the PVM. *)
 let update_on_decode current_tick current_time (current_node, call_stack) =
   let open Lwt_syntax in
   function
@@ -205,7 +205,7 @@ let update_on_decode current_tick current_time (current_node, call_stack) =
   | _ -> return_none
 
 (** [update_on_link current_tick current_call_state] starts and stop
-    `internal` call to the {Link} step of the PVM. *)
+    `internal` call to the {b Link} step of the PVM. *)
 let update_on_link current_tick current_time (current_node, call_stack) module_
     imports_offset =
   let open Lwt_syntax in
@@ -223,7 +223,7 @@ let update_on_link current_tick current_time (current_node, call_stack) module_
   else return_none
 
 (** [update_on_init current_tick current_call_state] starts and stop
-    `internal` call to the {Init} step of the PVM. *)
+    `internal` call to the {b Init} step of the PVM. *)
 let update_on_init current_tick current_time (current_node, call_stack) =
   let open Lwt_syntax in
   function

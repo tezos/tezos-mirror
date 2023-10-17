@@ -8243,15 +8243,12 @@ let octez_scoru_wasm_debugger_plugin =
     ~deps:[]
     ~synopsis:"Plugin interface for the Octez Smart Rollup WASM Debugger"
 
-let _octez_scoru_wasm_debugger =
-  public_exe
-    (sf "octez-smart-rollup-wasm-debugger")
-    ~internal_name:(sf "main_wasm_debugger")
-    ~path:"src/bin_wasm_debugger"
-    ~opam:"octez-smart-rollup-wasm-debugger"
-    ~synopsis:"Tezos: Debugger for the smart rollups’ WASM kernels"
+let octez_scoru_wasm_debugger_lib =
+  public_lib
+    "octez-smart-rollup-wasm-debugger-lib"
+    ~path:"src/lib_wasm_debugger"
+    ~synopsis:"Tezos: Library used for the Smart Rollups' WASM debugger"
     ~release_status:Released
-    ~with_macos_security_framework:true
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -8271,6 +8268,17 @@ let _octez_scoru_wasm_debugger =
         dynlink;
         lambda_term;
       ]
+
+let _octez_scoru_wasm_debugger =
+  public_exe
+    (sf "octez-smart-rollup-wasm-debugger")
+    ~internal_name:(sf "main_wasm_debugger")
+    ~path:"src/bin_wasm_debugger"
+    ~opam:"octez-smart-rollup-wasm-debugger"
+    ~synopsis:"Tezos: Debugger for the smart rollups’ WASM kernels"
+    ~release_status:Released
+    ~with_macos_security_framework:true
+    ~deps:[octez_scoru_wasm_debugger_lib |> open_]
 
 (* Container of the registered sublibraries of [octez-evm-node] *)
 let registered_octez_evm_node_libs : Sub_lib.container =

@@ -69,6 +69,7 @@
 (package (name octez-smart-rollup-node-alpha)(allow_empty))
 (package (name octez-smart-rollup-node-lib))
 (package (name octez-smart-rollup-wasm-debugger))
+(package (name octez-smart-rollup-wasm-debugger-lib))
 (package (name octez-smart-rollup-wasm-debugger-plugin))
 (package (name octez-snoop))
 (package (name octez-store-tests)(allow_empty))
