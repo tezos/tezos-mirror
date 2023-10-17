@@ -192,6 +192,7 @@ module Manager : sig
     | Gas_quota_exceeded_init_deserialize
     | Sc_rollup_feature_disabled
     | Sc_rollup_arith_pvm_disabled
+    | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
 end
 

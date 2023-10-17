@@ -230,7 +230,27 @@ let test_disable_arith_pvm_feature_flag () =
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
+    | _ -> failwith "It should have failed with [Sc_rollup_arith_pvm_disabled]"
+  in
+  let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
+  return_unit
+
+(** [test_disable_riscv_pvm_feature_flag ()] tries to originate a Riscv smart
+    rollup when the Riscv PVM feature flag is deactivated and checks that it
+    fails. *)
+let test_disable_riscv_pvm_feature_flag () =
+  let open Lwt_result_syntax in
+  let* b, contract = Context.init1 ~sc_rollup_riscv_pvm_enable:false () in
+  let* i = Incremental.begin_construction b in
+  let kind = Sc_rollup.Kind.Riscv in
+  let* op, _ = Sc_rollup_helpers.origination_op (B b) contract kind in
+  let expect_failure = function
+    | Environment.Ecoproto_error
+        (Validate_errors.Manager.Sc_rollup_riscv_pvm_disabled as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ -> failwith "It should have failed with [Sc_rollup_riscv_pvm_disabled]"
   in
   let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
   return_unit
@@ -3408,7 +3428,12 @@ let test_start_game_on_cemented_commitment () =
 
 let test_origination_fails_with_empty_whitelist () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~sc_rollup_private_enable:true () in
+  let* b, contract =
+    Context.init1
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:true
+      ()
+  in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, _rollup =
     Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[]
@@ -3421,7 +3446,12 @@ let test_origination_fails_with_empty_whitelist () =
 
 let test_private_rollup_can_be_deactivated () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~sc_rollup_private_enable:false () in
+  let* b, contract =
+    Context.init1
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:false
+      ()
+  in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, _rollup =
     Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[]
@@ -3434,7 +3464,12 @@ let test_private_rollup_can_be_deactivated () =
 
 let test_private_rollup_publish_succeeds_with_whitelisted_staker () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~sc_rollup_private_enable:true () in
+  let* b, contract =
+    Context.init1
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:true
+      ()
+  in
   let kind = Sc_rollup.Kind.Example_arith in
   let staker_pkh = Account.pkh_of_contract_exn contract in
   let* operation, rollup =
@@ -3449,7 +3484,10 @@ let test_private_rollup_publish_succeeds_with_whitelisted_staker () =
 let test_private_rollup_publish_fails_with_non_whitelisted_staker () =
   let open Lwt_result_syntax in
   let* b, (contract1, contract2) =
-    Context.init2 ~sc_rollup_private_enable:true ()
+    Context.init2
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:true
+      ()
   in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
