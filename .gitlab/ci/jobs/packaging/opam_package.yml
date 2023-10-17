@@ -803,6 +803,13 @@ opam:octez-smart-rollup-wasm-debugger:
   variables:
     package: octez-smart-rollup-wasm-debugger
 
+opam:octez-smart-rollup-wasm-debugger-plugin:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: octez-smart-rollup-wasm-debugger-plugin
+
 # Ignoring unreleased package octez-snoop.
 
 # Ignoring unreleased package octez-store-tests.

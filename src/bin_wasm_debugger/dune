@@ -18,6 +18,7 @@
   octez-l2-libs.webassembly-interpreter
   octez-l2-libs.webassembly-interpreter-extra
   octez-version.value
+  octez-smart-rollup-wasm-debugger-plugin
   lambda-term)
  (link_flags
   (:standard)

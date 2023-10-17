@@ -8163,6 +8163,14 @@ let _octez_smart_rollup_node_lib_tests =
         alcotezt;
       ]
 
+let octez_scoru_wasm_debugger_plugin =
+  public_lib
+    "octez-smart-rollup-wasm-debugger-plugin"
+    ~path:"src/bin_wasm_debugger/plugin"
+    ~release_status:Released
+    ~deps:[]
+    ~synopsis:"Plugin interface for the Octez Smart Rollup WASM Debugger"
+
 let _octez_scoru_wasm_debugger =
   public_exe
     (sf "octez-smart-rollup-wasm-debugger")
@@ -8187,6 +8195,7 @@ let _octez_scoru_wasm_debugger =
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
         octez_version_value;
+        octez_scoru_wasm_debugger_plugin;
         lambda_term;
       ]
 

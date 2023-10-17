@@ -1,0 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_wasm_debugger_plugin)
+ (public_name octez-smart-rollup-wasm-debugger-plugin)
+ (instrumentation (backend bisect_ppx)))

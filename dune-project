@@ -70,6 +70,7 @@
 (package (name octez-smart-rollup-sequencer)(allow_empty))
 (package (name octez-smart-rollup-sequencer-node))
 (package (name octez-smart-rollup-wasm-debugger))
+(package (name octez-smart-rollup-wasm-debugger-plugin))
 (package (name octez-snoop))
 (package (name octez-store-tests)(allow_empty))
 (package (name octez-testnet-scenarios))
