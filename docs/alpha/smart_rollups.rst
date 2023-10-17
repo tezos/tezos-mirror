@@ -14,7 +14,7 @@ rollups, allowing to increase the throughput of the Tezos blockchain,
 (almost) arbitrarily.
 
 The purpose of this documentation is to provide an overview of the terminology and basic principles of smart rollups.
-In the :doc:`../shell/smart_rollup_node`, we provide a complete tour 
+In the :doc:`../shell/smart_rollup_node`, we provide a complete tour
 of smart rollups related workflows and reference documentation for the development of a WASM kernel.
 
 The integration of these rollups in the Tezos protocol is
@@ -173,7 +173,7 @@ A smart rollup is characterized by:
 - the Michelson type of the entrypoint used by Layer 1 smart contracts
 to send internal messages to it, and
 - an optional list of addresses used as a white-list of allowed
-stakers (see :ref:`private_rollup_alpha`).
+stakers (see :ref:`private_rollups_alpha`).
 
 All these characteristics are provided when originating a new smart
 rollup.
@@ -258,7 +258,7 @@ to avoid type confusion: namely, a kernel transferring a tuple that
 the Layer 1 interprets as a ticket. Lastly, the outbox message can
 contain a white-list update. This message can only be executed for a
 rollup that is private since its origination (see
-:ref:`private_rollup_alpha`).
+:ref:`private_rollups_alpha`).
 
 Refutation
 ^^^^^^^^^^
@@ -308,26 +308,27 @@ published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
 concurrent stakers to avoid the rollup getting stuck.
 
-.. _private_rollup_alpha:
+.. _private_rollups_alpha:
 
-Private rollup
-^^^^^^^^^^^^^^
+Private rollups
+^^^^^^^^^^^^^^^
 
-A **private** smart rollup guarantees that private data can't be
+A **private** Smart Rollup guarantees that private data cannot be
 leaked by any means, whereas in a public rollup, one can force a
 rollup to leak part of the data by starting a refutation game. This is
-achieved by restricting the set of allowed stakers with a
-white-list. With that restriction only addresses on the white-list can
-publish commitments and therefore participate in a refutation game.
+achieved by restricting the set of allowed stakers using a
+*whitelist*. With that restriction, only addresses on the whitelist
+can publish commitments and therefore participate in a refutation
+game.
 
-The white-list is optionally defined at origination. The rollup is
+The whitelist is optionally defined at origination. The rollup is
 considered public if no white-list is defined, private otherwise. The
-white-list can be updated with a specific outbox message. This message
+whitelist can be updated with a specific outbox message. This message
 contains an optional list, the new list completely replaces the stored
-white-list in layer 1. If the message contains no list, then the
+whitelist in layer 1. If the message contains no list, then the
 rollup becomes public. In turn, it is forbidden to make a public
 rollup private by sending an outbox message with a non-empty
-white-list.
+whitelist.
 
 It is the responsibility of the kernel to maintain the white-list by
 submitting outbox messages. Kernels must therefore implement their

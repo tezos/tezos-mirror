@@ -4,8 +4,7 @@ The storage layer
 
 This document explains the inner workings of the storage layer of the
 Octez shell. The storage layer is responsible for aggregating blocks
-(along with their respective ledger state) and operations within
-blocks (along with their associated metadata). It is composed of two
+(along with their respective ledger state and :ref:`metadata <def_metadata>`) and operations within blocks. It is composed of two
 main components: a :ref:`store component <store_component>`
 providing storage abstractions for blockchain data such as blocks and operations; and the :ref:`context component <context_component>` providing storage abstractions for ledger states (also called contexts).
 
@@ -26,7 +25,11 @@ on disk. This is done by the :doc:`validation toolchain <validation>`.
 
 The store is initialized using a :doc:`history
 mode<../user/history_modes>` that can be either *Archive*, *Full* or
-*Rolling*. Depending on the chosen history mode, some data will be
+*Rolling*.
+
+In Archive mode, the storage keeps the complete history of all the blocks, up to the genesis block. The history of each block includes the block itself, the context (ledger state) in which the block was applied, and metadata such as the changes resulting of the block application.
+
+Depending on the chosen history mode, some data will be
 pruned while the chain is growing. In *Full* mode, all blocks that are
 part of the chain are kept but their associated metadata below a
 certain threshold are discarded. In *Rolling* mode, blocks under a
@@ -77,13 +80,11 @@ For the operational details of pruning, see :ref:`first_pruning`.
 Other features
 **************
 
-Note that after pruning metadata of some blocks, the store has the capability to reconstruct it
+It is possible to export a canonical representation of the chain for a given block, also known as a :doc:`snapshot <../user/snapshots>`, if that block is stored as a non-pruned one (that is a block from which we can read its header, metadata and associated context).
+
+Another notable feature is that after pruning the metadata and context of some blocks, the store has the capability to reconstruct them
 by replaying every block and operation present and repopulating the
 context. Hence, it is possible to transform a ``Full`` store into an ``Archive`` one (see also :ref:`Switch_mode_restrictions`).
-
-It is also possible to retrieve a canonical representation of the
-store and context for a given block (provided that its metadata are
-present) as a :doc:`snapshot<../user/snapshots>`.
 
 The store also writes on disk the sources of protocols no longer active.
 This allows to recompile them or even share them on the network if needed.
@@ -95,12 +96,12 @@ The store maintains two specific variables related to the pruned data, whose val
 history mode:
 
 - The *caboose*, which represents the oldest block known by the
-  store. The latter block may or may not have its metadata in
+  store. The latter block may or may not have its metadata and context in the
   store. In *Archive* and *Full* mode, this would always be the
   genesis block.
 
 - The *savepoint* which indicates the lowest block known by the store
-  that possesses metadata.
+  that possesses metadata and context.
 
 The *checkpoint* is another variable maintained by the store, that indicates one block that
 must be part of the chain. This special block may be in the future.
