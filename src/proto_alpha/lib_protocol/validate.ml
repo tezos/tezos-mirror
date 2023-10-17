@@ -1382,7 +1382,7 @@ module Anonymous = struct
     let open Result_syntax in
     let current_cycle = vi.current_level.cycle in
     let given_cycle = (Level.from_raw vi.ctxt given_level).cycle in
-    let max_slashing_period = Constants.max_slashing_period vi.ctxt in
+    let max_slashing_period = Constants.max_slashing_period in
     let last_slashable_cycle = Cycle.add given_cycle max_slashing_period in
     let* () =
       error_unless

@@ -305,7 +305,7 @@ let fold_snapshot ctxt ~index ~f ~init =
       f (delegate, stake) acc)
 
 let clear_at_cycle_end ctxt ~new_cycle =
-  let max_slashing_period = Constants_storage.max_slashing_period ctxt in
+  let max_slashing_period = Constants_repr.max_slashing_period in
   match Cycle_repr.sub new_cycle max_slashing_period with
   | None -> return ctxt
   | Some cycle_to_clear -> clear_cycle ctxt cycle_to_clear

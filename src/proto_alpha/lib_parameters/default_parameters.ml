@@ -177,7 +177,6 @@ let constants_mainnet =
     consensus_threshold;
     (* 4667 slots *)
     minimal_participation_ratio = {numerator = 2; denominator = 3};
-    max_slashing_period = 2;
     limit_of_delegation_over_baking = 9;
     percentage_of_frozen_deposits_slashed_per_double_baking =
       Protocol.Int_percentage.p7;
@@ -322,7 +321,6 @@ let constants_sandbox =
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
     consensus_threshold = 0;
-    max_slashing_period = 2;
     limit_of_delegation_over_baking = 19;
   }
 
@@ -356,7 +354,6 @@ let constants_test =
     vdf_difficulty = 50_000L;
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
-    max_slashing_period = 2;
     limit_of_delegation_over_baking =
       19
       (* Not 9 so that multiplication by a percentage and

@@ -218,7 +218,7 @@ let raw_for_cycle = Storage.Seed.For_cycle.get
 let for_cycle ctxt cycle =
   let open Lwt_result_syntax in
   let preserved = Constants_storage.preserved_cycles ctxt in
-  let max_slashing_period = Constants_storage.max_slashing_period ctxt in
+  let max_slashing_period = Constants_repr.max_slashing_period in
   let current_cycle = (Level_storage.current ctxt).cycle in
   let latest =
     if Cycle_repr.(current_cycle = root) then

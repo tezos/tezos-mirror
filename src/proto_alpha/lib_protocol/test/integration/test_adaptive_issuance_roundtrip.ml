@@ -42,7 +42,7 @@ type error += Unexpected_error
 let default_param_wait, default_unstake_wait =
   let constants = Default_parameters.constants_test in
   let pc = constants.preserved_cycles in
-  let msp = constants.max_slashing_period in
+  let msp = Protocol.Constants_repr.max_slashing_period in
   (pc + 1, pc + msp)
 
 (** Contains the functions and constants relative to logging.*)
@@ -197,7 +197,7 @@ module State = struct
   (** Expected number of cycles before staking unstaked funds get unfrozen *)
   let unstake_wait state =
     let pc = state.constants.preserved_cycles in
-    let msp = state.constants.max_slashing_period in
+    let msp = Protocol.Constants_repr.max_slashing_period in
     pc + msp
 
   (** From a name, returns the corresponding account *)

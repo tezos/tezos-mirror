@@ -172,7 +172,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   return (ctxt, {staked; unstaked})
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
-  let max_slashable_period = Constants_storage.max_slashing_period ctxt in
+  let max_slashable_period = Constants_repr.max_slashing_period in
   match Cycle_repr.(sub new_cycle max_slashable_period) with
   | None -> Lwt.return ctxt
   | Some outdated_cycle -> Storage.Slashed_deposits.clear (ctxt, outdated_cycle)

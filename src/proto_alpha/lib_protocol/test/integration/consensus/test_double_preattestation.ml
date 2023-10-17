@@ -90,7 +90,8 @@ end = struct
   let max_slashing_period () =
     let open Lwt_result_syntax in
     let* genesis, _contract = Context.init1 ~consensus_threshold:0 () in
-    let* {parametric = {max_slashing_period; blocks_per_cycle; _}; _} =
+    let max_slashing_period = Constants.max_slashing_period in
+    let* {parametric = {blocks_per_cycle; _}; _} =
       Context.get_constants (B genesis)
     in
     return (max_slashing_period * Int32.to_int blocks_per_cycle)

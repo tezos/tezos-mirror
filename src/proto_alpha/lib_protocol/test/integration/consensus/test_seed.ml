@@ -553,7 +553,7 @@ let test_cycle_bounds () =
   let open Lwt_result_syntax in
   let* b, _accounts = Context.init1 ~consensus_threshold:0 () in
   let* csts = Context.get_constants (B b) in
-  let past_offset = csts.parametric.max_slashing_period - 1 in
+  let past_offset = Constants_repr.max_slashing_period - 1 in
   let future_offset = csts.parametric.preserved_cycles in
   let open Alpha_context.Cycle in
   let expected_error_message direction current_cycle =
