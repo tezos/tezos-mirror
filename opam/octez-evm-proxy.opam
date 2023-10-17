@@ -14,6 +14,7 @@ depends: [
   "octez-version"
   "octez-evm-proxy-lib-prod"
   "octez-evm-proxy-lib-dev"
+  "octez-evm-proxy-lib-dev-encoding"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

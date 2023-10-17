@@ -516,6 +516,8 @@ opam:octez-distributed-lwt-internal:
 
 # Ignoring unreleased package octez-evm-proxy-lib-dev.
 
+# Ignoring unreleased package octez-evm-proxy-lib-dev-encoding.
+
 # Ignoring unreleased package octez-evm-proxy-lib-prod.
 
 # Ignoring unreleased package octez-evm-proxy-tests.

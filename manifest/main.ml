@@ -8218,6 +8218,15 @@ let evm_proxy_lib_prod =
         lwt_exit;
       ]
 
+let evm_proxy_lib_dev_encoding =
+  private_lib
+    "evm_proxy_lib_dev_encoding"
+    ~path:"src/bin_evm_proxy/lib_dev/encodings"
+    ~opam:"octez-evm-proxy-lib-dev-encoding"
+    ~synopsis:"EVM encodings for the EVM proxy and plugin for the WASM Debugger"
+    ~deps:
+      [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
+
 let evm_proxy_lib_dev =
   private_lib
     "evm_proxy_lib_dev"
@@ -8234,6 +8243,7 @@ let evm_proxy_lib_dev =
         octez_rpc_http_client_unix;
         octez_version_value;
         octez_stdlib_unix |> open_;
+        evm_proxy_lib_dev_encoding |> open_;
         lwt_exit;
       ]
 
@@ -8335,6 +8345,7 @@ let _evm_proxy =
         octez_version_value;
         evm_proxy_lib_prod;
         evm_proxy_lib_dev;
+        evm_proxy_lib_dev_encoding |> open_;
       ]
     ~bisect_ppx:Yes
 

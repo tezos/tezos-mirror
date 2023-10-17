@@ -30,7 +30,8 @@
     Subject:      Tests for the RLP encoder/decoder
 *)
 
-open Evm_proxy_lib_dev.Rlp
+open Evm_proxy_lib_dev_encoding
+open Rlp
 
 let decode_value s =
   match String.remove_prefix ~prefix:"#" s with
@@ -50,7 +51,7 @@ let decode_maybe_invalid_rlp = function
   | json -> Some (decode_rlp_in_vector json)
 
 let decode_out_in_vector out =
-  let (Hex stripped) = Evm_proxy_lib_dev.Ethereum_types.hex_of_string out in
+  let (Hex stripped) = Ethereum_types.hex_of_string out in
   match Hex.to_bytes (`Hex stripped) with
   | Some b -> b
   | None -> Test.fail "Illformed JSON test vector"

@@ -24,6 +24,7 @@
 (package (name octez-distributed-lwt-internal))
 (package (name octez-evm-proxy))
 (package (name octez-evm-proxy-lib-dev)(allow_empty))
+(package (name octez-evm-proxy-lib-dev-encoding)(allow_empty))
 (package (name octez-evm-proxy-lib-prod)(allow_empty))
 (package (name octez-evm-proxy-tests)(allow_empty))
 (package (name octez-injector))
