@@ -2068,8 +2068,6 @@ module Receipt : sig
     | Sc_rollup_refutation_punishments
     | Sc_rollup_refutation_rewards
 
-  val compare_balance : balance -> balance -> int
-
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
   type update_origin =
@@ -2078,16 +2076,12 @@ module Receipt : sig
     | Subsidy
     | Simulation
 
-  val compare_update_origin : update_origin -> update_origin -> int
-
   type balance_updates = (balance * balance_update * update_origin) list
 
   val balance_updates_encoding : balance_updates Data_encoding.t
 
   val balance_updates_encoding_with_legacy_attestation_name :
     balance_updates Data_encoding.t
-
-  val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)

@@ -202,6 +202,16 @@ let encoding =
   let encode = Json.wrap_error (fun i -> Tez_tag (Z.to_int64 i)) in
   Data_encoding.def name (check_size 10 (conv decode encode n))
 
+let balance_update_encoding =
+  let open Data_encoding in
+  conv
+    (function
+      | `Credited v -> to_mutez v | `Debited v -> Int64.neg (to_mutez v))
+    ( Json.wrap_error @@ fun v ->
+      if Compare.Int64.(v < 0L) then `Debited (Tez_tag (Int64.neg v))
+      else `Credited (Tez_tag v) )
+    int64
+
 let () =
   let open Data_encoding in
   register_error_kind

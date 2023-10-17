@@ -367,6 +367,10 @@ let pp_balance_updates ppf balance_updates =
     | Receipt.Shared delegate ->
         Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
   in
+  let pp_update ppf = function
+    | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
+    | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
+  in
   let balance_updates =
     List.map
       (fun (balance, update, origin) ->
@@ -423,6 +427,7 @@ let pp_balance_updates ppf balance_updates =
           | Subsidy -> Format.asprintf "subsidy %s" balance
           | Simulation -> Format.asprintf "simulation %s" balance
         in
+        let update = Format.asprintf "%a" pp_update update in
         (balance, update))
       balance_updates
   in
@@ -432,14 +437,10 @@ let pp_balance_updates ppf balance_updates =
       0
       balance_updates
   in
-  let pp_update ppf = function
-    | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
-    | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
-  in
   let pp_one ppf (balance, update) =
     let to_fill = column_size + 3 - String.length balance in
     let filler = String.make to_fill '.' in
-    Format.fprintf ppf "%s %s %a" balance filler pp_update update
+    Format.fprintf ppf "%s %s %s" balance filler update
   in
   match balance_updates with
   | [] -> ()
