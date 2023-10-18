@@ -39,6 +39,12 @@ let create_reorganised_blocks_table_query =
          round INTEGER NOT NULL,
          FOREIGN KEY (block_id) REFERENCES blocks(id)) |}
 
+let create_baker_nodes_table_query =
+  Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+    {| CREATE TABLE IF NOT EXISTS baker_nodes(
+         id INTEGER PRIMARY KEY,
+         pod_name TEXT UNIQUE NOT NULL ) |}
+
 (* Get entries queries *)
 
 let get_canonical_chain_head_id_query =
@@ -96,3 +102,8 @@ let insert_reorganised_blocks_entry_query =
   Caqti_request.Infix.(Caqti_type.(tup4 int string int int ->. unit))
     {| INSERT INTO reorganised_blocks(block_id, block_hash, level, round) 
        VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING |}
+
+let insert_baker_nodes_entry_query =
+  Caqti_request.Infix.(Caqti_type.(string ->. unit))
+    {| INSERT INTO baker_nodes(pod_name) 
+       VALUES ($1) ON CONFLICT DO NOTHING |}

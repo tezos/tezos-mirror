@@ -9,15 +9,21 @@
    ------------------------
    Invocation:
    1. ./_build/default/devtools/testnet_experiment_tools/get_teztale_data.exe \
-     canonical_chain_query \
-     --db-path <db-path>
-     [--print ]
+      canonical_chain_query \
+      --db-path <db-path> \
+      [--print ]
    2. ./_build/default/devtools/testnet_experiment_tools/get_teztale_data.exe \
-     reorganised_blocks_query \
-     --db-path <db-path>
-     [--print]
+      reorganised_blocks_query \
+      --db-path <db-path> \
+      [--print]
+   3. ./_build/default/devtools/testnet_experiment_tools/get_teztale_data.exe \
+      baker_nodes_query \
+      --db-path <db-path> \
+      --experiment-dir <experiment-dir> \
+      [--print]
    Requirements:
      <db-path> - path to the teztale database
+     <experiment-dir> - path to experiment data folder, which contains the bakers
      [<print>] - if this flag is set, we print the result of the query
    Description:
      This file contains the tool for querying the teztale database.
@@ -28,9 +34,11 @@
      which are not part of the canonical chain, together with more detailed info.
 *)
 
+open Filename.Infix
 open Tezos_clic
 open Teztale_sql_queries
 module Query_map = Map.Make (Int)
+module Query_set = Set.Make (String)
 
 let group = {name = "devtools"; title = "Command for querying the teztale db"}
 
@@ -39,9 +47,11 @@ let group = {name = "devtools"; title = "Command for querying the teztale db"}
 type error +=
   | Db_path of string
   | Caqti_db_connection of string
+  | Canonical_chain_head of string
   | Canonical_chain_query of string
   | Reorganised_blocks_query of string
-  | Canonical_chain_head of string
+  | Baker_nodes_query of string
+  | Experiment_dir of string
 
 let () =
   register_error_kind
@@ -66,6 +76,15 @@ let () =
     (fun s -> Caqti_db_connection s) ;
   register_error_kind
     `Permanent
+    ~id:"get_tezale_data.canonical_chain_head"
+    ~title:"Failed to obtain the head of the canonical chain"
+    ~description:"Canonical chain head is required"
+    ~pp:(fun ppf s -> Format.fprintf ppf "Expected canonical chain head: %s" s)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Canonical_chain_head s -> Some s | _ -> None)
+    (fun s -> Canonical_chain_head s) ;
+  register_error_kind
+    `Permanent
     ~id:"get_teztale_data.canonical_chain_query"
     ~title:"Failed to create canonical_chain table"
     ~description:"canonical_chain table must be created"
@@ -86,13 +105,23 @@ let () =
     (fun s -> Reorganised_blocks_query s) ;
   register_error_kind
     `Permanent
-    ~id:"get_tezale_data.canonical_chain_head"
-    ~title:"Failed to obtain the head of the canonical chain"
-    ~description:"Canonical chain head is required"
-    ~pp:(fun ppf s -> Format.fprintf ppf "Expected canonical chain head: %s" s)
+    ~id:"get_teztale_data.baker_nodes_query"
+    ~title:"Failed to create baker_nodes table"
+    ~description:"baker_nodes table must be created"
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "baker_nodes table could not be created : %s" s)
     Data_encoding.(obj1 (req "arg" string))
-    (function Canonical_chain_head s -> Some s | _ -> None)
-    (fun s -> Canonical_chain_head s)
+    (function Baker_nodes_query s -> Some s | _ -> None)
+    (fun s -> Baker_nodes_query s) ;
+  register_error_kind
+    `Permanent
+    ~id:"get_teztale_data.experiment_dir"
+    ~title:"Experiment directory path provided was invalid"
+    ~description:"Experiment directory path must be valid"
+    ~pp:(fun ppf s -> Format.fprintf ppf "%s is not a valid path" s)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Experiment_dir s -> Some s | _ -> None)
+    (fun s -> Experiment_dir s)
 
 (* Aggregators & helpers. *)
 
@@ -282,6 +311,41 @@ let reorganised_blocks_command db_path print_result =
         ~query_error:(fun e -> Reorganised_blocks_query e))
     map
 
+let baker_nodes_command db_path exp_dir print_result =
+  let open Lwt_result_syntax in
+  let* db_pool = connect_db db_path in
+  (* 1. Create baker_nodes table in teztale db *)
+  let* () =
+    create_table
+      ~db_pool
+      ~query:create_baker_nodes_table_query
+      ~query_error:(fun e -> Baker_nodes_query e)
+  in
+  (* 2. Retrieve the entries which form the baker nodes; the form of a
+     baker directory is "baker-[idx]-[str]" where [idx] is an integer
+     and [str] can be anything *)
+  let regex = Str.regexp "baker-\\([0-9]+\\)-.*" in
+  let dir_contents =
+    Query_set.of_list @@ Array.to_list @@ Sys.readdir exp_dir
+  in
+  let set =
+    Query_set.filter
+      (fun entry ->
+        Sys.is_directory (exp_dir // entry) && Str.string_match regex entry 0)
+      dir_contents
+  in
+  (* 3. Optional printing of the result *)
+  if print_result then Query_set.iter (Format.printf "Baker: %s@.") set ;
+  (* 4. Populate the baker_nodes table *)
+  Query_set.iter_es
+    (fun pod_name ->
+      insert_entry
+        ~db_pool
+        ~query:insert_baker_nodes_entry_query
+        ~entry:pod_name
+        ~query_error:(fun e -> Baker_nodes_query e))
+    set
+
 (* Arguments. *)
 
 let db_arg =
@@ -293,6 +357,17 @@ let db_arg =
     ( parameter @@ fun _ctxt db_path ->
       if Sys.file_exists db_path then return db_path
       else tzfail (Db_path db_path) )
+
+let experiment_dir_arg =
+  let open Lwt_result_syntax in
+  arg
+    ~doc:"Experiment data folder path"
+    ~long:"experiment-dir"
+    ~placeholder:"experiment-dir"
+    ( parameter @@ fun _ctxt experiment_dir ->
+      if Sys.file_exists experiment_dir && Sys.is_directory experiment_dir then
+        return experiment_dir
+      else tzfail (Experiment_dir experiment_dir) )
 
 let print_arg =
   Tezos_clic.switch
@@ -322,6 +397,17 @@ let commands =
         match db_path with
         | Some db_path -> reorganised_blocks_command db_path print_result
         | None -> tzfail (Db_path ""));
+    command
+      ~group
+      ~desc:"Baker nodes query."
+      (args3 db_arg experiment_dir_arg print_arg)
+      (fixed ["baker_nodes_query"])
+      (fun (db_path, exp_dir, print_result) _cctxt ->
+        match (db_path, exp_dir) with
+        | Some db_path, Some exp_dir ->
+            baker_nodes_command db_path exp_dir print_result
+        | None, _ -> tzfail (Db_path "")
+        | _, None -> tzfail (Experiment_dir ""));
   ]
 
 module Custom_client_config : Client_main_run.M = struct
