@@ -6,6 +6,7 @@
   "layer1": {
     "tags": [
       "protocol",
+      "protocol_cache",
       "protocol_table",
       "transaction",
       "transfer"

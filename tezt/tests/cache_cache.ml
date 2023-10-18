@@ -35,7 +35,7 @@ let cache_annotation_consistency =
   Protocol.register_test
     ~__FILE__
     ~title:"cache annotation consistency"
-    ~tags:["cache"; "node"; "baker"]
+    ~tags:["protocol_cache"; "cache"; "node"; "baker"]
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
@@ -88,7 +88,7 @@ let singleprocess_reorg =
   Protocol.register_test
     ~__FILE__
     ~title:"cache consistency on singleprocess reorg"
-    ~tags:["singleprocess"; "reorg"]
+    ~tags:["protocol_cache"; "singleprocess"; "reorg"]
   @@ fun protocol ->
   let minimal_block_delay = 5 in
   let* parameter_file =
