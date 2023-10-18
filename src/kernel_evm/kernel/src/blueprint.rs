@@ -103,21 +103,6 @@ pub struct Queue {
     pub kernel_upgrade: Option<KernelUpgrade>,
 }
 
-impl Queue {
-    pub fn new() -> Queue {
-        Queue {
-            proposals: Vec::new(),
-            kernel_upgrade: None,
-        }
-    }
-
-    pub fn add(queue: &mut Queue, transactions: Vec<Transaction>) {
-        queue
-            .proposals
-            .push(QueueElement::Blueprint(Blueprint { transactions }))
-    }
-}
-
 impl Decodable for Queue {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !decoder.is_list() {
