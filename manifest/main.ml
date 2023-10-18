@@ -7471,7 +7471,7 @@ let _get_teztale_data =
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
       ]
-    ~modules:["get_teztale_data"]
+    ~modules:["get_teztale_data"; "teztale_sql_queries"]
 
 let simdal_lib =
   private_lib

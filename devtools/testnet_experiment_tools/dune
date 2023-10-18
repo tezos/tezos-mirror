@@ -154,4 +154,4 @@
   -open Tezos_base.TzPervasives
   -open Tezos_client_base
   -open Tezos_client_base_unix)
- (modules get_teztale_data))
+ (modules get_teztale_data teztale_sql_queries))
