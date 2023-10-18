@@ -216,6 +216,14 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prim() {
+        assert_eq!(
+            parse("{UNNIT}").unwrap_err().to_string(),
+            "unknown primitive: UNNIT"
+        );
+    }
+
+    #[test]
     fn parse_contract_script_test() {
         use crate::lexer::Prim::{code, parameter, storage};
         use Instruction::*;

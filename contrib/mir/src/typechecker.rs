@@ -940,6 +940,20 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn push_option_none_value() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (option nat) None }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(TypedValue::new_option(None))])
+        );
+        assert_eq!(stack, tc_stk![Type::new_option(Type::Nat)]);
+    }
+
+    #[test]
     fn car() {
         let mut stack = tc_stk![];
         assert_eq!(
@@ -1430,5 +1444,234 @@ mod typecheck_tests {
             Ok(vec![Add(overloads::Add::NatInt)])
         );
         assert_eq!(stack, tc_stk![Type::Int]);
+    }
+
+    #[track_caller]
+    fn too_short_test(instr: ParsedInstruction, prim: Prim, len: usize) {
+        for n in 0..len {
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(instr.clone(), &mut ctx, &mut tc_stk![Type::Unit; n]),
+                Err(TcError::NoMatchingOverload {
+                    instr: prim,
+                    stack: stk![Type::Unit; n],
+                    reason: Some(NoMatchingOverloadReason::StackTooShort { expected: len })
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn test_add_short() {
+        too_short_test(Add(()), Prim::ADD, 2);
+    }
+
+    #[test]
+    fn test_add_mismatch() {
+        let mut stack = tc_stk![Type::String, Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(Add(()), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::ADD,
+                stack: stk![Type::String, Type::String],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn test_dup0() {
+        let mut stack = tc_stk![];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(Dup(Some(0)), &mut ctx, &mut stack),
+            Err(TcError::Dup0)
+        );
+    }
+
+    #[test]
+    fn test_gt_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(Gt, &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::GT,
+                stack: stk![Type::String],
+                reason: Some(TypesNotEqual(Type::Int, Type::String).into())
+            })
+        );
+    }
+
+    #[test]
+    fn test_gt_short() {
+        too_short_test(Gt, Prim::GT, 1);
+    }
+
+    #[test]
+    fn test_if_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(If(vec![], vec![]), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF,
+                stack: stk![Type::String],
+                reason: Some(TypesNotEqual(Type::Bool, Type::String).into())
+            })
+        );
+    }
+
+    #[test]
+    fn test_if_short() {
+        too_short_test(If(vec![], vec![]), Prim::IF, 1);
+    }
+
+    #[test]
+    fn test_if_none_short() {
+        too_short_test(IfNone(vec![], vec![]), Prim::IF_NONE, 1);
+    }
+
+    #[test]
+    fn test_int_short() {
+        too_short_test(Int, Prim::INT, 1);
+    }
+
+    #[test]
+    fn test_int_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(Int, &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::INT,
+                stack: stk![Type::String],
+                reason: None,
+            })
+        );
+    }
+
+    #[test]
+    fn test_loop_short() {
+        too_short_test(Loop(vec![]), Prim::LOOP, 1);
+    }
+
+    #[test]
+    fn test_loop_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(Loop(vec![]), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::LOOP,
+                stack: stk![Type::String],
+                reason: Some(TypesNotEqual(Type::Bool, Type::String).into()),
+            })
+        );
+    }
+
+    #[test]
+    fn test_swap_short() {
+        too_short_test(Swap, Prim::SWAP, 2);
+    }
+
+    #[test]
+    fn test_pair_short() {
+        too_short_test(Pair, Prim::PAIR, 2);
+    }
+
+    #[test]
+    fn test_get_short() {
+        too_short_test(Get(()), Prim::GET, 2);
+    }
+
+    #[test]
+    fn test_update_short() {
+        too_short_test(Update(()), Prim::UPDATE, 3);
+    }
+
+    #[test]
+    fn test_failwith_short() {
+        too_short_test(Failwith, Prim::FAILWITH, 1);
+    }
+
+    #[test]
+    fn test_car_short() {
+        too_short_test(Car, Prim::CAR, 1);
+    }
+
+    #[test]
+    fn test_cdr_short() {
+        too_short_test(Cdr, Prim::CDR, 1);
+    }
+
+    #[test]
+    fn test_some_short() {
+        too_short_test(ISome, Prim::SOME, 1);
+    }
+
+    #[test]
+    fn test_compare_short() {
+        too_short_test(Compare, Prim::COMPARE, 2);
+    }
+
+    #[test]
+    fn test_compare_gas_exhaustion() {
+        let mut ctx = Ctx {
+            gas: Gas::new(gas::tc_cost::INSTR_STEP),
+            ..Ctx::default()
+        };
+        assert_eq!(
+            typecheck_instruction(Compare, &mut ctx, &mut tc_stk![Type::Unit, Type::Unit]),
+            Err(TcError::OutOfGas(OutOfGas))
+        );
+    }
+
+    #[test]
+    fn test_compare_incomparable() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                Compare,
+                &mut ctx,
+                &mut tc_stk![Type::Operation, Type::Operation]
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::COMPARE,
+                stack: stk![Type::Operation, Type::Operation],
+                reason: Some(NoMatchingOverloadReason::TypeNotComparable(Type::Operation)),
+            })
+        );
+    }
+
+    #[test]
+    fn test_get_mismatch() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(Get(()), &mut ctx, &mut tc_stk![Type::Unit, Type::Unit]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::GET,
+                stack: stk![Type::Unit, Type::Unit],
+                reason: None,
+            })
+        );
+    }
+
+    #[test]
+    fn test_update_mismatch() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                Update(()),
+                &mut ctx,
+                &mut tc_stk![Type::Unit, Type::Unit, Type::Unit]
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::UPDATE,
+                stack: stk![Type::Unit, Type::Unit, Type::Unit],
+                reason: None,
+            })
+        );
     }
 }

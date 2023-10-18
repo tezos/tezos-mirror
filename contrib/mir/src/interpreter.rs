@@ -74,6 +74,7 @@ impl TypecheckedInstruction {
     }
 }
 
+#[track_caller]
 fn unreachable_state() -> ! {
     // If the typechecking of the program being interpreted was successful and if this is reached
     // during interpreting, then the typechecking should be broken, and needs to be fixed.
@@ -1037,5 +1038,19 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::Int(-747)]);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Unreachable state reached during interpreting, possibly broken typechecking!"
+    )]
+    fn trigger_unreachable_state() {
+        let mut stack = stk![];
+        interpret(
+            &vec![Add(overloads::Add::NatInt)],
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .unwrap(); // panics
     }
 }

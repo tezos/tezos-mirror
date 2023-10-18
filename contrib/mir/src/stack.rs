@@ -371,4 +371,9 @@ mod tests {
         stk[2] = 42;
         assert_eq!(stk, stk![1, 2, 42, 4, 5]);
     }
+
+    #[test]
+    fn default() {
+        assert_eq!(Stack::<()>::default(), stk![]);
+    }
 }
