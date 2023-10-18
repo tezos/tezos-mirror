@@ -50,7 +50,7 @@ let make_signers_for_transactions signer block_delay =
           [Injector_server.Configuration.Transaction] );
       ] )
 
-let register_dir signer =
+let register_dir () =
   let open Lwt_result_syntax in
   let open Injector_services in
   let dir =
@@ -58,9 +58,7 @@ let register_dir signer =
       Tezos_rpc.Directory.empty
       add_pending_transaction
       (fun () op ->
-        let*! inj_operation_hash =
-          Injector_server.add_pending_operation ~source:signer op
-        in
+        let*! inj_operation_hash = Injector_server.add_pending_operation op in
         let*! () = Injector_server.inject () in
         Lwt.return inj_operation_hash)
   in
@@ -99,12 +97,12 @@ let register_dir signer =
   in
   dir
 
-let start ~rpc_address ~rpc_port ~source () =
+let start ~rpc_address ~rpc_port () =
   let open Lwt_result_syntax in
   let rpc_address = P2p_addr.of_string_exn rpc_address in
   let mode = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
-  let dir = register_dir source in
+  let dir = register_dir () in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in
@@ -138,7 +136,7 @@ let run ~data_dir (cctxt : Client_context.full) =
        as config) =
     Configuration.load ~data_dir
   in
-  let*? source, signers = make_signers_for_transactions signer block_delay in
+  let*? _, signers = make_signers_for_transactions signer block_delay in
   let* () = Injector_server.init cctxt ~data_dir state ~signers in
   let*! () = Event.(emit accepting_requests) ("HTTP", config.rpc_port) in
-  start ~rpc_address ~rpc_port ~source ()
+  start ~rpc_address ~rpc_port ()

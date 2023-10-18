@@ -278,7 +278,7 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
       in
       gather [] commitment
 
-let publish_commitment (node_ctxt : _ Node_context.t) ~source
+let publish_commitment (node_ctxt : _ Node_context.t)
     (commitment : Octez_smart_rollup.Commitment.t) =
   let open Lwt_result_syntax in
   let publish_operation =
@@ -293,12 +293,11 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
   let* _hash =
     Injector.check_and_add_pending_operation
       node_ctxt.config.mode
-      ~source
       publish_operation
   in
   return_unit
 
-let inject_recover_bond (node_ctxt : _ Node_context.t) ~source
+let inject_recover_bond (node_ctxt : _ Node_context.t)
     (staker : Signature.Public_key_hash.t) =
   let open Lwt_result_syntax in
   let recover_operation =
@@ -306,7 +305,11 @@ let inject_recover_bond (node_ctxt : _ Node_context.t) ~source
       {rollup = node_ctxt.config.sc_rollup_address; staker}
   in
   let*! () = Commitment_event.recover_bond staker in
-  let* _hash = Injector.add_pending_operation ~source recover_operation in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.config.mode
+      recover_operation
+  in
   return_unit
 
 let on_publish_commitments (node_ctxt : state) =
@@ -317,12 +320,10 @@ let on_publish_commitments (node_ctxt : state) =
     return_unit
   else
     match operator with
-    | None ->
-        (* No known operator we can recover bond for. *)
-        return_unit
-    | Some source ->
+    | None -> (* Configured to not publish commitments *) return_unit
+    | Some _ ->
         let* commitments = missing_commitments node_ctxt in
-        List.iter_es (publish_commitment node_ctxt ~source) commitments
+        List.iter_es (publish_commitment node_ctxt) commitments
 
 let publish_single_commitment node_ctxt
     (commitment : Octez_smart_rollup.Commitment.t) =
@@ -333,21 +334,18 @@ let publish_single_commitment node_ctxt
   | None ->
       (* Configured to not publish commitments *)
       return_unit
-  | Some source ->
+  | Some _ ->
       when_ (commitment.inbox_level > lcc.level) @@ fun () ->
-      publish_commitment node_ctxt ~source commitment
+      publish_commitment node_ctxt commitment
 
 let recover_bond node_ctxt =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Operating in
-  let recovery_operator = Node_context.get_operator node_ctxt Recovering in
+  let operator = Node_context.get_operator node_ctxt Recovering in
   match operator with
   | None ->
       (* No known operator to recover bond for. *)
       return_unit
-  | Some committer ->
-      let source = Option.value recovery_operator ~default:committer in
-      inject_recover_bond node_ctxt ~source committer
+  | Some committer -> inject_recover_bond node_ctxt committer
 
 (* Commitments can only be cemented after [sc_rollup_challenge_window] has
    passed since they were first published. *)
@@ -428,7 +426,7 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
   in
   gather [] latest_cementable_commitment
 
-let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment =
+let cement_commitment (node_ctxt : _ Node_context.t) commitment =
   let open Lwt_result_syntax in
   let cement_operation =
     L1_operation.Cement
@@ -437,7 +435,6 @@ let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment =
   let* _hash =
     Injector.check_and_add_pending_operation
       node_ctxt.config.mode
-      ~source
       cement_operation
   in
   return_unit
@@ -449,9 +446,9 @@ let on_cement_commitments (node_ctxt : state) =
   | None ->
       (* Configured to not cement commitments *)
       return_unit
-  | Some source ->
+  | Some _ ->
       let* cementable_commitments = cementable_commitments node_ctxt in
-      List.iter_es (cement_commitment node_ctxt ~source) cementable_commitments
+      List.iter_es (cement_commitment node_ctxt) cementable_commitments
 
 module Types = struct
   type nonrec state = state

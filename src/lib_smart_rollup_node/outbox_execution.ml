@@ -142,7 +142,7 @@ let executable_whitelist_update_message (node_ctxt : _ Node_context.t) =
   in
   fold_over_commitment max_cemented_commitment lcc.commitment
 
-let execute_whitelist_update_message_aux (node_ctxt : _ Node_context.t) ~source
+let execute_whitelist_update_message_aux (node_ctxt : _ Node_context.t)
     (cemented_commitment, output_proof) =
   let open Lwt_result_syntax in
   let outbox_message =
@@ -153,7 +153,7 @@ let execute_whitelist_update_message_aux (node_ctxt : _ Node_context.t) ~source
         output_proof;
       }
   in
-  let* _hash = Injector.add_pending_operation ~source outbox_message in
+  let* _hash = Injector.add_pending_operation outbox_message in
   return_unit
 
 let publish_execute_whitelist_update_message (node_ctxt : _ Node_context.t) =
@@ -163,7 +163,7 @@ let publish_execute_whitelist_update_message (node_ctxt : _ Node_context.t) =
   | None ->
       (* Configured to not execute whitelist update commitments *)
       return_unit
-  | Some source -> (
+  | Some _ -> (
       let* cemented_commitment_and_proof =
         executable_whitelist_update_message node_ctxt
       in
@@ -181,6 +181,5 @@ let publish_execute_whitelist_update_message (node_ctxt : _ Node_context.t) =
       | Some cemented_commitment_and_proof ->
           execute_whitelist_update_message_aux
             node_ctxt
-            ~source
             cemented_commitment_and_proof
       | None -> return_unit)

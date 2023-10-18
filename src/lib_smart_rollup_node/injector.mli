@@ -40,9 +40,7 @@ include
 (** Checks if an operation can be added as a pending operation in the specified mode. 
     If allowed, adds it to the pending operation. Return none when the operation is not 
     allowed in the mode. *)
-
 val check_and_add_pending_operation :
   Configuration.mode ->
-  source:Signature.public_key_hash ->
   L1_operation.t ->
   Inj_operation.hash option tzresult Lwt.t
