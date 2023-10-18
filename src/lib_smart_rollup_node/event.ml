@@ -205,6 +205,17 @@ module Simple = struct
       ~level:Warning
       ~msg:"[Warning] An attempt to write GC level information to disk failed"
       ()
+
+  let convert_history_mode =
+    declare_2
+      ~section
+      ~name:"convert_history_mode"
+      ~level:Notice
+      ~msg:
+        "Converting the {old_history_mode} rollup node into an \
+         {new_history_mode} rollup node"
+      ("old_history_mode", Configuration.history_mode_encoding)
+      ("new_history_mode", Configuration.history_mode_encoding)
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -258,3 +269,6 @@ let context_gc_failure msg = Simple.(emit context_gc_failure) msg
 let context_gc_launch_failure msg = Simple.(emit context_gc_launch_failure) msg
 
 let gc_levels_storage_failure () = Simple.(emit gc_levels_storage_failure) ()
+
+let convert_history_mode old_history_mode new_history_mode =
+  Simple.(emit convert_history_mode) (old_history_mode, new_history_mode)

@@ -110,3 +110,8 @@ val context_gc_launch_failure : string -> unit Lwt.t
     values ([last_gc_level], [first_available_level]) could not be written to
     storage. *)
 val gc_levels_storage_failure : unit -> unit Lwt.t
+
+(** [convert_history_mode old_history_mode new_history_mode] emits an event for
+    when the history mode of the rollup node is changed. *)
+val convert_history_mode :
+  Configuration.history_mode -> Configuration.history_mode -> unit Lwt.t

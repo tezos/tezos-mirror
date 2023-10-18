@@ -182,6 +182,7 @@ let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
   | Some Archive, Archive | Some Full, Full -> return_unit
   | Some Archive, Full ->
       (* Data will be cleaned at next GC, just save new mode *)
+      let*! () = Event.convert_history_mode Archive Full in
       save_when_rw ()
   | Some Full, Archive ->
       failwith "Cannot transform a full rollup node into an archive one."
