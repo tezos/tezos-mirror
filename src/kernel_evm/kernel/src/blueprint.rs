@@ -304,6 +304,7 @@ mod tests {
             U256::zero(),
             VecDeque::new(),
             0,
+            Timestamp::from(0i64),
         )
     }
 
