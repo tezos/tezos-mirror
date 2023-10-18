@@ -312,7 +312,7 @@ impl EthereumTransactionCommon {
         stream.append(&self.gas_limit);
         append_option(stream, self.to);
         stream.append(&self.value);
-        append_vec(stream, self.data.clone());
+        append_vec(stream, &self.data);
         match &self.signature {
             None => {
                 // In case of unsigned legacy tx we have to append chain_id as v component of (v, r, s)
@@ -339,7 +339,7 @@ impl EthereumTransactionCommon {
         stream.append(&self.gas_limit);
         append_option(stream, self.to);
         stream.append(&self.value);
-        append_vec(stream, self.data.clone());
+        append_vec(stream, &self.data);
         stream.append_list(&self.access_list);
 
         match &self.signature {
@@ -364,7 +364,7 @@ impl EthereumTransactionCommon {
         stream.append(&self.gas_limit);
         append_option(stream, self.to);
         stream.append(&self.value);
-        append_vec(stream, self.data.clone());
+        append_vec(stream, &self.data);
         stream.append_list(&self.access_list);
 
         match &self.signature {

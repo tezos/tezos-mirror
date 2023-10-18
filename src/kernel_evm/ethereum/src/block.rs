@@ -5,7 +5,8 @@
 
 use crate::eth_gen::OwnedHash;
 use crate::rlp_helpers::{
-    append_u256_le, decode_field, decode_field_h256, decode_field_u256_le,
+    append_option_explicit, append_u256_le, append_u64_le, decode_field,
+    decode_field_h256, decode_field_u256_le, decode_field_u64_le, decode_option_explicit,
     decode_transaction_hash_list, next,
 };
 use crate::transaction::TransactionHash;
@@ -58,28 +59,27 @@ pub struct L2Block {
     // This choice of a L2 block representation is totally
     // arbitrarily based on what is an Ethereum block and is
     // subject to change.
+    // Optional types are used for currently unused fields,
+    // which will be populated in the future. This makes the
+    // data representation future proof, as it won't need
+    // to be migrated once the fields are used.
     pub number: U256,
     pub hash: H256,
     pub parent_hash: H256,
     pub logs_bloom: Option<OwnedHash>,
-    pub transactions_root: OwnedHash,
-    pub state_root: OwnedHash,
-    pub receipts_root: OwnedHash,
-    pub miner: OwnedHash,
-    pub extra_data: OwnedHash,
-    pub gas_limit: u64,
+    pub transactions_root: Option<OwnedHash>,
+    pub state_root: Option<OwnedHash>,
+    pub receipts_root: Option<OwnedHash>,
+    pub miner: Option<OwnedHash>,
+    pub extra_data: Option<OwnedHash>,
+    pub gas_limit: Option<u64>,
     pub gas_used: U256,
     pub timestamp: Timestamp,
     pub transactions: Vec<TransactionHash>,
 }
 
 impl L2Block {
-    const DUMMY_HASH: &str = "0000000000000000000000000000000000000000";
     const BLOCK_HASH_SIZE: usize = 32;
-
-    fn dummy_hash() -> OwnedHash {
-        L2Block::DUMMY_HASH.into()
-    }
 
     fn dummy_block_hash() -> H256 {
         H256([0; L2Block::BLOCK_HASH_SIZE])
@@ -108,7 +108,7 @@ impl L2Block {
             number: self.number,
             coinbase: H160::zero(),
             timestamp,
-            gas_limit: self.gas_limit,
+            gas_limit: self.gas_limit.unwrap_or(1u64),
             base_fee_per_gas,
             chain_id,
         }
@@ -122,12 +122,12 @@ impl Default for L2Block {
             hash: H256::default(),
             parent_hash: L2Block::dummy_block_hash(),
             logs_bloom: None,
-            transactions_root: L2Block::dummy_hash(),
-            state_root: L2Block::dummy_hash(),
-            receipts_root: L2Block::dummy_hash(),
-            miner: L2Block::dummy_hash(),
-            extra_data: L2Block::dummy_hash(),
-            gas_limit: 1u64,
+            transactions_root: None,
+            state_root: None,
+            receipts_root: None,
+            miner: None,
+            extra_data: None,
+            gas_limit: None,
             gas_used: U256::zero(),
             timestamp: Timestamp::from(0),
             transactions: Vec::new(),
@@ -137,10 +137,17 @@ impl Default for L2Block {
 
 impl Encodable for L2Block {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(6);
-        append_u256_le(s, self.number);
+        s.begin_list(13);
+        append_u256_le(s, &self.number);
         s.append(&self.hash);
         s.append(&self.parent_hash);
+        append_option_explicit(s, &self.logs_bloom, RlpStream::append);
+        append_option_explicit(s, &self.transactions_root, RlpStream::append);
+        append_option_explicit(s, &self.state_root, RlpStream::append);
+        append_option_explicit(s, &self.receipts_root, RlpStream::append);
+        append_option_explicit(s, &self.miner, RlpStream::append);
+        append_option_explicit(s, &self.extra_data, RlpStream::append);
+        append_option_explicit(s, &self.gas_limit, append_u64_le);
         let transactions_bytes: Vec<Vec<u8>> =
             self.transactions.iter().map(|x| x.to_vec()).collect();
         s.append_list::<Vec<u8>, _>(&transactions_bytes);
@@ -152,12 +159,35 @@ impl Encodable for L2Block {
 impl Decodable for L2Block {
     fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         if decoder.is_list() {
-            if Ok(6) == decoder.item_count() {
+            if Ok(13) == decoder.item_count() {
                 let mut it = decoder.iter();
                 let number: U256 = decode_field_u256_le(&next(&mut it)?, "number")?;
                 let hash: H256 = decode_field_h256(&next(&mut it)?, "hash")?;
                 let parent_hash: H256 =
                     decode_field_h256(&next(&mut it)?, "parent_hash")?;
+                let logs_bloom: Option<OwnedHash> =
+                    decode_option_explicit(&next(&mut it)?, "logs_bloom", decode_field)?;
+                let transactions_root: Option<OwnedHash> = decode_option_explicit(
+                    &next(&mut it)?,
+                    "transactions_root",
+                    decode_field,
+                )?;
+                let state_root: Option<OwnedHash> =
+                    decode_option_explicit(&next(&mut it)?, "state_root", decode_field)?;
+                let receipts_root: Option<OwnedHash> = decode_option_explicit(
+                    &next(&mut it)?,
+                    "receipts_root",
+                    decode_field,
+                )?;
+                let miner: Option<OwnedHash> =
+                    decode_option_explicit(&next(&mut it)?, "miner", decode_field)?;
+                let extra_data: Option<OwnedHash> =
+                    decode_option_explicit(&next(&mut it)?, "extra_data", decode_field)?;
+                let gas_limit: Option<u64> = decode_option_explicit(
+                    &next(&mut it)?,
+                    "gas_limit",
+                    decode_field_u64_le,
+                )?;
                 let transactions: Vec<TransactionHash> =
                     decode_transaction_hash_list(&next(&mut it)?, "transactions")?;
                 let gas_used: U256 = decode_field_u256_le(&next(&mut it)?, "gas_used")?;
@@ -174,10 +204,16 @@ impl Decodable for L2Block {
                     number,
                     hash,
                     parent_hash,
+                    logs_bloom,
+                    transactions_root,
+                    state_root,
+                    receipts_root,
+                    miner,
+                    extra_data,
+                    gas_limit,
                     gas_used,
                     timestamp,
                     transactions,
-                    ..Default::default()
                 })
             } else {
                 Err(DecoderError::RlpIncorrectListLen)
