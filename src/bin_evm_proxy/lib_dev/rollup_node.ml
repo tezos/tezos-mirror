@@ -348,42 +348,80 @@ module RPC = struct
   let current_block_number base () =
     block_number base Durable_storage_path.Block.Current
 
+  let un_qty (Qty z) = z
+
   let transaction_receipt base (Hash (Hex tx_hash)) =
     let open Lwt_result_syntax in
-    let+ bytes =
+    (* We use a mock block hash to decode the rest of the receipt,
+       so that we can get the number to query for the actual block
+       hash. *)
+    let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+    let* opt_receipt =
       inspect_durable_and_decode_opt
         base
         (Durable_storage_path.Transaction_receipt.receipt tx_hash)
-        Fun.id
+        (Ethereum_types.transaction_receipt_from_rlp mock_block_hash)
     in
-    match bytes with
-    | Some bytes -> Some (Ethereum_types.transaction_receipt_from_rlp bytes)
-    | None -> None
+    match opt_receipt with
+    | Some temp_receipt ->
+        let+ blockHash =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Indexes.blocks_by_number
+               (Nth (un_qty temp_receipt.blockNumber)))
+            decode_block_hash
+        in
+        Some {temp_receipt with blockHash}
+    | None -> return_none
 
   let transaction_object base (Hash (Hex tx_hash)) =
     let open Lwt_result_syntax in
-    let+ bytes =
+    (* We use a mock block hash to decode the rest of the receipt,
+       so that we can get the number to query for the actual block
+       hash. *)
+    let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+    let* opt_object =
       inspect_durable_and_decode_opt
         base
         (Durable_storage_path.Transaction_object.object_ tx_hash)
-        Fun.id
+        (Ethereum_types.transaction_object_from_rlp mock_block_hash)
     in
-    match bytes with
-    | Some bytes -> Some (Ethereum_types.transaction_object_from_rlp bytes)
-    | None -> None
+    match opt_object with
+    | Some temp_object ->
+        let+ blockHash =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Indexes.blocks_by_number
+               (Nth (un_qty temp_object.blockNumber)))
+            decode_block_hash
+        in
+        Some {temp_object with blockHash}
+    | None -> return_none
 
-  let full_transactions transactions base =
+  let transaction_object_with_block_hash base block_hash (Hash (Hex tx_hash)) =
+    inspect_durable_and_decode_opt
+      base
+      (Durable_storage_path.Transaction_object.object_ tx_hash)
+      (Ethereum_types.transaction_object_from_rlp block_hash)
+
+  let full_transactions block_hash transactions base =
     let open Lwt_result_syntax in
     match transactions with
     | TxHash hashes ->
-        let+ objects = List.filter_map_es (transaction_object base) hashes in
+        let+ objects =
+          List.filter_map_es
+            (transaction_object_with_block_hash base block_hash)
+            hashes
+        in
         TxFull objects
     | TxFull _ -> return transactions
 
   let populate_tx_objects ~full_transaction_object base block =
     let open Lwt_result_syntax in
     if full_transaction_object then
-      let* transactions = full_transactions block.transactions base in
+      let* transactions =
+        full_transactions block.hash block.transactions base
+      in
       return {block with transactions}
     else return block
 
