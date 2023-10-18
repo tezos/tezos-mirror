@@ -105,6 +105,28 @@ let if_spec = function
   | None -> []
   | Some ast -> [("if", scalar (Ast.to_string ast))]
 
+let valid_spec : ValidationSpec.t option -> _ = function
+  | None -> []
+  | Some v ->
+      let v =
+        match v with
+        | ValidationEq e -> [("eq", scalar (Ast.to_string e))]
+        | ValidationMin e -> [("min", scalar (Ast.to_string e))]
+        | ValidationMax e -> [("max", scalar (Ast.to_string e))]
+        | ValidationRange {min; max} ->
+            [
+              ("min", scalar (Ast.to_string min));
+              ("max", scalar (Ast.to_string max));
+            ]
+        | ValidationAnyOf es ->
+            [
+              ( "any-of",
+                sequence (List.map (fun e -> scalar (Ast.to_string e)) es) );
+            ]
+        | ValidationExpr e -> [("expr", scalar (Ast.to_string e))]
+      in
+      [("valid", mapping v)]
+
 let enum_spec attr =
   map_list_of_option (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
 
@@ -126,6 +148,7 @@ let attr_spec attr =
         size_spec attr;
         repeat_spec attr.cond.repeat;
         if_spec attr.cond.ifExpr;
+        valid_spec attr.valid;
         enum_spec attr;
         doc_spec attr.doc;
       ];

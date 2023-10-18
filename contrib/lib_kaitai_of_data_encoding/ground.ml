@@ -186,7 +186,6 @@ module Attr = struct
     {
       (Helpers.default_attr_spec ~id) with
       dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
-      valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
       enum = Some (fst Enum.bool);
     }
 
