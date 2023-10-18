@@ -25,6 +25,7 @@
   },
   "etherlink": {
     "tags": [
+      "evm",
       "sc_rollup",
       "rollup_node",
       "refutation",
