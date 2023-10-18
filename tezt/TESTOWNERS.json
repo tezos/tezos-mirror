@@ -1,6 +1,8 @@
 {
   "infrastructure": {
-    "tags": [],
+    "tags": [
+      "binaries"
+    ],
     "path_prefixes": []
   },
   "layer1": {
