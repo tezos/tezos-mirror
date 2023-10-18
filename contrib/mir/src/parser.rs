@@ -10,9 +10,21 @@ use crate::syntax;
 use lalrpop_util::lexer::Token;
 use lalrpop_util::ParseError;
 
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ParserError {
+    #[error("parsing of numeric literal {0} failed")]
+    NumericLiteral(String),
+    #[error("expected a natural from 0 to 1023 inclusive, but got {0}")]
+    ExpectedU10(String),
+    #[error("forbidden character found in string literal \"{0}\"")]
+    ForbiddenCharacterIn(String),
+    #[error("undefined escape sequence: \"\\{0}\"")]
+    UndefinedEscape(char),
+}
+
 pub fn parse(
     src: &str,
-) -> Result<ParsedInstructionBlock, ParseError<usize, Token<'_>, &'static str>> {
+) -> Result<ParsedInstructionBlock, ParseError<usize, Token<'_>, ParserError>> {
     syntax::instructionBlockParser::new().parse(src)
 }
 
@@ -21,15 +33,13 @@ pub fn parse(
 /// escapes with corresponding characters.
 pub fn validate_unescape_string(
     s: &str,
-) -> Result<String, ParseError<usize, Token<'_>, &'static str>> {
+) -> Result<String, ParseError<usize, Token<'_>, ParserError>> {
     // strip the quotes
     let s = &s[1..s.len() - 1];
 
     // check if all characters are printable ASCII
     if !s.chars().all(|c| matches!(c, ' '..='~')) {
-        return Err(ParseError::User {
-            error: "Forbidden character",
-        });
+        return Err(ParserError::ForbiddenCharacterIn(s.to_owned()).into());
     }
 
     let mut res = String::new();
@@ -40,9 +50,7 @@ pub fn validate_unescape_string(
         'n' => Ok('\n'),
         '"' => Ok('"'),
         '\\' => Ok('\\'),
-        _ => Err(ParseError::User {
-            error: "Undefined escape sequence",
-        }),
+        _ => Err(ParserError::UndefinedEscape(c)),
     };
 
     let mut in_escape: bool = false;
@@ -82,9 +90,15 @@ mod tests {
         assert_parse!(r#""foo\\nbar""#, Ok("foo\\nbar"));
         assert_parse!(r#""foo\\\\bar""#, Ok("foo\\\\bar"));
         // unicode is not accepted
-        assert_parse!(r#""हिन्दी""#, Err("Forbidden character".to_owned()));
+        assert_parse!(
+            r#""हिन्दी""#,
+            Err("forbidden character found in string literal \"हिन्दी\"".to_owned())
+        );
         // unknown escapes are not accepted
-        assert_parse!(r#""\a""#, Err("Undefined escape sequence".to_owned()));
+        assert_parse!(
+            r#""\a""#,
+            Err("undefined escape sequence: \"\\a\"".to_owned())
+        );
         // unterminated strings are not accepted
         assert_parse!(r#"""#, Err("Invalid token at 0".to_owned()));
         assert_parse!(r#""\""#, Err("Invalid token at 0".to_owned()));

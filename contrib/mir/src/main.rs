@@ -72,7 +72,7 @@ mod tests {
         let mut gas = Gas::new(1);
         assert_eq!(
             interpreter::interpret(&ast, &mut gas, &mut istack),
-            Err(interpreter::InterpretError::OutOfGas),
+            Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
         );
     }
 
@@ -102,17 +102,22 @@ mod tests {
         let mut gas = Gas::new(1000);
         assert_eq!(
             typechecker::typecheck(ast, &mut gas, &mut stack),
-            Err(typechecker::TcError::OutOfGas)
+            Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
 
     #[test]
     fn typecheck_test_expect_fail() {
+        use typechecker::{NoMatchingOverloadReason, TcError};
         let ast = parser::parse(&FIBONACCI_ILLTYPED_SRC).unwrap();
         let mut stack = stk![Type::Nat];
         assert_eq!(
             typechecker::typecheck(ast, &mut Gas::default(), &mut stack),
-            Err(typechecker::TcError::StackTooShort)
+            Err(TcError::NoMatchingOverload {
+                instr: "DUP",
+                stack: stk![Type::Int, Type::Int, Type::Int],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 4 })
+            })
         );
     }
 
@@ -179,21 +184,21 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "Expected a natural from 0 to 1023 inclusive"
+            "expected a natural from 0 to 1023 inclusive, but got 1025"
         );
         assert_eq!(
             parser::parse("{ DIP 1024 {} }")
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "Expected a natural from 0 to 1023 inclusive"
+            "expected a natural from 0 to 1023 inclusive, but got 1024"
         );
         assert_eq!(
             parser::parse("{ DUP 65536 }")
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "Expected a natural from 0 to 1023 inclusive"
+            "expected a natural from 0 to 1023 inclusive, but got 65536"
         );
     }
 

@@ -9,17 +9,14 @@ use crate::ast::*;
 use crate::gas::{interpret_cost, Gas, OutOfGas};
 use crate::stack::*;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum InterpretError {
-    OutOfGas,
+    #[error(transparent)]
+    OutOfGas(#[from] OutOfGas),
+    #[error("mutez overflow")]
     MutezOverflow,
+    #[error("failed with: {0:?}")]
     FailedWith(TypedValue),
-}
-
-impl From<OutOfGas> for InterpretError {
-    fn from(_: OutOfGas) -> Self {
-        InterpretError::OutOfGas
-    }
 }
 
 #[allow(dead_code)]
