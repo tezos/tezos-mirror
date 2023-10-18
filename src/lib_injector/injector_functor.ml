@@ -1446,7 +1446,7 @@ module Make (Parameters : PARAMETERS) = struct
     let* () =
       Signature.Public_key_hash.Map.iter_es
         (fun signer (strategy, tags) ->
-          let+ worker =
+          let* worker =
             Worker.launch
               table
               signer
@@ -1464,7 +1464,12 @@ module Make (Parameters : PARAMETERS) = struct
               }
               (module Handlers)
           in
-          ignore worker)
+          Tags.iter_es
+            (fun tag ->
+              if Tags_table.mem tags_table tag then
+                tzfail Overlapping_operations
+              else return (Tags_table.add tags_table tag worker))
+            tags)
         signers_map
     in
     async_monitor_l1_chain cctxt l1_ctxt ;

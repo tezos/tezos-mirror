@@ -69,3 +69,17 @@ let () =
     Data_encoding.(obj1 (req "step" string))
     (function Step_failed s -> Some s | _ -> None)
     (fun s -> Step_failed s)
+
+type error += Overlapping_operations
+
+let () =
+  register_error_kind
+    ~id:"injector.overlapping_operations"
+    ~title:"Injector operation assigned to multiple workers"
+    ~description:"Injector operation assigned to multiple workers."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Injector operation assigned to multiple workers")
+    `Permanent
+    Data_encoding.empty
+    (function Overlapping_operations -> Some () | _ -> None)
+    (fun () -> Overlapping_operations)
