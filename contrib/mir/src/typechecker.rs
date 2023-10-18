@@ -317,6 +317,10 @@ fn typecheck_instruction(
             stack[0] = T::Int;
             I::Compare
         }
+        I::Amount => {
+            stack.push(T::Mutez);
+            I::Amount
+        }
     })
 }
 
@@ -914,5 +918,19 @@ mod typecheck_tests {
                 reason: Some(TypesNotEqual(Type::Nat, Type::Int).into())
             })
         );
+    }
+
+    #[test]
+    fn amount() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ AMOUNT }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Amount])
+        );
+        assert_eq!(stack, stk![Type::Mutez]);
     }
 }

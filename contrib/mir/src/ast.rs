@@ -126,6 +126,7 @@ pub enum Instruction<T: Stage> {
     /// `ISome` because `Some` is already taken
     ISome,
     Compare,
+    Amount,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
