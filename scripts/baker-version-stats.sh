@@ -36,14 +36,14 @@ RAW_FILENAME=$(tempfile --prefix baker-version-stats-raw --suffix .txt)
 for i in $(seq $FROM_LEVEL $TO_LEVEL)
 do
 #    echo "Fetching $i/$TO_LEVEL..."
-    curl -s http://$HOST/chains/main/blocks/$i/header | jq .proof_of_work_nonce >> $RAW_FILENAME
+    curl -s http://$HOST/chains/main/blocks/$i/header | jq -r .proof_of_work_nonce >> $RAW_FILENAME
 done
 
 ########################################################
 # Count Statistics
 
 STATS_FILENAME=$(tempfile --prefix baker-version-stats --suffix .txt)
-sort $RAW_FILENAME | cut -c 2-9 | uniq -c | sort -n > $STATS_FILENAME
+sort $RAW_FILENAME | cut -c 1-8 | uniq -c | sort -n > $STATS_FILENAME
 rm -f $RAW_FILENAME
 
 ########################################################
