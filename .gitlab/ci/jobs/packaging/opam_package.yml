@@ -520,6 +520,8 @@ opam:octez-distributed-lwt-internal:
 
 # Ignoring unreleased package octez-evm-proxy-lib-prod.
 
+# Ignoring unreleased package octez-evm-proxy-lib-prod-encoding.
+
 # Ignoring unreleased package octez-evm-proxy-tests.
 
 opam:octez-injector:

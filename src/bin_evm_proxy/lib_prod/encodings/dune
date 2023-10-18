@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name evm_proxy_lib_prod_encoding)
+ (package octez-evm-proxy-lib-prod-encoding)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-smart-rollup-wasm-debugger-plugin)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

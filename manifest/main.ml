@@ -8199,6 +8199,17 @@ let _octez_scoru_wasm_debugger =
         lambda_term;
       ]
 
+let evm_proxy_lib_prod_encoding =
+  private_lib
+    "evm_proxy_lib_prod_encoding"
+    ~path:"src/bin_evm_proxy/lib_prod/encodings"
+    ~opam:"octez-evm-proxy-lib-prod-encoding"
+    ~synopsis:
+      "EVM encodings for the EVM proxy and plugin for the WASM Debugger [prod \
+       version]"
+    ~deps:
+      [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
+
 let evm_proxy_lib_prod =
   private_lib
     "evm_proxy_lib_prod"
@@ -8215,6 +8226,7 @@ let evm_proxy_lib_prod =
         octez_rpc_http_client_unix;
         octez_version_value;
         octez_stdlib_unix |> open_;
+        evm_proxy_lib_prod_encoding |> open_;
         lwt_exit;
       ]
 
@@ -8223,7 +8235,9 @@ let evm_proxy_lib_dev_encoding =
     "evm_proxy_lib_dev_encoding"
     ~path:"src/bin_evm_proxy/lib_dev/encodings"
     ~opam:"octez-evm-proxy-lib-dev-encoding"
-    ~synopsis:"EVM encodings for the EVM proxy and plugin for the WASM Debugger"
+    ~synopsis:
+      "EVM encodings for the EVM proxy and plugin for the WASM Debugger [dev \
+       version]"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
 
