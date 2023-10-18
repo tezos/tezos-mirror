@@ -22,7 +22,10 @@
     ]
   },
   "tezos2": {
-    "tags": [],
+    "tags": [
+      "dac",
+      "dac_node"
+    ],
     "path_prefixes": [
       "src/lib_aplonk",
       "src/lib_distributed_aplonk"
