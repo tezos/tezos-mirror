@@ -244,10 +244,14 @@ mod tests {
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_ethereum::tx_signature::TxSignature;
+    use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_mock::MockHost;
 
     fn blueprint(transactions: Vec<Transaction>) -> QueueElement {
-        QueueElement::Blueprint(Blueprint { transactions })
+        QueueElement::Blueprint(Blueprint {
+            transactions,
+            timestamp: Timestamp::from(0i64),
+        })
     }
 
     fn address_from_str(s: &str) -> Option<H160> {
