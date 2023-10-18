@@ -64,23 +64,3 @@ indicates a recommended course of action.
 +-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
 | 255         | like 127 but an error and an error occurred during exit (e.g., ``kill -9``)      | check output/logs, clean-up leftover files                       |
 +-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
-
-.. _failing_noop:
-
-Failing_noop operation
-----------------------
-
-Starting with protocol 009 a ``Failing_noop`` operation is added. This operation
-is not executable in the protocol and will always fail when injected. It allows
-to sign an arbitrary string that cannot be misinterpreted in the protocol.
-
-The client has commands to sign a message with a given key or to check that
-message has been signed by a given key. These commands create a ``failing_noop``
-operation from the message that is being signed or checked.
-
-::
-
-   octez-client sign message "hello world" for <account>
-
-   octez-client check that message "hello world" was signed by <account> to
-   produce <signature>
