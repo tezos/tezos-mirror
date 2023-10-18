@@ -123,7 +123,7 @@ type highwatermarks = {
 
 type t = highwatermarks
 
-let encoding =
+let encoding ~use_legacy_attestation_name =
   let open Data_encoding in
   conv
     (fun {blocks; preattestations; attestations} ->
@@ -132,8 +132,32 @@ let encoding =
       {blocks; preattestations; attestations})
     (obj3
        (req "blocks" highwatermark_delegate_map_encoding)
-       (req "preattestations" highwatermark_delegate_map_encoding)
-       (req "attestations" highwatermark_delegate_map_encoding))
+       (req
+          (if use_legacy_attestation_name then "preendorsements"
+          else "preattestations")
+          highwatermark_delegate_map_encoding)
+       (req
+          (if use_legacy_attestation_name then "endorsements"
+          else "attestations")
+          highwatermark_delegate_map_encoding))
+
+let load_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"new"
+        (Tag 0)
+        (encoding ~use_legacy_attestation_name:false)
+        Option.some
+        Fun.id;
+      case
+        ~title:"old"
+        (Tag 1)
+        (encoding ~use_legacy_attestation_name:true)
+        Option.some
+        Fun.id;
+    ]
 
 let empty =
   {
@@ -145,13 +169,16 @@ let empty =
 (* We do not lock these functions. The caller will be already locked. *)
 let load (cctxt : #Protocol_client_context.full) location : t tzresult Lwt.t =
   protect (fun () ->
-      cctxt#load (Baking_files.filename location) encoding ~default:empty)
+      cctxt#load (Baking_files.filename location) load_encoding ~default:empty)
 
 let save_highwatermarks (cctxt : #Protocol_client_context.full) filename
     highwatermarks : unit tzresult Lwt.t =
   protect (fun () ->
       (* TODO: improve the backend so we don't write partial informations *)
-      cctxt#write filename highwatermarks encoding)
+      cctxt#write
+        filename
+        highwatermarks
+        (encoding ~use_legacy_attestation_name:false))
 
 let may_sign highwatermarks ~delegate ~level ~round =
   match DelegateMap.find delegate highwatermarks with
