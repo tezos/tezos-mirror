@@ -1349,22 +1349,31 @@ let rec check_can_get_between_blocks rollup_client ~first ~last path =
     check_can_get_between_blocks rollup_client ~first ~last:(last - 1) path
   else unit
 
-let test_context_gc ~challenge_window ~commitment_period =
+let test_gc ~challenge_window ~commitment_period ~history_mode =
+  let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
   test_full_scenario
     {
-      tags = ["gc"];
+      tags = ["gc"; history_mode_str];
       variant = None;
       description =
-        "context garbage collection is triggered and finishes correctly";
+        sf
+          "garbage collection is triggered and finishes correctly (%s)"
+          history_mode_str;
     }
     ~challenge_window
     ~commitment_period
-  @@ fun _protocol sc_rollup_node rollup_client sc_rollup _node client ->
+  @@ fun _protocol sc_rollup_node rollup_client sc_rollup node client ->
   (* GC will be invoked at every available opportunity, i.e. after every new lcc *)
   let gc_frequency = 1 in
+  (* We want to bake enough blocks for the LCC to be updated and the GC
+     triggered. *)
   let expected_level = 5 * challenge_window in
   let* _config =
-    Sc_rollup_node.config_init ~gc_frequency sc_rollup_node sc_rollup
+    Sc_rollup_node.config_init
+      ~gc_frequency
+      ~history_mode
+      sc_rollup_node
+      sc_rollup
   in
   let gc_levels_started = ref [] in
   let context_gc_finalisations = ref 0 in
@@ -1381,18 +1390,21 @@ let test_context_gc ~challenge_window ~commitment_period =
           context_gc_finalisations := !context_gc_finalisations + 1
       | _ -> ()) ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* origination_level = Node.get_level node in
   (* We start at level 2, bake until the expected level *)
-  let* () = bake_levels (expected_level - 2) client in
+  let* () = bake_levels (expected_level - origination_level) client in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
   in
-
   let gc_levels_started = List.rev !gc_levels_started in
-  let first_gc_level = List.hd gc_levels_started in
   let expected_gc_levels =
-    List.init
-      (((expected_level - first_gc_level) / commitment_period) + 1)
-      (fun i -> first_gc_level + (i * commitment_period))
+    match history_mode with
+    | Archive -> [] (* No GC in archive mode *)
+    | Full ->
+        let first_gc_level = List.hd gc_levels_started in
+        List.init
+          (((expected_level - first_gc_level) / commitment_period) + 1)
+          (fun i -> first_gc_level + (i * commitment_period))
   in
   (* Check that GC was launched at least the expected number of times,
    * at or after the expected level. This check is not an equality in order
@@ -1408,9 +1420,17 @@ let test_context_gc ~challenge_window ~commitment_period =
       "Not all context GC calls finished (GC called %R times, finished %L \
        times)" ;
   (* We expect the first available level to be the one corresponding
-   * to the lcc *)
-  let* _, first_available_level =
-    Sc_rollup_helpers.last_cemented_commitment_hash_with_level ~sc_rollup client
+   * to the lcc for the full mode or the genesis for archive mode *)
+  let* first_available_level =
+    match history_mode with
+    | Archive -> Lwt.return origination_level
+    | Full ->
+        let* _, lcc =
+          Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+            ~sc_rollup
+            client
+        in
+        Lwt.return lcc
   in
   (* Check that RPC calls for blocks which were not GC'ed still return *)
   let* () =
@@ -6588,7 +6608,18 @@ let register ~kind ~protocols =
     ~variant:"basic"
     basic_scenario
     protocols ;
-  test_context_gc ~kind ~challenge_window:10 ~commitment_period:5 protocols ;
+  test_gc
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:5
+    ~history_mode:Full
+    protocols ;
+  test_gc
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:5
+    ~history_mode:Archive
+    protocols ;
   test_rpcs ~kind protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind
