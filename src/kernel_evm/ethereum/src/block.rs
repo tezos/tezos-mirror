@@ -6,9 +6,9 @@
 use crate::eth_gen::OwnedHash;
 use crate::helpers::{bytes_of_u256, hex_of_option};
 use crate::rlp_helpers::{
-    append_option_explicit, append_u256_le, append_u64_le, decode_field,
-    decode_field_h256, decode_field_u256_le, decode_field_u64_le, decode_option_explicit,
-    decode_transaction_hash_list, next,
+    append_option_explicit, append_timestamp, append_u256_le, append_u64_le,
+    decode_field, decode_field_h256, decode_field_u256_le, decode_field_u64_le,
+    decode_option_explicit, decode_timestamp, decode_transaction_hash_list, next,
 };
 use crate::transaction::TransactionHash;
 use ethbloom::Bloom;
@@ -213,7 +213,7 @@ impl Encodable for L2Block {
             self.transactions.iter().map(|x| x.to_vec()).collect();
         s.append_list::<Vec<u8>, _>(&transactions_bytes);
         s.append(&self.gas_used);
-        s.append(&self.timestamp.i64().to_le_bytes().to_vec());
+        append_timestamp(s, self.timestamp);
     }
 }
 
@@ -244,15 +244,7 @@ impl Decodable for L2Block {
                 let transactions: Vec<TransactionHash> =
                     decode_transaction_hash_list(&next(&mut it)?, "transactions")?;
                 let gas_used: U256 = decode_field_u256_le(&next(&mut it)?, "gas_used")?;
-                let timestamp_bytes =
-                    decode_field::<Vec<u8>>(&next(&mut it)?, "timestamp")?;
-                let timestamp: Timestamp =
-                    i64::from_le_bytes(timestamp_bytes.try_into().map_err(|_| {
-                        DecoderError::Custom(
-                            "Invalid conversion from timestamp vector of bytes to bytes.",
-                        )
-                    })?)
-                    .into();
+                let timestamp = decode_timestamp(&next(&mut it)?)?;
                 Ok(L2Block {
                     number,
                     hash,
