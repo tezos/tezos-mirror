@@ -85,6 +85,7 @@ pub mod tc_cost {
 
 pub mod interpret_cost {
     use super::OutOfGas;
+    use crate::ast::TypedValue;
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -158,6 +159,43 @@ pub mod interpret_cost {
         // the larger of the two due to result allocation
         let sz = std::cmp::max(size_of_val(&i1), size_of_val(&i2));
         Ok((sz >> 1).checked_add(35).ok_or(OutOfGas)?.try_into()?)
+    }
+
+    pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
+        use TypedValue as V;
+        let cmp_bytes = |s1: usize, s2: usize| -> Result<u32, OutOfGas> {
+            // Approximating 35 + 0.024413 x term
+            let v = std::cmp::min(s1, s2);
+            let go = |v| (35 as usize).checked_add(v >> 6)?.checked_add(v >> 7);
+            Ok(go(v).ok_or(OutOfGas)?.try_into()?)
+        };
+        let cmp_pair = |l1, r1, l2, r2| -> Result<u32, OutOfGas> {
+            let go = |a, b| (10 as u32).checked_add(a)?.checked_add(b);
+            Ok(go(compare(l1, r1)?, compare(l2, r2)?).ok_or(OutOfGas)?)
+        };
+        let cmp_option: u32 = 10;
+        Ok(match (v1, v2) {
+            (V::Nat(l), V::Nat(r)) => {
+                // NB: eventually when using BigInts, use BigInt::bits() &c
+                cmp_bytes(std::mem::size_of_val(l), std::mem::size_of_val(r))?
+            }
+            (V::Int(l), V::Int(r)) => {
+                // NB: eventually when using BigInts, use BigInt::bits() &c
+                cmp_bytes(std::mem::size_of_val(l), std::mem::size_of_val(r))?
+            }
+            (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
+            (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
+            (V::String(l), V::String(r)) => cmp_bytes(l.len(), r.len())?,
+            (V::Unit, V::Unit) => 10,
+            (V::Pair(l1, r1), V::Pair(l2, r2)) => cmp_pair(l1, r1, l2, r2)?,
+            (V::Option(l), V::Option(r)) => match (l, r) {
+                (None, None) => cmp_option,
+                (None, Some(_)) => cmp_option,
+                (Some(_), None) => cmp_option,
+                (Some(l), Some(r)) => cmp_option.checked_add(compare(l, r)?).ok_or(OutOfGas)?,
+            },
+            _ => unreachable!("Comparison of incomparable values"),
+        })
     }
 }
 

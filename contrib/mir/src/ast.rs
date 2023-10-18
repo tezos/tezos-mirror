@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
+pub mod comparable;
 pub mod parsed;
 pub mod typechecked;
 
@@ -21,6 +22,13 @@ pub enum Type {
     Unit,
     Pair(Box<Type>, Box<Type>),
     Option(Box<Type>),
+}
+
+impl Type {
+    pub fn is_comparable(&self) -> bool {
+        // all types are currently comparable
+        return true;
+    }
 }
 
 impl Type {
@@ -117,6 +125,7 @@ pub enum Instruction<T: Stage> {
     Pair,
     /// `ISome` because `Some` is already taken
     ISome,
+    Compare,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

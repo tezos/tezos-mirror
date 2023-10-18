@@ -226,6 +226,18 @@ fn typecheck_instruction(
             }
             _ => return Err(TcError::StackTooShort),
         },
+        I::Compare => match stack.as_slice() {
+            [.., t, u] => {
+                ensure_ty_eq(gas, t, u)?;
+                if !t.is_comparable() {
+                    return Err(TcError::GenericTcError);
+                }
+                stack.pop();
+                stack[0] = T::Int;
+                I::Compare
+            }
+            _ => return Err(TcError::GenericTcError),
+        },
     })
 }
 
@@ -720,5 +732,32 @@ mod typecheck_tests {
             Ok(vec![ISome])
         );
         assert_eq!(stack, stk![Type::new_option(Type::Int)]);
+    }
+
+    #[test]
+    fn compare_int() {
+        let mut stack = stk![Type::Int, Type::Int];
+        assert_eq!(
+            typecheck(
+                parse("{ COMPARE }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Ok(vec![Compare])
+        );
+        assert_eq!(stack, stk![Type::Int]);
+    }
+
+    #[test]
+    fn compare_int_fail() {
+        let mut stack = stk![Type::Int, Type::Nat];
+        assert_eq!(
+            typecheck(
+                parse("{ COMPARE }").unwrap(),
+                &mut Gas::default(),
+                &mut stack
+            ),
+            Err(TcError::StacksNotEqual)
+        );
     }
 }
