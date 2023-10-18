@@ -7,6 +7,7 @@
 
 #![allow(dead_code, unused_imports)]
 #![allow(clippy::all)]
+#![cfg(not(tarpaulin_include))]
 
 use crate::ast::*;
 use crate::parser::{ParserError, ContractScriptEntity, validate_u10};
