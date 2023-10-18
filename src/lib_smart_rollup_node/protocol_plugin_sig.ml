@@ -177,6 +177,7 @@ module type LAYER1_HELPERS = sig
     #Client_context.full -> Address.t -> Node_context.lcc tzresult Lwt.t
 
   val get_last_published_commitment :
+    ?allow_unstake:bool ->
     #Client_context.full ->
     Address.t ->
     Signature.public_key_hash ->
