@@ -17,7 +17,10 @@
   },
   "tezos2": {
     "tags": [],
-    "path_prefixes": []
+    "path_prefixes": [
+      "src/lib_aplonk",
+      "src/lib_distributed_aplonk"
+    ]
   },
   "etherlink": {
     "tags": [
