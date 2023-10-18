@@ -85,12 +85,12 @@ val acquiring_lock : unit -> unit Lwt.t
     made at [level]. *)
 val calling_gc : int32 -> unit Lwt.t
 
-(** [starting_context_gc hash] emits and event which indicates that a GC run
+(** [starting_context_gc hash] emits an event which indicates that a GC run
     was launched for [hash]. *)
 val starting_context_gc : Smart_rollup_context_hash.t -> unit Lwt.t
 
-(** [gc_already_launched ()] emits an event which indicates that a GC launch
-    was attempted but resulted in no action because a GC run is already
+(** [context_gc_already_launched ()] emits an event which indicates that a GC
+    launch was attempted but resulted in no action because a GC run is already
     in progress. *)
 val context_gc_already_launched : unit -> unit Lwt.t
 
@@ -102,10 +102,16 @@ val ending_context_gc : Ptime.span * Ptime.span -> unit Lwt.t
 (** [context_gc_failure err] emits an event which indicates a GC failure. *)
 val context_gc_failure : string -> unit Lwt.t
 
-(** [gc_launch_failure err] emits an event which indicates a GC launch error. *)
+(** [context_gc_launch_failure err] emits an event which indicates a GC launch
+    error. *)
 val context_gc_launch_failure : string -> unit Lwt.t
 
 (** [gc_levels_storage_failure ()] emits an event which indicates that GC level
     values ([last_gc_level], [first_available_level]) could not be written to
     storage. *)
 val gc_levels_storage_failure : unit -> unit Lwt.t
+
+(** [convert_history_mode old_history_mode new_history_mode] emits an event for
+    when the history mode of the rollup node is changed. *)
+val convert_history_mode :
+  Configuration.history_mode -> Configuration.history_mode -> unit Lwt.t

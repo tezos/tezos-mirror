@@ -164,6 +164,29 @@ let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   in
   return (kernel_debug, fun () -> Lwt_io.close chan)
 
+let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
+    (store : a Store.store) (history_mode : Configuration.history_mode) =
+  let open Lwt_result_syntax in
+  let* stored_history_mode =
+    match mode with
+    | Read_only -> Store.History_mode.read store.history_mode
+    | Read_write -> Store.History_mode.read store.history_mode
+  in
+  let save_when_rw () =
+    match mode with
+    | Read_only -> return_unit
+    | Read_write -> Store.History_mode.write store.history_mode history_mode
+  in
+  match (stored_history_mode, history_mode) with
+  | None, _ -> save_when_rw ()
+  | Some Archive, Archive | Some Full, Full -> return_unit
+  | Some Archive, Full ->
+      (* Data will be cleaned at next GC, just save new mode *)
+      let*! () = Event.convert_history_mode Archive Full in
+      save_when_rw ()
+  | Some Full, Archive ->
+      failwith "Cannot transform a full rollup node into an archive one."
+
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
     l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
@@ -198,6 +221,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       (Configuration.default_context_dir data_dir)
   in
   let* () = Context.Rollup.check_or_set_address mode context rollup_address in
+  let* () = check_and_set_history_mode mode store configuration.history_mode in
   let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
   let*! () =
     if dal_cctxt = None && current_protocol.constants.dal.feature_enable then
@@ -1015,28 +1039,41 @@ let save_gc_info node_ctxt ~at_level ~gc_level =
 
 let gc node_ctxt ~(level : int32) =
   let open Lwt_result_syntax in
+  (* [gc_level] is the level corresponding to the hash on which GC will be
+     called. *)
+  let gc_level =
+    match node_ctxt.config.history_mode with
+    | Archive ->
+        (* Never call GC in archive mode *)
+        None
+    | Full ->
+        (* GC up to LCC in full mode *)
+        Some (Reference.get node_ctxt.lcc).level
+  in
   let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
   let* last_gc_level, first_available_level = get_gc_levels node_ctxt in
-  (* [gc_level] is the level corresponding to the hash on which
-   * GC will be called, which is defined as the lcc. *)
-  let gc_level = (Reference.get node_ctxt.lcc).level in
-  when_
-    (gc_level > first_available_level
-    && Int32.(sub level last_gc_level >= frequency)
-    && Context.is_gc_finished node_ctxt.context)
-  @@ fun () ->
-  let* hash = hash_of_level node_ctxt gc_level in
-  let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
-  match header with
-  | None ->
-      failwith "Could not retrieve L2 block header for %a" Block_hash.pp hash
-  | Some {context; _} ->
-      let*! () = Event.calling_gc level in
-      let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
-      (* Start both node and context gc asynchronously *)
-      let*! () = Context.gc node_ctxt.context context in
-      let* () = Store.gc node_ctxt.store ~level:gc_level in
-      return_unit
+  match gc_level with
+  | None -> return_unit
+  | Some gc_level
+    when gc_level > first_available_level
+         && Int32.(sub level last_gc_level >= frequency)
+         && Context.is_gc_finished node_ctxt.context -> (
+      let* hash = hash_of_level node_ctxt gc_level in
+      let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
+      match header with
+      | None ->
+          failwith
+            "Could not retrieve L2 block header for %a"
+            Block_hash.pp
+            hash
+      | Some {context; _} ->
+          let*! () = Event.calling_gc level in
+          let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
+          (* Start both node and context gc asynchronously *)
+          let*! () = Context.gc node_ctxt.context context in
+          let* () = Store.gc node_ctxt.store ~level:gc_level in
+          return_unit)
+  | _ -> return_unit
 
 let check_level_available node_ctxt accessed_level =
   let open Lwt_result_syntax in
@@ -1083,6 +1120,7 @@ module Internal_for_tests = struct
           log_kernel_debug = false;
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;
+          history_mode = Configuration.default_history_mode;
         }
     in
     let* lockfile = lock ~data_dir in

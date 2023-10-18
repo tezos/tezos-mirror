@@ -98,6 +98,13 @@ type injector = {
 
 type gc_parameters = {frequency_in_blocks : int32}
 
+type history_mode =
+  | Archive
+      (** The whole history of the rollup (starting at its genesis) is kept *)
+  | Full
+      (** Only the history necessary to play refutation games is kept
+          (i.e. after the LCC only) *)
+
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
@@ -126,6 +133,7 @@ type t = {
   log_kernel_debug : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
+  history_mode : history_mode;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -144,6 +152,14 @@ val purpose_of_string : string -> purpose option
 
 (** [string_of_purpose p] returns a string representation of purpose [p]. *)
 val string_of_purpose : purpose -> string
+
+(** [history_mode_of_string s] parses a history_mode from the given string
+    [s]. *)
+val history_mode_of_string : string -> history_mode
+
+(** [string_of_history_mode p] returns a string representation of history_mode
+    [p]. *)
+val string_of_history_mode : history_mode -> string
 
 (** List of possible purposes for operator specialization. *)
 val purposes : purpose list
@@ -203,6 +219,12 @@ val default_l1_blocks_cache_size : int
 val default_l2_blocks_cache_size : int
 
 val default_gc_parameters : gc_parameters
+
+(** [default_history_mode] is the default history mode for the rollup node
+    ({!Full}).  *)
+val default_history_mode : history_mode
+
+val history_mode_encoding : history_mode Data_encoding.t
 
 (** [max_injector_retention_period] is the maximum allowed value for
     [injector_retention_period]. *)
@@ -293,6 +315,7 @@ module Cli : sig
     log_kernel_debug:bool ->
     no_degraded:bool ->
     gc_frequency:int32 option ->
+    history_mode:history_mode option ->
     t tzresult
 
   val create_or_read_config :
@@ -320,5 +343,6 @@ module Cli : sig
     log_kernel_debug:bool ->
     no_degraded:bool ->
     gc_frequency:int32 option ->
+    history_mode:history_mode option ->
     t tzresult Lwt.t
 end

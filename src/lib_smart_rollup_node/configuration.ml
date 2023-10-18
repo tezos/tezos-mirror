@@ -83,6 +83,8 @@ type injector = {retention_period : int; attempts : int; injection_ttl : int}
 
 type gc_parameters = {frequency_in_blocks : int32}
 
+type history_mode = Archive | Full
+
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
@@ -107,6 +109,7 @@ type t = {
   log_kernel_debug : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
+  history_mode : history_mode;
 }
 
 type error +=
@@ -294,6 +297,8 @@ let default_gc_parameters =
     frequency_in_blocks = 100l;
   }
 
+let default_history_mode = Full
+
 let string_of_operation_kind = function
   | Publish -> "publish"
   | Add_messages -> "add_messages"
@@ -342,6 +347,13 @@ let purpose_of_string_exn s =
   match purpose_of_string s with
   | Some p -> p
   | None -> invalid_arg ("purpose_of_string " ^ s)
+
+let string_of_history_mode = function Archive -> "archive" | Full -> "full"
+
+let history_mode_of_string = function
+  | "archive" -> Archive
+  | "full" -> Full
+  | s -> invalid_arg ("history_mode_of_string " ^ s)
 
 let make_purpose_map ~default bindings =
   let map = Operator_purpose_map.of_seq @@ List.to_seq bindings in
@@ -697,6 +709,9 @@ let gc_parameters_encoding : gc_parameters Data_encoding.t =
     (fun frequency_in_blocks -> {frequency_in_blocks})
   @@ obj1 (dft "frequency" int32 default_gc_parameters.frequency_in_blocks)
 
+let history_mode_encoding : history_mode Data_encoding.t =
+  Data_encoding.string_enum [("archive", Archive); ("full", Full)]
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -724,6 +739,7 @@ let encoding : t Data_encoding.t =
            log_kernel_debug;
            no_degraded;
            gc_parameters;
+           history_mode;
          } ->
       ( ( sc_rollup_address,
           boot_sector_file,
@@ -747,7 +763,8 @@ let encoding : t Data_encoding.t =
             irmin_cache_size,
             log_kernel_debug,
             no_degraded,
-            gc_parameters ) ) ))
+            gc_parameters,
+            history_mode ) ) ))
     (fun ( ( sc_rollup_address,
              boot_sector_file,
              sc_rollup_node_operators,
@@ -770,7 +787,8 @@ let encoding : t Data_encoding.t =
                irmin_cache_size,
                log_kernel_debug,
                no_degraded,
-               gc_parameters ) ) ) ->
+               gc_parameters,
+               history_mode ) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -795,6 +813,7 @@ let encoding : t Data_encoding.t =
         log_kernel_debug;
         no_degraded;
         gc_parameters;
+        history_mode;
       })
     (merge_objs
        (obj10
@@ -845,12 +864,13 @@ let encoding : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj5
+          (obj6
              (opt "index_buffer_size" int31)
              (opt "irmin_cache_size" int31)
              (dft "log-kernel-debug" Data_encoding.bool false)
              (dft "no-degraded" Data_encoding.bool false)
-             (dft "gc-parameters" gc_parameters_encoding default_gc_parameters))))
+             (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
+             (dft "history-mode" history_mode_encoding default_history_mode))))
 
 (* For each purpose, it returns a list of associated operation kinds *)
 let operation_kinds_of_purpose = function
@@ -983,7 +1003,7 @@ module Cli = struct
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency =
+      ~gc_frequency ~history_mode =
     let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
     let config =
       {
@@ -1027,6 +1047,7 @@ module Cli = struct
                 ~default:default_gc_parameters.frequency_in_blocks
                 gc_frequency;
           };
+        history_mode = Option.value ~default:default_history_mode history_mode;
       }
     in
     check_mode config
@@ -1036,7 +1057,8 @@ module Cli = struct
       ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~sc_rollup_node_operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded =
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
+      ~history_mode =
     let new_sc_rollup_node_operators =
       make_operators sc_rollup_node_operators
     in
@@ -1091,6 +1113,15 @@ module Cli = struct
           Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
         no_degraded = no_degraded || configuration.no_degraded;
+        gc_parameters =
+          {
+            frequency_in_blocks =
+              Option.value
+                ~default:configuration.gc_parameters.frequency_in_blocks
+                gc_frequency;
+          };
+        history_mode =
+          Option.value ~default:configuration.history_mode history_mode;
       }
     in
     check_mode configuration
@@ -1100,7 +1131,7 @@ module Cli = struct
       ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
       ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency =
+      ~gc_frequency ~history_mode =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -1142,6 +1173,8 @@ module Cli = struct
           ~irmin_cache_size
           ~log_kernel_debug
           ~no_degraded
+          ~gc_frequency
+          ~history_mode
       in
       return configuration
     else
@@ -1186,6 +1219,7 @@ module Cli = struct
           ~log_kernel_debug
           ~no_degraded
           ~gc_frequency
+          ~history_mode
       in
       return config
 end

@@ -138,6 +138,7 @@ let config_init_command =
           ~log_kernel_debug
           ~no_degraded
           ~gc_frequency
+          ~history_mode:None
       in
       let* () = Configuration.save ~force ~data_dir config in
       let*! () =
@@ -220,6 +221,7 @@ let run_command =
           ~boot_sector_file
           ~no_degraded
           ~gc_frequency
+          ~history_mode:None
       in
       Sc_rollup_node.Daemon.run
         ~data_dir

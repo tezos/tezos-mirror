@@ -45,10 +45,15 @@ type mode =
   | Accuser
   | Bailout
 
+type history_mode = Archive | Full
+
 type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Returns the associated {!mode}, fails if the mode is not valid. *)
 val mode_of_string : string -> mode
+
+(** Returns the string representation of an history mode. *)
+val string_of_history_mode : history_mode -> string
 
 (** Create a smart contract rollup node.
 
@@ -217,6 +222,7 @@ val config_init :
   ?force:bool ->
   ?loser_mode:string ->
   ?gc_frequency:int ->
+  ?history_mode:history_mode ->
   string ->
   string Lwt.t
 
@@ -228,6 +234,7 @@ val spawn_config_init :
   ?force:bool ->
   ?loser_mode:string ->
   ?gc_frequency:int ->
+  ?history_mode:history_mode ->
   string ->
   Process.t
 
