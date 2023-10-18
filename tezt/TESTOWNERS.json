@@ -3,7 +3,9 @@
     "tags": [
       "binaries"
     ],
-    "path_prefixes": []
+    "path_prefixes": [
+      "devtools/yes_wallet"
+    ]
   },
   "layer1": {
     "tags": [
@@ -15,7 +17,8 @@
     ],
     "path_prefixes": [
       "src/lib_requester",
-      "src/proto_alpha/lib_delegate"
+      "src/proto_alpha/lib_delegate",
+      "devtools/yes_wallet"
     ]
   },
   "tezos2": {
