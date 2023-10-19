@@ -160,6 +160,10 @@ module Staking_pseudotoken : sig
   module For_RPC : sig
     val encoding : t Data_encoding.encoding
   end
+
+  module Internal_for_tests : sig
+    val to_z : t -> Z.t
+  end
 end
 
 (** This module re-exports definitions from {!Period_repr}. *)
