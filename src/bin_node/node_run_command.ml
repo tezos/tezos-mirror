@@ -114,12 +114,12 @@ module Event = struct
       ("acl_policy", Data_encoding.string)
 
   let starting_internal_rpc_server =
-    declare_1
+    declare_0
       ~section
       ~name:"starting_internal_rpc_server"
-      ~msg:"starting internal RPC server (acl = {acl_policy})"
+      ~msg:"starting internal RPC server"
       ~level:Info
-      ("acl_policy", Data_encoding.string)
+      ()
 
   let starting_metrics_server =
     declare_2
@@ -358,13 +358,6 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
     config.shell.chain_validator_limits
     config.shell.history_mode
 
-(* Add default accepted CORS headers *)
-let sanitize_cors_headers ~default headers =
-  List.map String.lowercase_ascii headers
-  |> String.Set.of_list
-  |> String.Set.(union (of_list default))
-  |> String.Set.elements
-
 let rpc_metrics =
   Prometheus.Summary.v_labels
     ~label_names:["endpoint"; "method"]
@@ -375,33 +368,57 @@ let rpc_metrics =
 
 module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
-(* Launches an RPC server depending on the given [mode] (which is
-   usually TCP, TLS or unix sockets). *)
-let launch_rpc_server ~mode (config : Config_file.t) dir (addr, port) =
+type port = int
+
+type socket_file = string
+
+type single_server_kind =
+  | Process of socket_file
+  | Local of Conduit_lwt_unix.server * port
+
+let extract_mode = function
+  | Process socket_file -> `Unix_domain_socket (`File socket_file)
+  | Local (mode, _) -> mode
+
+(* Add default accepted CORS headers *)
+let sanitize_cors_headers ~default headers =
+  List.map String.lowercase_ascii headers
+  |> String.Set.of_list
+  |> String.Set.(union (of_list default))
+  |> String.Set.elements
+
+(* Launches an RPC server depending on the given server kind *)
+let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let media_types = rpc_config.media_type in
-  let*! acl_policy = RPC_server.Acl.resolve_domain_names rpc_config.acl in
   let host = Ipaddr.V6.to_string addr in
-  let acl =
-    let open RPC_server.Acl in
-    find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
-    |> Option.value_f ~default:(fun () -> default addr)
-  in
-  let*! () =
-    match (mode : Conduit_lwt_unix.server) with
-    | `Unix_domain_socket _ ->
-        Event.(emit starting_internal_rpc_server)
-          (RPC_server.Acl.policy_type acl)
-    | `TCP _ | `TLS _ ->
-        Event.(emit starting_local_rpc_server)
-          (host, port, RPC_server.Acl.policy_type acl)
-    | _ -> Lwt.return_unit
-  in
-  let cors_headers =
-    sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
+  let* acl =
+    (* Also emits events depending on server kind *)
+    match rpc_server_kind with
+    | Process _ ->
+        let*! () = Event.(emit starting_internal_rpc_server) () in
+        return_none
+    | Local (mode, port) ->
+        let*! acl_policy = RPC_server.Acl.resolve_domain_names rpc_config.acl in
+        let acl =
+          let open RPC_server.Acl in
+          find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
+          |> Option.value_f ~default:(fun () -> default addr)
+        in
+        let*! () =
+          match (mode : Conduit_lwt_unix.server) with
+          | `TCP _ | `TLS _ | `Unix_domain_socket _ ->
+              Event.(emit starting_local_rpc_server)
+                (host, port, RPC_server.Acl.policy_type acl)
+          | _ -> Lwt.return_unit
+        in
+        return_some acl
   in
   let cors =
+    let cors_headers =
+      sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
+    in
     Resto_cohttp.Cors.
       {
         allowed_origins = rpc_config.cors_origins;
@@ -411,7 +428,7 @@ let launch_rpc_server ~mode (config : Config_file.t) dir (addr, port) =
   let server =
     RPC_server.init_server
       ~cors
-      ~acl
+      ?acl
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
@@ -428,6 +445,7 @@ let launch_rpc_server ~mode (config : Config_file.t) dir (addr, port) =
   let callback =
     RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
   in
+  let mode = extract_mode rpc_server_kind in
   Lwt.catch
     (fun () ->
       let*! () = RPC_server.launch ~host server ~callback mode in
@@ -436,8 +454,10 @@ let launch_rpc_server ~mode (config : Config_file.t) dir (addr, port) =
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1312
          This exception seems to be unreachable.
       *)
-      | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-          tzfail (RPC_Port_already_in_use [(addr, port)])
+      | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") as exn -> (
+          match rpc_server_kind with
+          | Process _ -> fail_with_exn exn
+          | Local (_, port) -> tzfail (RPC_Port_already_in_use [(addr, port)]))
       | exn -> fail_with_exn exn)
 
 (* Describes the kind of servers that can be handled by the node.
@@ -462,8 +482,7 @@ let init_local_rpc_server (config : Config_file.t) dir =
         | [] -> failwith "Cannot resolve listening address: %S" addr
         | addrs ->
             List.map_es
-              (fun addr ->
-                let port = snd addr in
+              (fun (addr, port) ->
                 let mode =
                   match config.rpc.tls with
                   | None -> `TCP (`Port port)
@@ -474,7 +493,7 @@ let init_local_rpc_server (config : Config_file.t) dir =
                           `No_password,
                           `Port port )
                 in
-                launch_rpc_server ~mode config dir addr)
+                launch_rpc_server config dir (Local (mode, port)) addr)
               addrs)
       config.rpc.local_listen_addrs
   in
@@ -493,7 +512,6 @@ let init_local_rpc_server_for_external_process id (config : Config_file.t) dir
   let socket_dir = Tezos_base_unix.Socket.get_temporary_socket_dir () in
   let pid = Unix.getpid () in
   let comm_socket_path = rpc_socket_path ~id ~socket_dir ~pid in
-  let mode = `Unix_domain_socket (`File comm_socket_path) in
   (* Register a clean up callback to clean the comm_socket_path when
      shutting down. Indeed, the socket file is created by the
      Conduit-lwt-unix.Conduit_lwt_server.listen function, but the
@@ -502,7 +520,9 @@ let init_local_rpc_server_for_external_process id (config : Config_file.t) dir
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Lwt_unix.unlink comm_socket_path)
   in
-  let* rpc_server = launch_rpc_server ~mode config dir addr in
+  let* rpc_server =
+    launch_rpc_server config dir (Process comm_socket_path) addr
+  in
   return (rpc_server, comm_socket_path)
 
 let init_external_rpc_server config node_version dir internal_events =
@@ -528,7 +548,7 @@ let init_external_rpc_server config node_version dir internal_events =
                     id
                     config
                     dir
-                    p2p_point
+                    (fst p2p_point)
                 in
                 let addr = P2p_point.Id.to_string p2p_point in
                 (* Update the config sent to the rpc_process to

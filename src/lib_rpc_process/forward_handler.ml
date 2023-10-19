@@ -35,7 +35,7 @@ let build_socket_redirection_ctx socket_path =
   in
   Cohttp_lwt_unix.Client.custom_ctx ~resolver ()
 
-let callback server socket_path =
+let callback ~acl server socket_path =
   let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
     Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
   in
@@ -48,6 +48,7 @@ let callback server socket_path =
   in
   let ctx = build_socket_redirection_ctx socket_path in
   RPC_middleware.proxy_server_query_forwarder
+    ~acl
     ~ctx
     ~forwarder_events:{on_forwarding; on_locally_handled}
     forwarding_endpoint

@@ -36,10 +36,12 @@ type forwarder_events = {
           (without any forwarding). *)
 }
 
-(** A Resto middleware that transforms any callback to an other
-    that rewrites queries that the proxy server cannot
-    handle and forwards them to the full node at the given [Uri.t]. *)
+(** A Resto middleware that transforms any callback to an other that rewrites
+    queries that the proxy server cannot handle and forwards them to the full
+    node at the given [Uri.t]. If [acl] parameter is provided, the forwarding
+    happens only if the ACL rules are satisfied.*)
 val proxy_server_query_forwarder :
+  ?acl:RPC_server.Acl.t ->
   ?ctx:Cohttp_lwt_unix.Net.ctx ->
   ?forwarder_events:forwarder_events ->
   Uri.t ->
