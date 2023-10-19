@@ -490,6 +490,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ethbloom",
+ "ethereum",
  "evm",
  "evm-execution",
  "hex",
