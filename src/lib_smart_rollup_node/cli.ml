@@ -402,3 +402,10 @@ let history_mode_arg =
          "The history mode for the rollup node (archive, full) (default is %s)"
          Configuration.(string_of_history_mode default_history_mode))
     history_mode_parameter
+
+let wasm_dump_file_param next =
+  Tezos_clic.param
+    ~name:"dump.<json|yaml>"
+    ~desc:"YAML or JSON file containing the dumped durable storage"
+    string_parameter
+    next
