@@ -8,9 +8,11 @@ baker=${baker:?}
 endorser=${endorser:?}
 accuser=${accuser:?}
 signer=${signer:?}
+smart_rollup_node=${smart_rollup_node:?}
 client_dir=${client_dir:?}
 node_dir=${node_dir:?}
 node_data_dir=${node_data_dir:?}
+smart_rollup_node_data_dir=${smart_rollup_node_data_dir:?}
 
 configure_client() {
 
@@ -216,4 +218,22 @@ launch_accuser_test() {
          --base-dir "$client_dir" \
          --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
          run "$@"
+}
+
+launch_smart_rollup_node() {
+    configure_client
+
+    if [ ! -f "$smart_rollup_node_data_dir/config.json" ]; then
+        echo "Configuring the rollup node..."
+        "$smart_rollup_node" init observer config \
+                for "$SOR_ALIAS_OR_ADDR" \
+                with operators \
+                --data-dir "$smart_rollup_node_data_dir"
+    fi
+
+    exec "$smart_rollup_node" \
+         --base-dir "$client_dir" \
+         --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
+         "$@" \
+         --data-dir "$smart_rollup_node_data_dir"
 }

@@ -107,6 +107,8 @@ Smart Rollup node
 - Released the protocol agnostic rollup node ``octez-smart-rollup-node`` as part
   of the Octez distribution. (MR :gl:`!10086`)
 
+- Added the rollup node command inside the docker entrypoint (MR :gl:`!10253`)
+
 Smart Rollup client
 -------------------
 
