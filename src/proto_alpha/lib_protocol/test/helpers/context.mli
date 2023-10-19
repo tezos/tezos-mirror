@@ -207,6 +207,8 @@ module Contract : sig
 
   val full_balance : t -> Contract.t -> Tez.t tzresult Lwt.t
 
+  val staking_numerator : t -> Contract.t -> Z.t tzresult Lwt.t
+
   val counter : t -> Contract.t -> Manager_counter.t tzresult Lwt.t
 
   val manager : t -> Contract.t -> Account.t tzresult Lwt.t
@@ -252,6 +254,8 @@ module Delegate : sig
   val initial_frozen_deposits : t -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val staking_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  val staking_denominator : t -> public_key_hash -> Z.t tzresult Lwt.t
 
   val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
 
