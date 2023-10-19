@@ -603,11 +603,11 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let* () = check_issuance_rpc block in
   let state, operations = State.pop_pending_operations state in
   let* block, state =
+    let* block' =
+      Block.bake ?policy ~adaptive_issuance_vote ~operations block
+    in
     if state.burn_rewards then
       (* Incremental mode *)
-      let* block' =
-        Block.bake ?policy ~adaptive_issuance_vote ~operations block
-      in
       let* i =
         Incremental.begin_construction ?policy ~adaptive_issuance_vote block
       in
@@ -626,11 +626,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
       let* block = Incremental.finalize_block i in
       let state = State.apply_burn block_rewards baker_name state in
       return (block, state)
-    else
-      let* block =
-        Block.bake ?policy ~adaptive_issuance_vote ~operations block
-      in
-      return (block, state)
+    else return (block', state)
   in
   (* TODO: mistake ? The baking parameters apply before we reach the new cycle... *)
   let new_current_cycle = Block.current_cycle block in
