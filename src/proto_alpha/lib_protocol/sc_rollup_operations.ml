@@ -324,7 +324,7 @@ let originate ?whitelist ctxt ~kind ~boot_sector ~parameters_ty =
   let boot_sector_size_in_bytes = String.length boot_sector in
   let*? ctxt =
     match kind with
-    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith ->
+    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith | Riscv ->
         (*
 
            We do not really care about the precision of the gas model
