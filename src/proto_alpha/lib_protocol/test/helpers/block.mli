@@ -221,6 +221,22 @@ val bake :
   t ->
   t tzresult Lwt.t
 
+(** Variant of [bake] that returns the block metadata of the baked block. **)
+val bake_with_metadata :
+  ?locked_round:Alpha_context.Round.t option ->
+  ?policy:baker_policy ->
+  ?timestamp:Timestamp.time ->
+  ?operation:Operation.packed ->
+  ?operations:Operation.packed list ->
+  ?payload_round:Round.t option ->
+  ?check_size:bool ->
+  baking_mode:baking_mode ->
+  ?allow_manager_failures:bool ->
+  ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
+  t ->
+  (t * block_header_metadata, Error_monad.tztrace) result Lwt.t
+
 (** Bakes [n] blocks. *)
 val bake_n :
   ?baking_mode:baking_mode ->
