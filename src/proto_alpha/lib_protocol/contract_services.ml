@@ -99,7 +99,7 @@ module S = struct
         "Returns an abstract representation of the contract's \
          total_delegated_stake."
       ~query:RPC_query.empty
-      ~output:Staking_pseudotokens.For_RPC.encoding
+      ~output:Staking_pseudotoken.For_RPC.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "staking_numerator")
 
   let unstaked_frozen_balance =

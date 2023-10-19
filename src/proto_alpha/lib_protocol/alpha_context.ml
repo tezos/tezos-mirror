@@ -704,17 +704,14 @@ end
 
 module Unstaked_frozen_deposits = Unstaked_frozen_deposits_storage
 
-module Staking_pseudotokens = struct
+module Staking_pseudotoken = struct
   include Staking_pseudotoken_repr
+  module For_RPC = Staking_pseudotoken_repr
+end
+
+module Staking_pseudotokens = struct
   include Staking_pseudotokens_storage
-
-  module For_RPC = struct
-    type nonrec t = Staking_pseudotoken_repr.t
-
-    let encoding = Staking_pseudotoken_repr.encoding
-
-    include Staking_pseudotokens_storage.For_RPC
-  end
+  module For_RPC = Staking_pseudotokens_storage.For_RPC
 end
 
 module Internal_for_tests = struct
