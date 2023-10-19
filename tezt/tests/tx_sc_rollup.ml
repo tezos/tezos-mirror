@@ -26,6 +26,7 @@
 (* Testing
    -------
    Component:    Smart Optimistic Rollups: TX Kernel
+   Requirements: make build-kernels
    Invocation:   dune exec tezt/tests/main.exe -- --file tx_sc_rollup.ml
 
    Tests in this file originate tx kernel rollup
@@ -537,55 +538,27 @@ let tx_kernel_e2e setup protocol =
     Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
   in
   Log.info "Outbox is %s" @@ JSON.encode outbox ;
-  let* answer =
+  let* proof =
     let message_index = 0 in
     let outbox_level = withdrawal_level in
-    let destination = receive_tickets_contract in
-    let open Tezos_protocol_alpha.Protocol.Alpha_context in
-    let ticketer =
-      mint_and_deposit_contract |> Contract.of_b58check |> Result.get_ok
-      |> Data_encoding.(Binary.to_string_exn Contract.encoding)
-      |> hex_encode
-    in
-    let parameters d =
-      Printf.sprintf
-        {|Pair 0x%s (Pair "%s" %s)|}
-        ticketer
-        "Hello, Ticket!"
-        (Int.to_string d)
-    in
-    let outbox_transaction param =
-      Sc_rollup_client.
-        {
-          destination;
-          entrypoint = Some "receive_tickets";
-          parameters = parameters param;
-          parameters_ty = None;
-        }
-    in
-    Sc_rollup_client.outbox_proof_batch
-      sc_rollup_client
-      ~message_index
-      ~outbox_level
-      (List.map outbox_transaction [220; 100; 40])
+    Sc_rollup_client.outbox_proof sc_rollup_client ~message_index ~outbox_level
   in
-  let* () =
-    match answer with
-    | Some {commitment_hash; proof} ->
-        let*! () =
-          Client.Sc_rollup.execute_outbox_message
-            ~hooks
-            ~burn_cap:(Tez.of_int 10)
-            ~rollup:sc_rollup_address
-            ~src:Constant.bootstrap1.alias
-            ~commitment_hash
-            ~proof
-            client
-        in
-        Client.bake_for_and_wait client
-    | _ -> failwith "Unexpected error during proof generation"
+  let Sc_rollup_client.{commitment_hash; proof} =
+    match proof with
+    | Some p -> p
+    | None -> failwith "Unexpected error during proof generation"
   in
-  unit
+  let*! () =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~rollup:sc_rollup_address
+      ~src:Constant.bootstrap1.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  Client.bake_for_and_wait client
 
 let register_test ?supports ?(regression = false) ~__FILE__ ~tags ~title f =
   let tags = "tx_sc_rollup" :: tags in
