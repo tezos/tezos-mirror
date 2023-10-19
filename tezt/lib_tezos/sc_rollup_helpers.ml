@@ -61,6 +61,11 @@ let load_kernel_file
 let read_kernel ?base name : string =
   hex_encode (load_kernel_file ?base (name ^ ".wasm"))
 
+let string_match ~regexp string =
+  match Str.search_forward (Str.regexp regexp) string 0 with
+  | exception Stdlib.Not_found -> false
+  | _ -> true
+
 module Installer_kernel_config = struct
   type move_args = {from : string; to_ : string}
 
@@ -88,6 +93,30 @@ module Installer_kernel_config = struct
 
   let to_yaml t =
     "instructions:\n" ^ String.concat "" (List.map instr_to_yaml t)
+
+  let check_dump ~config dump =
+    let dump = Base.read_file dump in
+    let check kind value destination =
+      let regexp =
+        Format.asprintf "- set:\n    %s: %s\n    to: %s" kind value destination
+      in
+      let error_msg =
+        Format.asprintf
+          "key-value pair not found in dump (%s: %s, to: %s)"
+          kind
+          value
+          destination
+      in
+      Check.is_true ~error_msg (string_match ~regexp dump)
+    in
+    (* Check that the config is included in the dump (the PVM did not alter
+       the key-value pairs defined in the config) *)
+    List.iter
+      (function
+        | Move {from; to_} -> check "from" from to_
+        | Reveal {hash; to_} -> check "hash" hash to_
+        | Set {value; to_} -> check "value" value to_)
+      config
 end
 
 (* Testing the installation of a larger kernel, with e2e messages.
