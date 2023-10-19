@@ -93,13 +93,10 @@ let has_minimal_stake ctxt
   let open Result_syntax in
   let open Tez_repr in
   let minimal_stake = Constants_storage.minimal_stake ctxt in
-  let minimal_frozen_stake = Constants_storage.minimal_frozen_stake ctxt in
   let sum =
     let* frozen = own_frozen +? staked_frozen in
     frozen +? delegated
   in
-  own_frozen >= minimal_frozen_stake
-  &&
   match sum with
   | Error _sum_overflows ->
       true (* If the sum overflows, we are definitely over the minimal stake. *)
