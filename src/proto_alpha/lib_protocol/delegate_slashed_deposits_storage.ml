@@ -108,7 +108,15 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     (should_forbid, {reward; amount_to_burn})
   in
-  let* frozen_deposits = Frozen_deposits_storage.get ctxt delegate_contract in
+  let* frozen_deposits =
+    let* initial_amount =
+      Delegate_storage.initial_frozen_deposits ctxt delegate
+    in
+    let* current_amount =
+      Delegate_storage.current_frozen_deposits ctxt delegate
+    in
+    return Deposits_repr.{initial_amount; current_amount}
+  in
   let*? should_forbid, staked = compute_reward_and_burn frozen_deposits in
   let* unstaked =
     let oldest_slashable_cycle =
