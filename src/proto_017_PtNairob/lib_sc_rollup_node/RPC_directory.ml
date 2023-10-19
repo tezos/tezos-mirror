@@ -252,6 +252,16 @@ let () =
   (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
 
 let () =
+  Block_helpers_directory.register1
+    Sc_rollup_services.Block.Helpers.outbox_proof_simple
+  @@ fun (node_ctxt, _block_hash) outbox_level message_index () ->
+  let open Lwt_result_syntax in
+  let+ commitment, proof =
+    Outbox.proof_of_output_simple node_ctxt ~outbox_level ~message_index
+  in
+  (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
+
+let () =
   Block_directory.register0 Sc_rollup_services.Block.simulate
   @@ fun (node_ctxt, block)
              ()
