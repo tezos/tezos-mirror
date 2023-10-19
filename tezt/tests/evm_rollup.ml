@@ -1911,7 +1911,7 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
 
   (* Bake enough levels to have a commitment. *)
   let* _ =
-    repeat commitment_period (fun () ->
+    repeat (commitment_period * 2) (fun () ->
         let* _ = next_evm_level ~sc_rollup_node ~node ~client in
         unit)
   in
@@ -1930,11 +1930,13 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
         Test.fail "Looked for an outbox for 10 levels, stopping the loop"
       else
         let*! outbox =
-          Sc_rollup_client.outbox
-            ~outbox_level:(withdrawal_level + 2)
-            sc_rollup_client
+          Sc_rollup_client.outbox ~outbox_level:level' sc_rollup_client
         in
-        if JSON.is_null outbox then aux (level + 1) else return (outbox, level)
+        if
+          JSON.is_null outbox
+          || (JSON.is_list outbox && JSON.as_list outbox = [])
+        then aux (level' + 1)
+        else return (outbox, level')
     in
     aux level
   in
@@ -1955,7 +1957,7 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
     Sc_rollup_client.outbox_proof_single
       sc_rollup_client
       ~message_index:0
-      ~outbox_level:(withdrawal_level + 2)
+      ~outbox_level:withdrawal_level
       ~destination:JSON.(outbox_message |-> "destination" |> as_string)
       ~parameters
       ~entrypoint:JSON.(outbox_message |-> "entrypoint" |> as_string)
@@ -1988,7 +1990,7 @@ let check_balance ~receiver ~endpoint expected_balance =
 let test_deposit_and_withdraw =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "deposit"; "withdraw"; Tag.flaky]
+    ~tags:["evm"; "deposit"; "withdraw"]
     ~title:"Deposit and withdraw tez"
   @@ fun protocol ->
   let admin = Constant.bootstrap5 in
