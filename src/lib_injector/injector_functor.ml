@@ -1173,6 +1173,7 @@ module Make (Parameters : PARAMETERS) = struct
     type nonrec state = state
 
     type parameters = {
+      signer : Signature.public_key_hash;
       cctxt : Client_context.full;
       l1_ctxt : Layer_1.t;
       head_protocols : protocols;
@@ -1182,20 +1183,19 @@ module Make (Parameters : PARAMETERS) = struct
       allowed_attempts : int;
       injection_ttl : int;
       strategy : injection_strategy;
-      tags : Tags.t;
     }
   end
 
   module Name = struct
-    type t = Signature.public_key_hash
+    type t = Tags.t
 
-    let encoding = Signature.Public_key_hash.encoding
+    let encoding = Tags.encoding
 
     let base = Parameters.events_section @ ["injector"]
 
-    let pp = Signature.Public_key_hash.pp_short
+    let pp = Tags.pp
 
-    let equal = Signature.Public_key_hash.equal
+    let equal = Tags.equal
   end
 
   (* The worker for the injector. *)
@@ -1229,9 +1229,10 @@ module Make (Parameters : PARAMETERS) = struct
 
     type launch_error = error trace
 
-    let on_launch _w signer
+    let on_launch _w tags
         Types.
           {
+            signer;
             cctxt;
             l1_ctxt;
             head_protocols;
@@ -1241,7 +1242,6 @@ module Make (Parameters : PARAMETERS) = struct
             allowed_attempts;
             injection_ttl;
             strategy;
-            tags;
           } =
       trace (Step_failed "initialization")
       @@ init_injector
@@ -1449,8 +1449,9 @@ module Make (Parameters : PARAMETERS) = struct
           let* worker =
             Worker.launch
               table
-              signer
+              tags
               {
+                signer;
                 cctxt = (cctxt :> Client_context.full);
                 l1_ctxt;
                 head_protocols;
@@ -1460,7 +1461,6 @@ module Make (Parameters : PARAMETERS) = struct
                 allowed_attempts;
                 injection_ttl;
                 strategy;
-                tags;
               }
               (module Handlers)
           in
