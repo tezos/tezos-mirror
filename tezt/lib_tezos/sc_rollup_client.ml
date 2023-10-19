@@ -349,6 +349,10 @@ let last_published_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["local"; "last_published_commitment"]
   |> Runnable.map commitment_info_from_json
 
+let commitment ?hooks sc_client commitment_hash =
+  rpc_get ?hooks sc_client ["local"; "commitments"; commitment_hash]
+  |> Runnable.map commitment_info_from_json
+
 let dal_slot_headers ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
   |> Runnable.map (fun json ->

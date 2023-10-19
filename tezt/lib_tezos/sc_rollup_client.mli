@@ -215,6 +215,12 @@ val last_stored_commitment :
 val last_published_commitment :
   ?hooks:Process.hooks -> t -> commitment_info option Runnable.process
 
+(** [commitment client hash] gets commitment by its [hash] from the rollup node,
+    with its hash and level when the commitment was first published and the
+    level it was included. *)
+val commitment :
+  ?hooks:Process.hooks -> t -> string -> commitment_info option Runnable.process
+
 (** [dal_slot_headers ?block client] returns the dal slot headers of the
     [block] (default ["head"]). *)
 val dal_slot_headers :
