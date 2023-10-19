@@ -258,7 +258,7 @@ impl BlockInProgress {
                 self.valid_txs,
                 timestamp,
                 self.parent_hash,
-                Some(self.logs_bloom),
+                self.logs_bloom,
             )
         };
         storage::store_current_block(host, &new_block)

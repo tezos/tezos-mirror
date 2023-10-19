@@ -489,6 +489,7 @@ name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ethbloom",
  "evm",
  "evm-execution",
  "hex",
