@@ -9,6 +9,7 @@ use crate::storage::{
     block_path, index_block, init_blocks_index, read_current_block_number,
     read_storage_version, store_rlp, store_storage_version, STORAGE_VERSION,
 };
+use ethbloom::Bloom;
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::block::L2Block;
@@ -135,7 +136,7 @@ fn migrate_one_block<Host: Runtime>(
         number: old_block.number,
         hash: old_block.hash,
         parent_hash: old_block.parent_hash,
-        logs_bloom: old_block.logs_bloom,
+        logs_bloom: Bloom::default(),
         transactions_root: None,
         state_root: None,
         receipts_root: None,

@@ -10,6 +10,7 @@ use crate::rlp_helpers::{
     decode_transaction_hash_list, next,
 };
 use crate::transaction::TransactionHash;
+use ethbloom::Bloom;
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -66,7 +67,7 @@ pub struct L2Block {
     pub number: U256,
     pub hash: H256,
     pub parent_hash: H256,
-    pub logs_bloom: Option<OwnedHash>,
+    pub logs_bloom: Bloom,
     pub transactions_root: Option<OwnedHash>,
     pub state_root: Option<OwnedHash>,
     pub receipts_root: Option<OwnedHash>,
@@ -90,6 +91,7 @@ impl L2Block {
         transactions: Vec<TransactionHash>,
         timestamp: Timestamp,
         parent_hash: H256,
+        logs_bloom: Bloom,
     ) -> Self {
         L2Block {
             number,
@@ -97,6 +99,7 @@ impl L2Block {
             parent_hash,
             timestamp,
             transactions,
+            logs_bloom,
             ..Self::default()
         }
     }
@@ -121,7 +124,7 @@ impl Default for L2Block {
             number: U256::default(),
             hash: H256::default(),
             parent_hash: L2Block::dummy_block_hash(),
-            logs_bloom: None,
+            logs_bloom: Bloom::default(),
             transactions_root: None,
             state_root: None,
             receipts_root: None,
@@ -141,7 +144,7 @@ impl Encodable for L2Block {
         append_u256_le(s, &self.number);
         s.append(&self.hash);
         s.append(&self.parent_hash);
-        append_option_explicit(s, &self.logs_bloom, RlpStream::append);
+        s.append(&self.logs_bloom);
         append_option_explicit(s, &self.transactions_root, RlpStream::append);
         append_option_explicit(s, &self.state_root, RlpStream::append);
         append_option_explicit(s, &self.receipts_root, RlpStream::append);
@@ -165,8 +168,7 @@ impl Decodable for L2Block {
                 let hash: H256 = decode_field_h256(&next(&mut it)?, "hash")?;
                 let parent_hash: H256 =
                     decode_field_h256(&next(&mut it)?, "parent_hash")?;
-                let logs_bloom: Option<OwnedHash> =
-                    decode_option_explicit(&next(&mut it)?, "logs_bloom", decode_field)?;
+                let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
                 let transactions_root: Option<OwnedHash> = decode_option_explicit(
                     &next(&mut it)?,
                     "transactions_root",
