@@ -56,6 +56,7 @@ type error +=
     }
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
+  | Cannot_checkout_l2_header
   | No_batcher
   | No_publisher
   | Refutation_player_failed_to_start
@@ -255,6 +256,17 @@ let () =
       | Cannot_checkout_context (block, context) -> Some (block, context)
       | _ -> None)
     (fun (block, context) -> Cannot_checkout_context (block, context)) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"internal.cannot_checkout_l2_header"
+    ~title:"Internal error: Cannot checkout L2 header"
+    ~description:
+      "The rollup node cannot checkout the l2 header registered for the block."
+    ~pp:(fun ppf () -> Format.fprintf ppf "The l2 header cannot be checkouted")
+    Data_encoding.unit
+    (function Cannot_checkout_l2_header -> Some () | _ -> None)
+    (fun () -> Cannot_checkout_l2_header) ;
 
   register_error_kind
     `Permanent

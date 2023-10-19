@@ -309,3 +309,8 @@ val change_node_and_restart :
 (** Change the rollup mode. This does not terminate nor restart the
     node. Change will take effect when the node is run/restart. *)
 val change_node_mode : t -> mode -> t
+
+(** [dump_durable_storage ~sc_rollup_node ~dump ?string ()] writes to [dump] the current
+    state of the WASM PVM from [sc_rollup_node]. *)
+val dump_durable_storage :
+  sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t

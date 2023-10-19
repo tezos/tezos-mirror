@@ -339,6 +339,23 @@ let dump_metrics =
       let*! () = cctxt#message "%a@." Metrics.print_csv_metrics metrics in
       return_unit)
 
+let dump_durable_storage =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"dump the durable_storage."
+    (args2 data_dir_arg (Tezos_client_base_unix.Client_config.block_arg ()))
+    (prefixes ["dump"; "durable"; "storage"; "into"]
+    @@ Cli.wasm_dump_file_param @@ stop)
+    (fun (data_dir, block) file cctxt ->
+      let open Lwt_result_syntax in
+      let*! res = Wasm_2_0_0_dump.dump_durable_storage ~block ~data_dir ~file in
+      match res with
+      | Ok () ->
+          let*! () = cctxt#message "Dumped WASM PVM state to %s@." file in
+          return_unit
+      | Error errs -> cctxt#error "%a" pp_print_trace errs)
+
 let sc_rollup_commands () =
   [
     config_init_command;
@@ -346,6 +363,7 @@ let sc_rollup_commands () =
     legacy_run_command;
     protocols_command;
     dump_metrics;
+    dump_durable_storage;
   ]
 
 let select_commands _ctxt _ = Lwt_result_syntax.return (sc_rollup_commands ())

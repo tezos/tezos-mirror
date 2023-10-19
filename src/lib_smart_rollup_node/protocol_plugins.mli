@@ -45,6 +45,11 @@ val proto_plugin_for_protocol : Protocol_hash.t -> proto_plugin tzresult
 val proto_plugin_for_level :
   _ Node_context.t -> int32 -> proto_plugin tzresult Lwt.t
 
+(** Return the protocol plugin for a given level (or an error if not
+    supported). *)
+val proto_plugin_for_level_with_store :
+  _ Store.t -> int32 -> proto_plugin tzresult Lwt.t
+
 (** Return the protocol plugin for a given block (or an error if not
     supported). *)
 val proto_plugin_for_block :

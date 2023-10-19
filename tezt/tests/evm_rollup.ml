@@ -63,6 +63,7 @@ type full_evm_setup = {
   evm_proxy_server : Evm_proxy_server.t;
   endpoint : string;
   l1_contracts : l1_contracts option;
+  config : [`Config of Installer_kernel_config.t | `Path of string] option;
 }
 
 let hex_256_of n = Printf.sprintf "%064x" n
@@ -414,10 +415,14 @@ let setup_evm_kernel ?config ?kernel_installee
       evm_proxy_server;
       endpoint;
       l1_contracts;
+      config;
     }
 
-let setup_past_genesis ?config ?with_administrator ?kernel_installee
-    ?originator_key ?bootstrap_accounts ?rollup_operator_key ~admin protocol =
+let setup_past_genesis
+    ?(config :
+       [< `Config of Installer_kernel_config.instr list | `Path of string]
+       option) ?with_administrator ?kernel_installee ?originator_key
+    ?bootstrap_accounts ?rollup_operator_key ~admin protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
       ?config
@@ -3307,6 +3312,129 @@ let test_accounts_double_indexing =
   let* () = check_accounts_length 2 in
   unit
 
+let test_originate_evm_kernel_and_dump_pvm_state =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"]
+    ~title:"Originate EVM kernel with installer and dump PVM state"
+  @@ fun protocol ->
+  let* {node; client; sc_rollup_node; sc_rollup_client; config; _} =
+    setup_evm_kernel ~admin:None protocol
+  in
+  (* First run of the installed EVM kernel, it will initialize the directory
+     "eth_accounts". *)
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let evm_key = "evm" in
+  let*! storage_root_keys =
+    Sc_rollup_client.inspect_durable_state_value
+      ~hooks
+      sc_rollup_client
+      ~pvm_kind
+      ~operation:Sc_rollup_client.Subkeys
+      ~key:""
+  in
+  Check.(
+    list_mem
+      string
+      evm_key
+      storage_root_keys
+      ~error_msg:"Expected %L to be initialized by the EVM kernel.") ;
+  let* new_level = next_evm_level ~sc_rollup_node ~node ~client in
+  let dump = Temp.file "dump.yaml" in
+  (* Check that the given [config] is included in the dumped PVM state. *)
+  let check_dump ~config ~dump =
+    match Option.get config with
+    | `Config config -> return (Installer_kernel_config.check_dump ~config dump)
+    | `Path _ -> (* dead code path *) assert false
+  in
+  let* () = Sc_rollup_node.dump_durable_storage ~sc_rollup_node ~dump () in
+  let* () = check_dump ~config ~dump in
+  let* () =
+    Sc_rollup_node.dump_durable_storage
+      ~sc_rollup_node
+      ~dump
+      ~block:(string_of_int new_level)
+      ()
+  in
+  let* () = check_dump ~config ~dump in
+  (* Check the consistency of the PVM state as queried by RPCs and the dumped PVM state. *)
+  let of_yaml s : Installer_kernel_config.t =
+    let yaml = Yaml.of_string_exn (Base.read_file s) in
+    match yaml with
+    | `O (("instructions", `A instrs) :: _) ->
+        List.fold_left
+          (fun acc -> function
+            | `O (("set", `O ((op, value) :: ("to", dest) :: _)) :: _) ->
+                let to_ = Yaml.to_string_exn dest in
+                let value = Yaml.to_string_exn value in
+                let instr =
+                  Installer_kernel_config.(
+                    match op with
+                    | "from" -> Move {from = value; to_}
+                    | "hash" -> Reveal {hash = value; to_}
+                    | "value" -> Set {value; to_}
+                    | _ -> (* dead code path *) assert false)
+                in
+                instr :: acc
+            | _ -> (* dead code path *) assert false)
+          []
+          instrs
+    | _ -> (* dead code path *) assert false
+  in
+  let check_dump_rpc () =
+    let module Std = Tezos_lwt_result_stdlib.Lwtreslib.Bare in
+    let instrs = of_yaml dump in
+    Std.List.iter_s
+      (fun instr ->
+        let open Runnable.Syntax in
+        let value, key =
+          Installer_kernel_config.(
+            match instr with
+            | Move {from; to_} -> (from, to_)
+            | Reveal {hash; to_} -> (hash, to_)
+            | Set {value; to_} -> (value, to_))
+        in
+        let*! expected_value =
+          Sc_rollup_client.inspect_durable_state_value
+            sc_rollup_client
+            ~pvm_kind:"wasm_2_0_0"
+            ~operation:Sc_rollup_client.Value
+            ~key
+        in
+        let expected_value =
+          Std.WithExceptions.Option.get ~loc:__LOC__ expected_value
+        in
+        let value = String.trim value in
+        let error_msg =
+          Format.asprintf "Expected %s, got %s" expected_value value
+        in
+        let regexp = "^-?[1-9]\\(.[0-9]+\\)?[Ee][-+]?\\([0-9]+\\)$" in
+        if string_match ~regexp value then
+          (* Z.of_string does not parse scientific notation yet. *)
+          let tolerance =
+            Q.of_bigint
+              Z.(pow (of_int 10) (int_of_string (Str.matched_group 2 value)))
+          in
+          let expected_value = Q.of_string expected_value in
+          let value = Q.of_string value in
+          if Q.(abs (expected_value - value) < tolerance) then
+            (* Yaml.of_string_exn truncates integers.
+               For instance 35316531343563303366356465633665343730343131393831333665313530633063323962346161
+               becomes 3.53165313435633e+79, so we account for that. *) ()
+          else Check.(is_true (Q.equal expected_value value)) ~error_msg
+        else if string_match ~regexp:"^[1-9][0-9]*$" value then
+          Check.(is_true Q.(equal (of_string expected_value) (of_string value)))
+            ~error_msg
+        else if
+          string_match ~regexp:"^0+$" value
+          && string_match ~regexp:"^0+$" expected_value
+        then (* The case of 0 (can be an int or hex) *) ()
+        else Check.((expected_value = value) string) ~error_msg ;
+        unit)
+      instrs
+  in
+  check_dump_rpc ()
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -3365,7 +3493,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_gasPrice protocols ;
   test_rpc_getStorageAt protocols ;
   test_accounts_double_indexing protocols ;
-  test_validation_result protocols
+  test_validation_result protocols ;
+  test_originate_evm_kernel_and_dump_pvm_state protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;

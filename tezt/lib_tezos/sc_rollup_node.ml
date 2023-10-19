@@ -552,3 +552,20 @@ let change_node_mode sc_rollup_node mode =
     sc_rollup_node with
     persistent_state = {sc_rollup_node.persistent_state with mode};
   }
+
+let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
+  let cmd =
+    [
+      "dump";
+      "durable";
+      "storage";
+      "into";
+      dump;
+      "--data-dir";
+      sc_rollup_node.persistent_state.data_dir;
+      "--block";
+      block;
+    ]
+  in
+  let process = spawn_command sc_rollup_node cmd in
+  Process.check process

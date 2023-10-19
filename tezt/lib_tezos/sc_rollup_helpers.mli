@@ -39,6 +39,8 @@ val hex_encode : string -> string
 *)
 val read_kernel : ?base:string -> string -> string
 
+val string_match : regexp:string -> string -> bool
+
 module Installer_kernel_config : sig
   (** Moves path [from] at path [to_]. *)
   type move_args = {from : string; to_ : string}
@@ -53,6 +55,10 @@ module Installer_kernel_config : sig
 
   (** Set of instructions used by the installer-client. *)
   type t = instr list
+
+  (** [check_dump ~config dump] checks that the given [config] is included
+      in the dumped PVM state. *)
+  val check_dump : config:t -> string -> unit
 end
 
 (** [prepare_installer_kernel ~base_installee ~preimages_dir ?config

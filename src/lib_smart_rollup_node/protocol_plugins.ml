@@ -70,6 +70,14 @@ let proto_plugin_for_level node_ctxt level =
   let*? plugin = proto_plugin_for_protocol protocol in
   return plugin
 
+let proto_plugin_for_level_with_store node_store level =
+  let open Lwt_result_syntax in
+  let* {protocol; _} =
+    Node_context.protocol_of_level_with_store node_store level
+  in
+  let*? plugin = proto_plugin_for_protocol protocol in
+  return plugin
+
 let proto_plugin_for_block node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* level = Node_context.level_of_hash node_ctxt block_hash in
