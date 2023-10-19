@@ -57,8 +57,8 @@ let table = Worker.create_table Queue
 let on_play game Types.{node_ctxt; self; opponent; _} =
   play node_ctxt ~self game opponent
 
-let on_play_opening conflict (Types.{node_ctxt; self; _} : Types.state) =
-  play_opening_move node_ctxt self conflict
+let on_play_opening conflict (Types.{node_ctxt; _} : Types.state) =
+  play_opening_move node_ctxt conflict
 
 module Handlers = struct
   type self = worker

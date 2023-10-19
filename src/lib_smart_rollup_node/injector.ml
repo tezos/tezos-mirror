@@ -132,10 +132,10 @@ end
 
 include Injector_functor.Make (Parameters)
 
-let check_and_add_pending_operation (mode : Configuration.mode) ~source
+let check_and_add_pending_operation (mode : Configuration.mode)
     (operation : L1_operation.t) =
   let open Lwt_result_syntax in
   if Configuration.(can_inject mode (Parameters.operation_tag operation)) then
-    let* hash = add_pending_operation ~source operation in
+    let* hash = add_pending_operation operation in
     return (Some hash)
   else return None

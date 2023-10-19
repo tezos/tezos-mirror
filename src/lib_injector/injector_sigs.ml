@@ -326,14 +326,9 @@ module type S = sig
     signers:(Signature.public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 
-  (** Add an operation as pending injection in the injector. If the source is
-      not provided, the operation is queued to the worker which handles the
-      corresponding tag. It returns the hash of the operation in the injector
-      queue. *)
-  val add_pending_operation :
-    ?source:Signature.public_key_hash ->
-    operation ->
-    Inj_operation.Hash.t tzresult Lwt.t
+  (** Add an operation as pending injection in the injector. It returns the hash
+      of the operation in the injector queue. *)
+  val add_pending_operation : operation -> Inj_operation.Hash.t tzresult Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending

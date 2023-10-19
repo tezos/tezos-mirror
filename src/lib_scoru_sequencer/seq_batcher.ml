@@ -56,11 +56,7 @@ type state = {
 let inject_sequence state (sequencer_message, l2_messages) =
   let open Lwt_result_syntax in
   let operation = L1_operation.Add_messages {messages = [sequencer_message]} in
-  let+ l1_hash =
-    Injector.add_pending_operation
-      ~source:(Signature.Of_V0.public_key_hash @@ fst state.signer)
-      operation
-  in
+  let+ l1_hash = Injector.add_pending_operation operation in
   List.iter
     (fun msg ->
       let content = L2_message.content msg in

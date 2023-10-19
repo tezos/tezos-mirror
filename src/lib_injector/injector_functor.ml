@@ -1446,7 +1446,7 @@ module Make (Parameters : PARAMETERS) = struct
     let* () =
       Signature.Public_key_hash.Map.iter_es
         (fun signer (strategy, tags) ->
-          let+ worker =
+          let* worker =
             Worker.launch
               table
               signer
@@ -1464,20 +1464,16 @@ module Make (Parameters : PARAMETERS) = struct
               }
               (module Handlers)
           in
-          ignore worker)
+          Tags.iter_es
+            (fun tag ->
+              if Tags_table.mem tags_table tag then
+                tzfail Overlapping_operations
+              else return (Tags_table.add tags_table tag worker))
+            tags)
         signers_map
     in
     async_monitor_l1_chain cctxt l1_ctxt ;
     return_unit
-
-  let worker_of_signer signer_pkh =
-    let open Result_syntax in
-    match Worker.find_opt table signer_pkh with
-    | None ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2818
-           maybe lazily start worker here *)
-        tzfail (No_worker_for_source signer_pkh)
-    | Some worker -> return worker
 
   let worker_of_tag tag =
     let open Result_syntax in
@@ -1490,14 +1486,10 @@ module Make (Parameters : PARAMETERS) = struct
           tag
     | Some worker -> return worker
 
-  let add_pending_operation ?source op =
+  let add_pending_operation op =
     let open Lwt_result_syntax in
     let operation = Inj_operation.make op in
-    let*? w =
-      match source with
-      | Some source -> worker_of_signer source
-      | None -> worker_of_tag (Parameters.operation_tag op)
-    in
+    let*? w = worker_of_tag (Parameters.operation_tag op) in
     let*! (_pushed : bool) =
       Worker.Queue.push_request w (Request.Add_pending operation)
     in
