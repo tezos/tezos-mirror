@@ -24,39 +24,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Token : sig
+  type 'token t = Tez : Tez_repr.t t
+
+  val eq :
+    'token1 t -> 'token2 t -> ('token1, 'token2) Equality_witness.eq option
+
+  val equal : 'token t -> 'token -> 'token -> bool
+
+  val is_zero : 'token t -> 'token -> bool
+
+  val add : 'token t -> 'token -> 'token -> 'token tzresult
+
+  val pp : 'token t -> Format.formatter -> 'token -> unit
+end
+
 type staker = Staker_repr.staker =
   | Single of Contract_repr.t * Signature.public_key_hash
   | Shared of Signature.public_key_hash
 
-(** Places where tez can be found in the ledger's state. *)
-type balance =
-  | Contract of Contract_repr.t
-  | Block_fees
-  | Deposits of staker
-  | Unstaked_deposits of staker * Cycle_repr.t
-  | Nonce_revelation_rewards
-  | Attesting_rewards
-  | Baking_rewards
-  | Baking_bonuses
-  | Storage_fees
-  | Double_signing_punishments
-  | Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
-  | Liquidity_baking_subsidies
-  | Burned
-  | Commitments of Blinded_public_key_hash.t
-  | Bootstrap
-  | Invoice
-  | Initial_commitments
-  | Minted
-  | Frozen_bonds of Contract_repr.t * Bond_id_repr.t
-  | Sc_rollup_refutation_punishments
-  | Sc_rollup_refutation_rewards
+(** Places where tokens can be found in the ledger's state. *)
+type 'token balance =
+  | Contract : Contract_repr.t -> Tez_repr.t balance
+  | Block_fees : Tez_repr.t balance
+  | Deposits : staker -> Tez_repr.t balance
+  | Unstaked_deposits : staker * Cycle_repr.t -> Tez_repr.t balance
+  | Nonce_revelation_rewards : Tez_repr.t balance
+  | Attesting_rewards : Tez_repr.t balance
+  | Baking_rewards : Tez_repr.t balance
+  | Baking_bonuses : Tez_repr.t balance
+  | Storage_fees : Tez_repr.t balance
+  | Double_signing_punishments : Tez_repr.t balance
+  | Lost_attesting_rewards :
+      Signature.Public_key_hash.t * bool * bool
+      -> Tez_repr.t balance
+  | Liquidity_baking_subsidies : Tez_repr.t balance
+  | Burned : Tez_repr.t balance
+  | Commitments : Blinded_public_key_hash.t -> Tez_repr.t balance
+  | Bootstrap : Tez_repr.t balance
+  | Invoice : Tez_repr.t balance
+  | Initial_commitments : Tez_repr.t balance
+  | Minted : Tez_repr.t balance
+  | Frozen_bonds : Contract_repr.t * Bond_id_repr.t -> Tez_repr.t balance
+  | Sc_rollup_refutation_punishments : Tez_repr.t balance
+  | Sc_rollup_refutation_rewards : Tez_repr.t balance
+
+val token_of_balance : 'token balance -> 'token Token.t
 
 (** Compares two balances. *)
-val compare_balance : balance -> balance -> int
+val compare_balance : 'token1 balance -> 'token2 balance -> int
 
-(** A credit or debit of tez to a balance. *)
-type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
+(** A credit or debit of token to a balance. *)
+type 'token balance_update = Debited of 'token | Credited of 'token
 
 (** An origin of a balance update *)
 type update_origin =
@@ -74,11 +93,15 @@ val compare_update_origin : update_origin -> update_origin -> int
     [c]. *)
 type balance_update_item = private
   | Balance_update_item :
-      balance * balance_update * update_origin
+      'token balance * 'token balance_update * update_origin
       -> balance_update_item
 
 (** Smart constructor for [balance_update_item]. *)
-val item : balance -> balance_update -> update_origin -> balance_update_item
+val item :
+  'token balance ->
+  'token balance_update ->
+  update_origin ->
+  balance_update_item
 
 (** A list of balance updates. Duplicates may happen. *)
 type balance_updates = balance_update_item list

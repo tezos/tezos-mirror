@@ -139,12 +139,18 @@ let eq balance_updates1 balance_updates2 =
       ~when_different_lengths:()
       (fun (Balance_update_item (b1, bu1, uo1))
            (Balance_update_item (b2, bu2, uo2)) ->
-        compare b1 b2 = 0
-        && (match (bu1, bu2) with
-           | Debited tz1, Debited tz2 | Credited tz1, Credited tz2 ->
-               Tez_repr.equal tz1 tz2
-           | Debited tz1, Credited tz2 | Credited tz1, Debited tz2 ->
-               Tez_repr.(equal tz1 zero) && Tez_repr.(equal tz2 zero))
+        (let token1 = token_of_balance b1 in
+         let token2 = token_of_balance b2 in
+         match Token.eq token1 token2 with
+         | None -> false
+         | Some Refl -> (
+             compare b1 b2 = 0
+             &&
+             match (bu1, bu2) with
+             | Debited tz1, Debited tz2 | Credited tz1, Credited tz2 ->
+                 Token.equal token1 tz1 tz2
+             | Debited tz1, Credited tz2 | Credited tz1, Debited tz2 ->
+                 Token.is_zero token1 tz1 && Token.is_zero token1 tz2))
         && compare_update_origin uo1 uo2 = 0)
       balance_updates1
       balance_updates2

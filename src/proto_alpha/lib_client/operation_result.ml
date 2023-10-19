@@ -367,13 +367,16 @@ let pp_balance_updates ppf balance_updates =
     | Receipt.Shared delegate ->
         Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
   in
-  let pp_update ppf = function
-    | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
-    | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
+  let pp_update token ppf = function
+    | Credited amount ->
+        Format.fprintf ppf "+%s%a" tez_sym (Token.pp token) amount
+    | Debited amount ->
+        Format.fprintf ppf "-%s%a" tez_sym (Token.pp token) amount
   in
   let balance_updates =
     List.map
       (fun (Balance_update_item (balance, update, origin)) ->
+        let token = token_of_balance balance in
         let balance =
           match balance with
           | Contract c -> Format.asprintf "%a" Contract.pp c
@@ -427,7 +430,7 @@ let pp_balance_updates ppf balance_updates =
           | Subsidy -> Format.asprintf "subsidy %s" balance
           | Simulation -> Format.asprintf "simulation %s" balance
         in
-        let update = Format.asprintf "%a" pp_update update in
+        let update = Format.asprintf "%a" (pp_update token) update in
         (balance, update))
       balance_updates
   in
