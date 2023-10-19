@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-version"
+  "octez-evm-proxy-lib-prod-encoding"
   "lwt-exit"
 ]
 build: [

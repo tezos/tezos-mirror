@@ -219,16 +219,45 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let open Tezos_clic in
     switch ~doc:"Hides the kernel debug messages." ~long:"no-kernel-debug" ()
 
+  let plugins_parameter =
+    Tezos_clic.parameter (fun _ filenames ->
+        let filenames = String.split_on_char ',' filenames in
+        List.map_es
+          (fun filename ->
+            if Sys.file_exists filename then Lwt_result.return filename
+            else Error_monad.failwith "%s is not a valid file" filename)
+          filenames)
+
+  let plugins_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:"The list of plugins separated by commas"
+      ~long:"plugins"
+      ~placeholder:"plugin1.cmxs,plugin2.cmxs"
+      plugins_parameter
+
   let global_options =
     Tezos_clic.(
-      args7
+      args8
         wasm_arg
         input_arg
         rollup_arg
         preimage_directory_arg
         dal_pages_directory_arg
         version_arg
-        no_kernel_debug_flag)
+        no_kernel_debug_flag
+        plugins_arg)
+
+  let handle_plugin_file f =
+    try Dynlink.loadfile f with
+    | Dynlink.Error err ->
+        Format.printf
+          "Loading plugin `%s` failed with\n%s \n%!"
+          f
+          (Dynlink.error_message err)
+    | _ -> Format.printf "Loading the plugin %s failed\n%!" f
+
+  let handle_plugins files = List.iter handle_plugin_file files
 
   let dispatch args =
     let open Lwt_result_syntax in
@@ -238,7 +267,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
              preimage_directory,
              dal_pages_directory,
              version,
-             no_kernel_debug_flag ),
+             no_kernel_debug_flag,
+             plugins ),
            _ ) =
       Tezos_clic.parse_global_options global_options () args
     in
@@ -272,6 +302,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       | Some inputs -> Messages.parse_inboxes inputs config
       | None -> return_nil
     in
+    Option.iter handle_plugins plugins ;
     let+ _tree = repl tree inboxes 0l config in
     ()
 

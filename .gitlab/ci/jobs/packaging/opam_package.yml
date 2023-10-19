@@ -516,7 +516,11 @@ opam:octez-distributed-lwt-internal:
 
 # Ignoring unreleased package octez-evm-proxy-lib-dev.
 
+# Ignoring unreleased package octez-evm-proxy-lib-dev-encoding.
+
 # Ignoring unreleased package octez-evm-proxy-lib-prod.
+
+# Ignoring unreleased package octez-evm-proxy-lib-prod-encoding.
 
 # Ignoring unreleased package octez-evm-proxy-tests.
 
@@ -802,6 +806,13 @@ opam:octez-smart-rollup-wasm-debugger:
     - .rules_template__trigger_exec_opam_batch_2
   variables:
     package: octez-smart-rollup-wasm-debugger
+
+opam:octez-smart-rollup-wasm-debugger-plugin:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: octez-smart-rollup-wasm-debugger-plugin
 
 # Ignoring unreleased package octez-snoop.
 

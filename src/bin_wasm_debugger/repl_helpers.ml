@@ -67,7 +67,8 @@ let read_file file =
 
 type integer_value_kind = [`U16 | `I32 | `I64 | `U128 | `U256]
 
-type printable_value_kind = [integer_value_kind | `Hex | `String]
+type printable_value_kind =
+  [integer_value_kind | `Hex | `String | `Custom of bytes -> string]
 
 let integer_value_kind_of_string = function
   | "uint16" | "u16" -> Some `U16
@@ -76,6 +77,14 @@ let integer_value_kind_of_string = function
   | "uint128" | "u128" -> Some `U128
   | "uint256" | "u256" -> Some `U256
   | _ -> None
+
+let find_encoding s =
+  match integer_value_kind_of_string s with
+  | Some s -> Some s
+  | None ->
+      Option.map
+        (fun f -> `Custom f)
+        (Octez_smart_rollup_wasm_debugger_plugin.Encodings.get s)
 
 let integer_value_kind_to_string = function
   | `U16 -> "u16"
@@ -94,7 +103,7 @@ let value_kind_length = function
 let printable_value_kind_of_string = function
   | "hex" -> Some `Hex
   | "string" -> Some `String
-  | k -> integer_value_kind_of_string k
+  | k -> find_encoding k
 
 let print_wasm_encoded_value (kind : printable_value_kind) value =
   let open Result_syntax in
@@ -110,3 +119,4 @@ let print_wasm_encoded_value (kind : printable_value_kind) value =
              (integer_value_kind_to_string kind)
              kind_length)
       else return (Z.of_bits value |> Z.to_string)
+  | `Custom f -> return (f (Bytes.of_string value))

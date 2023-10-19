@@ -12,8 +12,9 @@
     Subject:      Tests for implementation of Ethereum bloom filters
 *)
 
+open Evm_proxy_lib_dev_encoding
 open Evm_proxy_lib_dev.Ethbloom
-open Evm_proxy_lib_dev.Ethereum_types
+open Ethereum_types
 
 let test_empty_is_empty () =
   let empty = make () in

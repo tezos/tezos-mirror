@@ -11,16 +11,11 @@ depends: [
   "dune" { >= "3.0" & < "3.11" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "yaml" { >= "3.1.0" }
-  "octez-protocol-alpha-libs"
-  "octez-l2-libs"
-  "octez-version"
   "octez-smart-rollup-wasm-debugger-plugin"
-  "lambda-term" { >= "3.3.1" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: Debugger for the smart rollups’ WASM kernels"
+synopsis: "EVM encodings for the EVM proxy and plugin for the WASM Debugger [dev version]"

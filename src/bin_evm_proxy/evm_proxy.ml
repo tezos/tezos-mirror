@@ -345,7 +345,7 @@ let make_prod_messages ~smart_rollup_address s =
   let*? _, messages =
     Rollup_node.make_encoded_messages
       ~smart_rollup_address
-      (Ethereum_types.hex_of_string s)
+      (Evm_proxy_lib_prod_encoding.Ethereum_types.hex_of_string s)
   in
   return messages
 
@@ -355,7 +355,7 @@ let make_dev_messages ~smart_rollup_address s =
   let*? _, messages =
     Rollup_node.make_encoded_messages
       ~smart_rollup_address
-      (Ethereum_types.hex_of_string s)
+      (Evm_proxy_lib_dev_encoding.Ethereum_types.hex_of_string s)
   in
   return messages
 
