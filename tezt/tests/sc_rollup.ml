@@ -3746,13 +3746,11 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     }
     (test_refutation_scenario_aux ~mode ~kind scenario)
 
-let test_refutation_migration_scenario ?(flaky = false) ?commitment_period
-    ?challenge_window ~variant ~mode ~kind scenario ~migrate_from ~migrate_to
-    ~migration_on_event =
+let test_refutation_migration_scenario ?commitment_period ?challenge_window
+    ~variant ~mode ~kind scenario ~migrate_from ~migrate_to ~migration_on_event
+    =
   let tags =
-    (if flaky then [Tag.flaky] else [])
-    @ ["refutation"]
-    @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
+    ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
   in
 
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
@@ -4027,7 +4025,6 @@ let test_refutation_migration ~migrate_from ~migrate_to =
         (fun (migration_variant, migration_on_event) ->
           let variant = String.concat "_" [variant; migration_variant] in
           test_refutation_migration_scenario
-            ~flaky:true
             ~kind:"wasm_2_0_0"
               (* The tests for refutations over migrations are only ran for wasm
                  as the arith PVMs do not have the same semantic in all
