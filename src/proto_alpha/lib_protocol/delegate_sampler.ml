@@ -175,8 +175,11 @@ let get_stakes_for_selected_index ctxt index =
       let* stake_for_cycle =
         get_delegate_stake_from_staking_balance ctxt delegate staking_balance
       in
-      let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
-      return ((delegate, stake_for_cycle) :: acc, total_stake))
+      if Stake_storage.has_minimal_stake_and_frozen_stake ctxt staking_balance
+      then
+        let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
+        return ((delegate, stake_for_cycle) :: acc, total_stake)
+      else return (acc, total_stake))
     ~init:([], Stake_repr.zero)
 
 let compute_snapshot_index_for_seed ~max_snapshot_index seed =
