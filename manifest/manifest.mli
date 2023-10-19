@@ -674,6 +674,9 @@ type bisect_ppx = No | Yes | With_sigterm
     - [inline_tests]: specifies an inline_tests backend. Can only be used when constructing a library.
       If used, will add [(inline_tests)] and the corresponding preprocessor in the dune stanza.
 
+    - [inline_tests_deps]: specifies inline_tests dependencies. Can only be used when constructing
+      a library with inline_tests enabled.
+
     - [js_compatible]: whether the target can be compiled to JavaScript.
       Default value for [js_compatible] is
       [false] if [js_of_ocaml] is [None],
@@ -803,6 +806,7 @@ type 'a maker =
   ?ctypes:Ctypes.t ->
   ?implements:target ->
   ?inline_tests:inline_tests ->
+  ?inline_tests_deps:Dune.s_expr list ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
   ?documentation:Dune.s_expr ->

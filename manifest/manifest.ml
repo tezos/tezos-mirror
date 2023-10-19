@@ -221,7 +221,8 @@ module Dune = struct
 
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
-      ?library_flags ?link_flags ?(inline_tests = false) ?(optional = false)
+      ?library_flags ?link_flags ?(inline_tests = false)
+      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false)
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
       ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
       ?modules ?modules_without_implementation ?modes
@@ -277,6 +278,9 @@ module Dune = struct
              [S "flags"; S "-verbose"];
              S "modes"
              :: of_list (List.map (fun mode -> S (string_of_mode mode)) modes);
+             (match inline_tests_deps with
+             | [] -> E
+             | deps -> S "deps" :: of_list deps);
            ]
           else E);
           (match preprocess with
@@ -1144,6 +1148,7 @@ module Target = struct
     foreign_stubs : Dune.foreign_stubs option;
     implements : t option;
     inline_tests : bool;
+    inline_tests_deps : Dune.s_expr list option;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
     documentation : Dune.s_expr option;
@@ -1327,6 +1332,7 @@ module Target = struct
     ?ctypes:Ctypes.t ->
     ?implements:t option ->
     ?inline_tests:inline_tests ->
+    ?inline_tests_deps:Dune.s_expr list ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
     ?documentation:Dune.s_expr ->
@@ -1415,16 +1421,16 @@ module Target = struct
       ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
-      ?modules ?(modules_without_implementation = []) ?(npm_deps = [])
-      ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
-      ?opam_homepage ?(opam_with_test = Always) ?(optional = false)
-      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
-      ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
-      ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
-      ?(extra_authors = []) ?(with_macos_security_framework = false) ~path names
-      =
+      ?inline_tests_deps ?js_compatible ?js_of_ocaml ?documentation
+      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
+      ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
+      ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
+      ?(optional = false) ?(preprocess = []) ?(preprocessor_deps = [])
+      ?(private_modules = []) ?profile ?(opam_only_deps = [])
+      ?(release_status = Auto_opam) ?static ?synopsis ?description
+      ?(time_measurement_ppx = false) ?(virtual_modules = [])
+      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
+      ?(with_macos_security_framework = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1456,9 +1462,13 @@ module Target = struct
     in
     let kind = make_kind names in
     let preprocess, inline_tests =
-      match inline_tests with
-      | None -> (preprocess, false)
-      | Some (Inline_tests_backend target) -> (
+      match (inline_tests, inline_tests_deps) with
+      | None, None -> (preprocess, false)
+      | None, Some _ ->
+          invalid_arg
+            "Target.internal: cannot specify `inline_tests_deps` without \
+             inline_tests"
+      | Some (Inline_tests_backend target), (Some _ | None) -> (
           match kind with
           | Public_library _ | Private_library _ ->
               (PPS [target] :: preprocess, true)
@@ -1748,6 +1758,7 @@ module Target = struct
         foreign_stubs;
         implements;
         inline_tests;
+        inline_tests_deps;
         js_compatible;
         js_of_ocaml;
         documentation;
@@ -2257,6 +2268,7 @@ module Sub_lib = struct
        ?ctypes
        ?implements
        ?inline_tests
+       ?inline_tests_deps
        ?js_compatible
        ?js_of_ocaml
        ?documentation
@@ -2336,6 +2348,7 @@ module Sub_lib = struct
       ?ctypes
       ?implements
       ?inline_tests
+      ?inline_tests_deps
       ?js_compatible
       ?js_of_ocaml
       ?documentation
@@ -2629,6 +2642,7 @@ let generate_dune (internal : Target.internal) =
       ?link_flags
       ?flags
       ~inline_tests:internal.inline_tests
+      ?inline_tests_deps:internal.inline_tests_deps
       ~optional:internal.optional
       ~preprocess
       ~preprocessor_deps
@@ -3253,14 +3267,14 @@ let generate_opam_files_for_release packages_dir opam_release_graph
 
 (* Bumping the dune lang version can result in different dune stanza
    semantic and could require changes to the generation logic. *)
-let dune_lang_version = "3.0"
+let dune_lang_version = "3.7"
 
 let generate_dune_project_files () =
   write "dune-project" @@ fun fmt ->
   Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
-  Format.fprintf fmt "(using ctypes 0.1)@." ;
+  Format.fprintf fmt "(using ctypes 0.3)@." ;
   ( Target.iter_internal_by_opam @@ fun package internals ->
     let has_public_target =
       List.exists
