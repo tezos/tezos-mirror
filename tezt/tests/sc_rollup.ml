@@ -822,12 +822,12 @@ let rec check_can_get_between_blocks rollup_client ~first ~last path =
     check_can_get_between_blocks rollup_client ~first ~last:(last - 1) path
   else unit
 
-let test_gc ~challenge_window ~commitment_period ~history_mode =
+let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
   test_full_scenario
     {
-      tags = ["gc"; history_mode_str];
-      variant = None;
+      tags = ["gc"; history_mode_str; variant];
+      variant = Some variant;
       description =
         sf
           "garbage collection is triggered and finishes correctly (%s)"
@@ -889,16 +889,13 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
        times)" ;
   (* We expect the first available level to be the one corresponding
    * to the lcc for the full mode or the genesis for archive mode *)
+  let* lcc_hash, lcc_level =
+    Sc_rollup_helpers.last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
   let* first_available_level =
     match history_mode with
     | Archive -> Lwt.return origination_level
-    | Full ->
-        let* _, lcc =
-          Sc_rollup_helpers.last_cemented_commitment_hash_with_level
-            ~sc_rollup
-            client
-        in
-        Lwt.return lcc
+    | Full -> Lwt.return lcc_level
   in
   (* Check that RPC calls for blocks which were not GC'ed still return *)
   let* () =
@@ -929,6 +926,16 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
       ~msg:(rex "Attempting to access data for level")
       rpc_call_err
   in
+  Log.info "Checking that commitment publication data was not completely erased" ;
+  let*! lcc = Sc_rollup_client.commitment rollup_client lcc_hash in
+  (match lcc with
+  | None -> Test.fail ~__LOC__ "No LCC"
+  | Some {published_at_level = None; _} ->
+      Test.fail
+        ~__LOC__
+        "Commitment was published but publication info is not available \
+         anymore."
+  | _ -> ()) ;
   unit
 
 (* One can retrieve the list of originated SCORUs.
@@ -5107,12 +5114,21 @@ let register ~kind ~protocols =
     basic_scenario
     protocols ;
   test_gc
+    "many_gc"
+    ~kind
+    ~challenge_window:5
+    ~commitment_period:2
+    ~history_mode:Full
+    protocols ;
+  test_gc
+    "sparse_gc"
     ~kind
     ~challenge_window:10
     ~commitment_period:5
     ~history_mode:Full
     protocols ;
   test_gc
+    "no_gc"
     ~kind
     ~challenge_window:10
     ~commitment_period:5
