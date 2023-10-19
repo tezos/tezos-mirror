@@ -137,7 +137,7 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
 let maximal_available_for_staking ctxt ~delegate =
   Contract_storage.get_balance ctxt (Implicit delegate)
 
-let _adjust_frozen_stakes ctxt :
+let adjust_frozen_stakes ctxt :
     (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t =
   let open Lwt_result_syntax in
   Stake_storage.fold_on_active_delegates_with_minimal_stake_es
@@ -198,6 +198,7 @@ let cycle_end ctxt last_cycle =
       ~new_cycle
   in
   let* ctxt = update_forbidden_delegates ctxt ~new_cycle in
+  let* ctxt, autostake_balance_updates = adjust_frozen_stakes ctxt in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
@@ -205,7 +206,10 @@ let cycle_end ctxt last_cycle =
   let* ctxt =
     Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   in
-  let balance_updates = slashing_balance_updates @ attesting_balance_updates in
+  let balance_updates =
+    slashing_balance_updates @ attesting_balance_updates
+    @ autostake_balance_updates
+  in
   return (ctxt, balance_updates, deactivated_delegates)
 
 let init_first_cycles ctxt =
