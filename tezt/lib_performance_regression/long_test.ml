@@ -288,7 +288,7 @@ module Slack = struct
       match s.[i] with
       | '&' -> Buffer.add_string buffer "&amp;"
       | '<' -> Buffer.add_string buffer "&lt;"
-      | '>' -> Buffer.add_string buffer ">gt;"
+      | '>' -> Buffer.add_string buffer "&gt;"
       | c -> Buffer.add_char buffer c
     done
 
