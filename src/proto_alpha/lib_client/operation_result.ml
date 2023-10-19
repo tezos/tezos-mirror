@@ -368,10 +368,8 @@ let pp_balance_updates ppf balance_updates =
         Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
   in
   let pp_update token ppf = function
-    | Credited amount ->
-        Format.fprintf ppf "+%s%a" tez_sym (Token.pp token) amount
-    | Debited amount ->
-        Format.fprintf ppf "-%s%a" tez_sym (Token.pp token) amount
+    | Credited amount -> Format.fprintf ppf "+%a" (Token.pp token) amount
+    | Debited amount -> Format.fprintf ppf "-%a" (Token.pp token) amount
   in
   let balance_updates =
     List.map

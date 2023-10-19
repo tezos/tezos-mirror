@@ -60,8 +60,12 @@ module Token = struct
     | Tez -> Tez_repr.( -? )
     | Staking_pseudotoken -> Staking_pseudotoken_repr.( -? )
 
+  let pp_tez =
+    let tez_sym = "\xEA\x9C\xA9" in
+    fun ppf tez -> Format.fprintf ppf "%s%a" tez_sym Tez_repr.pp tez
+
   let pp : type token. token t -> Format.formatter -> token -> unit = function
-    | Tez -> Tez_repr.pp
+    | Tez -> pp_tez
     | Staking_pseudotoken -> Staking_pseudotoken_repr.pp
 end
 
