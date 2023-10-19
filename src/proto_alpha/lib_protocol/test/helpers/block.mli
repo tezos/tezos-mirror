@@ -230,7 +230,7 @@ val bake_with_metadata :
   ?operations:Operation.packed list ->
   ?payload_round:Round.t option ->
   ?check_size:bool ->
-  baking_mode:baking_mode ->
+  ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
   ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
