@@ -53,6 +53,7 @@ pair_args: Type = {
 composite_type: Type = {
     "pair" <type_expr> <pair_args> => Type::new_pair(<>),
     "option" <type_expr> => Type::new_option(<>),
+    "list" <type_expr> => Type::new_list(<>),
 }
 
 type_expr: Type = {
@@ -87,9 +88,16 @@ composite_value: Value = {
 
 value_expr: Value = {
   atomic_value => <>,
-  "(" <composite_value> ")" => <>,
-  "(" <value_expr> ")" => <>,
+  "(" <value_expr_naked> ")" => <>,
+  "{" <value_seq> "}" => Seq(<>),
 }
+
+value_expr_naked: Value = {
+  composite_value => <>,
+  value_expr => <>,
+}
+
+value_seq: Vec<Value> = semicolonSepSeq<value_expr_naked>;
 
 use Instruction::*;
 instruction: ParsedInstruction = {
@@ -114,21 +122,21 @@ instruction: ParsedInstruction = {
   "AMOUNT" => Amount,
 }
 
-instructionSeq: Vec<ParsedInstruction> = {
-  <mut ib:(<instruction>";")*><i:instruction?> => {
-    // A sequence of instruction-followed-by-a-semicolon matched by
-    // `(<instruction>";")*` resulting in `Vec<instruction>` and bound to `ib`,
-    // which can be optionally followed by a single trailing instruction,
-    // matched by `<i:instruction?>.
+instructionSeq = semicolonSepSeq<instruction>;
+
+semicolonSepSeq<T>: Vec<T> = {
+  <mut tseq:(<T>";")*><i:T?> => {
+    // A sequence of T-followed-by-a-semicolon matched by
+    // `(<T>";")*` resulting in `Vec<T>` and bound to `ib`,
+    // which can be optionally followed by a single trailing T,
+    // matched by `<i:T?>.
 
     match i {
-      Some(instr) => {
-        ib.push(instr);
-        ib
+      Some(t) => {
+        tseq.push(t);
+        tseq
       },
-      None => {
-        ib
-      }
+      None => tseq
     }
   }
 }
