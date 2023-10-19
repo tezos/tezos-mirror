@@ -160,15 +160,21 @@ let mkdir dirname =
 let create_files_from_lines input_file searched_block output_directory =
   (* Get only file name. *)
   let output_file_prefix = String.split_on_char '/' input_file in
+  (* Get baker name. *)
+  let baker_name =
+    List.hd
+    @@ List.filter
+         (fun s -> String.starts_with ~prefix:"baker-" s)
+         output_file_prefix
+  in
   (* Remove .txt. *)
   let output_file_prefix =
     String.split_on_char '.' (List.last "" output_file_prefix)
   in
   (* Get only the part before file extension. *)
   let output_file_prefix = List.hd output_file_prefix in
-  match output_file_prefix with
-  | None -> tzfail @@ Cannot_get_profiling_file_name input_file
-  | Some output_file_prefix ->
+  match (output_file_prefix, baker_name) with
+  | Some output_file_prefix, Some baker_name ->
       let in_channel = open_in input_file in
       let input_string =
         really_input_string in_channel (in_channel_length in_channel)
@@ -189,7 +195,9 @@ let create_files_from_lines input_file searched_block output_directory =
                String.starts_with ~prefix:"B" first_line
                && String.equal block_name searched_block
              then (
-               let file_name = Printf.sprintf "%s_.txt" output_file_prefix in
+               let file_name =
+                 Printf.sprintf "%s_%s.txt" baker_name output_file_prefix
+               in
                let () = mkdir @@ output_directory ^ "/" ^ block_name in
                let out_channel =
                  open_out (output_directory ^ "/" ^ block_name ^ "/" ^ file_name)
@@ -197,6 +205,7 @@ let create_files_from_lines input_file searched_block output_directory =
                output_string out_channel line ;
                close_out out_channel))
            lines
+  | _ -> tzfail @@ Cannot_get_profiling_file_name input_file
 
 (* Map the whole directory to find corresponding filenames. *)
 let rec find_files_with_suffix dir suffix =
@@ -218,7 +227,7 @@ let find_and_process_profiling_file dir search_block output_directory =
   let profiling_files = find_files_with_suffix dir "_profiling.txt" in
   List.iter
     (fun profiling_file ->
-      Printf.printf "Found profiling file: %s\n" profiling_file ;
+      Printf.printf "Found profiling file: %s\n%!" profiling_file ;
       let _ =
         create_files_from_lines profiling_file search_block output_directory
       in
