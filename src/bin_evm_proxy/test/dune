@@ -23,7 +23,7 @@
   -open Tezos_base_test_helpers
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_rlp))
+ (modules test_rlp test_ethbloom))
 
 (executable
  (name main)
