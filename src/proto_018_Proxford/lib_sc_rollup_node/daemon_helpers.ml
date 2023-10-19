@@ -138,23 +138,15 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       Sc_rollup_publish_result {published_at_level; _} )
     when Node_context.is_operator node_ctxt source ->
       (* Published commitment --------------------------------------------- *)
-      let save_lpc =
-        match Reference.get node_ctxt.lpc with
-        | None -> true
-        | Some lpc ->
-            Raw_level.to_int32 commitment.inbox_level >= lpc.inbox_level
-      in
       let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
-      if save_lpc then Reference.set node_ctxt.lpc (Some commitment) ;
       let commitment_hash = Octez_smart_rollup.Commitment.hash commitment in
       let* () =
-        Node_context.set_commitment_published_at_level
+        Node_context.register_published_commitment
           node_ctxt
-          commitment_hash
-          {
-            first_published_at_level = Raw_level.to_int32 published_at_level;
-            published_at_level = Some head.Layer1.level;
-          }
+          commitment
+          ~first_published_at_level:(Raw_level.to_int32 published_at_level)
+          ~level:head.Layer1.level
+          ~published_by_us:true
       in
       let*! () =
         Commitment_event.last_published_commitment_updated
@@ -173,25 +165,12 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       let* () =
         if not known_commitment then return_unit
         else
-          let* republication =
-            Node_context.commitment_was_published
-              node_ctxt
-              ~source:Anyone
-              their_commitment_hash
-          in
-          if republication then return_unit
-          else
-            let* () =
-              Node_context.set_commitment_published_at_level
-                node_ctxt
-                their_commitment_hash
-                {
-                  first_published_at_level =
-                    Raw_level.to_int32 published_at_level;
-                  published_at_level = None;
-                }
-            in
-            return_unit
+          Node_context.register_published_commitment
+            node_ctxt
+            (Sc_rollup_proto_types.Commitment.to_octez their_commitment)
+            ~first_published_at_level:(Raw_level.to_int32 published_at_level)
+            ~level:head.Layer1.level
+            ~published_by_us:false
       in
       (* An accuser node will publish its commitment if the other one is
          refutable. *)

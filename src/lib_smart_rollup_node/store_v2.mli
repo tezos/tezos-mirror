@@ -55,12 +55,15 @@ module Commitments :
      and type value := Octez_smart_rollup.Commitment.t
      and type header := unit
 
-(** Storage containing a single commitment. *)
+(** Storage containing the last cemented commitment. *)
 module Lcc : sig
   type lcc = {commitment : Commitment.Hash.t; level : int32}
 
   include SINGLETON_STORE with type value := lcc
 end
+
+(** Storage containing a single commitment for the last published commitment. *)
+module Lpc : SINGLETON_STORE with type value := Octez_smart_rollup.Commitment.t
 
 (** Published slot headers per block hash,
     stored as a list of bindings from [Dal_slot_index.t]
@@ -134,6 +137,7 @@ type +'a store = {
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   lcc : 'a Lcc.t;
+  lpc : 'a Lpc.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;

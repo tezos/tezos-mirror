@@ -142,6 +142,19 @@ module Lcc = struct
   end)
 end
 
+(** Single commitment for LPC. *)
+module Lpc = Indexed_store.Make_singleton (struct
+  type t = Octez_smart_rollup.Commitment.t
+
+  let encoding =
+    Data_encoding.conv
+      Octez_smart_rollup.Commitment.to_versioned
+      Octez_smart_rollup.Commitment.of_versioned
+      Octez_smart_rollup.Commitment.versioned_encoding
+
+  let name = "lpc"
+end)
+
 (** Versioned slot headers *)
 module Dal_slots_headers =
   Irmin_store.Make_nested_map
@@ -315,6 +328,7 @@ type 'a store = {
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   lcc : 'a Lcc.t;
+  lpc : 'a Lpc.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
@@ -338,6 +352,7 @@ let readonly
        l2_head;
        last_finalized_level;
        lcc;
+       lpc;
        levels_to_hashes;
        protocols;
        irmin_store;
@@ -355,6 +370,7 @@ let readonly
     l2_head = L2_head.readonly l2_head;
     last_finalized_level = Last_finalized_level.readonly last_finalized_level;
     lcc = Lcc.readonly lcc;
+    lpc = Lpc.readonly lpc;
     levels_to_hashes = Levels_to_hashes.readonly levels_to_hashes;
     protocols = Protocols.readonly protocols;
     irmin_store = Irmin_store.readonly irmin_store;
@@ -372,6 +388,7 @@ let close
        l2_head = _;
        last_finalized_level = _;
        lcc = _;
+       lpc = _;
        levels_to_hashes;
        protocols = _;
        irmin_store;
@@ -421,6 +438,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     Last_finalized_level.load mode ~path:(path "last_finalized_level")
   in
   let* lcc = Lcc.load mode ~path:(path "lcc") in
+  let* lpc = Lpc.load mode ~path:(path "lpc") in
   let* levels_to_hashes =
     Levels_to_hashes.load
       mode
@@ -440,6 +458,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     l2_head;
     last_finalized_level;
     lcc;
+    lpc;
     levels_to_hashes;
     protocols;
     irmin_store;
@@ -578,6 +597,7 @@ let gc
        l2_head;
        last_finalized_level = _;
        lcc = _;
+       lpc = _;
        levels_to_hashes;
        irmin_store = _;
        protocols = _;
@@ -620,6 +640,7 @@ let wait_gc_completion
        l2_head = _;
        last_finalized_level = _;
        lcc = _;
+       lpc = _;
        levels_to_hashes;
        irmin_store = _;
        protocols = _;
@@ -648,6 +669,7 @@ let is_gc_finished
        l2_head = _;
        last_finalized_level = _;
        lcc = _;
+       lpc = _;
        levels_to_hashes;
        irmin_store = _;
        protocols = _;
