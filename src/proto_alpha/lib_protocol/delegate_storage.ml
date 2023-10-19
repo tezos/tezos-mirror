@@ -230,8 +230,10 @@ let frozen_deposits ctxt delegate =
 
 let initial_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in
-  let+ {initial_amount; _} = frozen_deposits ctxt delegate in
-  initial_amount
+  let*? distribution = Raw_context.stake_distribution_for_current_cycle ctxt in
+  match Signature.Public_key_hash.Map.find delegate distribution with
+  | None -> return Tez_repr.zero
+  | Some {frozen; weighted_delegated = _} -> return frozen
 
 let current_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in
