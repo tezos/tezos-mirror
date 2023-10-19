@@ -156,14 +156,16 @@ val string_of_purpose : purpose -> string
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
 (** [run ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
-    ?wait_ready node rollup_address arguments ] launches the given smart
-    contract rollup node for the rollup at [rollup_address] with the given extra
-    arguments. [event_level] and [event_sections_levels] allow to select which
-    events we want the node to emit (see {!Daemon}). [legacy] (by default
-    [false]) must be set if we want to use the legacy [run] command of the node
-    (which requires a config file to exist). If [wait_ready] is [false], tezt
-    does not wait for the node to be ready. If [restart] is [true], it will stop
-    and restart the node if it is already running. *)
+    ?gc_frequency ?history_mode ?wait_ready node rollup_address arguments ]
+    launches the given smart contract rollup node for the rollup at
+    [rollup_address] with the given extra arguments. [event_level] and
+    [event_sections_levels] allow to select which events we want the node to
+    emit (see {!Daemon}). [legacy] (by default [false]) must be set if we want
+    to use the legacy [run] command of the node (which requires a config file to
+    exist). If [wait_ready] is [false], tezt does not wait for the node to be
+    ready. If [restart] is [true], it will stop and restart the node if it is
+    already running. [gc_frequency] is [1] by default to make the rollup GC on
+    every occasion during tests. *)
 val run :
   ?legacy:bool ->
   ?restart:bool ->
@@ -172,6 +174,8 @@ val run :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?loser_mode:string ->
   ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
   ?wait_ready:bool ->
   t ->
   string ->
@@ -194,11 +198,14 @@ val run_sequencer :
   string list ->
   unit Lwt.t
 
-(** [spawn_run ?loser_mode ?allow_degraded node rollup_address arguments] is a
-    lightweight version of {!run} that spawns a process. *)
+(** [spawn_run ?loser_mode ?allow_degraded node ?gc_frequency ?history_mode
+    rollup_address arguments] is a lightweight version of {!run} that spawns a
+    process. *)
 val spawn_run :
   ?loser_mode:string ->
   ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
   t ->
   string ->
   string list ->

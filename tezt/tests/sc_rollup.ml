@@ -841,13 +841,6 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
   (* We want to bake enough blocks for the LCC to be updated and the GC
      triggered. *)
   let expected_level = 5 * challenge_window in
-  let* _config =
-    Sc_rollup_node.config_init
-      ~gc_frequency
-      ~history_mode
-      sc_rollup_node
-      sc_rollup
-  in
   let gc_levels_started = ref [] in
   let context_gc_finalisations = ref 0 in
   Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; value; _} ->
@@ -862,7 +855,9 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
           (* On each [ending_context_gc] event, increment a counter *)
           context_gc_finalisations := !context_gc_finalisations + 1
       | _ -> ()) ;
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~gc_frequency ~history_mode sc_rollup_node sc_rollup []
+  in
   let* origination_level = Node.get_level node in
   (* We start at level 2, bake until the expected level *)
   let* () = bake_levels (expected_level - origination_level) client in
@@ -3515,13 +3510,12 @@ let test_late_rollup_node_2 =
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap2.alias
   in
-  let* _config =
-    (* Do gc every block, to test we don't remove live data *)
-    Sc_rollup_node.config_init ~gc_frequency:1 sc_rollup_node2 sc_rollup_address
-  in
   Log.info
     "Starting alternative rollup node from scratch with a different operator." ;
-  let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
+  (* Do gc every block, to test we don't remove live data *)
+  let* () =
+    Sc_rollup_node.run ~gc_frequency:1 sc_rollup_node2 sc_rollup_address []
+  in
   let* _level = wait_for_current_level node ~timeout:20. sc_rollup_node2 in
   Log.info "Alternative rollup node is synchronized." ;
   let* () = Client.bake_for_and_wait client in
