@@ -297,12 +297,16 @@ type account_state = {
   frozen_deposits : Frozen_tez.t;
   unstaked_frozen : Unstaked_frozen.t;
   unstaked_finalizable : Unstaked_finalizable.t;
+  staking_delegator_numerator : Z.t;
+  staking_delegate_denominator : Z.t;
 }
 
 let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(bonds = Tez.zero) ?(frozen_deposits = Frozen_tez.zero)
     ?(unstaked_frozen = Unstaked_frozen.zero)
-    ?(unstaked_finalizable = Unstaked_finalizable.zero) () =
+    ?(unstaked_finalizable = Unstaked_finalizable.zero)
+    ?(staking_delegator_numerator = Z.zero)
+    ?(staking_delegate_denominator = Z.zero) () =
   {
     pkh;
     contract;
@@ -313,6 +317,8 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     frozen_deposits;
     unstaked_frozen;
     unstaked_finalizable;
+    staking_delegator_numerator;
+    staking_delegate_denominator;
   }
 
 type account_map = account_state String.Map.t
