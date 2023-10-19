@@ -297,6 +297,16 @@ module Arg = struct
         L2_message.Hash.of_b58check_opt s
         |> Option.to_result ~none:"Invalid L2 message hash")
       ()
+
+  let commitment_hash : Commitment.Hash.t Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
+      ~descr:"A commitment hash."
+      ~name:"commitment_hash"
+      ~construct:Commitment.Hash.to_b58check
+      ~destruct:(fun s ->
+        Commitment.Hash.of_b58check_opt s
+        |> Option.to_result ~none:"Invalid commitment hash")
+      ()
 end
 
 module type PREFIX = sig
@@ -391,6 +401,14 @@ module Local = struct
       ~output:
         (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "last_published_commitment")
+
+  let commitment =
+    Tezos_rpc.Service.get_service
+      ~description:"Commitment computed and published by the node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:
+        (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
+      (path / "commitments" /: Arg.commitment_hash)
 
   let injection =
     Tezos_rpc.Service.post_service
