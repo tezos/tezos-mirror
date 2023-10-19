@@ -605,11 +605,11 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let* block, state =
     if state.burn_rewards then
       (* Incremental mode *)
-      let* i =
-        Incremental.begin_construction ?policy ~adaptive_issuance_vote block
-      in
       let* block' =
         Block.bake ?policy ~adaptive_issuance_vote ~operations block
+      in
+      let* i =
+        Incremental.begin_construction ?policy ~adaptive_issuance_vote block
       in
       let* block_rewards = Context.get_issuance_per_minute (B block') in
       let ctxt = Incremental.alpha_ctxt i in
