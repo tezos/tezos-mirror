@@ -39,7 +39,7 @@ type commitment_and_hash = {commitment : commitment; hash : string}
 type commitment_info = {
   commitment_and_hash : commitment_and_hash;
   first_published_at_level : int option;
-  included_at_level : int option;
+  published_at_level : int option;
 }
 
 type slot_header = {level : int; commitment : string; index : int}

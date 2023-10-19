@@ -47,7 +47,7 @@ type commitment_and_hash = {commitment : commitment; hash : string}
 type commitment_info = {
   commitment_and_hash : commitment_and_hash;
   first_published_at_level : int option;
-  included_at_level : int option;
+  published_at_level : int option;
 }
 
 type slot_header = {level : int; commitment : string; index : int}
@@ -79,11 +79,11 @@ let commitment_with_hash_from_json json =
     (commitment_from_json commitment_json)
 
 let commitment_info_from_json json =
-  let hash, commitment_json, first_published_at_level, included_at_level =
+  let hash, commitment_json, first_published_at_level, published_at_level =
     ( JSON.get "hash" json,
       JSON.get "commitment" json,
       JSON.get "first_published_at_level" json,
-      JSON.get "included_at_level" json )
+      JSON.get "published_at_level" json )
   in
   Option.map
     (fun commitment ->
@@ -91,8 +91,8 @@ let commitment_info_from_json json =
         commitment_and_hash = {hash = JSON.as_string hash; commitment};
         first_published_at_level =
           first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
-        included_at_level =
-          included_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+        published_at_level =
+          published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
       })
     (commitment_from_json commitment_json)
 
