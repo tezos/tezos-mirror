@@ -2196,18 +2196,6 @@ module Delegate : sig
     destination:public_key_hash ->
     (context * bool * Tez.t * Receipt.balance_updates) tzresult Lwt.t
 
-  type participation_info = {
-    expected_cycle_activity : int;
-    minimal_cycle_activity : int;
-    missed_slots : int;
-    missed_levels : int;
-    remaining_allowed_missed_slots : int;
-    expected_attesting_rewards : Tez.t;
-  }
-
-  val participation_info :
-    context -> public_key_hash -> participation_info tzresult Lwt.t
-
   val cycle_end :
     context ->
     Cycle.t ->
@@ -2396,6 +2384,18 @@ module Delegate : sig
   the protocol.
       They are meant to be used only to answer RPC calls.  *)
   module For_RPC : sig
+    type participation_info = {
+      expected_cycle_activity : int;
+      minimal_cycle_activity : int;
+      missed_slots : int;
+      missed_levels : int;
+      remaining_allowed_missed_slots : int;
+      expected_attesting_rewards : Tez.t;
+    }
+
+    val participation_info :
+      context -> public_key_hash -> participation_info tzresult Lwt.t
+
     (** Returns the full 'balance' of the implicit contract associated to a
         given key, i.e. the sum of the spendable balance (given by [balance] or
         [Contract_storage.get_balance]) and of the frozen balance of the

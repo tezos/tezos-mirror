@@ -212,14 +212,15 @@ let info_encoding =
 let participation_info_encoding =
   let open Data_encoding in
   conv
-    (fun {
-           Delegate.expected_cycle_activity;
-           minimal_cycle_activity;
-           missed_slots;
-           missed_levels;
-           remaining_allowed_missed_slots;
-           expected_attesting_rewards;
-         } ->
+    (fun Delegate.For_RPC.
+           {
+             expected_cycle_activity;
+             minimal_cycle_activity;
+             missed_slots;
+             missed_levels;
+             remaining_allowed_missed_slots;
+             expected_attesting_rewards;
+           } ->
       ( expected_cycle_activity,
         minimal_cycle_activity,
         missed_slots,
@@ -705,7 +706,7 @@ let register () =
       return {active = {consensus_key_pk; consensus_key_pkh}; pendings}) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
-      Delegate.participation_info ctxt pkh) ;
+      Delegate.For_RPC.participation_info ctxt pkh) ;
   register1 ~chunked:false S.active_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.of_delegate ctxt pkh) ;
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
