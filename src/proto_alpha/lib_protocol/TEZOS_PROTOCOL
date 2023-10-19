@@ -166,6 +166,7 @@
         "Unstake_requests_storage",
         "Frozen_deposits_storage",
         "Staking_pseudotokens_storage",
+
         "Contract_storage",
         "Token",
         "Fees_storage",
@@ -178,6 +179,7 @@
         "Delegate_rewards",
         "Delegate_missed_attestations_storage",
         "Delegate_slashed_deposits_storage",
+        "Staking",
         "Delegate_cycles",
 
         "Vote_storage",
@@ -266,7 +268,6 @@
         "Dal_apply",
         "Zk_rollup_apply",
 
-        "Staking",
         "Baking",
         "Validate_errors",
         "Amendment",

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-
 type error +=
   | Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
 
@@ -57,7 +55,7 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
         Token.transfer
           ctxt
           (`Unstaked_frozen_deposits
-            (Receipt.Single (contract, delegate), cycle))
+            (Receipt_repr.Single (contract, delegate), cycle))
           (`Contract contract)
           amount
       in
@@ -70,9 +68,13 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
 let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
   let open Lwt_result_syntax in
   let*? ctxt =
-    Gas.consume ctxt Adaptive_issuance_costs.prepare_finalize_unstake_cost
+    Raw_context.consume_gas
+      ctxt
+      Adaptive_issuance_costs.prepare_finalize_unstake_cost
   in
-  let* prepared_opt = Unstake_requests.prepare_finalize_unstake ctxt contract in
+  let* prepared_opt =
+    Unstake_requests_storage.prepare_finalize_unstake ctxt contract
+  in
   match prepared_opt with
   | None -> return (ctxt, [])
   | Some {finalizable; unfinalizable} -> (
@@ -87,11 +89,13 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
              all the previous unstake requests, that should remain as requests after this
              operation. *)
           let*? ctxt =
-            Gas.consume
+            Raw_context.consume_gas
               ctxt
               Adaptive_issuance_costs.finalize_unstake_and_check_cost
           in
-          let* ctxt = Unstake_requests.update ctxt contract unfinalizable in
+          let* ctxt =
+            Unstake_requests_storage.update ctxt contract unfinalizable
+          in
           perform_finalizable_unstake_transfers ctxt contract finalizable)
 
 let finalize_unstake ctxt contract =
@@ -102,18 +106,24 @@ let punish_delegate ctxt delegate level (misbehaviour : Misbehaviour.t)
     ~rewarded =
   let open Lwt_result_syntax in
   let* ctxt, {staked; unstaked} =
-    Delegate.punish_double_signing ctxt misbehaviour delegate level ~rewarded
+    Delegate_slashed_deposits_storage.punish_double_signing
+      ctxt
+      misbehaviour
+      delegate
+      level
+      ~rewarded
   in
   let init_to_burn_to_reward =
-    let Delegate.{amount_to_burn; reward} = staked in
-    let giver = `Frozen_deposits (Receipt.Shared delegate) in
+    let Delegate_slashed_deposits_storage.{amount_to_burn; reward} = staked in
+    let giver = `Frozen_deposits (Receipt_repr.Shared delegate) in
     ([(giver, amount_to_burn)], [(giver, reward)])
   in
   let to_burn, to_reward =
     List.fold_left
-      (fun (to_burn, to_reward) (cycle, Delegate.{amount_to_burn; reward}) ->
+      (fun (to_burn, to_reward)
+           (cycle, Delegate_slashed_deposits_storage.{amount_to_burn; reward}) ->
         let giver =
-          `Unstaked_frozen_deposits (Receipt.Shared delegate, cycle)
+          `Unstaked_frozen_deposits (Receipt_repr.Shared delegate, cycle)
         in
         ((giver, amount_to_burn) :: to_burn, (giver, reward) :: to_reward))
       init_to_burn_to_reward
@@ -123,14 +133,17 @@ let punish_delegate ctxt delegate level (misbehaviour : Misbehaviour.t)
     Token.transfer_n ctxt to_burn `Double_signing_punishments
   in
   let+ ctxt, reward_balance_updates =
-    Token.transfer_n ctxt to_reward (`Contract (Contract.Implicit rewarded))
+    Token.transfer_n
+      ctxt
+      to_reward
+      (`Contract (Contract_repr.Implicit rewarded))
   in
   (ctxt, reward_balance_updates @ punish_balance_updates)
 
 let stake ctxt ~sender ~delegate amount =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
-      Unstake_requests.{delegate = unstake_delegate; requests} =
+      Unstake_requests_storage.{delegate = unstake_delegate; requests} =
     match requests with
     | [] -> return ctxt
     | _ :: _ ->
@@ -139,18 +152,22 @@ let stake ctxt ~sender ~delegate amount =
             Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
         else return ctxt
   in
-  let sender_contract = Contract.Implicit sender in
+  let sender_contract = Contract_repr.Implicit sender in
   let* ctxt, finalize_balance_updates =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
   let* ctxt =
-    Staking_pseudotokens.stake ctxt ~contract:sender_contract ~delegate amount
+    Staking_pseudotokens_storage.stake
+      ctxt
+      ~contract:sender_contract
+      ~delegate
+      amount
   in
   let+ ctxt, stake_balance_updates =
     Token.transfer
       ctxt
       (`Contract sender_contract)
-      (`Frozen_deposits (Receipt.Single (sender_contract, delegate)))
+      (`Frozen_deposits (Receipt_repr.Single (sender_contract, delegate)))
       amount
   in
   (ctxt, stake_balance_updates @ finalize_balance_updates)
@@ -158,31 +175,31 @@ let stake ctxt ~sender ~delegate amount =
 let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* ctxt, tez_to_unstake =
-    Staking_pseudotokens.request_unstake
+    Staking_pseudotokens_storage.request_unstake
       ctxt
       ~contract:sender_contract
       ~delegate
       requested_amount
   in
-  if Tez.(tez_to_unstake = zero) then return (ctxt, [])
+  if Tez_repr.(tez_to_unstake = zero) then return (ctxt, [])
   else
     let*? ctxt =
-      Gas.consume ctxt Adaptive_issuance_costs.request_unstake_cost
+      Raw_context.consume_gas ctxt Adaptive_issuance_costs.request_unstake_cost
     in
-    let current_cycle = (Level.current ctxt).cycle in
+    let current_cycle = (Raw_context.current_level ctxt).cycle in
     let* ctxt, balance_updates =
       Token.transfer
         ctxt
-        (`Frozen_deposits (Receipt.Single (sender_contract, delegate)))
+        (`Frozen_deposits (Receipt_repr.Single (sender_contract, delegate)))
         (`Unstaked_frozen_deposits
-          (Receipt.Single (sender_contract, delegate), current_cycle))
+          (Receipt_repr.Single (sender_contract, delegate), current_cycle))
         tez_to_unstake
     in
     let* ctxt, finalize_balance_updates =
       finalize_unstake ctxt sender_contract
     in
     let+ ctxt =
-      Unstake_requests.add
+      Unstake_requests_storage.add
         ctxt
         ~contract:sender_contract
         ~delegate
