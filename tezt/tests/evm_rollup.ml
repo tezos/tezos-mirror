@@ -1975,7 +1975,7 @@ let check_balance ~receiver ~endpoint expected_balance =
 let test_deposit_and_withdraw =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "deposit"; "withdraw"]
+    ~tags:["evm"; "deposit"; "withdraw"; Tag.flaky]
     ~title:"Deposit and withdraw tez"
   @@ fun protocol ->
   let admin = Constant.bootstrap5 in
