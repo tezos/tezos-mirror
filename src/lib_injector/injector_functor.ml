@@ -246,7 +246,7 @@ module Make (Parameters : PARAMETERS) = struct
     cctxt : Client_context.full;
         (** The client context which is used to perform the injections. *)
     l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
-    signer : signer;  (** The signer for this worker. *)
+    signers : signer list;  (** The signers for this worker. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
           purposes. *)
@@ -287,11 +287,13 @@ module Make (Parameters : PARAMETERS) = struct
       Injector_events.Make (Parameters) (Tags) (POperation) (Inj_operation)
         (Request)
 
-    let emit1 e state x = emit e (state.signer.alias, state.tags, x)
+    let signers_alias state = List.map (fun s -> s.alias) state.signers
 
-    let emit2 e state x y = emit e (state.signer.alias, state.tags, x, y)
+    let emit1 e state x = emit e (signers_alias state, state.tags, x)
 
-    let emit3 e state x y z = emit e (state.signer.alias, state.tags, x, y, z)
+    let emit2 e state x y = emit e (signers_alias state, state.tags, x, y)
+
+    let emit3 e state x y z = emit e (signers_alias state, state.tags, x, y, z)
   end
 
   let last_head_encoding =
@@ -318,9 +320,10 @@ module Make (Parameters : PARAMETERS) = struct
     state.last_seen_head <- Some head
 
   let init_injector cctxt l1_ctxt ~head_protocols ~data_dir state
-      ~retention_period ~allowed_attempts ~injection_ttl ~signer strategy tags =
+      ~retention_period ~allowed_attempts ~injection_ttl ~signers strategy tags
+      =
     let open Lwt_result_syntax in
-    let* signer = get_signer cctxt signer in
+    let* signers = List.map_ep (get_signer cctxt) signers in
     let data_dir = Filename.concat data_dir "injector" in
     let*! () = Lwt_utils_unix.create_dir data_dir in
     let filter op_proj op =
@@ -328,11 +331,13 @@ module Make (Parameters : PARAMETERS) = struct
     in
     (* Warn of corrupted files but don't fail *)
     let warn file error =
-      Event.(emit corrupted_operation_on_disk) (signer.alias, tags, file, error)
+      Event.(emit corrupted_operation_on_disk)
+        (List.map (fun s -> s.alias) signers, tags, file, error)
     in
     let warn_unreadable = Some warn in
     let emit_event_loaded kind nb =
-      Event.(emit loaded_from_disk) (signer.alias, tags, nb, kind)
+      Event.(emit loaded_from_disk)
+        (List.map (fun s -> s.alias) signers, tags, nb, kind)
     in
     let* queue =
       Op_queue.load_from_disk
@@ -400,7 +405,7 @@ module Make (Parameters : PARAMETERS) = struct
       {
         cctxt = injector_context (cctxt :> #Client_context.full);
         l1_ctxt;
-        signer;
+        signers;
         tags;
         strategy;
         save_dir = data_dir;
@@ -606,6 +611,14 @@ module Make (Parameters : PARAMETERS) = struct
   let rec simulate_operations ~must_succeed state
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
+    let signer =
+      match state.signers with
+      | signer :: _ -> signer
+      | [] ->
+          (* TODO: there is always at least a signer per
+             worker. changed in following commit *)
+          assert false
+    in
     let force =
       match operations with
       | [] -> assert false
@@ -627,8 +640,8 @@ module Make (Parameters : PARAMETERS) = struct
       Proto_client.simulate_operations
         state.cctxt
         ~force
-        ~source:state.signer.pkh
-        ~src_pk:state.signer.pk
+        ~source:signer.pkh
+        ~src_pk:signer.pk
         ~successor_level:true
           (* Operations are simulated in the next block, which is important for
              rollups and ok for other applications. *)
@@ -691,10 +704,18 @@ module Make (Parameters : PARAMETERS) = struct
 
   let inject_on_node state ~nb (module Unsigned_op : Proto_unsigned_op) =
     let open Lwt_result_syntax in
+    let signer =
+      match state.signers with
+      | signer :: _ -> signer
+      | [] ->
+          (* TODO: there is always at least a signer per
+             worker. changed in following commit *)
+          assert false
+    in
     let* signed_op_bytes =
       Unsigned_op.Proto_client.sign_operation
         state.cctxt
-        state.signer.sk
+        signer.sk
         Unsigned_op.value
     in
     let* oph =
@@ -1174,7 +1195,7 @@ module Make (Parameters : PARAMETERS) = struct
     type nonrec state = state
 
     type parameters = {
-      signer : Signature.public_key_hash;
+      signers : Signature.public_key_hash list;
       cctxt : Client_context.full;
       l1_ctxt : Layer_1.t;
       head_protocols : protocols;
@@ -1233,7 +1254,7 @@ module Make (Parameters : PARAMETERS) = struct
     let on_launch _w tags
         Types.
           {
-            signer;
+            signers;
             cctxt;
             l1_ctxt;
             head_protocols;
@@ -1254,7 +1275,7 @@ module Make (Parameters : PARAMETERS) = struct
            ~retention_period
            ~allowed_attempts
            ~injection_ttl
-           ~signer
+           ~signers
            strategy
            tags
 
@@ -1452,7 +1473,7 @@ module Make (Parameters : PARAMETERS) = struct
               table
               tags
               {
-                signer;
+                signers = [signer];
                 cctxt = (cctxt :> Client_context.full);
                 l1_ctxt;
                 head_protocols;
