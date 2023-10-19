@@ -51,229 +51,6 @@ type balance =
   | Sc_rollup_refutation_punishments
   | Sc_rollup_refutation_rewards
 
-let balance_encoding ~use_legacy_attestation_name =
-  let open Data_encoding in
-  let case = function
-    | Tag tag ->
-        (* The tag was used by old variant. It have been removed in
-           protocol proposal O, it can be unblocked in the future. *)
-        let tx_rollup_reserved_tag = [22; 23] in
-        assert (
-          not @@ List.exists (Compare.Int.equal tag) tx_rollup_reserved_tag) ;
-        case (Tag tag)
-    | _ as c -> case c
-  in
-  def
-    (if use_legacy_attestation_name then
-     "operation_metadata_with_legacy_attestation_name.alpha.balance"
-    else "operation_metadata.alpha.balance")
-  @@ union
-       [
-         case
-           (Tag 0)
-           ~title:"Contract"
-           (obj2
-              (req "kind" (constant "contract"))
-              (req "contract" Contract_repr.encoding))
-           (function Contract c -> Some ((), c) | _ -> None)
-           (fun ((), c) -> Contract c);
-         case
-           (Tag 2)
-           ~title:"Block_fees"
-           (obj2
-              (req "kind" (constant "accumulator"))
-              (req "category" (constant "block fees")))
-           (function Block_fees -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Block_fees);
-         case
-           (Tag 4)
-           ~title:"Deposits"
-           (obj3
-              (req "kind" (constant "freezer"))
-              (req "category" (constant "deposits"))
-              (req "staker" Staker_repr.staker_encoding))
-           (function Deposits staker -> Some ((), (), staker) | _ -> None)
-           (fun ((), (), staker) -> Deposits staker);
-         case
-           (Tag 5)
-           ~title:"Nonce_revelation_rewards"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "nonce revelation rewards")))
-           (function Nonce_revelation_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Nonce_revelation_rewards);
-         (* 6 was for Double_signing_evidence_rewards that has been removed.
-            https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
-         case
-           (Tag 7)
-           ~title:
-             (if use_legacy_attestation_name then "Endorsing_rewards"
-             else "Attesting_rewards")
-           (obj2
-              (req "kind" (constant "minted"))
-              (req
-                 "category"
-                 (constant
-                    (if use_legacy_attestation_name then "endorsing rewards"
-                    else "attesting rewards"))))
-           (function Attesting_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Attesting_rewards);
-         case
-           (Tag 8)
-           ~title:"Baking_rewards"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "baking rewards")))
-           (function Baking_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Baking_rewards);
-         case
-           (Tag 9)
-           ~title:"Baking_bonuses"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "baking bonuses")))
-           (function Baking_bonuses -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Baking_bonuses);
-         case
-           (Tag 11)
-           ~title:"Storage_fees"
-           (obj2
-              (req "kind" (constant "burned"))
-              (req "category" (constant "storage fees")))
-           (function Storage_fees -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Storage_fees);
-         case
-           (Tag 12)
-           ~title:"Double_signing_punishments"
-           (obj2
-              (req "kind" (constant "burned"))
-              (req "category" (constant "punishments")))
-           (function Double_signing_punishments -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Double_signing_punishments);
-         case
-           (Tag 13)
-           ~title:
-             (if use_legacy_attestation_name then "Lost_endorsing_rewards"
-             else "Lost_attesting_rewards")
-           (obj5
-              (req "kind" (constant "burned"))
-              (req
-                 "category"
-                 (constant
-                    (if use_legacy_attestation_name then
-                     "lost endorsing rewards"
-                    else "lost attesting rewards")))
-              (req "delegate" Signature.Public_key_hash.encoding)
-              (req "participation" Data_encoding.bool)
-              (req "revelation" Data_encoding.bool))
-           (function
-             | Lost_attesting_rewards (d, p, r) -> Some ((), (), d, p, r)
-             | _ -> None)
-           (fun ((), (), d, p, r) -> Lost_attesting_rewards (d, p, r));
-         case
-           (Tag 14)
-           ~title:"Liquidity_baking_subsidies"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "subsidy")))
-           (function Liquidity_baking_subsidies -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Liquidity_baking_subsidies);
-         case
-           (Tag 15)
-           ~title:"Burned"
-           (obj2
-              (req "kind" (constant "burned"))
-              (req "category" (constant "burned")))
-           (function Burned -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Burned);
-         case
-           (Tag 16)
-           ~title:"Commitments"
-           (obj3
-              (req "kind" (constant "commitment"))
-              (req "category" (constant "commitment"))
-              (req "committer" Blinded_public_key_hash.encoding))
-           (function Commitments bpkh -> Some ((), (), bpkh) | _ -> None)
-           (fun ((), (), bpkh) -> Commitments bpkh);
-         case
-           (Tag 17)
-           ~title:"Bootstrap"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "bootstrap")))
-           (function Bootstrap -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Bootstrap);
-         case
-           (Tag 18)
-           ~title:"Invoice"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "invoice")))
-           (function Invoice -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Invoice);
-         case
-           (Tag 19)
-           ~title:"Initial_commitments"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "commitment")))
-           (function Initial_commitments -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Initial_commitments);
-         case
-           (Tag 20)
-           ~title:"Minted"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "minted")))
-           (function Minted -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Minted);
-         case
-           (Tag 21)
-           ~title:"Frozen_bonds"
-           (obj4
-              (req "kind" (constant "freezer"))
-              (req "category" (constant "bonds"))
-              (req "contract" Contract_repr.encoding)
-              (req "bond_id" Bond_id_repr.encoding))
-           (function Frozen_bonds (c, r) -> Some ((), (), c, r) | _ -> None)
-           (fun ((), (), c, r) -> Frozen_bonds (c, r));
-         case
-           (Tag 24)
-           ~title:"Smart_rollup_refutation_punishments"
-           (obj2
-              (req "kind" (constant "burned"))
-              (req "category" (constant "smart_rollup_refutation_punishments")))
-           (function
-             | Sc_rollup_refutation_punishments -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Sc_rollup_refutation_punishments);
-         case
-           (Tag 25)
-           ~title:"Smart_rollup_refutation_rewards"
-           (obj2
-              (req "kind" (constant "minted"))
-              (req "category" (constant "smart_rollup_refutation_rewards")))
-           (function
-             | Sc_rollup_refutation_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Sc_rollup_refutation_rewards);
-         case
-           (Tag 26)
-           ~title:"Unstaked_deposits"
-           (obj4
-              (req "kind" (constant "freezer"))
-              (req "category" (constant "unstaked_deposits"))
-              (req "staker" Staker_repr.staker_encoding)
-              (req "cycle" Cycle_repr.encoding))
-           (function
-             | Unstaked_deposits (staker, cycle) -> Some ((), (), staker, cycle)
-             | _ -> None)
-           (fun ((), (), staker, cycle) -> Unstaked_deposits (staker, cycle));
-       ]
-
-let balance_encoding_with_legacy_attestation_name =
-  balance_encoding ~use_legacy_attestation_name:true
-
-let balance_encoding = balance_encoding ~use_legacy_attestation_name:false
-
 let is_not_zero c = not (Compare.Int.equal c 0)
 
 let compare_balance ba bb =
@@ -333,10 +110,243 @@ let conv_balance_update encoding =
     (function `Credited v -> Credited v | `Debited v -> Debited v)
     encoding
 
-let balance_update_encoding =
+let tez_balance_update_encoding =
   let open Data_encoding in
-  def "operation_metadata.alpha.balance_update"
+  def "operation_metadata.alpha.tez_balance_update"
   @@ obj1 (req "change" (conv_balance_update Tez_repr.balance_update_encoding))
+
+let balance_and_update_encoding ~use_legacy_attestation_name =
+  let open Data_encoding in
+  let case = function
+    | Tag tag ->
+        (* The tag was used by old variant. It have been removed in
+           protocol proposal O, it can be unblocked in the future. *)
+        let tx_rollup_reserved_tag = [22; 23] in
+        assert (
+          not @@ List.exists (Compare.Int.equal tag) tx_rollup_reserved_tag) ;
+        case (Tag tag)
+    | _ as c -> case c
+  in
+  let tez_case ~title tag enc proj inj =
+    case
+      ~title
+      tag
+      (merge_objs enc tez_balance_update_encoding)
+      (fun (balance, update) ->
+        proj balance |> Option.map (fun x -> (x, update)))
+      (fun (x, update) -> (inj x, update))
+  in
+  def
+    (if use_legacy_attestation_name then
+     "operation_metadata_with_legacy_attestation_name.alpha.balance_and_update"
+    else "operation_metadata.alpha.balance_and_update")
+  @@ union
+       [
+         tez_case
+           (Tag 0)
+           ~title:"Contract"
+           (obj2
+              (req "kind" (constant "contract"))
+              (req "contract" Contract_repr.encoding))
+           (function Contract c -> Some ((), c) | _ -> None)
+           (fun ((), c) -> Contract c);
+         tez_case
+           (Tag 2)
+           ~title:"Block_fees"
+           (obj2
+              (req "kind" (constant "accumulator"))
+              (req "category" (constant "block fees")))
+           (function Block_fees -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Block_fees);
+         tez_case
+           (Tag 4)
+           ~title:"Deposits"
+           (obj3
+              (req "kind" (constant "freezer"))
+              (req "category" (constant "deposits"))
+              (req "staker" Staker_repr.staker_encoding))
+           (function Deposits staker -> Some ((), (), staker) | _ -> None)
+           (fun ((), (), staker) -> Deposits staker);
+         tez_case
+           (Tag 5)
+           ~title:"Nonce_revelation_rewards"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "nonce revelation rewards")))
+           (function Nonce_revelation_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Nonce_revelation_rewards);
+         (* 6 was for Double_signing_evidence_rewards that has been removed.
+            https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
+         tez_case
+           (Tag 7)
+           ~title:
+             (if use_legacy_attestation_name then "Endorsing_rewards"
+             else "Attesting_rewards")
+           (obj2
+              (req "kind" (constant "minted"))
+              (req
+                 "category"
+                 (constant
+                    (if use_legacy_attestation_name then "endorsing rewards"
+                    else "attesting rewards"))))
+           (function Attesting_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Attesting_rewards);
+         tez_case
+           (Tag 8)
+           ~title:"Baking_rewards"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "baking rewards")))
+           (function Baking_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Baking_rewards);
+         tez_case
+           (Tag 9)
+           ~title:"Baking_bonuses"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "baking bonuses")))
+           (function Baking_bonuses -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Baking_bonuses);
+         tez_case
+           (Tag 11)
+           ~title:"Storage_fees"
+           (obj2
+              (req "kind" (constant "burned"))
+              (req "category" (constant "storage fees")))
+           (function Storage_fees -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Storage_fees);
+         tez_case
+           (Tag 12)
+           ~title:"Double_signing_punishments"
+           (obj2
+              (req "kind" (constant "burned"))
+              (req "category" (constant "punishments")))
+           (function Double_signing_punishments -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Double_signing_punishments);
+         tez_case
+           (Tag 13)
+           ~title:
+             (if use_legacy_attestation_name then "Lost_endorsing_rewards"
+             else "Lost_attesting_rewards")
+           (obj5
+              (req "kind" (constant "burned"))
+              (req
+                 "category"
+                 (constant
+                    (if use_legacy_attestation_name then
+                     "lost endorsing rewards"
+                    else "lost attesting rewards")))
+              (req "delegate" Signature.Public_key_hash.encoding)
+              (req "participation" Data_encoding.bool)
+              (req "revelation" Data_encoding.bool))
+           (function
+             | Lost_attesting_rewards (d, p, r) -> Some ((), (), d, p, r)
+             | _ -> None)
+           (fun ((), (), d, p, r) -> Lost_attesting_rewards (d, p, r));
+         tez_case
+           (Tag 14)
+           ~title:"Liquidity_baking_subsidies"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "subsidy")))
+           (function Liquidity_baking_subsidies -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Liquidity_baking_subsidies);
+         tez_case
+           (Tag 15)
+           ~title:"Burned"
+           (obj2
+              (req "kind" (constant "burned"))
+              (req "category" (constant "burned")))
+           (function Burned -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Burned);
+         tez_case
+           (Tag 16)
+           ~title:"Commitments"
+           (obj3
+              (req "kind" (constant "commitment"))
+              (req "category" (constant "commitment"))
+              (req "committer" Blinded_public_key_hash.encoding))
+           (function Commitments bpkh -> Some ((), (), bpkh) | _ -> None)
+           (fun ((), (), bpkh) -> Commitments bpkh);
+         tez_case
+           (Tag 17)
+           ~title:"Bootstrap"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "bootstrap")))
+           (function Bootstrap -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Bootstrap);
+         tez_case
+           (Tag 18)
+           ~title:"Invoice"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "invoice")))
+           (function Invoice -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Invoice);
+         tez_case
+           (Tag 19)
+           ~title:"Initial_commitments"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "commitment")))
+           (function Initial_commitments -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Initial_commitments);
+         tez_case
+           (Tag 20)
+           ~title:"Minted"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "minted")))
+           (function Minted -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Minted);
+         tez_case
+           (Tag 21)
+           ~title:"Frozen_bonds"
+           (obj4
+              (req "kind" (constant "freezer"))
+              (req "category" (constant "bonds"))
+              (req "contract" Contract_repr.encoding)
+              (req "bond_id" Bond_id_repr.encoding))
+           (function Frozen_bonds (c, r) -> Some ((), (), c, r) | _ -> None)
+           (fun ((), (), c, r) -> Frozen_bonds (c, r));
+         tez_case
+           (Tag 24)
+           ~title:"Smart_rollup_refutation_punishments"
+           (obj2
+              (req "kind" (constant "burned"))
+              (req "category" (constant "smart_rollup_refutation_punishments")))
+           (function
+             | Sc_rollup_refutation_punishments -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Sc_rollup_refutation_punishments);
+         tez_case
+           (Tag 25)
+           ~title:"Smart_rollup_refutation_rewards"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "smart_rollup_refutation_rewards")))
+           (function
+             | Sc_rollup_refutation_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Sc_rollup_refutation_rewards);
+         tez_case
+           (Tag 26)
+           ~title:"Unstaked_deposits"
+           (obj4
+              (req "kind" (constant "freezer"))
+              (req "category" (constant "unstaked_deposits"))
+              (req "staker" Staker_repr.staker_encoding)
+              (req "cycle" Cycle_repr.encoding))
+           (function
+             | Unstaked_deposits (staker, cycle) -> Some ((), (), staker, cycle)
+             | _ -> None)
+           (fun ((), (), staker, cycle) -> Unstaked_deposits (staker, cycle));
+       ]
+
+let balance_and_update_encoding_with_legacy_attestation_name =
+  balance_and_update_encoding ~use_legacy_attestation_name:true
+
+let balance_and_update_encoding =
+  balance_and_update_encoding ~use_legacy_attestation_name:false
 
 type update_origin =
   | Block_application
@@ -403,9 +413,7 @@ let item_encoding_with_legacy_attestation_name =
     (fun ((balance, balance_update), update_origin) ->
       Balance_update_item (balance, balance_update, update_origin))
     (merge_objs
-       (merge_objs
-          balance_encoding_with_legacy_attestation_name
-          balance_update_encoding)
+       balance_and_update_encoding_with_legacy_attestation_name
        update_origin_encoding)
 
 let item_encoding =
@@ -416,9 +424,7 @@ let item_encoding =
           ((balance, balance_update), update_origin))
     (fun ((balance, balance_update), update_origin) ->
       Balance_update_item (balance, balance_update, update_origin))
-    (merge_objs
-       (merge_objs balance_encoding balance_update_encoding)
-       update_origin_encoding)
+    (merge_objs balance_and_update_encoding update_origin_encoding)
 
 type balance_updates = balance_update_item list
 
