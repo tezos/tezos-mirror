@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "bisect_ppx" { >= "2.7.0" }
   "ocamlformat" { = "0.24.1" }
-  "ometrics" { >= "0.2.1" }
   "base-unix"
 ]
 build: [

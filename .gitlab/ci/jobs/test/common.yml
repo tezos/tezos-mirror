@@ -1,7 +1,3 @@
-.template__code_quality:
-  variables:
-    CODE_QUALITY_REPORT: "_reports/gl-code-quality-report.json"
-
 .test_template:
   extends:
     - .default_settings_template
