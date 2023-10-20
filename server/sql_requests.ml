@@ -25,20 +25,32 @@
 
 let env driver_info s =
   match (Caqti_driver_info.dialect_tag driver_info, s) with
+
   | `Pgsql, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "BIGSERIAL"
   | `Sqlite, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "INTEGER"
+
+  | `Pgsql, "SMALL_PRIMARY_INCREMENTING_INT" -> Caqti_query.L "SERIAL"
+  | `Sqlite, "SMALL_PRIMARY_INCREMENTING_INT" -> Caqti_query.L "INTEGER"
+
+  | `Pgsql, "PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "BIGINT"
+  | `Sqlite, "PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
+
+  | `Pgsql, "SMALL_PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
+  | `Sqlite, "SMALL_PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
+
   | `Pgsql, "BYTES" -> Caqti_query.L "BYTEA"
   | `Sqlite, "BYTES" -> Caqti_query.L "BLOB"
+
   | _, _ -> raise Not_found
 
 let create_delegates =
   "CREATE TABLE IF NOT EXISTS delegates(\n\
-  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  id $(SMALL_PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  address $(BYTES) UNIQUE NOT NULL)"
 
 let create_nodes =
   "CREATE TABLE IF NOT EXISTS nodes(\n\
-  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  id $(SMALL_PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  name TEXT UNIQUE NOT NULL,\n\
   \  comment TEXT,\n\
   \  password $(BYTES) -- node can't feed if NULL\n\
@@ -47,12 +59,12 @@ let create_nodes =
 let create_blocks =
   "CREATE TABLE IF NOT EXISTS blocks(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \  predecessor BIGINT,\n\
+  \  predecessor $(PRIMARY_INCREMENTING_INT_REF),\n\
   \  timestamp INTEGER NOT NULL, -- Unix time\n\
   \  hash $(BYTES) UNIQUE NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
   \  round INTEGER NOT NULL,\n\
-  \  baker BIGINT NOT NULL,\n\
+  \  baker $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  FOREIGN KEY (baker) REFERENCES delegates(id))"
 
 let create_blocks_reception =
@@ -60,8 +72,8 @@ let create_blocks_reception =
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  application_timestamp TEXT, -- ISO8601 string\n\
   \  validation_timestamp TEXT, -- ISO8601 string\n\
-  \  block BIGINT NOT NULL,\n\
-  \  source BIGINT NOT NULL,\n\
+  \  block $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  source $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  FOREIGN KEY (block) REFERENCES blocks(id),\n\
   \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
   \  UNIQUE (block, source))"
@@ -71,7 +83,7 @@ let create_operations =
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  hash $(BYTES) UNIQUE NOT NULL,\n\
   \  endorsement BOOLEAN NOT NULL,\n\
-  \  endorser BIGINT NOT NULL,\n\
+  \  endorser $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
   \  round INTEGER,\n\
   \  FOREIGN KEY (endorser) REFERENCES delegates(id))"
@@ -80,8 +92,8 @@ let create_operations_reception =
   "CREATE TABLE IF NOT EXISTS operations_reception(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  timestamp TEXT NOT NULL, -- ISO8601 string\n\
-  \  operation BIGINT NOT NULL,\n\
-  \  source BIGINT NOT NULL,\n\
+  \  operation $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  source $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  errors $(BYTES),\n\
   \  FOREIGN KEY (operation) REFERENCES operations(id),\n\
   \  FOREIGN KEY (source) REFERENCES nodes(id),\n\
@@ -90,8 +102,8 @@ let create_operations_reception =
 let create_operations_inclusion =
   "CREATE TABLE IF NOT EXISTS operations_inclusion(\n\
   \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \   block BIGINT NOT NULL,\n\
-  \   operation BIGINT NOT NULL,\n\
+  \   block $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \   operation $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \   FOREIGN KEY (block) REFERENCES blocks(id),\n\
   \   FOREIGN KEY (operation) REFERENCES operations(id),\n\
   \   UNIQUE (block, operation))"
@@ -100,7 +112,7 @@ let create_endorsing_rights =
   "CREATE TABLE IF NOT EXISTS endorsing_rights(\n\
   \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \   level INTEGER NOT NULL,\n\
-  \   delegate BIGINT NOT NULL,\n\
+  \   delegate $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \   first_slot INTEGER NOT NULL,\n\
   \   endorsing_power INTEGER NOT NULL,\n\
   \   FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
@@ -158,7 +170,7 @@ let create_tables =
     create_cycles_level_idx;
   ]
 
-let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor BIGINT"
+let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor $(PRIMARY_INCREMENTING_INT_REF)"
 
 let alter_blocks_reception_add_application_timestamp =
   "ALTER TABLE blocks_reception ADD COLUMN application_timestamp TEXT"
