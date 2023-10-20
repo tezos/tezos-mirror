@@ -182,17 +182,6 @@ val outbox_proof :
   outbox_level:int ->
   outbox_proof option Lwt.t
 
-(** Same as [outbox_proof_single] except that the claim is about a batch
-    of output transactions. *)
-val outbox_proof_batch :
-  ?hooks:Process.hooks ->
-  ?expected_error:Base.rex ->
-  t ->
-  message_index:int ->
-  outbox_level:int ->
-  transaction list ->
-  outbox_proof option Lwt.t
-
 (** [encode_json_outbox_msg outbox_msg_json] returns the encoding of
     an outbox message. *)
 val encode_json_outbox_msg :

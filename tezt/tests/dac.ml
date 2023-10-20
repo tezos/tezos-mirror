@@ -1833,8 +1833,7 @@ module Tx_kernel_e2e = struct
     return {prev_state_hash; prev_ticks; level}
 
   let verify_outbox_answer ~withdrawal_level ~sc_rollup_client
-      ~sc_rollup_address ~client ~receive_tickets_contract
-      ~mint_and_deposit_contract =
+      ~sc_rollup_address ~client =
     let*! outbox =
       Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
     in
@@ -1842,34 +1841,10 @@ module Tx_kernel_e2e = struct
     let* answer =
       let message_index = 0 in
       let outbox_level = withdrawal_level in
-      let destination = receive_tickets_contract in
-      let open Tezos_protocol_alpha.Protocol.Alpha_context in
-      let ticketer =
-        mint_and_deposit_contract |> Contract.of_b58check |> Result.get_ok
-        |> Data_encoding.(Binary.to_string_exn Contract.encoding)
-        |> hex_encode
-      in
-      let parameters d =
-        Printf.sprintf
-          {|Pair 0x%s (Pair "%s" %s)|}
-          ticketer
-          "Hello, Ticket!"
-          (Int.to_string d)
-      in
-      let outbox_transaction param =
-        Sc_rollup_client.
-          {
-            destination;
-            entrypoint = Some "receive_tickets";
-            parameters = parameters param;
-            parameters_ty = None;
-          }
-      in
-      Sc_rollup_client.outbox_proof_batch
+      Sc_rollup_client.outbox_proof
         sc_rollup_client
         ~message_index
         ~outbox_level
-        (List.map outbox_transaction [220; 100; 40])
     in
     match answer with
     | Some {commitment_hash; proof} ->
@@ -2010,8 +1985,7 @@ module Tx_kernel_e2e = struct
            pkh1;
            transfer_message;
            withdraw_message;
-           mint_and_deposit_contract;
-           receive_tickets_contract;
+           mint_and_deposit_contract : _;
            level;
            _;
          } =
@@ -2111,8 +2085,6 @@ module Tx_kernel_e2e = struct
         ~client
         ~sc_rollup_client
         ~sc_rollup_address
-        ~receive_tickets_contract
-        ~mint_and_deposit_contract
         ~withdrawal_level
     in
     unit
@@ -2188,7 +2160,6 @@ module Tx_kernel_e2e = struct
            transfer_message;
            withdraw_message;
            mint_and_deposit_contract;
-           receive_tickets_contract;
            level;
            _;
          } =
@@ -2311,8 +2282,6 @@ module Tx_kernel_e2e = struct
         ~client
         ~sc_rollup_client
         ~sc_rollup_address
-        ~receive_tickets_contract
-        ~mint_and_deposit_contract
         ~withdrawal_level
     in
     unit
