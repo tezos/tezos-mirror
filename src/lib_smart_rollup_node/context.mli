@@ -178,13 +178,19 @@ module PVMState : sig
   val set : 'a t -> value -> 'a t Lwt.t
 end
 
-(** Static information about the rollup. *)
-module Rollup : sig
-  val get_address :
-    _ index -> Octez_smart_rollup.Address.t option tzresult Lwt.t
+(** Version of the context  *)
+module Version : sig
+  type t
 
-  val check_or_set_address :
-    'a mode -> 'a index -> Octez_smart_rollup.Address.t -> unit tzresult Lwt.t
+  (** The current and expected version of the context. *)
+  val version : t
+
+  (** The encoding for the context version. *)
+  val encoding : t Data_encoding.t
+
+  (** [check v] fails if [v] is different from the expected version of the
+      context. *)
+  val check : t -> unit tzresult
 end
 
 module Internal_for_tests : sig

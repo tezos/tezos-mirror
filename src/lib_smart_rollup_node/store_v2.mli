@@ -55,6 +55,13 @@ module Commitments :
      and type value := Octez_smart_rollup.Commitment.t
      and type header := unit
 
+(** Storage containing a single commitment. *)
+module Lcc : sig
+  type lcc = {commitment : Commitment.Hash.t; level : int32}
+
+  include SINGLETON_STORE with type value := lcc
+end
+
 (** Published slot headers per block hash,
     stored as a list of bindings from [Dal_slot_index.t]
     to [Dal.Slot.t]. The encoding function converts this
@@ -126,6 +133,7 @@ type +'a store = {
   commitments_published_at_level : 'a Commitments_published_at_level.t;
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
+  lcc : 'a Lcc.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
@@ -134,3 +142,6 @@ type +'a store = {
 }
 
 include Store_sig.S with type 'a store := 'a store
+
+(** [is_gc_finished t] returns [true] if there is no GC running. *)
+val is_gc_finished : 'a t -> bool

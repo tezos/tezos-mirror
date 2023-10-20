@@ -33,38 +33,6 @@ module Context_encoding = Tezos_context_encoding.Context_binary
    refactoring.*)
 module Tezos_context_encoding = struct end
 
-type error +=
-  | Unexpected_rollup of {
-      rollup_address : Octez_smart_rollup.Address.t;
-      saved_address : Octez_smart_rollup.Address.t;
-    }
-
-let () =
-  register_error_kind
-    ~id:"sc_rollup.node.unexpected_rollup"
-    ~title:"Unexpected rollup for rollup node"
-    ~description:"This rollup node is already set up for another rollup."
-    ~pp:(fun ppf (rollup_address, saved_address) ->
-      Format.fprintf
-        ppf
-        "This rollup node was already set up for rollup %a, it cannot be run \
-         for a different rollup %a."
-        Octez_smart_rollup.Address.pp
-        saved_address
-        Octez_smart_rollup.Address.pp
-        rollup_address)
-    `Permanent
-    Data_encoding.(
-      obj2
-        (req "rollup_address" Octez_smart_rollup.Address.encoding)
-        (req "saved_address" Octez_smart_rollup.Address.encoding))
-    (function
-      | Unexpected_rollup {rollup_address; saved_address} ->
-          Some (rollup_address, saved_address)
-      | _ -> None)
-    (fun (rollup_address, saved_address) ->
-      Unexpected_rollup {rollup_address; saved_address})
-
 module Maker = Irmin_pack_unix.Maker (Context_encoding.Conf)
 
 module IStore = struct
@@ -121,7 +89,9 @@ let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
   in
   {path; repo}
 
-let close ctxt = IStore.Repo.close ctxt.repo
+let close ctxt =
+  let _interrupted_gc = IStore.Gc.cancel ctxt.repo in
+  IStore.Repo.close ctxt.repo
 
 let readonly (index : [> `Read] index) = (index :> [`Read] index)
 
@@ -275,51 +245,6 @@ module PVMState = struct
     {ctxt with tree}
 end
 
-module Rollup = struct
-  let path = ["rollup_address"]
-
-  let set_address (index : rw_index) addr =
-    let open Lwt_result_syntax in
-    protect @@ fun () ->
-    let info () =
-      let date =
-        Time.(System.now () |> System.to_protocol |> Protocol.to_seconds)
-      in
-      IStore.Info.v date
-    in
-    let value =
-      Data_encoding.Binary.to_bytes_exn Octez_smart_rollup.Address.encoding addr
-    in
-    let*! store = IStore.main index.repo in
-    let*! () = IStore.set_exn ~info store path value in
-    return_unit
-
-  let get_address (index : _ raw_index) =
-    let open Lwt_result_syntax in
-    protect @@ fun () ->
-    let*! store = IStore.main index.repo in
-    let*! value = IStore.find store path in
-    return
-    @@ Option.map
-         (Data_encoding.Binary.of_bytes_exn Octez_smart_rollup.Address.encoding)
-         value
-
-  let check_or_set_address (type a) (mode : a mode) (index : a raw_index)
-      rollup_address =
-    let open Lwt_result_syntax in
-    let* saved_address = get_address index in
-    match saved_address with
-    | Some saved_address ->
-        fail_unless Octez_smart_rollup.Address.(rollup_address = saved_address)
-        @@ Unexpected_rollup {rollup_address; saved_address}
-    | None -> (
-        (* Address was never saved, we set it permanently if not in read-only
-           mode. *)
-        match mode with
-        | Store_sigs.Read_only -> return_unit
-        | Read_write -> set_address index rollup_address)
-end
-
 module Version = struct
   type t = V0
 
@@ -327,46 +252,14 @@ module Version = struct
 
   let encoding =
     let open Data_encoding in
-    conv
+    conv_with_guard
       (fun V0 -> 0)
       (function
-        | 0 -> V0
-        | v ->
-            Format.ksprintf Stdlib.failwith "Unsupported context version %d" v)
+        | 0 -> Ok V0
+        | v -> Error ("Unsupported context version " ^ string_of_int v))
       int31
 
-  let path = ["context_version"]
-
-  let set (index : rw_index) =
-    let open Lwt_result_syntax in
-    protect @@ fun () ->
-    let info () =
-      let date =
-        Time.(System.now () |> System.to_protocol |> Protocol.to_seconds)
-      in
-      IStore.Info.v date
-    in
-    let value = Data_encoding.Binary.to_bytes_exn encoding version in
-    let*! store = IStore.main index.repo in
-    let*! () = IStore.set_exn ~info store path value in
-    return_unit
-
-  let get (index : _ index) =
-    let open Lwt_result_syntax in
-    protect @@ fun () ->
-    let*! store = IStore.main index.repo in
-    let*! value = IStore.find store path in
-    return @@ Option.map (Data_encoding.Binary.of_bytes_exn encoding) value
-
-  let check (index : _ index) =
-    let open Lwt_result_syntax in
-    let* context_version = get index in
-    match context_version with None | Some V0 -> return_unit
-
-  let check_and_set (index : _ index) =
-    let open Lwt_result_syntax in
-    let* context_version = get index in
-    match context_version with None -> set index | Some V0 -> return_unit
+  let check = function V0 -> Result.return_unit
 end
 
 let load :
@@ -374,12 +267,7 @@ let load :
  fun ~cache_size mode path ->
   let open Lwt_result_syntax in
   let*! index = load ~cache_size mode path in
-  let+ () =
-    match mode with
-    | Read_only -> Version.check index
-    | Read_write -> Version.check_and_set index
-  in
-  index
+  return index
 
 module Internal_for_tests = struct
   let get_a_tree key =

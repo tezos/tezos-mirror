@@ -80,10 +80,12 @@ type 'a t = {
   store : 'a store;  (** The store for the persistent storage. *)
   context : 'a Context.index;
       (** The persistent context for the rollup node. *)
-  lcc : ('a, lcc) Reference.t;  (** Last cemented commitment and its level. *)
+  lcc : ('a, lcc) Reference.t;
+      (** Last cemented commitment on L1 (independently of synchronized status
+          of rollup node) and its level. *)
   lpc : ('a, Commitment.t option) Reference.t;
-      (** The last published commitment, i.e. commitment that the operator is
-          staked on. *)
+      (** The last published commitment on L1, i.e. commitment that the operator
+          is staked on (even if the rollup node is not synchronized). *)
   private_info : ('a, private_info option) Reference.t;
       (** contains information for the rollup when it's private.*)
   kernel_debug_logger : debug_logger;
@@ -331,6 +333,9 @@ type commitment_source = Anyone | Us
     [`Anyone] published. *)
 val commitment_was_published :
   _ t -> source:commitment_source -> Commitment.Hash.t -> bool tzresult Lwt.t
+
+(** [set_lcc t lcc] saves the LCC both on disk and in the node context. It's written in the context iff [lcc] is is younger than its current value. *)
+val set_lcc : rw -> lcc -> unit tzresult Lwt.t
 
 (** {3 Inboxes} *)
 

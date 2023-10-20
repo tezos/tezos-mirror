@@ -4513,8 +4513,9 @@ let test_late_rollup_node =
 let test_late_rollup_node_2 =
   test_full_scenario
     ~commitment_period:3
+    ~challenge_window:10
     {
-      tags = ["late"];
+      tags = ["late"; "gc"];
       variant = None;
       description = "a late alternative rollup should catch up";
     }
@@ -4532,10 +4533,14 @@ let test_late_rollup_node_2 =
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap2.alias
   in
+  let* _config =
+    (* Do gc every block, to test we don't remove live data *)
+    Sc_rollup_node.config_init ~gc_frequency:1 sc_rollup_node2 sc_rollup_address
+  in
   Log.info
     "Starting alternative rollup node from scratch with a different operator." ;
   let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
-  let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in
+  let* _level = wait_for_current_level node ~timeout:20. sc_rollup_node2 in
   Log.info "Alternative rollup node is synchronized." ;
   let* () = Client.bake_for_and_wait client in
   let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in

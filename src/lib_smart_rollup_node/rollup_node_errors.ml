@@ -85,6 +85,12 @@ type error +=
       accessed_level : int32;
     }
 
+type error +=
+  | Unexpected_rollup of {
+      rollup_address : Octez_smart_rollup.Address.t;
+      saved_address : Octez_smart_rollup.Address.t;
+    }
+
 let () =
   register_error_kind
     `Permanent
@@ -459,4 +465,29 @@ let () =
           Some (first_available_level, accessed_level)
       | _ -> None)
     (fun (first_available_level, accessed_level) ->
-      Access_below_first_available_level {first_available_level; accessed_level})
+      Access_below_first_available_level {first_available_level; accessed_level}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.unexpected_rollup"
+    ~title:"Unexpected rollup for rollup node"
+    ~description:"This rollup node is already set up for another rollup."
+    ~pp:(fun ppf (rollup_address, saved_address) ->
+      Format.fprintf
+        ppf
+        "This rollup node was already set up for rollup %a, it cannot be run \
+         for a different rollup %a."
+        Address.pp
+        saved_address
+        Address.pp
+        rollup_address)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "rollup_address" Address.encoding)
+        (req "saved_address" Address.encoding))
+    (function
+      | Unexpected_rollup {rollup_address; saved_address} ->
+          Some (rollup_address, saved_address)
+      | _ -> None)
+    (fun (rollup_address, saved_address) ->
+      Unexpected_rollup {rollup_address; saved_address})

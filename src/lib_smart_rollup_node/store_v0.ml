@@ -71,7 +71,11 @@ module L2_blocks =
     (struct
       let name = "l2_blocks"
     end)
-    (Tezos_store_shared.Block_key)
+    (struct
+      include Tezos_store_shared.Block_key
+
+      let pp = Block_hash.pp
+    end)
     (struct
       type t = (unit, unit) Sc_rollup_block.block
 

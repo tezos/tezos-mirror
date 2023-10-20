@@ -122,6 +122,26 @@ module Commitments =
       include Add_empty_header
     end)
 
+(** Single commitment for LCC. *)
+module Lcc = struct
+  type lcc = {commitment : Commitment.Hash.t; level : int32}
+
+  include Indexed_store.Make_singleton (struct
+    type t = lcc
+
+    let name = "lcc"
+
+    let encoding =
+      let open Data_encoding in
+      conv
+        (fun {commitment; level} -> (commitment, level))
+        (fun (commitment, level) -> {commitment; level})
+      @@ obj2
+           (req "commitment" Octez_smart_rollup.Commitment.Hash.encoding)
+           (req "level" int32)
+  end)
+end
+
 (** Versioned slot headers *)
 module Dal_slots_headers =
   Irmin_store.Make_nested_map
@@ -294,6 +314,7 @@ type 'a store = {
   commitments_published_at_level : 'a Commitments_published_at_level.t;
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
+  lcc : 'a Lcc.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
@@ -316,6 +337,7 @@ let readonly
        commitments_published_at_level;
        l2_head;
        last_finalized_level;
+       lcc;
        levels_to_hashes;
        protocols;
        irmin_store;
@@ -332,6 +354,7 @@ let readonly
       Commitments_published_at_level.readonly commitments_published_at_level;
     l2_head = L2_head.readonly l2_head;
     last_finalized_level = Last_finalized_level.readonly last_finalized_level;
+    lcc = Lcc.readonly lcc;
     levels_to_hashes = Levels_to_hashes.readonly levels_to_hashes;
     protocols = Protocols.readonly protocols;
     irmin_store = Irmin_store.readonly irmin_store;
@@ -348,6 +371,7 @@ let close
        commitments_published_at_level;
        l2_head = _;
        last_finalized_level = _;
+       lcc = _;
        levels_to_hashes;
        protocols = _;
        irmin_store;
@@ -396,6 +420,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
   let* last_finalized_level =
     Last_finalized_level.load mode ~path:(path "last_finalized_level")
   in
+  let* lcc = Lcc.load mode ~path:(path "lcc") in
   let* levels_to_hashes =
     Levels_to_hashes.load
       mode
@@ -414,6 +439,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     commitments_published_at_level;
     l2_head;
     last_finalized_level;
+    lcc;
     levels_to_hashes;
     protocols;
     irmin_store;
@@ -551,6 +577,7 @@ let gc
        commitments_published_at_level;
        l2_head;
        last_finalized_level = _;
+       lcc = _;
        levels_to_hashes;
        irmin_store = _;
        protocols = _;
@@ -592,6 +619,7 @@ let wait_gc_completion
        commitments_published_at_level;
        l2_head = _;
        last_finalized_level = _;
+       lcc = _;
        levels_to_hashes;
        irmin_store = _;
        protocols = _;
@@ -609,3 +637,28 @@ let wait_gc_completion
       commitments_published_at_level
   and* () = Levels_to_hashes.wait_gc_completion levels_to_hashes in
   return_unit
+
+let is_gc_finished
+    ({
+       l2_blocks;
+       messages;
+       inboxes;
+       commitments;
+       commitments_published_at_level;
+       l2_head = _;
+       last_finalized_level = _;
+       lcc = _;
+       levels_to_hashes;
+       irmin_store = _;
+       protocols = _;
+       gc_levels = _;
+       history_mode = _;
+     } :
+      _ t) =
+  L2_blocks.is_gc_finished l2_blocks
+  && Messages.is_gc_finished messages
+  && Inboxes.is_gc_finished inboxes
+  && Commitments.is_gc_finished commitments
+  && Commitments_published_at_level.is_gc_finished
+       commitments_published_at_level
+  && Levels_to_hashes.is_gc_finished levels_to_hashes
