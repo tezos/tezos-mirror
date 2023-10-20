@@ -2921,11 +2921,47 @@ let test_kernel_upgrade_version_change =
   in
   gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
 
+let test_transaction_storage_before_and_after_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "transaction"; "storage"]
+    ~title:"Transaction storage before and after migration"
+  @@ fun protocol ->
+  let config =
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
+  in
+  let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
+  let raw_txs, tx_hashes = List.split txs in
+  let scenario_prior
+      ~evm_setup:{sc_rollup_node; node; client; evm_proxy_server; _} =
+    let* _requests, _receipt, _hashes =
+      send_n_transactions
+        ~sc_rollup_node
+        ~node
+        ~client
+        ~evm_proxy_server
+        raw_txs
+    in
+    return ()
+  in
+  let scenario_after ~evm_setup ~sanity_check:() =
+    let check_one tx_hash =
+      let* _receipt =
+        get_transaction_receipt ~full_evm_setup:evm_setup ~tx_hash
+      in
+      let* _tx_object = get_tx_object ~endpoint:evm_setup.endpoint ~tx_hash in
+      unit
+    in
+    Lwt_list.iter_p check_one tx_hashes
+  in
+  gen_kernel_migration_test ~config ~scenario_prior ~scenario_after protocol
+
 let register_evm_migration ~protocols =
   test_genesis_parent_hash_migration protocols ;
   test_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
-  test_block_storage_before_and_after_migration protocols
+  test_block_storage_before_and_after_migration protocols ;
+  test_transaction_storage_before_and_after_migration protocols
 
 (* Flakyness: the rollup node batches the transactions before receiving all of them
    issue for the fix: #6438 *)
