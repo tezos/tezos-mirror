@@ -494,17 +494,6 @@ mod tests {
     }
 
     #[test]
-    fn playground() {
-        let v = vec![1, 2, 3, 4];
-        let l1 = v.len();
-        let mut iter = v.into_iter();
-        println!("{:?}", iter.next());
-        let mut rest = vec![];
-        rest.extend(iter);
-        println!("{:?}", rest);
-        assert!(l1 > rest.len());
-    }
-    #[test]
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
         let mut host = MockHost::default();
