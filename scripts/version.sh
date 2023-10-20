@@ -40,4 +40,4 @@ export COVERAGE_OUTPUT=_coverage_output
 
 ## The version of the rust-specific image which can be used to build Rust
 ## artifacts of this repository.
-export rust_toolchain_image_version="v1.0.3"
+export rust_toolchain_image_version="rust-toolchain--${opam_repository_tag}"

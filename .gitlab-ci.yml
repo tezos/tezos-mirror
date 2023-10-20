@@ -74,6 +74,9 @@ variables:
 .image_template__runtime_prebuild_dependencies:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
+.image_template__rust_toolchain:
+  image: ${build_deps_image_name}:rust-toolchain--${build_deps_image_version}
+
 # Match GitLab executors version and directly use the Docker socket
 # The Docker daemon is already configured, experimental features are enabled
 # The following environment variables are already set:
