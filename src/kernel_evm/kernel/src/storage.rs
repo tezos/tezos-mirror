@@ -51,10 +51,11 @@ pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
 
-const EVM_TRANSACTIONS_RECEIPTS: RefPath =
+pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/transactions_receipts");
 
-const EVM_TRANSACTIONS_OBJECTS: RefPath = RefPath::assert_from(b"/transactions_objects");
+pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
+    RefPath::assert_from(b"/transactions_objects");
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
