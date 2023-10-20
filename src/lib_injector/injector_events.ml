@@ -133,12 +133,16 @@ module Make
           ~level:Debug
           ("count", Data_encoding.int31)
 
-      let pp_operations_list ppf operations =
-        Format.fprintf
-          ppf
-          "@[%a@]"
-          (Format.pp_print_list Operation.pp)
-          operations
+      let pp_operations_list ~numbered ppf operations =
+        Format.fprintf ppf "@[<v>" ;
+        List.iteri
+          (fun i op ->
+            if i <> 0 then Format.fprintf ppf "@," ;
+            if numbered then Format.fprintf ppf "%d. " (i + 1)
+            else Format.pp_print_string ppf "- " ;
+            Operation.pp ppf op)
+          operations ;
+        Format.fprintf ppf "@]"
 
       let pp_operations_hash_list ppf operations =
         Format.fprintf
@@ -164,7 +168,7 @@ module Make
              for injection {operations}"
           ~level:Debug
           ("operations", Data_encoding.list Operation.encoding)
-          ~pp1:pp_operations_list
+          ~pp1:(pp_operations_list ~numbered:true)
 
       let dropped_operations =
         declare_1
@@ -174,7 +178,7 @@ module Make
              {operations}"
           ~level:Debug
           ("operations", Data_encoding.list Operation.encoding)
-          ~pp1:pp_operations_list
+          ~pp1:(pp_operations_list ~numbered:false)
 
       let simulating_operations =
         declare_2
@@ -183,7 +187,7 @@ module Make
           ~level:Debug
           ("operations", Data_encoding.list Operation.encoding)
           ("force", Data_encoding.bool)
-          ~pp1:pp_operations_list
+          ~pp1:(pp_operations_list ~numbered:true)
 
       let discard_error_operation =
         declare_3
@@ -207,12 +211,13 @@ module Make
           ("oph", Operation_hash.encoding)
 
       let injected_ops =
-        declare_1
+        declare_2
           ~name:"injected_ops"
-          ~msg:"Injected operations: {operations}"
-          ~level:Info
+          ~msg:"Injected operations in {oph}: {operations}"
+          ~level:Notice
+          ("oph", Operation_hash.encoding)
           ("operations", Data_encoding.list Operation.encoding)
-          ~pp1:pp_operations_list
+          ~pp2:(pp_operations_list ~numbered:true)
 
       let add_pending =
         declare_1
