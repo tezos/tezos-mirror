@@ -10,6 +10,7 @@ use crate::blueprint::{Queue, QueueElement};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
+use crate::safe_storage::KernelRuntime;
 use crate::storage;
 use crate::storage::init_account_index;
 use anyhow::Context;
@@ -110,7 +111,7 @@ fn compute<Host: Runtime>(
     Ok(ComputationResult::Finished)
 }
 
-pub fn produce<Host: Runtime>(
+pub fn produce<Host: KernelRuntime>(
     host: &mut Host,
     queue: Queue,
     chain_id: U256,
@@ -206,6 +207,8 @@ mod tests {
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
+    use crate::mock_internal::MockInternal;
+    use crate::safe_storage::SafeStorage;
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
@@ -240,8 +243,8 @@ mod tests {
         H256::from(v)
     }
 
-    fn set_balance(
-        host: &mut MockHost,
+    fn set_balance<Host: KernelRuntime>(
+        host: &mut Host,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         balance: U256,
@@ -261,8 +264,8 @@ mod tests {
         }
     }
 
-    fn get_balance(
-        host: &mut MockHost,
+    fn get_balance<Host: KernelRuntime>(
+        host: &mut Host,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
     ) -> U256 {
@@ -370,8 +373,8 @@ mod tests {
         )
     }
 
-    fn produce_block_with_several_valid_txs(
-        host: &mut MockHost,
+    fn produce_block_with_several_valid_txs<Host: KernelRuntime>(
+        host: &mut Host,
         evm_account_storage: &mut EthereumAccountStorage,
     ) {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
@@ -405,7 +408,7 @@ mod tests {
             .expect("The block production failed.");
     }
 
-    fn assert_current_block_reading_validity(host: &mut MockHost) {
+    fn assert_current_block_reading_validity<Host: KernelRuntime>(host: &mut Host) {
         match storage::read_current_block(host) {
             Ok(_) => (),
             Err(e) => {
@@ -417,7 +420,9 @@ mod tests {
     #[test]
     // Test if the invalid transactions are producing receipts
     fn test_invalid_transactions_receipt_status() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -457,7 +462,9 @@ mod tests {
     #[test]
     // Test if a valid transaction is producing a receipt with a success status
     fn test_valid_transactions_receipt_status() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -497,7 +504,9 @@ mod tests {
     #[test]
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx = dummy_eth_transaction_deploy();
@@ -549,7 +558,9 @@ mod tests {
     #[test]
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
         let mut evm_account_storage = init_account_storage().unwrap();
 
         produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
@@ -565,7 +576,9 @@ mod tests {
     #[test]
     // Test if several valid proposals can produce valid blocks
     fn test_several_valid_proposals() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -613,7 +626,9 @@ mod tests {
     #[test]
     // Test transfers gas consumption consistency
     fn test_cumulative_transfers_gas_consumption() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
         let base_gas = U256::from(21000);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
@@ -667,7 +682,10 @@ mod tests {
     // Test if we're able to read current block (with a filled queue) after
     // a block production
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
+
         let mut evm_account_storage = init_account_storage().unwrap();
 
         produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
@@ -678,7 +696,9 @@ mod tests {
     #[test]
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
@@ -722,7 +742,10 @@ mod tests {
     #[test]
     //Test accounts are indexed at the end of the block production
     fn test_accounts_are_indexed() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
+
         let accounts_index = init_account_index().unwrap();
 
         let tx = Transaction {
@@ -769,7 +792,10 @@ mod tests {
     #[test]
     //Test accounts are indexed at the end of the block production
     fn test_accounts_are_indexed_once() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
+
         let accounts_index = init_account_index().unwrap();
 
         let tx = Transaction {
@@ -818,7 +844,10 @@ mod tests {
 
     #[test]
     fn test_blocks_and_transactions_are_indexed() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
+
         let blocks_index = init_blocks_index().unwrap();
         let transaction_hashes_index = init_transaction_hashes_index().unwrap();
 
@@ -931,7 +960,9 @@ mod tests {
     #[test]
     fn test_ticks_valid_transaction() {
         // init host
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
@@ -969,11 +1000,13 @@ mod tests {
 
         assert_eq!(ticks, tick_model::ticks_of_gas(21123));
     }
-
     #[test]
     fn test_ticks_invalid() {
         // init host
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
+
         let evm_account_storage = init_account_storage().unwrap();
 
         // tx is invalid because wrong nonce
@@ -1007,9 +1040,12 @@ mod tests {
     #[test]
     fn test_stop_computation() {
         // init host
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
+
         let block_constants = first_block(&mut host);
-        let precompiles = precompiles::precompile_set::<MockHost>();
+        let precompiles = precompiles::precompile_set();
         let mut accounts_index = init_account_index().unwrap();
 
         //provision sender account
@@ -1036,7 +1072,7 @@ mod tests {
         block_in_progress.estimated_ticks = tick_model::constants::MAX_TICKS - 1000;
 
         // act
-        compute::<MockHost>(
+        compute(
             &mut host,
             &mut block_in_progress,
             &block_constants,
@@ -1072,7 +1108,10 @@ mod tests {
 
     #[test]
     fn invalid_transaction_should_bump_nonce() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
+
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let caller =
@@ -1153,7 +1192,9 @@ mod tests {
 
     #[test]
     fn test_first_blocks() {
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         // first block should be 0
         produce(
@@ -1233,7 +1274,9 @@ mod tests {
     #[test]
     fn test_reboot_many_tx_one_proposal() {
         // init host
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         // sanity check: no current block
         assert!(
@@ -1287,7 +1330,9 @@ mod tests {
     #[test]
     fn test_reboot_many_tx_many_proposal() {
         // init host
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         // sanity check: no current block
         assert!(

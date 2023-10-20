@@ -26,7 +26,7 @@ use tezos_evm_logging::{log, Level::*};
 
 use crate::inbox::KernelUpgrade;
 use crate::migration::storage_migration;
-use crate::safe_storage::{SafeStorage, TMP_PATH};
+use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 
 use crate::blueprint::{fetch, Queue};
 use crate::error::Error;
@@ -43,6 +43,7 @@ mod error;
 mod inbox;
 mod indexable_storage;
 mod migration;
+mod mock_internal;
 mod parsing;
 mod safe_storage;
 mod simulation;
@@ -124,7 +125,7 @@ pub fn stage_one<Host: Runtime>(
     Ok(queue)
 }
 
-fn produce_and_upgrade<Host: Runtime>(
+fn produce_and_upgrade<Host: KernelRuntime>(
     host: &mut Host,
     queue: Queue,
     kernel_upgrade: KernelUpgrade,
@@ -165,7 +166,7 @@ fn upgrade<Host: Runtime>(
     upgrade_status
 }
 
-pub fn stage_two<Host: Runtime>(
+pub fn stage_two<Host: KernelRuntime>(
     host: &mut Host,
     queue: Queue,
     chain_id: U256,
@@ -234,7 +235,7 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
     }
 }
 
-pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
     let queue = if storage::was_rebooted(host)? {
         // kernel was rebooted
@@ -304,7 +305,8 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     host.store_copy(&EVM_PATH, &TMP_PATH)
         .expect("The kernel failed to create the temporary directory");
 
-    let mut host = SafeStorage(host);
+    let mut internal_storage = InternalStorage();
+    let mut host = SafeStorage(host, &mut internal_storage);
     match main(&mut host) {
         Ok(()) => {
             host.promote_upgrade()
@@ -345,6 +347,8 @@ kernel_entry!(kernel_loop);
 mod tests {
     use std::{ops::Rem, str::FromStr};
 
+    use crate::mock_internal::MockInternal;
+    use crate::safe_storage::{KernelRuntime, SafeStorage};
     use crate::{
         blueprint::{Blueprint, Queue, QueueElement},
         inbox::{KernelUpgrade, Transaction, TransactionContent},
@@ -364,8 +368,8 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
     const TOO_MANY_TRANSACTIONS: u64 = 500;
 
-    fn set_balance(
-        host: &mut MockHost,
+    fn set_balance<Host: KernelRuntime>(
+        host: &mut Host,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         balance: U256,
@@ -439,7 +443,9 @@ mod tests {
     #[test]
     fn test_reboot_during_block_production() {
         // init host
-        let mut host = MockHost::default();
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage(&mut mock_host, &mut internal);
 
         // sanity check: no current block
         assert!(

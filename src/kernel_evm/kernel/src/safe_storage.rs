@@ -11,7 +11,7 @@ use tezos_smart_rollup_host::{
     metadata::RollupMetadata,
     path::{concat, OwnedPath, Path, RefPath},
     runtime::{Runtime, RuntimeError, ValueType},
-    KERNEL_BOOT_PATH,
+    Error, KERNEL_BOOT_PATH,
 };
 
 const BACKUP_KERNEL_BOOT_PATH: RefPath =
@@ -19,13 +19,105 @@ const BACKUP_KERNEL_BOOT_PATH: RefPath =
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 
-pub struct SafeStorage<Host>(pub Host);
+const STORE_HASH_SIZE: usize = 32;
+
+// The [__internal_store_get_hash] host function is not made available by the
+// SDK. We expose it through an [InternalRuntime] trait.
+
+#[link(wasm_import_module = "smart_rollup_core")]
+extern "C" {
+    pub fn __internal_store_get_hash(
+        path: *const u8,
+        path_len: usize,
+        dst: *mut u8,
+        max_size: usize,
+    ) -> i32;
+}
+
+pub trait InternalRuntime {
+    fn __internal_store_get_hash<T: Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError>;
+}
+
+// Wrapper for InternalRuntime, this will be added
+// to the Runtime for the Kernel to use.
+// The path is optional to be able to get the hash
+// of the root directory.
+pub trait ExtendedRuntime {
+    fn store_get_hash<T: Path>(
+        &mut self,
+        path: Option<T>,
+    ) -> Result<Vec<u8>, RuntimeError>;
+}
+
+pub struct InternalStorage();
+
+impl InternalRuntime for InternalStorage {
+    fn __internal_store_get_hash<T: Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        let mut buffer = [0u8; STORE_HASH_SIZE];
+        let result = unsafe {
+            __internal_store_get_hash(
+                path.as_ptr(),
+                path.size(),
+                buffer.as_mut_ptr(),
+                STORE_HASH_SIZE,
+            )
+        };
+        match Error::wrap(result) {
+            Ok(_i) => Ok(buffer.to_vec()),
+            Err(e) => Err(RuntimeError::HostErr(e)),
+        }
+    }
+}
+
+// The kernel runtime requires both the standard Runtime and the
+// new Extended one.
+pub trait KernelRuntime: Runtime + ExtendedRuntime {}
+
+// Every type implementing an InternalRuntime will implement
+// the ExtendedRuntime.
+impl<T: InternalRuntime> ExtendedRuntime for T {
+    fn store_get_hash<P: Path>(
+        &mut self,
+        path: Option<P>,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        match path {
+            Some(p) => {
+                let path = safe_path(&p)?;
+                self.__internal_store_get_hash(&path)
+            }
+            None => self.__internal_store_get_hash(&TMP_PATH),
+        }
+    }
+}
+
+// If a type implements the Runtime and InternalRuntime traits,
+// it also implements the KernelRuntime.
+impl<T: Runtime + InternalRuntime> KernelRuntime for T {}
+
+pub struct SafeStorage<Host, Internal>(pub Host, pub Internal);
 
 fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
 }
 
-impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
+impl<Host, InternalHost: InternalRuntime> InternalRuntime
+    for SafeStorage<&mut Host, &mut InternalHost>
+{
+    fn __internal_store_get_hash<T: Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        self.1.__internal_store_get_hash(path)
+    }
+}
+
+impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut InternalHost> {
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.0.write_output(from)
     }
@@ -176,7 +268,7 @@ impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> SafeStorage<&mut Host> {
+impl<Host: Runtime, Internal> SafeStorage<&mut Host, &mut Internal> {
     fn backup_current_kernel(&mut self) -> Result<(), RuntimeError> {
         // Fallback preparation detected
         // Storing the current kernel boot path under a temporary path in
