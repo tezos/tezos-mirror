@@ -63,7 +63,11 @@ type full_evm_setup = {
   evm_proxy_server : Evm_proxy_server.t;
   endpoint : string;
   l1_contracts : l1_contracts option;
-  config : [`Config of Installer_kernel_config.t | `Path of string] option;
+  config :
+    [ `Config of Installer_kernel_config.t
+    | `Path of string
+    | `Both of Installer_kernel_config.instr list * string ]
+    option;
 }
 
 let hex_256_of n = Printf.sprintf "%064x" n
@@ -348,19 +352,23 @@ let setup_evm_kernel ?config ?kernel_installee
     | None -> return None
   in
   (* If a L1 bridge was set up, we make the kernel aware of the address. *)
+  let base_config =
+    let ticketer = Option.map (fun {exchanger; _} -> exchanger) l1_contracts in
+    let administrator =
+      if with_administrator then
+        Option.map (fun {admin; _} -> admin) l1_contracts
+      else None
+    in
+    make_config ~bootstrap_accounts ?ticketer ?administrator ()
+  in
   let config =
-    match config with
-    | Some config -> Some config
-    | None ->
-        let ticketer =
-          Option.map (fun {exchanger; _} -> exchanger) l1_contracts
-        in
-        let administrator =
-          if with_administrator then
-            Option.map (fun {admin; _} -> admin) l1_contracts
-          else None
-        in
-        make_config ~bootstrap_accounts ?ticketer ?administrator ()
+    match (config, base_config) with
+    | Some (`Config config), Some (`Config base) ->
+        Some (`Config (base @ config))
+    | Some (`Path path), Some (`Config base) -> Some (`Both (base, path))
+    | None, _ -> base_config
+    | Some (`Config config), None -> Some (`Config config)
+    | Some (`Path path), None -> Some (`Path path)
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -2522,12 +2530,13 @@ type storage_migration_results = {
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
-let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
-    ~scenario_after protocol =
+let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
+    ~scenario_prior ~scenario_after protocol =
   let current_kernel_base_installee = "src/kernel_evm/kernel/tests/resources" in
   let current_kernel_installee = "ghostnet_evm_kernel" in
   let* evm_setup =
     setup_past_genesis
+      ?config
       ~kernel_installee:
         {
           base_installee = current_kernel_base_installee;
@@ -3358,7 +3367,7 @@ let test_originate_evm_kernel_and_dump_pvm_state =
   let check_dump ~config ~dump =
     match Option.get config with
     | `Config config -> return (Installer_kernel_config.check_dump ~config dump)
-    | `Path _ -> (* dead code path *) assert false
+    | _ -> (* dead code path *) assert false
   in
   let* () = Sc_rollup_node.dump_durable_storage ~sc_rollup_node ~dump () in
   let* () = check_dump ~config ~dump in
