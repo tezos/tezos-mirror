@@ -25,22 +25,21 @@
 
 let env driver_info s =
   match (Caqti_driver_info.dialect_tag driver_info, s) with
-
+  (* PRIMARY KEY - 64 bits integers *)
   | `Pgsql, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "BIGSERIAL"
   | `Sqlite, "PRIMARY_INCREMENTING_INT" -> Caqti_query.L "INTEGER"
-
+  (* PRIMARY KEY - 32 bits integers *)
   | `Pgsql, "SMALL_PRIMARY_INCREMENTING_INT" -> Caqti_query.L "SERIAL"
   | `Sqlite, "SMALL_PRIMARY_INCREMENTING_INT" -> Caqti_query.L "INTEGER"
-
+  (* FOREIGN KEY - Refers to a 64 bits PRIMARY KEY *)
   | `Pgsql, "PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "BIGINT"
   | `Sqlite, "PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
-
+  (* FOREIGN KEY - Refers to a 32 bits PRIMARY KEY *)
   | `Pgsql, "SMALL_PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
   | `Sqlite, "SMALL_PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
-
+  (*  *)
   | `Pgsql, "BYTES" -> Caqti_query.L "BYTEA"
   | `Sqlite, "BYTES" -> Caqti_query.L "BLOB"
-
   | _, _ -> raise Not_found
 
 let create_delegates =
@@ -170,7 +169,8 @@ let create_tables =
     create_cycles_level_idx;
   ]
 
-let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor $(PRIMARY_INCREMENTING_INT_REF)"
+let alter_blocks =
+  "ALTER TABLE blocks ADD COLUMN predecessor $(PRIMARY_INCREMENTING_INT_REF)"
 
 let alter_blocks_reception_add_application_timestamp =
   "ALTER TABLE blocks_reception ADD COLUMN application_timestamp TEXT"
