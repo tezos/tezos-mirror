@@ -41,10 +41,6 @@ pub mod constants {
     /// of ticks.
     pub const SAFETY_MARGIN: u64 = 2_000_000_000;
 
-    /// Overapproximation of the number of ticks the kernel uses to initialise and
-    /// reload its state
-    pub const INITIALISATION_OVERHEAD: u64 = 1_000_000_000;
-
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
 
@@ -53,6 +49,25 @@ pub mod constants {
     /// set a limit, we could reboot again and again until the transaction
     /// fits in a reboot, which will never happen.
     pub const MAX_TRANSACTION_GAS_LIMIT: u64 = MAX_ALLOWED_TICKS / TICKS_PER_GAS;
+
+    /// Overapproximation of the upper bound of the number of ticks used to
+    /// fetch the inbox. Considers an inbox with the size of a full block, and
+    /// apply a tick model affine in the size of the inbox.
+    pub const FETCH_UPPER_BOUND: u64 = 350_000_000;
+
+    /// Overapproximation of the number of ticks used in kernel initialization
+    pub const KERNEL_INITIALIZATION: u64 = 50_000_000;
+
+    /// Overapproximation of the number of ticks the kernel uses to initialise and
+    /// reload its state.
+    /// TODO: #6091
+    /// Hidden hypothesis here: BIP reading is equivalent to fetch (TBV)
+    pub const INITIALISATION_OVERHEAD: u64 = FETCH_UPPER_BOUND + KERNEL_INITIALIZATION;
+
+    /// Overapproximation of the upper bound of the number of ticks used to
+    /// finalize a block. Considers a block corresponding to an inbox full of
+    /// transfers, and apply a tick model affine in the number of tx.
+    pub const _FINALIZE_UPPER_BOUND: u64 = 150_000_000;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
