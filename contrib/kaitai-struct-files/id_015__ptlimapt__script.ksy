@@ -3,19 +3,6 @@ meta:
   endian: be
 types:
   id_015__ptlimapt__scripted__contracts:
-    types:
-      storage:
-        seq:
-        - id: len_storage
-          type: s4
-        - id: storage
-          size: len_storage
-      code:
-        seq:
-        - id: len_code
-          type: s4
-        - id: code
-          size: len_code
     seq:
     - id: code
       type: code

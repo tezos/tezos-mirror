@@ -221,20 +221,20 @@ let rec seq_field_of_data_encoding :
       | [] -> failwith "Not supported"
       | [attr] -> (enums, types, [Helpers.merge_summaries attr description])
       | _ :: _ :: _ as attrs ->
+          let described_class =
+            Helpers.class_spec_of_attrs
+              ~id
+              ?description
+              ~enums:[]
+              ~types:[]
+              ~instances:[]
+              attrs
+          in
+          let types = Helpers.add_uniq_assoc types (id, described_class) in
           let attr =
             {
               (Helpers.default_attr_spec ~id) with
-              dataType =
-                DataType.(
-                  ComplexDataType
-                    (UserType
-                       (Helpers.class_spec_of_attrs
-                          ~id
-                          ?description
-                          ~enums:[]
-                          ~types:[]
-                          ~instances:[]
-                          attrs)));
+              dataType = DataType.(ComplexDataType (UserType described_class));
             }
           in
           (enums, types, [attr]))
