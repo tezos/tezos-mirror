@@ -227,19 +227,37 @@ module Scripts = struct
 
     let path = RPC_path.(path / "scripts")
 
+    type other_contract_description = {
+      address : Contract_hash.t;
+      ty : Script.expr;
+    }
+
     let other_contracts_encoding =
       list
-        (obj2
-           (req "address" Contract_hash.encoding)
-           (req "type" Script.expr_encoding))
+        (conv
+           (fun {address; ty} -> (address, ty))
+           (fun (address, ty) -> {address; ty})
+           (obj2
+              (req "address" Contract_hash.encoding)
+              (req "type" Script.expr_encoding)))
+
+    type extra_big_map_description = {
+      id : Big_map.Id.t;
+      kty : Script.expr;
+      vty : Script.expr;
+      items : Script.expr;
+    }
 
     let extra_big_maps_encoding =
       list
-        (obj4
-           (req "id" Big_map.Id.encoding)
-           (req "key_type" Script.expr_encoding)
-           (req "val_type" Script.expr_encoding)
-           (req "map_literal" Script.expr_encoding))
+        (conv
+           (fun {id; kty; vty; items} -> (id, kty, vty, items))
+           (fun (id, kty, vty, items) -> {id; kty; vty; items})
+           (obj4
+              (req "id" Big_map.Id.encoding)
+              (req "key_type" Script.expr_encoding)
+              (req "val_type" Script.expr_encoding)
+              (req "map_literal" Script.expr_encoding)))
 
     let run_code_input_encoding =
       merge_objs
@@ -1204,7 +1222,7 @@ module Scripts = struct
     in
     let originate_dummy_contracts ctxt =
       List.fold_left_es
-        (fun ctxt (address, ty) ->
+        (fun ctxt {S.address; ty} ->
           Contract.raw_originate
             ctxt
             ~prepaid_bootstrap_storage:false
@@ -1219,9 +1237,9 @@ module Scripts = struct
     let initialize_big_maps ctxt big_maps =
       let* ctxt, (big_map_diff : Lazy_storage.diffs) =
         List.fold_left_es
-          (fun (ctxt, big_map_diff_tl) (id, kty, vty, update) ->
+          (fun (ctxt, big_map_diff_tl) {S.id; kty; vty; items} ->
             let open Script_ir_translator in
-            let update = Micheline.root update in
+            let items = Micheline.root items in
             let init =
               Lazy_storage.(Alloc Big_map.{key_type = kty; value_type = vty})
             in
@@ -1241,10 +1259,10 @@ module Scripts = struct
                 ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
                 ~allow_forged:true
                 map_ty
-                update
+                items
             in
             let items =
-              match update with
+              match items with
               | Micheline.Seq (_, items) -> items
               | _ -> assert false
             in

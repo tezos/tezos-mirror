@@ -148,9 +148,8 @@ type simulation_params = {
   sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
-  other_contracts : (Contract_hash.t * Script.expr) list option;
-  extra_big_maps :
-    (Big_map.Id.t * Script.expr * Script.expr * Script.expr) list option;
+  other_contracts : RPC.Scripts.S.other_contract_description list option;
+  extra_big_maps : RPC.Scripts.S.extra_big_map_description list option;
 }
 
 type run_view_params = {

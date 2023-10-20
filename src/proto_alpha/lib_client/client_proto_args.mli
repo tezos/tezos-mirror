@@ -239,12 +239,10 @@ val edge_of_baking_over_staking_billionth_arg :
   (int option, full) Tezos_clic.arg
 
 val other_contracts_arg :
-  ((Contract_hash.t * Script.expr) list option, full) Tezos_clic.arg
+  (RPC.Scripts.S.other_contract_description list option, full) Tezos_clic.arg
 
 val extra_big_maps_arg :
-  ( (Big_map.Id.t * Script.expr * Script.expr * Script.expr) list option,
-    full )
-  Tezos_clic.arg
+  (RPC.Scripts.S.extra_big_map_description list option, full) Tezos_clic.arg
 
 module Sc_rollup_params : sig
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter

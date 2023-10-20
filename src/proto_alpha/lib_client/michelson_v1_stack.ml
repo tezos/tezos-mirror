@@ -201,10 +201,10 @@ let parse_stack_item ~source =
 let parse_other_contract_item ~source =
   let open Result_syntax in
   function
-  | Micheline.Prim (_loc, "Contract", [addr; ty], _annot) as e ->
-      let* addr = parse_expression ~source addr in
-      let* addr =
-        match Micheline.root addr with
+  | Micheline.Prim (_loc, "Contract", [address; ty], _annot) as e ->
+      let* address = parse_expression ~source address in
+      let* address =
+        match Micheline.root address with
         | Micheline.String (_loc, s) -> (
             match Environment.Base58.decode s with
             | Some (Contract_hash.Data h) -> return h
@@ -214,25 +214,25 @@ let parse_other_contract_item ~source =
               (Wrong_other_contracts_item (Micheline.location e, printable e))
       in
       let* ty = parse_expression ~source ty in
-      return (addr, ty)
+      return RPC.Scripts.S.{address; ty}
   | e -> tzfail (Wrong_other_contracts_item (Micheline.location e, printable e))
 
 let parse_extra_big_map_item ~source =
   let open Result_syntax in
   function
-  | Micheline.Prim (_loc, "Big_map", [i; kty; vty; map], _annot) as e ->
-      let* i = parse_expression ~source i in
-      let* i =
-        match Micheline.root i with
-        | Micheline.Int (_loc, i) -> return (Big_map.Id.parse_z i)
+  | Micheline.Prim (_loc, "Big_map", [id; kty; vty; items], _annot) as e ->
+      let* id = parse_expression ~source id in
+      let* id =
+        match Micheline.root id with
+        | Micheline.Int (_loc, id) -> return (Big_map.Id.parse_z id)
         | _ ->
             tzfail
               (Wrong_other_contracts_item (Micheline.location e, printable e))
       in
       let* kty = parse_expression ~source kty in
       let* vty = parse_expression ~source vty in
-      let* map = parse_expression ~source map in
-      return (i, kty, vty, map)
+      let* items = parse_expression ~source items in
+      return RPC.Scripts.S.{id; kty; vty; items}
   | e -> tzfail (Wrong_extra_big_maps_item (Micheline.location e, printable e))
 
 let parse_stack ~source = function
