@@ -124,6 +124,9 @@ module type INDEXABLE_STORE = sig
 
   (** [wait_gc_completion t] returns a blocking thread if a GC run is ongoing. *)
   val wait_gc_completion : 'a t -> unit Lwt.t
+
+  (** [is_gc_finished t] returns [true] if there is no GC running. *)
+  val is_gc_finished : 'a t -> bool
 end
 
 (** An index store mapping keys to values. Keys are associated to optional
@@ -203,6 +206,9 @@ module type INDEXED_FILE = sig
   (** [wait_gc_completion t] returns a blocking thread if a GC run is currently
       ongoing. *)
   val wait_gc_completion : 'a t -> unit Lwt.t
+
+  (** [is_gc_finished t] returns [true] if there is no GC running. *)
+  val is_gc_finished : 'a t -> bool
 end
 
 (** Same as {!INDEXED_FILE} but where headers are extracted from values. *)

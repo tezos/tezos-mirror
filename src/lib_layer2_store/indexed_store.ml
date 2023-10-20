@@ -106,6 +106,8 @@ module type INDEXABLE_STORE = sig
     ?async:bool -> rw t -> (key, value) gc_iterator -> unit tzresult Lwt.t
 
   val wait_gc_completion : 'a t -> unit Lwt.t
+
+  val is_gc_finished : 'a t -> bool
 end
 
 module type INDEXABLE_REMOVABLE_STORE = sig
@@ -155,6 +157,8 @@ module type INDEXED_FILE = sig
     unit tzresult Lwt.t
 
   val wait_gc_completion : 'a t -> unit Lwt.t
+
+  val is_gc_finished : 'a t -> bool
 end
 
 module type SIMPLE_INDEXED_FILE = sig
@@ -527,9 +531,12 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     match store.gc_status with
     | No_gc -> Lwt.return_unit
     | Ongoing {promise; _} -> promise
+
+  let is_gc_finished store =
+    match store.gc_status with No_gc -> true | Ongoing _ -> false
 end
 
-module Make_indexable_removable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) =
+module Make_indexable_removable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) =
 struct
   module V_opt = struct
     (* The values stored in the index are optional values.  When we "remove" a
@@ -1138,6 +1145,9 @@ struct
     match store.gc_status with
     | No_gc -> Lwt.return_unit
     | Ongoing {promise; _} -> promise
+
+  let is_gc_finished store =
+    match store.gc_status with No_gc -> true | Ongoing _ -> false
 end
 
 module Make_simple_indexed_file

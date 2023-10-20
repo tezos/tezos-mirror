@@ -134,3 +134,6 @@ type +'a store = {
 }
 
 include Store_sig.S with type 'a store := 'a store
+
+(** [is_gc_finished t] returns [true] if there is no GC running. *)
+val is_gc_finished : 'a t -> bool

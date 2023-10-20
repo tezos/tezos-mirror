@@ -1071,7 +1071,8 @@ let gc node_ctxt ~(level : int32) =
   | Some gc_level
     when gc_level > first_available_level
          && Int32.(sub level last_gc_level >= frequency)
-         && Context.is_gc_finished node_ctxt.context -> (
+         && Context.is_gc_finished node_ctxt.context
+         && Store.is_gc_finished node_ctxt.store -> (
       let* hash = hash_of_level node_ctxt gc_level in
       let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
       match header with

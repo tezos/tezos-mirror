@@ -609,3 +609,27 @@ let wait_gc_completion
       commitments_published_at_level
   and* () = Levels_to_hashes.wait_gc_completion levels_to_hashes in
   return_unit
+
+let is_gc_finished
+    ({
+       l2_blocks;
+       messages;
+       inboxes;
+       commitments;
+       commitments_published_at_level;
+       l2_head = _;
+       last_finalized_level = _;
+       levels_to_hashes;
+       irmin_store = _;
+       protocols = _;
+       gc_levels = _;
+       history_mode = _;
+     } :
+      _ t) =
+  L2_blocks.is_gc_finished l2_blocks
+  && Messages.is_gc_finished messages
+  && Inboxes.is_gc_finished inboxes
+  && Commitments.is_gc_finished commitments
+  && Commitments_published_at_level.is_gc_finished
+       commitments_published_at_level
+  && Levels_to_hashes.is_gc_finished levels_to_hashes
