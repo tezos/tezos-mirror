@@ -95,17 +95,17 @@ let%expect_test "test tuples with tup1 translation" =
         0: false
         255: true
     seq:
+    - id: tup1tup_field0
+      type: u1
+      enum: bool
     - id: tup1tup_field1
+      type: u1
+    - id: tup1tup_field2
       type: u1
       enum: bool
     - id: tup1tup_field3
       type: u1
     - id: tup1tup_field4
-      type: u1
-      enum: bool
-    - id: tup1tup_field7
-      type: u1
-    - id: tup1tup_field8
       type: u1 |}]
 
 let%expect_test "test tuples with n inside translation" =
@@ -138,17 +138,17 @@ let%expect_test "test tuples with n inside translation" =
         0: false
         255: true
     seq:
+    - id: tup1tup_field0
+      type: u1
+      enum: bool
     - id: tup1tup_field1
+      type: n
+    - id: tup1tup_field2
       type: u1
       enum: bool
     - id: tup1tup_field3
       type: n
     - id: tup1tup_field4
-      type: u1
-      enum: bool
-    - id: tup1tup_field7
-      type: n
-    - id: tup1tup_field8
       type: n |}]
 
 let%expect_test "test tuples descr inside" =
@@ -183,14 +183,96 @@ let%expect_test "test tuples descr inside" =
         0: false
         255: true
     seq:
-    - id: unique_id_trap
+    - id: tupdef_field0
       type: u1
       enum: bool
+      doc: unique_id_trap
     - id: tupdef_field1
       type: n
-    - id: unique_id_trap
+    - id: tupdef_field2
       type: u1
       enum: bool
+      doc: unique_id_trap
     - id: tupdef_field3
       type: u1
       enum: bool |}]
+
+let%expect_test "test tuples descr inside" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~id:"tupdef"
+      Data_encoding.(
+        let e = def "unique_id_trap" bool in
+        tup4
+          (obj1 (opt "foo" e))
+          (obj1 (opt "foo" n))
+          (obj1 (opt "foo" e))
+          (obj1 (opt "foo" bool)))
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: tupdef
+      endian: be
+    types:
+      tupdef_field3:
+        seq:
+        - id: foo_tag
+          type: u1
+          enum: bool
+        - id: foo
+          type: u1
+          if: (foo_tag == bool::true)
+          enum: bool
+      tupdef_field2:
+        seq:
+        - id: foo_tag
+          type: u1
+          enum: bool
+        - id: foo
+          type: u1
+          if: (foo_tag == bool::true)
+          enum: bool
+      tupdef_field1:
+        seq:
+        - id: foo_tag
+          type: u1
+          enum: bool
+        - id: foo
+          type: n
+          if: (foo_tag == bool::true)
+      n:
+        seq:
+        - id: n
+          type: n_chunk
+          repeat: until
+          repeat-until: not (_.has_more).as<bool>
+      n_chunk:
+        seq:
+        - id: has_more
+          type: b1be
+        - id: payload
+          type: b7be
+      tupdef_field0:
+        seq:
+        - id: foo_tag
+          type: u1
+          enum: bool
+        - id: foo
+          type: u1
+          if: (foo_tag == bool::true)
+          enum: bool
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: tupdef_field0
+      type: tupdef_field0
+    - id: tupdef_field1
+      type: tupdef_field1
+    - id: tupdef_field2
+      type: tupdef_field2
+    - id: tupdef_field3
+      type: tupdef_field3 |}]
