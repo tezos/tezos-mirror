@@ -47,7 +47,7 @@ let create_nodes =
 let create_blocks =
   "CREATE TABLE IF NOT EXISTS blocks(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \  predecessor INTEGER,\n\
+  \  predecessor BIGINT,\n\
   \  timestamp INTEGER NOT NULL, -- Unix time\n\
   \  hash $(BYTES) UNIQUE NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
@@ -158,7 +158,7 @@ let create_tables =
     create_cycles_level_idx;
   ]
 
-let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor INTEGER"
+let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor BIGINT"
 
 let alter_blocks_reception_add_application_timestamp =
   "ALTER TABLE blocks_reception ADD COLUMN application_timestamp TEXT"
