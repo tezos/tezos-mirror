@@ -3590,14 +3590,21 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
         loser_sc_rollup_nodes
     else unit
   in
-  (* Calls that can fail because the node is down due to the ongoing migration
-     need to be retried. *)
+  (* Calls that can fail because the node is down (or shutting down) due to the
+     ongoing migration need to be retried (10 times). *)
   let retry f =
-    let f _ =
-      let* () = Node.wait_for_ready node in
-      f ()
+    let rec retry count =
+      let f _ =
+        let* () = Node.wait_for_ready node in
+        f ()
+      in
+      Lwt.catch f (fun e ->
+          if count = 0 then raise e
+          else
+            let* () = Lwt_unix.sleep 0.5 in
+            retry (count - 1))
     in
-    Lwt.catch f f
+    retry 10
   in
   let rec consume_inputs = function
     | [] -> unit
@@ -3739,13 +3746,11 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     }
     (test_refutation_scenario_aux ~mode ~kind scenario)
 
-let test_refutation_migration_scenario ?(flaky = false) ?commitment_period
-    ?challenge_window ~variant ~mode ~kind scenario ~migrate_from ~migrate_to
-    ~migration_on_event =
+let test_refutation_migration_scenario ?commitment_period ?challenge_window
+    ~variant ~mode ~kind scenario ~migrate_from ~migrate_to ~migration_on_event
+    =
   let tags =
-    (if flaky then [Tag.flaky] else [])
-    @ ["refutation"]
-    @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
+    ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
   in
 
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
@@ -4020,7 +4025,6 @@ let test_refutation_migration ~migrate_from ~migrate_to =
         (fun (migration_variant, migration_on_event) ->
           let variant = String.concat "_" [variant; migration_variant] in
           test_refutation_migration_scenario
-            ~flaky:true
             ~kind:"wasm_2_0_0"
               (* The tests for refutations over migrations are only ran for wasm
                  as the arith PVMs do not have the same semantic in all

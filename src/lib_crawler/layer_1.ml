@@ -135,6 +135,8 @@ let shutdown state =
   state.running <- false ;
   Lwt.return_unit
 
+let regexp_ocaml_exception_connection_error = Re.Str.regexp ".*in connect:.*"
+
 let is_connection_error trace =
   TzTrace.fold
     (fun yes error ->
@@ -143,6 +145,10 @@ let is_connection_error trace =
       match error with
       | RPC_client_errors.(Request_failed {error = Connection_failed _; _}) ->
           true
+      | RPC_client_errors.(Request_failed {error = OCaml_exception s; _}) ->
+          (* This error can surface if the external RPC servers of the L1 node are
+             shutdown but the request is still in the RPC worker. *)
+          Re.Str.string_match regexp_ocaml_exception_connection_error s 0
       | _ -> false)
     false
     trace
