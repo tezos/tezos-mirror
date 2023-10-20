@@ -39,8 +39,6 @@ val hex_encode : string -> string
 *)
 val read_kernel : ?base:string -> string -> string
 
-val string_match : regexp:string -> string -> bool
-
 module Installer_kernel_config : sig
   (** Moves path [from] at path [to_]. *)
   type move_args = {from : string; to_ : string}

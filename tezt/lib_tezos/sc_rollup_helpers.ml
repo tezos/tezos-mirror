@@ -61,11 +61,6 @@ let load_kernel_file
 let read_kernel ?base name : string =
   hex_encode (load_kernel_file ?base (name ^ ".wasm"))
 
-let string_match ~regexp string =
-  match Str.search_forward (Str.regexp regexp) string 0 with
-  | exception Stdlib.Not_found -> false
-  | _ -> true
-
 module Installer_kernel_config = struct
   type move_args = {from : string; to_ : string}
 
@@ -107,7 +102,7 @@ module Installer_kernel_config = struct
           value
           destination
       in
-      Check.is_true ~error_msg (string_match ~regexp dump)
+      Check.is_true ~error_msg Base.(dump =~ rex regexp)
     in
     (* Check that the config is included in the dump (the PVM did not alter
        the key-value pairs defined in the config) *)
