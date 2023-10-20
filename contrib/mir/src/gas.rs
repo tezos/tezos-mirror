@@ -94,6 +94,23 @@ pub mod tc_cost {
         let sz = Checked::from(std::cmp::min(sz1, sz2));
         (sz * 60).as_gas_cost()
     }
+
+    pub fn construct_map(key_size: usize, sz: usize) -> Result<u32, OutOfGas> {
+        // Tezos protocol constructs maps element by element, thus the cost ends
+        // up Σ (80 + key_size*log2(i)) = 80 * n + key_size * Σ log2(i) = 80 * n
+        // + key_size * log2(Π i) = 80 * n + key_size * log2(n!)
+        // Using n * log2(n) as an approximation for log2(n!),
+        // ≈ 80 * n + key_size * n * log2(n)
+        // which seems like a reasonable first-order approximation.
+        // to avoid log2(0) it's more practical to compute log2(n + 1)
+        let n = Checked::from(sz);
+        let key_size = Checked::from(key_size);
+        let log2n = (n + 1)
+            .ok_or(OutOfGas)?
+            .next_power_of_two()
+            .trailing_zeros() as usize;
+        (80 * n + key_size * n * log2n).as_gas_cost()
+    }
 }
 
 pub mod interpret_cost {

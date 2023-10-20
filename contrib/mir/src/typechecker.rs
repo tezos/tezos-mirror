@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
+use std::collections::BTreeMap;
 use std::num::TryFromIntError;
 
 use crate::ast::*;
@@ -30,6 +31,14 @@ pub enum TcError {
     Dup0,
     #[error("value {0:?} is invalid for type {1:?}")]
     InvalidValueForType(Value, Type),
+    #[error("value {0:?} is invalid element for container type {1:?}")]
+    InvalidEltForMap(Value, Type),
+    #[error("sequence elements must be in strictly ascending order for type {0:?}")]
+    ElementsNotSorted(Type),
+    #[error("type not comparable: {0:?}")]
+    TypeNotComparable(Type),
+    #[error("sequence elements must contain no duplicate keys for type {0:?}")]
+    DuplicateElements(Type),
     #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {}", x)))]
     NoMatchingOverload {
         instr: &'static str,
@@ -362,6 +371,45 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
                 .collect();
             TV::List(lst?)
         }
+        (Map(tk, tv), Seq(vs)) => {
+            ensure_comparable(tk)?;
+            let tc_elt = |v: Value| -> Result<(TypedValue, TypedValue), TcError> {
+                match v {
+                    Value::Elt(k, v) => {
+                        let k = typecheck_value(ctx, tk, *k)?;
+                        let v = typecheck_value(ctx, tv, *v)?;
+                        Ok((k, v))
+                    }
+                    _ => Err(TcError::InvalidEltForMap(v, t.clone())),
+                }
+            };
+            let elts: Vec<(TypedValue, TypedValue)> =
+                vs.into_iter().map(tc_elt).collect::<Result<_, TcError>>()?;
+            if elts.len() > 1 {
+                let mut prev = &elts[0].0;
+                for i in &elts[1..] {
+                    ctx.gas.consume(gas::interpret_cost::compare(prev, &i.0)?)?;
+                    match prev.cmp(&i.0) {
+                        std::cmp::Ordering::Less => (),
+                        std::cmp::Ordering::Equal => {
+                            return Err(TcError::DuplicateElements(t.clone()))
+                        }
+                        std::cmp::Ordering::Greater => {
+                            return Err(TcError::ElementsNotSorted(t.clone()))
+                        }
+                    }
+                    prev = &i.0;
+                }
+            }
+            ctx.gas
+                .consume(gas::tc_cost::construct_map(tk.size_for_gas(), elts.len())?)?;
+            // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
+            // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
+            // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
+            // too much overhead.
+            let map: BTreeMap<TypedValue, TypedValue> = elts.into_iter().collect();
+            TV::Map(map)
+        }
         (t, v) => return Err(TcError::InvalidValueForType(v, t.clone())),
     })
 }
@@ -385,6 +433,14 @@ fn ensure_packable(ty: Type) -> Result<(), TcError> {
         Ok(())
     } else {
         Err(TcError::TypeNotPackable(ty))
+    }
+}
+
+fn ensure_comparable(ty: &Type) -> Result<(), TcError> {
+    if ty.is_comparable() {
+        Ok(())
+    } else {
+        Err(TcError::TypeNotComparable(ty.clone()))
     }
 }
 
@@ -1025,6 +1081,114 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::TypeNotPackable(Type::new_list(Type::Operation)))
+        );
+    }
+
+    #[test]
+    fn push_map() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH (map int string) { Elt 1 "foo"; Elt 2 "bar" } }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(TypedValue::Map(BTreeMap::from([
+                (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
+                (TypedValue::Int(2), TypedValue::String("bar".to_owned()))
+            ])))])
+        );
+        assert_eq!(stack, stk![Type::new_map(Type::Int, Type::String)]);
+    }
+
+    #[test]
+    fn push_map_unsorted() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH (map int string) { Elt 2 "foo"; Elt 1 "bar" } }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::ElementsNotSorted(Type::new_map(
+                Type::Int,
+                Type::String
+            )))
+        );
+    }
+
+    #[test]
+    fn push_map_incomparable() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH (map (list int) string) { Elt { 2 } "foo"; Elt { 1 } "bar" } }"#)
+                    .unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::TypeNotComparable(Type::new_list(Type::Int)))
+        );
+    }
+
+    #[test]
+    fn push_map_incomparable_empty() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH (map (list int) string) { } }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::TypeNotComparable(Type::new_list(Type::Int)))
+        );
+    }
+
+    #[test]
+    fn push_map_wrong_key_type() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH (map int string) { Elt "1" "foo"; Elt 2 "bar" } }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(
+                Value::StringValue("1".to_owned()),
+                Type::Int
+            ))
+        );
+    }
+
+    #[test]
+    fn push_map_wrong_elt() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH (map int string) { Elt 1 "foo"; "bar" } }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidEltForMap(
+                Value::StringValue("bar".to_owned()),
+                Type::new_map(Type::Int, Type::String)
+            ))
+        );
+    }
+
+    #[test]
+    fn push_map_duplicate_key() {
+        let mut stack = stk![];
+        assert_eq!(
+            typecheck(
+                parse(r#"{ PUSH (map int string) { Elt 1 "foo"; Elt 1 "bar" } }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::DuplicateElements(Type::new_map(
+                Type::Int,
+                Type::String
+            )))
         );
     }
 }

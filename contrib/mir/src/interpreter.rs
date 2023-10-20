@@ -227,6 +227,8 @@ fn interpret_one(
 
 #[cfg(test)]
 mod interpreter_tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use crate::gas::Gas;
     use Instruction::*;
@@ -745,5 +747,28 @@ mod interpreter_tests {
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
         )
+    }
+
+    #[test]
+    fn push_map() {
+        let mut stack = stk![];
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([
+            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
+            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+        ]);
+        assert_eq!(
+            interpret(
+                &vec![Push(TypedValue::Map(map.clone()))],
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Map(map)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+        );
     }
 }

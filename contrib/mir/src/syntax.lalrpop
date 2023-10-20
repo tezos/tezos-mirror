@@ -55,6 +55,7 @@ composite_type: Type = {
     "pair" <type_expr> <pair_args> => Type::new_pair(<>),
     "option" <type_expr> => Type::new_option(<>),
     "list" <type_expr> => Type::new_list(<>),
+    "map" <type_expr> <type_expr> => Type::new_map(<>),
 }
 
 type_expr: Type = {
@@ -85,6 +86,7 @@ pair_val_args: Value = {
 composite_value: Value = {
   "Pair" <value_expr> <pair_val_args> => Value::new_pair(<>),
   "Some" <value_expr> => Value::new_option(Some(<>)),
+  "Elt" <value_expr> <value_expr> => Value::new_elt(<>),
 }
 
 value_expr: Value = {

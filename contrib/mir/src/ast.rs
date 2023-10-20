@@ -9,6 +9,8 @@ pub mod comparable;
 pub mod parsed;
 pub mod typechecked;
 
+use std::collections::BTreeMap;
+
 pub use parsed::{ParsedInstruction, ParsedStage};
 pub use typechecked::{overloads, TypecheckedInstruction, TypecheckedStage};
 
@@ -24,13 +26,14 @@ pub enum Type {
     Option(Box<Type>),
     List(Box<Type>),
     Operation,
+    Map(Box<Type>, Box<Type>),
 }
 
 impl Type {
     pub fn is_comparable(&self) -> bool {
         use Type::*;
         match &self {
-            List(..) => false,
+            List(..) | Map(..) => false,
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
             Pair(l, r) => l.is_comparable() && r.is_comparable(),
@@ -44,7 +47,7 @@ impl Type {
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
             Pair(l, r) => l.is_packable() && r.is_packable(),
-            Option(x) | List(x) => x.is_packable(),
+            Option(x) | List(x) | Map(_, x) => x.is_packable(),
         }
     }
 
@@ -62,6 +65,7 @@ impl Type {
             Type::Pair(l, r) => 1 + l.size_for_gas() + r.size_for_gas(),
             Type::Option(x) => 1 + x.size_for_gas(),
             Type::List(x) => 1 + x.size_for_gas(),
+            Type::Map(k, v) => 1 + k.size_for_gas() + v.size_for_gas(),
         }
     }
 
@@ -76,6 +80,10 @@ impl Type {
     pub fn new_list(x: Self) -> Self {
         Self::List(Box::new(x))
     }
+
+    pub fn new_map(k: Self, v: Self) -> Self {
+        Self::Map(Box::new(k), Box::new(v))
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -87,6 +95,7 @@ pub enum Value {
     PairValue(Box<Value>, Box<Value>),
     OptionValue(Option<Box<Value>>),
     Seq(Vec<Value>),
+    Elt(Box<Value>, Box<Value>),
 }
 
 impl Value {
@@ -96,6 +105,10 @@ impl Value {
 
     pub fn new_option(x: Option<Self>) -> Self {
         Self::OptionValue(x.map(Box::new))
+    }
+
+    pub fn new_elt(k: Self, v: Self) -> Self {
+        Self::Elt(Box::new(k), Box::new(v))
     }
 }
 
@@ -110,6 +123,7 @@ pub enum TypedValue {
     Pair(Box<TypedValue>, Box<TypedValue>),
     Option(Option<Box<TypedValue>>),
     List(Vec<TypedValue>),
+    Map(BTreeMap<TypedValue, TypedValue>),
 }
 
 impl TypedValue {

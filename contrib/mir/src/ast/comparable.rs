@@ -17,6 +17,13 @@ impl PartialOrd for TypedValue {
     }
 }
 
+impl Ord for TypedValue {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other)
+            .expect("Comparing incomparable values in TypedValue")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28,6 +35,7 @@ mod tests {
         macro_rules! assert_cmp {
             ($c:expr; $($l:expr),*; $($r:expr),*; $ord:ident) => {
                 assert!($c($($l),*).partial_cmp(&$c($($r),*)) == Some(std::cmp::Ordering::$ord));
+                assert!($c($($l),*).cmp(&$c($($r),*)) == std::cmp::Ordering::$ord);
             };
         }
 
@@ -69,5 +77,13 @@ mod tests {
 
         // different types don't compare
         assert!(Bool(true).partial_cmp(&Int(5)) == None);
+    }
+
+    #[test]
+    #[should_panic(expected = "Comparing incomparable values in TypedValue")]
+    fn compare_different_comparable() {
+        // Comparable panics on different types
+        use TypedValue::*;
+        let _ = Bool(true).cmp(&Int(5)); //panics
     }
 }
