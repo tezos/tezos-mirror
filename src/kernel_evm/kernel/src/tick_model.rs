@@ -68,6 +68,21 @@ pub mod constants {
     /// finalize a block. Considers a block corresponding to an inbox full of
     /// transfers, and apply a tick model affine in the number of tx.
     pub const FINALIZE_UPPER_BOUND: u64 = 150_000_000;
+
+    /// The number of ticks used for storing receipt is overapproximated by
+    /// an affine function of the size of the receipt
+    pub const RECEIPT_TICKS_COEF: u64 = 960;
+    pub const RECEIPT_TICKS_INTERCEPT: u64 = 200_000;
+
+    /// The number of ticks used for storing transactions is overapproximated by
+    /// an affine function of the size of the transaction
+    pub const TX_OBJ_TICKS_COEF: u64 = 880;
+    pub const TX_OBJ_TICKS_INTERCEPT: u64 = 200_000;
+
+    /// unsafe overapproximation of bloom computation
+    /// TODO #6091
+    /// measure and model bloom computation
+    pub const BLOOM_OVERAPPROXIMATION: u64 = 1_000_000;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
@@ -124,4 +139,16 @@ pub fn ticks_of_valid_transaction_ethereum(
         Some(outcome) => ticks_of_gas(outcome.gas_used),
         None => ticks_of_gas(transaction.gas_limit),
     }
+}
+
+pub fn ticks_of_register(receipt_size: u64, obj_size: u64) -> u64 {
+    let receipt_ticks: u64 = receipt_size
+        .saturating_mul(constants::RECEIPT_TICKS_COEF)
+        .saturating_add(constants::RECEIPT_TICKS_INTERCEPT);
+    let obj_ticks: u64 = obj_size
+        .saturating_mul(constants::TX_OBJ_TICKS_COEF)
+        .saturating_add(constants::TX_OBJ_TICKS_INTERCEPT);
+    receipt_ticks
+        .saturating_add(obj_ticks)
+        .saturating_add(constants::BLOOM_OVERAPPROXIMATION)
 }

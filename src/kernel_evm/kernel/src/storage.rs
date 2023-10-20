@@ -335,7 +335,7 @@ pub fn store_simulation_status<Host: Runtime>(
 pub fn store_transaction_receipt<Host: Runtime>(
     host: &mut Host,
     receipt: &TransactionReceipt,
-) -> Result<(), Error> {
+) -> Result<u64, anyhow::Error> {
     // For each transaction hash there exists a receipt and an object. As
     // such the indexing must be done either with the objects or the
     // receipts otherwise they would be indexed twice. We chose to index
@@ -346,13 +346,13 @@ pub fn store_transaction_receipt<Host: Runtime>(
     let src: &[u8] = &receipt.rlp_bytes();
     log!(host, Debug, "Storing receipt of size {}", src.len());
     host.store_write_all(&receipt_path, src)?;
-    Ok(())
+    Ok(src.len().try_into()?)
 }
 
 pub fn store_transaction_object<Host: Runtime>(
     host: &mut Host,
     object: &TransactionObject,
-) -> Result<(), Error> {
+) -> Result<u64, anyhow::Error> {
     let object_path = object_path(&object.hash)?;
     let encoded: &[u8] = &object.rlp_bytes();
     log!(
@@ -362,7 +362,7 @@ pub fn store_transaction_object<Host: Runtime>(
         encoded.len()
     );
     host.store_write_all(&object_path, encoded)?;
-    Ok(())
+    Ok(encoded.len().try_into()?)
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");

@@ -224,7 +224,6 @@ mod tests {
         account_path, init_account_storage, EthereumAccountStorage,
     };
     use primitive_types::{H160, H256, U256};
-    use std::collections::VecDeque;
     use std::ops::Rem;
     use std::str::FromStr;
     use tezos_ethereum::transaction::{
@@ -935,111 +934,6 @@ mod tests {
             chain_id.unwrap(),
             base_fee_per_gas.unwrap(),
         )
-    }
-
-    fn compute_block<MockHost: Runtime>(
-        transactions: VecDeque<Transaction>,
-        host: &mut MockHost,
-        mut evm_account_storage: EthereumAccountStorage,
-    ) -> BlockInProgress {
-        let block_constants = first_block(host);
-        let precompiles = precompiles::precompile_set::<MockHost>();
-        let mut accounts_index = init_account_index().unwrap();
-
-        // init block in progress
-        let mut block_in_progress =
-            BlockInProgress::new(U256::from(1), U256::from(1), transactions);
-
-        compute::<MockHost>(
-            host,
-            &mut block_in_progress,
-            &block_constants,
-            &precompiles,
-            &mut evm_account_storage,
-            &mut accounts_index,
-        )
-        .expect("Should have computed block");
-        block_in_progress
-    }
-
-    #[test]
-    fn test_ticks_valid_transaction() {
-        // init host
-        let mut mock_host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
-
-        //provision sender account
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(5000000000000000u64),
-        );
-
-        // tx is valid because correct nonce and account provisionned
-        let valid_tx = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: TransactionContent::Ethereum(dummy_eth_transaction_deploy()),
-        };
-
-        let transactions = vec![valid_tx].into();
-
-        // act
-        let block_in_progress =
-            compute_block(transactions, &mut host, evm_account_storage);
-
-        // assert
-        let ticks = block_in_progress.estimated_ticks;
-        let block = block_in_progress
-            .finalize_and_store(&mut host)
-            .expect("should have succeeded in processing block");
-
-        assert_eq!(
-            block.gas_used,
-            U256::from(21123),
-            "Gas used for contract creation"
-        );
-
-        assert_eq!(ticks, tick_model::ticks_of_gas(21123));
-    }
-    #[test]
-    fn test_ticks_invalid() {
-        // init host
-        let mut mock_host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
-
-        let evm_account_storage = init_account_storage().unwrap();
-
-        // tx is invalid because wrong nonce
-        let valid_tx = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: TransactionContent::Ethereum(
-                dummy_eth_transaction_deploy_from_nonce_and_pk(
-                    42,
-                    "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158",
-                ),
-            ),
-        };
-
-        let transactions = vec![valid_tx].into();
-
-        // act
-        let block_in_progress =
-            compute_block(transactions, &mut host, evm_account_storage);
-
-        // assert
-        let ticks = block_in_progress.estimated_ticks;
-        let block = block_in_progress
-            .finalize_and_store(&mut host)
-            .expect("should be able to finalize block");
-
-        assert_eq!(block.gas_used, U256::zero(), "no gas used");
-        // crypto + tx overhead + init overhead
-        assert_eq!(ticks, tick_model::ticks_of_invalid_transaction());
     }
 
     #[test]

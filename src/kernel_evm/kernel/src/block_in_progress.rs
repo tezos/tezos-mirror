@@ -209,7 +209,7 @@ impl BlockInProgress {
             .checked_add(object_info.gas_used)
             .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?;
 
-        // account for ticks
+        // account for transaction ticks
         self.estimated_ticks +=
             tick_model::ticks_of_valid_transaction(transaction, &receipt_info);
 
@@ -224,10 +224,15 @@ impl BlockInProgress {
         self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
 
         // store info
-        storage::store_transaction_receipt(host, &receipt)
+        let receipt_size = storage::store_transaction_receipt(host, &receipt)
             .context("Failed to store the receipt")?;
-        storage::store_transaction_object(host, &self.make_object(object_info))
-            .context("Failed to store the transaction object")?;
+        let obj_size =
+            storage::store_transaction_object(host, &self.make_object(object_info))
+                .context("Failed to store the transaction object")?;
+
+        // account for registering ticks
+        self.estimated_ticks += tick_model::ticks_of_register(receipt_size, obj_size);
+
         Ok(())
     }
 
