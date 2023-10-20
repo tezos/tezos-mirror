@@ -150,3 +150,47 @@ let%expect_test "test tuples with n inside translation" =
       type: n
     - id: tup1tup_field8
       type: n |}]
+
+let%expect_test "test tuples descr inside" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~id:"tupdef"
+      Data_encoding.(
+        let e = def "unique_id_trap" bool in
+        tup4 e n e bool)
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: tupdef
+      endian: be
+    types:
+      n:
+        seq:
+        - id: n
+          type: n_chunk
+          repeat: until
+          repeat-until: not (_.has_more).as<bool>
+      n_chunk:
+        seq:
+        - id: has_more
+          type: b1be
+        - id: payload
+          type: b7be
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: unique_id_trap
+      type: u1
+      enum: bool
+    - id: tupdef_field1
+      type: n
+    - id: unique_id_trap
+      type: u1
+      enum: bool
+    - id: tupdef_field3
+      type: u1
+      enum: bool |}]
