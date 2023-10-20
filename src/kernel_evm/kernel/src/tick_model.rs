@@ -67,7 +67,7 @@ pub mod constants {
     /// Overapproximation of the upper bound of the number of ticks used to
     /// finalize a block. Considers a block corresponding to an inbox full of
     /// transfers, and apply a tick model affine in the number of tx.
-    pub const _FINALIZE_UPPER_BOUND: u64 = 150_000_000;
+    pub const FINALIZE_UPPER_BOUND: u64 = 150_000_000;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {

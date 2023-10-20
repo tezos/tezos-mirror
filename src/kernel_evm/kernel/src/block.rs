@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::apply::apply_transaction;
-use crate::block_in_progress;
 use crate::blueprint::{Queue, QueueElement};
 use crate::current_timestamp;
 use crate::error::Error;
@@ -13,6 +12,7 @@ use crate::indexable_storage::IndexableStorage;
 use crate::safe_storage::KernelRuntime;
 use crate::storage;
 use crate::storage::init_account_index;
+use crate::{block_in_progress, tick_model};
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
@@ -33,6 +33,11 @@ struct TickCounter {
 impl TickCounter {
     pub fn new(c: u64) -> Self {
         Self { c }
+    }
+    pub fn finalize(consumed_ticks: u64) -> Self {
+        Self {
+            c: consumed_ticks + tick_model::constants::FINALIZE_UPPER_BOUND,
+        }
     }
 }
 
@@ -176,7 +181,7 @@ pub fn produce<Host: KernelRuntime>(
                 return Ok(ComputationResult::RebootNeeded);
             }
             ComputationResult::Finished => {
-                tick_counter = TickCounter::new(block_in_progress.estimated_ticks);
+                tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
                 let new_block = block_in_progress
                     .finalize_and_store(host)
                     .context("Failed to finalize the block in progress")?;
