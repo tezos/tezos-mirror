@@ -467,15 +467,260 @@ pub fn apply_transaction<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use tezos_ethereum::{
+        block::BlockConstants,
         transaction::{TransactionType, TRANSACTION_HASH_SIZE},
         tx_common::EthereumTransactionCommon,
     };
+    use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_mock::MockHost;
 
     use crate::inbox::{Transaction, TransactionContent};
 
-    use super::make_object_info;
+    use super::{is_valid_ethereum_transaction_common, make_object_info};
+
+    fn mock_block_constants() -> BlockConstants {
+        BlockConstants::first_block(
+            U256::from(Timestamp::from(0).as_u64()),
+            U256::from(1337),
+            U256::from(21000),
+        )
+    }
+
+    fn address_from_str(s: &str) -> H160 {
+        let data = &hex::decode(s).unwrap();
+        H160::from_slice(data)
+    }
+
+    fn set_balance(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+        balance: U256,
+    ) {
+        let mut account = evm_account_storage
+            .get_or_create(host, &account_path(address).unwrap())
+            .unwrap();
+        let current_balance = account.balance(host).unwrap();
+        if current_balance > balance {
+            account
+                .balance_remove(host, current_balance - balance)
+                .unwrap();
+        } else {
+            account
+                .balance_add(host, balance - current_balance)
+                .unwrap();
+        }
+    }
+
+    fn resign(transaction: EthereumTransactionCommon) -> EthereumTransactionCommon {
+        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+        let private_key =
+            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701";
+        transaction
+            .sign_transaction(private_key.to_string())
+            .expect("Should have been able to sign")
+    }
+
+    fn valid_tx() -> EthereumTransactionCommon {
+        let transaction = EthereumTransactionCommon {
+            type_: TransactionType::Eip1559,
+            chain_id: U256::from(1),
+            nonce: U256::from(0),
+            max_priority_fee_per_gas: U256::zero(),
+            max_fee_per_gas: U256::from(21000),
+            gas_limit: 21000,
+            to: Some(H160::zero()),
+            value: U256::zero(),
+            data: vec![],
+            access_list: vec![],
+            signature: None,
+        };
+        // sign tx
+        resign(transaction)
+    }
+
+    #[test]
+    fn test_tx_is_valid() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let transaction = valid_tx();
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            Some(address),
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_cannot_prepay() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        // account doesnt have enough fundes
+        let balance = U256::from(1);
+        let transaction = valid_tx();
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            None,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_signature() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let mut transaction = valid_tx();
+        transaction.signature = None;
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            None,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_wrong_nonce() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let mut transaction = valid_tx();
+        transaction.nonce = U256::from(42);
+
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            None,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_max_fee_less_than_base_fee() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let mut transaction = valid_tx();
+        // set a max base fee too low
+        transaction.max_fee_per_gas = U256::from(1);
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            None,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_max_fee_less_than_priority_fee() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let mut transaction = valid_tx();
+        // set a max_priority_fee bigger than,
+        transaction.max_priority_fee_per_gas = U256::from(22000);
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            None,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
 
     #[test]
     // when the user specify a max fee per gas lower than base fee,
