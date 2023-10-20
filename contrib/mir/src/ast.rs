@@ -116,6 +116,7 @@ pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
 pub trait Stage {
     type AddMeta;
     type PushValue;
+    type NilType;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -140,6 +141,7 @@ pub enum Instruction<T: Stage> {
     ISome,
     Compare,
     Amount,
+    Nil(T::NilType),
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
