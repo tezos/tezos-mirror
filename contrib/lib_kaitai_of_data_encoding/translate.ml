@@ -155,17 +155,9 @@ let rec seq_field_of_data_encoding :
   | Conv {encoding; _} ->
       seq_field_of_data_encoding enums types encoding id tid_gen
   | Tup e ->
-      (* This case corresponds to a [tup1] combinator being called inside a
-         [tup*] combinator. It's probably never used, but it's still a valid use
-         of data-encoding. Note that we erase the information that there is an
-         extraneous [tup1] in the encoding. *)
       let id = match tid_gen with None -> id | Some tid_gen -> tid_gen () in
       seq_field_of_data_encoding enums types e id tid_gen
   | Tups {kind = _; left; right} ->
-      (* This case corresponds to a [tup*] combinator being called inside a
-         [tup*] combinator. It's probably never used, but it's still a valid use
-         of data-encoding. Note that we erase the information that there is an
-         extraneous [tup*] in the encoding. *)
       let tid_gen =
         match tid_gen with
         | None -> Some (Helpers.mk_tid_gen id)
