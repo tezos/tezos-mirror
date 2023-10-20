@@ -3408,28 +3408,30 @@ let test_originate_evm_kernel_and_dump_pvm_state =
         let error_msg =
           Format.asprintf "Expected %s, got %s" expected_value value
         in
-        let regexp = "^-?[1-9]\\(.[0-9]+\\)?[Ee][-+]?\\([0-9]+\\)$" in
-        if string_match ~regexp value then
-          (* Z.of_string does not parse scientific notation yet. *)
-          let tolerance =
-            Q.of_bigint
-              Z.(pow (of_int 10) (int_of_string (Str.matched_group 2 value)))
-          in
-          let expected_value = Q.of_string expected_value in
-          let value = Q.of_string value in
-          if Q.(abs (expected_value - value) < tolerance) then
-            (* Yaml.of_string_exn truncates integers.
-               For instance 35316531343563303366356465633665343730343131393831333665313530633063323962346161
-               becomes 3.53165313435633e+79, so we account for that. *) ()
-          else Check.(is_true (Q.equal expected_value value)) ~error_msg
-        else if string_match ~regexp:"^[1-9][0-9]*$" value then
-          Check.(is_true Q.(equal (of_string expected_value) (of_string value)))
-            ~error_msg
-        else if
-          string_match ~regexp:"^0+$" value
-          && string_match ~regexp:"^0+$" expected_value
-        then (* The case of 0 (can be an int or hex) *) ()
-        else Check.((expected_value = value) string) ~error_msg ;
+        (match Base.(value =~* rex "^-?\\d+[.]?\\d*e[+](\\d+)$") with
+        | Some exponent ->
+            (* Check integers in scientific notation. *)
+            let tolerance =
+              Q.of_bigint Z.(pow (of_int 10) (int_of_string exponent))
+            in
+            let expected_value = Q.of_string expected_value in
+            (* Z.of_string does not parse scientific notation yet. *)
+            let value = Q.of_string value in
+            if Q.(abs (expected_value - value) < tolerance) then
+              (* Yaml.of_string_exn truncates integers.
+                 For instance 35316531343563303366356465633665343730343131393831333665313530633063323962346161
+                 becomes 3.53165313435633e+79, so we account for that. *) ()
+            else Check.(is_true (Q.equal expected_value value)) ~error_msg
+        | None ->
+            if Base.(value =~ rex "^-?[1-9][0-9]*$") then
+              (* Check integers in base 10. *)
+              Check.(
+                is_true Q.(equal (of_string expected_value) (of_string value)))
+                ~error_msg
+            else if Base.(value =~ rex "^0+$" && expected_value =~ rex "^0+$")
+            then (* The case of 0 (can be an int or hex) *) ()
+            else Check.((expected_value = value) string) ~error_msg) ;
+
         unit)
       instrs
   in
