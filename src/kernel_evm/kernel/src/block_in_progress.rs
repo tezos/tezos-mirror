@@ -219,7 +219,7 @@ impl BlockInProgress {
 
         // make receipt
         let receipt = self.make_receipt(receipt_info);
-
+        let receipt_bloom_size: u64 = tick_model::bloom_size(&receipt.logs).try_into()?;
         // extend BIP's logs bloom
         self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
 
@@ -231,7 +231,8 @@ impl BlockInProgress {
                 .context("Failed to store the transaction object")?;
 
         // account for registering ticks
-        self.estimated_ticks += tick_model::ticks_of_register(receipt_size, obj_size);
+        self.estimated_ticks +=
+            tick_model::ticks_of_register(receipt_size, obj_size, receipt_bloom_size);
 
         Ok(())
     }

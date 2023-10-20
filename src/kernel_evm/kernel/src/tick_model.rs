@@ -79,10 +79,11 @@ pub mod constants {
     pub const TX_OBJ_TICKS_COEF: u64 = 880;
     pub const TX_OBJ_TICKS_INTERCEPT: u64 = 200_000;
 
-    /// unsafe overapproximation of bloom computation
-    /// TODO #6091
-    /// measure and model bloom computation
-    pub const BLOOM_OVERAPPROXIMATION: u64 = 1_000_000;
+    /// The number of ticks used to compute the bloom filter is overapproximated
+    /// by an affine function of the size of the bloom
+    /// (nb of logs + nb of topics)
+    pub const BLOOM_TICKS_INTERCEPT: u64 = 10000;
+    pub const BLOOM_TICKS_COEF: u64 = 85000;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
@@ -141,14 +142,26 @@ pub fn ticks_of_valid_transaction_ethereum(
     }
 }
 
-pub fn ticks_of_register(receipt_size: u64, obj_size: u64) -> u64 {
+pub fn bloom_size(logs: &[tezos_ethereum::Log]) -> usize {
+    let mut size = 0;
+    // for n in 0..logs.len() {
+    for item in logs.iter() {
+        size += item.topics.len();
+    }
+    size
+}
+
+pub fn ticks_of_register(receipt_size: u64, obj_size: u64, bloom_size: u64) -> u64 {
     let receipt_ticks: u64 = receipt_size
         .saturating_mul(constants::RECEIPT_TICKS_COEF)
         .saturating_add(constants::RECEIPT_TICKS_INTERCEPT);
     let obj_ticks: u64 = obj_size
         .saturating_mul(constants::TX_OBJ_TICKS_COEF)
         .saturating_add(constants::TX_OBJ_TICKS_INTERCEPT);
+    let bloom_ticks: u64 = bloom_size
+        .saturating_mul(constants::BLOOM_TICKS_COEF)
+        .saturating_add(constants::BLOOM_TICKS_INTERCEPT);
     receipt_ticks
         .saturating_add(obj_ticks)
-        .saturating_add(constants::BLOOM_OVERAPPROXIMATION)
+        .saturating_add(bloom_ticks)
 }
