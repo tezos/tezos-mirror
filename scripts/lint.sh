@@ -189,9 +189,20 @@ check_gitlab_ci_yml () {
 }
 
 check_licenses_git_new () {
+    if [ -z "${CHECK_LICENSES_DIFF_BASE:-}" ]; then
+        echo 'Action --check-licenses-git-new requires that CHECK_LICENSES_DIFF_BASE is set in the environment.'
+        echo 'The value of CHECK_LICENSES_DIFF_BASE should be a commit.'
+        echo 'It is used to discover files that have been added and whose license header should be checked.'
+        echo
+        echo "Typically, it should point to the merge base of the current branch, as given by \`git merge-base\`:"
+        echo
+        echo "  CHECK_LICENSES_DIFF_BASE=\$(git merge-base HEAD origin/master) $0 --check-licenses-git-new"
+        return 1
+    fi
+
     # Check that new ml(i) files have a valid license header.
     if ! git diff-tree --no-commit-id --name-only -r --diff-filter=A \
-         "${CHECK_LICENSES_DIFF_BASE:-$(git merge-base master HEAD)}" HEAD |
+         "${CHECK_LICENSES_DIFF_BASE:-}" HEAD |
             grep '\.ml\(i\|\)$' |
             xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
 
