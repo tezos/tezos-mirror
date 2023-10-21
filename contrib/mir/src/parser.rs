@@ -74,7 +74,7 @@ impl TryFrom<Vec<ContractScriptEntity>> for ContractScript<ParsedStage> {
     }
 }
 
-fn spanned_lexer(
+pub fn spanned_lexer(
     src: &'_ str,
 ) -> impl Iterator<Item = Result<(usize, Tok, usize), ParserError>> + '_ {
     Tok::lexer(src)
