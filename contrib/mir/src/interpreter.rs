@@ -10,7 +10,7 @@ use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::stack::*;
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum InterpretError {
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
