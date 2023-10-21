@@ -11,18 +11,24 @@ use logos::Logos;
 /// provided, and defines `FromStr` implementation using stringified
 /// representation of the identifiers.
 macro_rules! defprim {
-    ($($prim:ident),* $(,)*) => {
+    ($ty:ident; $($prim:ident),* $(,)*) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-        pub enum Prim {
+        pub enum $ty {
             $($prim),*
         }
 
-        impl std::str::FromStr for Prim {
+        impl std::fmt::Display for $ty {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{:?}", &self)
+            }
+        }
+
+        impl std::str::FromStr for $ty {
           type Err = PrimError;
           fn from_str(s: &str) -> Result<Self, Self::Err> {
               match s {
-                $(stringify!($prim) => Ok(Prim::$prim),)*
+                $(stringify!($prim) => Ok($ty::$prim),)*
                 _ => Err(PrimError(s.to_owned()))
               }
           }
@@ -36,6 +42,7 @@ pub struct PrimError(String);
 
 // NB: Primitives will be lexed as written, so capitalization matters.
 defprim! {
+    Prim;
     parameter,
     storage,
     code,
@@ -81,17 +88,28 @@ defprim! {
     UPDATE,
 }
 
-impl std::fmt::Display for Prim {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", &self)
-    }
+defprim! {
+    TztPrim;
+    Stack_elt,
+    input,
+    output,
+    Failed,
+    amount,
+    MutezOverflow,
+    GeneralOverflow,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrimWithTzt {
+    Prim(Prim),
+    TztPrim(TztPrim),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+")]
 pub enum Tok {
     #[regex(r"[A-Za-z_]+", lex_prim)]
-    Prim(Prim),
+    Prim(PrimWithTzt),
 
     #[regex("([+-]?)[0-9]+", lex_number)]
     Number(i128),
@@ -118,7 +136,8 @@ pub enum Tok {
 impl std::fmt::Display for Tok {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            Tok::Prim(p) => p.fmt(f),
+            Tok::Prim(PrimWithTzt::Prim(p)) => p.fmt(f),
+            Tok::Prim(PrimWithTzt::TztPrim(p)) => p.fmt(f),
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
             Tok::Annotation => write!(f, "<ann>"),
@@ -153,8 +172,12 @@ impl Default for LexerError {
 
 type Lexer<'a> = logos::Lexer<'a, Tok>;
 
-fn lex_prim(lex: &mut Lexer) -> Result<Prim, LexerError> {
-    lex.slice().parse().map_err(LexerError::from)
+fn lex_prim(lex: &mut Lexer) -> Result<PrimWithTzt, LexerError> {
+    lex.slice()
+        .parse()
+        .map(PrimWithTzt::Prim)
+        .or_else(|_| lex.slice().parse().map(PrimWithTzt::TztPrim))
+        .map_err(LexerError::from)
 }
 
 fn lex_number(lex: &mut Lexer) -> Result<i128, LexerError> {
