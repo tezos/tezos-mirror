@@ -2536,6 +2536,8 @@ module Sc_rollup = struct
         Some Sc_rollup.ArithPVM.reference_initial_state_hash
     | Sc_rollup.Kind.Wasm_2_0_0 ->
         Some Sc_rollup.Wasm_2_0_0PVM.reference_initial_state_hash
+    | Sc_rollup.Kind.Riscv ->
+        Some Sc_rollup.Riscv_PVM.reference_initial_state_hash
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
   let register_genesis_info () =

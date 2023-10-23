@@ -3421,7 +3421,7 @@ module Sc_rollup : sig
   end
 
   module Kind : sig
-    type t = Example_arith | Wasm_2_0_0
+    type t = Example_arith | Wasm_2_0_0 | Riscv
 
     val encoding : t Data_encoding.t
 
@@ -3521,6 +3521,16 @@ module Sc_rollup : sig
          and type proof = Context.Proof.tree Context.Proof.t
 
     val reference_initial_state_hash : State_hash.t
+  end
+
+  module Riscv_PVM : sig
+    val reference_initial_state_hash : State_hash.t
+
+    module Protocol_implementation :
+      PVM.S
+        with type context = unit
+         and type state = Sc_rollup_riscv.minimal_state
+         and type proof = Sc_rollup_riscv.void
   end
 
   module Number_of_ticks : sig
