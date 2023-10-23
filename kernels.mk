@@ -1,3 +1,9 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
 KERNELS=evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy.elf
 SDK_DIR=src/kernel_sdk
 RISC_V_SANDBOX_DIR=src/risc_v/sandbox
@@ -28,7 +34,7 @@ risc-v-interpreter:
 	@make -C $(RISC_V_INTERPRETER_DIR) build
 
 evm_kernel_unstripped.wasm::
-	@make -C src/kernel_evm build
+	@make -C src/kernel_evm EXCLUDE_MEMBER=evm-evaluation build
 	@cp src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
 
 evm_kernel.wasm:: evm_kernel_unstripped.wasm
