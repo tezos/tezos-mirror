@@ -63,6 +63,8 @@ pub enum NoMatchingOverloadReason {
     ExpectedOption(Type),
     #[error("expected list 'a, but got {0:?}")]
     ExpectedList(Type),
+    #[error("expected or 'a 'b, but got {0:?}")]
+    ExpectedOr(Type),
     #[error("type not comparable: {0:?}")]
     TypeNotComparable(Type),
 }
@@ -310,6 +312,23 @@ fn typecheck_instruction(
         }
         (I::IfCons(..), [.., t]) => no_overload!(IF_CONS, NMOR::ExpectedList(t.clone())),
         (I::IfCons(..), []) => no_overload!(IF_CONS, len 1),
+
+        (I::IfLeft(when_left, when_right), [.., T::Or(..)]) => {
+            // get the list element type
+            let (tl, tr) = *pop!(T::Or);
+            // use main stack as left branch, cloned stack as right
+            let mut right_stack = stack.clone();
+            stack.push(tl);
+            right_stack.push(tr);
+            let mut opt_right_stack = FailingTypeStack::Ok(right_stack);
+            let when_left = typecheck(when_left, ctx, opt_stack)?;
+            let when_right = typecheck(when_right, ctx, &mut opt_right_stack)?;
+            // If stacks unify, all is good
+            unify_stacks(ctx, opt_stack, opt_right_stack)?;
+            I::IfLeft(when_left, when_right)
+        }
+        (I::IfLeft(..), [.., t]) => no_overload!(IF_LEFT, NMOR::ExpectedOr(t.clone())),
+        (I::IfLeft(..), []) => no_overload!(IF_LEFT, len 1),
 
         (I::Int, [.., T::Nat]) => {
             stack[0] = Type::Int;
@@ -1319,6 +1338,73 @@ mod typecheck_tests {
                 stk![],
                 stk![Type::new_list(Type::Int), Type::Int],
                 StacksNotEqualReason::LengthsDiffer(0, 2)
+            ))
+        );
+    }
+
+    #[test]
+    fn if_left() {
+        let mut stack = tc_stk![Type::new_or(Type::Int, Type::Bool)];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_LEFT { GT } {} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![IfLeft(vec![Gt], vec![])])
+        );
+        assert_eq!(stack, tc_stk![Type::Bool]);
+    }
+
+    #[test]
+    fn if_left_too_short() {
+        too_short_test(IfLeft(vec![], vec![]), Prim::IF_LEFT, 1)
+    }
+
+    #[test]
+    fn if_left_same_branch_ty() {
+        let mut stack = tc_stk![Type::new_or(Type::Int, Type::Int)];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_LEFT {} {} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![IfLeft(vec![], vec![])])
+        );
+        assert_eq!(stack, tc_stk![Type::Int]);
+    }
+
+    #[test]
+    fn if_left_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_LEFT {} {} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF_LEFT,
+                stack: stk![Type::String],
+                reason: Some(NoMatchingOverloadReason::ExpectedOr(Type::String))
+            })
+        );
+    }
+
+    #[test]
+    fn if_left_branch_mismatch() {
+        let mut stack = tc_stk![Type::new_or(Type::Int, Type::Nat)];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_LEFT {} {} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::StacksNotEqual(
+                stk![Type::Int],
+                stk![Type::Nat],
+                TypesNotEqual(Type::Int, Type::Nat).into(),
             ))
         );
     }

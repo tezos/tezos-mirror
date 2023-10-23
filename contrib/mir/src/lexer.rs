@@ -93,6 +93,7 @@ defprim! {
     or,
     Left,
     Right,
+    IF_LEFT,
 }
 
 defprim! {

@@ -140,6 +140,7 @@ pub mod interpret_cost {
     pub const IF: u32 = 10;
     pub const IF_NONE: u32 = 10;
     pub const IF_CONS: u32 = 10;
+    pub const IF_LEFT: u32 = 10;
     pub const LOOP: u32 = 10;
     pub const ITER: u32 = 20;
     pub const SWAP: u32 = 10;
