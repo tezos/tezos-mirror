@@ -16,8 +16,8 @@ pub enum InterpretError {
     OutOfGas(#[from] OutOfGas),
     #[error("mutez overflow")]
     MutezOverflow,
-    #[error("failed with: {0:?}")]
-    FailedWith(TypedValue),
+    #[error("failed with: {1:?} of type {0:?}")]
+    FailedWith(Type, TypedValue),
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -219,9 +219,9 @@ fn interpret_one(
             ctx.gas.consume(interpret_cost::SWAP)?;
             stack.swap(0, 1);
         }
-        I::Failwith => {
+        I::Failwith(ty) => {
             let x = pop!();
-            return Err(InterpretError::FailedWith(x));
+            return Err(InterpretError::FailedWith(ty.clone(), x));
         }
         I::Unit => {
             ctx.gas.consume(interpret_cost::UNIT)?;
@@ -529,8 +529,12 @@ mod interpreter_tests {
     #[test]
     fn test_failwith() {
         assert_eq!(
-            interpret_one(&Failwith, &mut Ctx::default(), &mut stk![V::Nat(20)]),
-            Err(InterpretError::FailedWith(V::Nat(20)))
+            interpret_one(
+                &Failwith(Type::Nat),
+                &mut Ctx::default(),
+                &mut stk![V::Nat(20)]
+            ),
+            Err(InterpretError::FailedWith(Type::Nat, V::Nat(20)))
         );
     }
 

@@ -235,7 +235,7 @@ mod tests {
             Ok(ContractScript {
                 parameter: T::Unit,
                 storage: T::Unit,
-                code: Failwith
+                code: Failwith(())
             })
         );
 
