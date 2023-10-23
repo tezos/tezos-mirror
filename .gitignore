@@ -61,6 +61,7 @@ __pycache__
 /octogram
 /simulation-scenario
 /safety-checker
+/risc-v-sandbox
 
 /src/proto_*/parameters/*-parameters.json
 
