@@ -51,7 +51,15 @@ type purpose =
   | Executing_outbox
 
 let operation_kinds =
-  [Publish; Add_messages; Cement; Timeout; Refute; Execute_outbox_message]
+  [
+    Publish;
+    Add_messages;
+    Cement;
+    Timeout;
+    Refute;
+    Recover;
+    Execute_outbox_message;
+  ]
 
 let purposes = [Operating; Batching; Cementing; Recovering; Executing_outbox]
 
