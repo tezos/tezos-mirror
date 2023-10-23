@@ -30,7 +30,7 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file tx_sc_rollup.ml
 
    Tests in this file originate tx kernel rollup
-   from tx-kernel.wasm file using reveal_installer and DAC.
+   from tx_kernel.wasm file using reveal_installer and DAC.
 *)
 
 open Base
@@ -257,34 +257,6 @@ let assert_ticks_advanced ?block sc_rollup_client prev_ticks =
     ~error_msg:"Tick counter did not advance (%L > %R)" ;
   Lwt.return_unit
 
-(* Send a deposit into the rollup. *)
-let test_deposit ~client ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address
-    ~mint_and_deposit_contract level tz4_address =
-  let*! prev_state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
-  let* () =
-    (* Internal message through forwarder *)
-    let arg =
-      sf
-        {|Pair (Pair %S "%s") (Pair 450 "Hello, Ticket!")|}
-        sc_rollup_address
-        tz4_address
-    in
-    Client.transfer
-      client
-      ~hooks
-      ~amount:Tez.zero
-      ~giver:Constant.bootstrap1.alias
-      ~receiver:mint_and_deposit_contract
-      ~arg
-      ~burn_cap:(Tez.of_int 1000)
-  in
-  let* () = Client.bake_for_and_wait client in
-  let* _ =
-    Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + 1)
-  in
-  let* () = assert_state_changed sc_rollup_client prev_state_hash in
-  Lwt.return @@ (level + 1)
-
 let rec bake_until cond client sc_rollup_node =
   let* stop = cond client in
   if stop then unit
@@ -308,9 +280,10 @@ let setup_classic ~commitment_period ~challenge_window protocol =
   in
   let* boot_sector =
     prepare_installer_kernel
+      ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
-      "tx-kernel"
+      "tx_kernel"
   in
   (* Initialise the sc rollup *)
   let* sc_rollup_address =
@@ -334,10 +307,11 @@ let setup_bootstrap ~commitment_period ~challenge_window protocol =
          smart_rollup_node_extra_args;
        } =
     setup_bootstrap_smart_rollup
-      ~name:"tx-kernel"
+      ~base_installee:"./"
+      ~name:"tx_kernel"
       ~address:sc_rollup_address
       ~parameters_ty:"pair string (ticket string)"
-      ~installee:"tx-kernel"
+      ~installee:"tx_kernel"
       ()
   in
   let bootstrap1_key = Constant.bootstrap1.alias in
@@ -361,6 +335,7 @@ let setup_bootstrap ~commitment_period ~challenge_window protocol =
     (client, sc_rollup_node, sc_rollup_address, smart_rollup_node_extra_args)
 
 let tx_kernel_e2e setup protocol =
+  let open Tezt_tx_kernel in
   let commitment_period = 10 and challenge_window = 10 in
   let* client, sc_rollup_node, sc_rollup_address, node_args =
     setup ~commitment_period ~challenge_window protocol
@@ -383,126 +358,110 @@ let tx_kernel_e2e setup protocol =
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
 
   (* Originate a contract that will mint and transfer tickets to the tx kernel. *)
-  (* Originate forwarder contract to send internal messages to rollup *)
-  let* _, mint_and_deposit_contract =
-    Client.originate_contract_at (* ~alias:"rollup_deposit" *)
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.alias
-      ~init:"Unit"
-      ~burn_cap:Tez.(of_int 1)
-      client
-      ["mini_scenarios"; "smart_rollup_mint_and_deposit_ticket"]
-      protocol
+  let* mint_and_deposit_contract =
+    Tezt_tx_kernel.Contracts.prepare_mint_and_deposit_contract client protocol
   in
-  let* () = Client.bake_for_and_wait client in
-  Log.info
-    "The mint and deposit contract %s was successfully originated"
-    mint_and_deposit_contract ;
   let level = init_level + 1 in
 
-  (* gen two tz4 accounts *)
-  let pkh, _pk, sk = Tezos_crypto.Signature.Bls.generate_key () in
-  let pkh2, _pk2, sk2 = Tezos_crypto.Signature.Bls.generate_key () in
-  (* Deposit *)
-  let* level =
-    test_deposit
-      ~client
-      ~sc_rollup_node
-      ~sc_rollup_client
-      ~sc_rollup_address
-      ~mint_and_deposit_contract
-      level
-    @@ Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh
+  (* gen two tz1 accounts *)
+  let pkh1, pk1, sk1 = Tezos_crypto.Signature.Ed25519.generate_key () in
+  let pkh2, pk2, sk2 = Tezos_crypto.Signature.Ed25519.generate_key () in
+  let ticket_content = "Hello, Ticket!" in
+  let ticketer =
+    Tezos_protocol_alpha.Protocol.Contract_hash.to_b58check
+      mint_and_deposit_contract
   in
+
+  (* Deposit *)
+  let* () =
+    Tezt_tx_kernel.Contracts.deposit_string_tickets
+      ~hooks
+      client
+      ~mint_and_deposit_contract:ticketer
+      ~sc_rollup_address
+      ~destination_l2_addr:
+        (Tezos_crypto.Signature.Ed25519.Public_key_hash.to_b58check pkh1)
+      ~ticket_content
+      ~amount:450
+  in
+  let level = level + 1 in
+
   (* Construct transfer *)
-  let ticket amount =
-    Tx_kernel.ticket_of
-      ~ticketer:mint_and_deposit_contract
-      ~content:"Hello, Ticket!"
-      amount
+  let sc_rollup_hash =
+    Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn sc_rollup_address
   in
   let transfer_message =
-    Tx_kernel.(
-      [
-        multiaccount_tx_of
-          [
-            (* Transfer 50 tickets *)
-            account_operations_of
-              ~sk
-              ~counter:0L
-              [Transfer {destination = pkh2; ticket = ticket 60}];
-            (* Transfer 10 tickets back *)
-            account_operations_of
-              ~sk:sk2
-              ~counter:0L
-              [Transfer {destination = pkh; ticket = ticket 10}];
-          ];
-        multiaccount_tx_of
-          [
-            (* Transfer another 10 tickets back but in a separate tx *)
-            account_operations_of
-              ~sk:sk2
-              ~counter:1L
-              [Transfer {destination = pkh; ticket = ticket 10}];
-          ];
-      ]
-      |> transactions_batch_of |> external_message_of_batch)
+    Transaction_batch.(
+      empty
+      |> add_transfer
+           ~counter:0
+           ~signer:(Public_key pk1)
+           ~signer_secret_key:sk1
+           ~destination:pkh2
+           ~ticketer
+           ~ticket_content
+           ~amount:60
+      |> add_transfer
+           ~counter:0
+           ~signer:(Public_key pk2)
+           ~signer_secret_key:sk2
+           ~destination:pkh1
+           ~ticketer
+           ~ticket_content
+           ~amount:10
+      |> make_encoded_batch ~wrap_with:(`External_message_frame sc_rollup_hash)
+      |> hex_encode)
   in
 
   (* Send transfers *)
   let*! prev_state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
   let* () = send_message client (sf "hex:[%S]" transfer_message) in
   let level = level + 1 in
+
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
   let* () = assert_state_changed sc_rollup_client prev_state_hash in
 
-  (* After that pkh has 410 tickets, pkh2 has 40 tickets *)
+  (* After that pkh1 has 400 tickets, pkh2 has 50 tickets *)
 
   (**** Withdrawal part ****)
   (* originate ticket receiver contract *)
-  let* _, receive_tickets_contract =
-    Client.originate_contract_at
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.alias
-      ~init:"{}"
-      ~burn_cap:Tez.(of_int 1)
+  let* receive_tickets_contract =
+    Tezt_tx_kernel.Contracts.prepare_receive_withdrawn_tickets_contract
       client
-      ["mini_scenarios"; "smart_rollup_receive_tickets"]
       protocol
   in
-  let* () = Client.bake_for_and_wait client in
-  Log.info
-    "The receiver contract %s was successfully originated"
-    receive_tickets_contract ;
   let level = level + 1 in
-  (* Construct withdrawal *)
-  let withdrawal_op amount =
-    Tx_kernel.Withdrawal
-      {
-        receiver_contract =
-          Tezos_protocol_alpha.Protocol.Contract_hash.of_b58check_exn
-            receive_tickets_contract;
-        ticket = ticket amount;
-        entrypoint = "receive_tickets";
-      }
-  in
   (* pk withdraws part of his tickets, pk2 withdraws all of his tickets *)
   let withdraw_message =
-    Tx_kernel.(
-      [
-        account_operations_of
-          ~sk
-          ~counter:1L
-          [withdrawal_op 220; withdrawal_op 100];
-        account_operations_of ~sk:sk2 ~counter:2L [withdrawal_op 40];
-      ]
-      |> external_message_of_account_ops)
+    Transaction_batch.(
+      empty
+      |> add_withdraw
+           ~counter:1
+           ~signer:(Public_key pk1)
+           ~signer_secret_key:sk1
+           ~destination:receive_tickets_contract
+           ~entrypoint:"receive_tickets"
+           ~ticketer
+           ~ticket_content
+           ~amount:220
+      |> add_withdraw
+           ~counter:1
+           ~signer:(Public_key pk2)
+           ~signer_secret_key:sk2
+           ~destination:receive_tickets_contract
+           ~entrypoint:"receive_tickets"
+           ~ticketer
+           ~ticket_content
+           ~amount:40
+      |> make_encoded_batch ~wrap_with:(`External_message_frame sc_rollup_hash)
+      |> hex_encode)
   in
   (* Send withdrawal *)
   let*! prev_state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
   let*! prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
   let* () = send_message client (sf "hex:[%S]" withdraw_message) in
-  let withdrawal_level = level + 1 in
+  let level = level + 1 in
+  let withdrawal_level = level in
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node withdrawal_level
   in
@@ -538,27 +497,32 @@ let tx_kernel_e2e setup protocol =
     Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
   in
   Log.info "Outbox is %s" @@ JSON.encode outbox ;
-  let* proof =
-    let message_index = 0 in
+  let execute_outbox_proof ~message_index =
     let outbox_level = withdrawal_level in
-    Sc_rollup_client.outbox_proof sc_rollup_client ~message_index ~outbox_level
-  in
-  let Sc_rollup_client.{commitment_hash; proof} =
+    let* proof =
+      Sc_rollup_client.outbox_proof
+        sc_rollup_client
+        ~message_index
+        ~outbox_level
+    in
     match proof with
-    | Some p -> p
-    | None -> failwith "Unexpected error during proof generation"
+    | Some {commitment_hash; proof} ->
+        let*! () =
+          Client.Sc_rollup.execute_outbox_message
+            ~hooks
+            ~burn_cap:(Tez.of_int 10)
+            ~rollup:sc_rollup_address
+            ~src:Constant.bootstrap1.alias
+            ~commitment_hash
+            ~proof
+            client
+        in
+        Client.bake_for_and_wait client
+    | _ -> failwith "Unexpected error during proof generation"
   in
-  let*! () =
-    Client.Sc_rollup.execute_outbox_message
-      ~hooks
-      ~burn_cap:(Tez.of_int 10)
-      ~rollup:sc_rollup_address
-      ~src:Constant.bootstrap1.alias
-      ~commitment_hash
-      ~proof
-      client
-  in
-  Client.bake_for_and_wait client
+  let* () = execute_outbox_proof ~message_index:0 in
+  let* () = execute_outbox_proof ~message_index:1 in
+  unit
 
 let register_test ?supports ?(regression = false) ~__FILE__ ~tags ~title f =
   let tags = "tx_sc_rollup" :: tags in

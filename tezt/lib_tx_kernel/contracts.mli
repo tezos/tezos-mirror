@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -13,15 +14,16 @@ open Tezos_protocol_alpha.Protocol
 (** Originate a contract that will mint and transfer tickets to the tx kernel.
     Uses the contract [mini_scenarios/smart_rollup_mint_and_deposit_ticket.tz]. *)
 val prepare_mint_and_deposit_contract :
-  Client.t -> Protocol.t -> Contract_hash.t Lwt.t
+  ?hooks:Tezt.Process.hooks -> Client.t -> Protocol.t -> Contract_hash.t Lwt.t
 
 (** Originate ticket receiver contract that will receive withdrawals.
     Uses the contract [mini_scenarios/smart_rollup_receive_tickets.tz]. *)
 val prepare_receive_withdrawn_tickets_contract :
-  Client.t -> Protocol.t -> Contract_hash.t Lwt.t
+  ?hooks:Tezt.Process.hooks -> Client.t -> Protocol.t -> Contract_hash.t Lwt.t
 
-(** [deposit_string_tickets client ~sc_rollup_address ~ticket_content ~mint_and_deposit_contract
-    ~destination_l2_addr ~amount] deposits a string ticket into a rollup.
+(** [deposit_string_tickets ?hooks client ~sc_rollup_address ~ticket_content
+    ~mint_and_deposit_contract ~destination_l2_addr ~amount] deposits a string
+    ticket into a rollup.
 
     @param client The L1 client.
 
@@ -37,6 +39,7 @@ val prepare_receive_withdrawn_tickets_contract :
     @param amount The amount of the ticket we deposit.
 *)
 val deposit_string_tickets :
+  ?hooks:Tezt.Process.hooks ->
   Client.t ->
   mint_and_deposit_contract:string ->
   sc_rollup_address:string ->
