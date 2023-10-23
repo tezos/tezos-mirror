@@ -47,7 +47,7 @@ impl ContractScript<TypecheckedStage> {
         use TypedValue as V;
         match stack.pop().expect("empty execution stack") {
             V::Pair(p) => match *p {
-                (V::List(vec), storage) => Ok((vec, storage)),
+                (V::List(vec), storage) => Ok((vec.into(), storage)),
                 (v, _) => panic!("expected `list operation`, got {:?}", v),
             },
             v => panic!("expected `pair 'a 'b`, got {:?}", v),
@@ -267,18 +267,15 @@ fn interpret_one(
         }
         I::Nil(..) => {
             ctx.gas.consume(interpret_cost::NIL)?;
-            stack.push(V::List(vec![]));
+            stack.push(V::List(MichelsonList::new()));
         }
         I::Cons => {
             ctx.gas.consume(interpret_cost::CONS)?;
             let elt = pop!();
             let mut lst = pop!(V::List);
-            // NB: this unfortunately has O(n) complexity. If we want O(1), we
-            // need to use a linked list to represent lists. It does have a much
-            // higher overall overhead per operation, so we should benchmark
-            // exhaustively first. Alternatively, we could just store lists in
-            // the inverse order, but that's rather convoluted.
-            lst.insert(0, elt);
+            // NB: this is slightly better than lists on average, but needs to
+            // be benchmarked.
+            lst.cons(elt);
             stack.push(V::List(lst));
         }
         I::Get(overload) => match overload {
@@ -810,11 +807,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             interpret(
-                &vec![Push(TypedValue::List(vec![
-                    TypedValue::Int(1),
-                    TypedValue::Int(2),
-                    TypedValue::Int(3),
-                ]))],
+                &vec![Push(TypedValue::List(
+                    vec![TypedValue::Int(1), TypedValue::Int(2), TypedValue::Int(3),].into()
+                ))],
                 &mut ctx,
                 &mut stack
             ),
@@ -822,11 +817,9 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![TypedValue::List(vec![
-                TypedValue::Int(1),
-                TypedValue::Int(2),
-                TypedValue::Int(3),
-            ])]
+            stk![TypedValue::List(
+                vec![TypedValue::Int(1), TypedValue::Int(2), TypedValue::Int(3),].into()
+            )]
         );
         assert_eq!(
             ctx.gas.milligas(),
@@ -839,7 +832,7 @@ mod interpreter_tests {
         let mut stack = stk![];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&vec![Nil(())], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![TypedValue::List(vec![])]);
+        assert_eq!(stack, stk![TypedValue::List(vec![].into())]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
@@ -848,12 +841,12 @@ mod interpreter_tests {
 
     #[test]
     fn cons() {
-        let mut stack = stk![V::List(vec![V::Int(321)]), V::Int(123)];
+        let mut stack = stk![V::List(vec![V::Int(321)].into()), V::Int(123)];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&vec![Cons], &mut ctx, &mut stack), Ok(()));
         assert_eq!(
             stack,
-            stk![TypedValue::List(vec![V::Int(123), V::Int(321)])]
+            stk![TypedValue::List(vec![V::Int(123), V::Int(321)].into())]
         );
         assert_eq!(
             ctx.gas.milligas(),

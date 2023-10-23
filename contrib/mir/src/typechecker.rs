@@ -485,13 +485,11 @@ pub fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, 
             }
             None => TV::new_option(None),
         },
-        (List(ty), V::Seq(vs)) => {
-            let lst: Result<Vec<TypedValue>, TcError> = vs
-                .into_iter()
+        (List(ty), V::Seq(vs)) => TV::List(
+            vs.into_iter()
                 .map(|v| typecheck_value(ctx, ty, v))
-                .collect();
-            TV::List(lst?)
-        }
+                .collect::<Result<_, TcError>>()?,
+        ),
         (Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
             // can only fail if the typechecker is invoked on invalid
@@ -1185,11 +1183,9 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(vec![Push(TypedValue::List(vec![
-                TypedValue::Int(1),
-                TypedValue::Int(2),
-                TypedValue::Int(3),
-            ]))])
+            Ok(vec![Push(TypedValue::List(
+                vec![TypedValue::Int(1), TypedValue::Int(2), TypedValue::Int(3),].into()
+            ))])
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
     }
