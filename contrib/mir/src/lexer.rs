@@ -112,7 +112,7 @@ pub enum PrimWithTzt {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
-#[logos(error = LexerError, skip r"[ \t\r\n\v\f]+")]
+#[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok {
     #[regex(r"[A-Za-z_]+", lex_prim)]
     Prim(PrimWithTzt),
