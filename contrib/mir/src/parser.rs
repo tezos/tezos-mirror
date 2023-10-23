@@ -124,6 +124,24 @@ mod tests {
     }
 
     #[test]
+    fn or_type() {
+        assert_eq!(
+            parse("{ PUSH (or int nat) Unit }").unwrap(),
+            vec![Instruction::Push((
+                Type::new_or(Type::Int, Type::Nat),
+                Value::Unit
+            ))]
+        );
+        // unlike for pairs, there's no linearized syntax for `or`
+        assert_eq!(
+            parse("{ PUSH (or int nat unit) Unit }")
+                .unwrap_err()
+                .to_string(),
+            "Unrecognized token `unit` found at 19:23\nExpected one of \")\""
+        );
+    }
+
+    #[test]
     fn pair_value() {
         assert_eq!(
             parse("{ PUSH unit (Pair 3 4) }").unwrap(),
@@ -190,6 +208,10 @@ mod tests {
         assert_eq!(
             parse_type!("(pair %a (int %b) (int %c))"),
             Ok(T::new_pair(Int, Int))
+        );
+        assert_eq!(
+            parse_type!("(or %a (int %b) (int %c))"),
+            Ok(T::new_or(Int, Int))
         );
         assert_eq!(
             parse_type!("(option %a int %b)")

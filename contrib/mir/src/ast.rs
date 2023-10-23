@@ -29,16 +29,17 @@ pub enum Type {
     List(Box<Type>),
     Operation,
     Map(Box<(Type, Type)>),
+    Or(Box<(Type, Type)>),
 }
 
 impl Type {
     pub fn is_comparable(&self) -> bool {
         use Type::*;
-        match &self {
+        match self {
             List(..) | Map(..) => false,
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(p) => p.0.is_comparable() && p.1.is_comparable(),
+            Pair(p) | Or(p) => p.0.is_comparable() && p.1.is_comparable(),
             Option(x) => x.is_comparable(),
         }
     }
@@ -48,7 +49,7 @@ impl Type {
         match self {
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(p) => p.0.is_packable() && p.1.is_packable(),
+            Pair(p) | Or(p) => p.0.is_packable() && p.1.is_packable(),
             Option(x) | List(x) => x.is_packable(),
             Map(m) => m.1.is_packable(),
         }
@@ -65,7 +66,7 @@ impl Type {
             Type::String => 1,
             Type::Unit => 1,
             Type::Operation => 1,
-            Type::Pair(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
+            Type::Pair(p) | Type::Or(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Type::Option(x) => 1 + x.size_for_gas(),
             Type::List(x) => 1 + x.size_for_gas(),
             Type::Map(m) => 1 + m.0.size_for_gas() + m.1.size_for_gas(),
@@ -86,6 +87,10 @@ impl Type {
 
     pub fn new_map(k: Self, v: Self) -> Self {
         Self::Map(Box::new((k, v)))
+    }
+
+    pub fn new_or(l: Self, r: Self) -> Self {
+        Self::Or(Box::new((l, r)))
     }
 }
 
