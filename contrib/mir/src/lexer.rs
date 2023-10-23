@@ -87,6 +87,7 @@ defprim! {
     GET,
     UPDATE,
     UNPAIR,
+    CONS,
 }
 
 defprim! {

@@ -269,6 +269,18 @@ fn interpret_one(
             ctx.gas.consume(interpret_cost::NIL)?;
             stack.push(V::List(vec![]));
         }
+        I::Cons => {
+            ctx.gas.consume(interpret_cost::CONS)?;
+            let elt = pop!();
+            let mut lst = pop!(V::List);
+            // NB: this unfortunately has O(n) complexity. If we want O(1), we
+            // need to use a linked list to represent lists. It does have a much
+            // higher overall overhead per operation, so we should benchmark
+            // exhaustively first. Alternatively, we could just store lists in
+            // the inverse order, but that's rather convoluted.
+            lst.insert(0, elt);
+            stack.push(V::List(lst));
+        }
         I::Get(overload) => match overload {
             overloads::Get::Map => {
                 let key = pop!();
@@ -831,6 +843,21 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
+        )
+    }
+
+    #[test]
+    fn cons() {
+        let mut stack = stk![V::List(vec![V::Int(321)]), V::Int(123)];
+        let mut ctx = Ctx::default();
+        assert_eq!(interpret(&vec![Cons], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![TypedValue::List(vec![V::Int(123), V::Int(321)])]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::CONS - interpret_cost::INTERPRET_RET,
         )
     }
 
