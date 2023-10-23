@@ -86,6 +86,7 @@ defprim! {
     NIL,
     GET,
     UPDATE,
+    UNPAIR,
 }
 
 defprim! {

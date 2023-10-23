@@ -148,6 +148,7 @@ pub mod interpret_cost {
     pub const CAR: u32 = 10;
     pub const CDR: u32 = 10;
     pub const PAIR: u32 = 10;
+    pub const UNPAIR: u32 = 10;
     pub const SOME: u32 = 10;
     pub const AMOUNT: u32 = 10;
     pub const NIL: u32 = 10;

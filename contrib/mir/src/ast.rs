@@ -264,6 +264,7 @@ pub enum Instruction<T: Stage> {
     Get(T::GetOverload),
     Update(T::UpdateOverload),
     Seq(Vec<Instruction<T>>),
+    Unpair,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
