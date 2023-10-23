@@ -69,7 +69,7 @@ let config_init_command =
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
-    @@ seq_of_param @@ sc_rollup_node_operator_param)
+    @@ seq_of_param @@ operator_param)
     (fun ( force,
            data_dir,
            rpc_addr,
@@ -94,7 +94,7 @@ let config_init_command =
            allowed_headers )
          mode
          sc_rollup_address
-         sc_rollup_node_operators
+         operators
          cctxt ->
       let*? config =
         Configuration.Cli.configuration_from_args
@@ -112,7 +112,7 @@ let config_init_command =
           ~mode
           ~sc_rollup_address
           ~boot_sector_file
-          ~sc_rollup_node_operators
+          ~operators
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
@@ -205,7 +205,7 @@ let legacy_run_command =
           ~mode
           ~sc_rollup_address
           ~boot_sector_file
-          ~sc_rollup_node_operators:[]
+          ~operators:[]
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
@@ -258,7 +258,7 @@ let run_command =
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
-    @@ seq_of_param @@ sc_rollup_node_operator_param)
+    @@ seq_of_param @@ operator_param)
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
@@ -283,7 +283,7 @@ let run_command =
            allowed_headers )
          mode
          sc_rollup_address
-         sc_rollup_node_operators
+         operators
          cctxt ->
       let* configuration =
         Configuration.Cli.create_or_read_config
@@ -301,7 +301,7 @@ let run_command =
           ~injection_ttl
           ~mode:(Some mode)
           ~sc_rollup_address:(Some sc_rollup_address)
-          ~sc_rollup_node_operators
+          ~operators
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug

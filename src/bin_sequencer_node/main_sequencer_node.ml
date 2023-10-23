@@ -132,7 +132,7 @@ let config_init_command =
           ~mode:Configuration.Batcher
           ~sc_rollup_address
           ~boot_sector_file
-          ~sc_rollup_node_operators:[sc_sequencer_operator]
+          ~operators:[sc_sequencer_operator]
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
@@ -216,7 +216,7 @@ let run_command =
           ~injection_ttl
           ~mode:(Some Configuration.Batcher)
           ~sc_rollup_address:(Some sc_rollup_address)
-          ~sc_rollup_node_operators:[sc_sequencer_operator]
+          ~operators:[sc_sequencer_operator]
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug

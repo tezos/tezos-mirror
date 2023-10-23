@@ -108,7 +108,7 @@ type history_mode =
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
-  sc_rollup_node_operators : operators;
+  operators : operators;
   rpc_addr : string;
   rpc_port : int;
   metrics_addr : string option;
@@ -310,7 +310,7 @@ module Cli : sig
     mode:mode ->
     sc_rollup_address:Hashed.Smart_rollup_address.t ->
     boot_sector_file:string option ->
-    sc_rollup_node_operators:
+    operators:
       [< `Default of Signature.public_key_hash
       | `Purpose of purpose * Signature.public_key_hash ]
       trace ->
@@ -340,7 +340,7 @@ module Cli : sig
     mode:mode option ->
     sc_rollup_address:Smart_rollup_alias.Address.t option ->
     boot_sector_file:string option ->
-    sc_rollup_node_operators:
+    operators:
       [< `Default of Signature.public_key_hash
       | `Purpose of purpose * Signature.public_key_hash ]
       list ->

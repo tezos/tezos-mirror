@@ -393,8 +393,7 @@ let run node_ctxt configuration
   in
   let start () =
     let signers =
-      Configuration.Operator_purpose_map.bindings
-        node_ctxt.config.sc_rollup_node_operators
+      Configuration.Operator_purpose_map.bindings node_ctxt.config.operators
       |> List.fold_left
            (fun acc (operation_kind, operator) ->
              let operation_kinds =
@@ -436,11 +435,7 @@ let run node_ctxt configuration
         ~allowed_attempts:configuration.injector.attempts
     in
     let* () =
-      match
-        Configuration.Operator_purpose_map.find
-          Batching
-          node_ctxt.config.sc_rollup_node_operators
-      with
+      match Node_context.get_operator node_ctxt Batching with
       | None -> return_unit
       | Some signer ->
           Components.Batcher.init configuration.batcher ~signer node_ctxt
@@ -609,7 +604,7 @@ let run
       (fun _purpose operator ->
         let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
         ())
-      configuration.sc_rollup_node_operators
+      configuration.operators
   in
   let*! () = Event.waiting_first_block Protocol.hash in
   let* l1_ctxt =
@@ -627,9 +622,7 @@ let run
   in
   let*! () = Event.received_first_block head.hash Protocol.hash in
   let publisher =
-    Configuration.Operator_purpose_map.find
-      Operating
-      configuration.sc_rollup_node_operators
+    Configuration.Operator_purpose_map.find Operating configuration.operators
   in
   let* constants = Layer1_helpers.retrieve_constants cctxt
   and* genesis_info =
