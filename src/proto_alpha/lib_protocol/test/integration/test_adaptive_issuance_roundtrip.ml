@@ -371,8 +371,12 @@ module State = struct
       | None -> account_state
       | Some f -> f account_state
     in
-    let account_map = String.Map.map update_account state.account_map in
-    {state with account_map}
+    let log_updates =
+      List.map
+        (fun (x, _) -> fst @@ find_account_from_pkh x state)
+        (Signature.Public_key_hash.Map.bindings changes)
+    in
+    update_map ~log_updates ~f:(String.Map.map update_account) state
 
   (* TODO *)
   let apply_slashing _pct _delegate_name (state : t) : t = state
