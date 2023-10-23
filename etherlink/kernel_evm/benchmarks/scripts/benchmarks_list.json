@@ -57,7 +57,12 @@
     "benchmarks/bench_linear_erc20.js 20",
     "benchmarks/bench_linear_erc20.js 25",
     "benchmarks/bench_linear_erc20.js 30",
+    "benchmarks/bench_loop_calldataload.js",
+    "benchmarks/bench_linear_transfers.js 200",
+    "benchmarks/bench_linear_erc20.js 200",
+    "benchmarks/bench_linear_erc1155.js 20",
+    "benchmarks/bench_linear_erc1155_create.js 200",
+    "benchmarks/bench_linear_verifySignature.js 200",
     "benchmarks/bench_loop_progressive.js",
-    "benchmarks/bench_loop_expensive.js",
-    "benchmarks/bench_loop_calldataload.js"
+    "benchmarks/bench_loop_expensive.js"
 ]
