@@ -323,10 +323,6 @@ let state_hash ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "state_hash"]
   |> Runnable.map JSON.as_string
 
-let state_current_level ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "state_current_level"]
-  |> Runnable.map JSON.as_int
-
 let status ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "status"]
   |> Runnable.map JSON.as_string

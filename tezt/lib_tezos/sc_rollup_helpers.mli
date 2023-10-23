@@ -367,3 +367,7 @@ val injecting_refute_event : 'a -> Sc_rollup_node.t -> unit Lwt.t
 
 (** [total_ticks ?block sc_rollup_node] gets the total number of ticks for the PVM. *)
 val total_ticks : ?block:string -> Sc_rollup_node.t -> int Lwt.t
+
+(** [state_current_level ?block sc_rollup_node] gets the corresponding PVM state current
+    level for the [block] (default ["head"]). *)
+val state_current_level : ?block:string -> Sc_rollup_node.t -> int Lwt.t

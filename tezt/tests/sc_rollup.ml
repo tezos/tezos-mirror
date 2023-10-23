@@ -4340,10 +4340,10 @@ let test_messages_processed_by_commitment ~kind =
     get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
 
-  let*! current_level =
-    Sc_rollup_client.state_current_level
+  let* current_level =
+    Sc_rollup_helpers.state_current_level
       ~block:(string_of_int inbox_level)
-      sc_rollup_client
+      sc_rollup_node
   in
   Check.((current_level = inbox_level) int)
     ~error_msg:

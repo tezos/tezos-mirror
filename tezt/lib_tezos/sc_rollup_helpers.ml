@@ -1165,3 +1165,8 @@ let total_ticks ?(block = "head") sc_rollup_node =
   let service = "global/block/" ^ block ^ "/total_ticks" in
   let* json = call_rpc ~smart_rollup_node:sc_rollup_node ~service in
   return (JSON.as_int json)
+
+let state_current_level ?(block = "head") sc_rollup_node =
+  let service = "global/block/" ^ block ^ "/state_current_level" in
+  let* json = call_rpc ~smart_rollup_node:sc_rollup_node ~service in
+  return (JSON.as_int json)
