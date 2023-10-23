@@ -13,6 +13,7 @@ module Pool = struct
   type transaction = {
     index : int64; (* Global index of the transaction. *)
     raw_tx : Ethereum_types.hex; (* Current transaction. *)
+    gas_price : Z.t; (* The maximum price the user can pay for fees. *)
   }
 
   type t = {
@@ -23,11 +24,12 @@ module Pool = struct
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
   (** Add a transacion to the pool.*)
-  let add t pkey (raw_tx : Ethereum_types.hex) =
+  let add t pkey base_fee (raw_tx : Ethereum_types.hex) =
     let open Result_syntax in
     let {transactions; global_index} = t in
     let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
-    let transaction = {index = Int64.(add global_index one); raw_tx} in
+    let* gas_price = Ethereum_types.transaction_gas_price base_fee raw_tx in
+    let transaction = {index = global_index; raw_tx; gas_price} in
     (* Add the transaction to the user's transaction map *)
     let transactions =
       Pkey_map.update
@@ -42,7 +44,10 @@ module Pool = struct
                    nonce
                    (function
                      | None -> Some transaction
-                     | Some user_transaction -> Some user_transaction)
+                     | Some user_transaction ->
+                         if gas_price > user_transaction.gas_price then
+                           Some transaction
+                         else Some user_transaction)
                    user_transactions))
         transactions
     in
@@ -177,6 +182,7 @@ let on_transaction state tx_raw =
   let {rollup_node = (module Rollup_node); pool; _} = state in
   Format.printf "[tx-pool] Incoming transaction.\n%!" ;
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
+  let* (Qty base_fee) = Rollup_node.base_fee_per_gas () in
   match is_valid with
   | Error err ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
@@ -184,7 +190,7 @@ let on_transaction state tx_raw =
       return (Error err)
   | Ok pkey ->
       (* Add the tx to the pool*)
-      let*? pool = Pool.add pool pkey tx_raw in
+      let*? pool = Pool.add pool pkey base_fee tx_raw in
       (* compute the hash *)
       let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
