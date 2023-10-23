@@ -2160,6 +2160,7 @@ module Chain = struct
       | None -> Block_repr.create_genesis_block ~genesis genesis_context
       | Some genesis_block -> genesis_block
     in
+    let*! () = Lwt_utils_unix.create_dir (Naming.dir_path chain_dir) in
     (* Block_store.create also stores genesis *)
     let* block_store =
       Block_store.create ?block_cache_limit chain_dir ~genesis_block
