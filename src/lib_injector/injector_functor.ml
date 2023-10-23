@@ -453,8 +453,9 @@ module Make (Parameters : PARAMETERS) = struct
   let add_injected_operations state oph ~injection_level operations =
     let open Lwt_result_syntax in
     let*! () =
-      Event.(emit1 injected_ops)
+      Event.(emit2 injected_ops)
         state
+        oph
         (List.map (fun (_, o) -> o.Inj_operation.operation) operations)
     in
     let infos =
