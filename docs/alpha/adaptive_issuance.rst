@@ -28,7 +28,7 @@
 Adaptive Issuance and Staking
 =============================
 
-This document describes Adaptive Issuance and Staking, two new features of the Oxford protocol, which together constitute a major evolution of Tezos’ :doc:`Proof-of-Stake mechanism <proof_of_stake>`.
+This document describes Adaptive Issuance and Staking, two new features experimented in the Alpha protocol, which together constitute a major evolution of Tezos’ :doc:`Proof-of-Stake mechanism <proof_of_stake>`.
 
 .. note::
 
@@ -58,8 +58,8 @@ The values for participation rewards and
 the LB subsidy, if any, are currently defined by the Tezos protocol using fixed
 constants.
 
-The :doc:`Oxford protocol proposal <../protocols/018_oxford>`
-introduces the possibility to activate Adaptive Issuance: a mechanism where the amount of
+The initial Oxford protocol proposal
+introduced the possibility to activate Adaptive Issuance: a mechanism where the amount of
 *regularly* issued tez (participation rewards and the LB subsidy, if
 active) depends on the global **staked funds ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
@@ -483,7 +483,7 @@ As long as the unstake request is not finalized, the frozen tokens will continue
 to be delegated to the old delegate, however the spending
 balance of the account is accounted in the new delegate's stake.
 It will not be possible to stake with the new delegate as long as there are
-unfinalizable unstake request for token staked with the old delegate. 
+unfinalizable unstake request for token staked with the old delegate.
 
 .. _feature_activation_alpha:
 
