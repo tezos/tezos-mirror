@@ -44,7 +44,7 @@ let make_signers_for_transactions signer block_delay =
   let source = Signature.Public_key_hash.of_b58check_exn signer in
   return
     [
-      ( source,
+      ( [source],
         `Delay_block block_delay,
         [Injector_server.Configuration.Transaction] );
     ]
