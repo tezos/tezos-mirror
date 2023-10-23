@@ -226,6 +226,27 @@ fn interpret_one(
                 }
             }
         }
+        I::Iter(overload, nested) => {
+            ctx.gas.consume(interpret_cost::ITER)?;
+            match overload {
+                overloads::Iter::List => {
+                    let lst = pop!(V::List);
+                    for i in lst {
+                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        stack.push(i);
+                        interpret(nested, ctx, stack)?;
+                    }
+                }
+                overloads::Iter::Map => {
+                    let map = pop!(V::Map);
+                    for (k, v) in map {
+                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        stack.push(V::new_pair(k, v));
+                        interpret(nested, ctx, stack)?;
+                    }
+                }
+            }
+        }
         I::Push(v) => {
             ctx.gas.consume(interpret_cost::PUSH)?;
             stack.push(v.clone());
@@ -545,6 +566,83 @@ mod interpreter_tests {
         )
         .is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_iter_list_many() {
+        let mut stack = stk![
+            V::List(vec![].into()),
+            V::List((1..5).map(V::Int).collect())
+        ];
+        assert!(interpret_one(
+            &Iter(overloads::Iter::List, vec![Cons]),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        // NB: walking a list start-to-end and CONSing each element effectively
+        // reverses the list.
+        assert_eq!(stack, stk![V::List((1..5).rev().map(V::Int).collect())]);
+    }
+
+    #[test]
+    fn test_iter_list_zero() {
+        let mut stack = stk![V::Unit, V::List(vec![].into())];
+        assert!(interpret_one(
+            &Iter(overloads::Iter::List, vec![Drop(None)]),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, stk![V::Unit]);
+    }
+
+    #[test]
+    fn test_iter_map_many() {
+        let mut stack = stk![
+            V::List(vec![].into()),
+            V::Map(
+                vec![
+                    (V::Int(1), V::Nat(1)),
+                    (V::Int(2), V::Nat(2)),
+                    (V::Int(3), V::Nat(3)),
+                ]
+                .into_iter()
+                .collect()
+            )
+        ];
+        assert!(interpret_one(
+            &Iter(overloads::Iter::Map, vec![Cons]),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(
+            stack,
+            stk![V::List(
+                // NB: traversing the map start-to-end, we're CONSing to a
+                // list, thus the first element of the map is the last element
+                // of the list.
+                vec![
+                    V::new_pair(V::Int(3), V::Nat(3)),
+                    V::new_pair(V::Int(2), V::Nat(2)),
+                    V::new_pair(V::Int(1), V::Nat(1)),
+                ]
+                .into()
+            )]
+        );
+    }
+
+    #[test]
+    fn test_iter_map_zero() {
+        let mut stack = stk![V::Int(0), V::Map(BTreeMap::new())];
+        assert!(interpret_one(
+            &Iter(overloads::Iter::Map, vec![Car, Add(overloads::Add::IntInt)]),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, stk![V::Int(0)]);
     }
 
     #[test]

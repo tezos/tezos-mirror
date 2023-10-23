@@ -17,6 +17,7 @@ impl Stage for TypecheckedStage {
     type GetOverload = overloads::Get;
     type UpdateOverload = overloads::Update;
     type FailwithType = Type;
+    type IterOverload = overloads::Iter;
 }
 
 pub type TypecheckedInstruction = Instruction<TypecheckedStage>;
@@ -38,6 +39,12 @@ pub mod overloads {
 
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     pub enum Update {
+        Map,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum Iter {
+        List,
         Map,
     }
 }
