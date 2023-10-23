@@ -9,7 +9,7 @@ let
 
   kernelPackageSet = [
     # Packages required to build & develop kernels
-    (pkgs.rust-bin.stable."1.66.0".default.override {
+    (pkgs.rust-bin.stable."1.71.1".default.override {
       extensions = ["rust-src"];
       targets = [
         "wasm32-unknown-unknown"
