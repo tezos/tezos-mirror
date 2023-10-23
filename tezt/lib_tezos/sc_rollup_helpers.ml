@@ -1170,3 +1170,8 @@ let state_current_level ?(block = "head") sc_rollup_node =
   let service = "global/block/" ^ block ^ "/state_current_level" in
   let* json = call_rpc ~smart_rollup_node:sc_rollup_node ~service in
   return (JSON.as_int json)
+
+let status ?(block = "head") sc_rollup_node =
+  let service = "global/block/" ^ block ^ "/status" in
+  let* json = call_rpc ~smart_rollup_node:sc_rollup_node ~service in
+  return (JSON.as_string json)

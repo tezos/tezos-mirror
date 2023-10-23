@@ -1046,7 +1046,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
       description = "rollup node boots into the initial state";
     }
     ~kind
-  @@ fun _protocol sc_rollup_node sc_rollup_client sc_rollup _node client ->
+  @@ fun _protocol sc_rollup_node _sc_rollup_client sc_rollup _node client ->
   let* genesis_info =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
@@ -1065,7 +1065,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
     Check.int
     ~error_msg:"Unexpected initial tick count (%L = %R)" ;
 
-  let*! status = Sc_rollup_client.status ~hooks sc_rollup_client in
+  let* status = Sc_rollup_helpers.status sc_rollup_node in
   let expected_status =
     match kind with
     | "arith" -> "Halted"

@@ -124,11 +124,6 @@ val inspect_durable_state_value :
   key:string ->
   'a Runnable.process
 
-(** [status ?block client] gets the corresponding PVM status for the [block]
-    (default ["head"]). *)
-val status :
-  ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
-
 (** [outbox ?block outbox_level client] gets the rollup outbox of
    [outbox_level] as known to the [block] (default ["cemented"] which
    is the block corresponding to the last cemented level). *)

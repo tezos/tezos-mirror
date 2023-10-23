@@ -371,3 +371,7 @@ val total_ticks : ?block:string -> Sc_rollup_node.t -> int Lwt.t
 (** [state_current_level ?block sc_rollup_node] gets the corresponding PVM state current
     level for the [block] (default ["head"]). *)
 val state_current_level : ?block:string -> Sc_rollup_node.t -> int Lwt.t
+
+(** [status ?block sc_rollup_node] gets the corresponding PVM status for the [block]
+    (default ["head"]). *)
+val status : ?block:string -> Sc_rollup_node.t -> string Lwt.t

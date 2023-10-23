@@ -323,10 +323,6 @@ let state_hash ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "state_hash"]
   |> Runnable.map JSON.as_string
 
-let status ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "status"]
-  |> Runnable.map JSON.as_string
-
 let outbox ?hooks ?(block = "cemented") ~outbox_level sc_client =
   rpc_get
     ?hooks
