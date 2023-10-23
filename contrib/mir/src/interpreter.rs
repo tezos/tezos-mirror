@@ -8,6 +8,7 @@
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
+use crate::irrefutable_match::irrefutable_match;
 use crate::stack::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -192,6 +193,20 @@ fn interpret_one(
                     interpret(when_some, ctx, stack)?
                 }
                 None => interpret(when_none, ctx, stack)?,
+            }
+        }
+        I::IfCons(when_cons, when_nil) => {
+            ctx.gas.consume(interpret_cost::IF_CONS)?;
+            let lst = irrefutable_match!(&mut stack[0]; V::List);
+            match lst.uncons() {
+                Some(x) => {
+                    stack.push(x);
+                    interpret(when_cons, ctx, stack)?
+                }
+                None => {
+                    pop!();
+                    interpret(when_nil, ctx, stack)?;
+                }
             }
         }
         I::Int => {
@@ -738,6 +753,39 @@ mod interpreter_tests {
             ctx.gas.milligas(),
             Gas::default().milligas()
                 - interpret_cost::IF_NONE
+                - interpret_cost::PUSH
+                - interpret_cost::INTERPRET_RET * 2
+        );
+    }
+
+    #[test]
+    fn if_cons_cons() {
+        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::Int(0))])];
+        let mut stack = stk![V::List(vec![V::Int(1), V::Int(2)].into())];
+        let mut ctx = Ctx::default();
+        assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Int(1)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::IF_CONS
+                - interpret_cost::SWAP
+                - interpret_cost::DROP
+                - interpret_cost::INTERPRET_RET * 2
+        );
+    }
+
+    #[test]
+    fn if_cons_nil() {
+        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::Int(0))])];
+        let mut stack = stk![V::List(vec![].into())];
+        let mut ctx = Ctx::default();
+        assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Int(0)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::IF_CONS
                 - interpret_cost::PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );

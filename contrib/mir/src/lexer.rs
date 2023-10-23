@@ -88,6 +88,7 @@ defprim! {
     UPDATE,
     UNPAIR,
     CONS,
+    IF_CONS,
 }
 
 defprim! {

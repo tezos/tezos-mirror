@@ -294,6 +294,23 @@ fn typecheck_instruction(
         (I::IfNone(..), [.., t]) => no_overload!(IF_NONE, NMOR::ExpectedOption(t.clone())),
         (I::IfNone(..), []) => no_overload!(IF_NONE, len 1),
 
+        (I::IfCons(when_cons, when_nil), [.., T::List(..)]) => {
+            // Clone the cons_stack as we need to push a type on top of it
+            let mut cons_stack: TypeStack = stack.clone();
+            // get the list element type
+            let ty = pop!(T::List);
+            // push it to the cons stack
+            cons_stack.push(*ty);
+            let mut cons_opt_stack = FailingTypeStack::Ok(cons_stack);
+            let when_cons = typecheck(when_cons, ctx, &mut cons_opt_stack)?;
+            let when_nil = typecheck(when_nil, ctx, opt_stack)?;
+            // If stacks unify, all is good
+            unify_stacks(ctx, opt_stack, cons_opt_stack)?;
+            I::IfCons(when_cons, when_nil)
+        }
+        (I::IfCons(..), [.., t]) => no_overload!(IF_CONS, NMOR::ExpectedList(t.clone())),
+        (I::IfCons(..), []) => no_overload!(IF_CONS, len 1),
+
         (I::Int, [.., T::Nat]) => {
             stack[0] = Type::Int;
             I::Int
@@ -1100,6 +1117,55 @@ mod typecheck_tests {
             Ok(vec![IfNone(vec![Push(TypedValue::Int(5))], vec![])])
         );
         assert_eq!(stack, tc_stk![Type::Int]);
+    }
+
+    #[test]
+    fn if_cons() {
+        let mut stack = tc_stk![Type::new_list(Type::Int)];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_CONS { DROP 2 } {} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![IfCons(vec![Drop(Some(2))], vec![])])
+        );
+        assert_eq!(stack, tc_stk![]);
+        too_short_test(IfCons(vec![], vec![]), Prim::IF_CONS, 1)
+    }
+
+    #[test]
+    fn if_cons_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_CONS { DROP 2 } {} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF_CONS,
+                stack: stk![Type::String],
+                reason: Some(NoMatchingOverloadReason::ExpectedList(Type::String))
+            })
+        );
+    }
+
+    #[test]
+    fn if_cons_branch_mismatch() {
+        let mut stack = tc_stk![Type::new_list(Type::Int)];
+        assert_eq!(
+            typecheck(
+                parse("{ IF_CONS {} {} }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::StacksNotEqual(
+                stk![],
+                stk![Type::new_list(Type::Int), Type::Int],
+                StacksNotEqualReason::LengthsDiffer(0, 2)
+            ))
+        );
     }
 
     #[test]
