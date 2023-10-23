@@ -524,6 +524,14 @@ pub fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, 
             let r = typecheck_value(ctx, tr, vr)?;
             TV::new_pair(l, r)
         }
+        (Or(ot), V::Or(val)) => {
+            let (tl, tr) = ot.as_ref();
+            let typed_val = match *val {
+                crate::ast::Or::Left(lv) => crate::ast::Or::Left(typecheck_value(ctx, tl, lv)?),
+                crate::ast::Or::Right(rv) => crate::ast::Or::Right(typecheck_value(ctx, tr, rv)?),
+            };
+            TV::new_or(typed_val)
+        }
         (Option(ty), V::Option(v)) => match v {
             Some(v) => {
                 let v = typecheck_value(ctx, ty, *v)?;
@@ -1074,6 +1082,36 @@ mod typecheck_tests {
                 Type::new_pair(Type::Nat, Type::Bool)
             )]
         );
+    }
+
+    #[test]
+    fn push_or_value_left() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (or int bool) (Left 1) }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(TypedValue::new_or(Or::Left(TypedValue::Int(1))))])
+        );
+        assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Bool)]);
+    }
+
+    #[test]
+    fn push_or_value_right() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck(
+                parse("{ PUSH (or int bool) (Right False) }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Push(TypedValue::new_or(Or::Right(TypedValue::Bool(
+                false
+            ))))])
+        );
+        assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Bool)]);
     }
 
     #[test]

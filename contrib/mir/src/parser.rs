@@ -181,6 +181,17 @@ mod tests {
     }
 
     #[test]
+    fn or_value() {
+        assert_eq!(
+            parse("{ PUSH (or int unit) (Left 3) }").unwrap(),
+            vec![Instruction::Push((
+                Type::new_or(Type::Int, Type::Unit),
+                Value::new_or(Or::Left(Value::Number(3))),
+            ))]
+        );
+    }
+
+    #[test]
     fn value_parens() {
         assert_eq!(
             parse("{ PUSH unit (Unit) }").unwrap(),

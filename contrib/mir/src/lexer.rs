@@ -91,6 +91,8 @@ defprim! {
     IF_CONS,
     ITER,
     or,
+    Left,
+    Right,
 }
 
 defprim! {
