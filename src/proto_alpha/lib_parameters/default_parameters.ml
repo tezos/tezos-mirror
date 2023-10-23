@@ -245,6 +245,7 @@ let constants_mainnet =
                 Raw_level.of_int32_exn Int32.(pred max_int));
           };
         private_enable = true;
+        riscv_pvm_enable = false;
       };
     zk_rollup =
       {

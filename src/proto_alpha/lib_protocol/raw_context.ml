@@ -1051,6 +1051,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                 c.sc_rollup.max_number_of_parallel_games;
               reveal_activation_level;
               private_enable = true;
+              riscv_pvm_enable = false;
             }
         in
         let zk_rollup =

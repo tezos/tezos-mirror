@@ -832,6 +832,7 @@ module Constants : sig
       max_number_of_parallel_games : int;
       reveal_activation_level : sc_rollup_reveal_activation_level;
       private_enable : bool;
+      riscv_pvm_enable : bool;
     }
 
     type zk_rollup = {

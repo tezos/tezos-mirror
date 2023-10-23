@@ -89,6 +89,8 @@ type sc_rollup = {
   (* Activates an updatable whitelist of stakers. Only keys in the whitelist are
      allowed to stake and publish a commitment. *)
   private_enable : bool;
+  (* Activates the RISC-V pvm. *)
+  riscv_pvm_enable : bool;
 }
 
 type zk_rollup = {
