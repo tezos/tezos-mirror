@@ -1,18 +1,44 @@
 {
-    "infrastructure": {
-        "tags": [],
-        "path_prefixes": []
-    },
-    "layer1": {
-        "tags": [],
-        "path_prefixes": []
-    },
-    "tezos2": {
-        "tags": [],
-        "path_prefixes": []
-    },
-    "etherlink": {
-        "tags": [],
-        "path_prefixes": []
-    }
+  "infrastructure": {
+    "tags": [
+      "binaries"
+    ],
+    "path_prefixes": [
+      "devtools/yes_wallet"
+    ]
+  },
+  "layer1": {
+    "tags": [
+      "protocol",
+      "protocol_cache",
+      "protocol_table",
+      "transaction",
+      "transfer"
+    ],
+    "path_prefixes": [
+      "src/lib_requester",
+      "src/proto_alpha/lib_delegate",
+      "devtools/yes_wallet"
+    ]
+  },
+  "tezos2": {
+    "tags": [
+      "dac",
+      "dac_node"
+    ],
+    "path_prefixes": [
+      "src/lib_aplonk",
+      "src/lib_distributed_aplonk"
+    ]
+  },
+  "etherlink": {
+    "tags": [
+      "evm",
+      "sc_rollup",
+      "rollup_node",
+      "refutation",
+      "commitment"
+    ],
+    "path_prefixes": []
+  }
 }
