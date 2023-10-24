@@ -488,9 +488,9 @@ let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
           ~error_msg:
             "Unexpected different DAL committees at first level: %L, versus \
              current level: %R" ;
-        unit)
+        iter (offset + 1))
       else if offset = blocks_per_epoch then (
-        Check.((first_committee = committee) Dal.Committee.typ)
+        Check.((first_committee <> committee) Dal.Committee.typ)
           ~error_msg:
             "Unexpected equal DAL committees at first levels in subsequent \
              epochs: %L and %R" ;
@@ -3226,7 +3226,8 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
      - the messages (shards) that will be notified to dal_node2 on its topic. *)
   let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
-  let* committee = Dal.Committee.at_level node ~level:attested_level in
+  let attestation_level = attested_level - 1 in
+  let* committee = Dal.Committee.at_level node ~level:attestation_level in
 
   let waiter_publish_list =
     waiters_publish_shards
@@ -3422,7 +3423,8 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
 
   let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
-  let* committee = Dal.Committee.at_level node ~level:attested_level in
+  let attestation_level = attested_level - 1 in
+  let* committee = Dal.Committee.at_level node ~level:attestation_level in
 
   let Dal.Committee.{attester; first_shard_index; power} =
     match

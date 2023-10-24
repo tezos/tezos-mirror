@@ -986,7 +986,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               number_of_slots = c.dal.number_of_slots;
               attestation_lag = 4;
               attestation_threshold = c.dal.attestation_threshold;
-              blocks_per_epoch = c.dal.blocks_per_epoch;
+              blocks_per_epoch = 1l;
               cryptobox_parameters;
             }
         in
