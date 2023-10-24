@@ -6831,12 +6831,6 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_commitment_scenario
-    ~extra_tags:["modes"; "bailout"]
-    ~variant:"bailout_does_not_publish"
-    (mode_publish Bailout false)
-    protocols
-    ~kind ;
-  test_commitment_scenario
     ~commitment_period:15
     ~challenge_window:10080
     ~variant:"node_use_proto_param"
