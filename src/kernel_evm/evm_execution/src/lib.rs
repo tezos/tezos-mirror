@@ -201,7 +201,7 @@ mod test {
     const STORAGE_CONTRACT_CALL_SET42: &str =
         "60fe47b1000000000000000000000000000000000000000000000000000000000000002a";
 
-    const CONFIG: Config = Config::london();
+    const CONFIG: Config = Config::shanghai();
 
     // The compiled initialization code for the Ethereum demo contract given
     // as an example in kernel_evm/solidity_examples/erc20tok.sol
@@ -276,7 +276,7 @@ mod test {
         let caller = H160::from_low_u64_be(985493);
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
-        let config = Config::london();
+        let config = Config::shanghai();
 
         set_balance(
             &mut mock_runtime,
@@ -336,7 +336,7 @@ mod test {
         let caller = H160::from_low_u64_be(1234);
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
-        let config = Config::london();
+        let config = Config::shanghai();
 
         set_balance(
             &mut mock_runtime,
