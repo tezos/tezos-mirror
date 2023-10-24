@@ -228,6 +228,11 @@ let list = Storage.Delegates.elements
 let frozen_deposits ctxt delegate =
   Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
 
+let initial_frozen_deposits ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ {initial_amount; _} = frozen_deposits ctxt delegate in
+  initial_amount
+
 let current_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in
   let+ {current_amount; _} = frozen_deposits ctxt delegate in
