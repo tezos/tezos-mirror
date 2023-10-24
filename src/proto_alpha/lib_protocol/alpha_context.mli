@@ -5125,17 +5125,6 @@ module Unstake_requests : sig
   val prepare_finalize_unstake :
     context -> Contract.t -> prepared_finalize_unstake option tzresult Lwt.t
 
-  val update :
-    context -> Contract.t -> stored_requests -> context tzresult Lwt.t
-
-  val add :
-    context ->
-    contract:Contract.t ->
-    delegate:public_key_hash ->
-    Cycle.t ->
-    Tez.t ->
-    context tzresult Lwt.t
-
   module For_RPC : sig
     val apply_slash_to_unstaked_unfinalizable :
       context ->
@@ -5154,20 +5143,6 @@ end
 
 (** This module re-exports definitions from {!Staking_pseudotokens_storage}. *)
 module Staking_pseudotokens : sig
-  val stake :
-    context ->
-    contract:Contract.t ->
-    delegate:public_key_hash ->
-    Tez.t ->
-    context tzresult Lwt.t
-
-  val request_unstake :
-    context ->
-    contract:Contract.t ->
-    delegate:public_key_hash ->
-    Tez.t ->
-    (context * Tez.t) tzresult Lwt.t
-
   module For_RPC : sig
     type t
 
