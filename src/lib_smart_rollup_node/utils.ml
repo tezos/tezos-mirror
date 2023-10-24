@@ -75,3 +75,34 @@ let dictionary_encoding ~keys ~string_of_key ~key_of_string ~value_encoding =
             fields
       | _ -> assert false)
     Data_encoding.Json.encoding
+
+let lock lockfile_path =
+  let open Lwt_result_syntax in
+  let* lockfile =
+    protect @@ fun () ->
+    Lwt_unix.openfile
+      lockfile_path
+      [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+      0o644
+    |> Lwt_result.ok
+  in
+  let* () =
+    trace (Rollup_node_errors.Could_not_acquire_lock lockfile_path)
+    @@ protect ~on_error:(fun err ->
+           let*! () = Lwt_unix.close lockfile in
+           fail err)
+    @@ fun () ->
+    let*! () = Lwt_unix.lockf lockfile Unix.F_LOCK 0 in
+    return_unit
+  in
+  return lockfile
+
+let unlock lockfile =
+  Lwt.finalize
+    (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
+    (fun () -> Lwt_unix.close lockfile)
+
+let with_lockfile lockfile_path f =
+  let open Lwt_result_syntax in
+  let* lockfile = lock lockfile_path in
+  Lwt.finalize f (fun () -> unlock lockfile)
