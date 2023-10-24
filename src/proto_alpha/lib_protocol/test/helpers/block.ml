@@ -1041,13 +1041,113 @@ let bake_until_level ?baking_mode ?policy ?liquidity_baking_toggle_vote
     (fun b -> b.header.shell.level <= Raw_level.to_int32 level)
     b
 
+let balance_update_of_internal_operation_result = function
+  | Protocol.Apply_internal_results.Internal_operation_result (_, iopr) -> (
+      match iopr with
+      | Protocol.Apply_operation_result.Backtracked _ | Failed _ | Skipped _ ->
+          assert false
+      | Applied siopr -> (
+          match siopr with
+          | ITransaction_result
+              (Transaction_to_contract_result {balance_updates; _})
+          | ITransaction_result
+              (Transaction_to_zk_rollup_result {balance_updates; _})
+          | IOrigination_result {balance_updates; _}
+          | IDelegation_result {balance_updates; _} ->
+              balance_updates
+          | ITransaction_result (Transaction_to_sc_rollup_result _)
+          | IEvent_result _ ->
+              []))
+
+let balance_update_of_operation_result :
+    type a.
+    a Protocol.Apply_results.manager_operation_result ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | Protocol.Apply_operation_result.Backtracked _ | Failed _ | Skipped _ ->
+      assert false
+  | Applied siopr -> (
+      match siopr with
+      | Protocol.Apply_results.Transaction_result
+          (Transaction_to_sc_rollup_result _)
+      | Reveal_result _ | Update_consensus_key_result _
+      | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+      | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+      | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
+      | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
+      | Sc_rollup_execute_outbox_message_result _
+      | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
+      | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
+          []
+      | Delegation_result {balance_updates; _}
+      | Transaction_result
+          ( Transaction_to_contract_result {balance_updates; _}
+          | Transaction_to_zk_rollup_result {balance_updates; _} )
+      | Origination_result {balance_updates; _}
+      | Register_global_constant_result {balance_updates; _}
+      | Increase_paid_storage_result {balance_updates; _} ->
+          balance_updates)
+
+let balance_updates_of_single_content :
+    type a.
+    a Protocol.Apply_results.contents_result ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | Dal_attestation_result _ | Proposals_result | Ballot_result -> []
+  | Preattestation_result {balance_updates; _}
+  | Attestation_result {balance_updates; _}
+  | Seed_nonce_revelation_result balance_updates
+  | Vdf_revelation_result balance_updates
+  | Double_attestation_evidence_result balance_updates
+  | Double_preattestation_evidence_result balance_updates
+  | Double_baking_evidence_result balance_updates
+  | Activate_account_result balance_updates
+  | Drain_delegate_result {balance_updates; _} ->
+      balance_updates
+  | Manager_operation_result
+      {balance_updates; internal_operation_results; operation_result} ->
+      balance_updates
+      @ (List.map
+           balance_update_of_internal_operation_result
+           internal_operation_results
+        |> List.flatten)
+      @ balance_update_of_operation_result operation_result
+
+let rec balance_updates_of_contents :
+    type a.
+    a Protocol.Apply_results.contents_result_list ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | Single_result c -> balance_updates_of_single_content c
+  | Cons_result (h, t) ->
+      balance_updates_of_single_content h @ balance_updates_of_contents t
+
+let balance_updates_of_packed_operation_metadata :
+    Protocol.Apply_results.packed_operation_metadata ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | No_operation_metadata -> []
+  | Operation_metadata {contents} -> balance_updates_of_contents contents
+
+let get_balance_updates_from_metadata
+    ( Apply_results.{balance_updates; implicit_operations_results; _},
+      operation_receipts ) =
+  let implicit_balance_updates =
+    List.(
+      map
+        (fun (Protocol.Apply_results.Successful_manager_result r) ->
+          balance_update_of_operation_result (Applied r))
+        implicit_operations_results)
+    |> List.flatten
+  in
+  balance_updates
+  @ (List.map balance_updates_of_packed_operation_metadata operation_receipts
+    |> List.flatten)
+  @ implicit_balance_updates
+
 let bake_n_with_all_balance_updates ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
   let open Lwt_result_syntax in
   let+ b, balance_updates_rev =
     List.fold_left_es
       (fun (b, balance_updates_rev) _ ->
-        let* b, (metadata, _) =
+        let* b, metadata =
           bake_with_metadata
             ?baking_mode
             ?policy
@@ -1056,35 +1156,9 @@ let bake_n_with_all_balance_updates ?baking_mode ?policy
             b
         in
         let balance_updates_rev =
-          List.rev_append metadata.balance_updates balance_updates_rev
-        in
-        let balance_updates_rev =
-          List.fold_left
-            (fun balance_updates_rev ->
-              let open Apply_results in
-              fun (Successful_manager_result r) ->
-                match r with
-                | Transaction_result (Transaction_to_sc_rollup_result _)
-                | Reveal_result _ | Update_consensus_key_result _
-                | Transfer_ticket_result _ | Dal_publish_slot_header_result _
-                | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
-                | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
-                | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
-                | Sc_rollup_execute_outbox_message_result _
-                | Sc_rollup_recover_bond_result _
-                | Zk_rollup_origination_result _ | Zk_rollup_publish_result _
-                | Zk_rollup_update_result _ ->
-                    balance_updates_rev
-                | Delegation_result {balance_updates; _}
-                | Transaction_result
-                    ( Transaction_to_contract_result {balance_updates; _}
-                    | Transaction_to_zk_rollup_result {balance_updates; _} )
-                | Origination_result {balance_updates; _}
-                | Register_global_constant_result {balance_updates; _}
-                | Increase_paid_storage_result {balance_updates; _} ->
-                    List.rev_append balance_updates balance_updates_rev)
+          List.rev_append
             balance_updates_rev
-            metadata.implicit_operations_results
+            (get_balance_updates_from_metadata metadata)
         in
         return (b, balance_updates_rev))
       (b, [])

@@ -315,6 +315,10 @@ val bake_n_with_metadata :
   result
   Lwt.t
 
+val get_balance_updates_from_metadata :
+  block_header_metadata * operation_receipt list ->
+  Alpha_context.Receipt.balance_updates
+
 (** Bake blocks while a predicate over the block holds. The returned
     block is the last one for which the predicate holds; in case the
     predicate never holds, the input block is returned. When the
