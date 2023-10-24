@@ -20,10 +20,12 @@
       baker_nodes_query \
       --db-path <db-path> \
       --experiment-dir <experiment-dir> \
+      --delegates-path <path-to-delegates>
       [--print]
    Requirements:
      <db-path> - path to the teztale database
      <experiment-dir> - path to experiment data folder, which contains the bakers
+     <path-to-delegates> - path to baker addresses, starting from baker directory
      [<print>] - if this flag is set, we print the result of the query
    Description:
      This file contains the tool for querying the teztale database.
@@ -343,7 +345,7 @@ let reorganised_blocks_command db_path print_result =
         ~query_error:(fun e -> Reorganised_blocks_query e))
     map
 
-let baker_nodes_command db_path exp_dir print_result =
+let baker_nodes_command db_path exp_dir path_to_delegates print_result =
   let open Lwt_result_syntax in
   let* db_pool = connect_db db_path in
   (* 1. Create baker_nodes table in teztale db *)
@@ -385,21 +387,31 @@ let baker_nodes_command db_path exp_dir print_result =
       ~query_error:(fun e -> Delegates_of_baker_query e)
   in
   (* [get_delegate_addresses] receives as input a baker directory and
-     returns all the addresses found in "baker_addresses" file *)
-  let get_delegate_addresses baker_dir =
-    let in_channel = open_in (baker_dir // "baker" // "baker_addresses") in
+     returns all the addresses found in the file following the
+     path_to_delegates *)
+  let get_delegate_addresses baker_dir path_to_delegates =
+    let delegate_addresses_file = baker_dir // path_to_delegates in
+    let* () =
+      if not (Sys.file_exists delegate_addresses_file) then
+        tzfail (Experiment_dir delegate_addresses_file)
+      else return_unit
+    in
+    let in_channel = open_in delegate_addresses_file in
     let baker_addresses = In_channel.input_all in_channel in
     close_in in_channel ;
-    List.map
-      Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
-      Str.(split (regexp "\n") baker_addresses)
+    return
+    @@ List.map
+         Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+         Str.(split (regexp "\n") baker_addresses)
   in
   (* 5. Construct the map between baker nodes and delegate addresses *)
-  let baker_delegates_map =
-    Query_set.fold
+  let* baker_delegates_map =
+    Query_set.fold_es
       (fun baker acc ->
-        let delegate_addresses = get_delegate_addresses (exp_dir // baker) in
-        Delegates_map.add baker delegate_addresses acc)
+        let* delegate_addresses =
+          get_delegate_addresses (exp_dir // baker) path_to_delegates
+        in
+        return @@ Delegates_map.add baker delegate_addresses acc)
       bakers_set
       Delegates_map.empty
   in
@@ -462,6 +474,15 @@ let print_arg =
     ~doc:"If print flag is set, the result of the query will be printed."
     ()
 
+let path_to_delegates_arg =
+  let open Lwt_result_syntax in
+  default_arg
+    ~doc:"Path from the baker directories to the delegate addresses"
+    ~long:"delegates-path"
+    ~placeholder:"delegates-path"
+    ~default:"baker/baker_addresses"
+    (parameter @@ fun _ctxt delegates_path -> return delegates_path)
+
 let commands =
   let open Lwt_result_syntax in
   [
@@ -486,12 +507,12 @@ let commands =
     command
       ~group
       ~desc:"Baker nodes query."
-      (args3 db_arg experiment_dir_arg print_arg)
+      (args4 db_arg experiment_dir_arg path_to_delegates_arg print_arg)
       (fixed ["baker_nodes_query"])
-      (fun (db_path, exp_dir, print_result) _cctxt ->
+      (fun (db_path, exp_dir, path_to_delegates, print_result) _cctxt ->
         match (db_path, exp_dir) with
         | Some db_path, Some exp_dir ->
-            baker_nodes_command db_path exp_dir print_result
+            baker_nodes_command db_path exp_dir path_to_delegates print_result
         | None, _ -> tzfail (Db_path "")
         | _, None -> tzfail (Experiment_dir ""));
   ]
