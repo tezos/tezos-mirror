@@ -29,28 +29,3 @@ let get ctxt delegate =
     Storage.Contract.Frozen_deposits.find ctxt delegate
   in
   Option.value ~default:Deposits_repr.zero frozen_deposits_opt
-
-let update_balance ctxt delegate f amount =
-  let open Lwt_result_syntax in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*? new_amount = f frozen_deposits.current_amount amount in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with current_amount = new_amount}
-  in
-  return ctxt
-
-let credit_only_call_from_token ctxt staker amount =
-  let open Lwt_result_syntax in
-  let delegate = Staker_repr.staker_delegate staker in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( +? ) amount in
-  Stake_storage.add_frozen_stake ctxt staker amount
-
-let spend_only_call_from_token ctxt staker amount =
-  let open Lwt_result_syntax in
-  let delegate = Staker_repr.staker_delegate staker in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( -? ) amount in
-  Stake_storage.remove_frozen_stake ctxt staker amount

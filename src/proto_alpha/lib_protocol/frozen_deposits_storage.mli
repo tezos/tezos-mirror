@@ -31,21 +31,3 @@
 (** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt].
     It returns zero if there is no such value. *)
 val get : Raw_context.t -> Contract_repr.t -> Deposits_repr.t tzresult Lwt.t
-
-(** [credit_only_call_from_token ctxt staker tez] returns a new
-    context from [ctxt] where the amount of frozen deposits for the
-    given [staker] increases by [tez]. *)
-val credit_only_call_from_token :
-  Raw_context.t ->
-  Staker_repr.staker ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
-
-(** [spend_only_call_from_token ctxt delegate tez] returns a new context from
-   [ctxt] where the amount of frozen deposits for the implicit contract
-   represented by [delegate] decreases by [tez].*)
-val spend_only_call_from_token :
-  Raw_context.t ->
-  Staker_repr.staker ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
