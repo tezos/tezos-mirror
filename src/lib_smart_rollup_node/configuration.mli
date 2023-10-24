@@ -62,7 +62,7 @@ module Operator_purpose_map : Map.S with type key = purpose
 
 type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
-type fee_parameters = Injector_sigs.fee_parameter Operation_kind_map.t
+type fee_parameters = Injector_common.fee_parameter Operation_kind_map.t
 
 (** Configuration for the batcher.
 
@@ -198,11 +198,10 @@ val default_metrics_port : int
 (** [default_reconnection_delay] is the default value for [reconnection_delay]. *)
 val default_reconnection_delay : float
 
-(** [default_fee_parameter ?operation_kind ()] is the default fee parameter to inject
+(** [default_fee_parameter operation_kind] is the default fee parameter to inject
     operation on L1. If [operation_kind] is provided, it returns the default fee
     parameter for this kind of operation. *)
-val default_fee_parameter :
-  ?operation_kind:operation_kind -> unit -> Injector_sigs.fee_parameter
+val default_fee_parameter : operation_kind -> Injector_common.fee_parameter
 
 (** [default_fee_parameters] is the default fee parameters configuration build
     with {!default_fee_parameter} for all purposes. *)

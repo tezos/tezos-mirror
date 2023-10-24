@@ -26,6 +26,7 @@
 
 open Protocol
 open Alpha_context
+open Injector_common
 open Injector_sigs
 module Block_cache =
   Aches_lwt.Lache.Make_result
@@ -426,7 +427,7 @@ module Proto_client = struct
     in
     let check purpose
         {
-          Injector_sigs.minimal_fees;
+          minimal_fees;
           minimal_nanotez_per_byte;
           minimal_nanotez_per_gas_unit;
           force_low_fee = _;

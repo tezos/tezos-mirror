@@ -77,7 +77,7 @@ end)
 
 type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
-type fee_parameters = Injector_sigs.fee_parameter Operation_kind_map.t
+type fee_parameters = Injector_common.fee_parameter Operation_kind_map.t
 
 type batcher = {
   simulate : bool;
@@ -182,23 +182,9 @@ let default_metrics_port = 9933
 
 let default_reconnection_delay = 2.0 (* seconds *)
 
-let mutez mutez = {Injector_sigs.mutez}
+let mutez mutez = {Injector_common.mutez}
 
 let tez t = mutez Int64.(mul (of_int t) 1_000_000L)
-
-(* Copied from src/proto_alpha/lib_plugin/mempool.ml *)
-
-let default_minimal_fees = mutez 100L
-
-let default_minimal_nanotez_per_gas_unit = Q.of_int 100
-
-let default_minimal_nanotez_per_byte = Q.of_int 1000
-
-let default_force_low_fee = false
-
-let default_fee_cap = tez 1
-
-let default_burn_cap = mutez 0L
 
 (* The below default fee and burn limits are computed by taking into account
    the worst fee found in the tests for the rollup node.
@@ -247,19 +233,15 @@ let default_burn = function
       tez 1
   | Execute_outbox_message -> tez 1
 
-let default_fee_parameter ?operation_kind () =
-  let fee_cap, burn_cap =
-    match operation_kind with
-    | None -> (default_fee_cap, default_burn_cap)
-    | Some kind -> (default_fee kind, default_burn kind)
-  in
+(* Copied from src/proto_alpha/lib_plugin/mempool.ml *)
+let default_fee_parameter operation_kind =
   {
-    Injector_sigs.minimal_fees = default_minimal_fees;
-    minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
-    minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
-    force_low_fee = default_force_low_fee;
-    fee_cap;
-    burn_cap;
+    Injector_common.minimal_fees = mutez 100L;
+    minimal_nanotez_per_byte = Q.of_int 1000;
+    minimal_nanotez_per_gas_unit = Q.of_int 100;
+    force_low_fee = false;
+    fee_cap = default_fee operation_kind;
+    burn_cap = default_burn operation_kind;
   }
 
 let default_fee_parameters =
@@ -267,7 +249,7 @@ let default_fee_parameters =
     (fun acc operation_kind ->
       Operation_kind_map.add
         operation_kind
-        (default_fee_parameter ~operation_kind ())
+        (default_fee_parameter operation_kind)
         acc)
     Operation_kind_map.empty
     operation_kinds
@@ -449,96 +431,10 @@ let operation_kind_map_encoding encoding =
 let operators_encoding =
   operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
 
-(* Encoding for Tez amounts, replicated from mempool. *)
-let tez_encoding =
-  let open Data_encoding in
-  let decode {Injector_sigs.mutez} = Z.of_int64 mutez in
-  let encode =
-    Json.wrap_error (fun i -> {Injector_sigs.mutez = Z.to_int64 i})
-  in
-  Data_encoding.def
-    "mutez"
-    ~title:"A millionth of a tez"
-    ~description:"One million mutez make a tez (1 tez = 1e6 mutez)"
-    (conv decode encode n)
-
-(* Encoding for nano-Tez amounts, replicated from mempool. *)
-let nanotez_encoding =
-  let open Data_encoding in
-  def
-    "nanotez"
-    ~title:"A thousandth of a mutez"
-    ~description:"One thousand nanotez make a mutez (1 tez = 1e9 nanotez)"
-    (conv
-       (fun q -> (q.Q.num, q.Q.den))
-       (fun (num, den) -> {Q.num; den})
-       (tup2 z z))
-
-let fee_parameter_encoding operation_kind =
-  let open Data_encoding in
-  conv
-    (fun {
-           Injector_sigs.minimal_fees;
-           minimal_nanotez_per_byte;
-           minimal_nanotez_per_gas_unit;
-           force_low_fee;
-           fee_cap;
-           burn_cap;
-         } ->
-      ( minimal_fees,
-        minimal_nanotez_per_byte,
-        minimal_nanotez_per_gas_unit,
-        force_low_fee,
-        fee_cap,
-        burn_cap ))
-    (fun ( minimal_fees,
-           minimal_nanotez_per_byte,
-           minimal_nanotez_per_gas_unit,
-           force_low_fee,
-           fee_cap,
-           burn_cap ) ->
-      {
-        minimal_fees;
-        minimal_nanotez_per_byte;
-        minimal_nanotez_per_gas_unit;
-        force_low_fee;
-        fee_cap;
-        burn_cap;
-      })
-    (obj6
-       (dft
-          "minimal-fees"
-          ~description:"Exclude operations with lower fees"
-          tez_encoding
-          default_minimal_fees)
-       (dft
-          "minimal-nanotez-per-byte"
-          ~description:"Exclude operations with lower fees per byte"
-          nanotez_encoding
-          default_minimal_nanotez_per_byte)
-       (dft
-          "minimal-nanotez-per-gas-unit"
-          ~description:"Exclude operations with lower gas fees"
-          nanotez_encoding
-          default_minimal_nanotez_per_gas_unit)
-       (dft
-          "force-low-fee"
-          ~description:
-            "Don't check that the fee is lower than the estimated default"
-          bool
-          default_force_low_fee)
-       (dft
-          "fee-cap"
-          ~description:"The fee cap"
-          tez_encoding
-          (default_fee operation_kind))
-       (dft
-          "burn-cap"
-          ~description:"The burn cap"
-          tez_encoding
-          (default_burn operation_kind)))
-
-let fee_parameters_encoding = operation_kind_map_encoding fee_parameter_encoding
+let fee_parameters_encoding =
+  operation_kind_map_encoding (fun operation_kind ->
+      Injector_common.fee_parameter_encoding
+        ~default_fee_parameter:(default_fee_parameter operation_kind))
 
 let modes =
   [

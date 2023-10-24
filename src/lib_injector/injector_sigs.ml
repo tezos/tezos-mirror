@@ -24,17 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type tez = {mutez : int64}
-
-type fee_parameter = {
-  minimal_fees : tez;
-  minimal_nanotez_per_byte : Q.t;
-  minimal_nanotez_per_gas_unit : Q.t;
-  force_low_fee : bool;
-  fee_cap : tez;
-  burn_cap : tez;
-}
-
 type injection_strategy =
   [ `Each_block  (** Inject pending operations after each new L1 block *)
   | `Delay_block of float
@@ -166,7 +155,7 @@ module type PARAMETERS = sig
 
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
       caps of fee and burn for each operation. *)
-  val fee_parameter : state -> Operation.t -> fee_parameter
+  val fee_parameter : state -> Operation.t -> Injector_common.fee_parameter
 
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
@@ -223,7 +212,7 @@ module type PROTOCOL_CLIENT = sig
     source:Signature.public_key_hash ->
     src_pk:Signature.public_key ->
     successor_level:bool ->
-    fee_parameter:fee_parameter ->
+    fee_parameter:Injector_common.fee_parameter ->
     operation list ->
     ( unsigned_operation simulation_result,
       [`Exceeds_quotas of tztrace | `TzError of tztrace] )

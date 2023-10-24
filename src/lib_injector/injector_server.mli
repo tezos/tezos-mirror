@@ -18,13 +18,13 @@
 module Configuration : sig
   type tag = Transaction
 
-  type fee_parameters = Injector_sigs.fee_parameter
+  type fee_parameters = Injector_common.fee_parameter
 
   val tags : tag trace
 
   val string_of_purpose : tag -> string
 
-  val default_fee_parameters : Injector_sigs.fee_parameter
+  val default_fee_parameters : Injector_common.fee_parameter
 end
 
 type state = {
