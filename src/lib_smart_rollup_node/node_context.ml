@@ -134,6 +134,9 @@ let unlock {lockfile; _} =
     (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
     (fun () -> Lwt_unix.close lockfile)
 
+let processing_lockfile_path ~data_dir =
+  Filename.concat data_dir "processing_lock"
+
 let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   let open Lwt_syntax in
   let path =

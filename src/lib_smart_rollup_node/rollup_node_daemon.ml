@@ -216,6 +216,11 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       in
       return_unit
 
+let update_l2_chain state ~catching_up head =
+  Utils.with_lockfile
+    (Node_context.processing_lockfile_path ~data_dir:state.node_ctxt.data_dir)
+  @@ fun () -> update_l2_chain state ~catching_up head
+
 let missing_data_error trace =
   TzTrace.fold
     (fun acc error ->
