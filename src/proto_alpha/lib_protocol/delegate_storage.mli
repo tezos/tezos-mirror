@@ -109,6 +109,10 @@ val list : Raw_context.t -> Signature.Public_key_hash.t list Lwt.t
 val frozen_deposits :
   Raw_context.t -> Signature.Public_key_hash.t -> Deposits_repr.t tzresult Lwt.t
 
+(** Returns a delegate's current frozen deposits. *)
+val current_frozen_deposits :
+  Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+
 val spendable_balance :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.tez tzresult Lwt.t
 
