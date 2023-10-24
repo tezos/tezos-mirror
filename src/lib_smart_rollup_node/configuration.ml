@@ -357,76 +357,27 @@ let make_purpose_map ~default bindings =
         map
         purposes
 
-let dictionary_encoding (keys : 'k list) (string_of_key : 'k -> string)
-    (key_of_string : string -> 'k) (value_encoding : 'k -> 'v Data_encoding.t) :
-    ('k * 'v) list Data_encoding.t =
-  let open Data_encoding in
-  let schema =
-    let open Json_schema in
-    let value_schema key = Data_encoding.Json.schema (value_encoding key) in
-    let value_schema_r key = root (value_schema key) in
-    let kind =
-      Object
-        {
-          properties =
-            List.map
-              (fun key -> (string_of_key key, value_schema_r key, false, None))
-              keys;
-          pattern_properties = [];
-          additional_properties = None;
-          min_properties = 0;
-          max_properties = None;
-          schema_dependencies = [];
-          property_dependencies = [];
-        }
-    in
-    update
-      (element kind)
-      (value_schema
-         (List.hd keys |> WithExceptions.Option.get ~loc:__LOC__)
-         (* Dummy for definitions *))
-  in
-  conv
-    ~schema
-    (fun map ->
-      let fields =
-        map
-        |> List.map (fun (k, v) ->
-               ( string_of_key k,
-                 Data_encoding.Json.construct (value_encoding k) v ))
-      in
-      `O fields)
-    (function
-      | `O fields ->
-          List.map
-            (fun (k, v) ->
-              let k = key_of_string k in
-              (k, Data_encoding.Json.destruct (value_encoding k) v))
-            fields
-      | _ -> assert false)
-    Data_encoding.Json.encoding
-
-let operator_purpose_map_encoding encoding =
+let operator_purpose_map_encoding value_encoding =
   let open Data_encoding in
   conv
     Operator_purpose_map.bindings
     (fun l -> List.to_seq l |> Operator_purpose_map.of_seq)
-    (dictionary_encoding
-       purposes
-       string_of_purpose
-       purpose_of_string_exn
-       encoding)
+    (Utils.dictionary_encoding
+       ~keys:purposes
+       ~string_of_key:string_of_purpose
+       ~key_of_string:purpose_of_string_exn
+       ~value_encoding)
 
-let operation_kind_map_encoding encoding =
+let operation_kind_map_encoding value_encoding =
   let open Data_encoding in
   conv
     Operation_kind_map.bindings
     (fun l -> List.to_seq l |> Operation_kind_map.of_seq)
-    (dictionary_encoding
-       operation_kinds
-       string_of_operation_kind
-       operation_kind_of_string_exn
-       encoding)
+    (Utils.dictionary_encoding
+       ~keys:operation_kinds
+       ~string_of_key:string_of_operation_kind
+       ~key_of_string:operation_kind_of_string_exn
+       ~value_encoding)
 
 let operators_encoding =
   operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
