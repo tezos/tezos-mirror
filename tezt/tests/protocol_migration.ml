@@ -924,7 +924,10 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
       let expected_count =
         if level_from = post_migration_level then 0 else n_delegates
       in
-      check_attestations ~protocol:migrate_from ~expected_count consensus_ops ;
+      let protocol =
+        if level_from > migration_level then migrate_to else migrate_from
+      in
+      check_attestations ~protocol ~expected_count consensus_ops ;
       check_blocks ~level_from:(level_from + 1) ~level_to)
   in
   check_blocks ~level_from ~level_to
