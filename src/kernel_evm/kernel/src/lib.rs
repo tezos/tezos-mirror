@@ -59,7 +59,7 @@ pub const CHAIN_ID: u32 = 1337;
 pub const BASE_FEE_PER_GAS: u32 = 21_000;
 
 /// The configuration for the EVM execution.
-pub const CONFIG: Config = Config::london();
+pub const CONFIG: Config = Config::shanghai();
 
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
