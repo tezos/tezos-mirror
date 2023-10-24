@@ -81,7 +81,8 @@ let repeat_spec =
         ("repeat", scalar "until"); ("repeat-until", scalar (Ast.to_string expr));
       ]
   | RepeatEos -> [("repeat", scalar "eos")]
-  | RepeatExpr _ -> failwith "not supported (RepeatExpr)"
+  | RepeatExpr expr ->
+      [("repeat", scalar "expr"); ("repeat-expr", scalar (Ast.to_string expr))]
 
 let if_spec = function
   | None -> []
