@@ -751,6 +751,9 @@ let prequorum_reached_when_awaiting_preattestations state candidate
 let quorum_reached_when_waiting_attestations state candidate attestation_qc =
   let open Lwt_syntax in
   let latest_proposal = state.level_state.latest_proposal in
+  let is_latest_proposal_applied =
+    state.level_state.is_latest_proposal_applied
+  in
   if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
     let* () =
@@ -761,19 +764,34 @@ let quorum_reached_when_waiting_attestations state candidate attestation_qc =
     in
     do_nothing state
   else
-    let new_level_state =
+    let new_round_state, new_level_state =
       match state.level_state.elected_block with
-      | None ->
+      | None when is_latest_proposal_applied ->
+          (* The elected proposal has been applied. Record the elected block
+             and transition to the Idle phase, as there is nothing left to do.
+          *)
           let elected_block =
             Some {proposal = latest_proposal; attestation_qc}
           in
-          {state.level_state with elected_block}
-      | Some _ ->
+          let new_level_state = {state.level_state with elected_block} in
+          let new_round_state = {state.round_state with current_phase = Idle} in
+          (new_round_state, new_level_state)
+      | None ->
+          (* A quorum has been reached, but the elected proposal has not been
+             applied yet by the node. Transition in the `Awaiting_application`
+             phase, and do not save the elected block in the state. This avoids
+             the proposer of a block at the next level to inject a proposal
+             before the node has been applied the proposal elected at this
+             level. *)
+          let new_round_state =
+            {state.round_state with current_phase = Awaiting_application}
+          in
+          (new_round_state, state.level_state)
+      | _ ->
           (* If we already have an elected block, do not update it: the
              earliest, the better. *)
-          state.level_state
+          (state.round_state, state.level_state)
     in
-    let new_round_state = {state.round_state with current_phase = Idle} in
     let new_state =
       {state with round_state = new_round_state; level_state = new_level_state}
     in
