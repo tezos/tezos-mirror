@@ -22,12 +22,3 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(** Simple abstraction from low-level storage to handle frozen deposits.
-
-    This module is responsible for maintaining the
-    {!Storage.Contract.Frozen_deposits} table. *)
-
-(** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt].
-    It returns zero if there is no such value. *)
-val get : Raw_context.t -> Contract_repr.t -> Deposits_repr.t tzresult Lwt.t

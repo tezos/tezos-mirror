@@ -22,10 +22,3 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-let get ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ frozen_deposits_opt =
-    Storage.Contract.Frozen_deposits_up_to_Nairobi.find ctxt delegate
-  in
-  Option.value ~default:Deposits_repr.zero frozen_deposits_opt
