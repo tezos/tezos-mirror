@@ -91,6 +91,7 @@
   Michelson_v1_gas_costs
   Sc_rollup_repr
   Sc_rollup_metadata_repr
+  Sc_rollup_dal_parameters_repr
   Sc_rollup_tick_repr
   Sc_rollup_inbox_message_repr
   Sc_rollup_inbox_merkelized_payload_hashes_repr
@@ -382,6 +383,7 @@
   michelson_v1_gas_costs.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
+  sc_rollup_dal_parameters_repr.ml sc_rollup_dal_parameters_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_inbox_merkelized_payload_hashes_repr.ml
@@ -677,6 +679,7 @@
   michelson_v1_gas_costs.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
+  sc_rollup_dal_parameters_repr.ml sc_rollup_dal_parameters_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_inbox_merkelized_payload_hashes_repr.ml
@@ -956,6 +959,7 @@
   michelson_v1_gas_costs.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
+  sc_rollup_dal_parameters_repr.ml sc_rollup_dal_parameters_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_inbox_merkelized_payload_hashes_repr.ml

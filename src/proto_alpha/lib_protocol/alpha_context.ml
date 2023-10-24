@@ -63,6 +63,7 @@ module Sc_rollup = struct
   end
 
   module Metadata = Sc_rollup_metadata_repr
+  module Dal_parameters = Sc_rollup_dal_parameters_repr
   module Dissection_chunk = Sc_rollup_dissection_chunk_repr
   include Sc_rollup_PVM_sig
   module ArithPVM = Sc_rollup_arith

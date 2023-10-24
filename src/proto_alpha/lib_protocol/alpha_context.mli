@@ -2972,6 +2972,22 @@ module Sc_rollup : sig
     val encoding : t Data_encoding.t
   end
 
+  (** See {!Sc_rollup_dal_parameters_repr}. *)
+  module Dal_parameters : sig
+    type t = {
+      number_of_slots : int64;
+      attestation_lag : int64;
+      slot_size : int64;
+      page_size : int64;
+    }
+
+    val pp : Format.formatter -> t -> unit
+
+    val equal : t -> t -> bool
+
+    val encoding : t Data_encoding.t
+  end
+
   (** See {!Sc_rollup_inbox_message_repr}. *)
   module Inbox_message : sig
     type internal_inbox_message =
