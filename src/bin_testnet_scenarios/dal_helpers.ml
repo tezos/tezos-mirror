@@ -226,7 +226,7 @@ module Wallet = struct
                keys))
         else return ()
       in
-      Log.info "\nReveal wallet addresses if needed..." ;
+      Log.info "Reveal wallet addresses if needed..." ;
       reveal_accounts client keys
   end
 

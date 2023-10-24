@@ -1769,6 +1769,7 @@ module Sc_rollup : sig
   val originate :
     ?hooks:Process.hooks ->
     ?wait:string ->
+    ?force:bool ->
     ?burn_cap:Tez.t ->
     ?whitelist:string list ->
     alias:string ->
@@ -1783,6 +1784,7 @@ module Sc_rollup : sig
   val spawn_originate :
     ?hooks:Process.hooks ->
     ?wait:string ->
+    ?force:bool ->
     ?burn_cap:Tez.t ->
     ?whitelist:string list ->
     alias:string ->
