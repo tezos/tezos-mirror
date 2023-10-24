@@ -20,10 +20,12 @@
       baker_nodes_query \
       --db-path <db-path> \
       --experiment-dir <experiment-dir> \
+      --delegates-path <path-to-delegates>
       [--print]
    Requirements:
      <db-path> - path to the teztale database
      <experiment-dir> - path to experiment data folder, which contains the bakers
+     <path-to-delegates> - path to baker addresses, starting from baker directory
      [<print>] - if this flag is set, we print the result of the query
    Description:
      This file contains the tool for querying the teztale database.
@@ -32,12 +34,16 @@
      increasing order as they appear in the canonical chain from the db;
      - reorganised_blocks_query : get table (id, block_id, level, round) of block ids
      which are not part of the canonical chain, together with more detailed info.
+     - baker_nodes_query : get table (id, pod_name) of baker nodes which took part
+     in the experiment, additionally get table (id, baker_id, delegate_id) which
+     links these bakers to their respective delegates
 *)
 
 open Filename.Infix
 open Tezos_clic
 open Teztale_sql_queries
 module Query_map = Map.Make (Int)
+module Delegates_map = Map.Make (String)
 module Query_set = Set.Make (String)
 
 let group = {name = "devtools"; title = "Command for querying the teztale db"}
@@ -51,6 +57,7 @@ type error +=
   | Canonical_chain_query of string
   | Reorganised_blocks_query of string
   | Baker_nodes_query of string
+  | Delegates_of_baker_query of string
   | Experiment_dir of string
 
 let () =
@@ -115,6 +122,19 @@ let () =
     (fun s -> Baker_nodes_query s) ;
   register_error_kind
     `Permanent
+    ~id:"get_teztale_data.delegates_of_baker_query"
+    ~title:"Failed to create delegates_of_baker_query table"
+    ~description:"delegates_of_baker_query table must be created"
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "delegates_of_baker_query table could not be created : %s"
+        s)
+    Data_encoding.(obj1 (req "arg" string))
+    (function Delegates_of_baker_query s -> Some s | _ -> None)
+    (fun s -> Delegates_of_baker_query s) ;
+  register_error_kind
+    `Permanent
     ~id:"get_teztale_data.experiment_dir"
     ~title:"Experiment directory path provided was invalid"
     ~description:"Experiment directory path must be valid"
@@ -134,6 +154,8 @@ let add_canonical_chain_row (block_id, predecessor) acc =
 
 let add_reorganised_blocks_row (block_id, block_hash, level, round) acc =
   Query_map.add block_id (Block_hash.to_b58check block_hash, level, round) acc
+
+let add_delegates_row (id, address) acc = Query_map.add id address acc
 
 (** [find_key_by_value]: searches the first key in [map] with 
     corresponding value [v] *)
@@ -234,6 +256,18 @@ let print_reorganised_blocks =
         level
         round)
 
+let print_baker_nodes map =
+  Delegates_map.iter
+    (fun baker delegate_addresses ->
+      Format.printf "Baker: %s@." baker ;
+      List.iter
+        (fun delegate_address ->
+          Format.printf "%s @,"
+          @@ Tezos_crypto.Signature.Public_key_hash.to_b58check delegate_address)
+        delegate_addresses ;
+      Format.printf "@.")
+    map
+
 (* Commands. *)
 
 (** [connect_db]: establishes connection with the (sqlite) teztale db
@@ -311,7 +345,7 @@ let reorganised_blocks_command db_path print_result =
         ~query_error:(fun e -> Reorganised_blocks_query e))
     map
 
-let baker_nodes_command db_path exp_dir print_result =
+let baker_nodes_command db_path exp_dir path_to_delegates print_result =
   let open Lwt_result_syntax in
   let* db_pool = connect_db db_path in
   (* 1. Create baker_nodes table in teztale db *)
@@ -328,23 +362,87 @@ let baker_nodes_command db_path exp_dir print_result =
   let dir_contents =
     Query_set.of_list @@ Array.to_list @@ Sys.readdir exp_dir
   in
-  let set =
+  let bakers_set =
     Query_set.filter
       (fun entry ->
         Sys.is_directory (exp_dir // entry) && Str.string_match regex entry 0)
       dir_contents
   in
-  (* 3. Optional printing of the result *)
-  if print_result then Query_set.iter (Format.printf "Baker: %s@.") set ;
-  (* 4. Populate the baker_nodes table *)
-  Query_set.iter_es
-    (fun pod_name ->
-      insert_entry
-        ~db_pool
-        ~query:insert_baker_nodes_entry_query
-        ~entry:pod_name
-        ~query_error:(fun e -> Baker_nodes_query e))
-    set
+  (* 3. Populate the baker_nodes table *)
+  let* () =
+    Query_set.iter_es
+      (fun pod_name ->
+        insert_entry
+          ~db_pool
+          ~query:insert_baker_nodes_entry_query
+          ~entry:pod_name
+          ~query_error:(fun e -> Baker_nodes_query e))
+      bakers_set
+  in
+  (* 4. Create delegates_of_baker table *)
+  let* () =
+    create_table
+      ~db_pool
+      ~query:create_delegates_of_baker_table_query
+      ~query_error:(fun e -> Delegates_of_baker_query e)
+  in
+  (* [get_delegate_addresses] receives as input a baker directory and
+     returns all the addresses found in the file following the
+     path_to_delegates *)
+  let get_delegate_addresses baker_dir path_to_delegates =
+    let delegate_addresses_file = baker_dir // path_to_delegates in
+    let* () =
+      if not (Sys.file_exists delegate_addresses_file) then
+        tzfail (Experiment_dir delegate_addresses_file)
+      else return_unit
+    in
+    let in_channel = open_in delegate_addresses_file in
+    let baker_addresses = In_channel.input_all in_channel in
+    close_in in_channel ;
+    return
+    @@ List.map
+         Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+         Str.(split (regexp "\n") baker_addresses)
+  in
+  (* 5. Construct the map between baker nodes and delegate addresses *)
+  let* baker_delegates_map =
+    Query_set.fold_es
+      (fun baker acc ->
+        let* delegate_addresses =
+          get_delegate_addresses (exp_dir // baker) path_to_delegates
+        in
+        return @@ Delegates_map.add baker delegate_addresses acc)
+      bakers_set
+      Delegates_map.empty
+  in
+  (* 6. Optional printing of the result *)
+  if print_result then print_baker_nodes baker_delegates_map ;
+  (* 7. Get delegates map *)
+  let* delegates_map =
+    get_entries
+      ~db_pool
+      ~query:get_delegate_address_query
+      ~add_to_map:add_delegates_row
+      ~arg:()
+      ~query_error:(fun e -> Delegates_of_baker_query e)
+  in
+  (* 8. Populate the delegates_of_baker table *)
+  Delegates_map.iter_es
+    (fun baker delegate_addresses ->
+      List.iter_es
+        (fun delegate_address ->
+          let delegate_id =
+            Option.value
+              (find_key_by_value delegates_map delegate_address)
+              ~default:(-1)
+          in
+          insert_entry
+            ~db_pool
+            ~query:insert_delegates_of_baker_entry_query
+            ~entry:(baker, delegate_id)
+            ~query_error:(fun e -> Delegates_of_baker_query e))
+        delegate_addresses)
+    baker_delegates_map
 
 (* Arguments. *)
 
@@ -376,6 +474,15 @@ let print_arg =
     ~doc:"If print flag is set, the result of the query will be printed."
     ()
 
+let path_to_delegates_arg =
+  let open Lwt_result_syntax in
+  default_arg
+    ~doc:"Path from the baker directories to the delegate addresses"
+    ~long:"delegates-path"
+    ~placeholder:"delegates-path"
+    ~default:"baker/baker_addresses"
+    (parameter @@ fun _ctxt delegates_path -> return delegates_path)
+
 let commands =
   let open Lwt_result_syntax in
   [
@@ -400,12 +507,12 @@ let commands =
     command
       ~group
       ~desc:"Baker nodes query."
-      (args3 db_arg experiment_dir_arg print_arg)
+      (args4 db_arg experiment_dir_arg path_to_delegates_arg print_arg)
       (fixed ["baker_nodes_query"])
-      (fun (db_path, exp_dir, print_result) _cctxt ->
+      (fun (db_path, exp_dir, path_to_delegates, print_result) _cctxt ->
         match (db_path, exp_dir) with
         | Some db_path, Some exp_dir ->
-            baker_nodes_command db_path exp_dir print_result
+            baker_nodes_command db_path exp_dir path_to_delegates print_result
         | None, _ -> tzfail (Db_path "")
         | _, None -> tzfail (Experiment_dir ""));
   ]
