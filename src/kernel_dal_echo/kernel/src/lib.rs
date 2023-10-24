@@ -26,11 +26,35 @@ fn process_slot(
         );
 
         match result {
-            Ok(_) => {}
+            Ok(num) if num == 0 => {
+                // Currently, we send empty pages to kernels for non-attested slots.
+                debug_msg!(
+                    host,
+                    "Slot {} not attested for level {}\n",
+                    slot_index,
+                    published_level
+                );
+                return;
+            }
+            Ok(num) => {
+                debug_msg!(
+                    host,
+                    "Retrieved page {} for level {}, slot index {} successfully. {} bytes read\n",
+                    page_index,
+                    published_level,
+                    slot_index,
+                    num
+                );
+                let slot_path = format!("/output/slot-{}", slot_index);
+                let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
+                host.store_write(&path, &buffer, 0)
+                    .map_err(|_| "Error writing to storage".to_string())
+                    .unwrap_or_default();
+            }
             Err(err) => {
                 debug_msg!(
                     host,
-                    "Failed to retrieve one of the pages. Slot {} not processed. Error: {}",
+                    "Failed to retrieve one of the pages. Slot {} not processed. Error: {}\n",
                     slot_index,
                     &err.to_string()
                 );
@@ -39,13 +63,6 @@ fn process_slot(
             }
         }
     }
-
-    debug_msg!(host, "Writing buffer with size {}\n", buffer.len());
-    let slot_path = format!("/output/slot-{}", slot_index);
-    let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
-    host.store_write(&path, &buffer, 0)
-        .map_err(|_| "Error writing to storage".to_string())
-        .unwrap_or_default();
 }
 
 #[derive(Debug)]
