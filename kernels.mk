@@ -1,5 +1,6 @@
 KERNELS = evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm
 SDK_DIR=src/kernel_sdk
+RISC_V_SANDBOX_DIR=src/risc_v/sandbox
 EVM_DIR=src/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
 SEQUENCER_DIR=src/kernel_sequencer
@@ -13,6 +14,11 @@ all: build-dev-deps check test build
 kernel_sdk:
 	@make -C src/kernel_sdk build
 	@cp src/kernel_sdk/target/$(NATIVE_TARGET)/release/smart-rollup-installer .
+
+.PHONY: risc-v-sandbox
+risc-v-sandbox:
+	@make -C $(RISC_V_SANDBOX_DIR) build
+	@ln -f $(RISC_V_SANDBOX_DIR)/target/$(NATIVE_TARGET)/release/risc-v-sandbox $@
 
 evm_kernel_unstripped.wasm::
 	@make -C src/kernel_evm build
@@ -80,11 +86,12 @@ dal_echo_kernel.wasm:
 	@wasm-strip $@
 
 .PHONY: build
-build: ${KERNELS} kernel_sdk
+build: ${KERNELS} kernel_sdk risc-v-sandbox
 
 .PHONY: build-dev-deps
 build-dev-deps: build-deps
 	@make -C ${SDK_DIR} build-dev-deps
+	@make -C ${RISC_V_SANDBOX_DIR} build-dev-deps
 	@make -C ${EVM_DIR} build-dev-deps
 	@make -C ${SEQUENCER_DIR} build-dev-deps
 	@make -C ${DEMO_DIR} build-dev-deps
@@ -92,6 +99,7 @@ build-dev-deps: build-deps
 .PHONY: build-deps
 build-deps:
 	@make -C ${SDK_DIR} build-deps
+	@make -C ${RISC_V_SANDBOX_DIR} build-deps
 	@make -C ${EVM_DIR} build-deps
 	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
@@ -99,6 +107,7 @@ build-deps:
 .PHONY: test
 test:
 	@make -C ${SDK_DIR} test
+	@make -C ${RISC_V_SANDBOX_DIR} test
 	@make -C ${EVM_DIR} test
 	@make -C ${SEQUENCER_DIR} test
 	@make -C ${DEMO_DIR} test
@@ -106,6 +115,7 @@ test:
 .PHONY: check
 check:
 	@make -C ${SDK_DIR} check
+	@make -C ${RISC_V_SANDBOX_DIR} check
 	@make -C ${EVM_DIR} check
 	@make -C ${SEQUENCER_DIR} check
 	@make -C ${DEMO_DIR} check
@@ -122,7 +132,9 @@ publish-sdk:
 clean:
 	@rm -f ${KERNELS}
 	@make -C ${SDK_DIR} clean
+	@make -C ${RISC_V_SANDBOX_DIR} clean
 	@make -C ${EVM_DIR} clean
 	@make -C ${SEQUENCER_DIR} clean
 	@make -C ${DEMO_DIR} clean
 	@rm -rf ${EVM_KERNEL_PREIMAGES}
+	@rm -f risc-v-sandbox
