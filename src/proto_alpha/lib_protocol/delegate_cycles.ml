@@ -55,10 +55,10 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
   in
   List.fold_left_es
     (fun ctxt (delegate, _stake) ->
-      let delegate_contract = Contract_repr.Implicit delegate in
-      let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
-      let current_amount = deposits.current_amount in
-      if Tez_repr.(current_amount = zero) then
+      let* current_deposits =
+        Delegate_storage.current_frozen_deposits ctxt delegate
+      in
+      if Tez_repr.(current_deposits = zero) then
         (* If the delegate's current deposit remains at zero then we add it to
            the forbidden set. *)
         let*! ctxt = Delegate_storage.forbid_delegate ctxt delegate in
