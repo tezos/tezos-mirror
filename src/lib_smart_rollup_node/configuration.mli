@@ -37,19 +37,6 @@ type mode =
       (** In this mode, the system handles only the specific operation kinds
         defined by the user, allowing for tailored control and flexibility. *)
 
-(** Purposes for operators, indicating their role and thus the kinds of
-    operations that they sign. *)
-type purpose =
-  | Operating
-  | Batching
-  | Cementing
-  | Recovering
-  | Executing_outbox
-
-module Operator_purpose_map : Map.S with type key = purpose
-
-type operators = Signature.Public_key_hash.t Operator_purpose_map.t
-
 (** Configuration for the batcher.
 
   Invariants:
@@ -94,7 +81,7 @@ type history_mode =
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
-  operators : operators;
+  operators : Purpose.operators;
   rpc_addr : string;
   rpc_port : int;
   metrics_addr : string option;
@@ -127,17 +114,6 @@ type error +=
   | Missing_mode_operators of {mode : string; missing_operators : string list}
   | Empty_operation_kinds_for_custom_mode
 
-(** [make_purpose_map ~default purposes] constructs a purpose map from a list of
-    bindings [purposes], with a potential [default] value. *)
-val make_purpose_map :
-  default:'a option -> (purpose * 'a) trace -> 'a Operator_purpose_map.t
-
-(** [purpose_of_string s] parses a purpose from the given string [s]. *)
-val purpose_of_string : string -> purpose option
-
-(** [string_of_purpose p] returns a string representation of purpose [p]. *)
-val string_of_purpose : purpose -> string
-
 (** [history_mode_of_string s] parses a history_mode from the given string
     [s]. *)
 val history_mode_of_string : string -> history_mode
@@ -145,12 +121,6 @@ val history_mode_of_string : string -> history_mode
 (** [string_of_history_mode p] returns a string representation of history_mode
     [p]. *)
 val string_of_history_mode : history_mode -> string
-
-(** List of possible purposes for operator specialization. *)
-val purposes : purpose list
-
-(* For each purpose, it returns a list of associated operation kinds. *)
-val operation_kinds_of_purpose : purpose -> Operation_kind.t list
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
@@ -227,16 +197,12 @@ val description_of_mode : mode -> string
     the configration filename from the [data_dir] *)
 val config_filename : data_dir:string -> string
 
-(** [purposes_of_operation_kinds op_kinds] map a list of operation kinds
-    to their corresponding purposes based on their presence in the input list *)
-val purposes_of_operation_kinds : Operation_kind.t list -> purpose list
-
 (** [check_mode config] ensures the operators correspond to the chosen mode and
     removes the extra ones. *)
 val check_mode : t -> t tzresult
 
 (** [purposes_of_mode mode] returns purposes associated with the provided mode. *)
-val purposes_of_mode : mode -> purpose list
+val purposes_of_mode : mode -> Purpose.t list
 
 (** [operation_kinds_of_mode mode] returns operation kinds with the provided mode. *)
 val operation_kinds_of_mode : mode -> Operation_kind.t list
@@ -247,7 +213,7 @@ val can_inject : mode -> Operation_kind.t -> bool
 
 (** [purpose_matches_mode mode purpose] returns true if and only if the given [mode]
     supports the given [purpose]. *)
-val purpose_matches_mode : mode -> purpose -> bool
+val purpose_matches_mode : mode -> Purpose.t -> bool
 
 (** Number of levels the refutation player waits until trying to play
     for a game state it already played before. *)
@@ -293,8 +259,8 @@ module Cli : sig
     boot_sector_file:string option ->
     operators:
       [< `Default of Signature.public_key_hash
-      | `Purpose of purpose * Signature.public_key_hash ]
-      trace ->
+      | `Purpose of Purpose.t * Signature.public_key_hash ]
+      list ->
     index_buffer_size:int option ->
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
@@ -323,7 +289,7 @@ module Cli : sig
     boot_sector_file:string option ->
     operators:
       [< `Default of Signature.public_key_hash
-      | `Purpose of purpose * Signature.public_key_hash ]
+      | `Purpose of Purpose.t * Signature.public_key_hash ]
       list ->
     index_buffer_size:int option ->
     irmin_cache_size:int option ->

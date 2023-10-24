@@ -74,10 +74,10 @@ type rw = [`Read | `Write] t
 type ro = [`Read] t
 
 let get_operator node_ctxt purpose =
-  Configuration.Operator_purpose_map.find purpose node_ctxt.config.operators
+  Purpose.Map.find purpose node_ctxt.config.operators
 
 let is_operator node_ctxt pkh =
-  Configuration.Operator_purpose_map.exists
+  Purpose.Map.exists
     (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
     node_ctxt.config.operators
 
@@ -91,7 +91,7 @@ let can_inject node_ctxt (op_kind : Operation_kind.t) =
   Configuration.can_inject node_ctxt.config.mode op_kind
 
 let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
-  let operator = get_operator node_ctxt Configuration.Operating in
+  let operator = get_operator node_ctxt Purpose.Operating in
   match operator with
   | Some operator ->
       error_unless
@@ -1154,7 +1154,7 @@ module Internal_for_tests = struct
       kind =
     let open Lwt_result_syntax in
     let rollup_address = Address.zero in
-    let operators = Configuration.Operator_purpose_map.empty in
+    let operators = Purpose.Map.empty in
     let loser_mode = Loser_mode.no_failures in
     let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in

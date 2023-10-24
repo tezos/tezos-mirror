@@ -34,23 +34,6 @@ type mode =
   | Operator
   | Custom of Operation_kind.t list
 
-type purpose =
-  | Operating
-  | Batching
-  | Cementing
-  | Recovering
-  | Executing_outbox
-
-let purposes = [Operating; Batching; Cementing; Recovering; Executing_outbox]
-
-module Operator_purpose_map = Map.Make (struct
-  type t = purpose
-
-  let compare = Stdlib.compare
-end)
-
-type operators = Signature.Public_key_hash.t Operator_purpose_map.t
-
 type batcher = {
   simulate : bool;
   min_batch_elements : int;
@@ -68,7 +51,7 @@ type history_mode = Archive | Full
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
-  operators : operators;
+  operators : Purpose.operators;
   rpc_addr : string;
   rpc_port : int;
   metrics_addr : string option;
@@ -262,62 +245,12 @@ let default_gc_parameters =
 
 let default_history_mode = Full
 
-let string_of_purpose = function
-  | Operating -> "operating"
-  | Batching -> "batching"
-  | Cementing -> "cementing"
-  | Recovering -> "recovering"
-  | Executing_outbox -> "executing_outbox"
-
-let purpose_of_string = function
-  (* For backward compability:
-     "publish", "refute", "timeout" -> Operating
-     "add_messages" -> Batching
-     "cement" -> Cementing
-  *)
-  | "operating" | "publish" | "refute" | "timeout" -> Some Operating
-  | "batching" | "add_messages" -> Some Batching
-  | "cementing" | "cement" -> Some Cementing
-  | "recovering" -> Some Recovering
-  | "executing_outbox" -> Some Executing_outbox
-  | _ -> None
-
-let purpose_of_string_exn s =
-  match purpose_of_string s with
-  | Some p -> p
-  | None -> invalid_arg ("purpose_of_string " ^ s)
-
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
 let history_mode_of_string = function
   | "archive" -> Archive
   | "full" -> Full
   | s -> invalid_arg ("history_mode_of_string " ^ s)
-
-let make_purpose_map ~default bindings =
-  let map = Operator_purpose_map.of_seq @@ List.to_seq bindings in
-  match default with
-  | None -> map
-  | Some default ->
-      List.fold_left
-        (fun map purpose ->
-          Operator_purpose_map.update purpose (fun _ -> Some default) map)
-        map
-        purposes
-
-let operator_purpose_map_encoding value_encoding =
-  let open Data_encoding in
-  conv
-    Operator_purpose_map.bindings
-    (fun l -> List.to_seq l |> Operator_purpose_map.of_seq)
-    (Utils.dictionary_encoding
-       ~keys:purposes
-       ~string_of_key:string_of_purpose
-       ~key_of_string:purpose_of_string_exn
-       ~value_encoding)
-
-let operators_encoding =
-  operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
 
 let modes =
   [
@@ -619,7 +552,7 @@ let encoding : t Data_encoding.t =
              "smart-rollup-node-operator"
              ~description:
                "Operators that sign operations of the smart rollup, by purpose"
-             operators_encoding)
+             Purpose.operators_encoding)
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
           (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
           (opt "metrics-addr" ~description:"Metrics address" string)
@@ -666,30 +599,10 @@ let encoding : t Data_encoding.t =
              (dft "history-mode" history_mode_encoding default_history_mode)
              (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
 
-(* For each purpose, it returns a list of associated operation kinds *)
-let operation_kinds_of_purpose : purpose -> Operation_kind.t list = function
-  | Batching -> [Add_messages]
-  | Cementing -> [Cement]
-  | Operating -> [Publish; Refute; Timeout]
-  | Recovering -> [Recover]
-  | Executing_outbox -> [Execute_outbox_message]
-
-(* Maps a list of operation kinds to their corresponding purposes,
-   based on their presence in the input list. *)
-let purposes_of_operation_kinds (operation_kinds : Operation_kind.t list) :
-    purpose list =
-  List.filter
-    (fun purpose ->
-      let expected_operation_kinds = operation_kinds_of_purpose purpose in
-      List.exists
-        (fun kind -> List.mem ~equal:Stdlib.( = ) kind expected_operation_kinds)
-        operation_kinds)
-    purposes
-
 (** Maps a mode to their corresponding purposes. The Custom mode
     returns each purposes where it has at least one operation kind
     from (i.e. {!purposes_of_operation_kinds}). *)
-let purposes_of_mode mode =
+let purposes_of_mode mode : Purpose.t list =
   match mode with
   | Observer -> []
   | Batcher -> [Batching]
@@ -697,33 +610,31 @@ let purposes_of_mode mode =
   | Bailout -> [Operating; Cementing; Recovering]
   | Maintenance -> [Operating; Cementing; Executing_outbox]
   | Operator -> [Operating; Cementing; Executing_outbox; Batching]
-  | Custom op_kinds -> purposes_of_operation_kinds op_kinds
+  | Custom op_kinds -> Purpose.of_operation_kind op_kinds
 
 let operation_kinds_of_mode mode =
   match mode with
   | Custom op_kinds -> op_kinds
   | _ ->
       let purposes = purposes_of_mode mode in
-      List.map operation_kinds_of_purpose purposes |> List.flatten
+      List.map Purpose.operation_kind purposes |> List.flatten
 
 let check_mode config =
   let open Result_syntax in
   let check_purposes purposes =
     let missing_operators =
-      List.filter
-        (fun p -> not (Operator_purpose_map.mem p config.operators))
-        purposes
+      List.filter (fun p -> not (Purpose.Map.mem p config.operators)) purposes
     in
     if missing_operators <> [] then
       let mode = string_of_mode config.mode in
-      let missing_operators = List.map string_of_purpose missing_operators in
+      let missing_operators = List.map Purpose.to_string missing_operators in
       tzfail (Missing_mode_operators {mode; missing_operators})
     else return_unit
   in
   let narrow_purposes purposes =
     let* () = check_purposes purposes in
     let operators =
-      Operator_purpose_map.filter
+      Purpose.Map.filter
         (fun op_purpose _ -> List.mem ~equal:Stdlib.( = ) op_purpose purposes)
         config.operators
     in
@@ -792,7 +703,7 @@ module Cli = struct
       | [default_operator] -> Some default_operator
       | _ -> Stdlib.failwith "Multiple default operators"
     in
-    make_purpose_map purposed_operators ~default:default_operator
+    Purpose.make_map purposed_operators ?default:default_operator
 
   let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
       ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
@@ -866,7 +777,7 @@ module Cli = struct
     let new_operators = make_operators operators in
     (* Merge operators *)
     let operators =
-      Operator_purpose_map.merge
+      Purpose.Map.merge
         (fun _purpose -> Option.either)
         new_operators
         configuration.operators
