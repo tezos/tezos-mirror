@@ -139,6 +139,8 @@ let config_init_command =
           ~no_degraded
           ~gc_frequency
           ~history_mode:None
+          ~allowed_headers:None
+          ~allowed_origins:None
       in
       let* () = Configuration.save ~force ~data_dir config in
       let*! () =
@@ -222,6 +224,8 @@ let run_command =
           ~no_degraded
           ~gc_frequency
           ~history_mode:None
+          ~allowed_headers:None
+          ~allowed_origins:None
       in
       Sc_rollup_node.Daemon.run
         ~data_dir

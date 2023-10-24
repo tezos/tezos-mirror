@@ -134,6 +134,7 @@ type t = {
   no_degraded : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode;
+  cors : Resto_cohttp.Cors.t;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -316,6 +317,8 @@ module Cli : sig
     no_degraded:bool ->
     gc_frequency:int32 option ->
     history_mode:history_mode option ->
+    allowed_origins:string list option ->
+    allowed_headers:string list option ->
     t tzresult
 
   val create_or_read_config :
@@ -344,5 +347,7 @@ module Cli : sig
     no_degraded:bool ->
     gc_frequency:int32 option ->
     history_mode:history_mode option ->
+    allowed_origins:string list option ->
+    allowed_headers:string list option ->
     t tzresult Lwt.t
 end

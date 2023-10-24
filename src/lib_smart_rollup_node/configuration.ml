@@ -118,6 +118,7 @@ type t = {
   no_degraded : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode;
+  cors : Resto_cohttp.Cors.t;
 }
 
 type error +=
@@ -720,6 +721,18 @@ let gc_parameters_encoding : gc_parameters Data_encoding.t =
 let history_mode_encoding : history_mode Data_encoding.t =
   Data_encoding.string_enum [("archive", Archive); ("full", Full)]
 
+let cors_encoding : Resto_cohttp.Cors.t Data_encoding.t =
+  let open Resto_cohttp.Cors in
+  let open Data_encoding in
+  conv
+    (fun {allowed_headers; allowed_origins} ->
+      (allowed_headers, allowed_origins))
+    (fun (allowed_headers, allowed_origins) ->
+      {allowed_headers; allowed_origins})
+  @@ obj2
+       (req "allowed_headers" (list string))
+       (req "allowed_origins" (list string))
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -748,6 +761,7 @@ let encoding : t Data_encoding.t =
            no_degraded;
            gc_parameters;
            history_mode;
+           cors;
          } ->
       ( ( sc_rollup_address,
           boot_sector_file,
@@ -772,7 +786,8 @@ let encoding : t Data_encoding.t =
             log_kernel_debug,
             no_degraded,
             gc_parameters,
-            history_mode ) ) ))
+            history_mode,
+            cors ) ) ))
     (fun ( ( sc_rollup_address,
              boot_sector_file,
              sc_rollup_node_operators,
@@ -796,7 +811,8 @@ let encoding : t Data_encoding.t =
                log_kernel_debug,
                no_degraded,
                gc_parameters,
-               history_mode ) ) ) ->
+               history_mode,
+               cors ) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -822,6 +838,7 @@ let encoding : t Data_encoding.t =
         no_degraded;
         gc_parameters;
         history_mode;
+        cors;
       })
     (merge_objs
        (obj10
@@ -872,13 +889,14 @@ let encoding : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj6
+          (obj7
              (opt "index_buffer_size" int31)
              (opt "irmin_cache_size" int31)
              (dft "log-kernel-debug" Data_encoding.bool false)
              (dft "no-degraded" Data_encoding.bool false)
              (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
-             (dft "history-mode" history_mode_encoding default_history_mode))))
+             (dft "history-mode" history_mode_encoding default_history_mode)
+             (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
 
 (* For each purpose, it returns a list of associated operation kinds *)
 let operation_kinds_of_purpose = function
@@ -1011,7 +1029,7 @@ module Cli = struct
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode =
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
     let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
     let config =
       {
@@ -1056,6 +1074,14 @@ module Cli = struct
                 gc_frequency;
           };
         history_mode = Option.value ~default:default_history_mode history_mode;
+        cors =
+          Resto_cohttp.Cors.
+            {
+              allowed_headers =
+                Option.value ~default:default.allowed_headers allowed_headers;
+              allowed_origins =
+                Option.value ~default:default.allowed_origins allowed_origins;
+            };
       }
     in
     check_mode config
@@ -1066,7 +1092,7 @@ module Cli = struct
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~sc_rollup_node_operators ~index_buffer_size
       ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode =
+      ~history_mode ~allowed_origins ~allowed_headers =
     let new_sc_rollup_node_operators =
       make_operators sc_rollup_node_operators
     in
@@ -1130,6 +1156,18 @@ module Cli = struct
           };
         history_mode =
           Option.value ~default:configuration.history_mode history_mode;
+        cors =
+          Resto_cohttp.Cors.
+            {
+              allowed_headers =
+                Option.value
+                  ~default:configuration.cors.allowed_headers
+                  allowed_headers;
+              allowed_origins =
+                Option.value
+                  ~default:configuration.cors.allowed_origins
+                  allowed_origins;
+            };
       }
     in
     check_mode configuration
@@ -1139,7 +1177,7 @@ module Cli = struct
       ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
       ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode =
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -1183,6 +1221,8 @@ module Cli = struct
           ~no_degraded
           ~gc_frequency
           ~history_mode
+          ~allowed_origins
+          ~allowed_headers
       in
       return configuration
     else
@@ -1228,6 +1268,8 @@ module Cli = struct
           ~no_degraded
           ~gc_frequency
           ~history_mode
+          ~allowed_headers
+          ~allowed_origins
       in
       return config
 end

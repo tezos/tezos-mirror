@@ -409,3 +409,22 @@ let wasm_dump_file_param next =
     ~desc:"YAML or JSON file containing the dumped durable storage"
     string_parameter
     next
+
+let string_list =
+  Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+      let list = String.split ',' s in
+      Lwt_result.return list)
+
+let cors_allowed_headers_arg =
+  Tezos_clic.arg
+    ~long:"cors-headers"
+    ~placeholder:"ALLOWED_HEADERS"
+    ~doc:"List of accepted cors headers."
+    string_list
+
+let cors_allowed_origins_arg =
+  Tezos_clic.arg
+    ~long:"cors-origins"
+    ~placeholder:"ALLOWED_ORIGINS"
+    ~doc:"List of accepted cors origins."
+    string_list
