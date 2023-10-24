@@ -174,6 +174,9 @@ val close : _ t -> unit tzresult Lwt.t
 (** The path for the lockfile used in block processing. *)
 val processing_lockfile_path : data_dir:string -> string
 
+(** The path for the lockfile used in garbage collection. *)
+val gc_lockfile_path : data_dir:string -> string
+
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
 val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
