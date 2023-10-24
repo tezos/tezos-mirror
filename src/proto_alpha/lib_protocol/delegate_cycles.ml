@@ -31,7 +31,7 @@ let update_activity ctxt last_cycle =
   match Cycle_repr.sub last_cycle preserved with
   | None -> return (ctxt, [])
   | Some _unfrozen_cycle ->
-      Stake_storage.fold_on_active_delegates_with_minimal_stake
+      Stake_storage.fold_on_active_delegates_with_minimal_stake_s
         ctxt
         ~order:`Sorted
         ~init:(Ok (ctxt, []))

@@ -23,25 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-
 (** [stake ctxt ~sender ~delegate amount] add [amount] as [sender]'s stake
     to [delegate]. *)
 val stake :
-  context ->
-  sender:public_key_hash ->
-  delegate:public_key_hash ->
-  Tez.t ->
-  (context * Receipt.balance_updates) tzresult Lwt.t
+  Raw_context.t ->
+  sender:Signature.Public_key_hash.t ->
+  delegate:Signature.public_key_hash ->
+  Tez_repr.t ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** [request_unstake ctxt ~sender_contract ~delegate amount] records a request
     from [sender_contract] to unstake [amount] from [delegate]. *)
 val request_unstake :
-  context ->
-  sender_contract:Contract.t ->
-  delegate:public_key_hash ->
-  Tez.t ->
-  (context * Receipt.balance_updates) tzresult Lwt.t
+  Raw_context.t ->
+  sender_contract:Contract_repr.t ->
+  delegate:Signature.public_key_hash ->
+  Tez_repr.t ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** [finalize_unstake ctxt contract] performs the finalization of all unstake
     requests from [contract] that can be finalized.
@@ -53,14 +51,16 @@ val request_unstake :
     unstaked frozen deposits to [contract]'s spendable balance, minus slashing
     the requested stake undergone in between. *)
 val finalize_unstake :
-  context -> Contract.t -> (context * Receipt.balance_updates) tzresult Lwt.t
+  Raw_context.t ->
+  Contract_repr.t ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** [punish_delegate ctxt delegate level misbehaviour ~rewarded] slashes [delegate]
     for a [misbehaviour] at [level] and rewards [rewarded]. *)
 val punish_delegate :
-  context ->
-  public_key_hash ->
-  Level.t ->
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Level_repr.t ->
   Misbehaviour.t ->
   rewarded:Signature.public_key_hash ->
-  (context * Receipt.balance_updates) tzresult Lwt.t
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t

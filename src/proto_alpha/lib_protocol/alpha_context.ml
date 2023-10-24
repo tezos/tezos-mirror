@@ -567,6 +567,10 @@ module Stake_distribution = struct
   module For_RPC = Delegate_sampler.For_RPC
 end
 
+module Staking = struct
+  include Staking
+end
+
 module Nonce = Nonce_storage
 
 module Seed = struct
