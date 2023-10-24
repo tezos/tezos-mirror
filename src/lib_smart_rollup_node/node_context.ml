@@ -87,7 +87,7 @@ let is_bailout node_ctxt = node_ctxt.config.mode = Bailout
 
 let is_loser node_ctxt = node_ctxt.config.loser_mode <> Loser_mode.no_failures
 
-let can_inject node_ctxt (op_kind : Configuration.operation_kind) =
+let can_inject node_ctxt (op_kind : Operation_kind.t) =
   Configuration.can_inject node_ctxt.config.mode op_kind
 
 let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
@@ -101,9 +101,7 @@ let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
   | None -> Result_syntax.return_unit
 
 let get_fee_parameter node_ctxt operation_kind =
-  Configuration.Operation_kind_map.find
-    operation_kind
-    node_ctxt.config.fee_parameters
+  Operation_kind.Map.find operation_kind node_ctxt.config.fee_parameters
   |> Option.value ~default:(Configuration.default_fee_parameter operation_kind)
 
 let lock ~data_dir =

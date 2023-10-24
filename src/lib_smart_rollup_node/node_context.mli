@@ -130,7 +130,7 @@ val is_loser : _ t -> bool
 
 (** [can_inject config op_kind] determines if a given operation kind can
     be injected based on the configuration settings. *)
-val can_inject : _ t -> Configuration.operation_kind -> bool
+val can_inject : _ t -> Operation_kind.t -> bool
 
 (** [check_op_in_whitelist_or_bailout_mode node_ctxt whitelist] Checks
     when the rollup node is operating to determine if the operator is in the
@@ -145,8 +145,7 @@ val check_op_in_whitelist_or_bailout_mode :
     configured for this purpose, returns the default fee parameter for this
     purpose.
 *)
-val get_fee_parameter :
-  _ t -> Configuration.operation_kind -> Injector_common.fee_parameter
+val get_fee_parameter : _ t -> Operation_kind.t -> Injector_common.fee_parameter
 
 (** [init cctxt ~data_dir mode l1_ctxt genesis_info protocol configuration]
     initializes the rollup representation. The rollup origination level and kind

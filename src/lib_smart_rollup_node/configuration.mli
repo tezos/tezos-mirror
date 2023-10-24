@@ -24,16 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The kind of operations that can be injected by the rollup node. *)
-type operation_kind =
-  | Publish
-  | Add_messages
-  | Cement
-  | Timeout
-  | Refute
-  | Recover
-  | Execute_outbox_message
-
 (** Mode for the rollup node *)
 type mode =
   | Observer  (** Only follows the chain and reconstructs inboxes *)
@@ -43,7 +33,7 @@ type mode =
   | Batcher  (** Accept transactions in its queue and batches them on the L1 *)
   | Maintenance  (** Follows the chain and publishes commitments *)
   | Operator  (** Equivalent to maintenance + batcher  *)
-  | Custom of operation_kind list
+  | Custom of Operation_kind.t list
       (** In this mode, the system handles only the specific operation kinds
         defined by the user, allowing for tailored control and flexibility. *)
 
@@ -56,13 +46,9 @@ type purpose =
   | Recovering
   | Executing_outbox
 
-module Operation_kind_map : Map.S with type key = operation_kind
-
 module Operator_purpose_map : Map.S with type key = purpose
 
 type operators = Signature.Public_key_hash.t Operator_purpose_map.t
-
-type fee_parameters = Injector_common.fee_parameter Operation_kind_map.t
 
 (** Configuration for the batcher.
 
@@ -113,7 +99,7 @@ type t = {
   rpc_port : int;
   metrics_addr : string option;
   reconnection_delay : float;
-  fee_parameters : fee_parameters;
+  fee_parameters : Operation_kind.fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   (*DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3718
@@ -146,12 +132,6 @@ type error +=
 val make_purpose_map :
   default:'a option -> (purpose * 'a) trace -> 'a Operator_purpose_map.t
 
-(** [operation_kind_of_string s] parses an operation kind from the given string [s]. *)
-val operation_kind_of_string : string -> operation_kind option
-
-(** [string_of_operation_kind o] returns a string representation of operation_kind [o]. *)
-val string_of_operation_kind : operation_kind -> string
-
 (** [purpose_of_string s] parses a purpose from the given string [s]. *)
 val purpose_of_string : string -> purpose option
 
@@ -169,11 +149,8 @@ val string_of_history_mode : history_mode -> string
 (** List of possible purposes for operator specialization. *)
 val purposes : purpose list
 
-(** List of possible operations kind for operator specialization. *)
-val operation_kinds : operation_kind list
-
 (* For each purpose, it returns a list of associated operation kinds. *)
-val operation_kinds_of_purpose : purpose -> operation_kind list
+val operation_kinds_of_purpose : purpose -> Operation_kind.t list
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
@@ -201,11 +178,11 @@ val default_reconnection_delay : float
 (** [default_fee_parameter operation_kind] is the default fee parameter to inject
     operation on L1. If [operation_kind] is provided, it returns the default fee
     parameter for this kind of operation. *)
-val default_fee_parameter : operation_kind -> Injector_common.fee_parameter
+val default_fee_parameter : Operation_kind.t -> Injector_common.fee_parameter
 
 (** [default_fee_parameters] is the default fee parameters configuration build
     with {!default_fee_parameter} for all purposes. *)
-val default_fee_parameters : fee_parameters
+val default_fee_parameters : Operation_kind.fee_parameters
 
 (** [default_batcher] is the default configuration parameters for the batcher. *)
 val default_batcher : batcher
@@ -252,7 +229,7 @@ val config_filename : data_dir:string -> string
 
 (** [purposes_of_operation_kinds op_kinds] map a list of operation kinds
     to their corresponding purposes based on their presence in the input list *)
-val purposes_of_operation_kinds : operation_kind list -> purpose list
+val purposes_of_operation_kinds : Operation_kind.t list -> purpose list
 
 (** [check_mode config] ensures the operators correspond to the chosen mode and
     removes the extra ones. *)
@@ -262,11 +239,11 @@ val check_mode : t -> t tzresult
 val purposes_of_mode : mode -> purpose list
 
 (** [operation_kinds_of_mode mode] returns operation kinds with the provided mode. *)
-val operation_kinds_of_mode : mode -> operation_kind list
+val operation_kinds_of_mode : mode -> Operation_kind.t list
 
 (** [can_inject mode op_kind] determines if a given operation kind can
     be injected based on the configuration settings. *)
-val can_inject : mode -> operation_kind -> bool
+val can_inject : mode -> Operation_kind.t -> bool
 
 (** Number of levels the refutation player waits until trying to play
     for a game state it already played before. *)

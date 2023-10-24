@@ -25,15 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type operation_kind =
-  | Publish
-  | Add_messages
-  | Cement
-  | Timeout
-  | Refute
-  | Recover
-  | Execute_outbox_message
-
 type mode =
   | Observer
   | Accuser
@@ -41,7 +32,7 @@ type mode =
   | Batcher
   | Maintenance
   | Operator
-  | Custom of operation_kind list
+  | Custom of Operation_kind.t list
 
 type purpose =
   | Operating
@@ -50,24 +41,7 @@ type purpose =
   | Recovering
   | Executing_outbox
 
-let operation_kinds =
-  [
-    Publish;
-    Add_messages;
-    Cement;
-    Timeout;
-    Refute;
-    Recover;
-    Execute_outbox_message;
-  ]
-
 let purposes = [Operating; Batching; Cementing; Recovering; Executing_outbox]
-
-module Operation_kind_map = Map.Make (struct
-  type t = operation_kind
-
-  let compare = Stdlib.compare
-end)
 
 module Operator_purpose_map = Map.Make (struct
   type t = purpose
@@ -76,8 +50,6 @@ module Operator_purpose_map = Map.Make (struct
 end)
 
 type operators = Signature.Public_key_hash.t Operator_purpose_map.t
-
-type fee_parameters = Injector_common.fee_parameter Operation_kind_map.t
 
 type batcher = {
   simulate : bool;
@@ -101,7 +73,7 @@ type t = {
   rpc_port : int;
   metrics_addr : string option;
   reconnection_delay : float;
-  fee_parameters : fee_parameters;
+  fee_parameters : Operation_kind.fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   dal_node_endpoint : Uri.t option;
@@ -203,7 +175,7 @@ let tez t = mutez Int64.(mul (of_int t) 1_000_000L)
    should be plenty enough even if the gas price or gas consumption
    increases. We adjust the other limits in proportion.
 *)
-let default_fee = function
+let default_fee : Operation_kind.t -> Injector_common.tez = function
   | Cement -> tez 1
   | Recover -> tez 1
   | Publish -> tez 2
@@ -220,7 +192,7 @@ let default_fee = function
       tez 5
   | Execute_outbox_message -> tez 1
 
-let default_burn = function
+let default_burn : Operation_kind.t -> Injector_common.tez = function
   | Publish ->
       (* The first commitment can store data. *)
       tez 1
@@ -247,12 +219,12 @@ let default_fee_parameter operation_kind =
 let default_fee_parameters =
   List.fold_left
     (fun acc operation_kind ->
-      Operation_kind_map.add
+      Operation_kind.Map.add
         operation_kind
         (default_fee_parameter operation_kind)
         acc)
-    Operation_kind_map.empty
-    operation_kinds
+    Operation_kind.Map.empty
+    Operation_kind.all
 
 let default_batcher_simulate = true
 
@@ -289,30 +261,6 @@ let default_gc_parameters =
   }
 
 let default_history_mode = Full
-
-let string_of_operation_kind = function
-  | Publish -> "publish"
-  | Add_messages -> "add_messages"
-  | Cement -> "cement"
-  | Timeout -> "timeout"
-  | Refute -> "refute"
-  | Recover -> "recover"
-  | Execute_outbox_message -> "execute_outbox_message"
-
-let operation_kind_of_string = function
-  | "publish" -> Some Publish
-  | "add_messages" -> Some Add_messages
-  | "cement" -> Some Cement
-  | "timeout" -> Some Timeout
-  | "refute" -> Some Refute
-  | "recover" -> Some Recover
-  | "execute_outbox_message" -> Some Execute_outbox_message
-  | _ -> None
-
-let operation_kind_of_string_exn s =
-  match operation_kind_of_string s with
-  | Some p -> p
-  | None -> invalid_arg ("operation_kind_of_string " ^ s)
 
 let string_of_purpose = function
   | Operating -> "operating"
@@ -368,24 +316,8 @@ let operator_purpose_map_encoding value_encoding =
        ~key_of_string:purpose_of_string_exn
        ~value_encoding)
 
-let operation_kind_map_encoding value_encoding =
-  let open Data_encoding in
-  conv
-    Operation_kind_map.bindings
-    (fun l -> List.to_seq l |> Operation_kind_map.of_seq)
-    (Utils.dictionary_encoding
-       ~keys:operation_kinds
-       ~string_of_key:string_of_operation_kind
-       ~key_of_string:operation_kind_of_string_exn
-       ~value_encoding)
-
 let operators_encoding =
   operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
-
-let fee_parameters_encoding =
-  operation_kind_map_encoding (fun operation_kind ->
-      Injector_common.fee_parameter_encoding
-        ~default_fee_parameter:(default_fee_parameter operation_kind))
 
 let modes =
   [
@@ -395,7 +327,7 @@ let modes =
     Batcher;
     Maintenance;
     Operator;
-    Custom operation_kinds;
+    Custom Operation_kind.all;
   ]
 
 let string_of_mode = function
@@ -409,7 +341,7 @@ let string_of_mode = function
       if op_kinds = [] then "custom"
       else
         "custom:"
-        ^ String.concat "," (List.map string_of_operation_kind op_kinds)
+        ^ String.concat "," (List.map Operation_kind.to_string op_kinds)
 
 let mode_of_string s =
   match s with
@@ -424,7 +356,7 @@ let mode_of_string s =
       let kinds = String.sub s 7 (String.length s - 7) in
       let operation_kinds_strs = String.split_on_char ',' kinds in
       let operation_kinds =
-        List.map operation_kind_of_string_exn operation_kinds_strs
+        List.map Operation_kind.of_string_exn operation_kinds_strs
       in
       Ok (Custom operation_kinds)
   | _ -> Error [Exn (Failure "Invalid mode")]
@@ -440,7 +372,7 @@ let description_of_mode = function
   | Operator -> "Equivalent to maintenance + batcher"
   | Custom op_kinds ->
       let op_kinds_desc =
-        List.map string_of_operation_kind op_kinds |> String.concat ", "
+        List.map Operation_kind.to_string op_kinds |> String.concat ", "
       in
       Printf.sprintf
         "In this mode, the system handles only the specific operation \
@@ -449,18 +381,7 @@ let description_of_mode = function
 
 let mode_encoding =
   let open Data_encoding in
-  let operation_kind_encoding =
-    string_enum
-      [
-        ("publish", Publish);
-        ("add_messages", Add_messages);
-        ("cement", Cement);
-        ("timeout", Timeout);
-        ("refute", Refute);
-        ("recover", Recover);
-      ]
-  in
-  let operation_kinds_encoding = list operation_kind_encoding in
+  let operation_kinds_encoding = list Operation_kind.encoding in
   let constant_case mode =
     let title = string_of_mode mode in
     case
@@ -713,7 +634,7 @@ let encoding : t Data_encoding.t =
              ~description:
                "The fee parameters for each purpose used when injecting \
                 operations in L1"
-             fee_parameters_encoding
+             (Operation_kind.fee_parameters_encoding ~default_fee_parameter)
              default_fee_parameters)
           (req
              ~description:"The mode for this rollup node"
@@ -746,7 +667,7 @@ let encoding : t Data_encoding.t =
              (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
 
 (* For each purpose, it returns a list of associated operation kinds *)
-let operation_kinds_of_purpose = function
+let operation_kinds_of_purpose : purpose -> Operation_kind.t list = function
   | Batching -> [Add_messages]
   | Cementing -> [Cement]
   | Operating -> [Publish; Refute; Timeout]
@@ -755,7 +676,7 @@ let operation_kinds_of_purpose = function
 
 (* Maps a list of operation kinds to their corresponding purposes,
    based on their presence in the input list. *)
-let purposes_of_operation_kinds (operation_kinds : operation_kind list) :
+let purposes_of_operation_kinds (operation_kinds : Operation_kind.t list) :
     purpose list =
   List.filter
     (fun purpose ->
@@ -812,7 +733,7 @@ let check_mode config =
   | Custom [] -> tzfail Empty_operation_kinds_for_custom_mode
   | _ as mode -> narrow_purposes (purposes_of_mode mode)
 
-let can_inject mode (op_kind : operation_kind) =
+let can_inject mode (op_kind : Operation_kind.t) =
   let allowed_operations = operation_kinds_of_mode mode in
   List.mem ~equal:Stdlib.( = ) op_kind allowed_operations
 
@@ -890,7 +811,7 @@ module Cli = struct
         dac_observer_endpoint;
         dac_timeout;
         metrics_addr;
-        fee_parameters = Operation_kind_map.empty;
+        fee_parameters = Operation_kind.Map.empty;
         mode;
         loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
         batcher = default_batcher;
