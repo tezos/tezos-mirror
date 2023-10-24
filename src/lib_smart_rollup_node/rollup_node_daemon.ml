@@ -285,7 +285,6 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
         update_l2_chain state ~catching_up header)
       new_chain_prefetching
   in
-  let module Plugin = (val state.plugin) in
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
@@ -301,7 +300,6 @@ let degraded_refutation_mode state =
   let open Lwt_result_syntax in
   let*! () = Daemon_event.degraded_mode () in
   let message = state.node_ctxt.Node_context.cctxt#message in
-  let module Plugin = (val state.plugin) in
   let*! () = message "Shutting down Batcher@." in
   let*! () = Batcher.shutdown () in
   let*! () = message "Shutting down Commitment Publisher@." in
@@ -310,7 +308,6 @@ let degraded_refutation_mode state =
   let* predecessor = Node_context.get_predecessor_header state.node_ctxt head in
   let* () = Node_context.save_protocol_info state.node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up:false state head in
-  let module Plugin = (val state.plugin) in
   let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
   let*! () = Injector.inject () in
   return_unit
@@ -319,7 +316,6 @@ let install_finalizer state =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let message = state.node_ctxt.Node_context.cctxt#message in
-  let module Plugin = (val state.plugin) in
   let* () = message "Shutting down RPC server@." in
   let* () = Rpc_server.shutdown state.rpc_server in
   let* () = message "Shutting down Injector@." in
@@ -333,6 +329,41 @@ let install_finalizer state =
   let* (_ : unit tzresult) = Node_context.close state.node_ctxt in
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
+
+let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
+  let open Lwt_result_syntax in
+  (* At the start of the rollup node when in bailout mode check that there is
+     an operator who has stake, otherwise stop the node *)
+  if Node_context.is_bailout node_ctxt then
+    let operator =
+      Node_context.get_operator node_ctxt Configuration.Operating
+    in
+    match operator with
+    | None ->
+        (* this case can't happen because the bailout mode needs a operator to start*)
+        tzfail
+          (Configuration.Missing_mode_operators
+             {
+               mode = Configuration.string_of_mode Bailout;
+               missing_operators = [Configuration.string_of_purpose Operating];
+             })
+    | Some operating_pkh -> (
+        let module Plugin = (val state.plugin) in
+        let* last_published_commitment =
+          Plugin.Layer1_helpers.get_last_published_commitment
+            ~allow_unstake:false
+            node_ctxt.cctxt
+            configuration.sc_rollup_address
+            operating_pkh
+        in
+        match last_published_commitment with
+        | None ->
+            (* when the operator is no longer stake on any commitment, then recover bond *)
+            Publisher.recover_bond node_ctxt
+        | Some _ ->
+            (* when the operator is still stake on something *)
+            return_unit)
+  else return_unit
 
 let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
@@ -399,6 +430,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
           Node_context.check_op_in_whitelist_or_bailout_mode node_ctxt whitelist
       | None -> Result_syntax.return_unit
     in
+    let* () = maybe_recover_bond state in
     let*! () =
       Event.node_is_ready
         ~rpc_addr:configuration.rpc_addr
@@ -448,9 +480,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   protect start ~on_error:(function
       | Rollup_node_errors.(
           ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-          | Operator_not_in_whitelist
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5442
-               Smart rollup node: "bailout" mode *) ))
+          | Operator_not_in_whitelist | Configuration.Missing_mode_operators _ ))
         :: _ as e ->
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->

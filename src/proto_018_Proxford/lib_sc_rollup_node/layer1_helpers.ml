@@ -72,8 +72,8 @@ let get_last_cemented_commitment (cctxt : #Client_context.full) rollup_address :
     level = Protocol.Alpha_context.Raw_level.to_int32 level;
   }
 
-let get_last_published_commitment (cctxt : #Client_context.full) rollup_address
-    operator =
+let get_last_published_commitment ?(allow_unstake = true)
+    (cctxt : #Client_context.full) rollup_address operator =
   let open Lwt_result_syntax in
   let cctxt =
     new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
@@ -88,14 +88,15 @@ let get_last_published_commitment (cctxt : #Client_context.full) rollup_address
   in
   match res with
   | Error trace
-    when TzTrace.fold
-           (fun exists -> function
-             | Environment.Ecoproto_error
-                 Protocol.Sc_rollup_errors.Sc_rollup_not_staked ->
-                 true
-             | _ -> exists)
-           false
-           trace ->
+    when allow_unstake
+         && TzTrace.fold
+              (fun exists -> function
+                | Environment.Ecoproto_error
+                    Protocol.Sc_rollup_errors.Sc_rollup_not_staked ->
+                    true
+                | _ -> exists)
+              false
+              trace ->
       return_none
   | Error trace -> fail trace
   | Ok None -> return_none

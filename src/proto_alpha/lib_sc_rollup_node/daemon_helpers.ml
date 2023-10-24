@@ -122,7 +122,9 @@ let maybe_recover_bond node_ctxt =
             operating_pkh
         in
         match staked_on_commitment with
-        | None -> Publisher.recover_bond node_ctxt
+        | None ->
+            (* the operator is no longer stake on any commitment then recover its bond *)
+            Publisher.recover_bond node_ctxt
         | Some _ (* operator still staked on something *) -> return_unit)
   else return_unit
 

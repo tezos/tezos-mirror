@@ -4079,6 +4079,157 @@ let test_bailout_refutation protocols =
        ~priority:`Priority_honest)
     protocols
 
+(** Run the node in bailout mode, the node will exit with an error,
+    when it's run without an operator key *)
+let bailout_mode_fail_to_start_without_operator ~kind =
+  test_l1_scenario
+    ~kind
+    {
+      variant = None;
+      tags = ["rollup_node"; "mode"; "bailout"];
+      description = "rollup node in bailout fails without operator";
+    }
+  @@ fun _protocol sc_rollup tezos_node tezos_client ->
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      Bailout
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~operators:
+        [
+          (Sc_rollup_node.Cementing, Constant.bootstrap1.alias);
+          (Sc_rollup_node.Recovering, Constant.bootstrap1.alias);
+        ]
+  in
+  let process = Sc_rollup_node.spawn_run sc_rollup_node sc_rollup [] in
+  let* () =
+    Process.check_error
+      process
+      ~exit_code:1
+      ~msg:(rex "Missing operators operating for mode bailout.")
+  in
+  unit
+
+(** Start a bailout rollup node, fails directly as the operator has not stake. *)
+let bailout_mode_fail_operator_no_stake ~kind =
+  let _operator = Constant.bootstrap1.public_key_hash in
+  test_full_scenario
+    ~kind
+    ~mode:Bailout
+    {
+      variant = None;
+      tags = ["mode"; "bailout"];
+      description = "rollup node in bailout fails operator has no stake";
+    }
+  @@ fun _protocol
+             sc_rollup_node
+             _rollup_client
+             sc_rollup
+             _tezos_node
+             _tezos_client ->
+  let process = Sc_rollup_node.spawn_run sc_rollup_node sc_rollup [] in
+  let* () =
+    Process.check_error
+      process
+      ~exit_code:1
+      ~msg:(rex "This implicit account is not a staker of this smart rollup.")
+  in
+  unit
+
+(** Bailout mode operator has no stake, scenario:
+    - start an operator rollup and wait until it publish a commitment
+    - stop the rollup node
+    - bakes until refutation period is over
+    - using octez client cement the commitment   
+    - restart the rollup node in bailout mode
+  check that it fails directly when the operator has no stake.
+    *)
+let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
+  let operator = Constant.bootstrap1.public_key_hash in
+  let commitment_period = 5 in
+  let challenge_window = 5 in
+  Log.info "Start the rollup in Operator mode" ;
+  test_full_scenario
+    ~kind
+    {
+      variant = None;
+      tags = ["mode"; "bailout"];
+      description =
+        "rollup node in bailout recovers bond when starting if no commitment \
+         staked";
+    }
+    ~commitment_period
+    ~challenge_window
+  @@ fun protocol
+             sc_rollup_node
+             sc_rollup_client
+             sc_rollup
+             tezos_node
+             tezos_client ->
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
+  (* bake until the first commitment is published *)
+  let* _level =
+    bake_until_lpc_updated
+      ~at_least:commitment_period
+      tezos_client
+      sc_rollup_node
+  in
+  let* published_commitment =
+    get_last_published_commitment ~__LOC__ sc_rollup_client
+  in
+  Log.info "Terminate the node" ;
+  let* () = Sc_rollup_node.kill sc_rollup_node in
+  Log.info "Bake until refutation period is over" ;
+  let* () = bake_levels challenge_window tezos_client in
+  (* manually cement the commitment *)
+  let to_cement_commitment_hash = commitment_info_hash published_commitment in
+  let* () =
+    cement_commitment
+      protocol
+      tezos_client
+      ~sc_rollup
+      ~hash:to_cement_commitment_hash
+  in
+  let* () = Client.bake_for_and_wait tezos_client in
+  Log.info "Check that there is still tezt in frozen balance" ;
+  let* frozen_balance =
+    Client.RPC.call tezos_client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:operator ()
+  in
+  let () =
+    Check.(
+      (Tez.to_mutez frozen_balance <> 0)
+        int
+        ~error_msg:
+          "The operator should have a stake nor holds a frozen balance.")
+  in
+  Log.info
+    "Start a rollup node in bailout mode, operator still has stake but no \
+     attached commitment" ;
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      Bailout
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~default_operator:operator
+  in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () = Client.bake_for_and_wait tezos_client in
+  Log.info "Check that the bond have been recovered by the rollup node" ;
+  let* frozen_balance =
+    Client.RPC.call tezos_client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:operator ()
+  in
+  let () =
+    Check.(
+      (Tez.to_mutez frozen_balance = 0)
+        int
+        ~error_msg:"The operator should have recovered its stake.")
+  in
+  unit
+
 (** Helper to check that the operation whose hash is given is successfully
     included (applied) in the current head block. *)
 let check_op_included ~__LOC__ =
@@ -6236,7 +6387,7 @@ let test_private_rollup_node_publish_not_in_whitelist =
         "Rollup node fails to start if the operator is not in the whitelist";
     }
     ~kind:"arith"
-  @@ fun _protocol rollup_node _rollup_client sc_rollup tezos_node client ->
+  @@ fun _protocol rollup_node _rollup_client sc_rollup _tezos_node _client ->
   let node_process = Sc_rollup_node.spawn_run rollup_node sc_rollup [] in
   let* () =
     Process.check_error
@@ -6244,15 +6395,6 @@ let test_private_rollup_node_publish_not_in_whitelist =
       ~exit_code:1
       ~msg:(rex ".*The operator is not in the whitelist.*")
   in
-  let* () = Sc_rollup_node.kill rollup_node in
-  let rollup_node =
-    Sc_rollup_node.create
-      Bailout
-      tezos_node
-      ~base_dir:(Client.base_dir client)
-      ~default_operator:operator
-  in
-  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   unit
 
 let test_rollup_whitelist_update ~kind =
@@ -6689,12 +6831,6 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_commitment_scenario
-    ~extra_tags:["modes"; "bailout"]
-    ~variant:"bailout_does_not_publish"
-    (mode_publish Bailout false)
-    protocols
-    ~kind ;
-  test_commitment_scenario
     ~commitment_period:15
     ~challenge_window:10080
     ~variant:"node_use_proto_param"
@@ -6750,6 +6886,9 @@ let register ~kind ~protocols =
     ~kind ;
   test_cement_ignore_commitment ~kind [Nairobi; Alpha] ;
   bailout_mode_not_publish ~kind protocols ;
+  bailout_mode_fail_to_start_without_operator ~kind protocols ;
+  bailout_mode_fail_operator_no_stake ~kind protocols ;
+  bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
   custom_mode_empty_operation_kinds ~kind protocols ;
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
