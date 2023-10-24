@@ -225,9 +225,6 @@ let fold = Storage.Delegates.fold
 
 let list = Storage.Delegates.elements
 
-let frozen_deposits ctxt delegate =
-  Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
-
 let initial_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in
   let* stake_opt =
@@ -249,8 +246,11 @@ let initial_frozen_deposits ctxt delegate =
 
 let current_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in
-  let+ {current_amount; _} = frozen_deposits ctxt delegate in
-  current_amount
+  let* {own_frozen; staked_frozen; delegated = _} =
+    Stake_storage.get_full_staking_balance ctxt delegate
+  in
+  let*? total = Tez_repr.(own_frozen +? staked_frozen) in
+  return total
 
 let spendable_balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
