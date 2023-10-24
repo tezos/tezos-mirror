@@ -1,26 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -173,17 +155,9 @@ let rec seq_field_of_data_encoding :
   | Conv {encoding; _} ->
       seq_field_of_data_encoding enums types encoding id tid_gen
   | Tup e ->
-      (* This case corresponds to a [tup1] combinator being called inside a
-         [tup*] combinator. It's probably never used, but it's still a valid use
-         of data-encoding. Note that we erase the information that there is an
-         extraneous [tup1] in the encoding. *)
       let id = match tid_gen with None -> id | Some tid_gen -> tid_gen () in
       seq_field_of_data_encoding enums types e id tid_gen
   | Tups {kind = _; left; right} ->
-      (* This case corresponds to a [tup*] combinator being called inside a
-         [tup*] combinator. It's probably never used, but it's still a valid use
-         of data-encoding. Note that we erase the information that there is an
-         extraneous [tup*] in the encoding. *)
       let tid_gen =
         match tid_gen with
         | None -> Some (Helpers.mk_tid_gen id)
@@ -239,20 +213,20 @@ let rec seq_field_of_data_encoding :
       | [] -> failwith "Not supported"
       | [attr] -> (enums, types, [Helpers.merge_summaries attr description])
       | _ :: _ :: _ as attrs ->
+          let described_class =
+            Helpers.class_spec_of_attrs
+              ~id
+              ?description
+              ~enums:[]
+              ~types:[]
+              ~instances:[]
+              attrs
+          in
+          let types = Helpers.add_uniq_assoc types (id, described_class) in
           let attr =
             {
               (Helpers.default_attr_spec ~id) with
-              dataType =
-                DataType.(
-                  ComplexDataType
-                    (UserType
-                       (Helpers.class_spec_of_attrs
-                          ~id
-                          ?description
-                          ~enums:[]
-                          ~types:[]
-                          ~instances:[]
-                          attrs)));
+              dataType = DataType.(ComplexDataType (UserType described_class));
             }
           in
           (enums, types, [attr]))
