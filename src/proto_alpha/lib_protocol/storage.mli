@@ -182,7 +182,7 @@ module Contract : sig
      the initial frozen balance in frozen_deposits.initial_amount. We
      have current_amount <= initial_amount and current_amount <
      initial_amount iff the delegate was slashed. *)
-  module Frozen_deposits :
+  module Frozen_deposits_up_to_Nairobi :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Deposits_repr.t
