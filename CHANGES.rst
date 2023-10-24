@@ -109,6 +109,9 @@ Smart Rollup node
 
 - Added the rollup node command inside the docker entrypoint (MR :gl:`!10253`)
 
+- Added the argument ``cors-headers`` and ``cors-origins`` to specify respectively the
+  allowed headers and origins. (MR :gl:`!10571`)
+
 Smart Rollup client
 -------------------
 

@@ -42,7 +42,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args20
+    (args22
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -62,7 +62,9 @@ let config_init_command =
        boot_sector_file_arg
        no_degraded_arg
        gc_frequency_arg
-       history_mode_arg)
+       history_mode_arg
+       cors_allowed_origins_arg
+       cors_allowed_headers_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -87,7 +89,9 @@ let config_init_command =
            boot_sector_file,
            no_degraded,
            gc_frequency,
-           history_mode )
+           history_mode,
+           allowed_origins,
+           allowed_headers )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -115,6 +119,8 @@ let config_init_command =
           ~no_degraded
           ~gc_frequency
           ~history_mode
+          ~allowed_origins
+          ~allowed_headers
       in
       let* () = Configuration.save ~force ~data_dir config in
       let*! () =
@@ -131,7 +137,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args22
+    (args24
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -153,7 +159,9 @@ let legacy_run_command =
        boot_sector_file_arg
        no_degraded_arg
        gc_frequency_arg
-       history_mode_arg)
+       history_mode_arg
+       cors_allowed_origins_arg
+       cors_allowed_headers_arg)
     (prefixes ["run"] @@ stop)
     (fun ( data_dir,
            mode,
@@ -176,7 +184,9 @@ let legacy_run_command =
            boot_sector_file,
            no_degraded,
            gc_frequency,
-           history_mode )
+           history_mode,
+           allowed_origins,
+           allowed_headers )
          cctxt ->
       let* configuration =
         Configuration.Cli.create_or_read_config
@@ -202,6 +212,8 @@ let legacy_run_command =
           ~no_degraded
           ~gc_frequency
           ~history_mode
+          ~allowed_origins
+          ~allowed_headers
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -220,7 +232,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args20
+    (args22
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -240,7 +252,9 @@ let run_command =
        boot_sector_file_arg
        no_degraded_arg
        gc_frequency_arg
-       history_mode_arg)
+       history_mode_arg
+       cors_allowed_origins_arg
+       cors_allowed_headers_arg)
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -264,7 +278,9 @@ let run_command =
            boot_sector_file,
            no_degraded,
            gc_frequency,
-           history_mode )
+           history_mode,
+           allowed_origins,
+           allowed_headers )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -293,6 +309,8 @@ let run_command =
           ~no_degraded
           ~gc_frequency
           ~history_mode
+          ~allowed_origins
+          ~allowed_headers
       in
       Rollup_node_daemon.run
         ~data_dir

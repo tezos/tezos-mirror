@@ -1157,6 +1157,7 @@ module Internal_for_tests = struct
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;
           history_mode = Configuration.default_history_mode;
+          cors = Resto_cohttp.Cors.default;
         }
     in
     let* lockfile = lock ~data_dir in
