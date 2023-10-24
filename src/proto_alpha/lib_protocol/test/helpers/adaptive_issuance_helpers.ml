@@ -348,18 +348,31 @@ let balance_zero =
 let balance_of_account account_name (account_map : account_map) =
   match String.Map.find account_name account_map with
   | None -> raise Not_found
-  | Some account ->
+  | Some
+      {
+        pkh = _;
+        contract = _;
+        delegate;
+        parameters = _;
+        liquid;
+        bonds;
+        frozen_deposits = _;
+        unstaked_frozen = _;
+        unstaked_finalizable = _;
+        staking_delegator_numerator;
+        staking_delegate_denominator;
+      } ->
       let balance =
         {
           balance_zero with
-          liquid_b = account.liquid;
-          bonds_b = account.bonds;
-          staking_delegator_numerator_b = account.staking_delegator_numerator;
-          staking_delegate_denominator_b = account.staking_delegate_denominator;
+          liquid_b = liquid;
+          bonds_b = bonds;
+          staking_delegator_numerator_b = staking_delegator_numerator;
+          staking_delegate_denominator_b = staking_delegate_denominator;
         }
       in
       let balance =
-        match account.delegate with
+        match delegate with
         | None -> balance
         | Some d -> (
             match String.Map.find d account_map with
