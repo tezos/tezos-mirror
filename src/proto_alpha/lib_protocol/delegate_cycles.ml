@@ -47,7 +47,7 @@ let update_activity ctxt last_cycle =
             return (ctxt, delegate :: deactivated)
           else return (ctxt, deactivated))
 
-let update_initial_frozen_deposits ctxt ~new_cycle =
+let update_forbidden_delegates ctxt ~new_cycle =
   let open Lwt_result_syntax in
   let*! ctxt = Delegate_storage.reset_forbidden_delegates ctxt in
   let* selection_for_new_cycle =
@@ -153,7 +153,7 @@ let cycle_end ctxt last_cycle =
       ctxt
       ~new_cycle
   in
-  let* ctxt = update_initial_frozen_deposits ctxt ~new_cycle in
+  let* ctxt = update_forbidden_delegates ctxt ~new_cycle in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
@@ -178,4 +178,4 @@ let init_first_cycles ctxt =
       Misc.(0 --> preserved)
   in
   let cycle = (Raw_context.current_level ctxt).cycle in
-  update_initial_frozen_deposits ~new_cycle:cycle ctxt
+  update_forbidden_delegates ~new_cycle:cycle ctxt
