@@ -69,20 +69,13 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
   let* selection_for_new_cycle =
     Stake_storage.get_selected_distribution ctxt new_cycle
   in
-  let* ctxt, delegates_to_remove =
+  let* ctxt, _delegates_to_remove =
     List.fold_left_es
-      (fun (ctxt, delegates_to_remove)
-           (delegate, Stake_repr.{frozen; weighted_delegated = _}) ->
+      (fun (ctxt, delegates_to_remove) (delegate, _stake) ->
         let delegates_to_remove =
           Signature.Public_key_hash.Set.remove delegate delegates_to_remove
         in
         let delegate_contract = Contract_repr.Implicit delegate in
-        let* ctxt =
-          Frozen_deposits_storage.update_initial_amount
-            ctxt
-            delegate_contract
-            frozen
-        in
         let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
         let current_amount = deposits.current_amount in
         if Tez_repr.(current_amount = zero) then
@@ -94,15 +87,7 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
       (ctxt, last_cycle_delegates)
       selection_for_new_cycle
   in
-  Signature.Public_key_hash.Set.fold_es
-    (fun delegate ctxt ->
-      let delegate_contract = Contract_repr.Implicit delegate in
-      Frozen_deposits_storage.update_initial_amount
-        ctxt
-        delegate_contract
-        Tez_repr.zero)
-    delegates_to_remove
-    ctxt
+  return ctxt
 
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
