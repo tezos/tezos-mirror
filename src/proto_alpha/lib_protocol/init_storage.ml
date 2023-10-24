@@ -115,8 +115,13 @@ let migrate_staking_balance_for_o ctxt =
   let open Lwt_result_syntax in
   let convert ctxt delegate staking_balance =
     let delegate_contract = Contract_repr.Implicit delegate in
-    let* {current_amount = own_frozen; initial_amount = _} =
-      Frozen_deposits_storage.get ctxt delegate_contract
+    let* frozen_deposits_opt =
+      Storage.Contract.Frozen_deposits_up_to_Nairobi.find ctxt delegate_contract
+    in
+    let own_frozen =
+      match frozen_deposits_opt with
+      | Some {current_amount; initial_amount = _} -> current_amount
+      | None -> Tez_repr.zero
     in
     let delegated =
       Tez_repr.sub_opt staking_balance own_frozen
