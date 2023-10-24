@@ -188,7 +188,8 @@ module Contract : sig
        and type value = Deposits_repr.t
        and type t := Raw_context.t
 
-  (** Tez that were part of {!Frozen_deposits} but have been requested to be
+  (** Tez that were part of frozen deposits (either [own_frozen] or
+      [staked_frozen] in {!Staking_balance}) but have been requested to be
       unstaked by a staker.
       They won't be part of the stake for future distributions.
       For cycles [current_cycle - preserved_cycles - max_slashing_period + 1] to
@@ -209,8 +210,8 @@ module Contract : sig
        and type value = Unstake_request.t
        and type t := Raw_context.t
 
-  (** The sum of all pseudotokens owned by stakers (the delegate included)
-      corresponding to shares of the {!Frozen_deposits} current amount. *)
+  (** The sum of all pseudotokens owned by stakers
+      corresponding to shares of the [staked_frozen] in {!Staking_balance}. *)
   module Frozen_deposits_pseudotokens :
     Indexed_data_storage
       with type key = Contract_repr.t
