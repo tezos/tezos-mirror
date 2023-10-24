@@ -100,15 +100,6 @@ val fold :
 (** List all registered delegates. *)
 val list : Raw_context.t -> Signature.Public_key_hash.t list Lwt.t
 
-(** Returns a delegate's frozen deposits, both the current amount and
-   the initial freezed amount.
-
-    A delegate's frozen balance is only composed of frozen deposits;
-    rewards and fees are not frozen, but simply credited at the right
-    moment.  *)
-val frozen_deposits :
-  Raw_context.t -> Signature.Public_key_hash.t -> Deposits_repr.t tzresult Lwt.t
-
 (** Returns a delegate's initial frozen deposits at the beginning of cycle. *)
 val initial_frozen_deposits :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
