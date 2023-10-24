@@ -1257,3 +1257,10 @@ val get_monitor_validated_blocks : JSON.t t
 
 (** A nonexistent RPC. *)
 val nonexistent_path : JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/denunciations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_denunciations :
+  ?chain:string -> ?block:string -> unit -> JSON.t t

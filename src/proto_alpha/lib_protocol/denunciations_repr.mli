@@ -18,6 +18,8 @@ type item = {
 
 type t = item list
 
+val item_encoding : item Data_encoding.t
+
 val encoding : t Data_encoding.t
 
 val add :

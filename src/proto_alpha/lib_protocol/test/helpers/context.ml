@@ -315,6 +315,9 @@ let get_ai_current_yearly_rate_exact ctxt =
 let get_ai_expected_issuance ctxt =
   Adaptive_issuance_services.expected_issuance rpc_ctxt ctxt
 
+let get_denunciations ctxt =
+  Alpha_services.Denunciations.denunciations rpc_ctxt ctxt
+
 (* Voting *)
 
 module Vote = struct
