@@ -253,7 +253,7 @@ let test_launch threshold expected_vote_duration () =
   in
   let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
   (* We bake one more block to end the vote and set the feature to launch. *)
-  let* block, metadata =
+  let* block, (metadata, _) =
     Block.bake_n_with_metadata ~adaptive_issuance_vote:Per_block_vote_on 1 block
   in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in
@@ -298,7 +298,7 @@ let test_launch threshold expected_vote_duration () =
   in
   (* Bake until the activation. *)
   let* block = Block.bake_until_cycle launch_cycle block in
-  let* block, metadata = Block.bake_n_with_metadata 1 block in
+  let* block, (metadata, _) = Block.bake_n_with_metadata 1 block in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in
   (* Check that keeping the EMA above the threshold did not postpone
      the activation. *)
@@ -430,7 +430,7 @@ let test_does_not_launch_without_feature_flag threshold vote_duration () =
   let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
   (* We bake one more block, this would set the feature to launch if
      the vote was taken into account. *)
-  let* block, metadata =
+  let* block, (metadata, _) =
     Block.bake_n_with_metadata ~adaptive_issuance_vote:Per_block_vote_on 1 block
   in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in

@@ -840,7 +840,7 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
     ?(baking_mode = Application) ~allow_manager_failures header
     ?(operations = []) pred =
   let open Lwt_result_wrap_syntax in
-  let* context, result =
+  let* context, result, contents_result =
     let* vstate =
       match baking_mode with
       | Application ->
@@ -858,9 +858,9 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
             ~protocol_data:(Some header.protocol_data)
             (pred : t)
     in
-    let*@ vstate =
+    let*@ vstate, contents_result =
       List.fold_left_es
-        (fun vstate op ->
+        (fun (vstate, contents_result) op ->
           (if check_size then
            let operation_size =
              Data_encoding.Binary.length
@@ -876,24 +876,25 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
                      operation_size
                      Constants_repr.max_operation_data_length))) ;
           let* state, result = validate_and_apply_operation vstate op in
-          if allow_manager_failures then return state
+          if allow_manager_failures then
+            return (state, result :: contents_result)
           else
             match result with
-            | No_operation_metadata -> return state
+            | No_operation_metadata -> return (state, contents_result)
             | Operation_metadata metadata ->
                 let*? () = detect_manager_failure metadata in
-                return state)
-        vstate
+                return (state, result :: contents_result))
+        (vstate, [])
         operations
     in
     let+@ validation, result =
       finalize_validation_and_application vstate (Some header.shell)
     in
-    (validation.context, result)
+    (validation.context, result, List.rev contents_result)
   in
   let hash = Block_header.hash header in
   let+ constants = Alpha_services.Constants.parametric rpc_ctxt pred in
-  ({hash; header; operations; context; constants}, result)
+  ({hash; header; operations; context; constants}, (result, contents_result))
 
 let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
   let open Lwt_result_syntax in
@@ -963,7 +964,7 @@ let bake ?baking_mode ?(allow_manager_failures = false) ?payload_round
     ?locked_round ?policy ?timestamp ?operation ?operations
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote ?check_size pred =
   let open Lwt_result_syntax in
-  let* t, (_metadata : block_header_metadata) =
+  let* t, (_metadata : block_header_metadata * operation_receipt list) =
     bake_with_metadata
       ?payload_round
       ?baking_mode
@@ -1000,7 +1001,7 @@ let rec bake_while_with_metadata ?baking_mode ?policy
     ?(invariant = fun _ -> return_unit) predicate b =
   let open Lwt_result_syntax in
   let* () = invariant b in
-  let* new_block, metadata =
+  let* new_block, (metadata, _) =
     bake_with_metadata
       ?baking_mode
       ?policy
@@ -1046,7 +1047,7 @@ let bake_n_with_all_balance_updates ?baking_mode ?policy
   let+ b, balance_updates_rev =
     List.fold_left_es
       (fun (b, balance_updates_rev) _ ->
-        let* b, metadata =
+        let* b, (metadata, _) =
           bake_with_metadata
             ?baking_mode
             ?policy
@@ -1096,7 +1097,7 @@ let bake_n_with_origination_results ?baking_mode ?policy n b =
   let+ b, origination_results_rev =
     List.fold_left_es
       (fun (b, origination_results_rev) _ ->
-        let* b, metadata = bake_with_metadata ?baking_mode ?policy b in
+        let* b, (metadata, _) = bake_with_metadata ?baking_mode ?policy b in
         let origination_results_rev =
           List.fold_left
             (fun origination_results_rev ->
@@ -1137,7 +1138,7 @@ let bake_n_with_origination_results ?baking_mode ?policy n b =
 let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
   let open Lwt_result_syntax in
-  let+ b, metadata =
+  let+ b, (metadata, _) =
     bake_n_with_metadata
       ?baking_mode
       ?policy
