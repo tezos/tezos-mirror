@@ -896,6 +896,26 @@ let args22 a b c d e f g h i j k l m n o p q r s t u v =
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args6 q r s t u v))
 
+let args23 a b c d e f g h i j k l m n o p q r s t u v w =
+  map_arg
+    ~f:
+      (fun _
+           ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+             (q, r, s, t, u, v, w) ) ->
+      Lwt_result_syntax.return
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w))
+    (args2 (args16 a b c d e f g h i j k l m n o p) (args7 q r s t u v w))
+
+let args24 a b c d e f g h i j k l m n o p q r s t u v w x =
+  map_arg
+    ~f:
+      (fun _
+           ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+             (q, r, s, t, u, v, w, x) ) ->
+      Lwt_result_syntax.return
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x))
+    (args2 (args16 a b c d e f g h i j k l m n o p) (args8 q r s t u v w x))
+
 let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
 (* Argument parsing *)
