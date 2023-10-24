@@ -18,6 +18,7 @@
 - RPCs related to blocks now return default values for the POW fields instead of
   mockup. (!10427)
 - The binary `evm-proxy-server` is renamed to `evm-node`. (!10656)
+- Renamed node's argument `mode` to `version`. (!10657)
 
 ### Bug fixes
 

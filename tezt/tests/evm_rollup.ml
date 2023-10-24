@@ -402,7 +402,7 @@ let setup_evm_kernel ?config ?kernel_installee
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
-  let* evm_node = Evm_node.init ~mode:`Development sc_rollup_node in
+  let* evm_node = Evm_node.init ~version:`Development sc_rollup_node in
   let endpoint = Evm_node.endpoint evm_node in
   return
     {
@@ -2549,7 +2549,7 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
-  let* evm_node = Evm_node.init ~mode:`Production evm_setup.sc_rollup_node in
+  let* evm_node = Evm_node.init ~version:`Production evm_setup.sc_rollup_node in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
     scenario_prior ~evm_setup:{evm_setup with evm_node; endpoint}

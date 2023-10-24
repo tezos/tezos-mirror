@@ -29,7 +29,7 @@ module Parameters = struct
   type persistent_state = {
     arguments : string list;
     mutable pending_ready : unit option Lwt.u list;
-    mode : string;
+    version : string;
     rpc_addr : string;
     rpc_port : int;
     rollup_node : Sc_rollup_node.t;
@@ -48,16 +48,16 @@ include Daemon.Make (Parameters)
 
 let path = "./octez-evm-node"
 
-let string_of_mode = function `Development -> "dev" | `Production -> "prod"
+let string_of_version = function `Development -> "dev" | `Production -> "prod"
 
-let connection_arguments ?mode ?rpc_addr ?rpc_port () =
+let connection_arguments ?version ?rpc_addr ?rpc_port () =
   let open Cli_arg in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
   ( ["--rpc-port"; string_of_int rpc_port]
     @ optional_arg "rpc-addr" Fun.id rpc_addr
-    @ optional_arg "mode" string_of_mode mode,
+    @ optional_arg "version" string_of_version version,
     Option.value ~default:"127.0.0.1" rpc_addr,
     rpc_port )
 
@@ -95,9 +95,9 @@ let wait_for_ready evm_node =
         resolver :: evm_node.persistent_state.pending_ready ;
       check_event evm_node event_ready_name promise
 
-let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
+let create ?runner ?version ?rpc_addr ?rpc_port rollup_node =
   let arguments, rpc_addr, rpc_port =
-    connection_arguments ?mode ?rpc_addr ?rpc_port ()
+    connection_arguments ?version ?rpc_addr ?rpc_port ()
   in
   let evm_node =
     create
@@ -105,10 +105,10 @@ let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
       {
         arguments;
         pending_ready = [];
-        mode =
-          (match mode with
-          | Some mode -> string_of_mode mode
-          | None -> string_of_mode `Production);
+        version =
+          (match version with
+          | Some version -> string_of_version version
+          | None -> string_of_version `Production);
         rpc_addr;
         rpc_port;
         rollup_node;
@@ -118,8 +118,8 @@ let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
   on_event evm_node (handle_event evm_node) ;
   evm_node
 
-let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
-  create ?runner ?mode ?rpc_addr ?rpc_port rollup_node
+let create ?runner ?version ?rpc_addr ?rpc_port rollup_node =
+  create ?runner ?version ?rpc_addr ?rpc_port rollup_node
 
 let rollup_node_endpoint evm_node =
   Sc_rollup_node.endpoint evm_node.persistent_state.rollup_node
@@ -152,8 +152,8 @@ let endpoint (evm_node : t) =
     evm_node.persistent_state.rpc_addr
     evm_node.persistent_state.rpc_port
 
-let init ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
-  let evm_node = create ?runner ?mode ?rpc_addr ?rpc_port rollup_node in
+let init ?runner ?version ?rpc_addr ?rpc_port rollup_node =
+  let evm_node = create ?runner ?version ?rpc_addr ?rpc_port rollup_node in
   let* () = run evm_node in
   return evm_node
 
