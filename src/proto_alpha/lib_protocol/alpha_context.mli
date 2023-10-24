@@ -2151,7 +2151,7 @@ module Consensus_key : sig
   val pkh : pk -> t
 end
 
-(** This module re-exports definitions from {!Deposits_repr}, {!Delegate_storage},
+(** This module re-exports definitions from {!Delegate_storage},
    {!Delegate_consensus_key}, {!Delegate_missed_attestations_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
    {!Delegate_rewards}. *)
@@ -2227,10 +2227,6 @@ module Delegate : sig
     participation:level_participation ->
     attesting_power:int ->
     context tzresult Lwt.t
-
-  type deposits = {initial_amount : Tez.t; current_amount : Tez.t}
-
-  val frozen_deposits : context -> public_key_hash -> deposits tzresult Lwt.t
 
   val current_frozen_deposits :
     context -> public_key_hash -> Tez.t tzresult Lwt.t
