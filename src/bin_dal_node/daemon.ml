@@ -110,7 +110,14 @@ module Handler = struct
     let Types.Message.{share; shard_proof} = message in
     let Types.Message_id.{commitment; shard_index; _} = message_id in
     let shard = Cryptobox.{share; index = shard_index} in
-    match Cryptobox.verify_shard cryptobox commitment shard shard_proof with
+    let res =
+      Dal_metrics.sample_time
+        ~sampling_frequency:Constants.shards_verification_sampling_frequency
+        ~metric_updater:Dal_metrics.update_shards_verification_time
+        ~to_sample:(fun () ->
+          Cryptobox.verify_shard cryptobox commitment shard shard_proof)
+    in
+    match res with
     | Ok () -> `Valid
     | Error err ->
         let err =
@@ -322,6 +329,7 @@ module Handler = struct
             let* slot_headers = Plugin.get_published_slot_headers block_info in
             let* () =
               Slot_manager.store_slot_headers
+                ~number_of_slots:proto_parameters.number_of_slots
                 ~block_level
                 slot_headers
                 (Node_context.get_store ctxt)

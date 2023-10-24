@@ -102,6 +102,7 @@ module Shards = struct
     let*! () =
       List.of_seq shards
       |> Lwt_list.iter_s (fun (_commitment, index, _share) ->
+             Dal_metrics.shard_stored () ;
              Event.(emit stored_slot_shard (commitment, index)))
     in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
@@ -401,7 +402,8 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let add_slot_headers ~block_level slot_headers node_store =
+  let add_slot_headers ~number_of_slots ~block_level slot_headers node_store =
+    let module SI = Set.Make (Int) in
     let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
@@ -409,63 +411,73 @@ module Legacy = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
              https://gitlab.com/tezos/tezos/-/issues/4528
        Handle statuses evolution. *)
-    List.iter_es
-      (fun (slot_header, status) ->
-        let Dal_plugin.{slot_index; commitment; published_level} =
-          slot_header
-        in
-        (* This invariant should hold. *)
-        assert (Int32.equal published_level block_level) ;
-        let index = Types.{slot_level = published_level; slot_index} in
-        let header_path = Path.Commitment.header commitment index in
-        let*! () =
-          set
-            ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
-            slots_store
-            header_path
-            ""
-        in
-        let others_path = Path.Level.other_header_status index commitment in
-        match status with
-        | Dal_plugin.Succeeded ->
-            let commitment_path = Path.Level.accepted_header_commitment index in
-            let status_path = Path.Level.accepted_header_status index in
-            let data = encode_commitment commitment in
-            (* Before adding the item in accepted path, we should remove it from
-               others path, as it may appear there with an
-               Unseen_or_not_finalized status. *)
-            let*! () =
-              remove
-                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                slots_store
-                others_path
-            in
-            let*! () =
-              set
-                ~msg:
-                  (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
-                slots_store
-                commitment_path
-                data
-            in
-            let*! () =
-              set
-                ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
-                slots_store
-                status_path
-                (encode_header_status `Waiting_attestation)
-            in
-            return_unit
-        | Dal_plugin.Failed ->
-            let*! () =
-              set
-                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                slots_store
-                others_path
-                (encode_header_status `Not_selected)
-            in
-            return_unit)
-      slot_headers
+    let* waiting =
+      List.fold_left_es
+        (fun waiting (slot_header, status) ->
+          let Dal_plugin.{slot_index; commitment; published_level} =
+            slot_header
+          in
+          (* This invariant should hold. *)
+          assert (Int32.equal published_level block_level) ;
+          let index = Types.{slot_level = published_level; slot_index} in
+          let header_path = Path.Commitment.header commitment index in
+          let*! () =
+            set
+              ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
+              slots_store
+              header_path
+              ""
+          in
+          let others_path = Path.Level.other_header_status index commitment in
+          match status with
+          | Dal_plugin.Succeeded ->
+              let commitment_path =
+                Path.Level.accepted_header_commitment index
+              in
+              let status_path = Path.Level.accepted_header_status index in
+              let data = encode_commitment commitment in
+              (* Before adding the item in accepted path, we should remove it from
+                 others path, as it may appear there with an
+                 Unseen_or_not_finalized status. *)
+              let*! () =
+                remove
+                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                  slots_store
+                  others_path
+              in
+              let*! () =
+                set
+                  ~msg:
+                    (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
+                  slots_store
+                  commitment_path
+                  data
+              in
+              let*! () =
+                set
+                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
+                  slots_store
+                  status_path
+                  (encode_header_status `Waiting_attestation)
+              in
+              return (SI.add slot_index waiting)
+          | Dal_plugin.Failed ->
+              let*! () =
+                set
+                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                  slots_store
+                  others_path
+                  (encode_header_status `Not_selected)
+              in
+              return waiting)
+        SI.empty
+        slot_headers
+    in
+    List.iter
+      (fun i ->
+        Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
+      (0 -- (number_of_slots - 1)) ;
+    return_unit
 
   let update_slot_headers_attestation ~published_level ~number_of_slots store
       attested =
@@ -481,10 +493,12 @@ module Legacy = struct
         let msg =
           Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
         in
-        if S.mem slot_index attested then
-          set ~msg store status_path attested_str
+        if S.mem slot_index attested then (
+          Dal_metrics.slot_attested ~set:true slot_index ;
+          set ~msg store status_path attested_str)
         else
           let* old_data_opt = find store status_path in
+          Dal_metrics.slot_attested ~set:false slot_index ;
           if Option.is_some old_data_opt then
             set ~msg store status_path unattested_str
           else
