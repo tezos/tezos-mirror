@@ -124,16 +124,6 @@ val inspect_durable_state_value :
   key:string ->
   'a Runnable.process
 
-(** [outbox ?block outbox_level client] gets the rollup outbox of
-   [outbox_level] as known to the [block] (default ["cemented"] which
-   is the block corresponding to the last cemented level). *)
-val outbox :
-  ?hooks:Process.hooks ->
-  ?block:string ->
-  outbox_level:int ->
-  t ->
-  JSON.t Runnable.process
-
 type outbox_proof = {commitment_hash : string; proof : string}
 
 (** [outbox_proof_single] asks the rollup node for a proof that an

@@ -3836,9 +3836,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     let parameters = "37" in
     let message_index = 0 in
     let check_expected_outbox () =
-      let* outbox =
-        Runnable.run @@ Sc_rollup_client.outbox ~outbox_level sc_client
-      in
+      let* outbox = Sc_rollup_helpers.outbox ~outbox_level rollup_node in
       Log.info "Outbox is %s" (JSON.encode outbox) ;
 
       match expected_error with
@@ -4267,11 +4265,9 @@ let test_rpcs ~kind
       ["global"; "block"; "head"; "state_hash"]
   in
   let* _outbox =
-    Runnable.run
-    @@ Sc_rollup_client.outbox
-         ~hooks
-         ~outbox_level:l2_finalied_block_level
-         sc_client
+    Sc_rollup_helpers.outbox
+      ~outbox_level:l2_finalied_block_level
+      sc_rollup_node
   in
   let*! _head =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_head"]

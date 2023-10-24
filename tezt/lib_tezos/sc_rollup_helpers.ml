@@ -1175,3 +1175,10 @@ let status ?(block = "head") sc_rollup_node =
   let service = "global/block/" ^ block ^ "/status" in
   let* json = call_rpc ~smart_rollup_node:sc_rollup_node ~service in
   return (JSON.as_string json)
+
+let outbox ?(block = "cemented") ~outbox_level sc_rollup_node =
+  let service =
+    "global/block/" ^ block ^ "/outbox/" ^ string_of_int outbox_level
+    ^ "/messages"
+  in
+  call_rpc ~smart_rollup_node:sc_rollup_node ~service

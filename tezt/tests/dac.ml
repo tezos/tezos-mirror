@@ -1832,10 +1832,10 @@ module Tx_kernel_e2e = struct
     let* () = assert_state_changed sc_rollup_client prev_state_hash in
     return {prev_state_hash; prev_ticks; level}
 
-  let verify_outbox_answer ~withdrawal_level ~sc_rollup_client
+  let verify_outbox_answer ~withdrawal_level ~sc_rollup_node ~sc_rollup_client
       ~sc_rollup_address ~client =
-    let*! outbox =
-      Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
+    let* outbox =
+      Sc_rollup_helpers.outbox ~outbox_level:withdrawal_level sc_rollup_node
     in
     Log.info "Outbox is %s" @@ JSON.encode outbox ;
     let* answer =
@@ -2083,6 +2083,7 @@ module Tx_kernel_e2e = struct
     let* () =
       verify_outbox_answer
         ~client
+        ~sc_rollup_node
         ~sc_rollup_client
         ~sc_rollup_address
         ~withdrawal_level
@@ -2280,6 +2281,7 @@ module Tx_kernel_e2e = struct
     let* () =
       verify_outbox_answer
         ~client
+        ~sc_rollup_node
         ~sc_rollup_client
         ~sc_rollup_address
         ~withdrawal_level

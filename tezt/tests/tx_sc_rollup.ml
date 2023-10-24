@@ -493,8 +493,8 @@ let tx_kernel_e2e setup protocol =
   let* () = assert_ticks_advanced ~block sc_rollup_node prev_ticks in
 
   (* EXECUTE withdrawal *)
-  let*! outbox =
-    Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
+  let* outbox =
+    Sc_rollup_helpers.outbox ~outbox_level:withdrawal_level sc_rollup_node
   in
   Log.info "Outbox is %s" @@ JSON.encode outbox ;
   let execute_outbox_proof ~message_index =
