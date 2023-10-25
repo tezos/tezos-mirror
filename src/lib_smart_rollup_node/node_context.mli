@@ -527,6 +527,10 @@ val save_confirmed_slots_histories :
     levels lower than [level] will be removed. *)
 val gc : [> `Write] t -> level:int32 -> unit tzresult Lwt.t
 
+(** [get_gc_levels node_ctxt] returns information about the garbage collected
+    levels. *)
+val get_gc_levels : _ t -> Store.Gc_levels.levels tzresult Lwt.t
+
 (** [check_level_available node_ctxt level] resolves with an error if the
     [level] is before the first non garbage collected level. *)
 val check_level_available : _ t -> int32 -> unit tzresult Lwt.t

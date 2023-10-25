@@ -168,6 +168,15 @@ let () =
       return_some (commitment, hash, first_published, published)
 
 let () =
+  Local_directory.register0 Rollup_node_services.Local.gc_info
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let+ {last_gc_level; first_available_level} =
+    Node_context.get_gc_levels node_ctxt
+  in
+  Rollup_node_services.{last_gc_level; first_available_level}
+
+let () =
   Local_directory.register0 Rollup_node_services.Local.injection
   @@ fun _node_ctxt () messages -> Batcher.register_messages messages
 
