@@ -45,21 +45,21 @@ mod tests {
             parse("{ PUSH (pair int nat) Unit }").unwrap(),
             vec![Instruction::Push((
                 Type::new_pair(Type::Int, Type::Nat),
-                Value::UnitValue
+                Value::Unit
             ))]
         );
         assert_eq!(
             parse("{ PUSH (pair int nat unit) Unit }").unwrap(),
             vec![Instruction::Push((
                 Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Unit)),
-                Value::UnitValue
+                Value::Unit
             ))]
         );
         assert_eq!(
             parse("{ PUSH (pair (pair int nat) unit) Unit }").unwrap(),
             vec![Instruction::Push((
                 Type::new_pair(Type::new_pair(Type::Int, Type::Nat), Type::Unit),
-                Value::UnitValue
+                Value::Unit
             ))]
         );
     }
@@ -70,7 +70,7 @@ mod tests {
             parse("{ PUSH unit (Pair 3 4) }").unwrap(),
             vec![Instruction::Push((
                 Type::Unit,
-                Value::new_pair(Value::NumberValue(3), Value::NumberValue(4)),
+                Value::new_pair(Value::Number(3), Value::Number(4)),
             ))]
         );
         assert_eq!(
@@ -78,8 +78,8 @@ mod tests {
             vec![Instruction::Push((
                 Type::Unit,
                 Value::new_pair(
-                    Value::NumberValue(3),
-                    Value::new_pair(Value::NumberValue(4), Value::NumberValue(5)),
+                    Value::Number(3),
+                    Value::new_pair(Value::Number(4), Value::Number(5)),
                 ),
             ))]
         );
@@ -88,8 +88,8 @@ mod tests {
             vec![Instruction::Push((
                 Type::Unit,
                 Value::new_pair(
-                    Value::new_pair(Value::NumberValue(3), Value::NumberValue(4)),
-                    Value::NumberValue(5),
+                    Value::new_pair(Value::Number(3), Value::Number(4)),
+                    Value::Number(5),
                 ),
             ))]
         );
@@ -107,7 +107,7 @@ mod tests {
     fn value_parens() {
         assert_eq!(
             parse("{ PUSH unit (Unit) }").unwrap(),
-            vec![Instruction::Push((Type::Unit, Value::UnitValue))]
+            vec![Instruction::Push((Type::Unit, Value::Unit))]
         );
     }
 
@@ -148,7 +148,7 @@ mod tests {
         use Value as V;
         assert_eq!(
             parse("{PUSH @var :ty %field int 1}").unwrap(),
-            vec![Push((T::Int, V::NumberValue(1)))],
+            vec![Push((T::Int, V::Number(1)))],
         );
         assert_eq!(
             parse("{CAR @var :ty %field :ty.2 @var.2 %field.2}").unwrap(),

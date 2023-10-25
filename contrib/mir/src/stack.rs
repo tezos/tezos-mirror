@@ -15,13 +15,14 @@ pub type IStack = Stack<TypedValue>;
 
 /// Construct a `Stack` with the given content. Note that stack top is the
 /// _rightmost_ element.
+#[macro_export]
 macro_rules! stk {
     [$($args:tt)*] => {
         $crate::stack::TopIsLast::from(vec![$($args)*]).0
     };
 }
 
-pub(crate) use stk;
+pub use stk;
 
 /// A stack abstraction based on `Vec`.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -66,7 +67,7 @@ impl<T> Stack<T> {
         self.failed
     }
 
-    pub fn fail(&mut self) -> () {
+    pub fn fail(&mut self) {
         self.failed = true;
     }
 
@@ -89,7 +90,7 @@ impl<T> Stack<T> {
     /// bulk.
     ///
     /// Panics if the `size` is larger than length of the stack.
-    pub fn drop_top(&mut self, size: usize) -> () {
+    pub fn drop_top(&mut self, size: usize) {
         let len = self.len();
         self.data_mut()
             .truncate(len.checked_sub(size).expect("size too large in drop_top"));
@@ -114,13 +115,13 @@ impl<T> Stack<T> {
 
     /// Move elements from `other` to the top of the stack. New stack top is the
     /// top of `other`. Note that elements are moved out of `other`.
-    pub fn append(&mut self, other: &mut Stack<T>) -> () {
+    pub fn append(&mut self, other: &mut Stack<T>) {
         self.data_mut().append(other.data_mut())
     }
 
     /// Swap two elements in the stack, identified by their index from the top,
     /// with `0` being the top.
-    pub fn swap(&mut self, i1: usize, i2: usize) -> () {
+    pub fn swap(&mut self, i1: usize, i2: usize) {
         let i1v = self.vec_index(i1);
         let i2v = self.vec_index(i2);
         self.data_mut().swap(i1v, i2v)
@@ -186,6 +187,12 @@ macro_rules! boilerplate {
 
 boilerplate!(TopIsFirst);
 boilerplate!(TopIsLast);
+
+impl<T> Default for Stack<T> {
+    fn default() -> Self {
+        Stack::new()
+    }
+}
 
 impl<T> Index<usize> for Stack<T> {
     type Output = <usize as SliceIndex<[T]>>::Output;
@@ -258,7 +265,7 @@ mod tests {
 
     #[test]
     fn conversion_from_iter() {
-        let it = (1..=4).into_iter();
+        let it = 1..=4;
         assert_eq!(
             TopIsLast::from_iter(it.clone()).0.as_slice(),
             [1, 2, 3, 4] // NB: top is right

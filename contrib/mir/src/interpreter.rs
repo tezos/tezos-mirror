@@ -27,7 +27,7 @@ pub fn interpret(
     stack: &mut IStack,
 ) -> Result<(), InterpretError> {
     for i in ast {
-        interpret_one(&i, ctx, stack)?;
+        interpret_one(i, ctx, stack)?;
     }
     ctx.gas.consume(interpret_cost::INTERPRET_RET)?;
     Ok(())
@@ -721,8 +721,10 @@ mod interpreter_tests {
     #[test]
     fn amount() {
         let mut stack = stk![];
-        let mut ctx = &mut Ctx::default();
-        ctx.amount = 100500;
+        let mut ctx = Ctx {
+            amount: 100500,
+            ..Ctx::default()
+        };
         assert_eq!(interpret(&vec![Amount], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Mutez(100500)]);
         assert_eq!(
@@ -734,7 +736,7 @@ mod interpreter_tests {
     #[test]
     fn push_int_list() {
         let mut stack = stk![];
-        let mut ctx = &mut Ctx::default();
+        let mut ctx = Ctx::default();
         assert_eq!(
             interpret(
                 &vec![Push(TypedValue::List(vec![

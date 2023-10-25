@@ -419,35 +419,35 @@ fn typecheck_instruction(
 fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcError> {
     use Type::*;
     use TypedValue as TV;
-    use Value::*;
+    use Value as V;
     ctx.gas.consume(gas::tc_cost::VALUE_STEP)?;
     Ok(match (t, v) {
-        (Nat, NumberValue(n)) => TV::Nat(n.try_into()?),
-        (Int, NumberValue(n)) => TV::Int(n),
-        (Bool, BooleanValue(b)) => TV::Bool(b),
-        (Mutez, NumberValue(n)) if n >= 0 => TV::Mutez(n.try_into()?),
-        (String, StringValue(s)) => TV::String(s),
-        (Unit, UnitValue) => TV::Unit,
-        (Pair(tl, tr), PairValue(vl, vr)) => {
+        (Nat, V::Number(n)) => TV::Nat(n.try_into()?),
+        (Int, V::Number(n)) => TV::Int(n),
+        (Bool, V::Boolean(b)) => TV::Bool(b),
+        (Mutez, V::Number(n)) if n >= 0 => TV::Mutez(n.try_into()?),
+        (String, V::String(s)) => TV::String(s),
+        (Unit, V::Unit) => TV::Unit,
+        (Pair(tl, tr), V::Pair(vl, vr)) => {
             let l = typecheck_value(ctx, tl, *vl)?;
             let r = typecheck_value(ctx, tr, *vr)?;
             TV::new_pair(l, r)
         }
-        (Option(ty), OptionValue(v)) => match v {
+        (Option(ty), V::Option(v)) => match v {
             Some(v) => {
                 let v = typecheck_value(ctx, ty, *v)?;
                 TV::new_option(Some(v))
             }
             None => TV::new_option(None),
         },
-        (List(ty), Seq(vs)) => {
+        (List(ty), V::Seq(vs)) => {
             let lst: Result<Vec<TypedValue>, TcError> = vs
                 .into_iter()
                 .map(|v| typecheck_value(ctx, ty, v))
                 .collect();
             TV::List(lst?)
         }
-        (Map(tk, tv), Seq(vs)) => {
+        (Map(tk, tv), V::Seq(vs)) => {
             // can only fail if the typechecker is invoked on invalid
             // types, i.e. where `map` key is non-comparable
             ensure_comparable(tk)?;
@@ -643,11 +643,7 @@ mod typecheck_tests {
         let expected_stack = stk![Type::Nat, Type::Int];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(
-                Push((Type::Int, Value::NumberValue(1))),
-                &mut ctx,
-                &mut stack
-            ),
+            typecheck_instruction(Push((Type::Int, Value::Number(1))), &mut ctx, &mut stack),
             Ok(Push(TypedValue::Int(1)))
         );
         assert_eq!(stack, expected_stack);
@@ -819,7 +815,7 @@ mod typecheck_tests {
             typecheck_value(
                 &mut Ctx::default(),
                 &Type::String,
-                Value::StringValue("foo".to_owned())
+                Value::String("foo".to_owned())
             ),
             Ok(TypedValue::String("foo".to_owned()))
         )
@@ -1117,7 +1113,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Err(TcError::InvalidValueForType(Value::UnitValue, Type::Int))
+            Err(TcError::InvalidValueForType(Value::Unit, Type::Int))
         );
     }
 
@@ -1232,7 +1228,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                Value::StringValue("1".to_owned()),
+                Value::String("1".to_owned()),
                 Type::Int
             ))
         );
@@ -1248,7 +1244,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidEltForMap(
-                Value::StringValue("bar".to_owned()),
+                Value::String("bar".to_owned()),
                 Type::new_map(Type::Int, Type::String)
             ))
         );

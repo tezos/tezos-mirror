@@ -13,7 +13,7 @@ use logos::Logos;
 macro_rules! defprim {
     ($($prim:ident),* $(,)*) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        #[allow(non_camel_case_types)]
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         pub enum Prim {
             $($prim),*
         }
