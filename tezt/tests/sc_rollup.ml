@@ -890,14 +890,8 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   assert (!gc_finalisations <= List.length gc_levels_started) ;
   (* We expect the first available level to be the one corresponding
    * to the lcc for the full mode or the genesis for archive mode *)
-  let* lcc_hash, lcc_level =
-    Sc_rollup_helpers.last_cemented_commitment_hash_with_level ~sc_rollup client
-  in
-  let* first_available_level =
-    match history_mode with
-    | Archive -> Lwt.return origination_level
-    | Full -> Lwt.return lcc_level
-  in
+  let*! {first_available_level; _} = Sc_rollup_client.gc_info rollup_client in
+  Log.info "First available level %d" first_available_level ;
   (* Check that RPC calls for blocks which were not GC'ed still return *)
   let* () =
     check_can_get_between_blocks
@@ -928,6 +922,9 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
       rpc_call_err
   in
   Log.info "Checking that commitment publication data was not completely erased" ;
+  let* lcc_hash, _lcc_level =
+    Sc_rollup_helpers.last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
   let*! lcc = Sc_rollup_client.commitment rollup_client lcc_hash in
   (match lcc with
   | None -> Test.fail ~__LOC__ "No LCC"
