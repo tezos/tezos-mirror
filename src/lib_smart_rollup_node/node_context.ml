@@ -1131,6 +1131,13 @@ let gc node_ctxt ~(level : int32) =
           (* Start both node and context gc asynchronously *)
           let*! () = Context.gc node_ctxt.context context in
           let* () = Store.gc node_ctxt.store ~level:gc_level in
+          let gc_waiter () =
+            let open Lwt_syntax in
+            let* () = Context.wait_gc_completion node_ctxt.context
+            and* () = Store.wait_gc_completion node_ctxt.store in
+            Event.gc_finished ~gc_level ~head_level:level
+          in
+          Lwt.dont_wait gc_waiter (fun _exn -> ()) ;
           return_unit)
   | _ -> return_unit
 

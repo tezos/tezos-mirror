@@ -842,7 +842,7 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
      triggered. *)
   let expected_level = 5 * challenge_window in
   let gc_levels_started = ref [] in
-  let context_gc_finalisations = ref 0 in
+  let gc_finalisations = ref 0 in
   Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; value; _} ->
       match name with
       | "calling_gc.v0" ->
@@ -852,8 +852,12 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
           let head_level = JSON.(value |-> "head_level" |> as_int) in
           Log.info "Calling GC for %d at level %d" gc_level head_level ;
           gc_levels_started := head_level :: !gc_levels_started
-          (* On each [ending_context_gc] event, increment a counter *)
-          context_gc_finalisations := !context_gc_finalisations + 1
+      | "gc_finished.v0" ->
+          (* On each [gc_finished] event, increment a counter *)
+          let gc_level = JSON.(value |-> "gc_level" |> as_int) in
+          let head_level = JSON.(value |-> "head_level" |> as_int) in
+          Log.info "Finished GC for %d at level %d" gc_level head_level ;
+          gc_finalisations := !gc_finalisations + 1
       | _ -> ()) ;
   let* () =
     Sc_rollup_node.run ~gc_frequency ~history_mode sc_rollup_node sc_rollup []
@@ -883,10 +887,7 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
       (list int)
       ~error_msg:
         "Expected GC to start at levels %R, instead started at levels %L") ;
-  Check.((!context_gc_finalisations = List.length gc_levels_started) int)
-    ~error_msg:
-      "Not all context GC calls finished (GC called %R times, finished %L \
-       times)" ;
+  assert (!gc_finalisations <= List.length gc_levels_started) ;
   (* We expect the first available level to be the one corresponding
    * to the lcc for the full mode or the genesis for archive mode *)
   let* lcc_hash, lcc_level =

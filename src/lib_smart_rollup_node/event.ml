@@ -219,6 +219,17 @@ module Simple = struct
          {new_history_mode} rollup node"
       ("old_history_mode", Configuration.history_mode_encoding)
       ("new_history_mode", Configuration.history_mode_encoding)
+
+  let gc_finished =
+    declare_2
+      ~section
+      ~name:"gc_finished"
+      ~level:Info
+      ~msg:
+        "Garbage collection finished for level {gc_level} at head level \
+         {head_level}"
+      ("gc_level", Data_encoding.int32)
+      ("head_level", Data_encoding.int32)
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -276,3 +287,6 @@ let gc_levels_storage_failure () = Simple.(emit gc_levels_storage_failure) ()
 
 let convert_history_mode old_history_mode new_history_mode =
   Simple.(emit convert_history_mode) (old_history_mode, new_history_mode)
+
+let gc_finished ~gc_level ~head_level =
+  Simple.(emit gc_finished) (gc_level, head_level)

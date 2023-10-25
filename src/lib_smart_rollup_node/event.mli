@@ -115,3 +115,7 @@ val gc_levels_storage_failure : unit -> unit Lwt.t
     when the history mode of the rollup node is changed. *)
 val convert_history_mode :
   Configuration.history_mode -> Configuration.history_mode -> unit Lwt.t
+
+(** [gc_finished ~gc_level ~head_level] emits the event that the GC is finished
+    for level [gc_level].  *)
+val gc_finished : gc_level:int32 -> head_level:int32 -> unit Lwt.t
