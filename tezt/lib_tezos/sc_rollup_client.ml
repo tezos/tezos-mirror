@@ -432,19 +432,3 @@ let get_batcher_msg ?hooks sc_client msg_hash =
      if JSON.is_null obj then failwith "Message is not in the queue" ;
      let hex_msg = JSON.(obj |> get "content" |> as_string) in
      (Hex.to_string (`Hex hex_msg), obj)
-
-let spawn_import_secret_key ?hooks ?(force = false)
-    (key : Account.aggregate_key) sc_client =
-  let sk_uri =
-    "aggregate_unencrypted:"
-    ^ Account.require_unencrypted_secret_key ~__LOC__ key.aggregate_secret_key
-  in
-  spawn_command
-    ?hooks
-    sc_client
-    (["import"; "secret"; "key"; key.aggregate_alias; sk_uri]
-    @ if force then ["--force"] else [])
-
-let import_secret_key ?hooks ?force key sc_client =
-  let*? process = spawn_import_secret_key ?hooks ?force key sc_client in
-  Process.check process

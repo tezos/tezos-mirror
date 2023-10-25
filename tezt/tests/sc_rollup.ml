@@ -2589,31 +2589,6 @@ let test_reveals_above_4k =
   in
   Lwt.choose [error_promise; should_not_sync]
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4147
-
-    remove the need to have a scoru to run wallet command. In tezt the
-    {!Sc_rollup_client.create} takes a node where the command tested here does
-    not need to have a originated scoru nor a rollup node.
-*)
-
-(** Initializes a client with an account.*)
-let _test_scenario_client_with_account ~account ~variant ~kind f =
-  test_full_scenario
-    ~kind
-    {
-      tags = ["rollup_client"; "wallet"];
-      variant = Some variant;
-      description = "rollup client wallet is valid";
-    }
-  @@ fun _protocol
-             _rollup_node
-             rollup_client
-             _sc_rollup
-             _tezos_node
-             _tezos_client ->
-  let* () = Sc_rollup_client.import_secret_key account rollup_client in
-  f rollup_client
-
 let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
     _tezos_node tezos_client =
   let* inbox_level = Client.level tezos_client in

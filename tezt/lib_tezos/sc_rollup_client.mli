@@ -249,12 +249,3 @@ val batcher_queue :
     including the status. *)
 val get_batcher_msg :
   ?hooks:Process_hooks.t -> t -> string -> (string * JSON.t) Runnable.process
-
-(** [import_secret_key account] imports [account.alias] as alias to
-    [account.secret_key] into the client. *)
-val import_secret_key :
-  ?hooks:Process.hooks ->
-  ?force:bool ->
-  Account.aggregate_key ->
-  t ->
-  unit Lwt.t
