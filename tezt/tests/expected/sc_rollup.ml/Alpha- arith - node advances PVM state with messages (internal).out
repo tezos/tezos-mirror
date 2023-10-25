@@ -41,23 +41,14 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"5"
-
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\007"
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"26"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"26"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\n"
@@ -65,14 +56,8 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"47"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"47"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\r"
@@ -80,14 +65,8 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"69"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"69"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\016"
@@ -95,14 +74,8 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"91"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"91"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\019"
@@ -110,14 +83,8 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"113"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"113"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\022"
@@ -125,14 +92,8 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"135"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"135"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\025"
@@ -140,14 +101,8 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"157"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"157"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\028"
@@ -155,14 +110,8 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"179"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"179"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\031"
@@ -170,20 +119,11 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"201"
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"201"
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\""
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
-"224"
