@@ -184,15 +184,6 @@ let register_validation_plugin (module Proto_with_plugin : T) =
     Proto_with_plugin.hash
     (module Proto_with_plugin)
 
-let validation_plugin_not_found =
-  Internal_event.Simple.declare_1
-    ~section:["block"; "validation"]
-    ~name:"validation_plugin_not_found"
-    ~msg:"no validation plugin found for protocol {protocol_hash}"
-    ~level:Warning
-    ~pp1:Protocol_hash.pp
-    ("protocol_hash", Protocol_hash.encoding)
-
 type error += Ill_formed_operation of Operation_hash.t
 
 let () =
@@ -256,16 +247,6 @@ let proto_with_validation_plugin ~block_hash protocol_hash =
               (Block_validator_errors.Unavailable_protocol
                  {block = block_hash; protocol = protocol_hash})
         | Some (module Proto : Registered_protocol.T) ->
-            let*! () =
-              match Proto.environment_version with
-              | V0 ->
-                  (* This is normal for protocols Genesis and 000
-                     because they don't have a plugin. *)
-                  Lwt.return_unit
-              | _ ->
-                  Internal_event.Simple.(emit validation_plugin_not_found)
-                    protocol_hash
-            in
             return (module No_plugin (Proto) : T))
   in
   return (module Patch_T (Proto_with_plugin) : T)
