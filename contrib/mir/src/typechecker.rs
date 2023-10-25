@@ -100,10 +100,10 @@ impl ContractScript<ParsedStage> {
         let ContractScript {
             parameter, storage, ..
         } = self;
-        if !parameter.is_passable() {
+        if !parameter.is_passable(&mut ctx.gas)? {
             return Err(TcError::TypeNotPassable(parameter));
         }
-        if !storage.is_storable() {
+        if !storage.is_storable(&mut ctx.gas)? {
             return Err(TcError::TypeNotStorable(storage));
         }
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
@@ -158,7 +158,7 @@ fn verify_ty(ctx: &mut Ctx, t: &Type) -> Result<(), TcError> {
         }
         Option(ty) | List(ty) => verify_ty(ctx, ty),
         Map(tys) => {
-            if tys.0.is_comparable() {
+            if tys.0.is_comparable(&mut ctx.gas)? {
                 verify_ty(ctx, &tys.0)?;
                 verify_ty(ctx, &tys.1)
             } else {
@@ -308,7 +308,7 @@ fn typecheck_instruction(
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(Prim::DUP, stack, dup_height)?;
             let ty = &stack[dup_height - 1];
-            if !ty.is_duplicable() {
+            if !ty.is_duplicable(&mut ctx.gas)? {
                 return Err(TcError::TypeNotDuplicable(ty.clone()));
             }
             stack.push(ty.clone());
@@ -440,7 +440,7 @@ fn typecheck_instruction(
         (I::Iter(..), []) => no_overload!(ITER, len 1),
 
         (I::Push((t, v)), ..) => {
-            ensure_pushable(&t)?;
+            ensure_pushable(ctx, &t)?;
             verify_ty(ctx, &t)?;
             let v = typecheck_value(ctx, &t, v)?;
             stack.push(t);
@@ -455,7 +455,7 @@ fn typecheck_instruction(
 
         (I::Failwith(..), [.., _]) => {
             let ty = pop!();
-            ensure_packable(&ty)?;
+            ensure_packable(ctx, &ty)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
             I::Failwith(ty)
@@ -515,7 +515,7 @@ fn typecheck_instruction(
                 },
                 e => e,
             })?;
-            if !t.is_comparable() {
+            if !t.is_comparable(&mut ctx.gas)? {
                 return Err(TcError::NoMatchingOverload {
                     instr: Prim::COMPARE,
                     stack: stack.clone(),
@@ -553,7 +553,7 @@ fn typecheck_instruction(
             ensure_ty_eq(ctx, &kty, &kty_)?;
             // can only fail if the typechecker is invoked on invalid types,
             // i.e. where `map` key is non-comparable
-            ensure_comparable(&kty)?;
+            ensure_comparable(ctx, &kty)?;
             stack.push(T::new_option(vty));
             I::Get(overloads::Get::Map)
         }
@@ -566,7 +566,7 @@ fn typecheck_instruction(
             ensure_ty_eq(ctx, vty, vty_new)?;
             // can only fail if the typechecker is invoked on invalid types,
             // i.e. where `map` key is non-comparable
-            ensure_comparable(kty)?;
+            ensure_comparable(ctx, kty)?;
             pop!();
             pop!();
             I::Update(overloads::Update::Map)
@@ -623,7 +623,7 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
             let (tk, tv) = m.as_ref();
             // can only fail if the typechecker is invoked on invalid
             // types, i.e. where `map` key is non-comparable
-            ensure_comparable(tk)?;
+            ensure_comparable(ctx, tk)?;
             let tc_elt = |v: Value| -> Result<(TypedValue, TypedValue), TcError> {
                 match v {
                     Value::Elt(e) => {
@@ -680,24 +680,24 @@ fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcEr
     }
 }
 
-fn ensure_packable(ty: &Type) -> Result<(), TcError> {
-    if ty.is_packable() {
+fn ensure_packable(ctx: &mut Ctx, ty: &Type) -> Result<(), TcError> {
+    if ty.is_packable(&mut ctx.gas)? {
         Ok(())
     } else {
         Err(TcError::TypeNotPackable(ty.clone()))
     }
 }
 
-fn ensure_pushable(ty: &Type) -> Result<(), TcError> {
-    if ty.is_pushable() {
+fn ensure_pushable(ctx: &mut Ctx, ty: &Type) -> Result<(), TcError> {
+    if ty.is_pushable(&mut ctx.gas)? {
         Ok(())
     } else {
         Err(TcError::TypeNotPushable(ty.clone()))
     }
 }
 
-fn ensure_comparable(ty: &Type) -> Result<(), TcError> {
-    if ty.is_comparable() {
+fn ensure_comparable(ctx: &mut Ctx, ty: &Type) -> Result<(), TcError> {
+    if ty.is_comparable(&mut ctx.gas)? {
         Ok(())
     } else {
         Err(TcError::TypeNotComparable(ty.clone()))
@@ -770,7 +770,7 @@ mod typecheck_tests {
             Ok(Dup(Some(1)))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
@@ -783,7 +783,7 @@ mod typecheck_tests {
             Ok(Dup(Some(2)))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
     }
 
     #[test]

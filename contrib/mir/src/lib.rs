@@ -105,7 +105,7 @@ mod tests {
         report_gas(&mut ctx, |ctx| {
             assert!(ast.typecheck(ctx, &mut stack).is_ok());
         });
-        assert_eq!(start_milligas - ctx.gas.milligas(), 12200);
+        assert_eq!(start_milligas - ctx.gas.milligas(), 12680);
     }
 
     #[test]
