@@ -171,6 +171,7 @@ pub enum Instruction<T: Stage> {
     Nil(T::NilType),
     Get(T::GetOverload),
     Update(T::UpdateOverload),
+    Seq(Vec<Instruction<T>>),
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

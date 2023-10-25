@@ -250,6 +250,7 @@ fn interpret_one(
                 stack.push(V::Map(map));
             }
         },
+        I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
 }
@@ -924,5 +925,24 @@ mod interpreter_tests {
                 - interpret_cost::map_update(&TypedValue::Int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn seq() {
+        let mut stack = stk![TypedValue::Int(1), TypedValue::Nat(2)];
+        assert_eq!(
+            interpret(
+                &vec![
+                    Seq(vec![Pair]),
+                    Seq(vec![Seq(vec![Car])]),
+                    Seq(vec![]),
+                    Seq(vec![Seq(vec![Seq(vec![])])]),
+                ],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Nat(2)]);
     }
 }
