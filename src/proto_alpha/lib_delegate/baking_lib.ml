@@ -612,7 +612,6 @@ let rec baking_minimal_timestamp ~count state
                 {
                   Baking_state.current_round = Round.zero;
                   current_phase = Idle;
-                  delayed_prequorum = None;
                   delayed_quorum = None;
                 };
             }

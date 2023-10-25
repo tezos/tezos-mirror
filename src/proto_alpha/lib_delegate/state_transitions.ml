@@ -332,12 +332,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
     let compute_new_state ~current_round ~delegate_slots
         ~next_level_delegate_slots =
       let round_state =
-        {
-          current_round;
-          current_phase = Idle;
-          delayed_prequorum = None;
-          delayed_quorum = None;
-        }
+        {current_round; current_phase = Idle; delayed_quorum = None}
       in
       let level_state =
         {

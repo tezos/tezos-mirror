@@ -881,12 +881,7 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
       new_round_proposal.block.round
   else
     let new_round_state =
-      {
-        current_round;
-        current_phase = Idle;
-        delayed_prequorum = None;
-        delayed_quorum = None;
-      }
+      {current_round; current_phase = Idle; delayed_quorum = None}
     in
     let new_state = {state with round_state = new_round_state} in
     let*! new_state = handle_proposal new_state in

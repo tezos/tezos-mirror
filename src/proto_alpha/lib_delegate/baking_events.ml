@@ -144,30 +144,6 @@ module State_transitions = struct
       ~msg:"received valid proposal for a block already applied"
       ()
 
-  let unexpected_pqc_while_waiting_for_application =
-    declare_2
-      ~section
-      ~name:"unexpected_pqc_while_waiting_for_application"
-      ~level:Info
-      ~msg:
-        "received an unexpected prequorum for {prequorum} while waiting for \
-         the proposal's {proposal} application"
-      ~pp1:Block_hash.pp
-      ("prequorum", Block_hash.encoding)
-      ~pp2:Block_hash.pp
-      ("proposal", Block_hash.encoding)
-
-  let pqc_while_waiting_for_application =
-    declare_1
-      ~section
-      ~name:"pqc_while_waiting_for_application"
-      ~level:Info
-      ~msg:
-        "received expected prequorum for {prequorum} while waiting for the \
-         proposal's application"
-      ~pp1:Block_hash.pp
-      ("prequorum", Block_hash.encoding)
-
   let unexpected_proposal_round =
     declare_2
       ~section
@@ -358,14 +334,6 @@ module State_transitions = struct
       ("received_hash", Block_hash.encoding)
       ~pp2:Block_hash.pp
       ("expected_hash", Block_hash.encoding)
-
-  let handling_prequorum_on_non_applied_proposal =
-    declare_0
-      ~section
-      ~name:"handling_prequorum_on_non_applied_proposal"
-      ~level:Error
-      ~msg:"Handling prequorum on a non-applied proposal"
-      ()
 
   let step_current_phase =
     declare_2
