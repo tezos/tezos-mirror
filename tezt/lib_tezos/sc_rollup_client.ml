@@ -433,13 +433,6 @@ let get_batcher_msg ?hooks sc_client msg_hash =
      let hex_msg = JSON.(obj |> get "content" |> as_string) in
      (Hex.to_string (`Hex hex_msg), obj)
 
-let spawn_show_address ?hooks ~alias sc_client =
-  spawn_command ?hooks sc_client ["show"; "address"; alias]
-
-let show_address ?hooks ~alias sc_client =
-  let*! out = spawn_show_address ?hooks ~alias sc_client in
-  return (Account.parse_client_output_aggregate ~alias ~client_output:out)
-
 let spawn_import_secret_key ?hooks ?(force = false)
     (key : Account.aggregate_key) sc_client =
   let sk_uri =

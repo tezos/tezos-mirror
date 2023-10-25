@@ -250,13 +250,6 @@ val batcher_queue :
 val get_batcher_msg :
   ?hooks:Process_hooks.t -> t -> string -> (string * JSON.t) Runnable.process
 
-(** [show_address ~alias client] returns the BLS account associated with [alias].
-
-    Fails if the output from the client isn't in the expected format (see
-    {!Client.show_address}). *)
-val show_address :
-  ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
-
 (** [import_secret_key account] imports [account.alias] as alias to
     [account.secret_key] into the client. *)
 val import_secret_key :

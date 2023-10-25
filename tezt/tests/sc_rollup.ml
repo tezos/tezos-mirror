@@ -2597,7 +2597,7 @@ let test_reveals_above_4k =
 *)
 
 (** Initializes a client with an account.*)
-let test_scenario_client_with_account ~account ~variant ~kind f =
+let _test_scenario_client_with_account ~account ~variant ~kind f =
   test_full_scenario
     ~kind
     {
@@ -2613,30 +2613,6 @@ let test_scenario_client_with_account ~account ~variant ~kind f =
              _tezos_client ->
   let* () = Sc_rollup_client.import_secret_key account rollup_client in
   f rollup_client
-
-(* Check that the client can show the address of a registered account.
-   -------------------------------------------------------------------
-*)
-let test_rollup_client_show_address ~kind =
-  let account = Constant.aggregate_tz4_account in
-  test_scenario_client_with_account ~account ~kind ~variant:"show address"
-  @@ fun rollup_client ->
-  let* shown_account =
-    Sc_rollup_client.show_address ~alias:account.aggregate_alias rollup_client
-  in
-  Check.(
-    (account.aggregate_public_key_hash = shown_account.aggregate_public_key_hash)
-      string
-      ~error_msg:"Expecting %L, got %R as public key hash from the client.") ;
-  Check.(
-    (account.aggregate_public_key = shown_account.aggregate_public_key)
-      string
-      ~error_msg:"Expecting %L, got %R as public key from the client.") ;
-  Check.(
-    (shown_account.aggregate_secret_key = account.aggregate_secret_key)
-      Account.secret_key_typ
-      ~error_msg:"Expecting %L, got %R as secret key from the client.") ;
-  unit
 
 let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
     _tezos_node tezos_client =
@@ -5235,7 +5211,6 @@ let register ~protocols =
   test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_wallet protocols ~kind:"wasm_2_0_0" ;
-  test_rollup_client_show_address protocols ~kind:"wasm_2_0_0" ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;
