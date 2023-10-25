@@ -297,12 +297,16 @@ type account_state = {
   frozen_deposits : Frozen_tez.t;
   unstaked_frozen : Unstaked_frozen.t;
   unstaked_finalizable : Unstaked_finalizable.t;
+  staking_delegator_numerator : Z.t;
+  staking_delegate_denominator : Z.t;
 }
 
 let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(bonds = Tez.zero) ?(frozen_deposits = Frozen_tez.zero)
     ?(unstaked_frozen = Unstaked_frozen.zero)
-    ?(unstaked_finalizable = Unstaked_finalizable.zero) () =
+    ?(unstaked_finalizable = Unstaked_finalizable.zero)
+    ?(staking_delegator_numerator = Z.zero)
+    ?(staking_delegate_denominator = Z.zero) () =
   {
     pkh;
     contract;
@@ -313,6 +317,8 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     frozen_deposits;
     unstaked_frozen;
     unstaked_finalizable;
+    staking_delegator_numerator;
+    staking_delegate_denominator;
   }
 
 type account_map = account_state String.Map.t
@@ -324,6 +330,8 @@ type balance = {
   staked_b : Partial_tez.t;
   unstaked_frozen_b : Partial_tez.t;
   unstaked_finalizable_b : Tez.t;
+  staking_delegator_numerator_b : Z.t;
+  staking_delegate_denominator_b : Z.t;
 }
 
 let balance_zero =
@@ -333,17 +341,38 @@ let balance_zero =
     staked_b = Partial_tez.zero;
     unstaked_frozen_b = Partial_tez.zero;
     unstaked_finalizable_b = Tez.zero;
+    staking_delegator_numerator_b = Z.zero;
+    staking_delegate_denominator_b = Z.zero;
   }
 
 let balance_of_account account_name (account_map : account_map) =
   match String.Map.find account_name account_map with
   | None -> raise Not_found
-  | Some account ->
+  | Some
+      {
+        pkh = _;
+        contract = _;
+        delegate;
+        parameters = _;
+        liquid;
+        bonds;
+        frozen_deposits = _;
+        unstaked_frozen = _;
+        unstaked_finalizable = _;
+        staking_delegator_numerator;
+        staking_delegate_denominator;
+      } ->
       let balance =
-        {balance_zero with liquid_b = account.liquid; bonds_b = account.bonds}
+        {
+          balance_zero with
+          liquid_b = liquid;
+          bonds_b = bonds;
+          staking_delegator_numerator_b = staking_delegator_numerator;
+          staking_delegate_denominator_b = staking_delegate_denominator;
+        }
       in
       let balance =
-        match account.delegate with
+        match delegate with
         | None -> balance
         | Some d -> (
             match String.Map.find d account_map with
@@ -381,7 +410,15 @@ let balance_of_account account_name (account_map : account_map) =
       {balance with unstaked_frozen_b; unstaked_finalizable_b}
 
 let balance_pp fmt
-    {liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b} =
+    {
+      liquid_b;
+      bonds_b;
+      staked_b;
+      unstaked_frozen_b;
+      unstaked_finalizable_b;
+      staking_delegator_numerator_b;
+      staking_delegate_denominator_b;
+    } =
   Format.fprintf
     fmt
     "{@;\
@@ -390,6 +427,8 @@ let balance_pp fmt
      staked : %a@;\
      unstaked_frozen : %a@;\
      unstaked_finalizable : %a@;\
+     staking_delegator_numerator : %a@;\
+     staking_delegate_denominator : %a@;\
      }@."
     Tez.pp
     liquid_b
@@ -401,6 +440,10 @@ let balance_pp fmt
     unstaked_frozen_b
     Tez.pp
     unstaked_finalizable_b
+    Z.pp_print
+    staking_delegator_numerator_b
+    Z.pp_print
+    staking_delegate_denominator_b
 
 let balance_update_pp fmt
     ( {
@@ -409,6 +452,8 @@ let balance_update_pp fmt
         staked_b = a_staked_b;
         unstaked_frozen_b = a_unstaked_frozen_b;
         unstaked_finalizable_b = a_unstaked_finalizable_b;
+        staking_delegator_numerator_b = a_staking_delegator_numerator_b;
+        staking_delegate_denominator_b = a_staking_delegate_denominator_b;
       },
       {
         liquid_b = b_liquid_b;
@@ -416,6 +461,8 @@ let balance_update_pp fmt
         staked_b = b_staked_b;
         unstaked_frozen_b = b_unstaked_frozen_b;
         unstaked_finalizable_b = b_unstaked_finalizable_b;
+        staking_delegator_numerator_b = b_staking_delegator_numerator_b;
+        staking_delegate_denominator_b = b_staking_delegate_denominator_b;
       } ) =
   Format.fprintf
     fmt
@@ -425,6 +472,8 @@ let balance_update_pp fmt
      staked : %a -> %a@;\
      unstaked_frozen : %a -> %a@;\
      unstaked_finalizable : %a -> %a@;\
+     staking_delegator_numerator : %a -> %a@;\
+     staking_delegate_denominator : %a -> %a@;\
      }@."
     Tez.pp
     a_liquid_b
@@ -446,6 +495,14 @@ let balance_update_pp fmt
     a_unstaked_finalizable_b
     Tez.pp
     b_unstaked_finalizable_b
+    Z.pp_print
+    a_staking_delegator_numerator_b
+    Z.pp_print
+    b_staking_delegator_numerator_b
+    Z.pp_print
+    a_staking_delegate_denominator_b
+    Z.pp_print
+    b_staking_delegate_denominator_b
 
 let assert_balance_equal ~loc
     {
@@ -454,6 +511,8 @@ let assert_balance_equal ~loc
       staked_b = a_staked_b;
       unstaked_frozen_b = a_unstaked_frozen_b;
       unstaked_finalizable_b = a_unstaked_finalizable_b;
+      staking_delegator_numerator_b = a_staking_delegator_numerator_b;
+      staking_delegate_denominator_b = a_staking_delegate_denominator_b;
     }
     {
       liquid_b = b_liquid_b;
@@ -461,6 +520,8 @@ let assert_balance_equal ~loc
       staked_b = b_staked_b;
       unstaked_frozen_b = b_unstaked_frozen_b;
       unstaked_finalizable_b = b_unstaked_finalizable_b;
+      staking_delegator_numerator_b = b_staking_delegator_numerator_b;
+      staking_delegate_denominator_b = b_staking_delegate_denominator_b;
     } =
   let open Lwt_result_syntax in
   let* () = Assert.equal_tez ~loc a_liquid_b b_liquid_b in
@@ -479,6 +540,18 @@ let assert_balance_equal ~loc
   in
   let* () =
     Assert.equal_tez ~loc a_unstaked_finalizable_b b_unstaked_finalizable_b
+  in
+  let* () =
+    Assert.equal_z
+      ~loc
+      a_staking_delegator_numerator_b
+      b_staking_delegator_numerator_b
+  in
+  let* () =
+    Assert.equal_z
+      ~loc
+      a_staking_delegate_denominator_b
+      b_staking_delegate_denominator_b
   in
   return_unit
 
@@ -644,8 +717,15 @@ let apply_finalize staker_name account_map =
         account_map
 
 let balance_and_total_balance_of_account account_name account_map =
-  let ({liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b}
-      as balance) =
+  let ({
+         liquid_b;
+         bonds_b;
+         staked_b;
+         unstaked_frozen_b;
+         unstaked_finalizable_b;
+         staking_delegator_numerator_b = _;
+         staking_delegate_denominator_b = _;
+       } as balance) =
     balance_of_account account_name account_map
   in
   ( balance,
@@ -676,8 +756,29 @@ let get_balance_from_context ctxt contract =
     Option.value ~default:Tez.zero unstaked_finalizable_b
   in
   let* total_balance = Context.Contract.full_balance ctxt contract in
+  let* staking_delegator_numerator_b =
+    Context.Contract.staking_numerator ctxt contract
+  in
+  let*! staking_delegate_denominator_b =
+    match (contract : Protocol.Alpha_context.Contract.t) with
+    | Implicit pkh ->
+        let*! result = Context.Delegate.staking_denominator ctxt pkh in
+        Lwt.return
+          (match result with
+          | Ok v -> v
+          | Error _ -> (* Not a delegate *) Z.zero)
+    | Originated _ -> Lwt.return Z.zero
+  in
   let bd =
-    {liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b}
+    {
+      liquid_b;
+      bonds_b;
+      staked_b;
+      unstaked_frozen_b;
+      unstaked_finalizable_b;
+      staking_delegator_numerator_b;
+      staking_delegate_denominator_b;
+    }
   in
   return (bd, total_balance)
 

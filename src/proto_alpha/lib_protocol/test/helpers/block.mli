@@ -221,6 +221,25 @@ val bake :
   t ->
   t tzresult Lwt.t
 
+(** Variant of [bake] that returns the block metadata of the baked block. **)
+val bake_with_metadata :
+  ?locked_round:Alpha_context.Round.t option ->
+  ?policy:baker_policy ->
+  ?timestamp:Timestamp.time ->
+  ?operation:Operation.packed ->
+  ?operations:Operation.packed list ->
+  ?payload_round:Round.t option ->
+  ?check_size:bool ->
+  ?baking_mode:baking_mode ->
+  ?allow_manager_failures:bool ->
+  ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
+  t ->
+  ( t * (block_header_metadata * operation_receipt list),
+    Error_monad.tztrace )
+  result
+  Lwt.t
+
 (** Bakes [n] blocks. *)
 val bake_n :
   ?baking_mode:baking_mode ->
@@ -291,7 +310,14 @@ val bake_n_with_metadata :
   ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   int ->
   block ->
-  (block * block_header_metadata, Error_monad.tztrace) result Lwt.t
+  ( block * (block_header_metadata * operation_receipt list),
+    Error_monad.tztrace )
+  result
+  Lwt.t
+
+val get_balance_updates_from_metadata :
+  block_header_metadata * operation_receipt list ->
+  Alpha_context.Receipt.balance_updates
 
 (** Bake blocks while a predicate over the block holds. The returned
     block is the last one for which the predicate holds; in case the

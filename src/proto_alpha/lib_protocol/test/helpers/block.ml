@@ -836,10 +836,11 @@ let detect_manager_failure :
   in
   fun {contents} -> detect_manager_failure contents
 
-let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
-    ~allow_manager_failures header ?(operations = []) pred =
+let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
+    ?(baking_mode = Application) ~allow_manager_failures header
+    ?(operations = []) pred =
   let open Lwt_result_wrap_syntax in
-  let* context, result =
+  let* context, result, contents_result =
     let* vstate =
       match baking_mode with
       | Application ->
@@ -857,9 +858,9 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
             ~protocol_data:(Some header.protocol_data)
             (pred : t)
     in
-    let*@ vstate =
+    let*@ vstate, contents_result =
       List.fold_left_es
-        (fun vstate op ->
+        (fun (vstate, contents_result) op ->
           (if check_size then
            let operation_size =
              Data_encoding.Binary.length
@@ -875,24 +876,25 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
                      operation_size
                      Constants_repr.max_operation_data_length))) ;
           let* state, result = validate_and_apply_operation vstate op in
-          if allow_manager_failures then return state
+          if allow_manager_failures then
+            return (state, result :: contents_result)
           else
             match result with
-            | No_operation_metadata -> return state
+            | No_operation_metadata -> return (state, contents_result)
             | Operation_metadata metadata ->
                 let*? () = detect_manager_failure metadata in
-                return state)
-        vstate
+                return (state, result :: contents_result))
+        (vstate, [])
         operations
     in
     let+@ validation, result =
       finalize_validation_and_application vstate (Some header.shell)
     in
-    (validation.context, result)
+    (validation.context, result, List.rev contents_result)
   in
   let hash = Block_header.hash header in
   let+ constants = Alpha_services.Constants.parametric rpc_ctxt pred in
-  ({hash; header; operations; context; constants}, result)
+  ({hash; header; operations; context; constants}, (result, contents_result))
 
 let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
   let open Lwt_result_syntax in
@@ -907,7 +909,7 @@ let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
   return t
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
-    ?payload_round ?check_size ~baking_mode ?(allow_manager_failures = false)
+    ?payload_round ?check_size ?baking_mode ?(allow_manager_failures = false)
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
   let open Lwt_result_syntax in
   let operations =
@@ -932,14 +934,14 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
   apply_with_metadata
     ?policy
     ?check_size
-    ~baking_mode
+    ?baking_mode
     ~allow_manager_failures
     header
     ?operations
     pred
 
 let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
-    ?check_size ?(baking_mode = Application) ?(allow_manager_failures = false)
+    ?check_size ?baking_mode ?(allow_manager_failures = false)
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n pred =
   let open Lwt_result_syntax in
   let get_next b =
@@ -949,7 +951,7 @@ let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
       ?timestamp
       ?payload_round
       ?check_size
-      ~baking_mode
+      ?baking_mode
       ~allow_manager_failures
       ?liquidity_baking_toggle_vote
       ?adaptive_issuance_vote
@@ -958,14 +960,14 @@ let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
   let* b = get_next pred in
   List.fold_left_es (fun (b, _metadata) _ -> get_next b) b (2 -- n)
 
-let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
-    ?payload_round ?locked_round ?policy ?timestamp ?operation ?operations
+let bake ?baking_mode ?(allow_manager_failures = false) ?payload_round
+    ?locked_round ?policy ?timestamp ?operation ?operations
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote ?check_size pred =
   let open Lwt_result_syntax in
-  let* t, (_metadata : block_header_metadata) =
+  let* t, (_metadata : block_header_metadata * operation_receipt list) =
     bake_with_metadata
       ?payload_round
-      ~baking_mode
+      ?baking_mode
       ~allow_manager_failures
       ?locked_round
       ?policy
@@ -981,12 +983,12 @@ let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
 
 (********** Cycles ****************)
 
-let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
+let bake_n ?baking_mode ?policy ?liquidity_baking_toggle_vote
     ?adaptive_issuance_vote n b =
   List.fold_left_es
     (fun b _ ->
       bake
-        ~baking_mode
+        ?baking_mode
         ?policy
         ?liquidity_baking_toggle_vote
         ?adaptive_issuance_vote
@@ -994,14 +996,14 @@ let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
     b
     (1 -- n)
 
-let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
+let rec bake_while_with_metadata ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote
     ?(invariant = fun _ -> return_unit) predicate b =
   let open Lwt_result_syntax in
   let* () = invariant b in
-  let* new_block, metadata =
+  let* new_block, (metadata, _) =
     bake_with_metadata
-      ~baking_mode
+      ?baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
       ?adaptive_issuance_vote
@@ -1009,7 +1011,7 @@ let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
   in
   if predicate new_block metadata then
     (bake_while_with_metadata [@ocaml.tailcall])
-      ~baking_mode
+      ?baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
       ?adaptive_issuance_vote
@@ -1029,17 +1031,117 @@ let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
     (fun block _metadata -> predicate block)
     b
 
-let bake_until_level ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote level b =
+let bake_until_level ?baking_mode ?policy ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote level b =
   bake_while
-    ~baking_mode
+    ?baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
     ?adaptive_issuance_vote
     (fun b -> b.header.shell.level <= Raw_level.to_int32 level)
     b
 
-let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
+let balance_update_of_internal_operation_result = function
+  | Protocol.Apply_internal_results.Internal_operation_result (_, iopr) -> (
+      match iopr with
+      | Protocol.Apply_operation_result.Backtracked _ | Failed _ | Skipped _ ->
+          assert false
+      | Applied siopr -> (
+          match siopr with
+          | ITransaction_result
+              (Transaction_to_contract_result {balance_updates; _})
+          | ITransaction_result
+              (Transaction_to_zk_rollup_result {balance_updates; _})
+          | IOrigination_result {balance_updates; _}
+          | IDelegation_result {balance_updates; _} ->
+              balance_updates
+          | ITransaction_result (Transaction_to_sc_rollup_result _)
+          | IEvent_result _ ->
+              []))
+
+let balance_update_of_operation_result :
+    type a.
+    a Protocol.Apply_results.manager_operation_result ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | Protocol.Apply_operation_result.Backtracked _ | Failed _ | Skipped _ ->
+      assert false
+  | Applied siopr -> (
+      match siopr with
+      | Protocol.Apply_results.Transaction_result
+          (Transaction_to_sc_rollup_result _)
+      | Reveal_result _ | Update_consensus_key_result _
+      | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+      | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+      | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
+      | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
+      | Sc_rollup_execute_outbox_message_result _
+      | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
+      | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
+          []
+      | Delegation_result {balance_updates; _}
+      | Transaction_result
+          ( Transaction_to_contract_result {balance_updates; _}
+          | Transaction_to_zk_rollup_result {balance_updates; _} )
+      | Origination_result {balance_updates; _}
+      | Register_global_constant_result {balance_updates; _}
+      | Increase_paid_storage_result {balance_updates; _} ->
+          balance_updates)
+
+let balance_updates_of_single_content :
+    type a.
+    a Protocol.Apply_results.contents_result ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | Dal_attestation_result _ | Proposals_result | Ballot_result -> []
+  | Preattestation_result {balance_updates; _}
+  | Attestation_result {balance_updates; _}
+  | Seed_nonce_revelation_result balance_updates
+  | Vdf_revelation_result balance_updates
+  | Double_attestation_evidence_result balance_updates
+  | Double_preattestation_evidence_result balance_updates
+  | Double_baking_evidence_result balance_updates
+  | Activate_account_result balance_updates
+  | Drain_delegate_result {balance_updates; _} ->
+      balance_updates
+  | Manager_operation_result
+      {balance_updates; internal_operation_results; operation_result} ->
+      balance_updates
+      @ (List.map
+           balance_update_of_internal_operation_result
+           internal_operation_results
+        |> List.flatten)
+      @ balance_update_of_operation_result operation_result
+
+let rec balance_updates_of_contents :
+    type a.
+    a Protocol.Apply_results.contents_result_list ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | Single_result c -> balance_updates_of_single_content c
+  | Cons_result (h, t) ->
+      balance_updates_of_single_content h @ balance_updates_of_contents t
+
+let balance_updates_of_packed_operation_metadata :
+    Protocol.Apply_results.packed_operation_metadata ->
+    Protocol.Alpha_context.Receipt.balance_updates = function
+  | No_operation_metadata -> []
+  | Operation_metadata {contents} -> balance_updates_of_contents contents
+
+let get_balance_updates_from_metadata
+    ( Apply_results.{balance_updates; implicit_operations_results; _},
+      operation_receipts ) =
+  let implicit_balance_updates =
+    List.(
+      map
+        (fun (Protocol.Apply_results.Successful_manager_result r) ->
+          balance_update_of_operation_result (Applied r))
+        implicit_operations_results)
+    |> List.flatten
+  in
+  balance_updates
+  @ (List.map balance_updates_of_packed_operation_metadata operation_receipts
+    |> List.flatten)
+  @ implicit_balance_updates
+
+let bake_n_with_all_balance_updates ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
   let open Lwt_result_syntax in
   let+ b, balance_updates_rev =
@@ -1047,42 +1149,16 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
       (fun (b, balance_updates_rev) _ ->
         let* b, metadata =
           bake_with_metadata
-            ~baking_mode
+            ?baking_mode
             ?policy
             ?liquidity_baking_toggle_vote
             ?adaptive_issuance_vote
             b
         in
         let balance_updates_rev =
-          List.rev_append metadata.balance_updates balance_updates_rev
-        in
-        let balance_updates_rev =
-          List.fold_left
-            (fun balance_updates_rev ->
-              let open Apply_results in
-              fun (Successful_manager_result r) ->
-                match r with
-                | Transaction_result (Transaction_to_sc_rollup_result _)
-                | Reveal_result _ | Update_consensus_key_result _
-                | Transfer_ticket_result _ | Dal_publish_slot_header_result _
-                | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
-                | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
-                | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
-                | Sc_rollup_execute_outbox_message_result _
-                | Sc_rollup_recover_bond_result _
-                | Zk_rollup_origination_result _ | Zk_rollup_publish_result _
-                | Zk_rollup_update_result _ ->
-                    balance_updates_rev
-                | Delegation_result {balance_updates; _}
-                | Transaction_result
-                    ( Transaction_to_contract_result {balance_updates; _}
-                    | Transaction_to_zk_rollup_result {balance_updates; _} )
-                | Origination_result {balance_updates; _}
-                | Register_global_constant_result {balance_updates; _}
-                | Increase_paid_storage_result {balance_updates; _} ->
-                    List.rev_append balance_updates balance_updates_rev)
+          List.rev_append
             balance_updates_rev
-            metadata.implicit_operations_results
+            (get_balance_updates_from_metadata metadata)
         in
         return (b, balance_updates_rev))
       (b, [])
@@ -1090,12 +1166,12 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
   in
   (b, List.rev balance_updates_rev)
 
-let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
+let bake_n_with_origination_results ?baking_mode ?policy n b =
   let open Lwt_result_syntax in
   let+ b, origination_results_rev =
     List.fold_left_es
       (fun (b, origination_results_rev) _ ->
-        let* b, metadata = bake_with_metadata ~baking_mode ?policy b in
+        let* b, (metadata, _) = bake_with_metadata ?baking_mode ?policy b in
         let origination_results_rev =
           List.fold_left
             (fun origination_results_rev ->
@@ -1136,7 +1212,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
 let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
   let open Lwt_result_syntax in
-  let+ b, metadata =
+  let+ b, (metadata, _) =
     bake_n_with_metadata
       ?baking_mode
       ?policy

@@ -707,6 +707,7 @@ module Unstaked_frozen_deposits = Unstaked_frozen_deposits_storage
 module Staking_pseudotoken = struct
   include Staking_pseudotoken_repr
   module For_RPC = Staking_pseudotoken_repr
+  module Internal_for_tests = Staking_pseudotoken_repr
 end
 
 module Staking_pseudotokens = struct
