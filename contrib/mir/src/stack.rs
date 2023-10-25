@@ -101,12 +101,6 @@ impl<T> Stack<T> {
         self.data().as_slice()
     }
 
-    /// Borrow the stack content as a mutable slice. Note that stack top is
-    /// the _rightmost_ element.
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        self.data_mut().as_mut_slice()
-    }
-
     /// Split off the top `size` elements of the stack into a new `Stack`.
     ///
     /// Panics if the `size` is larger than length of the stack.
@@ -319,16 +313,6 @@ mod tests {
     fn as_slice() {
         let stk = stk![1, 2, 3, 4];
         assert!(matches!(stk.as_slice(), [1, 2, 3, 4]));
-    }
-
-    #[test]
-    fn as_mut_slice() {
-        let mut stk = stk![1, 2, 3, 4];
-        match stk.as_mut_slice() {
-            [.., i] => *i = 42,
-            _ => unreachable!("Slice is non-empty by construction"),
-        }
-        assert_eq!(stk, stk![1, 2, 3, 42]);
     }
 
     #[test]
