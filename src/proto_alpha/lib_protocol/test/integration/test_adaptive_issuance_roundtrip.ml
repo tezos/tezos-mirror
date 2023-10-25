@@ -768,8 +768,9 @@ let check_all_balances block state : unit tzresult Lwt.t =
   let* actual_total_supply = Context.get_total_supply (B block) in
   let*! r1 =
     String.Map.fold_s
-      (fun name _account acc ->
+      (fun name account acc ->
         log_debug_balance name account_map ;
+        let* () = log_debug_rpc_balance name (Implicit account.pkh) block in
         let*! r =
           assert_balance_check ~loc:__LOC__ (B block) name account_map
         in
