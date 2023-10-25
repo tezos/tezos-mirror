@@ -433,16 +433,6 @@ let get_batcher_msg ?hooks sc_client msg_hash =
      let hex_msg = JSON.(obj |> get "content" |> as_string) in
      (Hex.to_string (`Hex hex_msg), obj)
 
-let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
-  spawn_command
-    ?hooks
-    sc_client
-    (["gen"; "unencrypted"; "keys"; alias] @ if force then ["--force"] else [])
-
-let generate_keys ?hooks ?force ~alias sc_client =
-  let*? process = spawn_generate_keys ?hooks ?force ~alias sc_client in
-  Process.check process
-
 let spawn_list_keys ?hooks sc_client =
   spawn_command ?hooks sc_client ["list"; "keys"]
 

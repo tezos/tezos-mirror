@@ -2638,18 +2638,6 @@ let test_rollup_client_show_address ~kind =
       ~error_msg:"Expecting %L, got %R as secret key from the client.") ;
   unit
 
-(* Check that the client can generate keys.
-   ----------------------------------------
-*)
-let test_rollup_client_generate_keys ~kind =
-  let account = Constant.aggregate_tz4_account in
-  test_scenario_client_with_account ~account ~kind ~variant:"gen address"
-  @@ fun rollup_client ->
-  let alias = "test_key" in
-  let* () = Sc_rollup_client.generate_keys ~alias rollup_client in
-  let* _account = Sc_rollup_client.show_address ~alias rollup_client in
-  unit
-
 (* Check that the client can list keys.
    ------------------------------------
 *)
@@ -5265,7 +5253,6 @@ let register ~protocols =
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_wallet protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_show_address protocols ~kind:"wasm_2_0_0" ;
-  test_rollup_client_generate_keys protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_list_keys protocols ~kind:"wasm_2_0_0" ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;

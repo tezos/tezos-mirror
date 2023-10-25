@@ -250,10 +250,6 @@ val batcher_queue :
 val get_batcher_msg :
   ?hooks:Process_hooks.t -> t -> string -> (string * JSON.t) Runnable.process
 
-(** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
-val generate_keys :
-  ?hooks:Process.hooks -> ?force:bool -> alias:string -> t -> unit Lwt.t
-
 (** [list_keys client] returns the known aliases with their public key hash from
     client.
 
