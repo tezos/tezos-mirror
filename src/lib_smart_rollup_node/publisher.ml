@@ -330,7 +330,7 @@ let recover_bond node_ctxt =
   | None ->
       (* No known operator to recover bond for. *)
       return_unit
-  | Some committer -> inject_recover_bond node_ctxt committer
+  | Some (Single committer) -> inject_recover_bond node_ctxt committer
 
 (* Commitments can only be cemented after [sc_rollup_challenge_window] has
    passed since they were first published. *)
