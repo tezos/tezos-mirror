@@ -1216,7 +1216,7 @@ let length_encoding_of_length_encoding_parameter max_length = function
   | `N -> uint_like_n ~max_value:max_length
   | `Uint8 -> uint8
   | `Uint16 -> uint16
-  | `Uint30 -> int31
+  | `Uint30 -> ranged_int 0 (Binary_size.max_int `Uint30)
 
 let array_with_length ?max_length length_encoding e =
   let effective_max_length =
