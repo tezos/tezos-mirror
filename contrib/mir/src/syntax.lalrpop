@@ -5,39 +5,78 @@
 //                                                                            //
 //****************************************************************************//
 
-#![allow(dead_code)]
-use std::str::FromStr;
+#![allow(dead_code, unused_imports)]
 
 use crate::ast::*;
-use crate::parser::{validate_unescape_string, ParserError};
+use crate::parser::ParserError;
+use crate::lexer::{Prim, Tok};
 
 grammar;
 
 extern {
     type Error = ParserError;
+    type Location = usize;
+
+    enum Tok {
+        number => Tok::Number(<i128>),
+        string => Tok::String(<String>),
+        ann => Tok::Annotation,
+        "int" => Tok::Prim(Prim::int),
+        "nat" => Tok::Prim(Prim::nat),
+        "bool" => Tok::Prim(Prim::bool),
+        "mutez" => Tok::Prim(Prim::mutez),
+        "string" => Tok::Prim(Prim::string),
+        "unit" => Tok::Prim(Prim::unit),
+        "operation" => Tok::Prim(Prim::operation),
+        "pair" => Tok::Prim(Prim::pair),
+        "option" => Tok::Prim(Prim::option),
+        "list" => Tok::Prim(Prim::list),
+        "map" => Tok::Prim(Prim::map),
+        "True" => Tok::Prim(Prim::True),
+        "False" => Tok::Prim(Prim::False),
+        "Unit" => Tok::Prim(Prim::Unit),
+        "None" => Tok::Prim(Prim::None),
+        "Pair" => Tok::Prim(Prim::Pair),
+        "Some" => Tok::Prim(Prim::Some),
+        "Elt" => Tok::Prim(Prim::Elt),
+        "PUSH" => Tok::Prim(Prim::PUSH),
+        "INT" => Tok::Prim(Prim::INT),
+        "GT" => Tok::Prim(Prim::GT),
+        "LOOP" => Tok::Prim(Prim::LOOP),
+        "DIP" => Tok::Prim(Prim::DIP),
+        "ADD" => Tok::Prim(Prim::ADD),
+        "DROP" => Tok::Prim(Prim::DROP),
+        "SWAP" => Tok::Prim(Prim::SWAP),
+        "IF" => Tok::Prim(Prim::IF),
+        "DUP" => Tok::Prim(Prim::DUP),
+        "FAILWITH" => Tok::Prim(Prim::FAILWITH),
+        "UNIT" => Tok::Prim(Prim::UNIT),
+        "CAR" => Tok::Prim(Prim::CAR),
+        "CDR" => Tok::Prim(Prim::CDR),
+        "PAIR" => Tok::Prim(Prim::PAIR),
+        "IF_NONE" => Tok::Prim(Prim::IF_NONE),
+        "SOME" => Tok::Prim(Prim::SOME),
+        "COMPARE" => Tok::Prim(Prim::COMPARE),
+        "AMOUNT" => Tok::Prim(Prim::AMOUNT),
+        "NIL" => Tok::Prim(Prim::NIL),
+        "GET" => Tok::Prim(Prim::GET),
+        "UPDATE" => Tok::Prim(Prim::UPDATE),
+        "(" => Tok::LParen,
+        ")" => Tok::RParen,
+        "{" => Tok::LBrace,
+        "}" => Tok::RBrace,
+        ";" => Tok::Semi,
+    }
 }
 
-match {
-  r"(?-u:\s)+" => {}, // more or less same as default, but required to build w/o unicode
-  _
-}
-
-number: i128 = <s:r"([+-]?)[0-9]+"> =>? i128::from_str(s)
-  .map_err(|_| ParserError::NumericLiteral(s.to_owned()).into() );
-
-u10: u16 = <s:r"([+-]?)[0-9]+"> =>? {
-    let res = u16::from_str(s)
-      .map_err(|_| ParserError::ExpectedU10(s.to_owned()) )?;
+u10: u16 = <n:number> =>? {
+    let res = u16::try_from(n)
+      .map_err(|_| ParserError::ExpectedU10(n) )?;
     if res >= 1024 {
-      return Err(ParserError::ExpectedU10(s.to_owned()).into());
+      return Err(ParserError::ExpectedU10(n).into());
     }
     Ok(res)
   };
-
-pub string: String = <r#""(?:\\.|[^\\"])*""#> =>? validate_unescape_string(<>);
-
-// regex as per https://tezos.gitlab.io/active/michelson.html#syntax
-ann: () = r#"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*"# => ();
 
 anns: () = ann* => ();
 
