@@ -34,44 +34,92 @@ pub enum Type {
     Or(Box<(Type, Type)>),
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum TypeProperty {
+    Comparable,
+    Passable,
+    Storable,
+    Pushable,
+    Packable,
+    BigMapValue,
+    Duplicable,
+}
+
 impl Type {
-    pub fn is_comparable(&self) -> bool {
+    #[inline(always)]
+    fn prop(&self, prop: TypeProperty) -> bool {
         use Type::*;
         match self {
-            List(..) | Map(..) => false,
-            Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(p) | Or(p) => p.0.is_comparable() && p.1.is_comparable(),
-            Option(x) => x.is_comparable(),
+            Operation => match prop {
+                TypeProperty::Comparable
+                | TypeProperty::Passable
+                | TypeProperty::Storable
+                | TypeProperty::Pushable
+                | TypeProperty::Packable
+                | TypeProperty::BigMapValue => false,
+                TypeProperty::Duplicable => true,
+            },
+            Pair(p) | Or(p) => p.0.prop(prop) && p.1.prop(prop),
+            Option(x) => x.prop(prop),
+            List(x) => match prop {
+                TypeProperty::Comparable => false,
+                TypeProperty::Passable
+                | TypeProperty::Storable
+                | TypeProperty::Pushable
+                | TypeProperty::Packable
+                | TypeProperty::BigMapValue
+                | TypeProperty::Duplicable => x.prop(prop),
+            },
+            Map(p) => match prop {
+                TypeProperty::Comparable => false,
+                TypeProperty::Passable
+                | TypeProperty::Storable
+                | TypeProperty::Pushable
+                | TypeProperty::Packable
+                | TypeProperty::BigMapValue
+                | TypeProperty::Duplicable => p.1.prop(prop),
+            },
         }
     }
 
+    pub fn is_comparable(&self) -> bool {
+        self.prop(TypeProperty::Comparable)
+    }
+
+    pub fn is_passable(&self) -> bool {
+        self.prop(TypeProperty::Passable)
+    }
+
+    pub fn is_storable(&self) -> bool {
+        self.prop(TypeProperty::Storable)
+    }
+
+    pub fn is_pushable(&self) -> bool {
+        self.prop(TypeProperty::Pushable)
+    }
+
+    pub fn is_duplicable(&self) -> bool {
+        self.prop(TypeProperty::Duplicable)
+    }
+
+    #[allow(dead_code)] // while we don't have big_maps
+    pub fn is_big_map_value(&self) -> bool {
+        self.prop(TypeProperty::BigMapValue)
+    }
+
     pub fn is_packable(&self) -> bool {
-        use Type::*;
-        match self {
-            Operation => false,
-            Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(p) | Or(p) => p.0.is_packable() && p.1.is_packable(),
-            Option(x) | List(x) => x.is_packable(),
-            Map(m) => m.1.is_packable(),
-        }
+        self.prop(TypeProperty::Packable)
     }
 
     /// Returns abstract size of the type representation. Used for gas cost
     /// estimation.
     pub fn size_for_gas(&self) -> usize {
+        use Type::*;
         match self {
-            Type::Nat => 1,
-            Type::Int => 1,
-            Type::Bool => 1,
-            Type::Mutez => 1,
-            Type::String => 1,
-            Type::Unit => 1,
-            Type::Operation => 1,
-            Type::Pair(p) | Type::Or(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
-            Type::Option(x) => 1 + x.size_for_gas(),
-            Type::List(x) => 1 + x.size_for_gas(),
-            Type::Map(m) => 1 + m.0.size_for_gas() + m.1.size_for_gas(),
+            Nat | Int | Bool | Mutez | String | Unit | Operation => 1,
+            Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
+            Option(x) | List(x) => 1 + x.size_for_gas(),
         }
     }
 
