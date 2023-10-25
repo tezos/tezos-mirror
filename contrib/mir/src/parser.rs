@@ -309,4 +309,15 @@ mod tests {
             Err(Err::NoField(code).into())
         );
     }
+
+    #[test]
+    // Test parsing of annotated contract type.
+    // Type contract is not pushable so this would be rejected
+    // at type-checking but this test only exercises the parser.
+    fn contract_ty_push() {
+        assert_eq!(
+            parse("PUSH (contract :ct %foo unit) Unit").unwrap(),
+            Instruction::Push((Type::new_contract(Type::Unit), Value::Unit))
+        );
+    }
 }

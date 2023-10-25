@@ -94,6 +94,7 @@ defprim! {
     Left,
     Right,
     IF_LEFT,
+    contract,
 }
 
 defprim! {

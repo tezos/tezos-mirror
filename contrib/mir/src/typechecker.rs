@@ -152,6 +152,14 @@ fn verify_ty(ctx: &mut Ctx, t: &Type) -> Result<(), TcError> {
             verify_ty(ctx, &tys.0)?;
             verify_ty(ctx, &tys.1)
         }
+        Contract(ty) => {
+            // NB: despite `contract` type being duplicable and packable, its
+            // argument doesn't need to be. The only constraint is that it needs
+            // to be passable, as it represents the contract's parameter type.
+            // See https://tezos.gitlab.io/michelson-reference/#type-contract
+            ty.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
+            verify_ty(ctx, ty)
+        }
     }
 }
 
@@ -2150,6 +2158,74 @@ mod typecheck_tests {
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
             ))
+        );
+    }
+
+    #[test]
+    fn test_contract_not_storable() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::Unit,
+                storage: Type::new_contract(Type::Unit),
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Storable,
+                Type::new_contract(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_contract_not_pushable() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                Push((Type::new_contract(Type::Unit), Value::Unit)),
+                &mut ctx,
+                &mut tc_stk![]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::new_contract(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_contract_with_unpassable_arg() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::new_contract(Type::Operation),
+                storage: Type::Unit,
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Passable,
+                Type::Operation
+            ))
+        );
+    }
+
+    #[test]
+    fn test_contract_is_passable() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::new_contract(Type::Unit),
+                storage: Type::Unit,
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Ok(ContractScript {
+                parameter: Type::new_contract(Type::Unit),
+                storage: Type::Unit,
+                code: Failwith(Type::new_pair(Type::new_contract(Type::Unit), Type::Unit))
+            })
         );
     }
 }

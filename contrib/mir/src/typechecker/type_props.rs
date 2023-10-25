@@ -74,6 +74,13 @@ impl Type {
                 | TypeProperty::BigMapValue
                 | TypeProperty::Duplicable => p.1.ensure_prop(gas, prop)?,
             },
+            Contract(_) => match prop {
+                TypeProperty::Passable | TypeProperty::Packable | TypeProperty::Duplicable => (),
+                TypeProperty::Comparable
+                | TypeProperty::Storable
+                | TypeProperty::Pushable
+                | TypeProperty::BigMapValue => return invalid_type_prop(),
+            },
         }
         Ok(())
     }
