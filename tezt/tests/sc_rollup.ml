@@ -2638,23 +2638,6 @@ let test_rollup_client_show_address ~kind =
       ~error_msg:"Expecting %L, got %R as secret key from the client.") ;
   unit
 
-(* Check that the client can list keys.
-   ------------------------------------
-*)
-let test_rollup_client_list_keys ~kind =
-  let account = Constant.aggregate_tz4_account in
-  test_scenario_client_with_account ~account ~kind ~variant:"list alias"
-  @@ fun rollup_client ->
-  let* maybe_keys = Sc_rollup_client.list_keys rollup_client in
-  let expected_keys =
-    [(account.aggregate_alias, account.aggregate_public_key_hash)]
-  in
-  Check.(
-    (expected_keys = maybe_keys)
-      (list (tuple2 string string))
-      ~error_msg:"Expecting\n%L\ngot\n%R\nas keys from the client.") ;
-  unit
-
 let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
     _tezos_node tezos_client =
   let* inbox_level = Client.level tezos_client in
@@ -5253,7 +5236,6 @@ let register ~protocols =
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_wallet protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_show_address protocols ~kind:"wasm_2_0_0" ;
-  test_rollup_client_list_keys protocols ~kind:"wasm_2_0_0" ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;

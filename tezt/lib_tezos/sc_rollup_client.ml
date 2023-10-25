@@ -433,30 +433,6 @@ let get_batcher_msg ?hooks sc_client msg_hash =
      let hex_msg = JSON.(obj |> get "content" |> as_string) in
      (Hex.to_string (`Hex hex_msg), obj)
 
-let spawn_list_keys ?hooks sc_client =
-  spawn_command ?hooks sc_client ["list"; "keys"]
-
-let parse_list_keys output =
-  output |> String.trim |> String.split_on_char '\n'
-  |> List.fold_left (fun acc s -> (s =~** rex "^(\\w+): (\\w{36})") :: acc) []
-  |> List.fold_left
-       (fun acc k ->
-         match (k, acc) with
-         | None, _ | _, None -> None
-         | Some k, Some acc -> Some (k :: acc))
-       (Some [])
-  |> function
-  | None ->
-      Test.fail
-        ~__LOC__
-        "Cannot extract `list keys` format from client_output: %s"
-        output
-  | Some l -> l
-
-let list_keys ?hooks sc_client =
-  let*! out = spawn_list_keys ?hooks sc_client in
-  return (parse_list_keys out)
-
 let spawn_show_address ?hooks ~alias sc_client =
   spawn_command ?hooks sc_client ["show"; "address"; alias]
 

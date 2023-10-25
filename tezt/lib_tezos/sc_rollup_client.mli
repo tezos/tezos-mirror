@@ -250,12 +250,6 @@ val batcher_queue :
 val get_batcher_msg :
   ?hooks:Process_hooks.t -> t -> string -> (string * JSON.t) Runnable.process
 
-(** [list_keys client] returns the known aliases with their public key hash from
-    client.
-
-    Fails if the format isn't in the form `<alias>: <public key hash>`. *)
-val list_keys : ?hooks:Process.hooks -> t -> (string * string) list Lwt.t
-
 (** [show_address ~alias client] returns the BLS account associated with [alias].
 
     Fails if the output from the client isn't in the expected format (see
