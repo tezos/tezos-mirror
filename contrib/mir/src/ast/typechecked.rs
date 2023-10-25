@@ -14,6 +14,7 @@ impl Stage for TypecheckedStage {
     type AddMeta = overloads::Add;
     type PushValue = TypedValue;
     type NilType = ();
+    type GetOverload = overloads::Get;
 }
 
 pub type TypecheckedInstruction = Instruction<TypecheckedStage>;
@@ -24,5 +25,10 @@ pub mod overloads {
         IntInt,
         NatNat,
         MutezMutez,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum Get {
+        Map,
     }
 }
