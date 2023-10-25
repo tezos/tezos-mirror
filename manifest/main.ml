@@ -888,6 +888,65 @@ let octez_rpc =
       ]
     ~js_compatible:true
 
+let octez_risc_v_pvm =
+  let base_name = "octez_risc_v_pvm" in
+  let archive_file = Format.sprintf "lib%s.a" base_name in
+  let archive_output_file = Format.sprintf "target/release/%s" archive_file in
+  let header_file = Format.sprintf "%s.h" base_name in
+  let rust_foreign_library =
+    Dune.
+      [
+        S "rule";
+        [S "targets"; S archive_file; S header_file];
+        [
+          S "deps";
+          [S "source_tree"; S "src"];
+          [S "file"; S "build.rs"];
+          [S "file"; S "Cargo.toml"];
+          [S "file"; S "Cargo.lock"];
+          (* For the interpreter crate, these patterns only include files
+           * directly contained in [../interpreter], as well as the [src]
+           * directory, excluding all other directories in order to avoid
+           * copying any build artifacts. *)
+          [S "glob_files"; S "../interpreter/*"];
+          [S "source_tree"; S "../interpreter/src"];
+        ];
+        [
+          S "action";
+          [
+            S "no-infer";
+            [
+              S "progn";
+              [S "run"; S "cargo"; S "build"; S "--release"];
+              [S "copy"; S archive_output_file; S archive_file];
+            ];
+          ];
+        ];
+      ]
+  in
+  public_lib
+    "octez-risc-v-pvm"
+    ~path:"src/risc_v/pvm"
+    ~synopsis:"Bindings for RISC-V interpreter"
+    ~deps:[ctypes; ctypes_foreign]
+    ~flags:(Flags.standard ~disable_warnings:[9; 27] ())
+    ~ctypes:
+      Ctypes.
+        {
+          external_library_name = base_name;
+          include_header = header_file;
+          extra_search_dir = "%{env:INSIDE_DUNE=.}/src/risc_v/pvm";
+          type_description = {instance = "Types"; functor_ = "Api_types_desc"};
+          function_description =
+            {instance = "Functions"; functor_ = "Api_funcs_desc"};
+          generated_types = "Api_types";
+          generated_entry_point = "Api";
+          c_flags = [];
+          c_library_flags = [];
+          deps = [archive_file; header_file];
+        }
+    ~dune:Dune.[rust_foreign_library]
+
 let bls12_381 =
   public_lib
     "bls12-381"
