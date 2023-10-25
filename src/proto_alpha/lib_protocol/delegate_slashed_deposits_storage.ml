@@ -111,7 +111,14 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let* frozen_deposits =
     let* initial_amount =
-      Delegate_storage.initial_frozen_deposits ctxt delegate
+      if Cycle_repr.(level.cycle = current_cycle) then
+        Delegate_storage.initial_frozen_deposits ctxt delegate
+      else if Cycle_repr.(succ level.cycle = current_cycle) then
+        Delegate_storage.initial_frozen_deposits_of_previous_cycle ctxt delegate
+      else
+        (* Because [max_slashing_period = 2], there cannot be denunciations
+           for other cycles. *)
+        assert false
     in
     let* current_amount =
       Delegate_storage.current_frozen_deposits ctxt delegate
