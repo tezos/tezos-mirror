@@ -362,6 +362,38 @@ fn typecheck_instruction(
                 }
             }
         }
+        I::Update(..) => {
+            ensure_stack_len("UPDATE", stack, 3)?;
+            match stack.as_slice() {
+                [.., T::Map(..), _, _] => {
+                    let kty_ = stack.pop().unwrap();
+                    let vty_new = stack.pop().unwrap();
+                    match stack.pop().unwrap() {
+                        T::Map(kty, vty) => {
+                            ensure_ty_eq(ctx, &kty, &kty_)?;
+                            ensure_ty_eq(ctx, &T::new_option(*vty), &vty_new)?;
+                            // can only fail if the typechecker is invoked on invalid
+                            // types, i.e. where `map` key is non-comparable
+                            ensure_comparable(&kty)?;
+                            let boxed_vty = match vty_new {
+                                T::Option(bty) => bty,
+                                _ => unreachable!("We ensured it's an option a line above"),
+                            };
+                            stack.push(T::Map(kty, boxed_vty));
+                            I::Update(overloads::Update::Map)
+                        }
+                        _ => unreachable!("Ensured by the outer match"),
+                    }
+                }
+                _ => {
+                    return Err(TcError::NoMatchingOverload {
+                        instr: "UPDATE",
+                        stack: stack.clone(),
+                        reason: None,
+                    })
+                }
+            }
+        }
     })
 }
 
@@ -1247,6 +1279,58 @@ mod typecheck_tests {
         assert_eq!(
             typecheck(parse("{ GET }").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
+        );
+    }
+
+    #[test]
+    fn update_map() {
+        let mut stack = stk![
+            Type::new_map(Type::Int, Type::String),
+            Type::new_option(Type::String),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck(
+                parse("{ UPDATE }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(vec![Update(overloads::Update::Map)])
+        );
+        assert_eq!(stack, stk![Type::new_map(Type::Int, Type::String)]);
+    }
+
+    #[test]
+    fn update_map_wrong_ty() {
+        let mut stack = stk![
+            Type::new_map(Type::Int, Type::String),
+            Type::new_option(Type::Nat),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck(
+                parse("{ UPDATE }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TypesNotEqual(Type::new_option(Type::String), Type::new_option(Type::Nat)).into())
+        );
+    }
+
+    #[test]
+    fn update_map_incomparable() {
+        let mut stack = stk![
+            Type::new_map(Type::new_list(Type::Int), Type::String),
+            Type::new_option(Type::String),
+            Type::new_list(Type::Int)
+        ];
+        assert_eq!(
+            typecheck(
+                parse("{ UPDATE }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::TypeNotComparable(Type::new_list(Type::Int),))
         );
     }
 }

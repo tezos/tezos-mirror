@@ -233,6 +233,23 @@ fn interpret_one(
                 stack.push(V::new_option(result.cloned()));
             }
         },
+        I::Update(overload) => match overload {
+            overloads::Update::Map => {
+                let key = stack.pop().unwrap_or_else(|| unreachable_state());
+                let opt_new_val = stack.pop().unwrap_or_else(|| unreachable_state());
+                let mut map = match stack.pop() {
+                    Some(V::Map(map)) => map,
+                    _ => unreachable_state(),
+                };
+                gas.consume(interpret_cost::map_update(&key, map.len())?)?;
+                match opt_new_val {
+                    V::Option(None) => map.remove(&key),
+                    V::Option(Some(val)) => map.insert(key, *val),
+                    _ => unreachable_state(),
+                };
+                stack.push(V::Map(map));
+            }
+        },
     }
     Ok(())
 }
@@ -827,6 +844,84 @@ mod interpreter_tests {
             ctx.gas.milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_get(&TypedValue::Int(100500), 2).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn update_map_insert() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::new();
+        let mut stack = stk![
+            TypedValue::Map(map),
+            TypedValue::new_option(Some(TypedValue::String("foo".to_owned()))),
+            TypedValue::Int(1)
+        ];
+        assert_eq!(
+            interpret(&vec![Update(overloads::Update::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::Map(BTreeMap::from([(
+                TypedValue::Int(1),
+                TypedValue::String("foo".to_owned())
+            )])),]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::map_update(&TypedValue::Int(1), 0).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn update_map_update() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([(TypedValue::Int(1), TypedValue::String("bar".to_owned()))]);
+        let mut stack = stk![
+            TypedValue::Map(map),
+            TypedValue::new_option(Some(TypedValue::String("foo".to_owned()))),
+            TypedValue::Int(1)
+        ];
+        assert_eq!(
+            interpret(&vec![Update(overloads::Update::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::Map(BTreeMap::from([(
+                TypedValue::Int(1),
+                TypedValue::String("foo".to_owned())
+            )])),]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::map_update(&TypedValue::Int(1), 1).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn update_map_remove() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([(TypedValue::Int(1), TypedValue::String("bar".to_owned()))]);
+        let mut stack = stk![
+            TypedValue::Map(map),
+            TypedValue::new_option(None),
+            TypedValue::Int(1)
+        ];
+        assert_eq!(
+            interpret(&vec![Update(overloads::Update::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Map(BTreeMap::new())]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::map_update(&TypedValue::Int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }

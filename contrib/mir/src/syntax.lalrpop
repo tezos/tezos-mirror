@@ -125,6 +125,7 @@ instruction: ParsedInstruction = {
   "AMOUNT" => Amount,
   "NIL" <type_expr> => Nil(<>),
   "GET" => Get(()),
+  "UPDATE" => Update(()),
 }
 
 instructionSeq = semicolonSepSeq<instruction>;
