@@ -53,6 +53,10 @@ Node
 
 - Add logs at ``Info`` level about the disconnection reasons in the p2p section.
 
+- Removed a spurious "missing validation plugin" warning message that
+  was emitted every time a block was applied using an old protocol
+  where its plugin was removed.
+
 Client
 ------
 
