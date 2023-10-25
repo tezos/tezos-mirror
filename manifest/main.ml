@@ -947,6 +947,14 @@ let octez_risc_v_pvm =
         }
     ~dune:Dune.[rust_foreign_library]
 
+let _octez_risc_v_pvm_test =
+  tezt
+    ["test_main"]
+    ~path:"src/risc_v/pvm/test"
+    ~opam:"octez-risc-v-pvm-test"
+    ~synopsis:"Tests for RISC-V interpreter bindings"
+    ~deps:[alcotezt; octez_risc_v_pvm]
+
 let bls12_381 =
   public_lib
     "bls12-381"

@@ -724,6 +724,8 @@ opam:octez-proxy-server:
 
 # Ignoring unreleased package octez-risc-v-pvm.
 
+# Ignoring unreleased package octez-risc-v-pvm-test.
+
 opam:octez-rpc-process:
   extends:
     - .opam_template
