@@ -27,6 +27,8 @@ Currently, for the sake of simplicity, MIR parser is a bit more lenient wrt non-
 - Parentheses inside sequences, i.e. `{ (Unit) ; (Unit) }` is accepted
 - Arbitrary indentation
 
+Additionally, annotations are currently ignored completely; thus, annotation rules are not verified.
+
 #### Gas consumption
 
 Gas counter is represented as the type `Gas`, containing an `Option<u32>` with the current milligas amount (or `None` after gas exhaustion). A mutable reference to the gas counter is passed to typechecker and interpreter.
