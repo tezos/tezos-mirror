@@ -88,10 +88,6 @@ val rpc_get_rich :
   (string * string) list ->
   JSON.t Runnable.process
 
-(** [total_ticks ?block client] gets the total number of ticks for the PVM. *)
-val total_ticks :
-  ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process
-
 (** [ticks ?block client] gets the number of ticks for the PVM for the [block]
     (default ["head"]). *)
 val ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process

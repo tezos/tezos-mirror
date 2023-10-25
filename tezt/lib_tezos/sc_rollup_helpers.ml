@@ -1160,3 +1160,8 @@ let wait_for_injecting_event ?(tags = []) ?count node =
 let injecting_refute_event _tezos_node rollup_node =
   let* _injected = wait_for_injecting_event ~tags:["refute"] rollup_node in
   unit
+
+let total_ticks ?(block = "head") sc_rollup_node =
+  let service = "global/block/" ^ block ^ "/total_ticks" in
+  let* json = call_rpc ~smart_rollup_node:sc_rollup_node ~service in
+  return (JSON.as_int json)

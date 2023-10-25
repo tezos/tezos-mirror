@@ -250,8 +250,8 @@ let assert_state_changed ?block sc_rollup_client prev_state_hash =
     ~error_msg:"State hash has not changed (%L <> %R)" ;
   Lwt.return_unit
 
-let assert_ticks_advanced ?block sc_rollup_client prev_ticks =
-  let*! ticks = Sc_rollup_client.total_ticks ?block ~hooks sc_rollup_client in
+let assert_ticks_advanced ?block sc_rollup_node prev_ticks =
+  let* ticks = Sc_rollup_helpers.total_ticks ?block sc_rollup_node in
   Check.(ticks > prev_ticks)
     Check.int
     ~error_msg:"Tick counter did not advance (%L > %R)" ;
@@ -458,7 +458,7 @@ let tx_kernel_e2e setup protocol =
   in
   (* Send withdrawal *)
   let*! prev_state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
-  let*! prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+  let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
   let* () = send_message client (sf "hex:[%S]" withdraw_message) in
   let level = level + 1 in
   let withdrawal_level = level in
@@ -490,7 +490,7 @@ let tx_kernel_e2e setup protocol =
 
   let block = string_of_int next_lcc_level in
   let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
-  let* () = assert_ticks_advanced ~block sc_rollup_client prev_ticks in
+  let* () = assert_ticks_advanced ~block sc_rollup_node prev_ticks in
 
   (* EXECUTE withdrawal *)
   let*! outbox =

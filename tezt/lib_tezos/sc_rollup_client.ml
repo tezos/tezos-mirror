@@ -319,10 +319,6 @@ let ticks ?hooks ?(block = "head") sc_client =
   let res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
   Runnable.map JSON.as_int res
 
-let total_ticks ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "total_ticks"]
-  |> Runnable.map JSON.as_int
-
 let state_hash ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "state_hash"]
   |> Runnable.map JSON.as_string
