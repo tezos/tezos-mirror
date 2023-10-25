@@ -8,7 +8,7 @@
 
 type 'a t =
   | Operating : Signature.public_key_hash t
-  | Batching : Signature.public_key_hash t
+  | Batching : Signature.public_key_hash list t
   | Cementing : Signature.public_key_hash t
   | Recovering : Signature.public_key_hash t
   | Executing_outbox : Signature.public_key_hash t
@@ -197,12 +197,12 @@ let new_operator_for_purpose :
     type kind. kind t -> Signature.public_key_hash list -> kind operator =
  fun purpose pkh ->
   match (purpose, pkh) with
+  | _, [] -> invalid_arg "no public key hash given for the new operator"
   | Operating, [pkh] -> Single pkh
-  | Batching, [pkh] -> Single pkh
+  | Batching, pkhs -> Multiple pkhs
   | Cementing, [pkh] -> Single pkh
   | Recovering, [pkh] -> Single pkh
   | Executing_outbox, [pkh] -> Single pkh
-  | _, [] -> invalid_arg "no public key hash given for the new operator"
   | _, _ -> invalid_arg "multiple keys for a purpose allowing only one key"
 
 let update :
@@ -288,11 +288,16 @@ let single_operator : ex_operator -> Signature.public_key_hash operator =
   | Operator (Multiple _) -> assert false
   | Operator (Single pkh) -> Single pkh
 
+let multiple_operator : ex_operator -> Signature.Public_key_hash.t list operator
+    = function
+  | Operator (Multiple pkhs) -> Multiple pkhs
+  | Operator (Single _pkh) -> assert false
+
 let find_operator : type kind. kind t -> operators -> kind operator option =
  fun purpose operator_per_purpose ->
   let operator = Map.find (Purpose purpose) operator_per_purpose in
   match purpose with
-  | Batching -> Option.map single_operator operator
+  | Batching -> Option.map multiple_operator operator
   | Operating -> Option.map single_operator operator
   | Cementing -> Option.map single_operator operator
   | Recovering -> Option.map single_operator operator

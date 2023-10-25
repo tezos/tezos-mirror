@@ -10,7 +10,7 @@
     operations that they sign. *)
 type 'a t =
   | Operating : Signature.public_key_hash t
-  | Batching : Signature.public_key_hash t
+  | Batching : Signature.public_key_hash list t
   | Cementing : Signature.public_key_hash t
   | Recovering : Signature.public_key_hash t
   | Executing_outbox : Signature.public_key_hash t
