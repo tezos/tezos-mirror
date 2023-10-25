@@ -1241,9 +1241,9 @@ let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   in
   bake ?baking_mode ?policy final_block_of_previous_cycle
 
-let bake_until_cycle_end ?policy b =
+let bake_until_cycle_end ?baking_mode ?policy b =
   let cycle = current_cycle b in
-  bake_until_cycle ?policy (Cycle.succ cycle) b
+  bake_until_cycle ?baking_mode ?policy (Cycle.succ cycle) b
 
 let bake_until_n_cycle_end ?policy n b =
   let cycle = current_cycle b in
