@@ -282,10 +282,36 @@ let test_payload_producer_gets_evidence_rewards () =
       ~operations:(preattestations @ [db_evidence])
       b1
   in
+  (* The denunciation happened but no slashing nor reward happened yet. *)
   (* the frozen deposits of the double-signer [baker1] are slashed *)
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B b1) baker1
   in
+  let* frozen_deposits_right_after =
+    Context.Delegate.current_frozen_deposits (B b') baker1
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_right_after
+      frozen_deposits_before
+  in
+  let* full_balance = Context.Delegate.full_balance (B b1) baker2 in
+  let expected_reward_right_after = baking_reward_fixed_portion in
+  let* full_balance_with_rewards_right_after =
+    Context.Delegate.full_balance (B b') baker2
+  in
+  let real_reward_right_after =
+    Test_tez.(full_balance_with_rewards_right_after -! full_balance)
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      expected_reward_right_after
+      real_reward_right_after
+  in
+  (* Slashing and rewarding happen at the end of the cycle. *)
+  let* b' = Block.bake_until_cycle_end ~policy:(By_account baker2) b' in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in
@@ -304,7 +330,6 @@ let test_payload_producer_gets_evidence_rewards () =
   (* [baker2] included the double baking evidence in [b_with_evidence]
      and so it receives the reward for the evidence included in [b']
      (besides the reward for proposing the payload). *)
-  let* full_balance = Context.Delegate.full_balance (B b1) baker2 in
   let divider =
     Int64.add
       2L
@@ -312,8 +337,12 @@ let test_payload_producer_gets_evidence_rewards () =
          c.parametric.adaptive_issuance.global_limit_of_staking_over_baking)
   in
   let evidence_reward = Test_tez.(slashed_amount /! divider) in
+  let baked_blocks =
+    Int64.of_int
+      (Int32.to_int b'.header.shell.level - Int32.to_int b1.header.shell.level)
+  in
   let expected_reward =
-    Test_tez.(baking_reward_fixed_portion +! evidence_reward)
+    Test_tez.((baking_reward_fixed_portion *! baked_blocks) +! evidence_reward)
   in
   let* full_balance_with_rewards =
     Context.Delegate.full_balance (B b') baker2
