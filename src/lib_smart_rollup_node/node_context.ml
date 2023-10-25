@@ -665,6 +665,34 @@ let last_seen_lcc {store; genesis_info; _} =
   | None ->
       {commitment = genesis_info.commitment_hash; level = genesis_info.level}
 
+let register_published_commitment node_ctxt commitment ~first_published_at_level
+    ~level ~published_by_us =
+  let open Lwt_result_syntax in
+  let commitment_hash = Commitment.hash commitment in
+  let* prev_publication =
+    Store.Commitments_published_at_level.mem
+      node_ctxt.store.commitments_published_at_level
+      commitment_hash
+  in
+  let published_at_level = if published_by_us then Some level else None in
+  let* () =
+    if (not prev_publication) || published_by_us then
+      set_commitment_published_at_level
+        node_ctxt
+        commitment_hash
+        {first_published_at_level; published_at_level}
+    else return_unit
+  in
+  when_ published_by_us @@ fun () ->
+  let* () = Store.Lpc.write node_ctxt.store.lpc commitment in
+  let update_lpc_ref =
+    match Reference.get node_ctxt.lpc with
+    | None -> true
+    | Some {inbox_level; _} -> commitment.inbox_level >= inbox_level
+  in
+  if update_lpc_ref then Reference.set node_ctxt.lpc (Some commitment) ;
+  return_unit
+
 let find_inbox {store; _} inbox_hash =
   let open Lwt_result_syntax in
   let+ inbox = Store.Inboxes.read store.inboxes inbox_hash in

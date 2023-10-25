@@ -230,7 +230,8 @@ let spawn_command sc_node args =
     sc_node.path
   @@ make_arguments sc_node @ args
 
-let common_node_args ~loser_mode ~allow_degraded sc_node =
+let common_node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode
+    sc_node =
   [
     "--data-dir";
     data_dir sc_node;
@@ -239,41 +240,42 @@ let common_node_args ~loser_mode ~allow_degraded sc_node =
     "--rpc-port";
     string_of_int @@ rpc_port sc_node;
   ]
-  @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
-  @ (if allow_degraded then [] else ["--no-degraded"])
-  @
-  match sc_node.persistent_state.dal_node with
-  | None -> []
-  | Some dal_node ->
-      let endpoint =
+  @ Cli_arg.optional_arg "loser-mode" Fun.id loser_mode
+  @ Cli_arg.optional_switch "no-degraded" (not allow_degraded)
+  @ Cli_arg.optional_arg "gc-frequency" Int.to_string gc_frequency
+  @ Cli_arg.optional_arg "history-mode" string_of_history_mode history_mode
+  @ Cli_arg.optional_arg
+      "dal-node"
+      (fun dal_node ->
         sf
           "http://%s:%d"
           (Dal_node.rpc_host dal_node)
-          (Dal_node.rpc_port dal_node)
-      in
-      ["--dal-node"; endpoint]
+          (Dal_node.rpc_port dal_node))
+      sc_node.persistent_state.dal_node
 
-let optional_arg arg to_string = function
-  | None -> []
-  | Some v -> [arg; to_string v]
-
-let optional_args ?gc_frequency ?history_mode () =
-  optional_arg "--gc-frequency" Int.to_string gc_frequency
-  @ optional_arg "--history-mode" string_of_history_mode history_mode
-
-let node_args ~loser_mode ~allow_degraded ?gc_frequency ?history_mode sc_node
+let node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode sc_node
     rollup_address =
   let mode = string_of_mode sc_node.persistent_state.mode in
   ( mode,
     ["for"; rollup_address; "with"; "operators"]
     @ operators_params sc_node
-    @ common_node_args ~loser_mode ~allow_degraded sc_node
-    @ optional_args ?gc_frequency ?history_mode () )
+    @ common_node_args
+        ~loser_mode
+        ~allow_degraded
+        ~gc_frequency
+        ~history_mode
+        sc_node )
 
-let legacy_node_args ~loser_mode ~allow_degraded sc_node rollup_address =
+let legacy_node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode
+    sc_node rollup_address =
   let mode = string_of_mode sc_node.persistent_state.mode in
   ["--mode"; mode; "--rollup"; rollup_address]
-  @ common_node_args ~loser_mode ~allow_degraded sc_node
+  @ common_node_args
+      ~loser_mode
+      ~allow_degraded
+      ~gc_frequency
+      ~history_mode
+      sc_node
 
 let spawn_config_init sc_node ?(force = false) ?loser_mode ?gc_frequency
     ?history_mode rollup_address =
@@ -281,8 +283,8 @@ let spawn_config_init sc_node ?(force = false) ?loser_mode ?gc_frequency
     node_args
       ~loser_mode
       ~allow_degraded:true
-      ?gc_frequency
-      ?history_mode
+      ~gc_frequency
+      ~history_mode
       sc_node
       rollup_address
   in
@@ -496,18 +498,30 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     ~on_terminate
 
 let run ?(legacy = false) ?(restart = false) ?mode ?event_level
-    ?event_sections_levels ~loser_mode ~allow_degraded node rollup_address
-    extra_arguments =
+    ?event_sections_levels ~loser_mode ~allow_degraded ~gc_frequency
+    ~history_mode node rollup_address extra_arguments =
   let* () = if restart then terminate node else return () in
   let cmd =
     if legacy then
       let args =
-        legacy_node_args ~loser_mode ~allow_degraded node rollup_address
+        legacy_node_args
+          ~loser_mode
+          ~allow_degraded
+          ~gc_frequency
+          ~history_mode
+          node
+          rollup_address
       in
       ["run"] @ args @ extra_arguments
     else
       let default_mode, args =
-        node_args ~loser_mode ~allow_degraded node rollup_address
+        node_args
+          ~loser_mode
+          ~allow_degraded
+          ~gc_frequency
+          ~history_mode
+          node
+          rollup_address
       in
       let final_mode =
         match mode with Some m -> string_of_mode m | None -> default_mode
@@ -517,8 +531,9 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
   do_runlike_command ?event_level ?event_sections_levels node cmd
 
 let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
-    ?(allow_degraded = false) ?(wait_ready = true) node rollup_address arguments
-    =
+    ?(allow_degraded = false)
+    ?(gc_frequency = 1 (* Make GC run more frequently for tests *))
+    ?history_mode ?(wait_ready = true) node rollup_address arguments =
   let* () =
     run
       ?legacy
@@ -528,6 +543,8 @@ let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
       ?event_sections_levels
       ~loser_mode
       ~allow_degraded
+      ~gc_frequency:(Some gc_frequency)
+      ~history_mode
       node
       rollup_address
       arguments
@@ -540,16 +557,30 @@ let run_sequencer ?event_level ?event_sections_levels ?(allow_degraded = false)
   let cmd =
     ["run"; "for"; rollup_address; "with"; "operator"]
     @ operators_params node
-    @ common_node_args ~loser_mode:None ~allow_degraded node
+    @ common_node_args
+        ~loser_mode:None
+        ~allow_degraded
+        node
+        ~gc_frequency:None
+        ~history_mode:None
     @ extra_arguments
   in
   let* () = do_runlike_command ?event_level ?event_sections_levels node cmd in
   let* () = if wait_ready then wait_for_ready node else unit in
   return ()
 
-let spawn_run ?loser_mode ?(allow_degraded = false) node rollup_address
-    extra_arguments =
-  let mode, args = node_args ~loser_mode ~allow_degraded node rollup_address in
+let spawn_run ?loser_mode ?(allow_degraded = false)
+    ?(gc_frequency = 1 (* Make GC run more frequently for tests *))
+    ?history_mode node rollup_address extra_arguments =
+  let mode, args =
+    node_args
+      ~loser_mode
+      ~allow_degraded
+      node
+      ~gc_frequency:(Some gc_frequency)
+      ~history_mode
+      rollup_address
+  in
   spawn_command node (["run"; mode] @ args @ extra_arguments)
 
 let change_node_and_restart ?event_level sc_rollup_node rollup_address node =

@@ -337,6 +337,18 @@ val commitment_was_published :
 (** [set_lcc t lcc] saves the LCC both on disk and in the node context. It's written in the context iff [lcc] is is younger than its current value. *)
 val set_lcc : rw -> lcc -> unit tzresult Lwt.t
 
+(** [register_published_commitment t c ~first_published_at_level ~level
+    ~published_by_us] saves the publishing information for commitment [c] both
+    on disk and in the node context. We remember the first publication level
+    and the level the commitment was published by us. *)
+val register_published_commitment :
+  rw ->
+  Commitment.t ->
+  first_published_at_level:int32 ->
+  level:int32 ->
+  published_by_us:bool ->
+  unit tzresult Lwt.t
+
 (** {3 Inboxes} *)
 
 type messages_info = {

@@ -822,12 +822,12 @@ let rec check_can_get_between_blocks rollup_client ~first ~last path =
     check_can_get_between_blocks rollup_client ~first ~last:(last - 1) path
   else unit
 
-let test_gc ~challenge_window ~commitment_period ~history_mode =
+let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
   test_full_scenario
     {
-      tags = ["gc"; history_mode_str];
-      variant = None;
+      tags = ["gc"; history_mode_str; variant];
+      variant = Some variant;
       description =
         sf
           "garbage collection is triggered and finishes correctly (%s)"
@@ -841,13 +841,6 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
   (* We want to bake enough blocks for the LCC to be updated and the GC
      triggered. *)
   let expected_level = 5 * challenge_window in
-  let* _config =
-    Sc_rollup_node.config_init
-      ~gc_frequency
-      ~history_mode
-      sc_rollup_node
-      sc_rollup
-  in
   let gc_levels_started = ref [] in
   let context_gc_finalisations = ref 0 in
   Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; value; _} ->
@@ -862,7 +855,9 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
           (* On each [ending_context_gc] event, increment a counter *)
           context_gc_finalisations := !context_gc_finalisations + 1
       | _ -> ()) ;
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~gc_frequency ~history_mode sc_rollup_node sc_rollup []
+  in
   let* origination_level = Node.get_level node in
   (* We start at level 2, bake until the expected level *)
   let* () = bake_levels (expected_level - origination_level) client in
@@ -894,16 +889,13 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
        times)" ;
   (* We expect the first available level to be the one corresponding
    * to the lcc for the full mode or the genesis for archive mode *)
+  let* lcc_hash, lcc_level =
+    Sc_rollup_helpers.last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
   let* first_available_level =
     match history_mode with
     | Archive -> Lwt.return origination_level
-    | Full ->
-        let* _, lcc =
-          Sc_rollup_helpers.last_cemented_commitment_hash_with_level
-            ~sc_rollup
-            client
-        in
-        Lwt.return lcc
+    | Full -> Lwt.return lcc_level
   in
   (* Check that RPC calls for blocks which were not GC'ed still return *)
   let* () =
@@ -934,6 +926,16 @@ let test_gc ~challenge_window ~commitment_period ~history_mode =
       ~msg:(rex "Attempting to access data for level")
       rpc_call_err
   in
+  Log.info "Checking that commitment publication data was not completely erased" ;
+  let*! lcc = Sc_rollup_client.commitment rollup_client lcc_hash in
+  (match lcc with
+  | None -> Test.fail ~__LOC__ "No LCC"
+  | Some {published_at_level = None; _} ->
+      Test.fail
+        ~__LOC__
+        "Commitment was published but publication info is not available \
+         anymore."
+  | _ -> ()) ;
   unit
 
 (* One can retrieve the list of originated SCORUs.
@@ -3515,13 +3517,12 @@ let test_late_rollup_node_2 =
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap2.alias
   in
-  let* _config =
-    (* Do gc every block, to test we don't remove live data *)
-    Sc_rollup_node.config_init ~gc_frequency:1 sc_rollup_node2 sc_rollup_address
-  in
   Log.info
     "Starting alternative rollup node from scratch with a different operator." ;
-  let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
+  (* Do gc every block, to test we don't remove live data *)
+  let* () =
+    Sc_rollup_node.run ~gc_frequency:1 sc_rollup_node2 sc_rollup_address []
+  in
   let* _level = wait_for_current_level node ~timeout:20. sc_rollup_node2 in
   Log.info "Alternative rollup node is synchronized." ;
   let* () = Client.bake_for_and_wait client in
@@ -5113,12 +5114,21 @@ let register ~kind ~protocols =
     basic_scenario
     protocols ;
   test_gc
+    "many_gc"
+    ~kind
+    ~challenge_window:5
+    ~commitment_period:2
+    ~history_mode:Full
+    protocols ;
+  test_gc
+    "sparse_gc"
     ~kind
     ~challenge_window:10
     ~commitment_period:5
     ~history_mode:Full
     protocols ;
   test_gc
+    "no_gc"
     ~kind
     ~challenge_window:10
     ~commitment_period:5

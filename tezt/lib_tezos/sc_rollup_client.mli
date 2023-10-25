@@ -39,7 +39,7 @@ type commitment_and_hash = {commitment : commitment; hash : string}
 type commitment_info = {
   commitment_and_hash : commitment_and_hash;
   first_published_at_level : int option;
-  included_at_level : int option;
+  published_at_level : int option;
 }
 
 type slot_header = {level : int; commitment : string; index : int}
@@ -214,6 +214,12 @@ val last_stored_commitment :
     and the level it was included. *)
 val last_published_commitment :
   ?hooks:Process.hooks -> t -> commitment_info option Runnable.process
+
+(** [commitment client hash] gets commitment by its [hash] from the rollup node,
+    with its hash and level when the commitment was first published and the
+    level it was included. *)
+val commitment :
+  ?hooks:Process.hooks -> t -> string -> commitment_info option Runnable.process
 
 (** [dal_slot_headers ?block client] returns the dal slot headers of the
     [block] (default ["head"]). *)

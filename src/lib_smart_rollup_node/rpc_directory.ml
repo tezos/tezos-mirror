@@ -145,6 +145,29 @@ let () =
       return_some (commitment, hash, first_published, published)
 
 let () =
+  Local_directory.register1 Rollup_node_services.Local.commitment
+  @@ fun node_ctxt commitment_hash () () ->
+  let open Lwt_result_syntax in
+  let* commitment = Node_context.find_commitment node_ctxt commitment_hash in
+  match commitment with
+  | None -> return_none
+  | Some commitment ->
+      let hash = Octez_smart_rollup.Commitment.hash commitment in
+      (* The corresponding level in Store.Commitments.published_at_level is
+         available only when the commitment has been published and included
+         in a block. *)
+      let* published_at_level_info =
+        Node_context.commitment_published_at_level node_ctxt hash
+      in
+      let first_published, published =
+        match published_at_level_info with
+        | None -> (None, None)
+        | Some {first_published_at_level; published_at_level} ->
+            (Some first_published_at_level, published_at_level)
+      in
+      return_some (commitment, hash, first_published, published)
+
+let () =
   Local_directory.register0 Rollup_node_services.Local.injection
   @@ fun _node_ctxt () messages -> Batcher.register_messages messages
 
