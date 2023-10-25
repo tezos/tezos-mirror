@@ -672,14 +672,33 @@ let test_freeze_more_with_low_balance =
       Assert.equal_tez ~loc:__LOC__ info1.frozen_deposits info2.frozen_deposits
     in
     let* b3 = double_attest_and_punish b2 account1 in
-    (* Denunciation has happened: we check that the full balance of [account1]
-       is (still) equal to its deposit. *)
+    (* Denunciation has happened but slashing hasn't yet.
+       We check that frozen deposits haven't changed and still correspond to the
+       full balance and itself hasn't changed. *)
     let* info3 = Context.Delegate.info (B b3) account1 in
     let* () =
       Assert.equal_tez
         ~loc:__LOC__
-        info3.full_balance
+        info3.frozen_deposits
         info3.current_frozen_deposits
+    in
+    let* () =
+      Assert.equal_tez ~loc:__LOC__ info3.full_balance info3.frozen_deposits
+    in
+    let* () =
+      Assert.equal_tez ~loc:__LOC__ info3.full_balance info2.full_balance
+    in
+    (* We now bake until end of cycle only with [account2]:
+       block of the new cycle are called cX below. *)
+    let* c1 = Block.bake_until_cycle_end ~policy:(By_account account2) b3 in
+    (* Denunciation has happened: we check that the full balance of [account1]
+       is (still) equal to its deposit. *)
+    let* info4 = Context.Delegate.info (B c1) account1 in
+    let* () =
+      Assert.equal_tez
+        ~loc:__LOC__
+        info4.full_balance
+        info4.current_frozen_deposits
     in
     (* We also check that compared to deposits at block [b2], [account1] lost
        50% of its deposits. *)
@@ -696,47 +715,67 @@ let test_freeze_more_with_low_balance =
       Assert.equal_tez
         ~loc:__LOC__
         expected_frozen_deposits_after
-        info3.current_frozen_deposits
+        info4.current_frozen_deposits
     in
-    (* We now bake until end of cycle only with [account2]:
-       block of the new cycle are called cX below. *)
-    let* c1 = Block.bake_until_cycle_end ~policy:(By_account account2) b3 in
     let* c2 = double_attest_and_punish c1 account1 in
-    (* Second denunciation has happened: we check that the full balance of
-       [account1] reflects the slashing of 50% of the original deposit. Its
-       current deposits are thus 0tz. *)
-    let* info4 = Context.Delegate.info (B c2) account1 in
-    let* () = Assert.equal_tez ~loc:__LOC__ info4.full_balance Tez.zero in
+    (* Second denunciation has happened but slashing not yet, again.
+       Current frozen deposits reflect the slashing of 50% of the original
+       deposits. *)
+    let* info5 = Context.Delegate.info (B c2) account1 in
     let* () =
-      Assert.equal_tez ~loc:__LOC__ info4.current_frozen_deposits Tez.zero
+      Assert.not_equal_tez
+        ~loc:__LOC__
+        info5.current_frozen_deposits
+        info5.frozen_deposits
+    in
+    let* () =
+      Assert.equal_tez
+        ~loc:__LOC__
+        info5.current_frozen_deposits
+        info4.current_frozen_deposits
+    in
+    let* () =
+      Assert.equal_tez
+        ~loc:__LOC__
+        info5.full_balance
+        info5.current_frozen_deposits
     in
     let*! c3 = Block.bake c2 ~policy:(By_account account1) in
-    (* Once the deposits dropped to 0, the baker cannot bake anymore *)
+    (* Once the denunciations has summed up to 100%, the baker cannot bake anymore *)
     let* () =
       Assert.proto_error_with_info ~loc:__LOC__ c3 "Zero frozen deposits"
     in
-    (* We bake [2 * preserved_cycles] additional cycles only with [account2].
+    let* c3 = Block.bake_until_cycle_end c2 ~policy:(By_account account2) in
+    (* Second slashing has happened: we check that the full balance of
+       [account1] reflects the slashing of 50% of the original deposit. Its
+       current deposits are thus 0tz. *)
+    let* info6 = Context.Delegate.info (B c3) account1 in
+    let* () = Assert.equal_tez ~loc:__LOC__ info6.full_balance Tez.zero in
+    let* () =
+      Assert.equal_tez ~loc:__LOC__ info6.current_frozen_deposits Tez.zero
+    in
+    (* We bake [2 * preserved_cycles - 1] additional cycles only with [account2].
        Because [account1] does not bake during this period, it loses its rights.
     *)
     let* d1 =
       Block.bake_until_n_cycle_end
         ~policy:(By_account account2)
-        (2 * constants.preserved_cycles)
-        c2
+        ((2 * constants.preserved_cycles) - 1)
+        c3
     in
-    let* info5 = Context.Delegate.info (B d1) account1 in
+    let* info7 = Context.Delegate.info (B d1) account1 in
     (* [account1] is only deactivated after 1 + [2 * preserved_cycles] (see
        [Delegate_activation_storage.set_active] since the last time it was
        active, that is, since the first cycle. Thus the cycle at which
        [account1] is deactivated is 2 + [2 * preserved_cycles] from genesis. *)
-    let* () = Assert.equal_bool ~loc:__LOC__ info5.deactivated false in
+    let* () = Assert.equal_bool ~loc:__LOC__ info7.deactivated false in
     (* account1 is still active, but has no rights. *)
     let* () = check_unique_attester d1 account2 in
     let* e1 = Block.bake_until_cycle_end ~policy:(By_account account2) d1 in
     (* account1 has no rights and furthermore is no longer active. *)
     let* () = check_unique_attester e1 account2 in
-    let* info6 = Context.Delegate.info (B e1) account1 in
-    Assert.equal_bool ~loc:__LOC__ info6.deactivated true
+    let* info8 = Context.Delegate.info (B e1) account1 in
+    Assert.equal_bool ~loc:__LOC__ info8.deactivated true
 
 (** Injecting a valid double attestation multiple times raises an error. *)
 let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
