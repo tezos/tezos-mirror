@@ -62,6 +62,7 @@ type reveal_data =
   | Raw_data of string
   | Metadata of Sc_rollup_metadata_repr.t
   | Dal_page of Dal_slot_repr.Page.content option
+  | Dal_parameters of Sc_rollup_dal_parameters_repr.t
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -83,6 +84,8 @@ let pp_reveal_data fmt = function
         (fun fmt _a -> Format.fprintf fmt "<Some_dal_data>")
         fmt
         content_opt
+  | Dal_parameters dal_parameters ->
+      Sc_rollup_dal_parameters_repr.pp fmt dal_parameters
 
 let pp_input fmt = function
   | Inbox_message msg ->
@@ -136,7 +139,17 @@ let reveal_data_encoding =
       (function Dal_page p -> Some ((), p) | _ -> None)
       (fun ((), p) -> Dal_page p)
   in
-  union [case_raw_data; case_metadata; case_dal_page]
+  let case_dal_parameters =
+    case
+      ~title:"dal parameters"
+      (Tag 3)
+      (obj2
+         (kind "dal_parameters")
+         (req "dal_parameters" Sc_rollup_dal_parameters_repr.encoding))
+      (function Dal_parameters p -> Some ((), p) | _ -> None)
+      (fun ((), p) -> Dal_parameters p)
+  in
+  union [case_raw_data; case_metadata; case_dal_page; case_dal_parameters]
 
 let input_encoding =
   let open Data_encoding in
@@ -174,6 +187,9 @@ let reveal_data_equal a b =
   | Metadata _, _ -> false
   | Dal_page a, Dal_page b -> Option.equal Bytes.equal a b
   | Dal_page _, _ -> false
+  | Dal_parameters a, Dal_parameters b ->
+      Sc_rollup_dal_parameters_repr.equal a b
+  | Dal_parameters _, _ -> false
 
 let input_equal a b =
   match (a, b) with

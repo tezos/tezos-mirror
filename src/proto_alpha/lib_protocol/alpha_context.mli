@@ -3096,6 +3096,7 @@ module Sc_rollup : sig
     | Raw_data of string
     | Metadata of Metadata.t
     | Dal_page of Dal.Page.content option
+    | Dal_parameters of Dal_parameters.t
 
   type input = Inbox_message of inbox_message | Reveal of reveal_data
 

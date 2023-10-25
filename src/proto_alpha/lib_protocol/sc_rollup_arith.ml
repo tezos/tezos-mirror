@@ -1279,6 +1279,10 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         let* () = Next_message.set (Some (Bytes.to_string data)) in
         let* () = start_parsing in
         return ()
+    | PS.Dal_parameters _ ->
+        (* Should not happen as requesting DAL parameters is disabled
+           in the arith PVM. *)
+        assert false
 
   let ticked m =
     let open Monad.Syntax in
