@@ -157,8 +157,20 @@ let test_valid_double_baking_followed_by_double_attesting () =
   let* blk_final =
     Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
   in
-  let* frozen_deposits_after =
+  let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_final) baker1
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_before
+      frozen_deposits_right_after
+  in
+  let* blk_eoc =
+    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_final
+  in
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
   let* csts = Context.get_constants (B genesis) in
   let p_de =
