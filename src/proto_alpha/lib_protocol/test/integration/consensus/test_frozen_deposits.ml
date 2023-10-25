@@ -343,6 +343,9 @@ let test_may_not_bake_again_after_full_deposit_slash () =
       ~operation:double_preattestation_op
       blk_a
   in
+  let* fd_before =
+    Context.Delegate.current_frozen_deposits (B b) slashed_account
+  in
   let* operation =
     Op.transaction
       (B b)
@@ -364,14 +367,14 @@ let test_may_not_bake_again_after_full_deposit_slash () =
       ~operation:double_attestation_op
       b
   in
-  (* Assert that the [slashed_account]'s deposit is now 0 *)
+  (* The [slashed_account]'s deposits haven't changed yet... *)
   let* fd = Context.Delegate.current_frozen_deposits (B b) slashed_account in
-  let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
-  (* Check that we are not allowed to bake with [slashed_account] *)
+  let* () = Assert.equal_tez ~loc:__LOC__ fd fd_before in
+  (* ...though we are immediately not allowed to bake with [slashed_account] *)
   let*! res = Block.bake ~policy:(By_account slashed_account) b in
   let* () = Assert.error ~loc:__LOC__ res (fun _ -> true) in
   let* b = Block.bake_until_cycle_end ~policy:(By_account good_account) b in
-  (* Assert that the [slashed_account]'s deposit is still zero without manual
+  (* Assert that the [slashed_account]'s deposit is now zero without manual
      staking. *)
   let* fd = Context.Delegate.current_frozen_deposits (B b) slashed_account in
   let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
