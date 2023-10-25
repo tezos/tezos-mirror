@@ -1483,6 +1483,9 @@ let sampler_for_cycle ~read ctxt cycle =
       let ctxt = update_sampler_state ctxt map in
       return (ctxt, seed, state)
 
+let find_stake_distribution_for_current_cycle ctxt =
+  ctxt.back.stake_distribution_for_current_cycle
+
 let stake_distribution_for_current_cycle ctxt =
   let open Result_syntax in
   match ctxt.back.stake_distribution_for_current_cycle with
