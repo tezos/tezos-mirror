@@ -230,8 +230,20 @@ let frozen_deposits ctxt delegate =
 
 let initial_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in
-  let*? distribution = Raw_context.stake_distribution_for_current_cycle ctxt in
-  match Signature.Public_key_hash.Map.find delegate distribution with
+  let* stake_opt =
+    match Raw_context.find_stake_distribution_for_current_cycle ctxt with
+    | Some distribution ->
+        return (Signature.Public_key_hash.Map.find delegate distribution)
+    | None ->
+        (* This branch happens when the stake distribution is not initialized in
+           [ctxt], e.g. when RPCs are called or operations are simulated. *)
+        let current_cycle = (Raw_context.current_level ctxt).cycle in
+        let+ stakes =
+          Stake_storage.get_selected_distribution ctxt current_cycle
+        in
+        List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
+  in
+  match stake_opt with
   | None -> return Tez_repr.zero
   | Some {frozen; weighted_delegated = _} -> return frozen
 
