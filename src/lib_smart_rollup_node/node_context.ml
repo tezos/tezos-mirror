@@ -1126,7 +1126,7 @@ let gc node_ctxt ~(level : int32) =
             Block_hash.pp
             hash
       | Some {context; _} ->
-          let*! () = Event.calling_gc level in
+          let*! () = Event.calling_gc ~gc_level ~head_level:level in
           let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
           (* Start both node and context gc asynchronously *)
           let*! () = Context.gc node_ctxt.context context in

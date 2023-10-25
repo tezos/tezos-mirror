@@ -143,12 +143,15 @@ module Simple = struct
       ()
 
   let calling_gc =
-    declare_1
+    declare_2
       ~section
       ~name:"calling_gc"
       ~level:Info
-      ~msg:"Garbage collection initiated at level {level}"
-      ("level", Data_encoding.int32)
+      ~msg:
+        "Garbage collection started for level {gc_level} at head level \
+         {head_level}"
+      ("gc_level", Data_encoding.int32)
+      ("head_level", Data_encoding.int32)
 
   let starting_context_gc =
     declare_1
@@ -255,7 +258,8 @@ let detected_protocol_migration () =
 
 let acquiring_lock () = Simple.(emit acquiring_lock) ()
 
-let calling_gc level = Simple.(emit calling_gc) level
+let calling_gc ~gc_level ~head_level =
+  Simple.(emit calling_gc) (gc_level, head_level)
 
 let starting_context_gc hash = Simple.(emit starting_context_gc) hash
 

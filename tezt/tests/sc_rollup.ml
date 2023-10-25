@@ -848,10 +848,10 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
       | "calling_gc.v0" ->
           (* On each [calling_gc] event, record the level for which it was
              called *)
-          let level = JSON.(value |> as_int) in
-          Log.info "Calling GC at level %d@." level ;
-          gc_levels_started := level :: !gc_levels_started
-      | "ending_context_gc.v0" ->
+          let gc_level = JSON.(value |-> "gc_level" |> as_int) in
+          let head_level = JSON.(value |-> "head_level" |> as_int) in
+          Log.info "Calling GC for %d at level %d" gc_level head_level ;
+          gc_levels_started := head_level :: !gc_levels_started
           (* On each [ending_context_gc] event, increment a counter *)
           context_gc_finalisations := !context_gc_finalisations + 1
       | _ -> ()) ;
