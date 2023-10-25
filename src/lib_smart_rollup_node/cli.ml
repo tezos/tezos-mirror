@@ -46,7 +46,7 @@ let sc_rollup_address_arg : (_, Client_context.full) Tezos_clic.arg =
 
 let operator_param next =
   let open Lwt_result_syntax in
-  let format_purpose_list purposes =
+  let desc =
     let pp_purpose fmt purpose =
       Format.pp_print_string fmt (Purpose.to_string purpose)
     in
@@ -56,39 +56,28 @@ let operator_param next =
        alias by said purpose, e.g. operating:alias_of_my_operator. The \
        possible purposes are: @[<h>%a@]."
       (Format.pp_print_list pp_purpose)
-      purposes
+      Purpose.all
+  in
+  let parse_default cctxt s =
+    let* key = Client_keys.Public_key_hash.parse_source_string cctxt s in
+    return (`Default key)
+  in
+  let parse_purpose purpose cctxt s =
+    let* key = Client_keys.Public_key_hash.parse_source_string cctxt s in
+    return (`Purpose (purpose, key))
+  in
+  let all_purpose_case cctxt =
+    List.map
+      (fun purpose -> (Purpose.to_string purpose, parse_purpose purpose cctxt))
+      Purpose.all
   in
   Tezos_clic.param
     ~name:"operator"
-    ~desc:(format_purpose_list Purpose.all)
-    ( Tezos_clic.parameter @@ fun cctxt s ->
-      let parse_pkh s =
-        let from_alias s = Client_keys.Public_key_hash.find cctxt s in
-        let from_key s =
-          match Signature.Public_key_hash.of_b58check_opt s with
-          | None ->
-              failwith "Could not read public key hash for rollup node operator"
-          | Some pkh -> return pkh
-        in
-        Client_aliases.parse_alternatives
-          [("alias", from_alias); ("key", from_key)]
-          s
-      in
-      match String.split ~limit:1 ':' s with
-      | [_] ->
-          let+ pkh = parse_pkh s in
-          `Default pkh
-      | [purpose; operator_s] -> (
-          match Purpose.of_string purpose with
-          | Some purpose ->
-              let+ pkh = parse_pkh operator_s in
-              `Purpose (purpose, pkh)
-          | None ->
-              let+ pkh = parse_pkh s in
-              `Default pkh)
-      | _ ->
-          (* cannot happen due to String.split's implementation. *)
-          assert false )
+    ~desc
+    (Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
+         Client_aliases.parse_alternatives
+           (("default", parse_default cctxt) :: all_purpose_case cctxt)
+           s))
     next
 
 let possible_modes = List.map Configuration.string_of_mode Configuration.modes
