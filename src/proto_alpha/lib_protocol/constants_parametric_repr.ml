@@ -89,6 +89,7 @@ type sc_rollup_reveal_activation_level = {
   raw_data : sc_rollup_reveal_hashing_schemes;
   metadata : Raw_level_repr.t;
   dal_page : Raw_level_repr.t;
+  dal_parameters : Raw_level_repr.t;
 }
 
 let sc_rollup_reveal_hashing_schemes_encoding =
@@ -102,12 +103,14 @@ let sc_rollup_reveal_activation_level_encoding :
     sc_rollup_reveal_activation_level Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun t -> (t.raw_data, t.metadata, t.dal_page))
-    (fun (raw_data, metadata, dal_page) -> {raw_data; metadata; dal_page})
-    (obj3
+    (fun t -> (t.raw_data, t.metadata, t.dal_page, t.dal_parameters))
+    (fun (raw_data, metadata, dal_page, dal_parameters) ->
+      {raw_data; metadata; dal_page; dal_parameters})
+    (obj4
        (req "raw_data" sc_rollup_reveal_hashing_schemes_encoding)
        (req "metadata" Raw_level_repr.encoding)
-       (req "dal_page" Raw_level_repr.encoding))
+       (req "dal_page" Raw_level_repr.encoding)
+       (req "dal_parameters" Raw_level_repr.encoding))
 
 type sc_rollup = {
   enable : bool;

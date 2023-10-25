@@ -115,6 +115,18 @@ let constants_mainnet =
         } =
     Constants.Generated.generate ~consensus_committee_size
   in
+  let dal_activation_level =
+    if default_dal.feature_enable then Raw_level.root
+    else
+      (* Deactivate the reveal if the dal is not enabled. *)
+      (* https://gitlab.com/tezos/tezos/-/issues/5968
+         Encoding error with Raw_level
+
+         We set the activation level to [pred max_int] to deactivate
+         the feature. The [pred] is needed to not trigger an encoding
+         exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
+      Raw_level.of_int32_exn Int32.(pred max_int)
+  in
   {
     Constants.Parametric.preserved_cycles = 5;
     blocks_per_cycle = 16384l;
@@ -232,17 +244,8 @@ let constants_mainnet =
           {
             raw_data = {blake2B = Raw_level.root};
             metadata = Raw_level.root;
-            dal_page =
-              (if default_dal.feature_enable then Raw_level.root
-              else
-                (* Deactivate the reveal if the dal is not enabled. *)
-                (* https://gitlab.com/tezos/tezos/-/issues/5968
-                   Encoding error with Raw_level
-
-                   We set the activation level to [pred max_int] to deactivate
-                   the feature. The [pred] is needed to not trigger an encoding
-                   exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
-                Raw_level.of_int32_exn Int32.(pred max_int));
+            dal_page = dal_activation_level;
+            dal_parameters = dal_activation_level;
           };
         private_enable = true;
         riscv_pvm_enable = false;

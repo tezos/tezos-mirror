@@ -36,6 +36,7 @@ type reveal_activation_level = {
   blake2B : int32;
   metadata : int32;
   dal_page : int32;
+  dal_parameters : int32;
 }
 
 type sc_rollup_constants = {

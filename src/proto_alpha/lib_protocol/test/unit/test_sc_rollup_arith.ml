@@ -372,6 +372,7 @@ let test_reveal ~threshold ~inbox_level ~hash ~preimage_reveal_step
       raw_data = {blake2B};
       metadata = Protocol.Raw_level_repr.root;
       dal_page = Protocol.Raw_level_repr.root;
+      dal_parameters = Protocol.Raw_level_repr.root;
     }
   in
   let is_reveal_enabled =

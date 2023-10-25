@@ -278,7 +278,8 @@ let is_reveal_enabled_predicate
         match Sc_rollup_reveal_hash.scheme_of_hash h with
         | Blake2B -> t.raw_data.blake2B)
     | Reveal_metadata -> t.metadata
-    | Request_dal_page _ | Reveal_dal_parameters _ -> t.dal_page
+    | Request_dal_page _ -> t.dal_page
+    | Reveal_dal_parameters _ -> t.dal_parameters
   in
   Raw_level_repr.(current_block_level >= activation_level)
 

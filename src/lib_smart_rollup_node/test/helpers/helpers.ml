@@ -45,7 +45,8 @@ let default_constants =
           challenge_window_in_blocks = 4032;
           commitment_period_in_blocks = 3;
           reveal_activation_level =
-            Some {blake2B = 0l; metadata = 0l; dal_page = 0l};
+            Some
+              {blake2B = 0l; metadata = 0l; dal_page = 0l; dal_parameters = 0l};
           max_number_of_stored_cemented_commitments = 5;
         };
       dal =

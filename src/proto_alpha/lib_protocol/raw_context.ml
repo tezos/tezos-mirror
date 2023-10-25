@@ -998,6 +998,22 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                 error (Dal_errors_repr.Dal_cryptobox_error {explanation})
           else ok ()
         in
+        let dal_activation_level =
+          if c.dal.feature_enable then Raw_level_repr.root
+          else if dal.feature_enable then
+            (* First level of the protocol with dal activated. *)
+            Raw_level_repr.of_int32_exn (Int32.succ level)
+          else
+            (* Deactivate the reveal if the dal is not enabled.
+
+               assert (not (c.dal.feature_enable || dal.feature_enable))
+
+               We set the activation level to [pred max_int] to deactivate
+               the feature. The [pred] is needed to not trigger an encoding
+               exception with the value [Int32.int_min] (see
+               tezt/tests/mockup.ml). *)
+            Raw_level_repr.of_int32_exn Int32.(pred max_int)
+        in
         (* When stitching from Oxford and after, [Raw_level_repr.root]
            should be replaced by the previous value, that is
            [c.reveal_activation_level.*]. *)
@@ -1006,21 +1022,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           {
             raw_data = {blake2B = Raw_level_repr.root};
             metadata = Raw_level_repr.root;
-            dal_page =
-              (if c.dal.feature_enable then Raw_level_repr.root
-              else if dal.feature_enable then
-                (* First level of the protocol with dal activated. *)
-                Raw_level_repr.of_int32_exn (Int32.succ level)
-              else
-                (* Deactivate the reveal if the dal is not enabled.
-
-                   assert (not (c.dal.feature_enable || dal.feature_enable))
-
-                   We set the activation level to [pred max_int] to deactivate
-                   the feature. The [pred] is needed to not trigger an encoding
-                   exception with the value [Int32.int_min] (see
-                   tezt/tests/mockup.ml). *)
-                Raw_level_repr.of_int32_exn Int32.(pred max_int));
+            dal_page = dal_activation_level;
+            dal_parameters = dal_activation_level;
           }
         in
         let sc_rollup =

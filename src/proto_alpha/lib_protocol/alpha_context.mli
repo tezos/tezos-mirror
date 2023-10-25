@@ -827,6 +827,7 @@ module Constants : sig
       raw_data : sc_rollup_reveal_hashing_schemes;
       metadata : Raw_level.t;
       dal_page : Raw_level.t;
+      dal_parameters : Raw_level.t;
     }
 
     type sc_rollup = {
