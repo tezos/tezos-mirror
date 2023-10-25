@@ -258,6 +258,9 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let* (_full_balance : Tez.t) =
     Context.Delegate.full_balance (B blk_a) baker
   in
+  let* frozen_deposits_before =
+    Context.Delegate.current_frozen_deposits (B blk_a) delegate
+  in
   let* blk_with_evidence1 =
     Block.bake ~policy:(By_account baker) ~operation blk_a
   in
@@ -272,11 +275,16 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let* blk_with_evidence2 =
     Block.bake ~policy:(By_account baker) ~operation blk_3
   in
-  (* Check that all the frozen deposits are slashed *)
-  let* frozen_deposits_after =
+  (* Check that the frozen deposits haven't changed yet. *)
+  let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
   in
-  let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_before
+      frozen_deposits_right_after
+  in
   let* is_forbidden =
     Context.Delegate.is_forbidden
       ~policy:(Block.By_account baker)
@@ -286,7 +294,17 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
   (* a delegate with 0 frozen deposits cannot bake *)
-  Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
+  let* () =
+    Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
+  in
+  (* Check that all frozen deposits have been slashed at the end of the cycle. *)
+  let* b =
+    Block.bake_until_cycle_end ~policy:(By_account baker) blk_with_evidence2
+  in
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B b) delegate
+  in
+  Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after
 
 (** Say a delegate double-attests twice in a cycle,
     and say the 2 evidences are included in different (valid) cycles.
