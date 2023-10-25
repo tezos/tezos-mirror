@@ -80,29 +80,42 @@ let test_valid_double_baking_evidence () =
   let* blk_a, blk_b =
     block_fork ~policy:(By_account baker1) contracts genesis
   in
-  double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
+  let operation = double_baking (B blk_a) blk_a.header blk_b.header in
   let* blk_final = Block.bake ~policy:(By_account baker2) ~operation blk_a in
-  (* Check that the frozen deposits are slashed *)
+  (* Check that the frozen deposits haven't been slashed, yet. *)
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_a) baker1
   in
-  let* frozen_deposits_after =
+  let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_final) baker1
-  in
-  let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
   in
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
-      frozen_deposits_after
-      expected_frozen_deposits_after
+      frozen_deposits_before
+      frozen_deposits_right_after
   in
   (* Check that the initial frozen deposits has not changed *)
   let* initial_frozen_deposits =
     Context.Delegate.initial_frozen_deposits (B blk_final) baker1
   in
-  Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
+  in
+  (* Check that the frozen deposits have been slashed at the end of the cycle. *)
+  let* blk_eoc =
+    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_final
+  in
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
+  in
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+  in
+  Assert.equal_tez
+    ~loc:__LOC__
+    frozen_deposits_after
+    expected_frozen_deposits_after
 
 (* auxiliary function used in [double_attestation] *)
 let order_attestations ~correct_order op1 op2 =
