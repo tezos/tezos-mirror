@@ -2885,7 +2885,6 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   (* We mark the attestation branch as the grand parent branch when
      accessible. This will not be present before the first two blocks
      of tenderbake. *)
-  let level = Level.current ctxt in
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
   let*! ctxt =
