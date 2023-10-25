@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    DAL
-   Invocation:   dune exec tezt/manual_tests/main.exe -- --file dal.ml --test-arg output-file=<file>
+   Invocation:   See docstring of the individual tests for instructions on how to execute them.
    Subject:      Test getting informaton about the DAL distribution.
 *)
 
@@ -150,6 +150,12 @@ let scenario_on_teztnet =
       ~main_scenario
       () ->
     (* Parse CLI arguments *)
+    (* The working-dir option is not mandatory. It allows providing a fix
+       directly for nodes and wallet data/base dir. An advantage of this is the
+       ability to stop & restart the infra without being obliged to resync
+       dailynet or mondaynet from genesis. In fact, Tezt chooses a different
+       (random) directory for binaries (usually in /tmp) if they are not
+       explicitly specified. *)
     let working_dir = Cli.get_string_opt "working-dir" in
     let public_ip_addr = Cli.get_string_opt "public-ip-addr" in
     let teztnet_network_day = Cli.get_string_opt "teztnet-network-day" in
@@ -215,7 +221,7 @@ let scenario_on_teztnet =
 (** This function allows to injects DAL slots in the given network. *)
 let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
     l1_node ~slot_index =
-  let ( let*! ) = Runnable.Syntax.( let*! ) in
+  let open Runnable.Syntax in
   let alias = "publisher" in
   let* () =
     match publisher_sk with
@@ -273,7 +279,8 @@ let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
   let* level = Client.level client in
   loop level
 
-(** This function allows to injects DAL slots in the given network. *)
+(** This function allows to start a baker and attests slots DAL slots in the
+    given network. *)
 let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   (* We'll not airdrop baker account to avoid emptying airdropper. The user
      should either provide a baker secret key with enough tez, or we use
@@ -303,10 +310,7 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
          baker.Account.public_key_hash
   in
   let* available_balance = Client.get_balance_for ~account:baker_alias client in
-  (*
-  let baker_balance = JSON.as_string balance |> Z.of_string in
-  *)
-  (* Stake half of the airdropper's balance *)
+  (* Stake half of the baker's balance *)
   let frozen_balance = Tez.(full_balance - available_balance) in
   let* () =
     let entrypoint, amount =
@@ -329,7 +333,18 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   let* () = Baker.run baker in
   Lwt_unix.sleep Float.max_float
 
-(** A slots injector test parameterized by a network *)
+(** A slots injector test parameterized by a network. Typically, to run a slot
+    injector on dailynet for slot index 10, one could run:
+
+  dune exec tezt/manual_tests/main.exe -- --file dal.ml \
+    --title "Join dailynet and inject slots" --verbose \
+    -a public-ip-addr="<pub-addr>" \
+    -a slot-index=0 \
+    -a publisher-sk="edsk4Vi86eAcBVXYLnBawg2p9FaDEKeDxXPHo26UfhsJteVY7P7guq" \
+    -a working-dir=./dal-e2e \
+    -a rpc-port=30000 \
+    -a dal-rpc-port=30001
+*)
 let slots_injector_test ~network =
   Test.register
     ~__FILE__
@@ -349,7 +364,17 @@ let slots_injector_test ~network =
     ~producer_profiles:[slot_index]
     ()
 
-(** A baker test parameterized by a network *)
+(** A baker test parameterized by a network. Typically, to run a baker that
+    operates on dailynet, one could run:
+
+  dune exec tezt/manual_tests/main.exe -- --file dal.ml \
+    --title "Join dailynet and bake" --verbose \
+    -a public-ip-addr="<pub-addr>" \
+    -a working-dir=./dal-e2e \
+    -a rpc-port=10000 \
+    -a baker-sk="edpkuSZ6gD6reoGEuJyPiPk67gp94V7xXtP1EZ83H46fNW9YQBUUdg" \
+    -a dal-rpc-port=10001
+*)
 let baker_test ~network =
   Test.register
     ~__FILE__
