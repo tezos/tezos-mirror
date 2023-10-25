@@ -8,7 +8,7 @@ use crate::{
 };
 use ethbloom::{Bloom, Input};
 use ethereum::Log;
-use primitive_types::{H160, H256, U256};
+use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 pub const TRANSACTION_HASH_SIZE: usize = 32;
@@ -88,8 +88,6 @@ pub struct TransactionReceipt {
     pub hash: TransactionHash,
     /// Integer of the transactions index position in the block.
     pub index: u32,
-    /// Hash of the block where this transaction was in.
-    pub block_hash: H256,
     /// Block number where this transaction was in.
     pub block_number: U256,
     /// Address of the sender.
@@ -134,14 +132,13 @@ impl Decodable for TransactionReceipt {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if Ok(14) != decoder.item_count() {
+        if Ok(13) != decoder.item_count() {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
         let mut it = decoder.iter();
         let hash: TransactionHash = decode_transaction_hash(&next(&mut it)?)?;
         let index: u32 = decode_field(&next(&mut it)?, "index")?;
-        let block_hash: H256 = decode_field(&next(&mut it)?, "block_hash")?;
         let block_number: U256 = decode_field_u256_le(&next(&mut it)?, "block_number")?;
         let from: H160 = decode_field(&next(&mut it)?, "from")?;
         let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
@@ -159,7 +156,6 @@ impl Decodable for TransactionReceipt {
         Ok(Self {
             hash,
             index,
-            block_hash,
             block_number,
             from,
             to,
@@ -177,10 +173,9 @@ impl Decodable for TransactionReceipt {
 
 impl Encodable for TransactionReceipt {
     fn rlp_append(&self, stream: &mut RlpStream) {
-        stream.begin_list(14);
+        stream.begin_list(13);
         stream.append(&self.hash.to_vec());
         stream.append(&self.index);
-        stream.append(&self.block_hash);
         append_u256_le(stream, &self.block_number);
         stream.append(&self.from);
         match &self.to {
@@ -217,8 +212,6 @@ impl TryFrom<&[u8]> for TransactionReceipt {
 /// TODO: https://gitlab.com/tezos/tezos/-/issues/5695
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransactionObject {
-    /// Hash of the block where this transaction was in.
-    pub block_hash: H256,
     /// Block number where this transaction was in. null when its pending.
     pub block_number: U256,
     /// Address of the sender.
@@ -246,9 +239,8 @@ pub struct TransactionObject {
 impl Decodable for TransactionObject {
     fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
         if decoder.is_list() {
-            if Ok(14) == decoder.item_count() {
+            if Ok(13) == decoder.item_count() {
                 let mut it = decoder.iter();
-                let block_hash: H256 = decode_field_h256(&next(&mut it)?, "block_hash")?;
                 let block_number: U256 =
                     decode_field_u256_le(&next(&mut it)?, "block_number")?;
                 let from: H160 = decode_field(&next(&mut it)?, "from")?;
@@ -262,7 +254,6 @@ impl Decodable for TransactionObject {
                 let value: U256 = decode_field_u256_le(&next(&mut it)?, "value")?;
                 let signature = rlp_decode_opt(&mut it)?;
                 Ok(Self {
-                    block_hash,
                     block_number,
                     from,
                     gas_used,
@@ -286,8 +277,7 @@ impl Decodable for TransactionObject {
 
 impl Encodable for TransactionObject {
     fn rlp_append(&self, stream: &mut RlpStream) {
-        stream.begin_list(14);
-        stream.append(&self.block_hash);
+        stream.begin_list(13);
         append_u256_le(stream, &self.block_number);
         stream.append(&self.from);
         append_u256_le(stream, &self.gas_used);
@@ -308,6 +298,7 @@ impl Encodable for TransactionObject {
 #[cfg(test)]
 mod test {
     use super::*;
+    use primitive_types::H256;
 
     fn address_of_str(s: &str) -> H160 {
         let data = &hex::decode(s).unwrap();
@@ -325,7 +316,6 @@ mod test {
         TransactionReceipt {
             hash: [0; TRANSACTION_HASH_SIZE],
             index: 15u32,
-            block_hash: H256::default(),
             block_number: U256::from(42),
             from: address_of_str("3535353535353535353535353535353535353535"),
             to: Some(address_of_str("3635353535353535353535353535353535353536")),
@@ -384,7 +374,6 @@ mod test {
     #[test]
     fn test_object_encoding_rountrip() {
         let v = TransactionObject {
-            block_hash: H256::from_low_u64_be(14124212),
             block_number: U256::from(532532),
             from: address_of_str("3535353535353535353535353535353535353535"),
             gas_used: U256::from(32523),

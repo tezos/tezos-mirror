@@ -256,14 +256,13 @@ type transaction_receipt = {
   contractAddress : address option;
 }
 
-let transaction_receipt_from_rlp bytes =
+let transaction_receipt_from_rlp block_hash bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
         [
           Value hash;
           Value index;
-          Value block_hash;
           Value block_number;
           Value from;
           Value to_;
@@ -278,7 +277,6 @@ let transaction_receipt_from_rlp bytes =
         ]) ->
       let hash = decode_hash hash in
       let index = decode_number index in
-      let block_hash = decode_block_hash block_hash in
       let block_number = decode_number block_number in
       let from = decode_address from in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
@@ -328,7 +326,7 @@ let transaction_receipt_from_rlp bytes =
   | _ ->
       raise
         (Invalid_argument
-           "Expected a RlpList of 14 elements in transaction receipt")
+           "Expected a RlpList of 13 elements in transaction receipt")
 
 let transaction_receipt_encoding =
   let open Data_encoding in
@@ -406,8 +404,8 @@ let transaction_receipt_encoding =
           (req "contractAddress" (option address_encoding))))
 
 type transaction_object = {
-  blockHash : block_hash option;
-  blockNumber : quantity option;
+  blockHash : block_hash;
+  blockNumber : quantity;
   from : address;
   gas : quantity;
   gasPrice : quantity;
@@ -423,12 +421,11 @@ type transaction_object = {
   s : hash;
 }
 
-let transaction_object_from_rlp bytes =
+let transaction_object_from_rlp block_hash bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
         [
-          Value block_hash;
           Value block_number;
           Value from;
           Value gas_used;
@@ -443,9 +440,7 @@ let transaction_object_from_rlp bytes =
           Value r;
           Value s;
         ]) ->
-      let block_hash = decode_block_hash block_hash in
       let block_number = decode_number block_number in
-
       let from = decode_address from in
       let gas = decode_number gas_used in
       let gas_price = decode_number gas_price in
@@ -459,8 +454,8 @@ let transaction_object_from_rlp bytes =
       let r = decode_hash r in
       let s = decode_hash s in
       {
-        blockHash = Some block_hash;
-        blockNumber = Some block_number;
+        blockHash = block_hash;
+        blockNumber = block_number;
         from;
         gas;
         gasPrice = gas_price;
@@ -474,7 +469,7 @@ let transaction_object_from_rlp bytes =
         r;
         s;
       }
-  | _ -> raise (Invalid_argument "Expected a List of 14 elements")
+  | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
 let transaction_object_encoding =
   let open Data_encoding in
@@ -535,8 +530,8 @@ let transaction_object_encoding =
       })
     (merge_objs
        (obj10
-          (req "blockHash" (option block_hash_encoding))
-          (req "blockNumber" (option quantity_encoding))
+          (req "blockHash" block_hash_encoding)
+          (req "blockNumber" quantity_encoding)
           (req "from" address_encoding)
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
@@ -575,8 +570,8 @@ let block_transactions_encoding =
 
 (** Ethereum block hash representation from RPCs. *)
 type block = {
-  number : block_height option;
-  hash : block_hash option;
+  number : block_height;
+  hash : block_hash;
   parent : block_hash;
   nonce : hex;
   sha3Uncles : hash;
@@ -667,8 +662,8 @@ let block_from_rlp bytes =
       let gasUsed = decode_number gasUsed in
       let timestamp = decode_number timestamp in
       {
-        number = Some (Block_height number);
-        hash = Some hash;
+        number = Block_height number;
+        hash;
         parent;
         (* Post merge: always 0. *)
         nonce = Hex "0000000000000000";
@@ -784,8 +779,8 @@ let block_encoding =
       })
     (merge_objs
        (obj10
-          (req "number" (option block_height_encoding))
-          (req "hash" (option block_hash_encoding))
+          (req "number" block_height_encoding)
+          (req "hash" block_hash_encoding)
           (req "parentHash" block_hash_encoding)
           (req "nonce" hex_encoding)
           (req "sha3Uncles" hash_encoding)

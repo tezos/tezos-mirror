@@ -78,7 +78,10 @@ val prepare_installer_kernel :
   ?runner:Runner.t ->
   ?base_installee:string ->
   preimages_dir:string ->
-  ?config:[< `Config of Installer_kernel_config.t | `Path of string] ->
+  ?config:
+    [< `Config of Installer_kernel_config.t
+    | `Path of string
+    | `Both of Installer_kernel_config.t * string ] ->
   string ->
   string Lwt.t
 
@@ -91,7 +94,10 @@ val prepare_installer_kernel_gen :
   ?base_installee:string ->
   preimages_dir:string ->
   ?display_root_hash:bool ->
-  ?config:[< `Config of Installer_kernel_config.t | `Path of string] ->
+  ?config:
+    [< `Config of Installer_kernel_config.t
+    | `Path of string
+    | `Both of Installer_kernel_config.t * string ] ->
   string ->
   (string * string option) Lwt.t
 
