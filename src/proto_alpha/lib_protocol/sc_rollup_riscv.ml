@@ -24,7 +24,7 @@ type minimal_state = {
   message_counter : Z.t;
 }
 
-let minimal_state =
+let minimal_state_encoding =
   let open Data_encoding in
   conv
     (fun {payload; level; message_counter} -> (payload, level, message_counter))
@@ -37,7 +37,7 @@ let minimal_state =
 let make_empty_state () = {payload = ""; level = None; message_counter = Z.zero}
 
 let state_hash state =
-  [Data_encoding.Binary.to_bytes_exn minimal_state state]
+  [Data_encoding.Binary.to_bytes_exn minimal_state_encoding state]
   |> Context_hash.hash_bytes |> State_hash.context_hash_to_state_hash
 
 let reference_initial_state_hash = state_hash (make_empty_state ())

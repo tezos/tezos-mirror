@@ -13,6 +13,11 @@ type minimal_state = {
   message_counter : Z.t;
 }
 
+(* This encoding is used in the rollup node when embedding the state into an Irmin context. *)
+val minimal_state_encoding : minimal_state Data_encoding.t
+
+val make_empty_state : unit -> minimal_state
+
 module type S = sig
   include Sc_rollup_PVM_sig.S
 

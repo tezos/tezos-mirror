@@ -40,3 +40,4 @@ let of_kind = function
   | Kind.Example_arith -> no_rpc
   | Wasm_2_0_0 ->
       (module Wasm_2_0_0_rpc.Make_RPC (Wasm_2_0_0_pvm.Durable_state) : S)
+  | Riscv -> no_rpc
