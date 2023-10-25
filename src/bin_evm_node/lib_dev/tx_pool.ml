@@ -25,8 +25,9 @@ module Pool = struct
 
   (** Add a transacion to the pool.*)
   let add t pkey (raw_tx : Ethereum_types.hex) =
+    let open Result_syntax in
     let {transactions; global_index} = t in
-    let nonce = Ethereum_types.transaction_nonce raw_tx in
+    let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let txs = Pkey_map.find pkey transactions |> Option.value ~default:[] in
     let txs = {index = global_index; nonce; raw_tx} :: txs in
     (* Sort txs by nonce*)
@@ -38,7 +39,7 @@ module Pool = struct
     in
     (* Update the pool for the given pkey *)
     let transactions = Pkey_map.add pkey txs transactions in
-    {transactions; global_index = Int64.(add global_index one)}
+    return {transactions; global_index = Int64.(add global_index one)}
 
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
@@ -167,7 +168,7 @@ let on_transaction state tx_raw =
       return (Error err)
   | Ok pkey ->
       (* Add the tx to the pool*)
-      let pool = Pool.add pool pkey tx_raw in
+      let*? pool = Pool.add pool pkey tx_raw in
       (* compute the hash *)
       let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in

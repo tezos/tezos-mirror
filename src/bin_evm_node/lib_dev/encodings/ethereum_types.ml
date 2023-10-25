@@ -971,23 +971,28 @@ let hash_raw_tx str =
 
 (** [transaction_nonce raw_tx] returns the nonce of a given raw transaction. *)
 let transaction_nonce raw_tx =
+  let open Result_syntax in
   let bytes = hex_to_bytes raw_tx in
   if String.starts_with ~prefix:"01" bytes then
     (* eip 2930*)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _])
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _; _]) ->
-        decode_number nonce
-    | _ -> raise (Invalid_argument "Expected a List of 9 or 12 elements")
+        let+ nonce = Rlp.decode_z nonce in
+        Qty nonce
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else if String.starts_with ~prefix:"02" bytes then
     (* eip 1559*)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _])
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _]) ->
-        decode_number nonce
-    | _ -> raise (Invalid_argument "Expected a List of 8 or 11 elements")
+        let+ nonce = Rlp.decode_z nonce in
+        Qty nonce
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
   else
     (* Legacy *)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [Value nonce; _; _; _; _; _; _; _; _]) -> decode_number nonce
-    | _ -> raise (Invalid_argument "Expected a List of 9 elements")
+    | Ok (Rlp.List [Value nonce; _; _; _; _; _; _; _; _]) ->
+        let+ nonce = Rlp.decode_z nonce in
+        Qty nonce
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
