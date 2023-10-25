@@ -151,29 +151,37 @@ value_expr_naked: Value = {
 value_seq: Vec<Value> = semicolonSepSeq<value_expr_naked>;
 
 use Instruction::*;
+
+#[inline]
+atomic_instruction: ParsedInstruction = {
+  "ADD" => Add(()),
+  "INT" => Int,
+  "GT" => Gt,
+  "SWAP" => Swap,
+  "FAILWITH" => Failwith,
+  "UNIT" => Unit,
+  "CAR" => Car,
+  "CDR" => Cdr,
+  "PAIR" => Pair,
+  "SOME" => ISome,
+  "COMPARE" => Compare,
+  "AMOUNT" => Amount,
+  "GET" => Get(()),
+  "UPDATE" => Update(()),
+  "DROP" => Drop(None),
+  "DUP" => Dup(None),
+}
+
 instruction: ParsedInstruction = {
+  <atomic_instruction> anns => <>,
   "PUSH" anns <type_expr> <value_expr> => Push((<>)),
-  "INT" anns => Int,
-  "GT" anns => Gt,
   "LOOP" anns <ib: instructionBlock> => Loop(ib),
   "DIP" anns <n:u10?> <ib: instructionBlock> => Dip(n, ib),
-  "ADD" anns => Add(()),
-  "DROP" anns <n:u10?> => Drop(n),
-  "SWAP" anns => Swap,
+  "DROP" anns <u10> => Drop(Some(<>)),
   "IF" anns <t: instructionBlock> <f: instructionBlock> => If(t, f),
-  "DUP" anns <n:u10?> => Dup(n),
-  "FAILWITH" anns => Failwith,
-  "UNIT" anns => Unit,
-  "CAR" anns => Car,
-  "CDR" anns => Cdr,
-  "PAIR" anns => Pair,
+  "DUP" anns <u10> => Dup(Some(<>)),
   "IF_NONE" anns <instructionBlock> <instructionBlock> => IfNone(<>),
-  "SOME" anns => ISome,
-  "COMPARE" anns => Compare,
-  "AMOUNT" anns => Amount,
   "NIL" anns <type_expr> => Nil(<>),
-  "GET" anns => Get(()),
-  "UPDATE" anns => Update(()),
   instructionBlock => Instruction::Seq(<>),
 }
 
@@ -202,10 +210,16 @@ pub instructionBlock: ParsedInstructionBlock = {
 
 pub Type: Type = type_expr;
 
+code_content: ParsedInstruction = {
+  atomic_instruction => <>,
+  "(" <instruction> ")" => <>,
+  instructionBlock => Instruction::Seq(<>),
+}
+
 ContractScriptEntity: ContractScriptEntity = {
   "parameter" <type_expr> => ContractScriptEntity::Parameter(<>),
   "storage" <type_expr> => ContractScriptEntity::Storage(<>),
-  "code" <instruction> => ContractScriptEntity::Code(<>),
+  "code" <code_content> => ContractScriptEntity::Code(<>),
 }
 
 ContractScriptEntitySeq = semicolonSepSeq<ContractScriptEntity>;
