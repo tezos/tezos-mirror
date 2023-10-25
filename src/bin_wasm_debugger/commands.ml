@@ -358,6 +358,12 @@ let reveals config request =
   match Wasm_2_0_0PVM.decode_reveal request with
   | Reveal_raw_data hash -> reveal_preimage_builtin config num_retries hash
   | Reveal_metadata -> Lwt.return (build_metadata config)
+  | Reveal_dal_parameters _ ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6547
+         Support reveal_dal_parameters in the WASM debugger. *)
+      Stdlib.failwith
+        "The kernel tried to request DAL parameters, but this is not yet \
+         supported by the debugger."
   | Request_dal_page {slot_id = {published_level; index}; page_index} ->
       request_dal_page config num_retries published_level index page_index
 

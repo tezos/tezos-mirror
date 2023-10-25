@@ -487,6 +487,12 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~page_info
           ~get_history
           confirmed_slots_history
+    | Needs_reveal (Reveal_dal_parameters _) ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6555
+           Support reveal_dal_parameters in refutation game. *)
+        (* This should not happen as long as [Reveal_dal_parameters] is disabled
+           in {!Constant_parametric_level.sc_rollup_reveal_activation_level}. *)
+        assert false
   in
   let input_given =
     Option.bind

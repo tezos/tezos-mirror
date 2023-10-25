@@ -153,6 +153,11 @@ module Impl : Pvm_sig.S = struct
     | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
     | Waiting_for_reveal (Sc_rollup.Request_dal_page page_id) ->
         Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
+    | Waiting_for_reveal (Sc_rollup.Reveal_dal_parameters {published_level}) ->
+        Format.asprintf
+          "Waiting for DAL parameters reveal for published level %a"
+          Raw_level_repr.pp
+          published_level
     | Computing -> "Computing"
 
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)

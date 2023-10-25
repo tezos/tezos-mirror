@@ -200,6 +200,9 @@ type reveal =
   | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata
   | Request_dal_page of Dal_slot_repr.Page.t
+  | Reveal_dal_parameters of {published_level : Raw_level_repr.t}
+      (** Request DAL parameters that were used for the slots published at
+          [published_level]. *)
 
 let reveal_encoding =
   let open Data_encoding in
@@ -231,7 +234,19 @@ let reveal_encoding =
       (function Request_dal_page s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Request_dal_page s)
   in
-  union [case_raw_data; case_metadata; case_dal_page]
+  let case_dal_parameters =
+    case
+      ~title:"Reveal_dal_parameters"
+      (Tag 3)
+      (obj2
+         (kind "reveal_dal_parameters")
+         (req "published_level" Raw_level_repr.encoding))
+      (function
+        | Reveal_dal_parameters {published_level} -> Some ((), published_level)
+        | _ -> None)
+      (fun ((), published_level) -> Reveal_dal_parameters {published_level})
+  in
+  union [case_raw_data; case_metadata; case_dal_page; case_dal_parameters]
 
 (** [is_reveal_enabled] is the type of a predicate that tells if a kind of
      reveal is activated at a certain block level. *)
@@ -247,7 +262,7 @@ let is_reveal_enabled_predicate
         match Sc_rollup_reveal_hash.scheme_of_hash h with
         | Blake2B -> t.raw_data.blake2B)
     | Reveal_metadata -> t.metadata
-    | Request_dal_page _ -> t.dal_page
+    | Request_dal_page _ | Reveal_dal_parameters _ -> t.dal_page
   in
   Raw_level_repr.(current_block_level >= activation_level)
 
@@ -311,6 +326,12 @@ let pp_reveal fmt = function
   | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
   | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
+  | Reveal_dal_parameters {published_level} ->
+      Format.fprintf
+        fmt
+        "Reveal DAL parameters for published level %a"
+        Raw_level_repr.pp
+        published_level
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -337,6 +358,10 @@ let reveal_equal p1 p2 =
   | Reveal_metadata, _ -> false
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | Request_dal_page _, _ -> false
+  | ( Reveal_dal_parameters {published_level = l1},
+      Reveal_dal_parameters {published_level = l2} ) ->
+      Raw_level_repr.equal l1 l2
+  | Reveal_dal_parameters _, _ -> false
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =

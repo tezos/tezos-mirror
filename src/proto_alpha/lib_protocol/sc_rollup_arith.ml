@@ -1026,6 +1026,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         return PS.(Needs_reveal Reveal_metadata)
     | Waiting_for_reveal (Request_dal_page page) ->
         return PS.(Needs_reveal (Request_dal_page page))
+    | Waiting_for_reveal (Reveal_dal_parameters published_level) ->
+        return PS.(Needs_reveal (Reveal_dal_parameters published_level))
     | Halted | Parsing | Evaluating -> return PS.No_input_required
 
   let is_input_state ~is_reveal_enabled =
@@ -1159,7 +1161,7 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         | None, Some (Request_dal_page page_id) ->
             (* We are in the same level, fetch the next page. *)
             next_dal_page dal_params ~target:(`Page_after page_id)
-        | _, Some Reveal_metadata ->
+        | _, Some Reveal_metadata | _, Some (Reveal_dal_parameters _) ->
             (* Should not happen. *)
             assert false
         | _, Some (Reveal_raw_data _) ->
@@ -1609,6 +1611,10 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
           (* For all the cases above, the input request matches the given input, so
              we proceed by setting the input. *)
           set_input input state
+      | PS.Needs_reveal (Reveal_dal_parameters _), _ ->
+          error
+            "Invalid set_input: revealing DAL parameters is not supported in \
+             the arith PVM."
       | (PS.Initial | PS.First_after _), _ ->
           error "Invalid set_input: expecting inbox message, got a reveal."
       | PS.Needs_reveal (Reveal_raw_data _hash), _ ->

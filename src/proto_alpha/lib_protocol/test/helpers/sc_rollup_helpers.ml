@@ -873,6 +873,7 @@ struct
               go ~our_states (consume_fuel fuel) (tick + 1) state
           | Needs_reveal (Reveal_raw_data _)
           | Needs_reveal Reveal_metadata
+          | Needs_reveal (Reveal_dal_parameters _)
           | Initial | First_after _ ->
               return (state, fuel, tick, our_states))
     in
