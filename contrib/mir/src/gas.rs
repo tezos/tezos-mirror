@@ -67,7 +67,7 @@ impl AsGasCost for checked::Checked<usize> {
 /// A hack to get the integral logarithm base 2, rounded up.
 /// Rounds up to the nearest power of 2 and counts trailing zeroes. Thus,
 ///
-/// ```
+/// ```text
 /// log2i(1) = log2i(0b1) = 0;
 /// log2i(2) = log2i(0b10) = 1;
 /// log2i(3) = log2i(4) = log2i(0b100) = 2;

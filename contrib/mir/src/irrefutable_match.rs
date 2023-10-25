@@ -1,7 +1,7 @@
 /// Helper macro emulating forced irrefutable pattern matches, i.e. matches that
 /// panic at runtime if they fail. This helps avoid the awkward
 ///
-/// ```
+/// ```text
 /// let x = match y {
 ///     Something(z) => z
 ///     _ => panic!(<panic description>)
@@ -15,7 +15,7 @@
 ///
 /// There are three forms of this macro:
 ///
-/// ```
+/// ```text
 /// let x = irrefutable_match!(expr; Enum::Constructor)
 /// ```
 ///
@@ -24,11 +24,11 @@
 ///
 /// this is roughly equivalent to the let-else construct:
 ///
-/// ```ignore
+/// ```text
 /// let Enum::Constructor(x) = expr else { panic!(<panic description>) };
 /// ```
 ///
-/// ```
+/// ```text
 /// irrefutable_match!(expr; Enum::Constructor, ident, ...)
 /// ```
 ///
@@ -40,7 +40,7 @@
 ///
 /// this is roughly equivalent to the let-else construct:
 ///
-/// ```ignore
+/// ```text
 /// let Enum::Constructor(ident,...) = expr else { panic!(<panic description>) };
 /// ```
 ///
@@ -48,7 +48,7 @@
 ///
 /// A third form,
 ///
-/// ```
+/// ```text
 /// irrefutable_match!(expr;)
 /// ```
 ///

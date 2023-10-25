@@ -127,7 +127,7 @@ macro_rules! valuefrom {
 
 /// Simple helper for constructing Elt values:
 ///
-/// ```
+/// ```text
 /// let val: Value = Elt("foo", 3).into()
 /// ```
 pub struct Elt<K, V>(pub K, pub V);
