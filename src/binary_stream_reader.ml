@@ -371,6 +371,8 @@ let rec read_rec :
         elts = e;
       } ->
       read_rec whole length_encoding state @@ fun (len, state) ->
+      if len < 0 then
+        raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
       if len > max_length then raise (Read_error Array_too_long) ;
       read_fixed_array len e state k
   | Array
@@ -393,6 +395,8 @@ let rec read_rec :
         elts = e;
       } ->
       read_rec whole length_encoding state @@ fun (len, state) ->
+      if len < 0 then
+        raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
       if len > max_length then raise (Read_error List_too_long) ;
       read_fixed_list len e state k
   | List
