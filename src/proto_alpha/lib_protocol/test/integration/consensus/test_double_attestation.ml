@@ -95,7 +95,18 @@ let double_preattestation ctxt ?(correct_order = true) op1 op2 =
     that punishment is operated. *)
 let test_valid_double_attestation_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let constants =
+    {
+      Default_parameters.constants_test with
+      issuance_weights =
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        };
+      consensus_threshold = 0;
+    }
+  in
+  let* genesis, _contracts = Context.init_with_constants2 constants in
   let* blk_1, blk_2 = block_fork genesis in
   (* from blk_1 we bake blk_a and from blk_2 we bake blk_b so that
      the same delegate attests blk_a and blk_b and these 2 form
@@ -120,12 +131,32 @@ let test_valid_double_attestation_evidence () =
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_a) delegate
   in
-  let* frozen_deposits_after =
+  let* initial_frozen_deposits =
+    Context.Delegate.initial_frozen_deposits (B blk_final) delegate
+  in
+  let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_final) delegate
   in
-  let* csts = Context.get_constants (B genesis) in
+  (* Check that the initial frozen deposits has not changed *)
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
+  in
+  (* Similarly for current frozen deposits because slashing is deferred to the
+     end of the cycle. *)
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_right_after
+      frozen_deposits_before
+  in
+  let* blk_eoc =
+    Block.bake_until_cycle_end ~policy:(By_account baker) blk_final
+  in
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_eoc) delegate
+  in
   let p =
-    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
+    constants.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
   let expected_frozen_deposits_after =
     Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
@@ -136,31 +167,24 @@ let test_valid_double_attestation_evidence () =
       expected_frozen_deposits_after
       frozen_deposits_after
   in
-  (* Check that the initial frozen deposits has not changed *)
-  let* initial_frozen_deposits =
-    Context.Delegate.initial_frozen_deposits (B blk_final) delegate
-  in
-  let* () =
-    Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
-  in
   (* Check that [baker] is rewarded with:
      - baking_reward_fixed_portion for baking and,
      - half of the frozen_deposits for including the evidence *)
   let baking_reward =
     Delegate.Rewards.For_RPC.reward_from_constants
-      csts.parametric
+      constants
       ~reward_kind:Baking_reward_fixed_portion
   in
   let divider =
     Int64.add
       2L
       (Int64.of_int
-         csts.parametric.adaptive_issuance.global_limit_of_staking_over_baking)
+         constants.adaptive_issuance.global_limit_of_staking_over_baking)
   in
   let evidence_reward = Test_tez.(frozen_deposits_after /! divider) in
   let expected_reward = Test_tez.(baking_reward +! evidence_reward) in
   let* full_balance_with_rewards =
-    Context.Delegate.full_balance (B blk_final) baker
+    Context.Delegate.full_balance (B blk_eoc) baker
   in
   let real_reward = Test_tez.(full_balance_with_rewards -! full_balance) in
   Assert.equal_tez ~loc:__LOC__ expected_reward real_reward
