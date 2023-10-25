@@ -70,7 +70,7 @@ pub fn interpret(
 }
 
 impl TypecheckedInstruction {
-    fn interpret(&self, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
+    pub fn interpret(&self, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
         interpret_one(self, ctx, stack)
     }
 }
