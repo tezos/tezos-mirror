@@ -46,6 +46,8 @@ let () =
     (function Unregistered_delegate k -> Some k | _ -> None)
     (fun k -> Unregistered_delegate k)
 
+type error += No_previous_cycle
+
 let registered = Storage.Delegates.mem
 
 module Contract = struct
@@ -243,6 +245,21 @@ let initial_frozen_deposits ctxt delegate =
   match stake_opt with
   | None -> return Tez_repr.zero
   | Some {frozen; weighted_delegated = _} -> return frozen
+
+let initial_frozen_deposits_of_previous_cycle ctxt delegate =
+  let open Lwt_result_syntax in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  match Cycle_repr.pred current_cycle with
+  | None -> tzfail No_previous_cycle
+  | Some previous_cycle -> (
+      let+ stakes =
+        Stake_storage.get_selected_distribution ctxt previous_cycle
+      in
+      match
+        List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
+      with
+      | None -> Tez_repr.zero
+      | Some {frozen; weighted_delegated = _} -> frozen)
 
 let current_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in

@@ -104,6 +104,13 @@ val list : Raw_context.t -> Signature.Public_key_hash.t list Lwt.t
 val initial_frozen_deposits :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
 
+(** Returns a delegate's initial frozen deposits at the beginning of the
+    previous cycle.
+
+    Fails with [No_previous_cycle] if there is no previous cycle. *)
+val initial_frozen_deposits_of_previous_cycle :
+  Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+
 (** Returns a delegate's current frozen deposits. *)
 val current_frozen_deposits :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
