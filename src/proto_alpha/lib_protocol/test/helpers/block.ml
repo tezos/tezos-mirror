@@ -1230,12 +1230,16 @@ let current_cycle b =
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
   current_cycle
 
-let bake_until_cycle ?policy cycle (b : t) =
+let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   let open Lwt_result_syntax in
   let* final_block_of_previous_cycle =
-    bake_while ?policy (fun block -> Cycle.(current_cycle block < cycle)) b
+    bake_while
+      ?baking_mode
+      ?policy
+      (fun block -> Cycle.(current_cycle block < cycle))
+      b
   in
-  bake ?policy final_block_of_previous_cycle
+  bake ?baking_mode ?policy final_block_of_previous_cycle
 
 let bake_until_cycle_end ?policy b =
   let cycle = current_cycle b in

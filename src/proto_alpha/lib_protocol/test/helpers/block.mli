@@ -359,7 +359,12 @@ val bake_until_n_cycle_end :
   ?policy:baker_policy -> int -> t -> t tzresult Lwt.t
 
 (** Bakes enough blocks to reach the cycle. *)
-val bake_until_cycle : ?policy:baker_policy -> Cycle.t -> t -> t tzresult Lwt.t
+val bake_until_cycle :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  Cycle.t ->
+  t ->
+  t tzresult Lwt.t
 
 (** Common util function to create parameters for [initial_context] function *)
 val prepare_initial_context_params :
