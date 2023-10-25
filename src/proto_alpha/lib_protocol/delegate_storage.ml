@@ -228,6 +228,30 @@ let list = Storage.Delegates.elements
 let frozen_deposits ctxt delegate =
   Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
 
+let initial_frozen_deposits ctxt delegate =
+  let open Lwt_result_syntax in
+  let* stake_opt =
+    match Raw_context.find_stake_distribution_for_current_cycle ctxt with
+    | Some distribution ->
+        return (Signature.Public_key_hash.Map.find delegate distribution)
+    | None ->
+        (* This branch happens when the stake distribution is not initialized in
+           [ctxt], e.g. when RPCs are called or operations are simulated. *)
+        let current_cycle = (Raw_context.current_level ctxt).cycle in
+        let+ stakes =
+          Stake_storage.get_selected_distribution ctxt current_cycle
+        in
+        List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
+  in
+  match stake_opt with
+  | None -> return Tez_repr.zero
+  | Some {frozen; weighted_delegated = _} -> return frozen
+
+let current_frozen_deposits ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ {current_amount; _} = frozen_deposits ctxt delegate in
+  current_amount
+
 let spendable_balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract

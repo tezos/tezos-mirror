@@ -504,11 +504,6 @@ module Delegate = struct
   include Delegate_slashed_deposits_storage
   include Delegate_cycles
 
-  type deposits = Deposits_repr.t = {
-    initial_amount : Tez.t;
-    current_amount : Tez.t;
-  }
-
   let last_cycle_before_deactivation =
     Delegate_activation_storage.last_cycle_before_deactivation
 

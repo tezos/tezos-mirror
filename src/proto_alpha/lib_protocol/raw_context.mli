@@ -284,6 +284,11 @@ val sampler_for_cycle :
 val stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t tzresult
 
+(** Like [stake_distribution_for_current_cycle] but returns [None] rather than
+    an error. *)
+val find_stake_distribution_for_current_cycle :
+  t -> Stake_repr.t Signature.Public_key_hash.Map.t option
+
 val init_stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
 

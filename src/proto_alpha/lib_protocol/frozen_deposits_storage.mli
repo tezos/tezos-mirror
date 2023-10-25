@@ -49,9 +49,3 @@ val spend_only_call_from_token :
   Staker_repr.staker ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
-
-(** [update_initial_amount ctxt contract tez] returns a new context from [ctxt]
-   where the initial_amount of the frozen deposits for [contract] is set to
-   [tez]. *)
-val update_initial_amount :
-  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t

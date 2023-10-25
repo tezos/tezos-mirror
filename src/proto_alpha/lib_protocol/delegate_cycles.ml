@@ -47,62 +47,25 @@ let update_activity ctxt last_cycle =
             return (ctxt, delegate :: deactivated)
           else return (ctxt, deactivated))
 
-let update_initial_frozen_deposits ctxt ~new_cycle =
+let update_forbidden_delegates ctxt ~new_cycle =
   let open Lwt_result_syntax in
   let*! ctxt = Delegate_storage.reset_forbidden_delegates ctxt in
-  let* last_cycle_delegates =
-    match Cycle_repr.pred new_cycle with
-    | None -> return Signature.Public_key_hash.Set.empty
-    | Some last_cycle -> (
-        let+ last_cycle_distribution =
-          Stake_storage.find_selected_distribution ctxt last_cycle
-        in
-        match last_cycle_distribution with
-        | None -> Signature.Public_key_hash.Set.empty
-        | Some distribution ->
-            List.fold_left
-              (fun delegates (d, _) ->
-                Signature.Public_key_hash.Set.add d delegates)
-              Signature.Public_key_hash.Set.empty
-              distribution)
-  in
   let* selection_for_new_cycle =
     Stake_storage.get_selected_distribution ctxt new_cycle
   in
-  let* ctxt, delegates_to_remove =
-    List.fold_left_es
-      (fun (ctxt, delegates_to_remove)
-           (delegate, Stake_repr.{frozen; weighted_delegated = _}) ->
-        let delegates_to_remove =
-          Signature.Public_key_hash.Set.remove delegate delegates_to_remove
-        in
-        let delegate_contract = Contract_repr.Implicit delegate in
-        let* ctxt =
-          Frozen_deposits_storage.update_initial_amount
-            ctxt
-            delegate_contract
-            frozen
-        in
-        let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
-        let current_amount = deposits.current_amount in
-        if Tez_repr.(current_amount = zero) then
-          (* If the delegate's current deposit remains at zero then we add it to
-             the forbidden set. *)
-          let*! ctxt = Delegate_storage.forbid_delegate ctxt delegate in
-          return (ctxt, delegates_to_remove)
-        else return (ctxt, delegates_to_remove))
-      (ctxt, last_cycle_delegates)
-      selection_for_new_cycle
-  in
-  Signature.Public_key_hash.Set.fold_es
-    (fun delegate ctxt ->
-      let delegate_contract = Contract_repr.Implicit delegate in
-      Frozen_deposits_storage.update_initial_amount
-        ctxt
-        delegate_contract
-        Tez_repr.zero)
-    delegates_to_remove
+  List.fold_left_es
+    (fun ctxt (delegate, _stake) ->
+      let* current_deposits =
+        Delegate_storage.current_frozen_deposits ctxt delegate
+      in
+      if Tez_repr.(current_deposits = zero) then
+        (* If the delegate's current deposit remains at zero then we add it to
+           the forbidden set. *)
+        let*! ctxt = Delegate_storage.forbid_delegate ctxt delegate in
+        return ctxt
+      else return ctxt)
     ctxt
+    selection_for_new_cycle
 
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
@@ -190,7 +153,7 @@ let cycle_end ctxt last_cycle =
       ctxt
       ~new_cycle
   in
-  let* ctxt = update_initial_frozen_deposits ctxt ~new_cycle in
+  let* ctxt = update_forbidden_delegates ctxt ~new_cycle in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
@@ -215,4 +178,4 @@ let init_first_cycles ctxt =
       Misc.(0 --> preserved)
   in
   let cycle = (Raw_context.current_level ctxt).cycle in
-  update_initial_frozen_deposits ~new_cycle:cycle ctxt
+  update_forbidden_delegates ~new_cycle:cycle ctxt
