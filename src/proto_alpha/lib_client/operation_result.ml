@@ -368,10 +368,8 @@ let pp_balance_updates ppf balance_updates =
         Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
   in
   let pp_update token ppf = function
-    | Credited amount ->
-        Format.fprintf ppf "+%s%a" tez_sym (Token.pp token) amount
-    | Debited amount ->
-        Format.fprintf ppf "-%s%a" tez_sym (Token.pp token) amount
+    | Credited amount -> Format.fprintf ppf "+%a" (Token.pp token) amount
+    | Debited amount -> Format.fprintf ppf "-%a" (Token.pp token) amount
   in
   let balance_updates =
     List.map
@@ -422,6 +420,16 @@ let pp_balance_updates ppf balance_updates =
           | Sc_rollup_refutation_punishments ->
               "smart rollup refutation punishments"
           | Sc_rollup_refutation_rewards -> "smart rollup refutation rewards"
+          | Staking_delegator_numerator {delegator} ->
+              Format.asprintf
+                "staking delegator numerator(%a)"
+                Contract.pp
+                delegator
+          | Staking_delegate_denominator {delegate} ->
+              Format.asprintf
+                "staking delegate denominator(%a)"
+                Signature.Public_key_hash.pp
+                delegate
         in
         let balance =
           match origin with

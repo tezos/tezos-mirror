@@ -67,7 +67,7 @@ val staking_numerator :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  Staking_pseudotokens.For_RPC.t shell_tzresult Lwt.t
+  Staking_pseudotoken.t shell_tzresult Lwt.t
 
 val unstaked_frozen_balance :
   'a #RPC_context.simple ->

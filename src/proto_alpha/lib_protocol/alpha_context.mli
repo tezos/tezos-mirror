@@ -153,6 +153,15 @@ module Tez : sig
   val div_exn : t -> int -> t
 end
 
+(** This module re-exports definitions from {!Staking_pseudotoken_repr}. *)
+module Staking_pseudotoken : sig
+  type t
+
+  module For_RPC : sig
+    val encoding : t Data_encoding.encoding
+  end
+end
+
 (** This module re-exports definitions from {!Period_repr}. *)
 module Period : sig
   include BASIC_DATA
@@ -2042,7 +2051,9 @@ end
 (** This module re-exports definitions from {!Receipt_repr}. *)
 module Receipt : sig
   module Token : sig
-    type 'token t = Tez : Tez.t t
+    type 'token t =
+      | Tez : Tez.t t
+      | Staking_pseudotoken : Staking_pseudotoken.t t
 
     val eq :
       'token1 t -> 'token2 t -> ('token1, 'token2) Equality_witness.eq option
@@ -2078,6 +2089,14 @@ module Receipt : sig
     | Frozen_bonds : Contract.t * Bond_id.t -> Tez.t balance
     | Sc_rollup_refutation_punishments : Tez.t balance
     | Sc_rollup_refutation_rewards : Tez.t balance
+    | Staking_delegator_numerator : {
+        delegator : Contract.t;
+      }
+        -> Staking_pseudotoken.t balance
+    | Staking_delegate_denominator : {
+        delegate : public_key_hash;
+      }
+        -> Staking_pseudotoken.t balance
 
   val token_of_balance : 'token balance -> 'token Token.t
 
@@ -5144,10 +5163,6 @@ end
 (** This module re-exports definitions from {!Staking_pseudotokens_storage}. *)
 module Staking_pseudotokens : sig
   module For_RPC : sig
-    type t
-
-    val encoding : t Data_encoding.encoding
-
     val staked_balance :
       context ->
       contract:Contract.t ->
@@ -5155,10 +5170,12 @@ module Staking_pseudotokens : sig
       Tez.t tzresult Lwt.t
 
     val staking_pseudotokens_balance :
-      context -> delegator:Contract.t -> t tzresult Lwt.t
+      context -> delegator:Contract.t -> Staking_pseudotoken.t tzresult Lwt.t
 
     val get_frozen_deposits_pseudotokens :
-      context -> delegate:Signature.public_key_hash -> t tzresult Lwt.t
+      context ->
+      delegate:Signature.public_key_hash ->
+      Staking_pseudotoken.t tzresult Lwt.t
 
     val get_frozen_deposits_staked_tez :
       context -> delegate:Signature.public_key_hash -> Tez.t tzresult Lwt.t

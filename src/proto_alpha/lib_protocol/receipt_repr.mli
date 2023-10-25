@@ -25,7 +25,9 @@
 (*****************************************************************************)
 
 module Token : sig
-  type 'token t = Tez : Tez_repr.t t
+  type 'token t =
+    | Tez : Tez_repr.t t
+    | Staking_pseudotoken : Staking_pseudotoken_repr.t t
 
   val eq :
     'token1 t -> 'token2 t -> ('token1, 'token2) Equality_witness.eq option
@@ -68,6 +70,14 @@ type 'token balance =
   | Frozen_bonds : Contract_repr.t * Bond_id_repr.t -> Tez_repr.t balance
   | Sc_rollup_refutation_punishments : Tez_repr.t balance
   | Sc_rollup_refutation_rewards : Tez_repr.t balance
+  | Staking_delegator_numerator : {
+      delegator : Contract_repr.t;
+    }
+      -> Staking_pseudotoken_repr.t balance
+  | Staking_delegate_denominator : {
+      delegate : Signature.public_key_hash;
+    }
+      -> Staking_pseudotoken_repr.t balance
 
 val token_of_balance : 'token balance -> 'token Token.t
 

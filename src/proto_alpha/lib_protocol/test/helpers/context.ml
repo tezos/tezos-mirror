@@ -452,7 +452,7 @@ module Delegate = struct
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     total_delegated_stake : Tez.t;
-    staking_denominator : Staking_pseudotokens.For_RPC.t;
+    staking_denominator : Staking_pseudotoken.t;
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Alpha_context.Vote.delegate_info;

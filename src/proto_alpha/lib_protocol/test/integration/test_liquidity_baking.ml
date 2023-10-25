@@ -390,7 +390,8 @@ let liquidity_baking_balance_update () =
         | Tez -> (
             match update with
             | Credited x -> accum +? x
-            | Debited _ -> assert false))
+            | Debited _ -> assert false)
+        | _ -> assert false)
       (of_int 0)
       liquidity_baking_updates
   in

@@ -61,7 +61,7 @@ type info = {
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
   total_delegated_stake : Tez.t;
-  staking_denominator : Staking_pseudotokens.For_RPC.t;
+  staking_denominator : Staking_pseudotoken.t;
   deactivated : bool;
   grace_period : Cycle.t;
   voting_info : Vote.delegate_info;
@@ -130,7 +130,7 @@ val staking_denominator :
   'a #RPC_context.simple ->
   'a ->
   public_key_hash ->
-  Staking_pseudotokens.For_RPC.t shell_tzresult Lwt.t
+  Staking_pseudotoken.t shell_tzresult Lwt.t
 
 val deactivated :
   'a #RPC_context.simple ->

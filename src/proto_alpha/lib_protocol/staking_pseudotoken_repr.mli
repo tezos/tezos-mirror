@@ -29,6 +29,8 @@ include Compare.S
 
 val encoding : t Data_encoding.t
 
+val balance_update_encoding : [`Credited of t | `Debited of t] Data_encoding.t
+
 val zero : t
 
 val of_z_exn : Z.t -> t
@@ -40,3 +42,5 @@ val init_of_tez : Tez_repr.t -> t
 val ( +? ) : t -> t -> t tzresult
 
 val ( -? ) : t -> t -> t tzresult
+
+val pp : Format.formatter -> t -> unit
