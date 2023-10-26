@@ -330,3 +330,8 @@ module Web3_sha3 :
   METHOD
     with type m_input = Ethereum_types.hex
      and type m_output = Ethereum_types.hash
+
+module Get_logs :
+  METHOD
+    with type m_input = Ethereum_types.filter
+     and type m_output = Ethereum_types.filter_changes list

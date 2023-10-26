@@ -164,13 +164,13 @@ let decode_hash bytes = Hash (decode_hex bytes)
 type transaction_log = {
   address : address;
   topics : hash list;
-  data : hash;
-  blockNumber : quantity;
-  transactionHash : hash;
-  transactionIndex : quantity;
-  blockHash : block_hash;
-  logIndex : quantity;
-  removed : bool;
+  data : hex;
+  blockNumber : quantity option;
+  transactionHash : hash option;
+  transactionIndex : quantity option;
+  blockHash : block_hash option;
+  logIndex : quantity option;
+  removed : bool option;
 }
 
 let transaction_log_body_from_rlp = function
@@ -181,7 +181,7 @@ let transaction_log_body_from_rlp = function
             | Rlp.Value bytes -> decode_hash bytes
             | _ -> raise (Invalid_argument "Expected hash representing topic"))
           topics,
-        decode_hash data )
+        decode_hex data )
   | _ ->
       raise
         (Invalid_argument "Expected list of 3 elements representing log body")
@@ -232,13 +232,13 @@ let transaction_log_encoding =
     (obj9
        (req "address" address_encoding)
        (req "topics" (list hash_encoding))
-       (req "data" hash_encoding)
-       (req "blockNumber" quantity_encoding)
-       (req "transactionHash" hash_encoding)
-       (req "transactionIndex" quantity_encoding)
-       (req "blockHash" block_hash_encoding)
-       (req "logIndex" quantity_encoding)
-       (req "removed" bool))
+       (req "data" hex_encoding)
+       (req "blockNumber" (option quantity_encoding))
+       (req "transactionHash" (option hash_encoding))
+       (req "transactionIndex" (option quantity_encoding))
+       (req "blockHash" (option block_hash_encoding))
+       (req "logIndex" (option quantity_encoding))
+       (req "removed" (option bool)))
 
 type transaction_receipt = {
   transactionHash : hash;
@@ -296,12 +296,12 @@ let transaction_receipt_from_rlp block_hash bytes =
               address;
               topics;
               data;
-              blockHash = block_hash;
-              blockNumber = block_number;
-              transactionHash = hash;
-              transactionIndex = index;
-              logIndex = quantity_of_z (Z.of_int i);
-              removed = false;
+              blockHash = Some block_hash;
+              blockNumber = Some block_number;
+              transactionHash = Some hash;
+              transactionIndex = Some index;
+              logIndex = Some (quantity_of_z (Z.of_int i));
+              removed = Some false;
             })
           logs_body
       in
@@ -1051,3 +1051,76 @@ let transaction_gas_price base_fee raw_tx =
         let* gas_price = Rlp.decode_z gas_price in
         return gas_price
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9")
+
+(* Event filter, see
+   https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs *)
+type filter_topic = One of hash | Or of hash list
+
+let filter_topic_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"one"
+        (Tag 0)
+        hash_encoding
+        (function One hash -> Some hash | _ -> None)
+        (fun hash -> One hash);
+      case
+        ~title:"or"
+        (Tag 1)
+        (list hash_encoding)
+        (function Or l -> Some l | _ -> None)
+        (fun l -> Or l);
+    ]
+
+type filter = {
+  from_block : block_param option;
+  to_block : block_param option;
+  address : address option;
+  topics : filter_topic option list option;
+  block_hash : block_hash option;
+}
+
+let filter_encoding =
+  let open Data_encoding in
+  conv
+    (fun {from_block; to_block; address; topics; block_hash} ->
+      (from_block, to_block, address, topics, block_hash))
+    (fun (from_block, to_block, address, topics, block_hash) ->
+      {from_block; to_block; address; topics; block_hash})
+    (obj5
+       (opt "fromBlock" block_param_encoding)
+       (opt "toBlock" block_param_encoding)
+       (opt "address" address_encoding)
+       (opt "topics" (list @@ option filter_topic_encoding))
+       (opt "blockHash" block_hash_encoding))
+
+type filter_changes =
+  | Block_filter of block_hash
+  | Pending_transaction_filter of hash
+  | Log of transaction_log
+
+let filter_changes_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"block"
+        (Tag 0)
+        block_hash_encoding
+        (function Block_filter hash -> Some hash | _ -> None)
+        (fun hash -> Block_filter hash);
+      case
+        ~title:"pending_transaction"
+        (Tag 1)
+        hash_encoding
+        (function Pending_transaction_filter hash -> Some hash | _ -> None)
+        (fun hash -> Pending_transaction_filter hash);
+      case
+        ~title:"log"
+        (Tag 2)
+        transaction_log_encoding
+        (function Log f -> Some f | _ -> None)
+        (fun f -> Log f);
+    ]
