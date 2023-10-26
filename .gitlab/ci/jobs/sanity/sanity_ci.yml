@@ -2,6 +2,7 @@ sanity_ci:
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies
+    - .tags_template__gcp
   stage: sanity
   script:
     - ./scripts/ci/take_ownership.sh

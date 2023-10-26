@@ -122,6 +122,7 @@ stages:
 trigger:
   extends:
     - .image_template__alpine
+    - .tags_template__gcp
   stage: trigger
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE == "tezos" && $CI_MERGE_REQUEST_ASSIGNEES !~ /nomadic-margebot/'
