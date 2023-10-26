@@ -257,6 +257,28 @@ module P2P = struct
 
   let open_root = open_root / "p2p"
 
+  let post_connect :
+      < meth : [`POST]
+      ; input : P2p_point.Id.t
+      ; output : unit
+      ; prefix : unit
+      ; params : unit
+      ; query : < timeout : Ptime.Span.t option > >
+      service =
+    Tezos_rpc.Service.post_service
+      ~description:"Connect to a new peer"
+      ~query:
+        (let open Tezos_rpc.Query in
+        query (fun timeout ->
+            object
+              method timeout = timeout
+            end)
+        |+ opt_field "timeout" Time.System.Span.rpc_arg (fun t -> t#timeout)
+        |> seal)
+      ~input:P2p_point.Id.encoding
+      ~output:Data_encoding.unit
+      (open_root / "connect")
+
   module Gossipsub = struct
     let open_root = open_root / "gossipsub"
 

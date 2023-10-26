@@ -178,10 +178,13 @@ module Profile_handlers = struct
 end
 
 module P2P = struct
+  let post_connect ctxt q point =
+    Node_context.P2P.connect ctxt ?timeout:q#timeout point
+
   module Gossipsub = struct
     let get_topics ctxt () () =
       let open Lwt_result_syntax in
-      return @@ Node_context.P2P.get_topics ctxt
+      return @@ Node_context.P2P.Gossipsub.get_topics ctxt
   end
 end
 
@@ -248,6 +251,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_topics
        (P2P.Gossipsub.get_topics ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.post_connect
+       (P2P.post_connect ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in

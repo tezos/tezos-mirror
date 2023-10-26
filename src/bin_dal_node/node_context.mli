@@ -138,6 +138,16 @@ val fetch_committee :
 
 (** Module for P2P-related accessors.  *)
 module P2P : sig
-  (** [get_topics t] returns the list of topics the node is subscribed to. *)
-  val get_topics : t -> Types.Topic.t list
+  (** [connect t ?timeout point] initiates a connection to the point
+      [point]. The promise returned by this function is resolved once
+      the P2P handhshake successfully completes. If the [timeout] is
+      set, an error is returned if the P2P handshake takes more than
+      [timeout] to complete. *)
+  val connect :
+    t -> ?timeout:Ptime.Span.t -> P2p_point.Id.t -> unit tzresult Lwt.t
+
+  module Gossipsub : sig
+    (** [get_topics t] returns the list of topics the node is subscribed to. *)
+    val get_topics : t -> Types.Topic.t list
+  end
 end

@@ -184,6 +184,16 @@ val monitor_shards :
   service
 
 module P2P : sig
+  (** A service to initiate a connection with another point. *)
+  val post_connect :
+    < meth : [`POST]
+    ; input : P2p_point.Id.t
+    ; output : unit
+    ; prefix : unit
+    ; params : unit
+    ; query : < timeout : Ptime.Span.t option > >
+    service
+
   module Gossipsub : sig
     val get_topics :
       < meth : [`GET]

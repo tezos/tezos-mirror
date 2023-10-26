@@ -87,6 +87,16 @@ module Transport_layer = struct
         let* (_ : _ P2p.connection tzresult) = P2p.connect p2p point in
         return_unit)
       additional_points
+
+  let connect p2p ?timeout point =
+    let open Lwt_result_syntax in
+    match P2p.connect_handler p2p with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some connect_handler ->
+        let* _conn =
+          P2p_connect_handler.connect ?timeout connect_handler point
+        in
+        return_unit
 end
 
 module Transport_layer_hooks = Gs_transport_connection
