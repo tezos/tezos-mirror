@@ -33,7 +33,8 @@
 (* Simple tests to check support for the following operations-related options
    for baking
    - --ignore-node-mempool
-   - --operations-pool [file|uri] *)
+   - --operations-pool [file|uri]
+   - --record-state *)
 
 type http_path_mapping = Present | Absent
 
@@ -453,8 +454,65 @@ let test_baker_external_operations =
   in
   unit
 
+(* Test that baking a block results in the generation of the
+   "record_state" file in the client directory or not, depending
+   on the [state_recorder] input argument. *)
+let test_baker_state_recorder protocol state_recorder =
+  let* node, client =
+    Client.init_with_protocol ~timestamp:Now ~protocol `Client ()
+  in
+  let keys =
+    Array.map
+      (fun Account.{public_key_hash; _} -> public_key_hash)
+      Account.Bootstrap.keys
+    |> Array.to_list
+  in
+  (* Bake an empty block *)
+  let* () = Client.bake_for_and_wait ~keys client in
+  let* level = Node.get_level node in
+  (* Initialise a baker *)
+  let* _baker =
+    if state_recorder then Baker.init ~protocol ~state_recorder node client
+    else Baker.init ~protocol node client
+  in
+  (* Wait for chain to process the empty block *)
+  let* (_ : int) = Node.wait_for_level node (level + 1) in
+  (* Obtain the "record_state" file name *)
+  let* chain_id = Client.RPC.call client (RPC.get_chain_chain_id ()) in
+  let chain_id =
+    Tezos_crypto.Hashed.Chain_id.to_short_b58check
+      (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+  in
+  let state_recorder_file = chain_id ^ "_baker_state" in
+  let base_dir = Client.base_dir client in
+  let dir_contents = Array.to_list @@ Sys.readdir base_dir in
+  Check.(
+    (List.mem state_recorder_file dir_contents = state_recorder)
+      bool
+      ~__LOC__
+      ~error_msg:
+        "The state_recorder file presence: %L, but its presence should have \
+         been: %R") ;
+  unit
+
+let test_baker_state_recorder_memory =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker state recorder - memory case"
+    ~tags:["baker"; "state"; "recorder"; "memory"]
+  @@ fun protocol -> test_baker_state_recorder protocol false
+
+let test_baker_state_recorder_filesystem =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker state recorder - filesystem case"
+    ~tags:["baker"; "state"; "recorder"; "filesystem"]
+  @@ fun protocol -> test_baker_state_recorder protocol true
+
 let register ~protocols =
   test_ignore_node_mempool protocols ;
   test_bake_empty_operations protocols ;
   test_bake_singleton_operations protocols ;
-  test_baker_external_operations protocols
+  test_baker_external_operations protocols ;
+  test_baker_state_recorder_memory protocols ;
+  test_baker_state_recorder_filesystem protocols

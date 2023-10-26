@@ -125,8 +125,8 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
     passed. The default value is [Some Pass].
 
-    [operations_pool] and [force_apply] are passed to the baker daemon through
-    the flag [--operations-pool] and [--force_apply].
+    [operations_pool], [force_apply] and [state_recorder] are passed to the baker 
+    daemon through the flag [--operations-pool], [--force_apply] and [--record-state].
 
     If [remote_mode] is specified, the baker will run in RPC-only mode.
 
@@ -152,6 +152,7 @@ val create :
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   ?minimal_nanotez_per_gas_unit:int ->
+  ?state_recorder:bool ->
   Node.t ->
   Client.t ->
   t
@@ -189,6 +190,7 @@ val create_from_uris :
   ?operations_pool:string ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
   ?minimal_nanotez_per_gas_unit:int ->
+  ?state_recorder:bool ->
   base_dir:string ->
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
@@ -225,9 +227,9 @@ val create_from_uris :
     baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [votefile], [liquidity_baking_toggle_vote], [force_apply] respectively
-    [operations_pool] are passed to the baker daemon through the flags
-    [--votefile], [--liquidity-baking-toggle-vote], [--should-apply]
+    [votefile], [liquidity_baking_toggle_vote], [force_apply], [state_recorder]
+    respectively [operations_pool] are passed to the baker daemon through the flags
+    [--votefile], [--liquidity-baking-toggle-vote], [--should-apply], [--record-state]
     respectively [--operations-pool].
 
     If [remote_mode] is specified, the baker will run in RPC-only mode.
@@ -250,6 +252,7 @@ val init :
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   ?minimal_nanotez_per_gas_unit:int ->
+  ?state_recorder:bool ->
   Node.t ->
   Client.t ->
   t Lwt.t

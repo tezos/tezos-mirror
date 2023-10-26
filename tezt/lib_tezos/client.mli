@@ -533,6 +533,7 @@ val bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
+  ?state_recorder:bool ->
   ?expect_failure:bool ->
   t ->
   unit Lwt.t
@@ -584,6 +585,7 @@ val bake_for_and_wait_level :
   ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
+  ?state_recorder:bool ->
   t ->
   int Lwt.t
 
@@ -602,6 +604,7 @@ val spawn_bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
+  ?state_recorder:bool ->
   t ->
   Process.t
 
