@@ -283,7 +283,8 @@ let endorsement_quorum state =
        - No  :: repropose fresh block for current round *)
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
-    ?(minimal_timestamp = false) ?extra_operations ?context_path delegates =
+    ?(minimal_timestamp = false) ?extra_operations ?context_path ?state_recorder
+    delegates =
   let open Lwt_result_syntax in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
@@ -296,6 +297,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
       ?force_apply
       ?force
       ?extra_operations
+      ?state_recorder
       ()
   in
   let* state = create_state cctxt ~config ~current_proposal delegates in
@@ -609,7 +611,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
     ?(minimal_timestamp = false) ?extra_operations
     ?(monitor_node_mempool = true) ?context_path ?dal_node_endpoint ?(count = 1)
-    delegates =
+    ?state_recorder delegates =
   let open Lwt_result_syntax in
   let config =
     Baking_configuration.make
@@ -621,6 +623,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?force
       ?extra_operations
       ?dal_node_endpoint
+      ?state_recorder
       ()
   in
   let cache = Baking_cache.Block_cache.create 10 in

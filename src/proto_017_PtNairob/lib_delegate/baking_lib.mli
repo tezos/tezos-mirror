@@ -41,6 +41,7 @@ val bake :
   ?dal_node_endpoint:Uri.t ->
   (* Number of baked blocks. Defaults to 1. *)
   ?count:int ->
+  ?state_recorder:Baking_configuration.state_recorder_config ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
@@ -66,6 +67,7 @@ val propose :
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?context_path:string ->
+  ?state_recorder:Baking_configuration.state_recorder_config ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 

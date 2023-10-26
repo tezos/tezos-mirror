@@ -73,8 +73,8 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?liquidity_baking
-      ?extra_operations ?dal_node_endpoint ?force_apply ?context_path ~chain
-      ~keep_alive delegates =
+      ?extra_operations ?dal_node_endpoint ?force_apply ?context_path
+      ?state_recorder ~chain ~keep_alive delegates =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
@@ -89,6 +89,7 @@ module Baker = struct
           ?force_apply
           ?context_path
           ~user_activated_upgrades
+          ?state_recorder
           ()
       in
       cctxt#message

@@ -42,6 +42,7 @@ val bake :
   (* Number of baked blocks. Defaults to 1. *)
   ?count:int ->
   ?votes:Baking_configuration.per_block_votes_config ->
+  ?state_recorder:Baking_configuration.state_recorder_config ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
@@ -67,6 +68,7 @@ val propose :
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?context_path:string ->
+  ?state_recorder:Baking_configuration.state_recorder_config ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 

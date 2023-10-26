@@ -37,6 +37,7 @@ module Baker : sig
     ?dal_node_endpoint:Uri.t ->
     ?force_apply:bool ->
     ?context_path:string ->
+    ?state_recorder:Baking_configuration.state_recorder_config ->
     chain:Shell_services.chain ->
     keep_alive:bool ->
     Baking_state.consensus_key list ->
