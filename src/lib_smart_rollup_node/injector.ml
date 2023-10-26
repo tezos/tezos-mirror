@@ -87,7 +87,7 @@ module Parameters :
     let operation_kind = operation_tag operation in
     Configuration.Operation_kind_map.find operation_kind fee_parameters
     |> Option.value
-         ~default:(Configuration.default_fee_parameter ~operation_kind ())
+         ~default:(Configuration.default_fee_parameter operation_kind)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Decide if some batches must have all the operations succeed. See

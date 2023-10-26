@@ -146,7 +146,7 @@ val check_op_in_whitelist_or_bailout_mode :
     purpose.
 *)
 val get_fee_parameter :
-  _ t -> Configuration.operation_kind -> Injector_sigs.fee_parameter
+  _ t -> Configuration.operation_kind -> Injector_common.fee_parameter
 
 (** [init cctxt ~data_dir mode l1_ctxt genesis_info protocol configuration]
     initializes the rollup representation. The rollup origination level and kind

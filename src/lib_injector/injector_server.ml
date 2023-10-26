@@ -9,7 +9,7 @@
 module Configuration = struct
   type tag = Transaction
 
-  type fee_parameters = Injector_sigs.fee_parameter
+  type fee_parameters = Injector_common.fee_parameter
 
   let tags = [Transaction]
 
@@ -17,12 +17,12 @@ module Configuration = struct
 
   let default_fee_parameters =
     {
-      Injector_sigs.minimal_fees = {Injector_sigs.mutez = 100L};
+      Injector_common.minimal_fees = {Injector_common.mutez = 100L};
       minimal_nanotez_per_byte = Q.of_int 1000;
       minimal_nanotez_per_gas_unit = Q.of_int 100;
       force_low_fee = false;
-      fee_cap = {Injector_sigs.mutez = 1_000_000L};
-      burn_cap = {Injector_sigs.mutez = 1_000_000L};
+      fee_cap = {Injector_common.mutez = 1_000_000L};
+      burn_cap = {Injector_common.mutez = 1_000_000L};
     }
 end
 
@@ -84,7 +84,7 @@ module Parameters :
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Decide if some batches must have all the operations succeed. See
-     {!Injector_sigs.Parameter.batch_must_succeed}. *)
+     {!Injector_common.Parameter.batch_must_succeed}. *)
   let batch_must_succeed _ = `At_least_one
 
   let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =

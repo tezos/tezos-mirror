@@ -9,6 +9,7 @@
 open Protocol
 open Alpha_context
 open Protocol_client_context
+open Injector_common
 open Injector_sigs
 open Injector_server
 open Injector_server_operation
@@ -402,7 +403,7 @@ module Proto_client = struct
     in
     let check purpose
         {
-          Injector_sigs.minimal_fees;
+          minimal_fees;
           minimal_nanotez_per_byte;
           minimal_nanotez_per_gas_unit;
           force_low_fee = _;
