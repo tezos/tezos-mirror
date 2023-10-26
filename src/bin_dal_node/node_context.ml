@@ -187,7 +187,12 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
       Stdlib.List.init offset (fun i -> start_index + i)
 
 module P2P = struct
-  let get_topics {gs_worker; _} =
-    let state = Gossipsub.Worker.state gs_worker in
-    Gossipsub.Worker.GS.Topic.Map.bindings state.mesh |> List.rev_map fst
+  let connect {transport_layer; _} ?timeout point =
+    Gossipsub.Transport_layer.connect transport_layer ?timeout point
+
+  module Gossipsub = struct
+    let get_topics {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Topic.Map.bindings state.mesh |> List.rev_map fst
+  end
 end

@@ -92,6 +92,14 @@ module Transport_layer : sig
       is a wrapper on top of {!P2p.activate}. If some [additional_points] are
       given, they are added to [t]'s known points. *)
   val activate : ?additional_points:P2p_point.Id.t list -> t -> unit Lwt.t
+
+  (** [connect t ?timeout point] initiates a connection to the point
+      [point]. The promise returned by this function is resolved once
+      the P2P handhshake successfully completes. If the [timeout] is
+      set, an error is returned if the P2P handshake takes more than
+      [timeout] to complete. *)
+  val connect :
+    t -> ?timeout:Ptime.Span.t -> P2p_point.Id.t -> unit tzresult Lwt.t
 end
 
 (** This module implements the list of hooks that allow interconnecting the
