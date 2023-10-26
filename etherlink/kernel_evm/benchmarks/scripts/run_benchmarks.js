@@ -80,7 +80,7 @@ function push_profiler_sections(output, opcodes, precompiles) {
     return opcodes;
 }
 
-function run_profiler(path) {
+function run_profiler(path, logs) {
 
     profiler_result = new Promise((resolve, _) => {
 
@@ -116,6 +116,7 @@ function run_profiler(path) {
 
         childProcess.stdout.on('data', (data) => {
             const output = data.toString();
+            if (!output.includes("__wasm_debugger__::Section")) fs.appendFileSync(logs, output)
             const profiler_output_path_regex = /Profiling result can be found in (.+)/;
             const profiler_output_path_match = output.match(profiler_output_path_regex);
             const profiler_output_path_result = profiler_output_path_match
@@ -250,9 +251,9 @@ async function analyze_profiler_output(path) {
 }
 
 // Run given benchmark
-async function run_benchmark(path) {
+async function run_benchmark(path, logs) {
     var inbox_size = fs.statSync(path).size
-    run_profiler_result = await run_profiler(path);
+    run_profiler_result = await run_profiler(path, logs);
     profiler_output_analysis_result = await analyze_profiler_output(run_profiler_result.profiler_output_path);
     return {
         inbox_size,
@@ -396,6 +397,9 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     return rows;
 }
 
+function logs_filename(time) {
+    return path.format({ dir: OUTPUT_DIRECTORY, base: `logs_${time}.log` })
+}
 
 function output_filename(time) {
     return path.format({ dir: OUTPUT_DIRECTORY, base: `benchmark_result_${time}.csv` })
@@ -461,6 +465,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     let output = output_filename(time);
     let opcodes_dump = opcodes_dump_filename(time);
     let precompiles_output = precompiles_filename(time);
+    let logs = logs_filename(time)
     console.log(`Output in ${output}`);
     console.log(`Dumped opcodes in ${opcodes_dump}`);
     console.log(`Precompiles in ${precompiles_output}`);
@@ -468,14 +473,17 @@ async function run_all_benchmarks(benchmark_scripts) {
     const precompile_csv_config = { columns: precompiles_field };
     fs.writeFileSync(output, csv.stringify([], { header: true, ...benchmark_csv_config }));
     fs.writeFileSync(precompiles_output, csv.stringify([], { header: true, ...precompile_csv_config }));
+    fs.writeFileSync(logs, "Logging debugger\n")
+    console.log(`Full logs in ${logs}`)
     let opcodes = {};
     for (var i = 0; i < benchmark_scripts.length; i++) {
         var benchmark_script = benchmark_scripts[i];
         var parts = benchmark_script.split("/");
         var benchmark_name = parts[parts.length - 1].split(".")[0];
         console.log(`Benchmarking ${benchmark_script}`);
+        fs.appendFileSync(logs, `=================================================\nBenchmarking ${benchmark_script}\n`)
         build_benchmark_scenario(benchmark_script);
-        run_benchmark_result = await run_benchmark("transactions.json");
+        run_benchmark_result = await run_benchmark("transactions.json", logs);
         benchmark_log = log_benchmark_result(benchmark_name, run_benchmark_result);
         opcodes[benchmark_name] = run_benchmark_result.opcodes;
         fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config));
@@ -483,6 +491,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     }
     dump_opcodes(opcodes_dump, opcodes);
     console.log("Benchmarking complete");
+    fs.appendFileSync(logs, "=================================================\nBenchmarking complete.\n")
     execSync("rm transactions.json");
 }
 
