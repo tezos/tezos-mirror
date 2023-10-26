@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::eth_gen::OwnedHash;
+use crate::helpers::{bytes_of_u256, hex_of_option};
 use crate::rlp_helpers::{
     append_option_explicit, append_u256_le, append_u64_le, decode_field,
     decode_field_h256, decode_field_u256_le, decode_field_u64_le, decode_option_explicit,
@@ -13,6 +14,7 @@ use crate::transaction::TransactionHash;
 use ethbloom::Bloom;
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// All data for an Ethereum block.
@@ -93,9 +95,22 @@ impl L2Block {
         parent_hash: H256,
         logs_bloom: Bloom,
     ) -> Self {
+        let hash = Self::hash(
+            parent_hash,
+            &None,
+            &None,
+            &None,
+            &logs_bloom,
+            &None,
+            number,
+            None,
+            U256::zero(),
+            timestamp,
+            &None,
+        );
         L2Block {
             number,
-            hash: H256(number.into()),
+            hash,
             parent_hash,
             timestamp,
             transactions,
@@ -115,6 +130,37 @@ impl L2Block {
             base_fee_per_gas,
             chain_id,
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn hash(
+        parent_hash: H256,
+        state_root: &Option<OwnedHash>,
+        transactions_root: &Option<OwnedHash>,
+        receipts_root: &Option<OwnedHash>,
+        logs_bloom: &Bloom,
+        miner: &Option<OwnedHash>,
+        number: U256,
+        gas_limit: Option<u64>,
+        gas_used: U256,
+        timestamp: Timestamp,
+        extra_data: &Option<OwnedHash>,
+    ) -> H256 {
+        let header = [
+            hex::encode(parent_hash),
+            hex_of_option(state_root),
+            hex_of_option(transactions_root),
+            hex_of_option(receipts_root),
+            hex::encode(logs_bloom),
+            hex_of_option(miner),
+            hex::encode(bytes_of_u256(number)),
+            hex_of_option(&gas_limit.map(|u| u.to_le_bytes())),
+            hex::encode(gas_used.to_string()),
+            hex::encode(timestamp.to_string()),
+            hex_of_option(extra_data),
+        ];
+        let bytes: Vec<u8> = rlp::encode_list::<String, String>(&header).into();
+        H256(Keccak256::digest(bytes).into())
     }
 }
 

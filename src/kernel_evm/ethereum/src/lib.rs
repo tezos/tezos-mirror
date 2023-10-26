@@ -5,6 +5,7 @@
 pub mod access_list;
 pub mod block;
 pub mod eth_gen;
+pub mod helpers;
 pub mod rlp_helpers;
 pub mod transaction;
 pub mod tx_common;

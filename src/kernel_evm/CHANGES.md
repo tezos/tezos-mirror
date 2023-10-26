@@ -30,6 +30,7 @@
 - Remove POW related fields from L2 blocks. (!10421)
 - L2 blocks' RLP encoding includes all the fields. (!10386)
 - Block hash is no longer in Tx object, receipt and BIP. (!10520)
+- Compute real block hashes. (!10442)
 
 ## Version fc06d63568b1be253088ff5d6e422fd80ed3d2c2
 
