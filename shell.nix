@@ -30,7 +30,7 @@ let
     pkgs.llvmPackages.bintools
 
     # Cross-compilation for RISC-V
-    sources.riscv64Pkgs.buildPackages.gcc-unwrapped
+    sources.riscv64Pkgs.clangStdenv.cc
   ];
 
   mainPackage = (import ./default.nix).overrideAttrs (old: {

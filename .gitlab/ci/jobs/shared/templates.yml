@@ -65,5 +65,6 @@
       - sequenced_kernel.wasm
       - smart-rollup-installer
       - risc-v-sandbox
+      - risc-v-dummy.elf
     expire_in: 1 day
     when: on_success

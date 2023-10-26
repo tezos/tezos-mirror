@@ -1,7 +1,8 @@
-KERNELS = evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm
+KERNELS=evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy.elf
 SDK_DIR=src/kernel_sdk
 RISC_V_SANDBOX_DIR=src/risc_v/sandbox
 RISC_V_INTERPRETER_DIR=src/risc_v/interpreter
+RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
 EVM_DIR=src/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
 SEQUENCER_DIR=src/kernel_sequencer
@@ -9,6 +10,7 @@ EVM_KERNEL_PREIMAGES=_evm_installer_preimages
 EVM_UNSTRIPPED_KERNEL_PREIMAGES=_evm_unstripped_installer_preimages
 
 .PHONY: all
+all: build-dev-deps check test build
 all: build-dev-deps check test build
 
 .PHONY: kernel_sdk
@@ -90,6 +92,11 @@ dal_echo_kernel.wasm:
 	@cp src/kernel_dal_echo/target/wasm32-unknown-unknown/release/dal_echo_kernel.wasm $@
 	@wasm-strip $@
 
+.PHONY: risc-v-dummy.elf
+risc-v-dummy.elf:
+	@make -C ${RISC_V_DUMMY_DIR} build
+	@ln -f ${RISC_V_DUMMY_DIR}/target/riscv64gc-unknown-none-elf/release/risc-v-dummy $@
+
 .PHONY: build
 build: ${KERNELS} kernel_sdk risc-v-sandbox risc-v-interpreter
 
@@ -98,6 +105,7 @@ build-dev-deps: build-deps
 	@make -C ${SDK_DIR} build-dev-deps
 	@make -C ${RISC_V_SANDBOX_DIR} build-dev-deps
 	@make -C ${RISC_V_INTERPRETER_DIR} build-dev-deps
+	@make -C ${RISC_V_DUMMY_DIR} build-dev-deps
 	@make -C ${EVM_DIR} build-dev-deps
 	@make -C ${SEQUENCER_DIR} build-dev-deps
 	@make -C ${DEMO_DIR} build-dev-deps
@@ -107,6 +115,7 @@ build-deps:
 	@make -C ${SDK_DIR} build-deps
 	@make -C ${RISC_V_SANDBOX_DIR} build-deps
 	@make -C ${RISC_V_INTERPRETER_DIR} build-deps
+	@make -C ${RISC_V_DUMMY_DIR} build-deps
 	@make -C ${EVM_DIR} build-deps
 	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
@@ -116,6 +125,7 @@ test:
 	@make -C ${SDK_DIR} test
 	@make -C ${RISC_V_SANDBOX_DIR} test
 	@make -C ${RISC_V_INTERPRETER_DIR} test
+	@make -C ${RISC_V_DUMMY_DIR} test
 	@make -C ${EVM_DIR} test
 	@make -C ${SEQUENCER_DIR} test
 	@make -C ${DEMO_DIR} test
@@ -125,6 +135,7 @@ check:
 	@make -C ${SDK_DIR} check
 	@make -C ${RISC_V_SANDBOX_DIR} check
 	@make -C ${RISC_V_INTERPRETER_DIR} check
+	@make -C ${RISC_V_DUMMY_DIR} check
 	@make -C ${EVM_DIR} check
 	@make -C ${SEQUENCER_DIR} check
 	@make -C ${DEMO_DIR} check
@@ -143,6 +154,7 @@ clean:
 	@make -C ${SDK_DIR} clean
 	@make -C ${RISC_V_SANDBOX_DIR} clean
 	@make -C ${RISC_V_INTERPRETER_DIR} clean
+	@make -C ${RISC_V_DUMMY_DIR} clean
 	@make -C ${EVM_DIR} clean
 	@make -C ${SEQUENCER_DIR} clean
 	@make -C ${DEMO_DIR} clean

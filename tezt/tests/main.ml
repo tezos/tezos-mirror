@@ -59,7 +59,8 @@ let register_protocol_independent_tests () =
   Proxy.register_protocol_independent () ;
   Rpc_tls.register_protocol_independent () ;
   Snoop_codegen.register_protocol_independent () ;
-  Snoop_protocol_codegen.register_protocol_independent ()
+  Snoop_protocol_codegen.register_protocol_independent () ;
+  Risc_v_sandbox.register ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =

@@ -2582,6 +2582,16 @@ let tezt_ethereum =
       ]
     ~release_status:Unreleased
 
+let tezt_risc_v_sandbox =
+  private_lib
+    "tezt_risc_v_sandbox"
+    ~path:"tezt/lib_risc_v_sandbox"
+    ~opam:"tezt-risc-v-sandbox"
+    ~synopsis:"Test framework for RISC-V sandbox"
+    ~bisect_ppx:No
+    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"]
+    ~release_status:Unreleased
+
 let _tezt_self_tests =
   tezt
     ["test_michelson_script"; "test_daemon"]
@@ -8631,6 +8641,7 @@ let () =
         bls12_381;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_ethereum |> open_;
+        tezt_risc_v_sandbox;
         tezt_tx_kernel;
         data_encoding;
         octez_base;

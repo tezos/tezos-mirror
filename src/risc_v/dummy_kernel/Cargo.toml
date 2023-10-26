@@ -1,0 +1,16 @@
+[package]
+name = "risc-v-dummy"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies.riscv-rt]
+version = "*"
+optional = true
+
+[dependencies.libc]
+version = "0.2.149"
+optional = true
+
+[features]
+default = ["bare-metal"]
+bare-metal = ["riscv-rt"]

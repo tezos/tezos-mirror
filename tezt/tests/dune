@@ -11,6 +11,7 @@
   bls12-381
   tezt-tezos
   tezt_ethereum
+  tezt_risc_v_sandbox
   tezt_tx_kernel
   data-encoding
   octez-libs.base
