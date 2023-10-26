@@ -1939,8 +1939,8 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
       if level' > level + 10 then
         Test.fail "Looked for an outbox for 10 levels, stopping the loop"
       else
-        let*! outbox =
-          Sc_rollup_client.outbox ~outbox_level:level' sc_rollup_client
+        let* outbox =
+          Sc_rollup_helpers.outbox ~outbox_level:level' sc_rollup_node
         in
         if
           JSON.is_null outbox

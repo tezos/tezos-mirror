@@ -97,11 +97,6 @@ val ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process
 val state_hash :
   ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
 
-(** [state_current_level ?block client] gets the corresponding PVM state current
-    level for the [block] (default ["head"]). *)
-val state_current_level :
-  ?hooks:Process_hooks.t -> ?block:string -> t -> int Runnable.process
-
 (** [state_value ?block client key] gets the corresponding PVM state value
     mapped to [key] for the [block] (default ["head"]). *)
 val state_value :
@@ -128,21 +123,6 @@ val inspect_durable_state_value :
   operation:'a durable_state_operation ->
   key:string ->
   'a Runnable.process
-
-(** [status ?block client] gets the corresponding PVM status for the [block]
-    (default ["head"]). *)
-val status :
-  ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
-
-(** [outbox ?block outbox_level client] gets the rollup outbox of
-   [outbox_level] as known to the [block] (default ["cemented"] which
-   is the block corresponding to the last cemented level). *)
-val outbox :
-  ?hooks:Process.hooks ->
-  ?block:string ->
-  outbox_level:int ->
-  t ->
-  JSON.t Runnable.process
 
 type outbox_proof = {commitment_hash : string; proof : string}
 

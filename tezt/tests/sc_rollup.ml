@@ -1046,7 +1046,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
       description = "rollup node boots into the initial state";
     }
     ~kind
-  @@ fun _protocol sc_rollup_node sc_rollup_client sc_rollup _node client ->
+  @@ fun _protocol sc_rollup_node _sc_rollup_client sc_rollup _node client ->
   let* genesis_info =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
@@ -1065,7 +1065,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
     Check.int
     ~error_msg:"Unexpected initial tick count (%L = %R)" ;
 
-  let*! status = Sc_rollup_client.status ~hooks sc_rollup_client in
+  let* status = Sc_rollup_helpers.status sc_rollup_node in
   let expected_status =
     match kind with
     | "arith" -> "Halted"
@@ -3836,9 +3836,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     let parameters = "37" in
     let message_index = 0 in
     let check_expected_outbox () =
-      let* outbox =
-        Runnable.run @@ Sc_rollup_client.outbox ~outbox_level sc_client
-      in
+      let* outbox = Sc_rollup_helpers.outbox ~outbox_level rollup_node in
       Log.info "Outbox is %s" (JSON.encode outbox) ;
 
       match expected_error with
@@ -4267,11 +4265,9 @@ let test_rpcs ~kind
       ["global"; "block"; "head"; "state_hash"]
   in
   let* _outbox =
-    Runnable.run
-    @@ Sc_rollup_client.outbox
-         ~hooks
-         ~outbox_level:l2_finalied_block_level
-         sc_client
+    Sc_rollup_helpers.outbox
+      ~outbox_level:l2_finalied_block_level
+      sc_rollup_node
   in
   let*! _head =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_head"]
@@ -4340,10 +4336,10 @@ let test_messages_processed_by_commitment ~kind =
     get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
 
-  let*! current_level =
-    Sc_rollup_client.state_current_level
+  let* current_level =
+    Sc_rollup_helpers.state_current_level
       ~block:(string_of_int inbox_level)
-      sc_rollup_client
+      sc_rollup_node
   in
   Check.((current_level = inbox_level) int)
     ~error_msg:

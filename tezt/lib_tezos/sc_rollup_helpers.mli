@@ -367,3 +367,17 @@ val injecting_refute_event : 'a -> Sc_rollup_node.t -> unit Lwt.t
 
 (** [total_ticks ?block sc_rollup_node] gets the total number of ticks for the PVM. *)
 val total_ticks : ?block:string -> Sc_rollup_node.t -> int Lwt.t
+
+(** [state_current_level ?block sc_rollup_node] gets the corresponding PVM state current
+    level for the [block] (default ["head"]). *)
+val state_current_level : ?block:string -> Sc_rollup_node.t -> int Lwt.t
+
+(** [status ?block sc_rollup_node] gets the corresponding PVM status for the [block]
+    (default ["head"]). *)
+val status : ?block:string -> Sc_rollup_node.t -> string Lwt.t
+
+(** [outbox ?block outbox_level sc_rollup_node] gets the rollup outbox of
+   [outbox_level] as known to the [block] (default ["cemented"] which
+   is the block corresponding to the last cemented level). *)
+val outbox :
+  ?block:string -> outbox_level:int -> Sc_rollup_node.t -> JSON.t Lwt.t
