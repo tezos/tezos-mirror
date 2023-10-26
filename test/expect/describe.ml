@@ -1942,4 +1942,26 @@ let%expect_test _ =
                    { "size": "Uint16", "endianness": "Little", "kind": "Int" },
                  "kind": "anon", "data_kind": { "size": 2, "kind": "Fixed" } } ] },
        "fields": [] } |}] ;
+  dump Data_encoding.(list_with_length `Uint30 bool) ;
+  [%expect
+    {|
+    +-----------------+----------+--------------------------------------------------------------------+
+    | Name            | Size     | Contents                                                           |
+    +=================+==========+====================================================================+
+    | Unnamed field 0 | 4 bytes  | unsigned 30-bit big-endian integer in the range 0 to 1073741823    |
+    +-----------------+----------+--------------------------------------------------------------------+
+    | Unnamed field 1 | Variable | sequence of at most 1073741823 boolean (0 for false, 255 for true) |
+    +-----------------+----------+--------------------------------------------------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "min": 0, "max": 1073741823, "kind": "RangedInt" },
+                 "kind": "anon", "data_kind": { "size": 4, "kind": "Fixed" } },
+               { "layout":
+                   { "layout": { "kind": "Bool" }, "kind": "Seq",
+                     "length_limit": { "kind": "at-most", "at_most": 1073741823 } },
+                 "kind": "anon", "data_kind": { "kind": "Variable" } } ] },
+       "fields": [] } |}] ;
   ()

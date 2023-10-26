@@ -283,6 +283,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         | Binary_error_types.Read_error (Invalid_int _) ->
           raise_read_error Array_too_long
       in
+      if len < 0 then
+        raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
       if len > max_length then raise_read_error Array_too_long ;
       read_fixed_array len e state
   | Array
@@ -308,6 +310,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         | Binary_error_types.Read_error (Invalid_int _) ->
           raise_read_error List_too_long
       in
+      if len < 0 then
+        raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
       if len > max_length then raise_read_error List_too_long ;
       read_fixed_list len e state
   | List
