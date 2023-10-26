@@ -174,17 +174,19 @@ type transaction_log = {
 }
 
 let transaction_log_body_from_rlp = function
-  | Rlp.List [Value address; List topics; Value data] ->
+  | Rlp.List [List [Value address; List topics; Value data]; Value index] ->
       ( decode_address address,
         List.map
           (function
             | Rlp.Value bytes -> decode_hash bytes
             | _ -> raise (Invalid_argument "Expected hash representing topic"))
           topics,
-        decode_hex data )
+        decode_hex data,
+        decode_number index )
   | _ ->
       raise
-        (Invalid_argument "Expected list of 3 elements representing log body")
+        (Invalid_argument
+           "Expected list of 2 elements representing an indexed log body")
 
 let transaction_log_encoding =
   let open Data_encoding in
@@ -290,8 +292,8 @@ let transaction_receipt_from_rlp block_hash bytes =
       in
       let logs_body = List.map transaction_log_body_from_rlp logs in
       let logs_objects =
-        List.mapi
-          (fun i (address, topics, data) ->
+        List.map
+          (fun (address, topics, data, logIndex) ->
             {
               address;
               topics;
@@ -300,7 +302,7 @@ let transaction_receipt_from_rlp block_hash bytes =
               blockNumber = Some block_number;
               transactionHash = Some hash;
               transactionIndex = Some index;
-              logIndex = Some (quantity_of_z (Z.of_int i));
+              logIndex = Some logIndex;
               removed = Some false;
             })
           logs_body
