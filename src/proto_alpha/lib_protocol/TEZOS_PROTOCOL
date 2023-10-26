@@ -164,7 +164,6 @@
         "Stake_storage",
         "Unstaked_frozen_deposits_storage",
         "Unstake_requests_storage",
-        "Frozen_deposits_storage",
         "Staking_pseudotokens_storage",
 
         "Contract_storage",

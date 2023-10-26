@@ -115,8 +115,13 @@ let migrate_staking_balance_for_o ctxt =
   let open Lwt_result_syntax in
   let convert ctxt delegate staking_balance =
     let delegate_contract = Contract_repr.Implicit delegate in
-    let* {current_amount = own_frozen; initial_amount = _} =
-      Frozen_deposits_storage.get ctxt delegate_contract
+    let* frozen_deposits_opt =
+      Storage.Contract.Frozen_deposits_up_to_Nairobi.find ctxt delegate_contract
+    in
+    let own_frozen =
+      match frozen_deposits_opt with
+      | Some {current_amount; initial_amount = _} -> current_amount
+      | None -> Tez_repr.zero
     in
     let delegated =
       Tez_repr.sub_opt staking_balance own_frozen
@@ -342,6 +347,9 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
             Signature.Public_key_hash.Set.empty
         in
         let* ctxt = migrate_staking_balance_for_o ctxt in
+        let*! ctxt =
+          Storage.Contract.Frozen_deposits_up_to_Nairobi.clear ctxt
+        in
         let* ctxt = clear_staking_balance_snapshots_for_o ctxt in
         let* ctxt = migrate_stake_distribution_for_o ctxt in
         let*! ctxt = initialize_total_supply_for_o chain_id ctxt in

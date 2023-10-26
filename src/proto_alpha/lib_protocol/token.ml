@@ -99,12 +99,7 @@ let credit ctxt receiver amount origin =
             in
             (ctxt, Commitments bpkh)
         | `Frozen_deposits staker ->
-            let+ ctxt =
-              Frozen_deposits_storage.credit_only_call_from_token
-                ctxt
-                staker
-                amount
-            in
+            let+ ctxt = Stake_storage.add_frozen_stake ctxt staker amount in
             (ctxt, Deposits staker)
         | `Unstaked_frozen_deposits (staker, cycle) ->
             let+ ctxt =
@@ -173,12 +168,7 @@ let spend ctxt giver amount origin =
             in
             (ctxt, Commitments bpkh)
         | `Frozen_deposits staker ->
-            let+ ctxt =
-              Frozen_deposits_storage.spend_only_call_from_token
-                ctxt
-                staker
-                amount
-            in
+            let+ ctxt = Stake_storage.remove_frozen_stake ctxt staker amount in
             (ctxt, Deposits staker)
         | `Unstaked_frozen_deposits (staker, cycle) ->
             let+ ctxt =

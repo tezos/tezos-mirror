@@ -452,7 +452,8 @@ module Contract = struct
       end)
       (Encoding.Z)
 
-  module Frozen_deposits =
+  (* Remove me in P. *)
+  module Frozen_deposits_up_to_Nairobi =
     Indexed_context.Make_map
       (Registered)
       (struct
