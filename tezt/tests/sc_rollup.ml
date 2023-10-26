@@ -5031,7 +5031,13 @@ let custom_mode_empty_operation_kinds ~kind =
     ~msg:(rex "Operation kinds for custom mode are empty.")
 
 let register_riscv () =
-  test_rollup_node_boots_into_initial_state [Protocol.Alpha] ~kind:"riscv"
+  test_rollup_node_boots_into_initial_state [Protocol.Alpha] ~kind:"riscv" ;
+  test_commitment_scenario
+    ~extra_tags:["modes"; "operator"]
+    ~variant:"operator_publishes"
+    (mode_publish Operator true)
+    [Protocol.Alpha]
+    ~kind:"riscv"
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
