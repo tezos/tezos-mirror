@@ -3598,6 +3598,171 @@ let test_l2_call_inter_contract =
   in
   unit
 
+let get_logs_request ?from_block ?to_block ?address ?topics () =
+  let parse_topic = function
+    | [] -> `Null
+    | [t] -> `String t
+    | l -> `A (List.map (fun s -> `String s) l)
+  in
+  let parameters : JSON.u =
+    `A
+      [
+        `O
+          (Option.fold
+             ~none:[]
+             ~some:(fun f -> [("fromBlock", `String f)])
+             from_block
+          @ Option.fold
+              ~none:[]
+              ~some:(fun t -> [("toBlock", `String t)])
+              to_block
+          @ Option.fold
+              ~none:[]
+              ~some:(fun a -> [("address", `String a)])
+              address
+          @ Option.fold
+              ~none:[]
+              ~some:(fun t -> [("topics", `A (List.map parse_topic t))])
+              topics);
+      ]
+  in
+  Evm_node.{method_ = "eth_getLogs"; parameters}
+
+let get_logs ?from_block ?to_block ?address ?topics proxy_server =
+  let* response =
+    Evm_node.call_evm_rpc
+      proxy_server
+      (get_logs_request ?from_block ?to_block ?address ?topics ())
+  in
+  return
+    JSON.(response |-> "result" |> as_list |> List.map Transaction.logs_of_json)
+
+let test_rpc_getLogs =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "rpc"; "get_logs"]
+    ~title:"Check getLogs RPC"
+  @@ fun protocol ->
+  (* setup *)
+  let* ({evm_node; node; client; sc_rollup_node; _} as evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let player = Eth_account.bootstrap_accounts.(1) in
+  (* deploy the contract *)
+  let* address, _tx = deploy ~contract:erc20 ~sender evm_setup in
+  let address = String.lowercase_ascii address in
+  Check.(
+    (address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+      string
+      ~error_msg:"Expected address to be %R but was %L.") ;
+  (* minting / burning *)
+  let call_mint (sender : Eth_account.t) n =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:erc20.label
+      ~address
+      ~method_call:(Printf.sprintf "mint(%d)" n)
+  in
+  let call_burn ?(expect_failure = false) (sender : Eth_account.t) n =
+    Eth_cli.contract_send
+      ~expect_failure
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:erc20.label
+      ~address
+      ~method_call:(Printf.sprintf "burn(%d)" n)
+  in
+  let transfer_event_topic =
+    let h =
+      Tezos_crypto.Hacl.Hash.Keccak_256.digest
+        (Bytes.of_string "Transfer(address,address,uint256)")
+    in
+    "0x" ^ Hex.show (Hex.of_bytes h)
+  in
+  let zero_address = "0x" ^ String.make 64 '0' in
+  let burn_logs sender amount =
+    [
+      ( address,
+        [transfer_event_topic; hex_256_of_address sender; zero_address],
+        "0x" ^ hex_256_of amount );
+    ]
+  in
+  (* sender mints 42 *)
+  let* tx1 =
+    wait_for_application ~sc_rollup_node ~node ~client (call_mint sender 42) ()
+  in
+  (* player mints 100 *)
+  let* _tx =
+    wait_for_application ~sc_rollup_node ~node ~client (call_mint player 100) ()
+  in
+  (* sender burns 42 *)
+  let* _tx =
+    wait_for_application ~sc_rollup_node ~node ~client (call_burn sender 42) ()
+  in
+  (* Check that there have been 3 logs in total *)
+  let* all_logs = get_logs ~from_block:"0" evm_node in
+  Check.((List.length all_logs = 3) int) ~error_msg:"Expected %R logs, got %L" ;
+  (* Check that the [address] contract has produced 3 logs in total *)
+  let* contract_logs = get_logs ~from_block:"0" ~address evm_node in
+  Check.((List.length contract_logs = 3) int)
+    ~error_msg:"Expected %R logs, got %L" ;
+  (* Check that there have been 3 logs with the transfer event topic *)
+  let* transfer_logs =
+    get_logs ~from_block:"0" ~topics:[[transfer_event_topic]] evm_node
+  in
+  Check.((List.length transfer_logs = 3) int)
+    ~error_msg:"Expected %R logs, got %L" ;
+  (* Check that [sender] appears in 2 logs.
+     Note: this would also match on a transfer from zero to zero. *)
+  let* sender_logs =
+    get_logs
+      ~from_block:"0"
+      ~topics:
+        [
+          [];
+          [hex_256_of_address sender; zero_address];
+          [hex_256_of_address sender; zero_address];
+        ]
+      evm_node
+  in
+  Check.((List.length sender_logs = 2) int)
+    ~error_msg:"Expected %R logs, got %L" ;
+  (* Look for a specific log, for the sender burn. *)
+  let* sender_burn_logs =
+    get_logs
+      ~from_block:"0"
+      ~topics:
+        [[transfer_event_topic]; [hex_256_of_address sender]; [zero_address]]
+      evm_node
+  in
+  Check.(
+    (List.map Transaction.extract_log_body sender_burn_logs
+    = burn_logs sender 42)
+      (list (tuple3 string (list string) string)))
+    ~error_msg:"Expected logs %R, got %L" ;
+  (* Check that a specific block has a log *)
+  let* tx1_receipt =
+    get_transaction_receipt ~full_evm_setup:evm_setup ~tx_hash:tx1
+  in
+  let* tx1_block_logs =
+    get_logs
+      ~from_block:(Int32.to_string tx1_receipt.blockNumber)
+      ~to_block:(Int32.to_string tx1_receipt.blockNumber)
+      evm_node
+  in
+  Check.((List.length tx1_block_logs = 1) int)
+    ~error_msg:"Expected %R logs, got %L" ;
+  (* Check no logs after transactions *)
+  let* no_logs_start = next_evm_level ~sc_rollup_node ~node ~client in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  let* new_logs = get_logs ~from_block:(string_of_int no_logs_start) evm_node in
+  Check.((List.length new_logs = 0) int) ~error_msg:"Expected %R logs, got %L" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -3662,7 +3827,8 @@ let register_evm_node ~protocols =
   test_rpc_sendRawTransaction_with_consecutive_nonce protocols ;
   test_rpc_sendRawTransaction_not_included protocols ;
   test_originate_evm_kernel_and_dump_pvm_state protocols ;
-  test_l2_call_inter_contract protocols
+  test_l2_call_inter_contract protocols ;
+  test_rpc_getLogs protocols
 
 let register ~protocols = register_evm_node ~protocols
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6591
