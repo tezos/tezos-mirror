@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -11,7 +12,10 @@ build:
 ifdef EVM_KERNEL_FEATURES
 	$(eval FEATURES := --features ${EVM_KERNEL_FEATURES})
 endif
-	@cargo build --target wasm32-unknown-unknown --release ${FEATURES}
+ifdef EXCLUDE_MEMBER
+	$(eval EXCLUDE := --workspace --exclude ${EXCLUDE_MEMBER})
+endif
+	@cargo build --target wasm32-unknown-unknown --release ${EXCLUDE} ${FEATURES}
 
 .PHONY: build-deps
 build-deps:
