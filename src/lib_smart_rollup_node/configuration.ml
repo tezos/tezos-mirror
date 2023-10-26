@@ -96,7 +96,7 @@ type history_mode = Archive | Full
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
-  sc_rollup_node_operators : operators;
+  operators : operators;
   rpc_addr : string;
   rpc_port : int;
   metrics_addr : string option;
@@ -635,7 +635,7 @@ let encoding : t Data_encoding.t =
     (fun {
            sc_rollup_address;
            boot_sector_file;
-           sc_rollup_node_operators;
+           operators;
            rpc_addr;
            rpc_port;
            metrics_addr;
@@ -661,7 +661,7 @@ let encoding : t Data_encoding.t =
          } ->
       ( ( sc_rollup_address,
           boot_sector_file,
-          sc_rollup_node_operators,
+          operators,
           rpc_addr,
           rpc_port,
           metrics_addr,
@@ -686,7 +686,7 @@ let encoding : t Data_encoding.t =
             cors ) ) ))
     (fun ( ( sc_rollup_address,
              boot_sector_file,
-             sc_rollup_node_operators,
+             operators,
              rpc_addr,
              rpc_port,
              metrics_addr,
@@ -712,7 +712,7 @@ let encoding : t Data_encoding.t =
       {
         sc_rollup_address;
         boot_sector_file;
-        sc_rollup_node_operators;
+        operators;
         rpc_addr;
         rpc_port;
         metrics_addr;
@@ -839,8 +839,7 @@ let check_mode config =
   let check_purposes purposes =
     let missing_operators =
       List.filter
-        (fun p ->
-          not (Operator_purpose_map.mem p config.sc_rollup_node_operators))
+        (fun p -> not (Operator_purpose_map.mem p config.operators))
         purposes
     in
     if missing_operators <> [] then
@@ -851,12 +850,12 @@ let check_mode config =
   in
   let narrow_purposes purposes =
     let* () = check_purposes purposes in
-    let sc_rollup_node_operators =
+    let operators =
       Operator_purpose_map.filter
         (fun op_purpose _ -> List.mem ~equal:Stdlib.( = ) op_purpose purposes)
-        config.sc_rollup_node_operators
+        config.operators
     in
-    return {config with sc_rollup_node_operators}
+    return {config with operators}
   in
   match config.mode with
   | Custom [] -> tzfail Empty_operation_kinds_for_custom_mode
@@ -904,13 +903,13 @@ let load ~data_dir =
   config
 
 module Cli = struct
-  let make_operators sc_rollup_node_operators =
+  let make_operators operators =
     let purposed_operators, default_operators =
       List.partition_map
         (function
           | `Purpose p_operator -> Left p_operator
           | `Default operator -> Right operator)
-        sc_rollup_node_operators
+        operators
     in
     let default_operator =
       match default_operators with
@@ -923,15 +922,15 @@ module Cli = struct
   let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
       ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-      ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
-    let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
+      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers =
+    let operators = make_operators operators in
     let config =
       {
         sc_rollup_address;
         boot_sector_file;
-        sc_rollup_node_operators;
+        operators;
         rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
         rpc_port = Option.value ~default:default_rpc_port rpc_port;
         reconnection_delay =
@@ -986,18 +985,16 @@ module Cli = struct
       ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
       ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
-      ~boot_sector_file ~sc_rollup_node_operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers =
-    let new_sc_rollup_node_operators =
-      make_operators sc_rollup_node_operators
-    in
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
+      ~allowed_origins ~allowed_headers =
+    let new_operators = make_operators operators in
     (* Merge operators *)
-    let sc_rollup_node_operators =
+    let operators =
       Operator_purpose_map.merge
         (fun _purpose -> Option.either)
-        new_sc_rollup_node_operators
-        configuration.sc_rollup_node_operators
+        new_operators
+        configuration.operators
     in
 
     let configuration =
@@ -1009,7 +1006,7 @@ module Cli = struct
             sc_rollup_address;
         boot_sector_file =
           Option.either boot_sector_file configuration.boot_sector_file;
-        sc_rollup_node_operators;
+        operators;
         mode = Option.value ~default:configuration.mode mode;
         rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
         rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -1071,9 +1068,9 @@ module Cli = struct
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
       ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
       ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
-      ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
+      ~mode ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -1110,7 +1107,7 @@ module Cli = struct
           ~mode
           ~sc_rollup_address
           ~boot_sector_file
-          ~sc_rollup_node_operators
+          ~operators
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
@@ -1157,7 +1154,7 @@ module Cli = struct
           ~mode
           ~sc_rollup_address
           ~boot_sector_file
-          ~sc_rollup_node_operators
+          ~operators
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug

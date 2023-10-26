@@ -51,11 +51,7 @@ let start_workers (configuration : Configuration.t)
   let open Lwt_result_syntax in
   let* () = Publisher.init node_ctxt in
   let* () =
-    match
-      Configuration.Operator_purpose_map.find
-        Batching
-        node_ctxt.config.sc_rollup_node_operators
-    with
+    match Node_context.get_operator node_ctxt Batching with
     | None -> return_unit
     | Some signer -> Batcher.init plugin configuration.batcher ~signer node_ctxt
   in
@@ -370,8 +366,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let start () =
     let signers =
-      Configuration.Operator_purpose_map.bindings
-        node_ctxt.config.sc_rollup_node_operators
+      Configuration.Operator_purpose_map.bindings node_ctxt.config.operators
       |> List.fold_left
            (fun acc (purpose, operator) ->
              let operation_kinds =
@@ -581,7 +576,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       (fun _purpose operator ->
         let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
         ())
-      configuration.sc_rollup_node_operators
+      configuration.operators
   in
   let* l1_ctxt =
     Layer1.start
@@ -596,9 +591,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
   let publisher =
-    Configuration.Operator_purpose_map.find
-      Operating
-      configuration.sc_rollup_node_operators
+    Configuration.Operator_purpose_map.find Operating configuration.operators
   in
 
   let* protocol, plugin = plugin_of_first_block cctxt head in

@@ -74,14 +74,12 @@ type rw = [`Read | `Write] t
 type ro = [`Read] t
 
 let get_operator node_ctxt purpose =
-  Configuration.Operator_purpose_map.find
-    purpose
-    node_ctxt.config.sc_rollup_node_operators
+  Configuration.Operator_purpose_map.find purpose node_ctxt.config.operators
 
 let is_operator node_ctxt pkh =
   Configuration.Operator_purpose_map.exists
     (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
-    node_ctxt.config.sc_rollup_node_operators
+    node_ctxt.config.operators
 
 let is_accuser node_ctxt = node_ctxt.config.mode = Accuser
 
@@ -1162,7 +1160,7 @@ module Internal_for_tests = struct
         {
           sc_rollup_address = rollup_address;
           boot_sector_file = None;
-          sc_rollup_node_operators = operators;
+          operators;
           rpc_addr = Configuration.default_rpc_addr;
           rpc_port = Configuration.default_rpc_port;
           metrics_addr = None;

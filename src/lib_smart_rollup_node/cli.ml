@@ -44,7 +44,7 @@ let sc_rollup_address_arg : (_, Client_context.full) Tezos_clic.arg =
 
 (* Rollup node only arguments *)
 
-let sc_rollup_node_operator_param next =
+let operator_param next =
   let open Lwt_result_syntax in
   let format_purpose_list purposes =
     let pp_purpose fmt purpose =
