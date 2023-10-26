@@ -26,6 +26,8 @@
 
 # Add variables for bisect_ppx instrumentation
 .template__coverage:
+  extends:
+    - .tags_template__gcp
   variables:
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
     BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"

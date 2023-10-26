@@ -1,6 +1,7 @@
 .install_python_debian_ubuntu_template:
   extends:
     - .default_settings_template
+    - .tags_template__gcp
   stage: doc
   needs: [trigger]
   rules:
@@ -15,15 +16,6 @@
       when: on_success
     - when: manual
       allow_failure: true
-  before_script:
-    # Trigger an allowed fail on runner that do not have the tezos tag
-    # This condition means this job MUST be run under Tezos namespace
-    - if ! echo $CI_RUNNER_TAGS | grep -qe '\btezos\b'; then
-        echo -e "\e[33m/.\ This test is skipped on runners lacking the tezos tag\e[0m";
-        exit 137;
-      fi
-  allow_failure:
-    exit_codes: 137
   script:
     - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
