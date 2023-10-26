@@ -46,6 +46,7 @@ mod migration;
 mod mock_internal;
 mod parsing;
 mod safe_storage;
+mod sequencer_blueprint;
 mod simulation;
 mod storage;
 mod tick_model;
@@ -89,7 +90,7 @@ pub fn stage_one<Host: Runtime>(
     chain_id: U256,
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-    _is_sequencer: bool,
+    is_sequencer: bool,
 ) -> Result<Queue, anyhow::Error> {
     log!(host, Info, "Entering stage one.");
     log!(
@@ -102,7 +103,14 @@ pub fn stage_one<Host: Runtime>(
 
     // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
     // if rebooted, don't fetch inbox
-    let queue = fetch(host, smart_rollup_address, chain_id, ticketer, admin)?;
+    let queue = fetch(
+        host,
+        smart_rollup_address,
+        chain_id,
+        ticketer,
+        admin,
+        is_sequencer,
+    )?;
 
     for (i, queue_elt) in queue.proposals.iter().enumerate() {
         match queue_elt {

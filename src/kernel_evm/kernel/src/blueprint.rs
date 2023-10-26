@@ -6,13 +6,15 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
-use crate::current_timestamp;
 use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
+use crate::sequencer_blueprint::SequencerBlueprint;
 use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
+use crate::{current_timestamp, sequencer_blueprint};
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
+
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -21,6 +23,15 @@ use tezos_smart_rollup_host::runtime::Runtime;
 pub struct Blueprint {
     pub transactions: Vec<Transaction>,
     pub timestamp: Timestamp,
+}
+
+impl From<SequencerBlueprint> for Blueprint {
+    fn from(seq_blueprint: SequencerBlueprint) -> Self {
+        Self {
+            transactions: seq_blueprint.transactions,
+            timestamp: seq_blueprint.timestamp,
+        }
+    }
 }
 
 impl Encodable for Blueprint {
@@ -167,7 +178,7 @@ fn filter_invalid_transactions(
         .collect()
 }
 
-pub fn fetch<Host: Runtime>(
+pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     chain_id: U256,
@@ -186,6 +197,35 @@ pub fn fetch<Host: Runtime>(
         proposals: vec![blueprint],
         kernel_upgrade: inbox_content.kernel_upgrade,
     })
+}
+
+fn fetch_sequencer_blueprints<Host: Runtime>(
+    host: &mut Host,
+) -> Result<Queue, anyhow::Error> {
+    let seq_blueprints = sequencer_blueprint::fetch(host)?;
+    let proposals = seq_blueprints
+        .into_iter()
+        .map(|sb| QueueElement::Blueprint(From::from(sb)))
+        .collect();
+    Ok(Queue {
+        proposals,
+        kernel_upgrade: None,
+    })
+}
+
+pub fn fetch<Host: Runtime>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+    chain_id: U256,
+    ticketer: Option<ContractKt1Hash>,
+    admin: Option<ContractKt1Hash>,
+    is_sequencer: bool,
+) -> Result<Queue, anyhow::Error> {
+    if is_sequencer {
+        fetch_sequencer_blueprints(host)
+    } else {
+        fetch_inbox_blueprints(host, smart_rollup_address, chain_id, ticketer, admin)
+    }
 }
 
 #[cfg(test)]
