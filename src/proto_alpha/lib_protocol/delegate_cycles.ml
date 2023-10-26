@@ -134,6 +134,14 @@ let adjust_frozen_stakes ctxt :
           ctxt
           full_staking_balance
       in
+      let* deposit_limit =
+        Delegate_storage.frozen_deposits_limit ctxt delegate
+      in
+      let optimal_frozen =
+        match deposit_limit with
+        | None -> optimal_frozen
+        | Some deposit_limit -> Tez_repr.min optimal_frozen deposit_limit
+      in
       let* ctxt, new_balance_updates =
         if Tez_repr.(optimal_frozen > own_frozen) then
           let*? optimal_to_stake = Tez_repr.(optimal_frozen -? own_frozen) in
