@@ -212,6 +212,15 @@ module P2P : sig
     ; query : < wait : bool > >
     service
 
+  val get_points :
+    < meth : [`GET]
+    ; input : unit
+    ; output : P2p_point.Id.t list
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service
+
   module Gossipsub : sig
     val get_topics :
       < meth : [`GET]

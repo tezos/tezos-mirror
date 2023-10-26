@@ -307,6 +307,20 @@ module P2P = struct
       ~output:Data_encoding.unit
       (open_root / "peer" /: P2p_peer.Id.rpc_arg / "disconnect")
 
+  let get_points :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_point.Id.t list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service =
+    Tezos_rpc.Service.get_service
+      ~description:"Get list of points"
+      ~query:connected_query
+      ~output:Data_encoding.(list (obj1 (req "point" P2p_point.Id.encoding)))
+      (open_root / "points")
+
   module Gossipsub = struct
     let open_root = open_root / "gossipsub"
 

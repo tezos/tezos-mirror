@@ -115,6 +115,17 @@ module Transport_layer = struct
         match P2p_pool.Connection.find_by_point pool point with
         | None -> return_unit
         | Some conn -> P2p_conn.disconnect ?wait ~reason:Explicit_RPC conn)
+
+  let get_points p2p =
+    let open Lwt_result_syntax in
+    match P2p.pool p2p with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some pool ->
+        P2p_pool.Points.fold_known
+          ~init:[]
+          ~f:(fun point _info acc -> point :: acc)
+          pool
+        |> return
 end
 
 module Transport_layer_hooks = Gs_transport_connection

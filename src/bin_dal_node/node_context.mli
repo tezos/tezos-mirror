@@ -170,6 +170,8 @@ module P2P : sig
       it may occur that a discconnection takes several minutes. *)
   val disconnect_peer : t -> ?wait:bool -> P2p_peer.Id.t -> unit Lwt.t
 
+  val get_points : t -> P2p_point.Id.t list tzresult Lwt.t
+
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list

@@ -191,6 +191,8 @@ module P2P = struct
     let*! () = Node_context.P2P.disconnect_peer ctxt ~wait:q#wait peer in
     return_unit
 
+  let get_points ctxt () () = Node_context.P2P.get_points ctxt
+
   module Gossipsub = struct
     let get_topics ctxt () () =
       let open Lwt_result_syntax in
@@ -273,6 +275,10 @@ let register_new :
        Tezos_rpc.Directory.register1
        Services.P2P.delete_disconnect_peer
        (P2P.disconnect_peer ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.get_points
+       (P2P.get_points ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
