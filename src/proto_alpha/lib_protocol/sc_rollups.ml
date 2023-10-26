@@ -104,7 +104,7 @@ module Kind = struct
     function
     | Example_arith -> (module Sc_rollup_machine_no_proofs.Arith)
     | Wasm_2_0_0 -> (module Sc_rollup_machine_no_proofs.Wasm)
-    | Riscv -> assert false
+    | Riscv -> (module Sc_rollup_machine_no_proofs.Riscv)
 end
 
 let genesis_state_hash_of ~boot_sector kind =

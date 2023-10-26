@@ -26,11 +26,15 @@ module Embed_into_Irmin
     (P : Sc_rollup.PVM.S)
     (S : Serializable_state_S
            with type context = P.context
-            and type state = P.state) :
-  Sc_rollup.PVM.S
-    with type context = Context.rw_index
-     and type state = Context.tree
-     and type hash = Sc_rollup.State_hash.t = struct
+            and type state = P.state) : sig
+  include
+    Sc_rollup.PVM.S
+      with type context = Context.rw_index
+       and type state = Context.tree
+       and type hash = Sc_rollup.State_hash.t
+
+  val decode : Context.tree -> P.state Lwt.t
+end = struct
   (* We need to instantiate this functor to access the underlying Tree module. *)
   module Irmin_proof_format =
     Context.Proof
@@ -164,7 +168,10 @@ include
 
 let kind = Sc_rollup.Kind.Riscv
 
-let get_tick _state = Lwt.return Sc_rollup.Tick.initial
+let get_tick state =
+  let open Lwt_syntax in
+  let* state = decode state in
+  Lwt.return (Sc_rollup.Tick.of_z state.Sc_rollup_riscv.tick)
 
 type status = Riscv_dummy_status
 

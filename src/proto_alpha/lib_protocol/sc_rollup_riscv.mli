@@ -11,6 +11,7 @@ type minimal_state = {
   payload : string;
   level : Raw_level_repr.t option;
   message_counter : Z.t;
+  tick : Z.t;
 }
 
 (* This encoding is used in the rollup node when embedding the state into an Irmin context. *)
