@@ -174,7 +174,7 @@ let liquidity_baking_toggle_vote_arg =
 let state_recorder_switch_arg =
   let open Baking_configuration in
   Tezos_clic.map_arg
-    ~f:(fun _cctxt flag -> if flag then return Filesystem else return Disabled)
+    ~f:(fun _cctxt flag -> if flag then return Filesystem else return Memory)
     (Tezos_clic.switch
        ~long:"record-state"
        ~doc:

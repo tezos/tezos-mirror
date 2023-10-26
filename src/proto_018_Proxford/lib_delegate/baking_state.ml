@@ -558,8 +558,7 @@ let () =
 
 let may_record_new_state ~previous_state ~new_state =
   let open Lwt_result_syntax in
-  if
-    new_state.global_state.config.state_recorder = Baking_configuration.Disabled
+  if new_state.global_state.config.state_recorder = Baking_configuration.Memory
   then return_unit
   else
     let {

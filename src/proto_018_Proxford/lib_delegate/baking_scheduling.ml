@@ -774,7 +774,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
     match config.Baking_configuration.state_recorder with
     | Baking_configuration.Filesystem ->
         Baking_state.may_record_new_state ~previous_state:state ~new_state
-    | Baking_configuration.Disabled -> return_unit
+    | Baking_configuration.Memory -> return_unit
   in
   let*! state', action = State_transitions.step state event in
   let* state'' =

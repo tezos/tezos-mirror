@@ -524,8 +524,7 @@ let () =
     (fun () -> Broken_locked_values_invariant)
 
 let may_record_new_state ~previous_state ~new_state =
-  if
-    new_state.global_state.config.state_recorder = Baking_configuration.Disabled
+  if new_state.global_state.config.state_recorder = Baking_configuration.Memory
   then return_unit
   else
     let {
