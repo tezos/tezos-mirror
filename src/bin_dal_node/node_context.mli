@@ -146,6 +146,30 @@ module P2P : sig
   val connect :
     t -> ?timeout:Ptime.Span.t -> P2p_point.Id.t -> unit tzresult Lwt.t
 
+  (** [disconnect_point t ?wait point] initiaties a disconnection to
+      the point [point]. The promise returned by this function is
+      fullfiled when the socket is closed on our side. If [wait] is
+      [true], we do not close the socket before having canceled all
+      the current messages in the write buffer. Should not matter in
+      practice.
+
+      Due to the following issue https://gitlab.com/tezos/tezos/-/issues/5319
+
+      it may occur that a discconnection takes several minutes. *)
+  val disconnect_point : t -> ?wait:bool -> P2p_point.Id.t -> unit Lwt.t
+
+  (** [disconnect_peer t ?wait point] initiaties a disconnection to
+      the point [peer]. The promise returned by this function is
+      fullfiled when the socket is closed on our side. If [wait] is
+      [true], we do not close the socket before having canceled all
+      the current messages in the write buffer. Should not matter in
+      practice.
+
+      Due to the following issue https://gitlab.com/tezos/tezos/-/issues/5319
+
+      it may occur that a discconnection takes several minutes. *)
+  val disconnect_peer : t -> ?wait:bool -> P2p_peer.Id.t -> unit Lwt.t
+
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list

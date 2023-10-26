@@ -100,6 +100,31 @@ module Transport_layer : sig
       [timeout] to complete. *)
   val connect :
     t -> ?timeout:Ptime.Span.t -> P2p_point.Id.t -> unit tzresult Lwt.t
+
+  (** [disconnect_point t ?wait point] initiaties a disconnection to
+      the point [point]. The promise returned by this function is
+      fullfiled when the socket is closed on our side. If [wait] is
+      [true], we do not close the socket before having canceled all
+      the current messages in the write buffer. Should not matter in
+      practice.
+
+      Due to the following issue https://gitlab.com/tezos/tezos/-/issues/5319
+
+      it may occur that a discconnection takes several minutes. *)
+  val disconnect_point : t -> ?wait:bool -> P2p_point.Id.t -> unit Lwt.t
+
+  (** [disconnect_peer t ?wait point] initiaties a disconnection to
+      the point [peer]. The promise returned by this function is
+      fullfiled when the socket is closed on our side. If [wait] is
+      [true], we do not close the socket before having canceled all
+      the current messages in the write buffer. Should not matter in
+      practice.
+
+      Due to the following issue https://gitlab.com/tezos/tezos/-/issues/5319
+
+      it may occur that a discconnection takes several minutes. *)
+  val disconnect_peer :
+    t -> ?wait:bool -> Crypto_box.Public_key_hash.t -> unit Lwt.t
 end
 
 (** This module implements the list of hooks that allow interconnecting the

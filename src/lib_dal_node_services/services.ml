@@ -279,6 +279,34 @@ module P2P = struct
       ~output:Data_encoding.unit
       (open_root / "connect")
 
+  let delete_disconnect_point :
+      < meth : [`DELETE]
+      ; input : unit
+      ; output : unit
+      ; prefix : unit
+      ; params : unit * P2p_point.Id.t
+      ; query : < wait : bool > >
+      service =
+    Tezos_rpc.Service.delete_service
+      ~description:"Disconnect from a point"
+      ~query:wait_query
+      ~output:Data_encoding.unit
+      (open_root / "point" /: P2p_point.Id.rpc_arg / "disconnect")
+
+  let delete_disconnect_peer :
+      < meth : [`DELETE]
+      ; input : unit
+      ; output : unit
+      ; prefix : unit
+      ; params : unit * P2p_peer.Id.t
+      ; query : < wait : bool > >
+      service =
+    Tezos_rpc.Service.delete_service
+      ~description:"Disconnect from a peer"
+      ~query:wait_query
+      ~output:Data_encoding.unit
+      (open_root / "peer" /: P2p_peer.Id.rpc_arg / "disconnect")
+
   module Gossipsub = struct
     let open_root = open_root / "gossipsub"
 

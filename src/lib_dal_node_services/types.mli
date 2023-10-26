@@ -213,6 +213,8 @@ type with_proof = {with_proof : bool}
 
 val slot_id_query : (level option * shard_index option) Resto.Query.t
 
+val wait_query : < wait : bool > Resto.Query.t
+
 val opt_header_status_query : header_status option Resto.Query.t
 
 val slot_encoding : Cryptobox.slot Data_encoding.t
