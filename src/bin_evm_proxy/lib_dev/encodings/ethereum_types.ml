@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -967,3 +968,26 @@ let txpool_encoding =
 let hash_raw_tx str =
   str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
   |> Bytes.to_string
+
+(** [transaction_nonce raw_tx] returns the nonce of a given raw transaction. *)
+let transaction_nonce raw_tx =
+  let bytes = hex_to_bytes raw_tx in
+  if String.starts_with ~prefix:"01" bytes then
+    (* eip 2930*)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _])
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _; _]) ->
+        decode_number nonce
+    | _ -> raise (Invalid_argument "Expected a List of 9 or 12 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* eip 1559*)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _])
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _]) ->
+        decode_number nonce
+    | _ -> raise (Invalid_argument "Expected a List of 8 or 11 elements")
+  else
+    (* Legacy *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [Value nonce; _; _; _; _; _; _; _; _]) -> decode_number nonce
+    | _ -> raise (Invalid_argument "Expected a List of 9 elements")
