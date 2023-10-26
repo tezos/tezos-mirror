@@ -132,6 +132,10 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                  We return empty string in this case, as done in the slow executon. *)
               Lwt.return ""
           | Ok (Some b) -> Lwt.return (Bytes.to_string b))
+      | Reveal_dal_parameters _ ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6543
+             Support reveal_dal_parameters in fast execution PVM. *)
+          assert false
     in
     let eval_tick fuel failing_ticks state =
       let max_steps = F.max_ticks fuel in
@@ -242,6 +246,10 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | None -> abort state fuel current_tick
           | Some fuel ->
               go fuel (Int64.succ current_tick) failing_ticks next_state)
+      | Needs_reveal (Reveal_dal_parameters _) ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6544
+             Support reveal_dal_parameters in slow execution PVM. *)
+          assert false
       | Initial | First_after _ ->
           complete state fuel current_tick failing_ticks
     in

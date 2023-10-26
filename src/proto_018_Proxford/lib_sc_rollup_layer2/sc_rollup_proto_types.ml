@@ -466,8 +466,11 @@ module Constants = struct
     Constants.Parametric.sc_rollup_reveal_activation_level
 
   let reveal_activation_level_of_octez
-      Octez_smart_rollup.Rollup_constants.{blake2B; metadata; dal_page} :
+      Octez_smart_rollup.Rollup_constants.
+        {blake2B; metadata; dal_page; dal_parameters = _} :
       reveal_activation_level =
+    (* We ignore the [dal_parameters] field as revealing DAL parameters
+       is not implemented in Oxford. *)
     {
       raw_data = {blake2B = Raw_level.of_int32_exn blake2B};
       metadata = Raw_level.of_int32_exn metadata;
@@ -481,5 +484,8 @@ module Constants = struct
       blake2B = Raw_level.to_int32 blake2B;
       metadata = Raw_level.to_int32 metadata;
       dal_page = Raw_level.to_int32 dal_page;
+      (* We effectively disable revealing DAL parameters as it is not
+         implemented in Oxford. *)
+      dal_parameters = Int32.max_int;
     }
 end
