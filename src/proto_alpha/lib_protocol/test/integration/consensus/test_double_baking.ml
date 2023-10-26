@@ -307,7 +307,6 @@ let test_payload_producer_gets_evidence_rewards () =
       b1
   in
   (* The denunciation happened but no slashing nor reward happened yet. *)
-  (* the frozen deposits of the double-signer [baker1] are slashed *)
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B b1) baker1
   in
@@ -342,6 +341,7 @@ let test_payload_producer_gets_evidence_rewards () =
   let expected_frozen_deposits_after =
     Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
   in
+  (* the frozen deposits of the double-signer [baker1] are slashed *)
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
