@@ -88,9 +88,6 @@ This sequence of operations was run:
 ./octez-smart-rollup-client-PtNairob rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-smart-rollup-client-PtNairob rpc get /global/block/head/total_ticks
-"143000000000"
-
 ./octez-client --wait none send smart rollup message '[SMART_ROLLUP_EXTERNAL_MESSAGES]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 186.288 units (will add 100 for safety)
@@ -118,9 +115,6 @@ This sequence of operations was run:
 
 ./octez-smart-rollup-client-PtNairob rpc get /global/block/12/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-PtNairob rpc get /global/block/12/total_ticks
-"341000000000"
 
 ./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from bootstrap1 for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof '[SMART_ROLLUP_BYTES]' --burn-cap 10
 Node is bootstrapped.
