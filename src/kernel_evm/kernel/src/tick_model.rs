@@ -41,10 +41,6 @@ pub mod constants {
     /// of ticks.
     pub const SAFETY_MARGIN: u64 = 2_000_000_000;
 
-    /// Overapproximation of the number of ticks the kernel uses to initialise and
-    /// reload its state
-    pub const INITIALISATION_OVERHEAD: u64 = 1_000_000_000;
-
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
 
@@ -53,6 +49,41 @@ pub mod constants {
     /// set a limit, we could reboot again and again until the transaction
     /// fits in a reboot, which will never happen.
     pub const MAX_TRANSACTION_GAS_LIMIT: u64 = MAX_ALLOWED_TICKS / TICKS_PER_GAS;
+
+    /// Overapproximation of the upper bound of the number of ticks used to
+    /// fetch the inbox. Considers an inbox with the size of a full block, and
+    /// apply a tick model affine in the size of the inbox.
+    pub const FETCH_UPPER_BOUND: u64 = 350_000_000;
+
+    /// Overapproximation of the number of ticks used in kernel initialization
+    pub const KERNEL_INITIALIZATION: u64 = 50_000_000;
+
+    /// Overapproximation of the number of ticks the kernel uses to initialise and
+    /// reload its state.
+    /// TODO: #6091
+    /// Hidden hypothesis here: BIP reading is equivalent to fetch (TBV)
+    pub const INITIALISATION_OVERHEAD: u64 = FETCH_UPPER_BOUND + KERNEL_INITIALIZATION;
+
+    /// Overapproximation of the upper bound of the number of ticks used to
+    /// finalize a block. Considers a block corresponding to an inbox full of
+    /// transfers, and apply a tick model affine in the number of tx.
+    pub const FINALIZE_UPPER_BOUND: u64 = 150_000_000;
+
+    /// The number of ticks used for storing receipt is overapproximated by
+    /// an affine function of the size of the receipt
+    pub const RECEIPT_TICKS_COEF: u64 = 960;
+    pub const RECEIPT_TICKS_INTERCEPT: u64 = 200_000;
+
+    /// The number of ticks used for storing transactions is overapproximated by
+    /// an affine function of the size of the transaction
+    pub const TX_OBJ_TICKS_COEF: u64 = 880;
+    pub const TX_OBJ_TICKS_INTERCEPT: u64 = 200_000;
+
+    /// The number of ticks used to compute the bloom filter is overapproximated
+    /// by an affine function of the size of the bloom
+    /// (nb of logs + nb of topics)
+    pub const BLOOM_TICKS_INTERCEPT: u64 = 10000;
+    pub const BLOOM_TICKS_COEF: u64 = 85000;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
@@ -109,4 +140,28 @@ pub fn ticks_of_valid_transaction_ethereum(
         Some(outcome) => ticks_of_gas(outcome.gas_used),
         None => ticks_of_gas(transaction.gas_limit),
     }
+}
+
+pub fn bloom_size(logs: &[tezos_ethereum::Log]) -> usize {
+    let mut size = 0;
+    // for n in 0..logs.len() {
+    for item in logs.iter() {
+        size += item.topics.len();
+    }
+    size
+}
+
+pub fn ticks_of_register(receipt_size: u64, obj_size: u64, bloom_size: u64) -> u64 {
+    let receipt_ticks: u64 = receipt_size
+        .saturating_mul(constants::RECEIPT_TICKS_COEF)
+        .saturating_add(constants::RECEIPT_TICKS_INTERCEPT);
+    let obj_ticks: u64 = obj_size
+        .saturating_mul(constants::TX_OBJ_TICKS_COEF)
+        .saturating_add(constants::TX_OBJ_TICKS_INTERCEPT);
+    let bloom_ticks: u64 = bloom_size
+        .saturating_mul(constants::BLOOM_TICKS_COEF)
+        .saturating_add(constants::BLOOM_TICKS_INTERCEPT);
+    receipt_ticks
+        .saturating_add(obj_ticks)
+        .saturating_add(bloom_ticks)
 }
