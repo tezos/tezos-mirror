@@ -350,6 +350,8 @@ val bake_while_with_metadata :
 
 val current_cycle : block -> Cycle.t
 
+val last_block_of_cycle : block -> bool
+
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
     that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
 val bake_until_cycle_end :
