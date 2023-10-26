@@ -50,6 +50,6 @@ txs.push(utils.send(player1, create.addr, 0, call_getEthSignedMessageHash))
 
 // following tx needs more than 3999000 gas
 // tick model can't accept more for now
-txs.push(utils.send(player1, create.addr, 0, call_verify, gasLimit = 3999000))
+txs.push(utils.send(player1, create.addr, 0, call_verify, { gasLimit: 3999000 }))
 
 utils.print_bench([txs])
