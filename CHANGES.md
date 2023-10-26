@@ -68,7 +68,7 @@ v0.7:
 v0.7.1:  
 - fixed binary-schema reference duplication issue
 
-v1.0.0:
+v1.0.0:  
 - merge in the json-data-encoding repository
 - allow bigstring encodings
 - allow to chose endianness of integers
@@ -77,3 +77,5 @@ v1.0.0:
 - improve self documentation of compact encodings
 - improve (further) error management when converting lazy-bytes into JSON
 
+v1.0.1:  
+- fixed a bug where negative lengths were accepted by the binary reader
