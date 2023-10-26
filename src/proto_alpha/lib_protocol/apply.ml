@@ -2863,6 +2863,13 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
+  (* Compute consumed gas earlier, in case maintenance actions performed below
+     are carbonated. *)
+  let consumed_gas =
+    Gas.Arith.sub
+      (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
+      (Gas.block_level ctxt)
+  in
   let level = Level.current ctxt in
   let attestation_power = Consensus.current_attestation_power ctxt in
   let* required_attestations =
@@ -2878,7 +2885,6 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   (* We mark the attestation branch as the grand parent branch when
      accessible. This will not be present before the first two blocks
      of tenderbake. *)
-  let level = Level.current ctxt in
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
   let*! ctxt =
@@ -2930,11 +2936,6 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   let* ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
-  in
-  let consumed_gas =
-    Gas.Arith.sub
-      (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
-      (Gas.block_level ctxt)
   in
   let+ voting_period_info = Voting_period.get_rpc_current_info ctxt in
   let receipt =
