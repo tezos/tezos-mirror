@@ -48,6 +48,9 @@ end = struct
 
   let bake_n = Block.bake_n ~baking_mode:Mode.baking_mode
 
+  let bake_until_cycle_end =
+    Block.bake_until_cycle_end ~baking_mode:Mode.baking_mode
+
   (****************************************************************)
   (*                    Utility functions                         *)
   (****************************************************************)
@@ -135,6 +138,13 @@ end = struct
     in
     (* let's bake the block on top of pred without denunciating d1 *)
     let* bgood = bake ~policy:(By_account baker) pred in
+    (* Slashing hasn't happened yet. *)
+    let* bal_good = Context.Delegate.full_balance (B bgood) d1 in
+    let* bal_bad = Context.Delegate.full_balance (B bbad) d1 in
+    let* () = Assert.equal_tez ~loc:__LOC__ bal_good bal_bad in
+    (* Slashing happens at the end of the cycle. *)
+    let* bgood = bake_until_cycle_end ~policy:(By_account baker) bgood in
+    let* bbad = bake_until_cycle_end ~policy:(By_account baker) bbad in
     (* Checking what the attester lost *)
     let* frozen_deposit =
       Context.Delegate.current_frozen_deposits (B pred) d1

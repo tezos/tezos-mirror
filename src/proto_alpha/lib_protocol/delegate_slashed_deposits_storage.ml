@@ -84,67 +84,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
   in
   assert (Compare.Bool.(already_slashed = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let global_limit_of_staking_over_baking =
-    Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking ctxt
-  in
-  let global_limit_of_staking_over_baking_plus_two =
-    Int64.add (Int64.of_int global_limit_of_staking_over_baking) 2L
-  in
-  let compute_reward_and_burn (frozen_deposits : Deposits_repr.t) =
-    let open Result_syntax in
-    let punish_value =
-      Tez_repr.mul_percentage frozen_deposits.initial_amount slashing_percentage
-    in
-    let should_forbid, punishing_amount =
-      if Tez_repr.(punish_value >= frozen_deposits.current_amount) then
-        (true, frozen_deposits.current_amount)
-      else (false, punish_value)
-    in
-    let* reward =
-      Tez_repr.(
-        punishing_amount /? global_limit_of_staking_over_baking_plus_two)
-    in
-    let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
-    (should_forbid, {reward; amount_to_burn})
-  in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let* frozen_deposits =
-    let* initial_amount =
-      if Cycle_repr.(level.cycle = current_cycle) then
-        Delegate_storage.initial_frozen_deposits ctxt delegate
-      else if Cycle_repr.(succ level.cycle = current_cycle) then
-        Delegate_storage.initial_frozen_deposits_of_previous_cycle ctxt delegate
-      else
-        (* Because [max_slashing_period = 2], there cannot be denunciations
-           for other cycles. *)
-        assert false
-    in
-    let* current_amount =
-      Delegate_storage.current_frozen_deposits ctxt delegate
-    in
-    return Deposits_repr.{initial_amount; current_amount}
-  in
-  let*? should_forbid, staked = compute_reward_and_burn frozen_deposits in
-  let* unstaked =
-    let oldest_slashable_cycle =
-      Cycle_repr.sub level.cycle preserved_cycles
-      |> Option.value ~default:Cycle_repr.root
-    in
-    let slashable_cycles =
-      Cycle_repr.(oldest_slashable_cycle ---> level.cycle)
-    in
-    List.rev_map_es
-      (fun cycle ->
-        let* frozen_deposits =
-          Unstaked_frozen_deposits_storage.get ctxt delegate cycle
-        in
-        let*? _should_forbid, reward_and_burn =
-          compute_reward_and_burn frozen_deposits
-        in
-        return (cycle, reward_and_burn))
-      slashable_cycles
-  in
   let*! ctxt =
     Storage.Slashed_deposits.add
       (ctxt, level.cycle)
@@ -183,7 +123,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
     Compare.Int.((slashed_both_cycles :> int) >= 100)
   in
   let*! ctxt =
-    if should_forbid || should_forbid_from_history then
+    if should_forbid_from_history then
       Delegate_storage.forbid_delegate ctxt delegate
     else Lwt.return ctxt
   in
@@ -213,7 +153,7 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
       in
       return ctxt
   in
-  return (ctxt, {staked; unstaked})
+  return ctxt
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
   let max_slashable_period = Constants_repr.max_slashing_period in
@@ -221,5 +161,140 @@ let clear_outdated_slashed_deposits ctxt ~new_cycle =
   | None -> Lwt.return ctxt
   | Some outdated_cycle -> Storage.Slashed_deposits.clear (ctxt, outdated_cycle)
 
-let clear_current_cycle_denunciations =
-  Storage.Current_cycle_denunciations.clear
+let apply_and_clear_current_cycle_denunciations ctxt =
+  let open Lwt_result_syntax in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let previous_cycle =
+    match Cycle_repr.pred current_cycle with
+    | None -> current_cycle
+    | Some previous_cycle -> previous_cycle
+  in
+  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let global_limit_of_staking_over_baking_plus_two =
+    let global_limit_of_staking_over_baking =
+      Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking
+        ctxt
+    in
+    Int64.add (Int64.of_int global_limit_of_staking_over_baking) 2L
+  in
+  let compute_reward_and_burn slashing_percentage
+      (frozen_deposits : Deposits_repr.t) =
+    let open Result_syntax in
+    let punish_value =
+      Tez_repr.mul_percentage frozen_deposits.initial_amount slashing_percentage
+    in
+    let punishing_amount =
+      Tez_repr.min punish_value frozen_deposits.current_amount
+    in
+    let* reward =
+      Tez_repr.(
+        punishing_amount /? global_limit_of_staking_over_baking_plus_two)
+    in
+    let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
+    {reward; amount_to_burn}
+  in
+  let* ctxt, slashings, balance_updates =
+    Storage.Current_cycle_denunciations.fold
+      ctxt
+      ~order:`Undefined
+      ~init:(Ok (ctxt, Signature.Public_key_hash.Map.empty, []))
+      ~f:(fun delegate denunciations acc ->
+        let*? ctxt, slashings, balance_updates = acc in
+        let+ ctxt, percentage, balance_updates =
+          List.fold_left_es
+            (fun (ctxt, percentage, balance_updates)
+                 Denunciations_repr.{rewarded; misbehaviour; misbehaviour_cycle} ->
+              let slashing_percentage =
+                match misbehaviour with
+                | Double_baking ->
+                    Constants_storage
+                    .percentage_of_frozen_deposits_slashed_per_double_baking
+                      ctxt
+                | Double_attesting ->
+                    Constants_storage
+                    .percentage_of_frozen_deposits_slashed_per_double_attestation
+                      ctxt
+              in
+              let ( misbehaviour_cycle,
+                    get_initial_frozen_deposits_of_misbehaviour_cycle ) =
+                match misbehaviour_cycle with
+                | Current ->
+                    (current_cycle, Delegate_storage.initial_frozen_deposits)
+                | Previous ->
+                    ( previous_cycle,
+                      Delegate_storage.initial_frozen_deposits_of_previous_cycle
+                    )
+              in
+              let* frozen_deposits =
+                let* initial_amount =
+                  get_initial_frozen_deposits_of_misbehaviour_cycle
+                    ctxt
+                    delegate
+                in
+                let* current_amount =
+                  Delegate_storage.current_frozen_deposits ctxt delegate
+                in
+                return Deposits_repr.{initial_amount; current_amount}
+              in
+              let*? staked =
+                compute_reward_and_burn slashing_percentage frozen_deposits
+              in
+              let init_to_burn_to_reward =
+                let {amount_to_burn; reward} = staked in
+                let giver = `Frozen_deposits (Receipt_repr.Shared delegate) in
+                ([(giver, amount_to_burn)], [(giver, reward)])
+              in
+              let* to_burn, to_reward =
+                let oldest_slashable_cycle =
+                  Cycle_repr.sub misbehaviour_cycle preserved_cycles
+                  |> Option.value ~default:Cycle_repr.root
+                in
+                let slashable_cycles =
+                  Cycle_repr.(oldest_slashable_cycle ---> misbehaviour_cycle)
+                in
+                List.fold_left_es
+                  (fun (to_burn, to_reward) cycle ->
+                    let* frozen_deposits =
+                      Unstaked_frozen_deposits_storage.get ctxt delegate cycle
+                    in
+                    let*? {amount_to_burn; reward} =
+                      compute_reward_and_burn
+                        slashing_percentage
+                        frozen_deposits
+                    in
+                    let giver =
+                      `Unstaked_frozen_deposits
+                        (Receipt_repr.Shared delegate, cycle)
+                    in
+                    return
+                      ( (giver, amount_to_burn) :: to_burn,
+                        (giver, reward) :: to_reward ))
+                  init_to_burn_to_reward
+                  slashable_cycles
+              in
+              let* ctxt, punish_balance_updates =
+                Token.transfer_n ctxt to_burn `Double_signing_punishments
+              in
+              let+ ctxt, reward_balance_updates =
+                Token.transfer_n
+                  ctxt
+                  to_reward
+                  (`Contract (Contract_repr.Implicit rewarded))
+              in
+              let percentage =
+                Int_percentage.add_bounded percentage slashing_percentage
+              in
+              ( ctxt,
+                percentage,
+                punish_balance_updates @ reward_balance_updates
+                @ balance_updates ))
+            (ctxt, Int_percentage.p0, balance_updates)
+            denunciations
+        in
+        let slashings =
+          Signature.Public_key_hash.Map.add delegate percentage slashings
+        in
+        (ctxt, slashings, balance_updates))
+  in
+  let*! ctxt = Storage.Current_cycle_denunciations.clear ctxt in
+  return (ctxt, slashings, balance_updates)

@@ -166,12 +166,18 @@ let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
   Lwt.return
     (Stake_context.apply_limits ctxt staking_parameters staking_balance)
 
-let get_stakes_for_selected_index ctxt index =
+let get_stakes_for_selected_index ctxt ~slashings index =
   let open Lwt_result_syntax in
   Stake_storage.fold_snapshot
     ctxt
     ~index
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
+      let staking_balance =
+        match Signature.Public_key_hash.Map.find delegate slashings with
+        | None -> staking_balance
+        | Some percentage ->
+            Full_staking_balance_repr.apply_slashing ~percentage staking_balance
+      in
       let* stake_for_cycle =
         get_delegate_stake_from_staking_balance ctxt delegate staking_balance
       in
@@ -193,7 +199,7 @@ let compute_snapshot_index ctxt cycle ~max_snapshot_index =
   let* seed = Seed_storage.for_cycle ctxt cycle in
   compute_snapshot_index_for_seed ~max_snapshot_index seed
 
-let select_distribution_for_cycle ctxt cycle =
+let select_distribution_for_cycle ctxt ~slashings cycle =
   let open Lwt_result_syntax in
   let* max_snapshot_index = Stake_storage.max_snapshot_index ctxt in
   let* seed = Seed_storage.raw_for_cycle ctxt cycle in
@@ -201,7 +207,7 @@ let select_distribution_for_cycle ctxt cycle =
     compute_snapshot_index_for_seed ~max_snapshot_index seed
   in
   let* stakes, total_stake =
-    get_stakes_for_selected_index ctxt selected_index
+    get_stakes_for_selected_index ctxt ~slashings selected_index
   in
   let* ctxt =
     Stake_storage.set_selected_distribution_for_cycle
@@ -225,10 +231,10 @@ let select_distribution_for_cycle ctxt cycle =
   (* pre-allocate the sampler *)
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
-let select_new_distribution_at_cycle_end ctxt ~new_cycle =
+let select_new_distribution_at_cycle_end ctxt ~slashings ~new_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let for_cycle = Cycle_repr.add new_cycle preserved in
-  select_distribution_for_cycle ctxt for_cycle
+  select_distribution_for_cycle ctxt ~slashings for_cycle
 
 let clear_outdated_sampling_data ctxt ~new_cycle =
   let open Lwt_result_syntax in

@@ -80,29 +80,42 @@ let test_valid_double_baking_evidence () =
   let* blk_a, blk_b =
     block_fork ~policy:(By_account baker1) contracts genesis
   in
-  double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
+  let operation = double_baking (B blk_a) blk_a.header blk_b.header in
   let* blk_final = Block.bake ~policy:(By_account baker2) ~operation blk_a in
-  (* Check that the frozen deposits are slashed *)
+  (* Check that the frozen deposits haven't been slashed, yet. *)
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_a) baker1
   in
-  let* frozen_deposits_after =
+  let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_final) baker1
-  in
-  let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
   in
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
-      frozen_deposits_after
-      expected_frozen_deposits_after
+      frozen_deposits_before
+      frozen_deposits_right_after
   in
   (* Check that the initial frozen deposits has not changed *)
   let* initial_frozen_deposits =
     Context.Delegate.initial_frozen_deposits (B blk_final) baker1
   in
-  Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
+  in
+  (* Check that the frozen deposits have been slashed at the end of the cycle. *)
+  let* blk_eoc =
+    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_final
+  in
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
+  in
+  let expected_frozen_deposits_after =
+    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+  in
+  Assert.equal_tez
+    ~loc:__LOC__
+    frozen_deposits_after
+    expected_frozen_deposits_after
 
 (* auxiliary function used in [double_attestation] *)
 let order_attestations ~correct_order op1 op2 =
@@ -144,8 +157,20 @@ let test_valid_double_baking_followed_by_double_attesting () =
   let* blk_final =
     Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
   in
-  let* frozen_deposits_after =
+  let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_final) baker1
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_before
+      frozen_deposits_right_after
+  in
+  let* blk_eoc =
+    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_final
+  in
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
   let* csts = Context.get_constants (B genesis) in
   let p_de =
@@ -202,8 +227,20 @@ let test_valid_double_attesting_followed_by_double_baking () =
   let* blk_with_db_evidence =
     Block.bake ~policy:(By_account baker2) ~operation blk_with_de_evidence
   in
-  let* frozen_deposits_after =
+  let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_with_db_evidence) baker1
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_before
+      frozen_deposits_right_after
+  in
+  let* blk_eoc =
+    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_with_db_evidence
+  in
+  let* frozen_deposits_after =
+    Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
   let* csts = Context.get_constants (B genesis) in
   let p_de =
@@ -269,16 +306,42 @@ let test_payload_producer_gets_evidence_rewards () =
       ~operations:(preattestations @ [db_evidence])
       b1
   in
-  (* the frozen deposits of the double-signer [baker1] are slashed *)
+  (* The denunciation happened but no slashing nor reward happened yet. *)
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B b1) baker1
   in
+  let* frozen_deposits_right_after =
+    Context.Delegate.current_frozen_deposits (B b') baker1
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_right_after
+      frozen_deposits_before
+  in
+  let* full_balance = Context.Delegate.full_balance (B b1) baker2 in
+  let expected_reward_right_after = baking_reward_fixed_portion in
+  let* full_balance_with_rewards_right_after =
+    Context.Delegate.full_balance (B b') baker2
+  in
+  let real_reward_right_after =
+    Test_tez.(full_balance_with_rewards_right_after -! full_balance)
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      expected_reward_right_after
+      real_reward_right_after
+  in
+  (* Slashing and rewarding happen at the end of the cycle. *)
+  let* b' = Block.bake_until_cycle_end ~policy:(By_account baker2) b' in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in
   let expected_frozen_deposits_after =
     Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
   in
+  (* the frozen deposits of the double-signer [baker1] are slashed *)
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
@@ -291,7 +354,6 @@ let test_payload_producer_gets_evidence_rewards () =
   (* [baker2] included the double baking evidence in [b_with_evidence]
      and so it receives the reward for the evidence included in [b']
      (besides the reward for proposing the payload). *)
-  let* full_balance = Context.Delegate.full_balance (B b1) baker2 in
   let divider =
     Int64.add
       2L
@@ -299,8 +361,12 @@ let test_payload_producer_gets_evidence_rewards () =
          c.parametric.adaptive_issuance.global_limit_of_staking_over_baking)
   in
   let evidence_reward = Test_tez.(slashed_amount /! divider) in
+  let baked_blocks =
+    Int64.of_int
+      (Int32.to_int b'.header.shell.level - Int32.to_int b1.header.shell.level)
+  in
   let expected_reward =
-    Test_tez.(baking_reward_fixed_portion +! evidence_reward)
+    Test_tez.((baking_reward_fixed_portion *! baked_blocks) +! evidence_reward)
   in
   let* full_balance_with_rewards =
     Context.Delegate.full_balance (B b') baker2

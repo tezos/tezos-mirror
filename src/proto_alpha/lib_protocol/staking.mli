@@ -54,13 +54,3 @@ val finalize_unstake :
   Raw_context.t ->
   Contract_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
-
-(** [punish_delegate ctxt delegate level misbehaviour ~rewarded] slashes [delegate]
-    for a [misbehaviour] at [level] and rewards [rewarded]. *)
-val punish_delegate :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Level_repr.t ->
-  Misbehaviour.t ->
-  rewarded:Signature.public_key_hash ->
-  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t

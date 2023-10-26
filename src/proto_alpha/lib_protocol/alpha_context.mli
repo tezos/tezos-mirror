@@ -2209,7 +2209,7 @@ module Delegate : sig
     public_key_hash ->
     Level.t ->
     rewarded:public_key_hash ->
-    (context * punishing_amounts) tzresult Lwt.t
+    context tzresult Lwt.t
 
   type level_participation = Participated | Didn't_participate
 
@@ -2424,16 +2424,6 @@ module Staking : sig
     the requested stake undergone in between. *)
   val finalize_unstake :
     context -> Contract.t -> (context * Receipt.balance_updates) tzresult Lwt.t
-
-  (** [punish_delegate ctxt delegate level misbehaviour ~rewarded] slashes [delegate]
-    for a [misbehaviour] at [level] and rewards [rewarded]. *)
-  val punish_delegate :
-    context ->
-    public_key_hash ->
-    Level.t ->
-    Misbehaviour.t ->
-    rewarded:public_key_hash ->
-    (context * Receipt.balance_updates) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Voting_period_repr} and

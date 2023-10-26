@@ -136,16 +136,21 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
 
 let cycle_end ctxt last_cycle =
   let open Lwt_result_syntax in
-  let*! ctxt =
-    Delegate_slashed_deposits_storage.clear_current_cycle_denunciations ctxt
-  in
   let* ctxt, unrevealed_nonces = Seed_storage.cycle_end ctxt last_cycle in
-  let* ctxt, balance_updates =
+  let* ctxt, attesting_balance_updates =
     distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
+  in
+  let* ctxt, slashings, slashing_balance_updates =
+    Delegate_slashed_deposits_storage
+    .apply_and_clear_current_cycle_denunciations
+      ctxt
   in
   let new_cycle = Cycle_repr.add last_cycle 1 in
   let* ctxt =
-    Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
+    Delegate_sampler.select_new_distribution_at_cycle_end
+      ctxt
+      ~slashings
+      ~new_cycle
   in
   let*! ctxt = Delegate_consensus_key.activate ctxt ~new_cycle in
   let*! ctxt =
@@ -161,6 +166,7 @@ let cycle_end ctxt last_cycle =
   let* ctxt =
     Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   in
+  let balance_updates = slashing_balance_updates @ attesting_balance_updates in
   return (ctxt, balance_updates, deactivated_delegates)
 
 let init_first_cycles ctxt =
@@ -173,7 +179,10 @@ let init_first_cycles ctxt =
         let* ctxt = Stake_storage.snapshot ctxt in
         (* NB: we need to take several snapshots because
            select_distribution_for_cycle deletes the snapshots *)
-        Delegate_sampler.select_distribution_for_cycle ctxt cycle)
+        Delegate_sampler.select_distribution_for_cycle
+          ctxt
+          ~slashings:Signature.Public_key_hash.Map.empty
+          cycle)
       ctxt
       Misc.(0 --> preserved)
   in
