@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_ethereum::transaction::IndexedLog;
+
 use crate::inbox::Transaction;
 
 /// Tick model constants
@@ -187,11 +189,11 @@ fn ticks_of_valid_transaction_ethereum(resulting_ticks: u64, tx_data_size: u64) 
         .saturating_add(ticks_of_transaction_overhead(tx_data_size))
 }
 
-pub fn bloom_size(logs: &[tezos_ethereum::Log]) -> usize {
+pub fn bloom_size(logs: &[IndexedLog]) -> usize {
     let mut size = 0;
     // for n in 0..logs.len() {
     for item in logs.iter() {
-        size += item.topics.len();
+        size += item.log.topics.len();
     }
     size
 }
