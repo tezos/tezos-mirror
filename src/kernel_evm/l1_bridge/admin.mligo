@@ -1,8 +1,11 @@
+(* SPDX-CopyrightText Nomadic Labs <contact@nomadic-labs.com> *)
+
+#include "./ticket_type.mligo"
+#include "./evm_type.mligo"
+
 // The EVM administrator contract is controlled by a L1 address.
 type storage = { admin : address }
 
-// EVM rollup type used to send internal inbox message.
-type rollup_type = (bytes * unit ticket * nat * bytes)
 
 type return = operation list * storage
 
@@ -17,12 +20,7 @@ let main {evm_rollup; payload} (store : storage) : return =
   else
     // Craft an internal inbox message that respect the EVM rollup type
     // and put the payload in the last "bytes" field.
-    let evm_rollup : rollup_type contract =
-      Option.unopt ((Tezos.get_contract_opt evm_rollup) : rollup_type contract option)
+    let evm_rollup : evm contract =
+      Option.unopt ((Tezos.get_contract_opt evm_rollup) : evm contract option)
     in
-    let ticket =
-      match Tezos.create_ticket () 1n with
-      | Some ticket -> ticket
-      | None -> failwith "Failed to create the ticket"
-    in
-    [Tezos.transaction (("" : bytes), ticket, 0n, payload) 0mutez evm_rollup], store
+    [Tezos.transaction (Upgrade payload) 0mutez evm_rollup], store

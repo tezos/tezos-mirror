@@ -7,23 +7,14 @@
          COMPARE ;
          NEQ ;
          IF { DROP 3 ; PUSH string "Unauthorized set entrypoint" ; FAILWITH }
-            { CONTRACT (pair (pair bytes (ticket unit)) nat bytes) ;
+            { CONTRACT (or (or (pair bytes (ticket unit)) bytes) bytes) ;
               IF_NONE { PUSH string "option is None" ; FAILWITH } {} ;
-              PUSH nat 1 ;
-              UNIT ;
-              TICKET ;
-              IF_NONE { PUSH string "Failed to create the ticket" ; FAILWITH } {} ;
-              DIG 3 ;
+              DIG 2 ;
               NIL operation ;
-              DIG 3 ;
+              DIG 2 ;
               PUSH mutez 0 ;
-              DIG 5 ;
-              PUSH nat 0 ;
-              PAIR ;
-              DIG 5 ;
-              PUSH bytes 0x ;
-              PAIR ;
-              PAIR ;
+              DIG 4 ;
+              RIGHT (or (pair bytes (ticket unit)) bytes) ;
               TRANSFER_TOKENS ;
               CONS ;
               PAIR } } }
