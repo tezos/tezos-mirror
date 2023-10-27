@@ -212,6 +212,8 @@ module Input_hash =
       let size = Some 20
     end)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/6573
+   Remove the `published_level` parameter from the Reveal_dal_page for now. *)
 type reveal =
   | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata

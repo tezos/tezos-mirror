@@ -3683,6 +3683,7 @@ module Sc_rollup : sig
           page_id : Dal.Page.t;
           proof : Dal.Slots_history.proof;
         }
+      | Dal_parameters_proof of {published_level : Raw_level.t}
 
     type input_proof =
       | Inbox_proof of {
