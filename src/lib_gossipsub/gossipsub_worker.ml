@@ -42,6 +42,64 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   module Message_id = GS.Message_id
   module Message = GS.Message
 
+  module Stats = struct
+    type exchanged_stats = {
+      mutable num_valid_messages : int;
+      mutable num_invalid_messages : int;
+      mutable num_unknown_messages_validity : int;
+      mutable num_grafts : int;
+      mutable num_prunes : int;
+      mutable num_ihaves : int;
+      mutable num_iwants : int;
+    }
+
+    type t = {
+      mutable num_topics : int;
+      mutable num_connections : int;
+      mutable num_bootstrap_connections : int;
+      received : exchanged_stats;
+      sent : exchanged_stats;
+    }
+
+    let exchanged_stats () =
+      {
+        num_valid_messages = 0;
+        num_invalid_messages = 0;
+        num_unknown_messages_validity = 0;
+        num_grafts = 0;
+        num_prunes = 0;
+        num_ihaves = 0;
+        num_iwants = 0;
+      }
+
+    let empty () =
+      {
+        num_topics = 0;
+        num_connections = 0;
+        num_bootstrap_connections = 0;
+        received = exchanged_stats ();
+        sent = exchanged_stats ();
+      }
+  end
+
+  type exchanged_stats = Stats.exchanged_stats = private {
+    mutable num_valid_messages : int;
+    mutable num_invalid_messages : int;
+    mutable num_unknown_messages_validity : int;
+    mutable num_grafts : int;
+    mutable num_prunes : int;
+    mutable num_ihaves : int;
+    mutable num_iwants : int;
+  }
+
+  type stats = Stats.t = private {
+    mutable num_topics : int;
+    mutable num_connections : int;
+    mutable num_bootstrap_connections : int;
+    received : exchanged_stats;
+    sent : exchanged_stats;
+  }
+
   type 'a cancellation_handle = {
     schedule_cancellation : unit -> 'a Monad.t;
         (** A handle for a cancellable looping monad. When
@@ -112,6 +170,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       and a stream of events to process. It also has two output streams to
       communicate with the application and P2P layers. *)
   type worker_state = {
+    stats : stats;
     gossip_state : GS.state;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
@@ -600,6 +659,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       status = Starting;
       state =
         {
+          stats = Stats.empty ();
           gossip_state = GS.make rng limits parameters;
           connected_bootstrap_peers = Peer.Set.empty;
           events_stream = Stream.empty ();
@@ -608,6 +668,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           events_logging;
         };
     }
+
+  let stats t = t.state.stats
 
   let p2p_output_stream t = t.state.p2p_output_stream
 

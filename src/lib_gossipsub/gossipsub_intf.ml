@@ -1172,5 +1172,28 @@ module type WORKER = sig
   (** Pretty-printer for values of type {!app_output}. *)
   val pp_app_output : Format.formatter -> app_output -> unit
 
+  (** Introspection and stats facilities *)
+  type exchanged_stats = private {
+    mutable num_valid_messages : int;
+    mutable num_invalid_messages : int;
+    mutable num_unknown_messages_validity : int;
+    mutable num_grafts : int;
+    mutable num_prunes : int;
+    mutable num_ihaves : int;
+    mutable num_iwants : int;
+  }
+
+  type stats = private {
+    mutable num_topics : int;
+    mutable num_connections : int;
+    mutable num_bootstrap_connections : int;
+    received : exchanged_stats;
+        (** In case of received, we only count the messages that would
+            succeed. *)
+    sent : exchanged_stats;
+  }
+
+  val stats : t -> stats
+
   val state : t -> GS.Introspection.view
 end
