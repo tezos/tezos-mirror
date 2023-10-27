@@ -449,6 +449,8 @@ module type PVM_with_context_and_state = sig
     val dal_parameters : Dal_slot_repr.parameters
 
     val dal_attestation_lag : int
+
+    val dal_number_of_slots : int
   end
 end
 
@@ -522,12 +524,21 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~page_info
           ~get_history
           confirmed_slots_history
-    | Needs_reveal (Reveal_dal_parameters _) ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6555
-           Support reveal_dal_parameters in refutation game. *)
-        (* This should not happen as long as [Reveal_dal_parameters] is disabled
-           in {!Constant_parametric_level.sc_rollup_reveal_activation_level}. *)
-        assert false
+    | Needs_reveal (Reveal_dal_parameters {published_level}) ->
+        let open Dal_with_history in
+        return
+          ( Some (Reveal_proof (Dal_parameters_proof {published_level})),
+            Some
+              Sc_rollup_PVM_sig.(
+                Reveal
+                  (Dal_parameters
+                     Sc_rollup_dal_parameters_repr.
+                       {
+                         number_of_slots = Int64.of_int dal_number_of_slots;
+                         attestation_lag = Int64.of_int dal_attestation_lag;
+                         slot_size = Int64.of_int dal_parameters.slot_size;
+                         page_size = Int64.of_int dal_parameters.page_size;
+                       })) )
   in
   let input_given =
     Option.bind

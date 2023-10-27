@@ -1004,5 +1004,8 @@ let make_pvm_with_context_and_state (type context state)
 
       let dal_attestation_lag =
         Default_parameters.constants_test.dal.attestation_lag
+
+      let dal_number_of_slots =
+        Default_parameters.constants_test.dal.number_of_slots
     end
   end)

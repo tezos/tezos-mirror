@@ -231,6 +231,9 @@ module type PVM_with_context_and_state = sig
     (** The lag between the time an attestation is published on L1
         (its published_level) and the level it should be confirmed. *)
     val dal_attestation_lag : int
+
+    (** The number of DAL slots provided by the L1. *)
+    val dal_number_of_slots : int
   end
 end
 

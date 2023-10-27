@@ -243,6 +243,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
 
       let dal_parameters = dal_parameters
 
+      let dal_number_of_slots = dal_number_of_slots
+
       let page_info = page_info
     end
   end in

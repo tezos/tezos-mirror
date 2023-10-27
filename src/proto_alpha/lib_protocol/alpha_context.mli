@@ -3744,6 +3744,8 @@ module Sc_rollup : sig
         val dal_parameters : Dal.parameters
 
         val dal_attestation_lag : int
+
+        val dal_number_of_slots : int
       end
     end
 
