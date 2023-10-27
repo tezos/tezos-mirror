@@ -461,6 +461,59 @@ let deploy ~contract ~sender full_evm_setup =
   in
   wait_for_application ~sc_rollup_node ~node ~client send_deploy ()
 
+type deploy_checks = {
+  contract : contract;
+  expected_address : string;
+  expected_code : string;
+}
+
+let deploy_with_base_checks {contract; expected_address; expected_code} protocol
+    =
+  let* ({sc_rollup_client; evm_proxy_server; _} as full_evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* contract_address, tx = deploy ~contract ~sender full_evm_setup in
+  let address = String.lowercase_ascii contract_address in
+  Check.(
+    (address = expected_address)
+      string
+      ~error_msg:"Expected address to be %R but was %L.") ;
+  let* code_in_kernel =
+    Evm_proxy_server.fetch_contract_code evm_proxy_server contract_address
+  in
+  Check.((code_in_kernel = expected_code) string)
+    ~error_msg:"Unexpected code %L, it should be %R" ;
+  (* The transaction was a contract creation, the transaction object
+     must not contain the [to] field. *)
+  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx in
+  (match tx_object with
+  | Some tx_object ->
+      Check.((tx_object.to_ = None) (option string))
+        ~error_msg:
+          "The transaction object of a contract creation should not have the \
+           [to] field present"
+  | None -> Test.fail "The transaction object of %s should be available" tx) ;
+  let*! accounts =
+    Sc_rollup_client.inspect_durable_state_value
+      ~hooks
+      sc_rollup_client
+      ~pvm_kind
+      ~operation:Sc_rollup_client.Subkeys
+      ~key:Durable_storage_path.eth_accounts
+  in
+  (* check tx status*)
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  (* check contract account was created *)
+  Check.(
+    list_mem
+      string
+      (Helpers.normalize contract_address)
+      (List.map String.lowercase_ascii accounts)
+      ~error_msg:"Expected %L account to be initialized by contract creation.") ;
+  unit
+
 let send ~sender ~receiver ~value ?data full_evm_setup =
   let {node; client; sc_rollup_node; evm_proxy_server; _} = full_evm_setup in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
@@ -851,6 +904,15 @@ let mapping_storage =
     bin = kernel_inputs_path ^ "/mapping_storage.bin";
   }
 
+(** The info for the "storage.sol" contract, compiled for Shanghai.
+    See [tezt/tests/evm_kernel_inputs/shanghai_storage.*] *)
+let shanghai_storage =
+  {
+    label = "shanghai";
+    abi = kernel_inputs_path ^ "/shanghai_storage.abi";
+    bin = kernel_inputs_path ^ "/shanghai_storage.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -858,60 +920,16 @@ let test_l2_deploy_simple_storage =
     ~tags:["evm"; "l2_deploy"]
     ~title:"Check L2 contract deployment"
   @@ fun protocol ->
-  let* ({sc_rollup_client; evm_proxy_server; _} as full_evm_setup) =
-    setup_past_genesis ~admin:None protocol
-  in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* contract_address, tx =
-    deploy ~contract:simple_storage ~sender full_evm_setup
-  in
-  let address = String.lowercase_ascii contract_address in
-  Check.(
-    (address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
-      string
-      ~error_msg:"Expected address to be %R but was %L.") ;
-
-  let* code_in_kernel =
-    Evm_proxy_server.fetch_contract_code evm_proxy_server contract_address
-  in
-  (* The same deployment has been reproduced on the Sepolia testnet, resulting
-     on this specific code. *)
-  let expected_code =
-    "0x608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033"
-  in
-  Check.((code_in_kernel = expected_code) string)
-    ~error_msg:"Unexpected code %L, it should be %R" ;
-  (* The transaction was a contract creation, the transaction object
-     must not contain the [to] field. *)
-  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx in
-  (match tx_object with
-  | Some tx_object ->
-      Check.((tx_object.to_ = None) (option string))
-        ~error_msg:
-          "The transaction object of a contract creation should not have the \
-           [to] field present"
-  | None -> Test.fail "The transaction object of %s should be available" tx) ;
-
-  let*! accounts =
-    Sc_rollup_client.inspect_durable_state_value
-      ~hooks
-      sc_rollup_client
-      ~pvm_kind
-      ~operation:Sc_rollup_client.Subkeys
-      ~key:Durable_storage_path.eth_accounts
-  in
-  (* check tx status*)
-  let* () = check_tx_succeeded ~endpoint ~tx in
-
-  (* check contract account was created *)
-  Check.(
-    list_mem
-      string
-      (Helpers.normalize contract_address)
-      (List.map String.lowercase_ascii accounts)
-      ~error_msg:"Expected %L account to be initialized by contract creation.") ;
-  unit
+  deploy_with_base_checks
+    {
+      contract = simple_storage;
+      expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
+      (* The same deployment has been reproduced on the Sepolia testnet, resulting
+         on this specific code. *)
+      expected_code =
+        "0x608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033";
+    }
+    protocol
 
 let send_call_set_storage_simple contract_address sender n
     {sc_rollup_node; node; client; endpoint; _} =
@@ -1105,6 +1123,20 @@ let test_l2_deploy_erc20 =
   in
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
+
+let test_deploy_contract_for_shanghai =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "deploy"; "shanghai"]
+    ~title:
+      "Check that a contract containing PUSH0 can successfully be deployed."
+  @@ deploy_with_base_checks
+       {
+         contract = shanghai_storage;
+         expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
+         expected_code =
+           "0x608060405234801561000f575f80fd5b5060043610610034575f3560e01c80632e64cec1146100385780636057361d14610056575b5f80fd5b610040610072565b60405161004d919061009b565b60405180910390f35b610070600480360381019061006b91906100e2565b61007a565b005b5f8054905090565b805f8190555050565b5f819050919050565b61009581610083565b82525050565b5f6020820190506100ae5f83018461008c565b92915050565b5f80fd5b6100c181610083565b81146100cb575f80fd5b50565b5f813590506100dc816100b8565b92915050565b5f602082840312156100f7576100f66100b4565b5b5f610104848285016100ce565b9150509291505056fea2646970667358221220c1aa96a14de9ab1c36fb97f3051eac7ba11ec6ac604ddeab90e5b6ac8bd4efc064736f6c63430008140033";
+       }
 
 (* TODO: add internal parameters here (e.g the kernel version) *)
 type config_result = {chain_id : int64}
@@ -3599,6 +3631,7 @@ let register_evm_proxy_server ~protocols =
   test_l2_deploy_simple_storage protocols ;
   test_l2_call_simple_storage protocols ;
   test_l2_deploy_erc20 protocols ;
+  test_deploy_contract_for_shanghai protocols ;
   test_inject_100_transactions protocols ;
   test_eth_call_storage_contract_rollup_node protocols ;
   test_eth_call_storage_contract_proxy protocols ;
