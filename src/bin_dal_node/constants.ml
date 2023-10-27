@@ -50,3 +50,5 @@ let committee_cache_size = 50
 
    1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
 let shards_proofs_cache_size = 1024
+
+let shards_verification_sampling_frequency = 100

@@ -104,10 +104,11 @@ val publish_slot_data :
   int ->
   unit tzresult Lwt.t
 
-(** [store_slot_headers  ~block_level ~block_hash slot_headers node_store]
-    stores [slot_headers] onto the [node_store] associated to the given [block_hash]
-    baked at level [block_level]. *)
+(** [store_slot_headers ~number_of_slots ~block_level ~block_hash slot_headers
+    node_store] stores [slot_headers] onto the [node_store] associated to the
+    given [block_hash] baked at level [block_level]. *)
 val store_slot_headers :
+  number_of_slots:int ->
   block_level:int32 ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
