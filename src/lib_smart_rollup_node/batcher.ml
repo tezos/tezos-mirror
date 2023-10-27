@@ -338,7 +338,14 @@ let start plugin conf ~signer node_ctxt =
   in
   Lwt.wakeup worker_waker worker
 
-let init plugin conf ~signer node_ctxt =
+let start_in_mode mode =
+  let open Configuration in
+  match mode with
+  | Batcher | Operator -> true
+  | Observer | Accuser | Bailout | Maintenance -> false
+  | Custom ops -> purpose_matches_mode (Custom ops) Batching
+
+let init plugin conf ~signer (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   match Lwt.state worker_promise with
   | Lwt.Return _ ->
@@ -349,15 +356,17 @@ let init plugin conf ~signer node_ctxt =
       fail [Rollup_node_errors.No_batcher; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
-      start plugin conf ~signer node_ctxt
+      if start_in_mode node_ctxt.config.mode then
+        start plugin conf ~signer node_ctxt
+      else return_unit
 
 (* This is a batcher worker for a single scoru *)
 let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail _ | Lwt.Sleep ->
-        Error (TzTrace.make Rollup_node_errors.No_batcher))
+    | Lwt.Fail exn -> Error (Error_monad.error_of_exn exn)
+    | Lwt.Sleep -> Error Rollup_node_errors.No_batcher)
 
 let active () =
   match Lwt.state worker_promise with
@@ -366,13 +375,13 @@ let active () =
 
 let find_message hash =
   let open Result_syntax in
-  let+ w = Lazy.force worker in
+  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
   Message_queue.find_opt state.messages hash
 
 let get_queue () =
   let open Result_syntax in
-  let+ w = Lazy.force worker in
+  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
   Message_queue.bindings state.messages
 
@@ -388,24 +397,23 @@ let handle_request_error rq =
 
 let register_messages messages =
   let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
+  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
   Worker.Queue.push_request_and_wait w (Request.Register messages)
   |> handle_request_error
 
 let new_head b =
   let open Lwt_result_syntax in
-  let w = Lazy.force worker in
-  match w with
-  | Error _ ->
+  match Lazy.force worker with
+  | Error Rollup_node_errors.No_batcher ->
       (* There is no batcher, nothing to do *)
       return_unit
+  | Error e -> tzfail e
   | Ok w ->
       Worker.Queue.push_request_and_wait w (Request.New_head b)
       |> handle_request_error
 
 let shutdown () =
-  let w = Lazy.force worker in
-  match w with
+  match Lazy.force worker with
   | Error _ ->
       (* There is no batcher, nothing to do *)
       Lwt.return_unit
@@ -421,6 +429,6 @@ let message_status state msg_hash =
 
 let message_status msg_hash =
   let open Result_syntax in
-  let+ w = Lazy.force worker in
+  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
   message_status state msg_hash

@@ -29,7 +29,8 @@
     the refutation game players. (See {!Refutation_player}).
 *)
 
-(** Initiatilize the refuation coordinator. *)
+(** Initiatilize the refuation coordinator, if the rollup node mode
+    supports it. *)
 val init : Node_context.rw -> unit tzresult Lwt.t
 
 (** [process head] processes a new l1 head. This means that the coordinator

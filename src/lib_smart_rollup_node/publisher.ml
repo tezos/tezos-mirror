@@ -314,29 +314,14 @@ let inject_recover_bond (node_ctxt : _ Node_context.t)
 
 let on_publish_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Operating in
-  if Node_context.is_accuser node_ctxt || Node_context.is_bailout node_ctxt then
-    (* Accuser and Bailout do not publish all commitments *)
-    return_unit
-  else
-    match operator with
-    | None -> (* Configured to not publish commitments *) return_unit
-    | Some _ ->
-        let* commitments = missing_commitments node_ctxt in
-        List.iter_es (publish_commitment node_ctxt) commitments
+  let* commitments = missing_commitments node_ctxt in
+  List.iter_es (publish_commitment node_ctxt) commitments
 
-let publish_single_commitment node_ctxt
+let publish_single_commitment (node_ctxt : _ Node_context.t)
     (commitment : Octez_smart_rollup.Commitment.t) =
-  let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Operating in
   let lcc = Reference.get node_ctxt.lcc in
-  match operator with
-  | None ->
-      (* Configured to not publish commitments *)
-      return_unit
-  | Some _ ->
-      when_ (commitment.inbox_level > lcc.level) @@ fun () ->
-      publish_commitment node_ctxt commitment
+  when_ (commitment.inbox_level > lcc.level) @@ fun () ->
+  publish_commitment node_ctxt commitment
 
 let recover_bond node_ctxt =
   let open Lwt_result_syntax in
@@ -441,14 +426,8 @@ let cement_commitment (node_ctxt : _ Node_context.t) commitment =
 
 let on_cement_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Cementing in
-  match operator with
-  | None ->
-      (* Configured to not cement commitments *)
-      return_unit
-  | Some _ ->
-      let* cementable_commitments = cementable_commitments node_ctxt in
-      List.iter_es (cement_commitment node_ctxt) cementable_commitments
+  let* cementable_commitments = cementable_commitments node_ctxt in
+  List.iter_es (cement_commitment node_ctxt) cementable_commitments
 
 module Types = struct
   type nonrec state = state
@@ -523,7 +502,14 @@ let start node_ctxt =
   let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
   Lwt.wakeup worker_waker worker
 
-let init node_ctxt =
+let start_in_mode mode =
+  let open Configuration in
+  match mode with
+  | Maintenance | Operator | Bailout -> true
+  | Observer | Accuser | Batcher -> false
+  | Custom ops -> purpose_matches_mode (Custom ops) Operating
+
+let init (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   match Lwt.state worker_promise with
   | Lwt.Return _ ->
@@ -534,7 +520,8 @@ let init node_ctxt =
       fail [Rollup_node_errors.No_publisher; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
-      start node_ctxt
+      if start_in_mode node_ctxt.config.mode then start node_ctxt
+      else return_unit
 
 (* This is a publisher worker for a single scoru *)
 let worker =
@@ -542,23 +529,28 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> return worker
-    | Lwt.Fail _ | Lwt.Sleep -> tzfail Rollup_node_errors.No_publisher)
+    | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
+    | Lwt.Sleep -> Error Rollup_node_errors.No_publisher)
 
-let publish_commitments () =
+let worker_add_request ~request =
   let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  let*! (_pushed : bool) = Worker.Queue.push_request w Request.Publish in
-  return_unit
+  match Lazy.force worker with
+  | Ok w ->
+      let node_ctxt = Worker.state w in
+      (* Bailout does not publish any commitment it only cement them. *)
+      unless (Node_context.is_bailout node_ctxt && request = Request.Publish)
+      @@ fun () ->
+      let*! (_pushed : bool) = Worker.Queue.push_request w request in
+      return_unit
+  | Error Rollup_node_errors.No_publisher -> return_unit
+  | Error e -> tzfail e
 
-let cement_commitments () =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  let*! (_pushed : bool) = Worker.Queue.push_request w Request.Cement in
-  return_unit
+let publish_commitments () = worker_add_request ~request:Request.Publish
+
+let cement_commitments () = worker_add_request ~request:Request.Cement
 
 let shutdown () =
-  let w = Lazy.force worker in
-  match w with
+  match Lazy.force worker with
   | Error _ ->
       (* There is no publisher, nothing to do *)
       Lwt.return_unit

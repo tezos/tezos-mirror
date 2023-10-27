@@ -41,6 +41,7 @@ type operation_kind =
   | Timeout
   | Refute
   | Recover
+  | Execute_outbox_message
 
 type mode =
   | Batcher

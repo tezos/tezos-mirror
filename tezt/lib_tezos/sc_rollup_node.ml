@@ -35,6 +35,7 @@ type operation_kind =
   | Timeout
   | Refute
   | Recover
+  | Execute_outbox_message
 
 type mode =
   | Batcher
@@ -80,6 +81,7 @@ let string_of_operation_kind = function
   | Timeout -> "timeout"
   | Refute -> "refute"
   | Recover -> "recover"
+  | Execute_outbox_message -> "execute_outbox_message"
 
 let operation_kind_of_string = function
   | "publish" -> Some Publish
@@ -88,6 +90,7 @@ let operation_kind_of_string = function
   | "timeout" -> Some Timeout
   | "refute" -> Some Refute
   | "recover" -> Some Recover
+  | "execute_outbox_message" -> Some Execute_outbox_message
   | _ -> None
 
 let operation_kind_of_string_exn s =

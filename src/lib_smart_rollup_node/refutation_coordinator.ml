@@ -181,13 +181,20 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start node_ctxt =
+let start (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   let*! () = Refutation_game_event.Coordinator.starting () in
   let+ worker = Worker.launch table () node_ctxt (module Handlers) in
   Lwt.wakeup worker_waker worker
 
-let init node_ctxt =
+let start_in_mode mode =
+  let open Configuration in
+  match mode with
+  | Accuser | Bailout | Operator | Maintenance -> true
+  | Observer | Batcher -> false
+  | Custom ops -> purpose_matches_mode (Custom ops) Operating
+
+let init (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   match Lwt.state worker_promise with
   | Lwt.Return _ ->
@@ -198,7 +205,8 @@ let init node_ctxt =
       fail [Rollup_node_errors.No_refutation_coordinator; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
-      start node_ctxt
+      if start_in_mode node_ctxt.config.mode then start node_ctxt
+      else return_unit
 
 (* This is a refutation coordinator for a single scoru *)
 let worker =
@@ -206,22 +214,26 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> return worker
-    | Lwt.Fail _ | Lwt.Sleep ->
-        tzfail Rollup_node_errors.No_refutation_coordinator)
+    | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
+    | Lwt.Sleep -> Error Rollup_node_errors.No_refutation_coordinator)
 
 let process b =
   let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  let*! (_pushed : bool) = Worker.Queue.push_request w (Request.Process b) in
-  return_unit
+  match Lazy.force worker with
+  | Ok w ->
+      let*! (_pushed : bool) =
+        Worker.Queue.push_request w (Request.Process b)
+      in
+      return_unit
+  | Error Rollup_node_errors.No_refutation_coordinator -> return_unit
+  | Error e -> tzfail e
 
 let shutdown () =
   let open Lwt_syntax in
-  let w = Lazy.force worker in
-  match w with
+  match Lazy.force worker with
   | Error _ ->
       (* There is no refutation coordinator, nothing to do *)
-      Lwt.return_unit
+      return_unit
   | Ok w ->
       (* Shut down all current refutation players *)
       let games = Player.current_games () in

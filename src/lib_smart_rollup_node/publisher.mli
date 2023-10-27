@@ -68,18 +68,21 @@ val publish_single_commitment :
     is intended to be used by the {e bailout} mode. *)
 val recover_bond : _ Node_context.t -> unit tzresult Lwt.t
 
-(** Initialize worker for publishing and cementing commitments. *)
+(** Initialize worker for publishing and cementing commitments, if the
+    rollup node mode supports it. *)
 val init : _ Node_context.t -> unit tzresult Lwt.t
 
-(** [publish_commitments ()] publishes the commitments that were not yet
+(** [publish_commitments] publishes the commitments that were not yet
     published up to the finalized head and which are after the last cemented
-    commitment. *)
+    commitment. This is a no-op if the rollup node is not in the appropriate
+    mode. *)
 val publish_commitments : unit -> unit tzresult Lwt.t
 
-(** [cement_commitments ()] cements the commitments that can be cemented,
+(** [cement_commitments] cements the commitments that can be cemented,
     i.e. the commitments that are after the current last cemented commitment and
     which have [sc_rollup_challenge_period] levels on top of them since they
-    were originally published.  *)
+    were originally published. This is a no-op if the rollup node is not in the
+    appropriate mode. *)
 val cement_commitments : unit -> unit tzresult Lwt.t
 
 (** Stop worker for publishing and cementing commitments. *)
