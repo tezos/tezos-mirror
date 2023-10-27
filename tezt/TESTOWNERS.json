@@ -17,7 +17,8 @@
     ],
     "path_patterns": [
       "^src/lib_requester",
-      "^src/proto_alpha/lib_delegate",
+      "^src/proto_.*/lib_protocol",
+      "^src/proto_.*/lib_delegate",
       "^devtools/yes_wallet"
     ]
   },
