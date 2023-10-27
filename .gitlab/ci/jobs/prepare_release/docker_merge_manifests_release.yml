@@ -1,5 +1,3 @@
-include: .gitlab/ci/jobs/publish/common.yml
-
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
 # $IMAGE_ARCH_PREFIX is only used when building Docker images,

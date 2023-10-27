@@ -14,5 +14,3 @@ include:
 
   # Stage: publish_release
   - .gitlab/ci/jobs/publish/opam.yml
-  - .gitlab/ci/jobs/publish/deb_packages_stable_amd64.yml
-  - .gitlab/ci/jobs/publish/rpm_packages_stable_amd64.yml

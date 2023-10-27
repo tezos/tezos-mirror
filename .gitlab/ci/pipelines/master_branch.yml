@@ -15,9 +15,5 @@ include:
   # Stage: prepare_release
   - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_release.yml
 
-  # Stage: publish_release
-  - .gitlab/ci/jobs/publish/deb_packages_unstable_amd64.yml
-  - .gitlab/ci/jobs/publish/rpm_packages_unstable_amd64.yml
-
   # Stage: manual
   - .gitlab/ci/jobs/publish/kernel_sdk.yml

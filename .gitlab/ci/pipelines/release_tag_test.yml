@@ -11,10 +11,3 @@ include:
 
   # Stage: publish_release_gitlab
   - .gitlab/ci/jobs/publish/gitlab:release.yml
-
-  # Stage: publish_release
-  # We cannot test this job because it requires CI variables
-  # that are not set up outside of the tezos namespace.
-  # - .gitlab/ci/jobs/publish/opam.yml
-  - .gitlab/ci/jobs/publish/deb_packages_stable_amd64.yml
-  - .gitlab/ci/jobs/publish/rpm_packages_stable_amd64.yml
