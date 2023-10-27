@@ -816,7 +816,7 @@ let test_consistent_block_hashes =
   unit
 
 (** The info for the "storage.sol" contract.
-    See [src/kernel_evm/solidity_examples] *)
+    See [tezt/tests/evm_kernel_inputs/storage.*] *)
 let simple_storage =
   {
     label = "simpleStorage";
@@ -825,7 +825,7 @@ let simple_storage =
   }
 
 (** The info for the "erc20tok.sol" contract.
-    See [src/kernel_evm/solidity_examples] *)
+    See [tezt/tests/evm_kernel_inputs/erc20tok.*] *)
 let erc20 =
   {
     label = "erc20tok";
@@ -834,7 +834,7 @@ let erc20 =
   }
 
 (** The info for the "loop.sol" contract.
-    See [src/kernel_evm/benchmarks/scripts/benchmarks/contracts/loop.sol] *)
+    See [tezt/tests/evm_kernel_inputs/loop.*] *)
 let loop =
   {
     label = "loop";
@@ -843,7 +843,7 @@ let loop =
   }
 
 (** The info for the "mapping_storage.sol" contract.
-    See [src\kernel_evm\solidity_examples] *)
+    See [tezt/tests/evm_kernel_inputs/mapping_storage*] *)
 let mapping_storage =
   {
     label = "mappingStorage";
