@@ -25,6 +25,18 @@ let to_string = function
   | Recovering -> "recovering"
   | Executing_outbox -> "executing_outbox"
 
+let pp fmt purpose = Format.pp_print_string fmt (to_string purpose)
+
+let encoding =
+  Data_encoding.string_enum @@ List.map (fun p -> (to_string p, p)) all
+
+type error +=
+  | Missing_operator of t
+  | Too_many_operators of {
+      expected_purposes : t list;
+      given_operators : operators;
+    }
+
 let of_string = function
   (* For backward compability:
      "publish", "refute", "timeout" -> Operating
@@ -54,6 +66,59 @@ let operators_encoding =
        ~key_of_string:of_string_exn
        ~value_encoding:(fun _ -> Signature.Public_key_hash.encoding))
 
+let pp_operators fmt operators =
+  Format.pp_print_list
+    (fun fmt (purpose, operator) ->
+      Format.fprintf
+        fmt
+        "%a: %a"
+        pp
+        purpose
+        Signature.Public_key_hash.pp
+        operator)
+    fmt
+    (Map.bindings operators)
+
+let () =
+  register_error_kind
+    ~id:"sc_rollup.node.missing_mode_operator"
+    ~title:"Missing operator for the chosen mode"
+    ~description:"Missing operator for the chosen mode."
+    ~pp:(fun ppf missing_purpose ->
+      Format.fprintf
+        ppf
+        "@[<hov>Missing operator for the purpose of %a.@]"
+        pp
+        missing_purpose)
+    `Permanent
+    Data_encoding.(obj1 (req "missing_purpose" encoding))
+    (function
+      | Missing_operator missing_purpose -> Some missing_purpose | _ -> None)
+    (fun missing_purpose -> Missing_operator missing_purpose) ;
+  register_error_kind
+    ~id:"sc_rollup.node.too_many_operators"
+    ~title:"Too many operators for the chosen mode"
+    ~description:"Too many operators for the chosen mode."
+    ~pp:(fun ppf (expected_purposes, given_operators) ->
+      Format.fprintf
+        ppf
+        "@[<hov>Too many operators, expecting operators for only %a, have %a.@]"
+        (Format.pp_print_list pp)
+        expected_purposes
+        pp_operators
+        given_operators)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "expected_purposes" (list encoding))
+        (req "given_operators" operators_encoding))
+    (function
+      | Too_many_operators {expected_purposes; given_operators} ->
+          Some (expected_purposes, given_operators)
+      | _ -> None)
+    (fun (expected_purposes, given_operators) ->
+      Too_many_operators {expected_purposes; given_operators})
+
 (* For each purpose, it returns a list of associated operation kinds *)
 let operation_kind : t -> Operation_kind.t list = function
   | Batching -> [Add_messages]
@@ -73,12 +138,54 @@ let of_operation_kind (operation_kinds : Operation_kind.t list) : t list =
         operation_kinds)
     all
 
-let make_map ?default bindings =
-  let map = Map.of_seq @@ List.to_seq bindings in
-  match default with
-  | None -> map
-  | Some default ->
-      List.fold_left
-        (fun map purpose -> Map.update purpose (fun _ -> Some default) map)
-        map
-        all
+let make_operator ?default_operator ~needed_purposes purposed_key =
+  let open Result_syntax in
+  List.fold_left_e
+    (fun map purpose ->
+      let purposed_key = List.assq purpose purposed_key in
+      (* first the purpose then if none default *)
+      let purposed_key = Option.either purposed_key default_operator in
+      let+ operator =
+        Option.value_e
+          purposed_key
+          ~error:(TzTrace.make (Missing_operator purpose))
+      in
+      Map.add purpose operator map)
+    Map.empty
+    needed_purposes
+
+let replace_operator ?default_operator ~needed_purposes
+    (purposed_key : (t * Signature.public_key_hash) list) operators =
+  let open Result_syntax in
+  let replacement_map =
+    List.fold_left
+      (fun map (purpose, key) ->
+        Map.update
+          purpose
+          (function
+            | Some _key -> invalid_arg "mutiple keys for the same purpose"
+            | None -> Some key)
+          map)
+      Map.empty
+      purposed_key
+  in
+  let operators =
+    Map.merge
+      (fun _purpose replacement_operator existing_operator ->
+        (* replacement_operator > default_operator > existing_operator *)
+        match (replacement_operator, existing_operator) with
+        | Some replacement_operator, _ -> Some replacement_operator
+        | _, existing_operator ->
+            Option.either default_operator existing_operator)
+      replacement_map
+      operators
+  in
+  let map_size = Map.cardinal operators in
+  let needed_purpose_len = List.length needed_purposes in
+  let* () =
+    error_when
+      (map_size <> needed_purpose_len)
+      (Too_many_operators
+         {expected_purposes = needed_purposes; given_operators = operators})
+  in
+  return operators

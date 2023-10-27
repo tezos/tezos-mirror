@@ -331,12 +331,7 @@ let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
     match operator with
     | None ->
         (* this case can't happen because the bailout mode needs a operator to start*)
-        tzfail
-          (Configuration.Missing_mode_operators
-             {
-               mode = Configuration.string_of_mode Bailout;
-               missing_operators = [Purpose.to_string Operating];
-             })
+        tzfail (Purpose.Missing_operator Operating)
     | Some operating_pkh -> (
         let module Plugin = (val state.plugin) in
         let* last_published_commitment =
@@ -467,7 +462,8 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   protect start ~on_error:(function
       | Rollup_node_errors.(
           ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-          | Operator_not_in_whitelist | Configuration.Missing_mode_operators _ ))
+          | Operator_not_in_whitelist | Purpose.Missing_operator _
+          | Purpose.Too_many_operators _ ))
         :: _ as e ->
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->

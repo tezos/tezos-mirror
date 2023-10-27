@@ -110,9 +110,7 @@ type t = {
   cors : Resto_cohttp.Cors.t;
 }
 
-type error +=
-  | Missing_mode_operators of {mode : string; missing_operators : string list}
-  | Empty_operation_kinds_for_custom_mode
+type error += Empty_operation_kinds_for_custom_mode
 
 (** [history_mode_of_string s] parses a history_mode from the given string
     [s]. *)
@@ -196,10 +194,6 @@ val description_of_mode : mode -> string
 (** [config_filename data_dir] returns
     the configration filename from the [data_dir] *)
 val config_filename : data_dir:string -> string
-
-(** [check_mode config] ensures the operators correspond to the chosen mode and
-    removes the extra ones. *)
-val check_mode : t -> t tzresult
 
 (** [purposes_of_mode mode] returns purposes associated with the provided mode. *)
 val purposes_of_mode : mode -> Purpose.t list

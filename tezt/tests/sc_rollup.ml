@@ -2941,7 +2941,7 @@ let bailout_mode_fail_to_start_without_operator ~kind =
     Process.check_error
       process
       ~exit_code:1
-      ~msg:(rex "Missing operators operating for mode bailout.")
+      ~msg:(rex "Missing operator for the purpose of operating.")
   in
   unit
 

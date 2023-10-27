@@ -17,6 +17,13 @@ module Map : Map.S with type key = t
 
 type operators = Signature.Public_key_hash.t Map.t
 
+type error +=
+  | Missing_operator of t
+  | Too_many_operators of {
+      expected_purposes : t list;
+      given_operators : operators;
+    }
+
 (** [to_string p] returns a string representation of purpose [p]. *)
 val to_string : t -> string
 
@@ -28,9 +35,29 @@ val of_string_exn : string -> t
 
 val operators_encoding : operators Data_encoding.t
 
-(** [make_map ?default purposes] constructs a purpose map from a list
-    of bindings [purposes], with a potential [default] value. *)
-val make_map : ?default:'a -> (t * 'a) list -> 'a Map.t
+(** [make_operator ?default ~needed_purposes operators] constructs a
+    purpose map from a list of bindings [operators], with a potential
+    [default] key. If [operators] does not cover all purposes of
+    [needed_purposes] and does not contains a [default] key then
+    fails.*)
+val make_operator :
+  ?default_operator:Signature.public_key_hash ->
+  needed_purposes:t list ->
+  (t * Signature.public_key_hash) list ->
+  operators tzresult
+
+(** [replace_operator ?default_operator ~needed_purposes purposed_keys
+    operators] replaces keys of [operators] by [default_operator] if
+    it's set or by the purposed key in [purposed_keys]. It does
+    nothing if [default_operator] is not set or [purposed_keys] is
+    empty. Similar to {!make_operator} the returns [operators]
+    contains only mapping of purpose from needed_purposes.*)
+val replace_operator :
+  ?default_operator:Signature.public_key_hash ->
+  needed_purposes:t list ->
+  (t * Signature.public_key_hash) list ->
+  operators ->
+  operators tzresult
 
 (** For each purpose, it returns a list of associated operation
     kinds. *)
