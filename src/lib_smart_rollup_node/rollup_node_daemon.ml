@@ -383,7 +383,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       |> List.map (fun (operator, operation_kinds) ->
              let strategy =
                match operation_kinds with
-               | [Configuration.Add_messages] -> `Delay_block 0.5
+               | [Operation_kind.Add_messages] -> `Delay_block 0.5
                | _ -> `Each_block
              in
              (operator, strategy, operation_kinds))
