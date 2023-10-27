@@ -22,6 +22,7 @@ mod bare_metal {
         dumb_alloc,
         syscalls::{exit, write_str, StdErr},
     };
+    use alloc::string::ToString;
 
     // This code runs before the main.
     #[riscv_rt::pre_init]
@@ -33,38 +34,8 @@ mod bare_metal {
     // outside world.
     #[panic_handler]
     pub fn panic_handler(info: &core::panic::PanicInfo) -> ! {
-        write_str(StdErr, "Panic at ");
-
-        if let Some(loc) = info.location() {
-            let location = alloc::format!("{}: ", loc);
-            write_str(StdErr, location);
-        } else {
-            write_str(StdErr, "<unknown>: ");
-        }
-
-        // Unfortunately the following section only works when TypeIds work.
-        // TypeIds appear to not work for some reason when targeting bare-metal
-        // RISC-V.
-        #[cfg(feature = "typeids")]
-        {
-            let message =
-                if let Some(message) = info.payload().downcast_ref::<alloc::string::String>() {
-                    message.as_str()
-                } else {
-                    let message = info.payload().downcast_ref::<&str>();
-                    message.unwrap_or(&"<unknown message>")
-                };
-
-            write_str(StdErr, message);
-        }
-
-        #[cfg(not(feature = "typeids"))]
-        {
-            write_str(StdErr, "<unknown>");
-        }
-
+        write_str(StdErr, &info.to_string());
         write_str(StdErr, "\n");
-
         exit(1)
     }
 
