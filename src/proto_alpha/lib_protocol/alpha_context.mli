@@ -3757,6 +3757,7 @@ module Sc_rollup : sig
       Dal.Slots_history.t ->
       Dal.parameters ->
       dal_attestation_lag:int ->
+      dal_number_of_slots:int ->
       is_reveal_enabled:is_reveal_enabled ->
       'proof t ->
       (input option * input_request) tzresult Lwt.t
@@ -3865,6 +3866,7 @@ module Sc_rollup : sig
       Kind.t ->
       Dal.parameters ->
       dal_attestation_lag:int ->
+      dal_number_of_slots:int ->
       stakers:Index.t ->
       Metadata.t ->
       t ->

@@ -313,7 +313,7 @@ end
 let valid (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation) ~metadata
     snapshot commit_inbox_level dal_snapshot dal_parameters ~dal_attestation_lag
-    ~is_reveal_enabled (proof : proof t) =
+    ~dal_number_of_slots ~is_reveal_enabled (proof : proof t) =
   let open Lwt_result_syntax in
   let (module P) = pvm in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
@@ -349,9 +349,22 @@ let valid (type state proof output)
           dal_snapshot
           proof
         |> Lwt.return
-    | Some (Reveal_proof (Dal_parameters_proof _)) ->
-        (* Will be implemented in subsequent commits. *)
-        assert false
+    | Some (Reveal_proof (Dal_parameters_proof {published_level = _})) ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
+           Support revealing historical DAL parameters.
+
+           Currently, we do not support revealing DAL parameters for the past.
+           We ignore the given [published_level] and use the DAL parameters. *)
+        return_some
+          (Sc_rollup_PVM_sig.Reveal
+             (Dal_parameters
+                Sc_rollup_dal_parameters_repr.
+                  {
+                    number_of_slots = Int64.of_int dal_number_of_slots;
+                    attestation_lag = Int64.of_int dal_attestation_lag;
+                    slot_size = Int64.of_int dal_parameters.slot_size;
+                    page_size = Int64.of_int dal_parameters.page_size;
+                  }))
   in
   let input =
     Option.bind input (cut_at_level ~origination_level ~commit_inbox_level)

@@ -383,14 +383,16 @@ val status_encoding : status Data_encoding.t
     player and returns a [Ongoing] status. Otherwise, it returns a
     [Ended <game_result>] status.
 
-    The provided DAL parameters and [dal_attestation_lag] are used in case the
-    game needs to check that a page's content is part of a slot (using the
-    slot's commitment).
+    The provided DAL related parameters are used in case the game needs to:
+    - Check that a page's content is part of a slot (using the slot's commitment)
+      when refuting a DAL page reveal.
+    - Check that the parameters are correct when refuting a DAL parameter reveal.
 *)
 val play :
   Sc_rollups.Kind.t ->
   Dal_slot_repr.parameters ->
   dal_attestation_lag:int ->
+  dal_number_of_slots:int ->
   stakers:Index.t ->
   Sc_rollup_metadata_repr.t ->
   t ->

@@ -153,8 +153,8 @@ val stop_of_pvm_step :
         output from the [input] proof is too recent to be allowed into
         the PVM proof ;
 
-      - DAL parameters and [dal_attestation_lag], to be able to check the page
-        content membership to a slot if needed ;
+      - DAL related parameters, to be able to check the page content membership to a slot
+        or check the revealed parameters if needed ;
 
       - the [pvm_name], used to check that the proof given has the right
         PVM kind.
@@ -170,6 +170,7 @@ val valid :
   Dal_slot_repr.History.t ->
   Dal_slot_repr.parameters ->
   dal_attestation_lag:int ->
+  dal_number_of_slots:int ->
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
   'proof t ->
   (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult

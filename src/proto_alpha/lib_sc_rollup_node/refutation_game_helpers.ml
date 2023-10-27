@@ -163,6 +163,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let dal_l1_parameters = constants.dal in
   let dal_parameters = dal_l1_parameters.cryptobox_parameters in
   let dal_attestation_lag = dal_l1_parameters.attestation_lag in
+  let dal_number_of_slots = dal_l1_parameters.number_of_slots in
 
   let* page_info =
     page_info_from_pvm_state
@@ -290,6 +291,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
       dal_slots_history
       dal_parameters
       ~dal_attestation_lag
+      ~dal_number_of_slots
       ~pvm:(module PVM)
       unserialized_proof
       ~is_reveal_enabled
