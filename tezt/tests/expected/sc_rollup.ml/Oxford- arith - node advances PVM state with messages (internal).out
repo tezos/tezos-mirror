@@ -38,92 +38,32 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\007"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\n"
 
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\r"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\016"
 
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\019"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\022"
 
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\025"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\028"
 
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\031"
 
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-smart-rollup-client-Proxford get state value for vars/value --block head
 "\000\000\000\""
-
-./octez-smart-rollup-client-Proxford rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
