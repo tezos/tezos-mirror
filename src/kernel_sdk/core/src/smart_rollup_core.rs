@@ -343,7 +343,7 @@ pub struct ReadInputMessageInfo {
     pub id: i32,
 }
 
-#[cfg(target_arch = "riscv64")]
+#[cfg(all(target_arch = "riscv64", feature = "proto-alpha"))]
 mod riscv64 {
     pub use crate::{
         riscv64_syscalls::{write, StdErr},
@@ -448,5 +448,5 @@ mod riscv64 {
     }
 }
 
-#[cfg(target_arch = "riscv64")]
+#[cfg(all(target_arch = "riscv64", feature = "proto-alpha"))]
 pub use riscv64::*;

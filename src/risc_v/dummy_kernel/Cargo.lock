@@ -123,8 +123,9 @@ checksum = "e5ea92a5b6195c6ef2a0295ea818b312502c6fc94dde986c5553242e18fd4ce2"
 name = "risc-v-dummy"
 version = "0.0.0"
 dependencies = [
- "libc",
  "riscv-rt",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-panic-hook",
 ]
 
 [[package]]
@@ -180,6 +181,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "tezos-smart-rollup-core"
+version = "0.2.1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "tezos-smart-rollup-panic-hook"
+version = "0.2.1"
+dependencies = [
+ "tezos-smart-rollup-core",
 ]
 
 [[package]]

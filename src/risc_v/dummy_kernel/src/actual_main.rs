@@ -1,5 +1,8 @@
-use crate::syscalls::{write_str, StdOut};
+use tezos_smart_rollup_core::SmartRollupCore;
 
-pub fn main() {
-    write_str(StdOut, "Hello World\n");
+pub fn main(host: impl SmartRollupCore) {
+    let msg = "Hello World\n";
+    unsafe {
+        host.write_debug(msg.as_ptr(), msg.len());
+    }
 }

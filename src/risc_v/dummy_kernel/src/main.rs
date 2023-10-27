@@ -8,21 +8,20 @@ extern crate std;
 
 mod actual_main;
 mod dumb_alloc;
-mod syscalls;
+
+use tezos_smart_rollup_core::{riscv64_syscalls::exit, rollup_host::RollupHost};
 
 #[inline]
 fn main_wrapper() -> ! {
-    crate::actual_main::main();
-    crate::syscalls::exit(0)
+    let host = unsafe { RollupHost::new() };
+    crate::actual_main::main(host);
+    exit(0)
 }
 
 #[cfg(target_os = "none")]
 mod bare_metal {
-    use crate::{
-        dumb_alloc,
-        syscalls::{exit, write_str, StdErr},
-    };
-    use alloc::string::ToString;
+    use crate::dumb_alloc;
+    use tezos_smart_rollup_core::riscv64_syscalls::exit;
 
     // This code runs before the main.
     #[riscv_rt::pre_init]
@@ -34,8 +33,7 @@ mod bare_metal {
     // outside world.
     #[panic_handler]
     pub fn panic_handler(info: &core::panic::PanicInfo) -> ! {
-        write_str(StdErr, &info.to_string());
-        write_str(StdErr, "\n");
+        tezos_smart_rollup_panic_hook::panic_handler(info);
         exit(1)
     }
 
