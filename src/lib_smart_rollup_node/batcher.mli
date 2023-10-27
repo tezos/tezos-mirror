@@ -34,7 +34,8 @@ type status =
     for [signer]. If [config.simulation] is [true] (the default), messages added
     to the batcher are simulated in an incremental simulation context. [plugin]
     is the protocol plugin with which the batcher is started, but it will
-    automatically change plugins on protocol migrations. *)
+    automatically change plugins on protocol migrations. The batcher worker is
+    launched only if the current rollup node mode supports batching L2 operations. *)
 val init :
   (module Protocol_plugin_sig.S) ->
   Configuration.batcher ->

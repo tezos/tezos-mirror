@@ -737,6 +737,9 @@ let can_inject mode (op_kind : Operation_kind.t) =
   let allowed_operations = operation_kinds_of_mode mode in
   List.mem ~equal:Stdlib.( = ) op_kind allowed_operations
 
+let purpose_matches_mode mode purpose =
+  List.mem ~equal:Stdlib.( = ) purpose (purposes_of_mode mode)
+
 let refutation_player_buffer_levels = 5
 
 let default_index_buffer_size = 10_000

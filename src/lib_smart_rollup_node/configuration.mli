@@ -245,6 +245,10 @@ val operation_kinds_of_mode : mode -> Operation_kind.t list
     be injected based on the configuration settings. *)
 val can_inject : mode -> Operation_kind.t -> bool
 
+(** [purpose_matches_mode mode purpose] returns true if and only if the given [mode]
+    supports the given [purpose]. *)
+val purpose_matches_mode : mode -> purpose -> bool
+
 (** Number of levels the refutation player waits until trying to play
     for a game state it already played before. *)
 val refutation_player_buffer_levels : int
