@@ -40,8 +40,6 @@ type status = Pending_batch | Batched of Injector.Inj_operation.hash
 
 type state = {
   node_ctxt : Node_context.ro;
-  signer : Signature.public_key_hash;
-  conf : Configuration.batcher;
   messages : Message_queue.t;
   batched : Batched_messages.t;
   mutable simulation_ctxt : Simulation.t option;
@@ -77,10 +75,10 @@ let inject_batch state (l2_messages : L2_message.t list) =
 
 let inject_batches state = List.iter_es (inject_batch state)
 
-let max_batch_size {conf; plugin; _} =
+let max_batch_size {node_ctxt; plugin; _} =
   let module Plugin = (val plugin) in
   Option.value
-    conf.max_batch_size
+    node_ctxt.config.batcher.max_batch_size
     ~default:Plugin.Batcher_constants.protocol_max_batch_size
 
 let get_batches state ~only_full =
@@ -100,7 +98,8 @@ let get_batches state ~only_full =
         let new_batch_elements = current_batch_elements + 1 in
         if
           new_batch_size <= max_batch_size state
-          && new_batch_elements <= state.conf.max_batch_elements
+          && new_batch_elements
+             <= state.node_ctxt.config.batcher.max_batch_elements
         then
           (* We can add the message to the current batch because we are still
              within the bounds. *)
@@ -122,8 +121,9 @@ let get_batches state ~only_full =
   let batches =
     if
       (not only_full)
-      || current_batch_size >= state.conf.min_batch_size
-         && current_batch_elements >= state.conf.min_batch_elements
+      || current_batch_size >= state.node_ctxt.config.batcher.min_batch_size
+         && current_batch_elements
+            >= state.node_ctxt.config.batcher.min_batch_elements
     then
       (* We have enough to make a batch with the last non-full batch. *)
       List.rev current_rev_batch :: full_batches
@@ -186,7 +186,7 @@ let on_register state (messages : string list) =
       messages
   in
   let* () =
-    if not state.conf.simulate then return_unit
+    if not state.node_ctxt.config.batcher.simulate then return_unit
     else
       match state.simulation_ctxt with
       | None -> failwith "Simulation context of batcher not initialized"
@@ -216,7 +216,8 @@ let on_new_head state head =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4224
      Replay with simulation may be too expensive *)
   let+ simulation_ctxt, failing =
-    if not state.conf.simulate then return (simulation_ctxt, [])
+    if not state.node_ctxt.config.batcher.simulate then
+      return (simulation_ctxt, [])
     else
       (* Re-simulate one by one *)
       Message_queue.fold_es
@@ -232,11 +233,9 @@ let on_new_head state head =
   (* Forget failing messages *)
   List.iter (Message_queue.remove state.messages) failing
 
-let init_batcher_state plugin node_ctxt ~signer (conf : Configuration.batcher) =
+let init_batcher_state plugin node_ctxt =
   {
     node_ctxt;
-    signer;
-    conf;
     messages = Message_queue.create 100_000 (* ~ 400MB *);
     batched = Batched_messages.create 100_000 (* ~ 400MB *);
     simulation_ctxt = None;
@@ -249,8 +248,6 @@ module Types = struct
   type parameters = {
     node_ctxt : Node_context.ro;
     plugin : (module Protocol_plugin_sig.S);
-    signer : Signature.public_key_hash;
-    conf : Configuration.batcher;
   }
 end
 
@@ -287,9 +284,9 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt; plugin; signer; conf} =
+  let on_launch _w () Types.{node_ctxt; plugin} =
     let open Lwt_result_syntax in
-    let state = init_batcher_state plugin node_ctxt ~signer conf in
+    let state = init_batcher_state plugin node_ctxt in
     return state
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
@@ -329,13 +326,13 @@ let check_batcher_config (module Plugin : Protocol_plugin_sig.S)
         Plugin.Batcher_constants.protocol_max_batch_size
   | _ -> Ok ()
 
-let start plugin conf ~signer node_ctxt =
+let start plugin node_ctxt =
   let open Lwt_result_syntax in
-  let*? () = check_batcher_config plugin conf in
-  let node_ctxt = Node_context.readonly node_ctxt in
-  let+ worker =
-    Worker.launch table () {node_ctxt; plugin; signer; conf} (module Handlers)
+  let*? () =
+    check_batcher_config plugin node_ctxt.Node_context.config.batcher
   in
+  let node_ctxt = Node_context.readonly node_ctxt in
+  let+ worker = Worker.launch table () {node_ctxt; plugin} (module Handlers) in
   Lwt.wakeup worker_waker worker
 
 let start_in_mode mode =
@@ -345,7 +342,7 @@ let start_in_mode mode =
   | Observer | Accuser | Bailout | Maintenance -> false
   | Custom ops -> purpose_matches_mode (Custom ops) Batching
 
-let init plugin conf ~signer (node_ctxt : _ Node_context.t) =
+let init plugin (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   match Lwt.state worker_promise with
   | Lwt.Return _ ->
@@ -356,8 +353,7 @@ let init plugin conf ~signer (node_ctxt : _ Node_context.t) =
       fail [Rollup_node_errors.No_batcher; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
-      if start_in_mode node_ctxt.config.mode then
-        start plugin conf ~signer node_ctxt
+      if start_in_mode node_ctxt.config.mode then start plugin node_ctxt
       else return_unit
 
 (* This is a batcher worker for a single scoru *)

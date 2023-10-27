@@ -30,18 +30,14 @@ type status =
       (** The message has already been batched and sent to the injector in an L1
           operation whose hash is given. *)
 
-(** [init plugin config ~signer node_ctxt] initializes and starts the batcher
-    for [signer]. If [config.simulation] is [true] (the default), messages added
+(** [init plugin node_ctxt] initializes and starts the batcher
+    for [signer]. If [node_ctxt.config.simulation] is [true] (the default), messages added
     to the batcher are simulated in an incremental simulation context. [plugin]
     is the protocol plugin with which the batcher is started, but it will
     automatically change plugins on protocol migrations. The batcher worker is
     launched only if the current rollup node mode supports batching L2 operations. *)
 val init :
-  (module Protocol_plugin_sig.S) ->
-  Configuration.batcher ->
-  signer:Signature.public_key_hash ->
-  _ Node_context.t ->
-  unit tzresult Lwt.t
+  (module Protocol_plugin_sig.S) -> _ Node_context.t -> unit tzresult Lwt.t
 
 (** Create L2 batches of operations from the queue and pack each batch in an L1
     operation. The L1 operations (i.e. L2 batches) are queued in the injector for
