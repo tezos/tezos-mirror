@@ -175,9 +175,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     in
     (* Called with monotonically increasing [i] *)
     let test_message i =
-      let*! prev_state_hash =
-        Sc_rollup_client.state_hash ~hooks sc_rollup_client
-      in
+      let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
       let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
       let message = sf "%d %d + value" i ((i + 2) * 2) in
       let* () =
@@ -237,7 +235,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         | _otherwise -> raise (Invalid_argument kind)
       in
 
-      let*! state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
+      let* state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
       Check.(state_hash <> prev_state_hash)
         Check.string
         ~error_msg:"State hash has not changed (%L <> %R)" ;

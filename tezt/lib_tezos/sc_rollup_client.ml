@@ -317,10 +317,6 @@ let inspect_durable_state_value :
       rpc_req ()
       |> Runnable.map (fun json -> List.map JSON.as_string (JSON.as_list json))
 
-let state_hash ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "state_hash"]
-  |> Runnable.map JSON.as_string
-
 let last_stored_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["global"; "last_stored_commitment"]
   |> Runnable.map commitment_with_hash_from_json

@@ -858,7 +858,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
       bad_reveal_at;
       priority;
       allow_degraded;
-    } protocol sc_rollup_node sc_client1 sc_rollup_address node client =
+    } protocol sc_rollup_node _sc_client1 sc_rollup_address node client =
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   let loser_keys =
     List.mapi
@@ -1125,9 +1125,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     loser_deposits_json ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
-  let open Runnable in
-  let open Syntax in
-  let*! _value = Sc_rollup_client.state_hash sc_client1 in
+  let* _value = Sc_rollup_rpc.state_hash sc_rollup_node in
   List.iter Lwt.cancel (restart_promise :: gather_promises) ;
   (* Capture dissections *)
   Hashtbl.to_seq_values dissections
