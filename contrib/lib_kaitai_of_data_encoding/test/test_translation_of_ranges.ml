@@ -83,3 +83,57 @@ let%expect_test "test float range" =
         min: -22299.01
         max: 3333333.33333
   |}]
+
+let%expect_test "test small shifted range" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~id:"shifted_small_range"
+      Data_encoding.(ranged_int 3 13)
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: shifted_small_range
+      endian: be
+    types:
+      shifted_small_range_shifted_to_zero:
+        instances:
+          value:
+            value: (shifted_small_range_shifted_to_zero + 3)
+        seq:
+        - id: shifted_small_range_shifted_to_zero
+          type: u1
+          valid:
+            max: 10
+    seq:
+    - id: shifted_small_range
+      type: shifted_small_range_shifted_to_zero
+  |}]
+
+let%expect_test "test bigger shifted range" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~id:"shifted_big_range"
+      Data_encoding.(ranged_int 103 100002)
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: shifted_big_range
+      endian: be
+    types:
+      shifted_big_range_shifted_to_zero:
+        instances:
+          value:
+            value: (shifted_big_range_shifted_to_zero + 103)
+        seq:
+        - id: shifted_big_range_shifted_to_zero
+          type: s4
+          valid:
+            max: 99899
+    seq:
+    - id: shifted_big_range
+      type: shifted_big_range_shifted_to_zero
+  |}]

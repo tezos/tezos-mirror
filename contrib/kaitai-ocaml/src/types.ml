@@ -34,6 +34,7 @@ module Ast = struct
   let operator_to_string = function
     | BitAnd -> "&"
     | RShift -> ">>"
+    | Add -> "+"
     | _ -> failwith "not implemented"
 
   type unaryop = Invert | Not | Minus

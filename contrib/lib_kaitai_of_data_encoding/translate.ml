@@ -99,31 +99,103 @@ let rec seq_field_of_data_encoding :
   | Int32 -> (enums, types, [Ground.Attr.int32 ~id])
   | Int64 -> (enums, types, [Ground.Attr.int64 ~id])
   | Int31 -> (enums, types, [Ground.Attr.int31 ~id])
-  | RangedInt {minimum; maximum} -> (
-      (* TODO: support shifted RangedInt
-         - make the de/serialiser shift the value
-         - make the [valid] field check the shifted value *)
-      if minimum > 0 then failwith "Not supported (shifted range)" ;
+  | RangedInt {minimum; maximum} ->
       let size = Data_encoding__Binary_size.range_to_size ~minimum ~maximum in
-      let valid =
-        Some
-          (ValidationSpec.ValidationRange
-             {min = Ast.IntNum minimum; max = Ast.IntNum maximum})
-      in
-      let uvalid =
-        if minimum = 0 then
-          Some (ValidationSpec.ValidationMax (Ast.IntNum maximum))
-        else valid
-      in
-      match size with
-      | `Uint8 -> (enums, types, [{(Ground.Attr.uint8 ~id) with valid = uvalid}])
-      | `Uint16 ->
-          (enums, types, [{(Ground.Attr.uint16 ~id) with valid = uvalid}])
-      | `Uint30 ->
-          (enums, types, [{(Ground.Attr.uint30 ~id) with valid = uvalid}])
-      | `Int8 -> (enums, types, [{(Ground.Attr.int8 ~id) with valid}])
-      | `Int16 -> (enums, types, [{(Ground.Attr.int16 ~id) with valid}])
-      | `Int31 -> (enums, types, [{(Ground.Attr.int31 ~id) with valid}]))
+      if minimum <= 0 then
+        let valid =
+          Some
+            (ValidationSpec.ValidationRange
+               {min = Ast.IntNum minimum; max = Ast.IntNum maximum})
+        in
+        let uvalid =
+          if minimum = 0 then
+            Some (ValidationSpec.ValidationMax (Ast.IntNum maximum))
+          else valid
+        in
+        match size with
+        | `Uint8 ->
+            (enums, types, [{(Ground.Attr.uint8 ~id) with valid = uvalid}])
+        | `Uint16 ->
+            (enums, types, [{(Ground.Attr.uint16 ~id) with valid = uvalid}])
+        | `Uint30 ->
+            (enums, types, [{(Ground.Attr.uint30 ~id) with valid = uvalid}])
+        | `Int8 -> (enums, types, [{(Ground.Attr.int8 ~id) with valid}])
+        | `Int16 -> (enums, types, [{(Ground.Attr.int16 ~id) with valid}])
+        | `Int31 -> (enums, types, [{(Ground.Attr.int31 ~id) with valid}])
+      else
+        (* when [minimum > 0] (as is the case in this branch), data-encoding
+           shifts the value of the binary representation so that the minimum is at
+           [0]. E.g., the interval [200]–[300] is represented on the wire as the
+           interval [0]-[100] and the de/serialisation function is responsible for
+           shifting to/from the actual range. *)
+        let shift = minimum in
+        let shifted_id = id ^ "_shifted_to_zero" in
+        let shifted_encoding : a DataEncoding.t =
+          {
+            encoding =
+              RangedInt {minimum = minimum - shift; maximum = maximum - shift};
+            json_encoding = None;
+          }
+        in
+        let enums, types, represented_interval_attrs =
+          seq_field_of_data_encoding enums types shifted_encoding shifted_id
+        in
+        let instance_type : Kaitai.Types.DataType.int_type =
+          match size with
+          | `Uint8 -> Int1Type {signed = false}
+          | `Uint16 -> IntMultiType {signed = false; width = W2; endian = None}
+          | `Uint30 -> IntMultiType {signed = false; width = W4; endian = None}
+          | `Int8 -> Int1Type {signed = true}
+          | `Int16 -> IntMultiType {signed = true; width = W2; endian = None}
+          | `Int31 -> IntMultiType {signed = true; width = W4; endian = None}
+        in
+        let represented_interval_class =
+          Helpers.class_spec_of_attrs
+            ~id:shifted_id
+            ~instances:
+              [
+                ( "value",
+                  {
+                    doc =
+                      {
+                        summary =
+                          Some
+                            "The interval is represented shifted towards 0 for \
+                             compactness, this instance corrects the shift.";
+                        refs = [];
+                      };
+                    descr =
+                      ValueInstanceSpec
+                        {
+                          id = "value";
+                          path = [];
+                          value =
+                            BinOp
+                              {
+                                left = Name shifted_id;
+                                op = Add;
+                                right = IntNum shift;
+                              };
+                          ifExpr = None;
+                          dataTypeOpt =
+                            Some (NumericType (Int_type instance_type));
+                        };
+                  } );
+              ]
+            represented_interval_attrs
+        in
+        let types =
+          Helpers.add_uniq_assoc types (shifted_id, represented_interval_class)
+        in
+        ( enums,
+          types,
+          [
+            {
+              (Helpers.default_attr_spec ~id) with
+              dataType =
+                DataType.(ComplexDataType (UserType represented_interval_class));
+            };
+          ] )
   | Float -> (enums, types, [Ground.Attr.float ~id])
   | RangedFloat {minimum; maximum} ->
       let valid =
