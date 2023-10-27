@@ -4779,8 +4779,6 @@ module Protocol : sig
 
   val octez_sc_rollup : t -> target option
 
-  val octez_sc_rollup_layer2 : t -> target option
-
   val octez_sc_rollup_node : t -> target option
 
   val octez_injector : t -> target option
@@ -4903,7 +4901,6 @@ end = struct
     benchmarks_proto : target option;
     baking : target option;
     octez_sc_rollup : target option;
-    octez_sc_rollup_layer2 : target option;
     octez_sc_rollup_node : target option;
     octez_injector : target option;
   }
@@ -4911,8 +4908,8 @@ end = struct
   let make ?client ?client_commands ?client_commands_registration
       ?baking_commands_registration ?plugin ?plugin_registerer ?dal ?dac
       ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup
-      ?octez_sc_rollup_layer2 ?octez_sc_rollup_node ?octez_injector ?baking
-      ~status ~name ~main ~embedded () =
+      ?octez_sc_rollup_node ?octez_injector ?baking ~status ~name ~main
+      ~embedded () =
     {
       status;
       name;
@@ -4931,7 +4928,6 @@ end = struct
       benchmarks_proto;
       baking;
       octez_sc_rollup;
-      octez_sc_rollup_layer2;
       octez_sc_rollup_node;
       octez_injector;
     }
@@ -4993,8 +4989,6 @@ end = struct
   let baking_exn p = mandatory "baking" p p.baking
 
   let octez_sc_rollup p = p.octez_sc_rollup
-
-  let octez_sc_rollup_layer2 p = p.octez_sc_rollup_layer2
 
   let octez_sc_rollup_node p = p.octez_sc_rollup_node
 
@@ -6956,7 +6950,6 @@ let hash = Protocol.hash
          ?benchmarks_proto
          ?baking
          ?octez_sc_rollup
-         ?octez_sc_rollup_layer2
          ?octez_sc_rollup_node
          ?octez_injector
          ()
@@ -8356,66 +8349,6 @@ let _octez_evm_node_tests =
         alcotezt;
         evm_node_lib_prod;
         evm_node_lib_dev;
-      ]
-
-let octez_scoru_sequencer =
-  private_lib
-    "octez_smart_rollup_sequencer"
-    ~path:"src/lib_scoru_sequencer"
-    ~opam:"octez-smart-rollup-sequencer"
-    ~synopsis:"Sequencer library for smart contract rollup"
-    ~deps:
-      [
-        octez_base |> open_ |> open_ ~m:"TzPervasives";
-        Protocol.(octez_sc_rollup_layer2 alpha |> if_some |> open_);
-        Protocol.(main alpha) |> open_;
-        Protocol.(octez_sc_rollup_node alpha) |> if_some;
-        octez_workers |> open_;
-        octez_smart_rollup_node_lib |> open_;
-        octez_smart_rollup_lib |> open_;
-        octez_client_base |> open_;
-        octez_rpc;
-        octez_rpc_http;
-        octez_rpc_http_server;
-      ]
-
-let _octez_scoru_sequencer_tests =
-  tezt
-    ["test_kernel_message"]
-    ~path:"src/lib_scoru_sequencer/test"
-    ~opam:"scoru-sequencer-test"
-    ~synopsis:"Tests for the scoru sequencer library"
-    ~with_macos_security_framework:true
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        Protocol.(main alpha) |> open_;
-        octez_scoru_sequencer;
-        octez_base_test_helpers |> open_;
-        octez_test_helpers |> open_;
-        qcheck_alcotest;
-        alcotezt;
-      ]
-
-let _sc_sequencer_node =
-  public_exe
-    "octez-smart-rollup-sequencer-node"
-    ~internal_name:"main_sequencer_node"
-    ~path:"src/bin_sequencer_node"
-    ~synopsis:"Smart rollup sequencer node (low-latency node)"
-    ~release_status:Experimental
-    ~with_macos_security_framework:true
-    ~deps:
-      [
-        octez_base |> open_ |> open_ ~m:"TzPervasives";
-        octez_clic;
-        octez_client_base |> open_;
-        octez_client_base_unix |> open_;
-        octez_client_commands |> open_;
-        octez_smart_rollup_node_lib |> open_;
-        Protocol.(client alpha) |> if_some |> open_;
-        Protocol.(octez_sc_rollup_node alpha) |> if_some |> open_;
-        octez_scoru_sequencer |> open_;
       ]
 
 let _evm_node =
