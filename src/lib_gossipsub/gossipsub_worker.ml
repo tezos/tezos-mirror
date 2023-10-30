@@ -105,6 +105,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
     let update_num_ihaves exch delta =
       exch.num_ihaves <- exch.num_ihaves + counter_update delta
+
+    let update_num_iwants exch delta =
+      exch.num_iwants <- exch.num_iwants + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -218,7 +221,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | Graft _ -> Stats.update_num_grafts stats.sent `Incr
           | Prune _ -> Stats.update_num_prunes stats.sent `Incr
           | IHave _ -> Stats.update_num_ihaves stats.sent `Incr
-          | Message_with_header _ | IWant _ | Subscribe _ | Unsubscribe _ -> ())
+          | IWant _ -> Stats.update_num_iwants stats.sent `Incr
+          | Message_with_header _ | Subscribe _ | Unsubscribe _ -> ())
       | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
     fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
@@ -449,6 +453,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           (fun message_id status ->
             match status with
             | `Message message ->
+                Stats.update_num_iwants state.stats.received `Incr ;
                 let topic = Message_id.get_topic message_id in
                 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5415
 
