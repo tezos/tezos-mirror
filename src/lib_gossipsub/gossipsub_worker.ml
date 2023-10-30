@@ -99,6 +99,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
     let update_num_grafts exch delta =
       exch.num_grafts <- exch.num_grafts + counter_update delta
+
+    let update_num_prunes exch delta =
+      exch.num_prunes <- exch.num_prunes + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -210,7 +213,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       | Out_message {p2p_message; to_peer = _} -> (
           match p2p_message with
           | Graft _ -> Stats.update_num_grafts stats.sent `Incr
-          | Message_with_header _ | IHave _ | IWant _ | Prune _ | Subscribe _
+          | Prune _ -> Stats.update_num_prunes stats.sent `Incr
+          | Message_with_header _ | IHave _ | IWant _ | Subscribe _
           | Unsubscribe _ ->
               ())
       | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
@@ -475,9 +479,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         forget_all state ;
         state
     | state, (Ignore_PX_score_too_low _ | No_PX) ->
+        Stats.update_num_prunes state.stats.received `Incr ;
         forget_all state ;
         state
     | state, GS.PX peers ->
+        Stats.update_num_prunes state.stats.received `Incr ;
         emit_p2p_output
           state
           ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
