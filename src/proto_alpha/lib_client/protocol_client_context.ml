@@ -167,6 +167,7 @@ let () =
   register ~pp:Protocol.Alpha_context.Contract.pp
   @@ def "contract" [] Protocol.Alpha_context.Contract.encoding ;
   register @@ def "staker" [] Protocol.Staker_repr.encoding ;
+  register @@ def "frozen_staker" [] Protocol.Frozen_staker_repr.encoding ;
   register
   @@ def
        "receipt"

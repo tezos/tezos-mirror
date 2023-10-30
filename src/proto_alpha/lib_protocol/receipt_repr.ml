@@ -72,7 +72,7 @@ end
 type 'token balance =
   | Contract : Contract_repr.t -> Tez_repr.t balance
   | Block_fees : Tez_repr.t balance
-  | Deposits : Staker_repr.t -> Tez_repr.t balance
+  | Deposits : Frozen_staker_repr.t -> Tez_repr.t balance
   | Unstaked_deposits : Staker_repr.t * Cycle_repr.t -> Tez_repr.t balance
   | Nonce_revelation_rewards : Tez_repr.t balance
   | Attesting_rewards : Tez_repr.t balance
@@ -134,7 +134,7 @@ let compare_balance :
  fun ba bb ->
   match (ba, bb) with
   | Contract ca, Contract cb -> Contract_repr.compare ca cb
-  | Deposits sa, Deposits sb -> Staker_repr.compare sa sb
+  | Deposits sa, Deposits sb -> Frozen_staker_repr.compare sa sb
   | Unstaked_deposits (sa, ca), Unstaked_deposits (sb, cb) ->
       Compare.or_else (Staker_repr.compare sa sb) (fun () ->
           Cycle_repr.compare ca cb)
@@ -276,7 +276,7 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
            (obj3
               (req "kind" (constant "freezer"))
               (req "category" (constant "deposits"))
-              (req "staker" Staker_repr.encoding))
+              (req "staker" Frozen_staker_repr.encoding))
            (function Deposits staker -> Some ((), (), staker) | _ -> None)
            (fun ((), (), staker) -> Deposits staker);
          tez_case

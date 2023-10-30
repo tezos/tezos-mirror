@@ -56,9 +56,23 @@ let staker =
       Staker_repr.Single (default_contract, default_delegate);
     ]
 
+let frozen_staker =
+  let open Gen in
+  oneofl
+    [
+      Frozen_staker_repr.Shared {delegate = default_delegate};
+      Frozen_staker_repr.Single
+        {
+          staker = Contract_repr.Implicit default_delegate;
+          delegate = default_delegate;
+        };
+      Frozen_staker_repr.Single
+        {staker = default_contract; delegate = default_delegate};
+    ]
+
 let deposits =
   let open Gen in
-  let+ staker in
+  let+ staker = frozen_staker in
   Receipt_repr.Deposits staker
 
 let lost_attesting_rewards =
