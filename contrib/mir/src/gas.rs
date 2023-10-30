@@ -177,6 +177,7 @@ pub mod interpret_cost {
     pub const AMOUNT: u32 = 10;
     pub const NIL: u32 = 10;
     pub const CONS: u32 = 15;
+    pub const CHAIN_ID: u32 = 15;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol

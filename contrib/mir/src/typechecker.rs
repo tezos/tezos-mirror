@@ -585,6 +585,11 @@ fn typecheck_instruction(
         (I::Update(..), [.., _, _, _]) => no_overload!(UPDATE),
         (I::Update(..), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
 
+        (I::ChainId, ..) => {
+            stack.push(T::ChainId);
+            I::ChainId
+        }
+
         (I::Seq(nested), ..) => I::Seq(typecheck(nested, ctx, opt_stack)?),
     })
 }
@@ -2522,7 +2527,7 @@ mod typecheck_tests {
     fn test_push_chain_id() {
         let bytes = "f3d48554";
         let exp = hex::decode(bytes).unwrap();
-        let exp = Ok(Push(TypedValue::ChainId(ChainId(exp))));
+        let exp = Ok(Push(TypedValue::ChainId(super::ChainId(exp))));
         let lit = "NetXynUjJNZm7wi";
         assert_eq!(
             &typecheck_instruction(
@@ -2559,6 +2564,18 @@ mod typecheck_tests {
             Err(TcError::ChainIdError(
                 tezos_crypto_rs::hash::FromBytesError::InvalidSize.into()
             ))
+        );
+    }
+
+    #[test]
+    fn chain_id_instr() {
+        assert_eq!(
+            typecheck_instruction(
+                parse("CHAIN_ID").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![]
+            ),
+            Ok(Instruction::ChainId)
         );
     }
 }

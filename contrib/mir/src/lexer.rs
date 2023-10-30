@@ -97,6 +97,7 @@ defprim! {
     contract,
     address,
     chain_id,
+    CHAIN_ID,
 }
 
 defprim! {
