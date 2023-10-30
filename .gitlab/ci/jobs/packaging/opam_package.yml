@@ -512,17 +512,9 @@ opam:octez-distributed-lwt-internal:
   variables:
     package: octez-distributed-lwt-internal
 
-# Ignoring unreleased package octez-evm-proxy.
+# Ignoring unreleased package octez-evm-node.
 
-# Ignoring unreleased package octez-evm-proxy-lib-dev.
-
-# Ignoring unreleased package octez-evm-proxy-lib-dev-encoding.
-
-# Ignoring unreleased package octez-evm-proxy-lib-prod.
-
-# Ignoring unreleased package octez-evm-proxy-lib-prod-encoding.
-
-# Ignoring unreleased package octez-evm-proxy-tests.
+# Ignoring unreleased package octez-evm-node-tests.
 
 opam:octez-injector:
   extends:
@@ -560,6 +552,14 @@ opam:octez-node-config:
     - .rules_template__trigger_all_opam_batch_4
   variables:
     package: octez-node-config
+
+# Ignoring unreleased package octez-node-lib-dev.
+
+# Ignoring unreleased package octez-node-lib-dev-encoding.
+
+# Ignoring unreleased package octez-node-lib-prod.
+
+# Ignoring unreleased package octez-node-lib-prod-encoding.
 
 opam:octez-proto-libs:
   extends:

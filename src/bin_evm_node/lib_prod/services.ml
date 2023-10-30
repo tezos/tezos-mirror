@@ -38,7 +38,7 @@ let version_service =
 let client_version =
   Format.sprintf
     "%s/%s-%s/%s/ocamlc.%s"
-    "octez-evm-proxy-server"
+    "octez-evm-node"
     (Tezos_version.Version.to_string
        Tezos_version_value.Current_git_info.version)
     Tezos_version_value.Current_git_info.abbreviated_commit_hash
@@ -49,7 +49,7 @@ let version dir =
   Directory.register0 dir version_service (fun () () ->
       Lwt.return_ok client_version)
 
-(* The proxy server can either take a single request or multiple requests at
+(* The node can either take a single request or multiple requests at
    once. *)
 type 'a request = Singleton of 'a | Batch of 'a list
 

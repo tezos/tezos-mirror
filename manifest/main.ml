@@ -8278,22 +8278,22 @@ let _octez_scoru_wasm_debugger =
         lambda_term;
       ]
 
-let evm_proxy_lib_prod_encoding =
+let evm_node_lib_prod_encoding =
   private_lib
-    "evm_proxy_lib_prod_encoding"
-    ~path:"src/bin_evm_proxy/lib_prod/encodings"
-    ~opam:"octez-evm-proxy-lib-prod-encoding"
+    "evm_node_lib_prod_encoding"
+    ~path:"src/bin_evm_node/lib_prod/encodings"
+    ~opam:"octez-node-lib-prod-encoding"
     ~synopsis:
-      "EVM encodings for the EVM proxy and plugin for the WASM Debugger [prod \
+      "EVM encodings for the EVM node and plugin for the WASM Debugger [prod \
        version]"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
 
-let evm_proxy_lib_prod =
+let evm_node_lib_prod =
   private_lib
-    "evm_proxy_lib_prod"
-    ~path:"src/bin_evm_proxy/lib_prod"
-    ~opam:"octez-evm-proxy-lib-prod"
+    "evm_node_lib_prod"
+    ~path:"src/bin_evm_node/lib_prod"
+    ~opam:"octez-node-lib-prod"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [prod version]"
@@ -8305,26 +8305,26 @@ let evm_proxy_lib_prod =
         octez_rpc_http_client_unix;
         octez_version_value;
         octez_stdlib_unix |> open_;
-        evm_proxy_lib_prod_encoding |> open_;
+        evm_node_lib_prod_encoding |> open_;
         lwt_exit;
       ]
 
-let evm_proxy_lib_dev_encoding =
+let evm_node_lib_dev_encoding =
   private_lib
-    "evm_proxy_lib_dev_encoding"
-    ~path:"src/bin_evm_proxy/lib_dev/encodings"
-    ~opam:"octez-evm-proxy-lib-dev-encoding"
+    "evm_node_lib_dev_encoding"
+    ~path:"src/bin_evm_node/lib_dev/encodings"
+    ~opam:"octez-node-lib-dev-encoding"
     ~synopsis:
-      "EVM encodings for the EVM proxy and plugin for the WASM Debugger [dev \
+      "EVM encodings for the EVM node and plugin for the WASM Debugger [dev \
        version]"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
 
-let evm_proxy_lib_dev =
+let evm_node_lib_dev =
   private_lib
-    "evm_proxy_lib_dev"
-    ~path:"src/bin_evm_proxy/lib_dev"
-    ~opam:"octez-evm-proxy-lib-dev"
+    "evm_node_lib_dev"
+    ~path:"src/bin_evm_node/lib_dev"
+    ~opam:"octez-node-lib-dev"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [dev version]"
@@ -8336,16 +8336,16 @@ let evm_proxy_lib_dev =
         octez_rpc_http_client_unix;
         octez_version_value;
         octez_stdlib_unix |> open_;
-        evm_proxy_lib_dev_encoding |> open_;
+        evm_node_lib_dev_encoding |> open_;
         lwt_exit;
       ]
 
-let _octez_evm_proxy_tests =
+let _octez_evm_node_tests =
   tezt
     ["test_rlp"; "test_ethbloom"]
-    ~path:"src/bin_evm_proxy/test"
-    ~opam:"octez-evm-proxy-tests"
-    ~synopsis:"Tests for the EVM Proxy"
+    ~path:"src/bin_evm_node/test"
+    ~opam:"octez-evm-node-tests"
+    ~synopsis:"Tests for the EVM Node"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -8354,8 +8354,8 @@ let _octez_evm_proxy_tests =
         octez_test_helpers |> open_;
         qcheck_alcotest;
         alcotezt;
-        evm_proxy_lib_prod;
-        evm_proxy_lib_dev;
+        evm_node_lib_prod;
+        evm_node_lib_dev;
       ]
 
 let octez_scoru_sequencer =
@@ -8418,12 +8418,12 @@ let _sc_sequencer_node =
         octez_scoru_sequencer |> open_;
       ]
 
-let _evm_proxy =
+let _evm_node =
   public_exe
-    (sf "octez-evm-proxy-server")
-    ~internal_name:(sf "evm_proxy")
-    ~path:("src" // "bin_evm_proxy")
-    ~opam:"octez-evm-proxy"
+    (sf "octez-evm-node")
+    ~internal_name:(sf "evm_node")
+    ~path:("src" // "bin_evm_node")
+    ~opam:"octez-evm-node"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup"
@@ -8436,9 +8436,9 @@ let _evm_proxy =
         octez_rpc_http |> open_;
         octez_rpc_http_server;
         octez_version_value;
-        evm_proxy_lib_prod;
-        evm_proxy_lib_dev;
-        evm_proxy_lib_dev_encoding |> open_;
+        evm_node_lib_prod;
+        evm_node_lib_dev;
+        evm_node_lib_dev_encoding |> open_;
       ]
     ~bisect_ppx:Yes
 

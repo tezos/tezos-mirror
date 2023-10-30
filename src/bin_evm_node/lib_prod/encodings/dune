@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name evm_proxy_lib_prod_encoding)
- (package octez-evm-proxy-lib-prod-encoding)
+ (name evm_node_lib_prod_encoding)
+ (package octez-node-lib-prod-encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base

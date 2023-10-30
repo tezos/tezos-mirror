@@ -18,4 +18,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "EVM encodings for the EVM proxy and plugin for the WASM Debugger [prod version]"
+synopsis: "EVM encodings for the EVM node and plugin for the WASM Debugger [dev version]"

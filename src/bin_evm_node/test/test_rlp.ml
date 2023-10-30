@@ -25,12 +25,12 @@
 
 (** Testing
     -------
-    Component:    Bin_evm_proxy
-    Invocation:   dune exec src/bin_evm_proxy/test/main.exe -- --file test_rlp.ml
+    Component:    Bin_evm_node
+    Invocation:   dune exec src/bin_evm_node/test/main.exe -- --file test_rlp.ml
     Subject:      Tests for the RLP encoder/decoder
 *)
 
-open Evm_proxy_lib_dev_encoding
+open Evm_node_lib_dev_encoding
 open Rlp
 
 let decode_value s =

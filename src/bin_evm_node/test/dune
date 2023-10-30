@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_bin_evm_proxy_test_tezt_lib)
+ (name src_bin_evm_node_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -12,8 +12,8 @@
   octez-libs.test-helpers
   qcheck-alcotest
   octez-alcotezt
-  evm_proxy_lib_prod
-  evm_proxy_lib_dev)
+  evm_node_lib_prod
+  evm_node_lib_dev)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -29,13 +29,13 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_bin_evm_proxy_test_tezt_lib
+  src_bin_evm_node_test_tezt_lib
   tezt)
  (modules main))
 
 (rule
  (alias runtest)
- (package octez-evm-proxy-tests)
+ (package octez-evm-node-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
