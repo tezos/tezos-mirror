@@ -36,6 +36,9 @@ pub struct PrimError(String);
 
 // NB: Primitives will be lexed as written, so capitalization matters.
 defprim! {
+    parameter,
+    storage,
+    code,
     int,
     nat,
     bool,
