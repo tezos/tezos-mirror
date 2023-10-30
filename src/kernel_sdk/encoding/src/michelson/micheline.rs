@@ -446,7 +446,7 @@ mod test {
     fn micheline_pair_encode() {
         let expected = vec![
             7, // Prim_2
-            1, // Prim tag
+            7, // Prim tag
             0, // int encoding tag
             2, // amount
             1, // String tag
@@ -454,7 +454,7 @@ mod test {
             b'g', b'r', b'e', b'e', b'n', // string contents
         ];
 
-        let test = MichelinePrim2ArgsNoAnnots::<MichelineInt, _, 1> {
+        let test = MichelinePrim2ArgsNoAnnots::<MichelineInt, _, 7> {
             arg1: 2.into(),
             arg2: MichelineString("green".into()),
         };
