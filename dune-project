@@ -57,6 +57,8 @@
 (package (name octez-protocol-alpha-libs))
 (package (name octez-protocol-compiler))
 (package (name octez-proxy-server))
+(package (name octez-risc-v-pvm))
+(package (name octez-risc-v-pvm-test)(allow_empty))
 (package (name octez-rpc-process))
 (package (name octez-shell-libs))
 (package (name octez-shell-tests)(allow_empty))
