@@ -108,6 +108,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
     let update_num_iwants exch delta =
       exch.num_iwants <- exch.num_iwants + counter_update delta
+
+    let update_num_invalid_messages exch delta =
+      exch.num_invalid_messages <-
+        exch.num_invalid_messages + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -288,8 +292,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         state
     | state, GS.Already_received
     | state, GS.Not_subscribed
-    | state, GS.Invalid_message
     | state, GS.Unknown_validity ->
+        state
+    | state, GS.Invalid_message ->
+        Stats.update_num_invalid_messages state.stats.received `Incr ;
         state
 
   (** From the worker's perspective, the outcome of joining a new topic from the
