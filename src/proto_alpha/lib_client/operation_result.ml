@@ -372,6 +372,7 @@ let pp_balance_updates ppf balance_updates =
   in
   let pp_frozen_staker ppf (staker : Receipt.frozen_staker) =
     match staker with
+    | Baker baker -> pp_baker ppf baker
     | Single {staker; delegate} ->
         Format.fprintf
           ppf

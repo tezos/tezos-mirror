@@ -10,6 +10,7 @@
    once. We need to distinguish these cases to enforce the staking
    over baking limit. *)
 type t = private
+  | Baker of Signature.public_key_hash  (** The baker itself. *)
   | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
       (** A single staker, either the delegate itself or one of its
        staker. *)
