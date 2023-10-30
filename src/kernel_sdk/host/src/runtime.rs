@@ -641,7 +641,7 @@ where
         ]
         .concat();
 
-        let res = unsafe {
+        let bytes_read = unsafe {
             SmartRollupCore::reveal(
                 self,
                 payload.as_ptr(),
@@ -758,6 +758,8 @@ fn check_path_exists<T: Path>(
 #[cfg(test)]
 mod tests {
     use super::{Runtime, RuntimeError, PREIMAGE_HASH_SIZE};
+    #[cfg(feature = "proto-alpha")]
+    use crate::{dal_parameters::RollupDalParameters, DAL_PARAMETERS_SIZE};
     use crate::{
         input::Message,
         metadata::RollupMetadata,
@@ -1344,6 +1346,37 @@ mod tests {
 
         // Assert
         assert_eq!(expected_metadata, result);
+    }
+
+    #[test]
+    #[cfg(feature = "proto-alpha")]
+    fn reveal_dal_parameters_ok() {
+        // Arrange
+        let expected_dal_parameters = RollupDalParameters {
+            number_of_slots: 1122,
+            attestation_lag: 3344,
+            slot_size: 5566,
+            page_size: 7788,
+        };
+        let mut mock = MockSmartRollupCore::new();
+        let dal_parameters_bytes = [
+            0, 0, 0, 0, 0, 0, 4, 98, 0, 0, 0, 0, 0, 0, 13, 16, 0, 0, 0, 0, 0, 0, 21, 190,
+            0, 0, 0, 0, 0, 0, 30, 108,
+        ];
+        mock.expect_reveal()
+            .return_once(move |_, _, destination_address, _| {
+                let buffer = unsafe {
+                    from_raw_parts_mut(destination_address, DAL_PARAMETERS_SIZE)
+                };
+                buffer.copy_from_slice(&dal_parameters_bytes.clone());
+                DAL_PARAMETERS_SIZE as i32
+            });
+
+        // Act
+        let result = mock.reveal_dal_parameters(0);
+
+        // Assert
+        assert_eq!(expected_dal_parameters, result);
     }
 
     mod test_helpers {
