@@ -112,6 +112,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let update_num_invalid_messages exch delta =
       exch.num_invalid_messages <-
         exch.num_invalid_messages + counter_update delta
+
+    let update_num_unknown_messages_validity exch delta =
+      exch.num_unknown_messages_validity <-
+        exch.num_unknown_messages_validity + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -290,9 +294,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let has_joined = View.(has_joined topic @@ view state.gossip_state) in
         if has_joined then emit_app_output state message_with_header ;
         state
-    | state, GS.Already_received
-    | state, GS.Not_subscribed
+    | state, GS.Already_received | state, GS.Not_subscribed -> state
     | state, GS.Unknown_validity ->
+        Stats.update_num_unknown_messages_validity state.stats.received `Incr ;
         state
     | state, GS.Invalid_message ->
         Stats.update_num_invalid_messages state.stats.received `Incr ;
