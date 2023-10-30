@@ -410,6 +410,15 @@ let header_status_arg =
   let construct = Data_encoding.Binary.to_string_exn header_status_encoding in
   Tezos_rpc.Arg.make ~name:"header_status" ~destruct ~construct ()
 
+let wait_query =
+  let open Tezos_rpc.Query in
+  query (fun wait ->
+      object
+        method wait = wait
+      end)
+  |+ flag "wait" (fun t -> t#wait)
+  |> seal
+
 let slot_id_query =
   let open Tezos_rpc in
   let open Query in

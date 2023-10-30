@@ -97,6 +97,24 @@ module Transport_layer = struct
           P2p_connect_handler.connect ?timeout connect_handler point
         in
         return_unit
+
+  let disconnect_peer p2p ?wait peer_id =
+    let open Lwt_syntax in
+    match P2p.pool p2p with
+    | None -> return_unit
+    | Some pool -> (
+        match P2p_pool.Connection.find_by_peer_id pool peer_id with
+        | None -> return_unit
+        | Some conn -> P2p_conn.disconnect ?wait ~reason:Explicit_RPC conn)
+
+  let disconnect_point p2p ?wait point =
+    let open Lwt_syntax in
+    match P2p.pool p2p with
+    | None -> return_unit
+    | Some pool -> (
+        match P2p_pool.Connection.find_by_point pool point with
+        | None -> return_unit
+        | Some conn -> P2p_conn.disconnect ?wait ~reason:Explicit_RPC conn)
 end
 
 module Transport_layer_hooks = Gs_transport_connection

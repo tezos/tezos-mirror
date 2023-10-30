@@ -194,6 +194,24 @@ module P2P : sig
     ; query : < timeout : Ptime.Span.t option > >
     service
 
+  val delete_disconnect_point :
+    < meth : [`DELETE]
+    ; input : unit
+    ; output : unit
+    ; prefix : unit
+    ; params : unit * P2p_point.Id.t
+    ; query : < wait : bool > >
+    service
+
+  val delete_disconnect_peer :
+    < meth : [`DELETE]
+    ; input : unit
+    ; output : unit
+    ; prefix : unit
+    ; params : unit * P2p_peer.Id.t
+    ; query : < wait : bool > >
+    service
+
   module Gossipsub : sig
     val get_topics :
       < meth : [`GET]

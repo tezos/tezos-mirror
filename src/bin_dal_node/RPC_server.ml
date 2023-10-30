@@ -178,8 +178,18 @@ module Profile_handlers = struct
 end
 
 module P2P = struct
-  let post_connect ctxt q point =
+  let connect ctxt q point =
     Node_context.P2P.connect ctxt ?timeout:q#timeout point
+
+  let disconnect_point ctxt point q () =
+    let open Lwt_result_syntax in
+    let*! () = Node_context.P2P.disconnect_point ctxt ~wait:q#wait point in
+    return_unit
+
+  let disconnect_peer ctxt peer q () =
+    let open Lwt_result_syntax in
+    let*! () = Node_context.P2P.disconnect_peer ctxt ~wait:q#wait peer in
+    return_unit
 
   module Gossipsub = struct
     let get_topics ctxt () () =
@@ -254,7 +264,15 @@ let register_new :
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.post_connect
-       (P2P.post_connect ctxt)
+       (P2P.connect ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.P2P.delete_disconnect_point
+       (P2P.disconnect_point ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.P2P.delete_disconnect_peer
+       (P2P.disconnect_peer ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
