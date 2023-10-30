@@ -111,9 +111,6 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
     | Kernel_version.Input _ ->
         let* kernel_version = Rollup_node_rpc.kernel_version () in
         return (Kernel_version.Output (Ok kernel_version))
-    | Upgrade_nonce.Input _ ->
-        let* upgrade_nonce = Rollup_node_rpc.upgrade_nonce () in
-        return (Upgrade_nonce.Output (Ok (Int32.of_int upgrade_nonce)))
     (* ETHEREUM JSON-RPC API *)
     | Accounts.Input _ -> return (Accounts.Output (Ok []))
     | Network_id.Input _ ->

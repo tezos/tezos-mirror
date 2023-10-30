@@ -120,8 +120,6 @@ module Durable_storage_path = struct
 
   let kernel_version = EVM.make "/kernel_version"
 
-  let upgrade_nonce = EVM.make "/upgrade_nonce"
-
   module Accounts = struct
     let accounts = EVM.make "/eth_accounts"
 
@@ -489,10 +487,6 @@ module RPC = struct
       Durable_storage_path.kernel_version
       Bytes.to_string
 
-  let upgrade_nonce base () =
-    inspect_durable_and_decode base Durable_storage_path.upgrade_nonce (fun i ->
-        Bytes.get_uint16_le i 0)
-
   let simulate_call base call =
     let open Lwt_result_syntax in
     let*? messages = Simulation.encode call in
@@ -630,8 +624,6 @@ module type S = sig
 
   val kernel_version : unit -> string tzresult Lwt.t
 
-  val upgrade_nonce : unit -> int tzresult Lwt.t
-
   val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
 
   val estimate_gas :
@@ -678,8 +670,6 @@ end) : S = struct
   let base_fee_per_gas = RPC.base_fee_per_gas Base.base
 
   let kernel_version = RPC.kernel_version Base.base
-
-  let upgrade_nonce = RPC.upgrade_nonce Base.base
 
   let simulate_call = RPC.simulate_call Base.base
 
