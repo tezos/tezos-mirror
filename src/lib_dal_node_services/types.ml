@@ -460,3 +460,17 @@ module Store = struct
   let to_string data_kind =
     Data_encoding.Binary.to_string_exn encoding data_kind
 end
+
+module P2P = struct
+  module Metadata = struct
+    module Peer = struct
+      type t = unit
+
+      let config : t P2p_params.peer_meta_config =
+        let empty () = () in
+        let encoding = Data_encoding.unit in
+        let score (_ : t) = 1.0 in
+        {peer_meta_encoding = encoding; peer_meta_initial = empty; score}
+    end
+  end
+end

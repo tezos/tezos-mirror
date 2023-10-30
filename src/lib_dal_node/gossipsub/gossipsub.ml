@@ -40,7 +40,7 @@ module Transport_layer = struct
 
   type t =
     ( Interface.p2p_message,
-      Interface.peer_metadata,
+      Types.P2P.Metadata.Peer.t,
       Interface.connection_metadata )
     P2p.t
 
@@ -75,7 +75,7 @@ module Transport_layer = struct
       P2p.create
         ~config
         ~limits
-        Interface.peer_meta_config
+        Types.P2P.Metadata.Peer.config
         (Interface.conn_meta_config connection_metadata)
       @@ Interface.message_config ~network_name
 

@@ -60,9 +60,6 @@ type p2p_message =
       message_id : Types.Message_id.t;
     }
 
-(** {!peer_metadata} is not used. So, its value is [unit]. *)
-type peer_metadata = unit
-
 (** {!connection_metadata} type. Currently, peers are using them to exchange
     their public net addresses and ports on which they can be reached. The
     {!advertised_net_port} is not mandatory, as it is already sent via the first
@@ -78,8 +75,6 @@ type connection_metadata = {
 (** A P2P message config is parameterized by the network's name. *)
 val message_config :
   network_name:string -> p2p_message P2p_params.message_config
-
-val peer_meta_config : peer_metadata P2p_params.peer_meta_config
 
 val conn_meta_config :
   connection_metadata -> connection_metadata P2p_params.conn_meta_config

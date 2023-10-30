@@ -154,14 +154,6 @@ end
 
 include P2p_message_V1
 
-type peer_metadata = unit
-
-let peer_meta_config : peer_metadata P2p_params.peer_meta_config =
-  let empty () = () in
-  let encoding = Data_encoding.unit in
-  let score (_ : peer_metadata) = 1.0 in
-  {peer_meta_encoding = encoding; peer_meta_initial = empty; score}
-
 type connection_metadata = {
   advertised_net_addr : P2p_addr.t option;
   advertised_net_port : int option;
