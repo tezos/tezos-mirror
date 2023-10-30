@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 use std::num::TryFromIntError;
+use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
 pub mod type_props;
 
@@ -53,6 +54,28 @@ pub enum TcError {
     },
     #[error(transparent)]
     AddressError(#[from] AddressError),
+    #[error("invalid value for chain_id: {0}")]
+    ChainIdError(#[from] ChainIdError),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+pub enum ChainIdError {
+    #[error("{0}")]
+    FromBase58CheckError(String),
+    #[error("{0}")]
+    FromBytesError(String),
+}
+
+impl From<FromBase58CheckError> for ChainIdError {
+    fn from(value: FromBase58CheckError) -> Self {
+        Self::FromBase58CheckError(value.to_string())
+    }
+}
+
+impl From<FromBytesError> for ChainIdError {
+    fn from(value: FromBytesError) -> Self {
+        Self::FromBytesError(value.to_string())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -143,7 +166,7 @@ fn verify_ty(ctx: &mut Ctx, t: &Type) -> Result<(), TcError> {
     use Type::*;
     ctx.gas.consume(gas::tc_cost::VERIFY_TYPE_STEP)?;
     match t {
-        Nat | Int | Bool | Mutez | String | Operation | Unit | Address => Ok(()),
+        Nat | Int | Bool | Mutez | String | Operation | Unit | Address | ChainId => Ok(()),
         Pair(tys) | Or(tys) => {
             verify_ty(ctx, &tys.0)?;
             verify_ty(ctx, &tys.1)
@@ -654,6 +677,17 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
         (T::Address, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::Address(Address::from_bytes(&bs)?)
+        }
+        (T::ChainId, V::String(str)) => {
+            ctx.gas.consume(gas::tc_cost::CHAIN_ID_READABLE)?;
+            TV::ChainId(
+                ChainId::from_base58_check(&str).map_err(|x| TcError::ChainIdError(x.into()))?,
+            )
+        }
+        (T::ChainId, V::Bytes(bs)) => {
+            use tezos_crypto_rs::hash::HashTrait;
+            ctx.gas.consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
+            TV::ChainId(ChainId::try_from_bytes(&bs).map_err(|x| TcError::ChainIdError(x.into()))?)
         }
         (t, v) => return Err(TcError::InvalidValueForType(v, t.clone())),
     })
@@ -2481,6 +2515,50 @@ mod typecheck_tests {
                 &mut tc_stk![],
             ),
             Err(TcError::AddressError(AddressError::WrongFormat(_)))
+        );
+    }
+
+    #[test]
+    fn test_push_chain_id() {
+        let bytes = "f3d48554";
+        let exp = hex::decode(bytes).unwrap();
+        let exp = Ok(Push(TypedValue::ChainId(ChainId(exp))));
+        let lit = "NetXynUjJNZm7wi";
+        assert_eq!(
+            &typecheck_instruction(
+                parse(&format!("PUSH chain_id \"{}\"", lit)).unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![],
+            ),
+            &exp
+        );
+        assert_eq!(
+            &typecheck_instruction(
+                parse(&format!("PUSH chain_id 0x{}", bytes)).unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![],
+            ),
+            &exp
+        );
+        assert_eq!(
+            typecheck_instruction(
+                parse("PUSH chain_id \"foobar\"").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![],
+            ),
+            Err(TcError::ChainIdError(
+                tezos_crypto_rs::base58::FromBase58CheckError::InvalidChecksum.into()
+            ))
+        );
+        assert_eq!(
+            typecheck_instruction(
+                parse("PUSH chain_id 0xbeef").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![],
+            ),
+            Err(TcError::ChainIdError(
+                tezos_crypto_rs::hash::FromBytesError::InvalidSize.into()
+            ))
         );
     }
 }

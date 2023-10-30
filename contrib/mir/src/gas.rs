@@ -107,6 +107,12 @@ pub mod tc_cost {
     // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
     pub const KEY_HASH_OPTIMIZED: u32 = 80;
 
+    // corresponds to cost_B58CHECK_DECODING_CHAIN_ID in the protocol
+    pub const CHAIN_ID_READABLE: u32 = 1600;
+
+    // corresponds to cost_DECODING_CHAIN_ID in the protocol
+    pub const CHAIN_ID_OPTIMIZED: u32 = 50;
+
     fn variadic(depth: u16) -> Result<u32, OutOfGas> {
         let depth = Checked::from(depth as u32);
         (depth * 50).as_gas_cost()
