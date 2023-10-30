@@ -96,6 +96,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let update_num_bootstrap_connections t delta =
       t.num_bootstrap_connections <-
         t.num_bootstrap_connections + counter_update delta
+
+    let update_num_grafts exch delta =
+      exch.num_grafts <- exch.num_grafts + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -373,13 +376,18 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
        the backoffs accordingly in the automaton. *)
     let () =
       match output with
-      | GS.Peer_already_in_mesh | Unexpected_grafting_peer
+      | GS.Peer_already_in_mesh | Unexpected_grafting_peer -> ()
       | Grafting_successfully ->
+          Stats.update_num_grafts state.stats.received `Incr ;
           ()
       | Peer_filtered | Unsubscribed_topic | Grafting_direct_peer
       | Grafting_peer_with_negative_score | Peer_backed_off ->
           do_prune ~do_px:false
-      | Mesh_full -> do_prune ~do_px:true
+      | Mesh_full ->
+          (* We consider this case as a successful graft, although the peer is
+             pruned immediately. *)
+          Stats.update_num_grafts state.stats.received `Incr ;
+          do_prune ~do_px:true
     in
     state
 
