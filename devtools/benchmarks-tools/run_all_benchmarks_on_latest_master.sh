@@ -67,6 +67,7 @@ echo $$ > "$SNOOP_RESULT_DIR"/STARTED
 # Build dependencies.
 cd tezos
 dated_log "Compiling dependencies"
+# shellcheck disable=SC1091
 . "/home/mclaren/.cargo/env"
 # OPAMSOLVERTIMEOUT=0 means that the opam solver won't timeout
 make OPAMSOLVERTIMEOUT=0 build-dev-deps

@@ -5,4 +5,3 @@ src/bin_client/bash-completion.sh
 src/bin_client/octez-init-sandboxed-client.sh
 src/lib_bls12_381/libblst/build.sh
 src/lib_bls12_381/libblst/build/refresh.sh
-devtools/benchmarks-tools/run_all_benchmarks_on_latest_master.sh
