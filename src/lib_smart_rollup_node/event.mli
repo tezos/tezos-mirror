@@ -81,9 +81,9 @@ val detected_protocol_migration : unit -> unit Lwt.t
     to acquire a lock on the data directory. *)
 val acquiring_lock : unit -> unit Lwt.t
 
-(** [calling_gc level] emits and event which indicates that a call to GC was
-    made at [level]. *)
-val calling_gc : int32 -> unit Lwt.t
+(** [calling_gc ~gc_level ~head_level] emits the event that the GC is started
+    for level [gc_level].  *)
+val calling_gc : gc_level:int32 -> head_level:int32 -> unit Lwt.t
 
 (** [starting_context_gc hash] emits an event which indicates that a GC run
     was launched for [hash]. *)
@@ -115,3 +115,7 @@ val gc_levels_storage_failure : unit -> unit Lwt.t
     when the history mode of the rollup node is changed. *)
 val convert_history_mode :
   Configuration.history_mode -> Configuration.history_mode -> unit Lwt.t
+
+(** [gc_finished ~gc_level ~head_level] emits the event that the GC is finished
+    for level [gc_level].  *)
+val gc_finished : gc_level:int32 -> head_level:int32 -> unit Lwt.t

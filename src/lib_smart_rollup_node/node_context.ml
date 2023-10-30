@@ -1067,14 +1067,14 @@ let save_confirmed_slots_histories {store; _} block hist =
 
 let get_gc_levels node_ctxt =
   let open Lwt_result_syntax in
-  let* gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in
-  let last_gc_level, first_available_level =
-    match gc_levels with
-    | Some {last_gc_level; first_available_level} ->
-        (last_gc_level, first_available_level)
-    | None -> (node_ctxt.genesis_info.level, node_ctxt.genesis_info.level)
-  in
-  Lwt_result.return (last_gc_level, first_available_level)
+  let+ gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in
+  match gc_levels with
+  | Some gc_levels -> gc_levels
+  | None ->
+      {
+        last_gc_level = node_ctxt.genesis_info.level;
+        first_available_level = node_ctxt.genesis_info.level;
+      }
 
 let save_gc_info node_ctxt ~at_level ~gc_level =
   let open Lwt_syntax in
@@ -1109,7 +1109,7 @@ let gc node_ctxt ~(level : int32) =
      called. *)
   let* gc_level = get_gc_level node_ctxt in
   let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
-  let* last_gc_level, first_available_level = get_gc_levels node_ctxt in
+  let* {last_gc_level; first_available_level} = get_gc_levels node_ctxt in
   match gc_level with
   | None -> return_unit
   | Some gc_level
@@ -1126,17 +1126,24 @@ let gc node_ctxt ~(level : int32) =
             Block_hash.pp
             hash
       | Some {context; _} ->
-          let*! () = Event.calling_gc level in
+          let*! () = Event.calling_gc ~gc_level ~head_level:level in
           let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
           (* Start both node and context gc asynchronously *)
           let*! () = Context.gc node_ctxt.context context in
           let* () = Store.gc node_ctxt.store ~level:gc_level in
+          let gc_waiter () =
+            let open Lwt_syntax in
+            let* () = Context.wait_gc_completion node_ctxt.context
+            and* () = Store.wait_gc_completion node_ctxt.store in
+            Event.gc_finished ~gc_level ~head_level:level
+          in
+          Lwt.dont_wait gc_waiter (fun _exn -> ()) ;
           return_unit)
   | _ -> return_unit
 
 let check_level_available node_ctxt accessed_level =
   let open Lwt_result_syntax in
-  let* _, first_available_level = get_gc_levels node_ctxt in
+  let* {first_available_level; _} = get_gc_levels node_ctxt in
   fail_when
     (accessed_level < first_available_level)
     (Rollup_node_errors.Access_below_first_available_level

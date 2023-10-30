@@ -85,6 +85,8 @@ type message_status =
       published_at_level : int32;
     }
 
+type gc_info = {last_gc_level : int32; first_available_level : int32}
+
 module Encodings = struct
   open Data_encoding
 
@@ -254,6 +256,14 @@ module Encodings = struct
 
   let message_status_output =
     merge_objs (obj1 (opt "content" (string' Hex))) message_status
+
+  let gc_info : gc_info Data_encoding.t =
+    conv
+      (fun {last_gc_level; first_available_level} ->
+        (last_gc_level, first_available_level))
+      (fun (last_gc_level, first_available_level) ->
+        {last_gc_level; first_available_level})
+    @@ obj2 (req "last_gc_level" int32) (req "first_available_level" int32)
 end
 
 module Arg = struct
@@ -409,6 +419,13 @@ module Local = struct
       ~output:
         (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "commitments" /: Arg.commitment_hash)
+
+  let gc_info =
+    Tezos_rpc.Service.get_service
+      ~description:"Information about garbage collection"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.gc_info
+      (path / "gc_info")
 
   let injection =
     Tezos_rpc.Service.post_service

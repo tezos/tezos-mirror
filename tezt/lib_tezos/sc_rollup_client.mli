@@ -53,6 +53,8 @@ type simulation_result = {
   insights : string option list;
 }
 
+type gc_info = {last_gc_level : int; first_available_level : int}
+
 (** [create ~protocol ?runner ?name ?base_dir node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -196,6 +198,9 @@ val last_published_commitment :
     level it was included. *)
 val commitment :
   ?hooks:Process.hooks -> t -> string -> commitment_info option Runnable.process
+
+(** [gc_info client] returns garbage collection information. *)
+val gc_info : ?hooks:Process.hooks -> t -> gc_info Runnable.process
 
 (** [dal_slot_headers ?block client] returns the dal slot headers of the
     [block] (default ["head"]). *)

@@ -61,6 +61,8 @@ type simulation_result = {
   insights : string option list;
 }
 
+type gc_info = {last_gc_level : int; first_available_level : int}
+
 let commitment_from_json json =
   if JSON.is_null json then None
   else
@@ -334,6 +336,14 @@ let last_published_commitment ?hooks sc_client =
 let commitment ?hooks sc_client commitment_hash =
   rpc_get ?hooks sc_client ["local"; "commitments"; commitment_hash]
   |> Runnable.map commitment_info_from_json
+
+let gc_info ?hooks sc_client =
+  rpc_get ?hooks sc_client ["local"; "gc_info"]
+  |> Runnable.map @@ fun obj ->
+     {
+       last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
+       first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
+     }
 
 let dal_slot_headers ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
