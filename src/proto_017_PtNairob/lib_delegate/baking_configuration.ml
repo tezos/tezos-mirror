@@ -74,7 +74,7 @@ type validation_config =
 
 type nonce_config = Deterministic | Random
 
-type state_recorder_config = Filesystem | Disabled
+type state_recorder_config = Filesystem | Memory
 
 type liquidity_baking_config = {
   vote_file : string option;
@@ -124,7 +124,7 @@ let default_force = false
 
 let default_force_apply = false
 
-let default_state_recorder_config = Filesystem
+let default_state_recorder_config = Memory
 
 let default_extra_operations = None
 
@@ -269,11 +269,11 @@ let state_recorder_config_encoding =
         (function Filesystem -> Some () | _ -> None)
         (fun () -> Filesystem);
       case
-        ~title:"Disabled"
+        ~title:"Memory"
         (Tag 1)
-        (constant "disabled")
-        (function Disabled -> Some () | _ -> None)
-        (fun () -> Disabled);
+        (constant "memory")
+        (function Memory -> Some () | _ -> None)
+        (fun () -> Memory);
     ]
 
 let encoding : t Data_encoding.t =

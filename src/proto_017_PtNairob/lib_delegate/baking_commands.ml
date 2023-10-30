@@ -171,6 +171,17 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     liquidity_baking_toggle_vote_parameter
 
+let state_recorder_switch_arg =
+  let open Baking_configuration in
+  Tezos_clic.map_arg
+    ~f:(fun _cctxt flag -> if flag then return Filesystem else return Memory)
+    (Tezos_clic.switch
+       ~long:"record-state"
+       ~doc:
+         "If record-state flag is set, the baker saves all its internal \
+          consensus state in the filesystem, otherwise just in memory."
+       ())
+
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
@@ -240,7 +251,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     command
       ~group
       ~desc:"Forge and inject block using the delegates' rights."
-      (args11
+      (args12
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
@@ -251,7 +262,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          context_path_arg
          do_not_monitor_node_mempool_arg
          endpoint_arg
-         block_count_arg)
+         block_count_arg
+         state_recorder_switch_arg)
       (prefixes ["bake"; "for"] @@ sources_param)
       (fun ( minimal_fees,
              minimal_nanotez_per_gas_unit,
@@ -263,7 +275,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              context_path,
              do_not_monitor_node_mempool,
              dal_node_endpoint,
-             block_count )
+             block_count,
+             state_recorder )
            pkhs
            cctxt ->
         get_delegates cctxt pkhs >>=? fun delegates ->
@@ -280,6 +293,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?context_path
           ?dal_node_endpoint
           ~count:block_count
+          ~state_recorder
           delegates);
     command
       ~group
@@ -300,7 +314,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     command
       ~group
       ~desc:"Send a Tenderbake proposal"
-      (args8
+      (args9
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
@@ -308,7 +322,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_apply_switch_arg
          force_switch
          operations_arg
-         context_path_arg)
+         context_path_arg
+         state_recorder_switch_arg)
       (prefixes ["propose"; "for"] @@ sources_param)
       (fun ( minimal_fees,
              minimal_nanotez_per_gas_unit,
@@ -317,7 +332,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force_apply,
              force,
              extra_operations,
-             context_path )
+             context_path,
+             state_recorder )
            sources
            cctxt ->
         get_delegates cctxt sources >>=? fun delegates ->
@@ -331,6 +347,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~force
           ?extra_operations
           ?context_path
+          ~state_recorder
           delegates);
   ]
 
@@ -378,7 +395,7 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args10
+  Tezos_clic.args11
     pidfile_arg
     minimal_fees_arg
     minimal_nanotez_per_gas_unit_arg
@@ -389,6 +406,7 @@ let baker_args =
     per_block_vote_file_arg
     operations_arg
     endpoint_arg
+    state_recorder_switch_arg
 
 let run_baker
     ( pidfile,
@@ -400,7 +418,8 @@ let run_baker
       liquidity_baking_toggle_vote,
       per_block_vote_file,
       extra_operations,
-      dal_node_endpoint ) baking_mode sources cctxt =
+      dal_node_endpoint,
+      state_recorder ) baking_mode sources cctxt =
   may_lock_pidfile pidfile @@ fun () ->
   (if per_block_vote_file = None then
    (* If the liquidity baking file was not explicitly given, we
@@ -434,6 +453,7 @@ let run_baker
     ?context_path
     ~chain:cctxt#chain
     ~keep_alive
+    ~state_recorder
     delegates
 
 let baker_commands () : Protocol_client_context.full Tezos_clic.command list =

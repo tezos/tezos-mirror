@@ -558,60 +558,64 @@ let () =
 
 let may_record_new_state ~previous_state ~new_state =
   let open Lwt_result_syntax in
-  let {
-    current_level = previous_current_level;
-    locked_round = previous_locked_round;
-    attestable_payload = previous_attestable_payload;
-    _;
-  } =
-    previous_state.level_state
-  in
-  let {
-    current_level = new_current_level;
-    locked_round = new_locked_round;
-    attestable_payload = new_attestable_payload;
-    _;
-  } =
-    new_state.level_state
-  in
-  let is_new_state_consistent =
-    Compare.Int32.(new_current_level > previous_current_level)
-    || new_current_level = previous_current_level
-       &&
-       if Compare.Int32.(new_current_level = previous_current_level) then
-         let is_new_locked_round_consistent =
-           match (new_locked_round, previous_locked_round) with
-           | None, None -> true
-           | Some _, None -> true
-           | None, Some _ -> false
-           | Some new_locked_round, Some previous_locked_round ->
-               Round.(new_locked_round.round >= previous_locked_round.round)
-         in
-         let is_new_attestable_payload_consistent =
-           match (new_attestable_payload, previous_attestable_payload) with
-           | None, None -> true
-           | Some _, None -> true
-           | None, Some _ -> false
-           | Some new_attestable_payload, Some previous_attestable_payload ->
-               Round.(
-                 new_attestable_payload.proposal.block.round
-                 >= previous_attestable_payload.proposal.block.round)
-         in
-         is_new_locked_round_consistent && is_new_attestable_payload_consistent
-       else true
-  in
-  let* () =
-    fail_unless is_new_state_consistent Broken_locked_values_invariant
-  in
-  let has_not_changed =
-    previous_state.level_state.current_level
-    == new_state.level_state.current_level
-    && previous_state.level_state.locked_round
-       == new_state.level_state.locked_round
-    && previous_state.level_state.attestable_payload
-       == new_state.level_state.attestable_payload
-  in
-  if has_not_changed then return_unit else record_state new_state
+  if new_state.global_state.config.state_recorder = Baking_configuration.Memory
+  then return_unit
+  else
+    let {
+      current_level = previous_current_level;
+      locked_round = previous_locked_round;
+      attestable_payload = previous_attestable_payload;
+      _;
+    } =
+      previous_state.level_state
+    in
+    let {
+      current_level = new_current_level;
+      locked_round = new_locked_round;
+      attestable_payload = new_attestable_payload;
+      _;
+    } =
+      new_state.level_state
+    in
+    let is_new_state_consistent =
+      Compare.Int32.(new_current_level > previous_current_level)
+      || new_current_level = previous_current_level
+         &&
+         if Compare.Int32.(new_current_level = previous_current_level) then
+           let is_new_locked_round_consistent =
+             match (new_locked_round, previous_locked_round) with
+             | None, None -> true
+             | Some _, None -> true
+             | None, Some _ -> false
+             | Some new_locked_round, Some previous_locked_round ->
+                 Round.(new_locked_round.round >= previous_locked_round.round)
+           in
+           let is_new_attestable_payload_consistent =
+             match (new_attestable_payload, previous_attestable_payload) with
+             | None, None -> true
+             | Some _, None -> true
+             | None, Some _ -> false
+             | Some new_attestable_payload, Some previous_attestable_payload ->
+                 Round.(
+                   new_attestable_payload.proposal.block.round
+                   >= previous_attestable_payload.proposal.block.round)
+           in
+           is_new_locked_round_consistent
+           && is_new_attestable_payload_consistent
+         else true
+    in
+    let* () =
+      fail_unless is_new_state_consistent Broken_locked_values_invariant
+    in
+    let has_not_changed =
+      previous_state.level_state.current_level
+      == new_state.level_state.current_level
+      && previous_state.level_state.locked_round
+         == new_state.level_state.locked_round
+      && previous_state.level_state.attestable_payload
+         == new_state.level_state.attestable_payload
+    in
+    if has_not_changed then return_unit else record_state new_state
 
 let load_attestable_data cctxt location =
   let open Lwt_result_syntax in

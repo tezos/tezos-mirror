@@ -49,7 +49,7 @@ type validation_config =
 
 type nonce_config = Deterministic | Random
 
-type state_recorder_config = Filesystem | Disabled
+type state_recorder_config = Filesystem | Memory
 
 type per_block_votes_config = {
   vote_file : string option;

@@ -739,7 +739,7 @@ let empty_mempool_file ?(filename = "mempool.json") () =
 let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
-    ?force ?context_path ?dal_node_endpoint client =
+    ?force ?context_path ?dal_node_endpoint ?(state_recorder = false) client =
   spawn_command
     ?endpoint
     client
@@ -760,12 +760,13 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     @ optional_arg "count" string_of_int count
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
-    @ optional_arg "dal-node" Fun.id dal_node_endpoint)
+    @ optional_arg "dal-node" Fun.id dal_node_endpoint
+    @ optional_switch "record_state" state_recorder)
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
-    ?expect_failure client =
+    ?state_recorder ?expect_failure client =
   spawn_bake_for
     ?endpoint
     ?keys
@@ -780,13 +781,14 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?context_path
     ?protocol
     ?dal_node_endpoint
+    ?state_recorder
     client
   |> Process.check ?expect_failure
 
 let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint client =
+    ?node ?dal_node_endpoint ?state_recorder client =
   let node =
     match node with
     | Some n -> n
@@ -817,6 +819,7 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
       ?force
       ?context_path
       ?dal_node_endpoint
+      ?state_recorder
       client
   in
   Node.wait_for_level node (actual_level_before + 1)
