@@ -12,7 +12,10 @@ type t =
 
 let baker pkh = Baker pkh
 
-let single ~staker ~delegate = Single {staker; delegate}
+let single ~staker ~delegate =
+  match (staker : Contract_repr.t) with
+  | Implicit pkh when Signature.Public_key_hash.(pkh = delegate) -> Baker pkh
+  | _ -> Single {staker; delegate}
 
 let shared ~delegate = Shared {delegate}
 
@@ -55,7 +58,7 @@ let encoding =
            single_encoding
            (function
              | Single {staker; delegate} -> Some (staker, delegate) | _ -> None)
-           (fun (staker, delegate) -> Single {staker; delegate});
+           (fun (staker, delegate) -> single ~staker ~delegate);
          case
            ~title:"Shared"
            (Tag shared_tag)

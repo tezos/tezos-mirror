@@ -12,8 +12,7 @@
 type t = private
   | Baker of Signature.public_key_hash  (** The baker itself. *)
   | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
-      (** A single staker, either the delegate itself or one of its
-       staker. *)
+      (** A single staker, cannot be the delegate. *)
   | Shared of {delegate : Signature.public_key_hash}
       (** The delegate and all its stakers simultaneously. *)
 
