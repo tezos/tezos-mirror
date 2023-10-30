@@ -205,26 +205,37 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let emit_app_output state e = Stream.push e state.app_output_stream
 
-  let emit_p2p_output {connected_bootstrap_peers; p2p_output_stream; _}
-      ~mk_output =
-    let maybe_emit to_peer =
-      let message = mk_output to_peer in
-      let do_emit =
-        (not (Peer.Set.mem to_peer connected_bootstrap_peers))
-        ||
-        match message with
-        | Out_message {p2p_message; to_peer = _} -> (
-            match p2p_message with
-            | Message_with_header _ | IHave _ | IWant _ ->
-                (* Don't emit app messages, send IHave messages or respond to
-                   IWant if the remote peer has a bootstrap profile. *)
-                false
-            | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
-        | Connect _ | Disconnect _ | Forget _ | Kick _ -> true
-      in
-      if do_emit then Stream.push message p2p_output_stream
+  let emit_p2p_output =
+    let update_sent_stats stats = function
+      | Out_message {p2p_message; to_peer = _} -> (
+          match p2p_message with
+          | Graft _ -> Stats.update_num_grafts stats.sent `Incr
+          | Message_with_header _ | IHave _ | IWant _ | Prune _ | Subscribe _
+          | Unsubscribe _ ->
+              ())
+      | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
-    Seq.iter maybe_emit
+    fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
+      let maybe_emit to_peer =
+        let message = mk_output to_peer in
+        let do_emit =
+          (not (Peer.Set.mem to_peer connected_bootstrap_peers))
+          ||
+          match message with
+          | Out_message {p2p_message; to_peer = _} -> (
+              match p2p_message with
+              | Message_with_header _ | IHave _ | IWant _ ->
+                  (* Don't emit app messages, send IHave messages or respond to
+                     IWant if the remote peer has a bootstrap profile. *)
+                  false
+              | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
+          | Connect _ | Disconnect _ | Forget _ | Kick _ -> true
+        in
+        if do_emit then (
+          update_sent_stats stats message ;
+          Stream.push message p2p_output_stream)
+      in
+      Seq.iter maybe_emit
 
   let emit_p2p_message state p2p_message =
     emit_p2p_output state ~mk_output:(fun to_peer ->
