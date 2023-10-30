@@ -61,11 +61,7 @@ let frozen_staker =
   oneofl
     [
       Frozen_staker_repr.Shared {delegate = default_delegate};
-      Frozen_staker_repr.Single
-        {
-          staker = Contract_repr.Implicit default_delegate;
-          delegate = default_delegate;
-        };
+      Frozen_staker_repr.baker default_delegate;
       Frozen_staker_repr.Single
         {staker = default_contract; delegate = default_delegate};
     ]
