@@ -54,19 +54,16 @@ impl Input {
 
         for segment in loadable_segments {
             // Copy the region from the file to memory.
-            for (file_offset, memory_offset) in iter::zip(segment.file_range(), segment.vm_range())
-            {
-                emu.cpu.bus.write(
-                    memory_offset as u64,
-                    self.contents[file_offset] as u64,
-                    BYTE,
-                )?;
+            for (file_offset, memory_offset) in iter::zip(segment.file_range(), segment.p_paddr..) {
+                emu.cpu
+                    .bus
+                    .write(memory_offset, self.contents[file_offset] as u64, BYTE)?;
             }
 
             // If the target memory region is larger than the source region,
             // we must fill the gap with 0s.
             if segment.p_memsz > segment.p_filesz {
-                let first_zero = segment.p_vaddr + segment.p_filesz;
+                let first_zero = segment.p_paddr + segment.p_filesz;
                 let num_zeroes = segment.p_memsz - segment.p_filesz;
                 for i in first_zero..(first_zero + num_zeroes) {
                     emu.cpu.bus.write(i, 0, BYTE)?;
