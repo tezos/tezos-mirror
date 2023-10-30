@@ -153,28 +153,3 @@ end
 (* Exposed interface *)
 
 include P2p_message_V1
-
-type connection_metadata = {
-  advertised_net_addr : P2p_addr.t option;
-  advertised_net_port : int option;
-  is_bootstrap_peer : bool;
-}
-
-let conn_meta_encoding =
-  let open Data_encoding in
-  (conv
-     (fun {advertised_net_addr; advertised_net_port; is_bootstrap_peer} ->
-       (advertised_net_addr, advertised_net_port, is_bootstrap_peer))
-     (fun (advertised_net_addr, advertised_net_port, is_bootstrap_peer) ->
-       {advertised_net_addr; advertised_net_port; is_bootstrap_peer}))
-    (obj3
-       (opt "advertised_net_addr" P2p_addr.encoding)
-       (opt "advertised_net_port" uint16)
-       (req "is_bootstrap_peer" bool))
-
-let conn_meta_config cfg : connection_metadata P2p_params.conn_meta_config =
-  {
-    conn_meta_encoding;
-    private_node = (fun _cfg -> false);
-    conn_meta_value = (fun () -> cfg);
-  }

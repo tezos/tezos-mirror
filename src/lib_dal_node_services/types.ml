@@ -472,5 +472,33 @@ module P2P = struct
         let score (_ : t) = 1.0 in
         {peer_meta_encoding = encoding; peer_meta_initial = empty; score}
     end
+
+    module Connection = struct
+      type t = {
+        advertised_net_addr : P2p_addr.t option;
+        advertised_net_port : int option;
+        is_bootstrap_peer : bool;
+      }
+
+      let encoding =
+        let open Data_encoding in
+        (conv
+           (fun {advertised_net_addr; advertised_net_port; is_bootstrap_peer} ->
+             (advertised_net_addr, advertised_net_port, is_bootstrap_peer))
+           (fun (advertised_net_addr, advertised_net_port, is_bootstrap_peer) ->
+             {advertised_net_addr; advertised_net_port; is_bootstrap_peer}))
+          (obj3
+             (opt "advertised_net_addr" P2p_addr.encoding)
+             (opt "advertised_net_port" uint16)
+             (req "is_bootstrap_peer" bool))
+
+      let config cfg : t P2p_params.conn_meta_config =
+        P2p_params.
+          {
+            conn_meta_encoding = encoding;
+            private_node = (fun _cfg -> false);
+            conn_meta_value = (fun () -> cfg);
+          }
+    end
   end
 end

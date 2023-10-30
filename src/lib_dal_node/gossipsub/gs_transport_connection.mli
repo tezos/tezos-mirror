@@ -37,7 +37,7 @@ val activate :
   Gs_interface.Worker_instance.t ->
   ( Transport_layer_interface.p2p_message,
     Types.P2P.Metadata.Peer.t,
-    Transport_layer_interface.connection_metadata )
+    Types.P2P.Metadata.Connection.t )
   P2p.t ->
   app_messages_callback:
     (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->

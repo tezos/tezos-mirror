@@ -257,7 +257,7 @@ module P2P : sig
     module Connection : sig
       (** {!connection_metadata} type.
 
-          A value of this type is exchanged through the handshaking
+          A value of this type is exchanged through the handshake
           protocol of the P2P.
 
           The {!advertised_net_port} is not mandatory, as it is
@@ -267,11 +267,18 @@ module P2P : sig
           whether the remote peer has a bootstrap profile or not. *)
       type t = {
         advertised_net_addr : P2p_addr.t option;
-            (** The public address for which the local node can be reached from the outside. This is useful if the node is behind a NAT or a load balancer for example. *)
+            (** The public address for which the local node can be
+                reached from the outside. This is useful if the node
+                is behind a NAT or a load balancer for example. *)
         advertised_net_port : int option;
-            (** The port at which the local node can be reached. It is a bit redundant since the handshaking protocol already exchange this piece of information. *)
+            (** The port at which the local node can be reached. It is
+                a bit redundant since the handshaking protocol already
+                exchange this piece of information. *)
         is_bootstrap_peer : bool;
-            (** [true] if the node advertises itself as a bootstrap node. *)
+            (** [true] if the node advertises itself as a bootstrap
+                node. This is to prevent a race condition from
+                Gossipsub where a node may send full messages to a
+                bootstrap node while this is not necessary. *)
       }
 
       include ENCODABLE with type t := t
