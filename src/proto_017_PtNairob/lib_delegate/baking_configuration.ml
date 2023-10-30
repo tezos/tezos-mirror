@@ -124,7 +124,7 @@ let default_force = false
 
 let default_force_apply = false
 
-let default_state_recorder_config = Filesystem
+let default_state_recorder_config = Memory
 
 let default_extra_operations = None
 
