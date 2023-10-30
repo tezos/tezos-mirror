@@ -19,6 +19,7 @@
   mockup. (!10427)
 - The binary `evm-proxy-server` is renamed to `evm-node`. (!10656)
 - Renamed node's argument `mode` to `version`. (!10657)
+- The node's mode is no longer `proxy` by default. The command becomes `run proxy ..` (!12345)
 
 ### Bug fixes
 

@@ -129,7 +129,7 @@ let run evm_node =
     run
       evm_node
       {ready = false}
-      (["run"; "with"; "endpoint"]
+      (["run"; "proxy"; "with"; "endpoint"]
       @ [rollup_node_endpoint evm_node]
       @ evm_node.persistent_state.arguments)
   in
@@ -142,7 +142,7 @@ let spawn_command evm_node args =
 let spawn_run evm_node =
   spawn_command
     evm_node
-    (["run"; "with"; "endpoint"]
+    (["run"; "proxy"; "with"; "endpoint"]
     @ [rollup_node_endpoint evm_node]
     @ evm_node.persistent_state.arguments)
 
