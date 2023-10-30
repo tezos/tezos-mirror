@@ -636,8 +636,7 @@ let bake_levels ?hook n client =
     Then continues baking until an event happens.
     waiting for the rollup node to catch up to the client's level.
     Returns the event value. *)
-let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client
-    sc_rollup_node event =
+let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client event =
   let event_value = ref None in
   let _ =
     let* return_value = event in
@@ -662,8 +661,6 @@ let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client
               timeout
         | e -> raise e)
   in
-  (* Let the sc rollup node catch up *)
-  let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
   return updated_level
 
 (** Bake [at_least] levels.
@@ -677,7 +674,7 @@ let bake_until_lpc_updated ?hook ?at_least ?timeout client sc_rollup_node =
       "smart_rollup_node_commitment_lpc_updated.v0"
     @@ fun json -> JSON.(json |-> "level" |> as_int_opt)
   in
-  bake_until_event ?hook ?at_least ?timeout client sc_rollup_node event
+  bake_until_event ?hook ?at_least ?timeout client event
 
 (** helpers that send a message then bake until the rollup node
     executes an output message (whitelist_update) *)
@@ -689,7 +686,6 @@ let send_messages_then_bake_until_rollup_node_execute_output_message
       ~timeout:5.0
       ~at_least:(commitment_period + challenge_window + 1)
       client
-      rollup_node
     @@ wait_for_included_successful_operation
          rollup_node
          ~operation_kind:"execute_outbox_message"
@@ -3062,18 +3058,42 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
         ~error_msg:
           "The operator should have a stake nor holds a frozen balance.")
   in
+  let* staked_on =
+    Client.RPC.call tezos_client
+    @@ RPC
+       .get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
+         ~sc_rollup
+         operator
+  in
+  let staked_on =
+    (* We do not really care about the value *)
+    Option.map (Fun.const ()) (JSON.as_opt staked_on)
+  in
+  let () =
+    Check.(
+      (staked_on = None)
+        (option unit)
+        ~error_msg:
+          "The operator should have a stake but no commitment attached to it.")
+  in
   Log.info
     "Start a rollup node in bailout mode, operator still has stake but no \
      attached commitment" ;
-  let sc_rollup_node =
+  let sc_rollup_node' =
     Sc_rollup_node.create
       Bailout
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
   in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
-  let* () = Client.bake_for_and_wait tezos_client in
+  let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup []
+  and* () =
+    bake_until_event tezos_client
+    @@ Sc_rollup_node.wait_for
+         sc_rollup_node'
+         "smart_rollup_node_daemon_exit_bailout_mode.v0"
+         (Fun.const (Some ()))
+  in
   Log.info "Check that the bond have been recovered by the rollup node" ;
   let* frozen_balance =
     Client.RPC.call tezos_client
