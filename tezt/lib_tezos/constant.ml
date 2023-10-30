@@ -42,7 +42,7 @@ let octez_protocol_compiler =
 
 let octez_dal_node = "./octez-dal-node"
 
-let octez_dac_node = "./octez-dac-node"
+let octez_dac_node = Uses.make ~tag:"dac_node" ~path:"./octez-dac-node"
 
 let octez_dac_client = "./octez-dac-client"
 

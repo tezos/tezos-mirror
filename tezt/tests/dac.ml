@@ -2647,7 +2647,7 @@ let register ~protocols =
     ~__FILE__
     ~committee_size:0
     ~observers:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_streaming_of_root_hashes"
     Full_infrastructure.test_streaming_of_root_hashes_as_observer
     protocols ;
@@ -2655,7 +2655,7 @@ let register ~protocols =
     ~__FILE__
     ~committee_size:1
     ~observers:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_push_signature_as_member"
     Full_infrastructure.test_streaming_of_root_hashes_as_member
     protocols ;
@@ -2663,7 +2663,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "committee member downloads pages from coordinator"
     Full_infrastructure.test_observer_downloads_pages
     protocols ;
@@ -2671,7 +2671,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_get_certificate"
     Full_infrastructure.Signature_manager.test_get_certificate
     protocols ;
@@ -2679,7 +2679,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:3
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_store_member_signature"
     Full_infrastructure.Signature_manager.test_handle_store_signature
     protocols ;
@@ -2687,7 +2687,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_coordinator_post_preimage_endpoint"
     Full_infrastructure.test_coordinator_post_preimage_endpoint
     protocols ;
@@ -2695,13 +2695,14 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_observer_get_missing_page"
     Full_infrastructure.test_observer_get_missing_page
     protocols ;
   scenario_with_layer1_node
     ~__FILE__
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_node])
     "dac_observer_times_out_when_page_cannot_be_fetched"
     test_observer_times_out_when_page_cannot_be_fetched
     protocols ;
@@ -2709,7 +2710,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:1
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "committee members and observers download pages from coordinator"
     Full_infrastructure.test_download_and_retrieval_of_pages
     protocols ;
@@ -2717,7 +2718,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "certificates are updated in streaming endpoint"
     Full_infrastructure.test_streaming_certificates
     protocols ;
@@ -2725,7 +2726,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test client commands (hex payload from CLI)"
     (Full_infrastructure.test_client ~send_payload_from_file:false)
     protocols ;
@@ -2733,7 +2734,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test client commands (binary payload from file)"
     (Full_infrastructure.test_client ~send_payload_from_file:true)
     protocols ;
@@ -2741,7 +2742,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test serialized certificate"
     Full_infrastructure.test_serialized_certificate
     protocols ;
@@ -2749,7 +2750,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:1
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test committee member disconnects from Coordinator"
     Full_infrastructure.test_committe_member_disconnects_scenario
     protocols ;
@@ -2757,7 +2758,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:1
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test DAC disconnects from L1"
     Full_infrastructure.test_tezos_node_disconnects_scenario
     protocols ;
@@ -2768,7 +2769,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test v1/get_pages"
     V1_API.test_get_pages
     protocols ;
@@ -2777,7 +2778,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test --allow_v1_api feature flag"
     V1_API.test_allow_v1_feature_flag
     protocols ;
@@ -2785,7 +2786,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test Coordinator's post preimage"
     Api_regression.V0.test_coordinator_post_preimage
@@ -2794,7 +2795,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/preimage"
     Api_regression.V0.test_get_preimage
@@ -2803,7 +2804,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test PUT v0/dac_member_signature"
     Api_regression.V0.test_put_dac_member_signature
@@ -2812,7 +2813,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/certificate"
     Api_regression.V0.test_get_certificate
@@ -2821,7 +2822,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:3
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/missing_page"
     Api_regression.V0.test_observer_get_missing_page
@@ -2830,7 +2831,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/monitor/root_hashes"
     Api_regression.V0.test_monitor_root_hashes
@@ -2839,7 +2840,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:1
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/monitor/certificate"
     Api_regression.V0.test_monitor_certificates
