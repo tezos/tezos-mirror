@@ -16,7 +16,7 @@ use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
-use primitive_types::H160;
+use primitive_types::{H160, U256};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use tezos_ethereum::withdrawal::Withdrawal;
@@ -217,6 +217,15 @@ fn withdrawal_precompile<Host: Runtime>(
         log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: no transfer");
         return Ok(revert_withdrawal())
     };
+
+    if U256::is_zero(&transfer.value) {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Withdrawal precompiled contract: transfer of 0"
+        );
+        return Ok(revert_withdrawal());
+    }
 
     match input {
         [0xcd, 0xa4, 0xfe, 0xe2, rest @ ..] => {
@@ -518,13 +527,15 @@ mod tests {
     #[test]
     fn call_withdrawal_fails_without_transfer() {
         let input: &[u8] = &hex::decode(
-            "bc85a759\
+            "cda4fee2\
                  0000000000000000000000000000000000000000000000000000000000000020\
                  0000000000000000000000000000000000000000000000000000000000000024\
-                 4b54314275455a7462363863315134796a74636b634e6a47454c71577435365879657363\
+                 747a31526a745a5556654c6841444648444c385577445a4136766a5757686f6a70753577\
                  00000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
+
+        // 1. Fails with no transfer
 
         let target = H160::from_low_u64_be(32u64);
 
@@ -540,6 +551,30 @@ mod tests {
             result: None,
             withdrawals: vec![],
         };
+
+        assert_eq!(Ok(expected), result);
+
+        // 2. Fails with transfer of 0 amount.
+
+        let target = H160::from_low_u64_be(32u64);
+        let source = H160::from_low_u64_be(118u64);
+
+        let transfer: Option<Transfer> = Some(Transfer {
+            target,
+            source,
+            value: U256::zero(),
+        });
+
+        let expected = ExecutionOutcome {
+            gas_used: 21000,
+            is_success: false,
+            new_address: None,
+            logs: vec![],
+            result: None,
+            withdrawals: vec![],
+        };
+
+        let result = execute_precompiled(target, input, transfer, Some(21000));
 
         assert_eq!(Ok(expected), result);
     }
