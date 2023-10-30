@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let spawn_command ?(path = Constant.octez_codec) ?hooks arguments =
+let spawn_command ?(path = Uses.path Constant.octez_codec) ?hooks arguments =
   Process.spawn path ?hooks arguments
 
 let spawn_encode ?path ?hooks ~name json =

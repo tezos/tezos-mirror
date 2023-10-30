@@ -164,6 +164,7 @@ let propagate_precheckable_bad_block =
     ~__FILE__
     ~title:"forge fake block"
     ~tags:["precheck"; "fake_block"; "propagation"; Tag.memory_3k]
+    ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
                N3
@@ -277,6 +278,7 @@ let propagate_precheckable_bad_block_payload =
     ~__FILE__
     ~title:"forge block with wrong payload"
     ~tags:["precheck"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
+    ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
                N3

@@ -31,12 +31,13 @@
    Subject:      rpc versioning
 *)
 
-let register_test ~title ?(additionnal_tags = []) f =
+let register_test ~title ?(additionnal_tags = []) ?uses f =
   Protocol.register_test
     ~__FILE__
     ~title
     ~supports:(Protocol.From_protocol 18)
     ~tags:(["rpc"; "versioning"] @ additionnal_tags)
+    ?uses
     f
 
 let get_consensus_info delegate client =
@@ -413,12 +414,14 @@ module Parse = struct
     register_test
       ~title:"Parse raw consensus operations"
       ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol -> test_parse Operation.Attestation protocol
 
   let test_parse_preconsensus =
     register_test
       ~title:"Parse raw pre-consensus operations"
       ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"; "pre"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol -> test_parse Operation.Preattestation protocol
 
   let test_parse_double_evidence double_evidence_kind protocol =
@@ -448,6 +451,7 @@ module Parse = struct
       ~title:"Parse raw double consensus evidence operations"
       ~additionnal_tags:
         ["parse"; "raw"; "operations"; "double"; "consensus"; "evidence"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     test_parse_double_evidence
       Operation.Anonymous.Double_attestation_evidence
@@ -458,6 +462,7 @@ module Parse = struct
       ~title:"Parse raw double pre-consensus evidence operations"
       ~additionnal_tags:
         ["parse"; "raw"; "operations"; "double"; "consensus"; "pre"; "evidence"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     test_parse_double_evidence
       Operation.Anonymous.Double_preattestation_evidence
