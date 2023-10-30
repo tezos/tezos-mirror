@@ -435,6 +435,7 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
   Test.register
     ~__FILE__
     ~tags
+    ~uses:[Constant.octez_smart_rollup_node]
     ~title:
       (sf
          "%s->%s: %s"
@@ -738,6 +739,7 @@ let test_l2_migration_scenario_event ?parameters_ty
   Test.register
     ~__FILE__
     ~tags
+    ~uses:[Constant.octez_smart_rollup_node]
     ~title:
       (sf
          "%s->%s: %s"

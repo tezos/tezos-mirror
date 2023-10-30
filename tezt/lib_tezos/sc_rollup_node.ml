@@ -445,7 +445,9 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let path = Option.value ~default:Constant.octez_smart_rollup_node path in
+  let path =
+    Option.value ~default:(Uses.path Constant.octez_smart_rollup_node) path
+  in
   let sc_node =
     create
       ~path

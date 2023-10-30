@@ -88,11 +88,12 @@ let commit_too_recent =
 
 let disputed_commit = "Attempted to cement a disputed commitment"
 
-let register_test ?supports ?(regression = false) ~__FILE__ ~tags ~title f =
+let register_test ?supports ?(regression = false) ~__FILE__ ~tags ?uses ~title f
+    =
   let tags = "sc_rollup" :: tags in
   if regression then
-    Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags f
-  else Protocol.register_test ?supports ~__FILE__ ~title ~tags f
+    Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags ?uses f
+  else Protocol.register_test ?supports ~__FILE__ ~title ~tags ?uses f
 
 let get_sc_rollup_commitment_period_in_blocks client =
   let* constants = get_sc_rollup_constants client in
@@ -135,14 +136,15 @@ let wait_for_current_level node ?timeout sc_rollup_node =
 
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
-    ?(src = Constant.bootstrap1.alias) ?rpc_local {variant; tags; description}
-    scenario =
+    ?(src = Constant.bootstrap1.alias) ?rpc_local ?uses
+    {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
     ?supports
     ?regression
     ~__FILE__
     ~tags
+    ?uses
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let* tezos_node, tezos_client =
@@ -162,13 +164,14 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
-    {variant; tags; description} scenario =
-  let tags = kind :: "rollup_node" :: tags in
+    ?(uses = fun _protocol -> []) {variant; tags; description} scenario =
+  let tags = kind :: tags in
   register_test
     ?supports
     ?regression
     ~__FILE__
     ~tags
+    ~uses:(fun protocol -> Constant.octez_smart_rollup_node :: uses protocol)
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let* tezos_node, tezos_client =
@@ -2977,6 +2980,7 @@ let bailout_mode_fail_to_start_without_operator ~kind =
       tags = ["rollup_node"; "mode"; "bailout"];
       description = "rollup node in bailout fails without operator";
     }
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
   @@ fun _protocol sc_rollup tezos_node tezos_client ->
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -4604,6 +4608,7 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
     ~supports:(From_protocol 016)
     ~__FILE__
     ~tags:["node"; "preimage"; "boot_sector"]
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
     ~title:
       "Rollup node exit if at initialisation, there is one or multiple \
        preimage(s) missing."
@@ -5078,6 +5083,7 @@ let custom_mode_empty_operation_kinds ~kind =
       tags = ["mode"; "custom"];
       description = "custom mode has empty operation kinds";
     }
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
   @@ fun _protocol sc_rollup tezos_node tezos_client ->
   let sc_rollup_node =
     Sc_rollup_node.create

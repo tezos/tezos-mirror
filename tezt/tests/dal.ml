@@ -78,13 +78,13 @@ let make_string_parameter name = function
   | None -> []
   | Some value -> [(name, `String value)]
 
-let test ~__FILE__ ?(tags = []) ?supports title f =
+let test ~__FILE__ ?(tags = []) ?uses ?supports title f =
   let tags = "dal" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags ?supports f
+  Protocol.register_test ~__FILE__ ~title ~tags ?uses ?supports f
 
-let regression_test ~__FILE__ ?(tags = []) title f =
+let regression_test ~__FILE__ ?(tags = []) ?uses title f =
   let tags = "dal" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags f
+  Protocol.register_regression_test ~__FILE__ ~title ~tags ?uses f
 
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
@@ -310,6 +310,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
   regression_test
     ~__FILE__
     ~tags
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1

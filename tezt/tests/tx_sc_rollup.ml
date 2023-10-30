@@ -538,17 +538,19 @@ let tx_kernel_e2e setup protocol =
   let* () = execute_outbox_proof ~message_index:1 in
   unit
 
-let register_test ?supports ?(regression = false) ~__FILE__ ~tags ~title f =
+let register_test ?supports ?(regression = false) ~__FILE__ ~tags ?uses ~title f
+    =
   let tags = "tx_sc_rollup" :: tags in
   if regression then
-    Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags f
-  else Protocol.register_test ?supports ~__FILE__ ~title ~tags f
+    Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags ?uses f
+  else Protocol.register_test ?supports ~__FILE__ ~title ~tags ?uses f
 
 let test_tx_kernel_e2e =
   register_test
     ~regression:true
     ~__FILE__
     ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"]
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
     ~title:(Printf.sprintf "wasm_2_0_0 - tx kernel should run e2e (kernel_e2e)")
     (tx_kernel_e2e setup_classic)
 
@@ -557,6 +559,7 @@ let test_bootstrapped_tx_kernel_e2e =
     ~supports:(Protocol.From_protocol 018)
     ~__FILE__
     ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "bootstrap"]
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
     ~title:
       (Printf.sprintf
          "wasm_2_0_0 - bootstrapped tx kernel should run e2e (kernel_e2e)")
