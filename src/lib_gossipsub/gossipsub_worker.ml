@@ -89,6 +89,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
     let update_num_topics t delta =
       t.num_topics <- t.num_topics + counter_update delta
+
+    let update_num_connections t delta =
+      t.num_connections <- t.num_connections + counter_update delta
+
+    let update_num_bootstrap_connections t delta =
+      t.num_bootstrap_connections <-
+        t.num_bootstrap_connections + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -311,8 +318,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_new_connection peer ~bootstrap = function
     | state, GS.Peer_already_known -> state
     | state, Peer_added ->
+        Stats.update_num_connections state.stats `Incr ;
         let connected_bootstrap_peers =
-          if bootstrap then Peer.Set.add peer state.connected_bootstrap_peers
+          if bootstrap then (
+            Stats.update_num_bootstrap_connections state.stats `Incr ;
+            Peer.Set.add peer state.connected_bootstrap_peers)
           else state.connected_bootstrap_peers
         in
         let state = {state with connected_bootstrap_peers} in
@@ -328,6 +338,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         {!GS.remove_peer}. *)
   let handle_disconnection peer = function
     | state, GS.Removing_peer ->
+        Stats.update_num_connections state.stats `Decr ;
+        if Peer.Set.mem peer state.connected_bootstrap_peers then
+          Stats.update_num_bootstrap_connections state.stats `Decr ;
         {
           state with
           connected_bootstrap_peers =
