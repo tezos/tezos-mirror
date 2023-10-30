@@ -193,6 +193,8 @@ module P2P = struct
 
   let get_points ctxt () () = Node_context.P2P.get_points ctxt
 
+  let get_points_info ctxt () () = Node_context.P2P.get_points_info ctxt
+
   module Gossipsub = struct
     let get_topics ctxt () () =
       let open Lwt_result_syntax in
@@ -279,6 +281,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.P2P.get_points
        (P2P.get_points ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.get_points_info
+       (P2P.get_points_info ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in

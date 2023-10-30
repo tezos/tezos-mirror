@@ -199,6 +199,9 @@ module P2P = struct
   let get_points {transport_layer; _} =
     Gossipsub.Transport_layer.get_points transport_layer
 
+  let get_points_info {transport_layer; _} =
+    Gossipsub.Transport_layer.get_points_info transport_layer
+
   module Gossipsub = struct
     let get_topics {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in

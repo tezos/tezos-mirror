@@ -172,6 +172,9 @@ module P2P : sig
 
   val get_points : t -> P2p_point.Id.t list tzresult Lwt.t
 
+  val get_points_info :
+    t -> (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
+
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list
