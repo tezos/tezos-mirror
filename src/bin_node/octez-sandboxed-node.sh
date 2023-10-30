@@ -188,15 +188,16 @@ EOF
 
 cleanup_nodes() {
     [ -z "${node_pids[0]}" ] || kill "${node_pids[@]}"
-    for pid in "${node_pids[@]}" ; do wait "$pid" ; done
+    for pid in "${node_pids[@]}"; do wait "$pid"; done
     rm -rf "${node_dirs[@]}"
 }
 
 
 main() {
 
-    local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-    if [ $(basename "$bin_dir") = "bin_node" ]; then
+    local bin_dir
+    bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+    if [ "$(basename "$bin_dir")" = "bin_node" ]; then
         local_node="${local_node:-$bin_dir/../../_build/default/src/bin_node/main.exe}"
         sandbox_file="${sandbox_file:-$bin_dir/../../scripts/sandbox.json}"
     else
@@ -220,10 +221,10 @@ main() {
     trap cleanup EXIT INT
 
     start_sandboxed_node "$@"
-    wait $node_pids
+    for pid in "${node_pids[@]}"; do wait "$pid"; done
 
 }
 
-if [ "$0" == "$BASH_SOURCE" ]; then
+if [ "$0" == "${BASH_SOURCE[0]}" ]; then
     main "$@"
 fi
