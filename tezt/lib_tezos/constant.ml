@@ -42,6 +42,8 @@ let dal_node = "./octez-dal-node"
 
 let dac_node = "./octez-dac-node"
 
+let dac_client = "./octez-dac-client"
+
 let smart_rollup_node = "./octez-smart-rollup-node"
 
 (* TODO: tezos/tezos#4803
