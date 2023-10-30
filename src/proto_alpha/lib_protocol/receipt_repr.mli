@@ -41,16 +41,12 @@ module Token : sig
   val pp : 'token t -> Format.formatter -> 'token -> unit
 end
 
-type staker = Staker_repr.t =
-  | Single of Contract_repr.t * Signature.public_key_hash
-  | Shared of Signature.public_key_hash
-
 (** Places where tokens can be found in the ledger's state. *)
 type 'token balance =
   | Contract : Contract_repr.t -> Tez_repr.t balance
   | Block_fees : Tez_repr.t balance
-  | Deposits : staker -> Tez_repr.t balance
-  | Unstaked_deposits : staker * Cycle_repr.t -> Tez_repr.t balance
+  | Deposits : Staker_repr.t -> Tez_repr.t balance
+  | Unstaked_deposits : Staker_repr.t * Cycle_repr.t -> Tez_repr.t balance
   | Nonce_revelation_rewards : Tez_repr.t balance
   | Attesting_rewards : Tez_repr.t balance
   | Baking_rewards : Tez_repr.t balance

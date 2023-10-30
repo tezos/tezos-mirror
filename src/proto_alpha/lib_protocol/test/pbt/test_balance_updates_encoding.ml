@@ -50,10 +50,10 @@ let staker =
   let open Gen in
   oneofl
     [
-      Receipt_repr.Shared default_delegate;
-      Receipt_repr.Single
+      Staker_repr.Shared default_delegate;
+      Staker_repr.Single
         (Contract_repr.Implicit default_delegate, default_delegate);
-      Receipt_repr.Single (default_contract, default_delegate);
+      Staker_repr.Single (default_contract, default_delegate);
     ]
 
 let deposits =

@@ -2053,7 +2053,7 @@ module Zk_rollup : sig
   end
 end
 
-(** This module re-exports definitions from {!Receipt_repr}. *)
+(** This module re-exports definitions from {!Receipt_repr} and {!Staker_repr}. *)
 module Receipt : sig
   module Token : sig
     type 'token t =

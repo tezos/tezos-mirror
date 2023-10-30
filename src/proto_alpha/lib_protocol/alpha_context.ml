@@ -496,7 +496,14 @@ module Bond_id = struct
   module Internal_for_tests = Contract_storage
 end
 
-module Receipt = Receipt_repr
+module Receipt = struct
+  type staker = Staker_repr.t =
+    | Single of Contract_repr.t * Signature.public_key_hash
+    | Shared of Signature.public_key_hash
+
+  include Receipt_repr
+end
+
 module Consensus_key = Delegate_consensus_key
 
 module Delegate = struct
