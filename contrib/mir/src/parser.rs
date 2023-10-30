@@ -328,4 +328,15 @@ mod tests {
             Instruction::Push((Type::Unit, Value::Bytes(vec![0xde, 0xad, 0xf0, 0x0d])))
         );
     }
+
+    #[test]
+    fn address_ty_push() {
+        assert_eq!(
+            parse("PUSH address \"tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw\"").unwrap(),
+            Instruction::Push((
+                Type::Address,
+                Value::String("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".to_owned())
+            ))
+        );
+    }
 }

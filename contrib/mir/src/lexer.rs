@@ -95,6 +95,7 @@ defprim! {
     Right,
     IF_LEFT,
     contract,
+    address,
 }
 
 defprim! {

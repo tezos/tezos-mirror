@@ -141,7 +141,7 @@ fn verify_ty(ctx: &mut Ctx, t: &Type) -> Result<(), TcError> {
     use Type::*;
     ctx.gas.consume(gas::tc_cost::VERIFY_TYPE_STEP)?;
     match t {
-        Nat | Int | Bool | Mutez | String | Operation | Unit => Ok(()),
+        Nat | Int | Bool | Mutez | String | Operation | Unit | Address => Ok(()),
         Pair(tys) | Or(tys) => {
             verify_ty(ctx, &tys.0)?;
             verify_ty(ctx, &tys.1)
