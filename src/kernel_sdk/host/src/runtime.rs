@@ -12,6 +12,8 @@
 use alloc::vec::Vec;
 use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
 
+#[cfg(feature = "proto-alpha")]
+use crate::dal_parameters::RollupDalParameters;
 #[cfg(feature = "alloc")]
 use crate::input::Message;
 use crate::metadata::RollupMetadata;
@@ -19,6 +21,8 @@ use crate::metadata::RollupMetadata;
 use crate::path::{Path, RefPath};
 #[cfg(not(feature = "alloc"))]
 use crate::path::{Path, RefPath};
+#[cfg(feature = "proto-alpha")]
+use crate::DAL_PARAMETERS_SIZE;
 use crate::{Error, METADATA_SIZE};
 #[cfg(feature = "alloc")]
 use tezos_smart_rollup_core::smart_rollup_core::ReadInputMessageInfo;
@@ -195,6 +199,10 @@ pub trait Runtime {
         page_index: i16,
         destination: &mut [u8],
     ) -> Result<usize, RuntimeError>;
+
+    /// Reveal the DAL parameters.
+    #[cfg(feature = "proto-alpha")]
+    fn reveal_dal_parameters(&self, published_level: i32) -> RollupDalParameters;
 
     /// Return the size of value stored at `path`
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError>;
@@ -620,6 +628,44 @@ where
         match Error::wrap(res) {
             Ok(size) => Ok(size),
             Err(e) => Err(RuntimeError::HostErr(e)),
+        }
+    }
+
+    #[cfg(feature = "proto-alpha")]
+    fn reveal_dal_parameters(&self, published_level: i32) -> RollupDalParameters {
+        let mut destination = [0u8; DAL_PARAMETERS_SIZE];
+        // This will match the encoding declared for revealing DAL parameters in the Tezos protocol.
+        let payload: &[u8] = &[
+            &[3u8], // tag
+            published_level.to_be_bytes().as_ref(),
+        ]
+        .concat();
+
+        let res = unsafe {
+            SmartRollupCore::reveal(
+                self,
+                payload.as_ptr(),
+                payload.len(),
+                destination.as_mut_ptr(),
+                destination.len(),
+            )
+        };
+
+        debug_assert!(bytes_read == DAL_PARAMETERS_SIZE as i32, "SDK_ERROR: Revealing DAL parameters should always succeed. \
+                                             If you see this message, please report it to the \
+                                             SDK developers at https://gitlab.com/tezos/tezos");
+
+        match RollupDalParameters::try_from(destination) {
+            Ok(dal_parameters) => dal_parameters,
+            Err(_) => {
+                debug_assert!(
+                    false,
+                    "SDK_ERROR: Decoding DAL parameters should always succeed. \
+                     If you see this message, please report it to the \
+                     SDK developers at https://gitlab.com/tezos/tezos"
+                );
+                unreachable!()
+            }
         }
     }
 

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! DAL parameters returned from the [`reveal_dal_parameters`].
+//! DAL parameters returned from the reveal DAL parameters host function.
 
 use core::num::TryFromIntError;
 

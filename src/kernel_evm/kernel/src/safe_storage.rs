@@ -6,6 +6,8 @@
 
 use tezos_evm_logging::{log, Level};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+#[cfg(feature = "proto-alpha")]
+use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
@@ -245,6 +247,11 @@ impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut Intern
     ) -> Result<usize, RuntimeError> {
         self.0
             .reveal_dal_page(published_level, slot_index, page_index, destination)
+    }
+
+    #[cfg(feature = "proto-alpha")]
+    fn reveal_dal_parameters(&self, published_level: i32) -> RollupDalParameters {
+        self.0.reveal_dal_parameters(published_level)
     }
 
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
