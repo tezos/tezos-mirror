@@ -102,6 +102,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
     let update_num_prunes exch delta =
       exch.num_prunes <- exch.num_prunes + counter_update delta
+
+    let update_num_ihaves exch delta =
+      exch.num_ihaves <- exch.num_ihaves + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -214,9 +217,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           match p2p_message with
           | Graft _ -> Stats.update_num_grafts stats.sent `Incr
           | Prune _ -> Stats.update_num_prunes stats.sent `Incr
-          | Message_with_header _ | IHave _ | IWant _ | Subscribe _
-          | Unsubscribe _ ->
-              ())
+          | IHave _ -> Stats.update_num_ihaves stats.sent `Incr
+          | Message_with_header _ | IWant _ | Subscribe _ | Unsubscribe _ -> ())
       | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
     fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
@@ -422,6 +424,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       [IWant] message. *)
   let handle_ihave ({peer; _} : GS.ihave) = function
     | state, GS.Message_requested_message_ids message_ids ->
+        Stats.update_num_ihaves state.stats.received
+        @@ `Plus (List.length message_ids) ;
         if not (List.is_empty message_ids) then
           emit_p2p_message state (IWant {message_ids}) (Seq.return peer) ;
         state
