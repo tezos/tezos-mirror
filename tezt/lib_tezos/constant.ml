@@ -46,6 +46,8 @@ let dac_client = "./octez-dac-client"
 
 let smart_rollup_node = "./octez-smart-rollup-node"
 
+let octez_evm_node = "./octez-evm-node"
+
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)
