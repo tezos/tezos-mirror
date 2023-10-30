@@ -104,6 +104,14 @@ defprim! {
     // If you add anything here, see the note about the order above.
 }
 
+impl Prim {
+    // Our [Prim] enum has its variants in the right order, so its
+    // discriminant should match the ID.
+    pub fn encode(&self, out: &mut Vec<u8>) {
+        out.push(*self as u8)
+    }
+}
+
 defprim! {
     TztPrim;
     Stack_elt,

@@ -13,6 +13,7 @@ pub mod interpreter;
 pub mod irrefutable_match;
 pub mod lexer;
 pub mod parser;
+pub mod serializer;
 pub mod stack;
 pub mod syntax;
 pub mod typechecker;
