@@ -41,7 +41,7 @@ module Token : sig
   val pp : 'token t -> Format.formatter -> 'token -> unit
 end
 
-type staker = Staker_repr.staker =
+type staker = Staker_repr.t =
   | Single of Contract_repr.t * Signature.public_key_hash
   | Shared of Signature.public_key_hash
 

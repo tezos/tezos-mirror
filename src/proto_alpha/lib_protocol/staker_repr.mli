@@ -9,15 +9,15 @@
    of its staker, or both the delegate and all its stakers at
    once. We need to distinguish these cases to enforce the staking
    over baking limit. *)
-type staker =
+type t =
   | Single of Contract_repr.t * Signature.public_key_hash
       (** A single staker, either the delegate itself or one of its
        staker. *)
   | Shared of Signature.public_key_hash
       (** The delegate and all its stakers simultaneously. *)
 
-val staker_encoding : staker Data_encoding.t
+val staker_encoding : t Data_encoding.t
 
-val compare_staker : staker -> staker -> int
+val compare_staker : t -> t -> int
 
-val staker_delegate : staker -> Signature.public_key_hash
+val staker_delegate : t -> Signature.public_key_hash

@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type staker =
+type t =
   | Single of Contract_repr.t * Signature.public_key_hash
   | Shared of Signature.public_key_hash
 
