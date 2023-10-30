@@ -2727,6 +2727,7 @@ let register ~protocols =
     ~observers:0
     ~committee_size:2
     ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_client])
     "test client commands (hex payload from CLI)"
     (Full_infrastructure.test_client ~send_payload_from_file:false)
     protocols ;
@@ -2735,6 +2736,7 @@ let register ~protocols =
     ~observers:0
     ~committee_size:2
     ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_client])
     "test client commands (binary payload from file)"
     (Full_infrastructure.test_client ~send_payload_from_file:true)
     protocols ;
@@ -2743,6 +2745,7 @@ let register ~protocols =
     ~observers:0
     ~committee_size:2
     ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_client])
     "test serialized certificate"
     Full_infrastructure.test_serialized_certificate
     protocols ;

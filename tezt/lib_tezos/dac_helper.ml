@@ -216,16 +216,17 @@ let with_fresh_rollup ?(pvm_name = "arith") ?hooks tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
-    ?(pvm_name = "arith") ?(custom_committee_members = []) ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments
-    ?(allow_v1_api = false) ?(allow_regression = false) ~__FILE__
-    ~committee_size ~observers variant scenario =
+    ?(uses = fun _protocol -> []) ?(pvm_name = "arith")
+    ?(custom_committee_members = []) ?commitment_period ?challenge_window
+    ?event_sections_levels ?node_arguments ?(allow_v1_api = false)
+    ?(allow_regression = false) ~__FILE__ ~committee_size ~observers variant
+    scenario =
   let description = "Testing Full DAC infrastructure" in
   (if allow_regression then regression_test else test)
     ?supports
     ~__FILE__
     ~tags
-    ~uses:(fun _protocol -> [Constant.octez_dac_node])
+    ~uses:(fun protocol -> Constant.octez_dac_node :: uses protocol)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
