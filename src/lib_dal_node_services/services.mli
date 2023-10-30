@@ -239,6 +239,15 @@ module P2P : sig
     ; query : < connected : bool > >
     service
 
+  val get_peers_info :
+    < meth : [`GET]
+    ; input : unit
+    ; output : (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list
+    ; prefix : unit
+    ; params : unit
+    ; query : < connected : bool > >
+    service
+
   module Gossipsub : sig
     val get_topics :
       < meth : [`GET]

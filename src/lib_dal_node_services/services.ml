@@ -354,6 +354,25 @@ module P2P = struct
       ~output:Data_encoding.(list (obj1 (req "peer" P2p_peer.Id.encoding)))
       (open_root / "peers")
 
+  let get_peers_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service =
+    Tezos_rpc.Service.get_service
+      ~description:"Get list of known peers and their corresponding info"
+      ~query:connected_query
+      ~output:
+        Data_encoding.(
+          list
+            (obj2
+               (req "point" P2p_peer.Id.encoding)
+               (req "info" Types.P2P.Peer.Info.encoding)))
+      (open_root / "peers" / "info")
+
   module Gossipsub = struct
     let open_root = open_root / "gossipsub"
 
