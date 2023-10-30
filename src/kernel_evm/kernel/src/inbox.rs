@@ -5,15 +5,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
-use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK, UPGRADE_NONCE_SIZE};
+use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK};
 use crate::simulation;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, create_chunked_transaction,
-    get_and_increment_deposit_nonce, read_kernel_upgrade_nonce,
-    remove_chunked_transaction, store_last_info_per_level_timestamp,
-    store_transaction_chunk,
+    get_and_increment_deposit_nonce, remove_chunked_transaction,
+    store_last_info_per_level_timestamp, store_transaction_chunk,
 };
 use crate::tick_model;
 use crate::Error;
@@ -157,7 +155,6 @@ impl Decodable for Transaction {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct KernelUpgrade {
-    pub nonce: [u8; UPGRADE_NONCE_SIZE],
     pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
 }
 
@@ -166,26 +163,20 @@ impl Decodable for KernelUpgrade {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 2 {
+        if decoder.item_count()? != 1 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
-        let mut nonce = [0u8; UPGRADE_NONCE_SIZE];
         let mut preimage_hash = [0u8; PREIMAGE_HASH_SIZE];
 
         let mut it = decoder.iter();
-        decode_array(next(&mut it)?, UPGRADE_NONCE_SIZE, &mut nonce)?;
         decode_array(next(&mut it)?, PREIMAGE_HASH_SIZE, &mut preimage_hash)?;
-        Ok(Self {
-            nonce,
-            preimage_hash,
-        })
+        Ok(Self { preimage_hash })
     }
 }
 
 impl Encodable for KernelUpgrade {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
-        stream.append_iter(self.nonce);
+        stream.begin_list(1);
         stream.append_iter(self.preimage_hash);
     }
 }
@@ -269,19 +260,6 @@ fn handle_transaction_chunk<Host: Runtime>(
     Ok(None)
 }
 
-fn handle_kernel_upgrade<Host: Runtime>(
-    host: &mut Host,
-    kernel_upgrade: &KernelUpgrade,
-) -> Result<(), Error> {
-    let current_kernel_upgrade_nonce = read_kernel_upgrade_nonce(host)?;
-    let incoming_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
-    if incoming_nonce == current_kernel_upgrade_nonce + 1 {
-        Ok(())
-    } else {
-        Err(Error::UpgradeError(InvalidUpgradeNonce))
-    }
-}
-
 fn handle_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: Deposit,
@@ -348,15 +326,7 @@ pub fn read_inbox<Host: Runtime>(
                 }
             }
             InputResult::Input(Input::Upgrade(kernel_upgrade)) => {
-                match handle_kernel_upgrade(host, &kernel_upgrade) {
-                    Ok(()) => res.kernel_upgrade = Some(kernel_upgrade),
-                    Err(e) => log!(
-                        host,
-                        Error,
-                        "Error while processing the kernel upgrade: {:?}",
-                        e
-                    ),
-                }
+                res.kernel_upgrade = Some(kernel_upgrade)
             }
             InputResult::Input(Input::Simulation) => {
                 // kernel enters in simulation mode, reading will be done by the
@@ -544,7 +514,6 @@ mod tests {
         store_kernel_upgrade_nonce(&mut host, 1).unwrap();
 
         // Prepare the upgrade's payload
-        let nonce = 2u16.to_le_bytes();
         let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hex::decode(
             "004b28109df802cb1885ab29461bc1b410057a9f3a848d122ac7a742351a3a1f4e",
         )
@@ -552,9 +521,7 @@ mod tests {
         .try_into()
         .unwrap();
 
-        let mut kernel_upgrade_payload = vec![];
-        kernel_upgrade_payload.extend_from_slice(&nonce);
-        kernel_upgrade_payload.extend_from_slice(&preimage_hash);
+        let kernel_upgrade_payload = preimage_hash.to_vec();
 
         // Create a transfer from the bridge contract, that act as the
         // dictator (or administrator).
@@ -575,10 +542,7 @@ mod tests {
         host.add_transfer(payload, &transfer_metadata);
 
         let inbox_content = read_inbox(&mut host, [0; 20], None, Some(sender)).unwrap();
-        let expected_upgrade = Some(KernelUpgrade {
-            nonce,
-            preimage_hash,
-        });
+        let expected_upgrade = Some(KernelUpgrade { preimage_hash });
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }
 

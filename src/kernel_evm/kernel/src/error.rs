@@ -57,8 +57,6 @@ pub enum StorageError {
 
 #[derive(Error, Debug)]
 pub enum UpgradeProcessError {
-    #[error("Upgrade error: invalid nonce")]
-    InvalidUpgradeNonce,
     #[error("Internal upgrade error: {0}")]
     InternalUpgrade(&'static str),
     #[error("Fallback mechanism was triggered")]
