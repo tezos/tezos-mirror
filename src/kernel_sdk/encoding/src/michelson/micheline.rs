@@ -419,6 +419,36 @@ mod test {
     }
 
     #[test]
+    fn micheline_unit_decode() {
+        let test = vec![
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+        ];
+
+        let expected = MichelinePrimNoArgsNoAnnots::<11> {};
+
+        let (remaining_input, unit) = NomReader::nom_read(test.as_slice()).unwrap();
+
+        assert!(remaining_input.is_empty());
+        assert_eq!(expected, unit);
+    }
+
+    #[test]
+    fn micheline_unit_encode() {
+        let expected = vec![
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+        ];
+
+        let test = MichelinePrimNoArgsNoAnnots::<11> {};
+
+        let mut bin = Vec::new();
+        test.bin_write(&mut bin).unwrap();
+
+        assert_eq!(expected, bin);
+    }
+
+    #[test]
     fn micheline_pair_decode() {
         let test = vec![
             7, // Prim_2 (no annots)
