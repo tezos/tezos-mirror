@@ -2098,9 +2098,9 @@ let get_kernel_boot_wasm ~sc_rollup_client =
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
 let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
-    ?(nonce = 2) ~base_installee ~installee ?with_administrator
-    ?expect_l1_failure ?(admin = Constant.bootstrap1) ?(upgrador = admin)
-    protocol =
+    ?(from_ghostnet = false) ?(nonce = 2) ~base_installee ~installee
+    ?with_administrator ?expect_l1_failure ?(admin = Constant.bootstrap1)
+    ?(upgrador = admin) protocol =
   let* {
          node;
          client;
@@ -2139,9 +2139,16 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
           "Couldn't obtain the root hash of the preimages of the chunked \
            kernel."
   in
-  let upgrade_nonce_bytes = Helpers.u16_to_bytes nonce in
   let upgrade_payload =
-    upgrade_nonce_bytes ^ preimage_root_hash_bytes |> Hex.of_string |> Hex.show
+    let payload =
+      (* TODO: remove this condition whenever the ghostnet kernel is upgraded
+         to the version without an upgrade nonce. *)
+      if from_ghostnet then
+        let upgrade_nonce_bytes = Helpers.u16_to_bytes nonce in
+        upgrade_nonce_bytes ^ preimage_root_hash_bytes
+      else preimage_root_hash_bytes
+    in
+    Hex.of_string payload |> Hex.show
   in
   let* kernel_boot_wasm_before_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
@@ -2231,24 +2238,6 @@ let test_kernel_upgrade_wrong_key =
   in
   unit
 
-let test_kernel_upgrade_wrong_nonce =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["nonce"; "upgrade"]
-    ~title:"Ensures EVM kernel's upgrade fails with a wrong upgrade nonce"
-  @@ fun protocol ->
-  let base_installee = "src/kernel_evm/kernel/tests/resources" in
-  let installee = "debug_kernel" in
-  let* _ =
-    gen_test_kernel_upgrade
-      ~nonce:3
-      ~should_fail:true
-      ~base_installee
-      ~installee
-      protocol
-  in
-  unit
-
 let test_kernel_upgrade_wrong_rollup_address =
   Protocol.register_test
     ~__FILE__
@@ -2331,29 +2320,6 @@ let test_kernel_upgrade_failing_migration =
     ~client
     ~endpoint
     ~expected_block_level:2
-
-let test_check_kernel_upgrade_nonce =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "upgrade"; "nonce"]
-    ~title:"Ensures EVM kernel's upgrade nonce is bumped"
-  @@ fun protocol ->
-  let base_installee = "./" in
-  let installee = "evm_kernel" in
-  let* _, _, _, _, evm_node, _ =
-    gen_test_kernel_upgrade ~base_installee ~installee protocol
-  in
-  let* upgrade_nonce_result =
-    Evm_node.call_evm_rpc
-      evm_node
-      Evm_node.{method_ = "tez_upgradeNonce"; parameters = `Null}
-  in
-  let upgrade_nonce =
-    upgrade_nonce_result |> Evm_node.extract_result |> JSON.as_int32
-  in
-  Check.((upgrade_nonce = Int32.of_int 2) int32)
-    ~error_msg:(sf "Expected upgrade nonce should be %%R, but got %%L") ;
-  unit
 
 let send_raw_transaction_request raw_tx =
   Evm_node.
@@ -2559,6 +2525,7 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   let next_kernel_installee = "evm_kernel" in
   let* _ =
     gen_test_kernel_upgrade
+      ~from_ghostnet:true
       ~evm_setup
       ~base_installee:next_kernel_base_installee
       ~installee:next_kernel_installee
@@ -3575,12 +3542,10 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_to_debug protocols ;
   test_kernel_upgrade_evm_to_evm protocols ;
   test_kernel_upgrade_wrong_key protocols ;
-  test_kernel_upgrade_wrong_nonce protocols ;
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_administrator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
   test_kernel_upgrade_version_change protocols ;
-  test_check_kernel_upgrade_nonce protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
