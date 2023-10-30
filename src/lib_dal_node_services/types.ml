@@ -502,4 +502,15 @@ module P2P = struct
           }
     end
   end
+
+  module Peer = struct
+    module Info = struct
+      type t = (Metadata.Peer.t, Metadata.Connection.t) P2p_peer.Info.t
+
+      let encoding =
+        P2p_peer.Info.encoding
+          Metadata.Peer.encoding
+          Metadata.Connection.encoding
+    end
+  end
 end
