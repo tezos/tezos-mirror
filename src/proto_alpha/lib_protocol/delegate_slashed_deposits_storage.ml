@@ -290,7 +290,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                     in
                     let giver =
                       `Unstaked_frozen_deposits
-                        (Staker_repr.Shared delegate, cycle)
+                        (Unstaked_frozen_staker_repr.Shared delegate, cycle)
                     in
                     return
                       ( (giver, amount_to_burn) :: to_burn,

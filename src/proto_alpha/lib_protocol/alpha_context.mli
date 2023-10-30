@@ -2068,7 +2068,7 @@ module Receipt : sig
     val pp : 'token t -> Format.formatter -> 'token -> unit
   end
 
-  type staker =
+  type unstaked_frozen_staker =
     | Single of Contract.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
 
@@ -2092,7 +2092,7 @@ module Receipt : sig
     | Contract : Contract.t -> Tez.t balance
     | Block_fees : Tez.t balance
     | Deposits : frozen_staker -> Tez.t balance
-    | Unstaked_deposits : staker * Cycle.t -> Tez.t balance
+    | Unstaked_deposits : unstaked_frozen_staker * Cycle.t -> Tez.t balance
     | Nonce_revelation_rewards : Tez.t balance
     | Attesting_rewards : Tez.t balance
     | Baking_rewards : Tez.t balance
@@ -5103,7 +5103,7 @@ module Token : sig
     [ `Contract of Contract.t
     | `Collected_commitments of Blinded_public_key_hash.t
     | `Frozen_deposits of Receipt.frozen_staker
-    | `Unstaked_frozen_deposits of Receipt.staker * Cycle.t
+    | `Unstaked_frozen_deposits of Receipt.unstaked_frozen_staker * Cycle.t
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 
