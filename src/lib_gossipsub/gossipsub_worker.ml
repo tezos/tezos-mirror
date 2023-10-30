@@ -116,6 +116,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let update_num_unknown_messages_validity exch delta =
       exch.num_unknown_messages_validity <-
         exch.num_unknown_messages_validity + counter_update delta
+
+    let update_num_valid_messages exch delta =
+      exch.num_valid_messages <- exch.num_valid_messages + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -230,7 +233,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | Prune _ -> Stats.update_num_prunes stats.sent `Incr
           | IHave _ -> Stats.update_num_ihaves stats.sent `Incr
           | IWant _ -> Stats.update_num_iwants stats.sent `Incr
-          | Message_with_header _ | Subscribe _ | Unsubscribe _ -> ())
+          | Message_with_header _ ->
+              Stats.update_num_valid_messages stats.sent `Incr
+          | Subscribe _ | Unsubscribe _ -> ())
       | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
     fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
@@ -285,6 +290,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       peers based on various criteria (bad score, connection expired, ...). *)
   let handle_receive_message received_message = function
     | state, GS.Route_message {to_route} ->
+        Stats.update_num_valid_messages state.stats.received `Incr ;
         let ({sender = _; topic; message_id; message} : GS.receive_message) =
           received_message
         in
