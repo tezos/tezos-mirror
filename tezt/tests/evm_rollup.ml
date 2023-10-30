@@ -60,7 +60,7 @@ type full_evm_setup = {
   sc_rollup_address : string;
   originator_key : string;
   rollup_operator_key : string;
-  evm_proxy_server : Evm_proxy_server.t;
+  evm_node : Evm_node.t;
   endpoint : string;
   l1_contracts : l1_contracts option;
   config :
@@ -80,8 +80,8 @@ let hex_256_of_address acc =
   (* prepend 24 leading zeros *)
   String.("0x" ^ make 24 '0' ^ s)
 
-let evm_proxy_server_version proxy_server =
-  let endpoint = Evm_proxy_server.endpoint proxy_server in
+let evm_node_version evm_node =
+  let endpoint = Evm_node.endpoint evm_node in
   let get_version_url = endpoint ^ "/version" in
   Curl.get get_version_url
 
@@ -165,27 +165,26 @@ let next_evm_level ~sc_rollup_node ~node ~client =
   let* level = Node.get_level node in
   Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
 
-(** [wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash] takes an
+(** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]
     blocks have passed and the receipt is still not available. *)
-let wait_for_transaction_receipt ?(count = 3) ~evm_proxy_server
-    ~transaction_hash () =
+let wait_for_transaction_receipt ?(count = 3) ~evm_node ~transaction_hash () =
   let rec loop count =
     let* () = Lwt_unix.sleep 5. in
     let* receipt =
-      Evm_proxy_server.(
+      Evm_node.(
         call_evm_rpc
-          evm_proxy_server
+          evm_node
           {
             method_ = "eth_getTransactionReceipt";
             parameters = `A [`String transaction_hash];
           })
     in
-    if receipt |> Evm_proxy_server.extract_result |> JSON.is_null then
+    if receipt |> Evm_node.extract_result |> JSON.is_null then
       if count > 0 then loop (count - 1)
       else Test.fail "Transaction still hasn't been included"
     else
-      receipt |> Evm_proxy_server.extract_result
+      receipt |> Evm_node.extract_result
       |> Transaction.transaction_receipt_of_json |> return
   in
   loop count
@@ -210,32 +209,30 @@ let wait_for_application ~sc_rollup_node ~node ~client apply () =
   return result
 
 let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
-    ~source_private_key ~to_public_key ~value ~evm_proxy_server_endpoint ?data
-    () =
+    ~source_private_key ~to_public_key ~value ~evm_node_endpoint ?data () =
   let send =
     Eth_cli.transaction_send
       ~source_private_key
       ~to_public_key
       ~value
-      ~endpoint:evm_proxy_server_endpoint
+      ~endpoint:evm_node_endpoint
       ?data
   in
   wait_for_application ~sc_rollup_node ~node ~client send ()
 
 (* sending more than ~300 tx could fail, because or curl *)
-let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
+let send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs =
   let requests =
     List.map
       (fun tx ->
-        Evm_proxy_server.
+        Evm_node.
           {method_ = "eth_sendRawTransaction"; parameters = `A [`String tx]})
       txs
   in
-  let* hashes = Evm_proxy_server.batch_evm_rpc evm_proxy_server requests in
+  let* hashes = Evm_node.batch_evm_rpc evm_node requests in
   let hashes =
     hashes |> JSON.as_list
-    |> List.map (fun json ->
-           Evm_proxy_server.extract_result json |> JSON.as_string)
+    |> List.map (fun json -> Evm_node.extract_result json |> JSON.as_string)
   in
   let first_hash = List.hd hashes in
   (* Let's wait until one of the transactions is injected into a block, and
@@ -245,9 +242,7 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
       ~sc_rollup_node
       ~node
       ~client
-      (wait_for_transaction_receipt
-         ~evm_proxy_server
-         ~transaction_hash:first_hash)
+      (wait_for_transaction_receipt ~evm_node ~transaction_hash:first_hash)
       ()
   in
   return (requests, receipt, hashes)
@@ -407,10 +402,8 @@ let setup_evm_kernel ?config ?kernel_installee
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
-  let* evm_proxy_server =
-    Evm_proxy_server.init ~mode:`Development sc_rollup_node
-  in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* evm_node = Evm_node.init ~mode:`Development sc_rollup_node in
+  let endpoint = Evm_node.endpoint evm_node in
   return
     {
       node;
@@ -420,7 +413,7 @@ let setup_evm_kernel ?config ?kernel_installee
       sc_rollup_address;
       originator_key;
       rollup_operator_key;
-      evm_proxy_server;
+      evm_node;
       endpoint;
       l1_contracts;
       config;
@@ -449,13 +442,13 @@ let setup_past_genesis
 type contract = {label : string; abi : string; bin : string}
 
 let deploy ~contract ~sender full_evm_setup =
-  let {node; client; sc_rollup_node; evm_proxy_server; _} = full_evm_setup in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let {node; client; sc_rollup_node; evm_node; _} = full_evm_setup in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* () = Eth_cli.add_abi ~label:contract.label ~abi:contract.abi () in
   let send_deploy () =
     Eth_cli.deploy
       ~source_private_key:sender.Eth_account.private_key
-      ~endpoint:evm_proxy_server_endpoint
+      ~endpoint:evm_node_endpoint
       ~abi:contract.label
       ~bin:contract.bin
   in
@@ -469,10 +462,10 @@ type deploy_checks = {
 
 let deploy_with_base_checks {contract; expected_address; expected_code} protocol
     =
-  let* ({sc_rollup_client; evm_proxy_server; _} as full_evm_setup) =
+  let* ({sc_rollup_client; evm_node; _} as full_evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* contract_address, tx = deploy ~contract ~sender full_evm_setup in
   let address = String.lowercase_ascii contract_address in
@@ -481,7 +474,7 @@ let deploy_with_base_checks {contract; expected_address; expected_code} protocol
       string
       ~error_msg:"Expected address to be %R but was %L.") ;
   let* code_in_kernel =
-    Evm_proxy_server.fetch_contract_code evm_proxy_server contract_address
+    Evm_node.fetch_contract_code evm_node contract_address
   in
   Check.((code_in_kernel = expected_code) string)
     ~error_msg:"Unexpected code %L, it should be %R" ;
@@ -515,14 +508,14 @@ let deploy_with_base_checks {contract; expected_address; expected_code} protocol
   unit
 
 let send ~sender ~receiver ~value ?data full_evm_setup =
-  let {node; client; sc_rollup_node; evm_proxy_server; _} = full_evm_setup in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let {node; client; sc_rollup_node; evm_node; _} = full_evm_setup in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
   let send =
     Eth_cli.transaction_send
       ~source_private_key:sender.Eth_account.private_key
       ~to_public_key:receiver.Eth_account.address
       ~value
-      ~endpoint:evm_proxy_server_endpoint
+      ~endpoint:evm_node_endpoint
       ?data
   in
   wait_for_application ~sc_rollup_node ~node ~client send ()
@@ -546,11 +539,11 @@ let check_block_progression ~sc_rollup_node ~node ~client ~endpoint
   @@ Check.((block_number = expected_block_level) int)
        ~error_msg:"Unexpected block number, should be %%R, but got %%L"
 
-let test_evm_proxy_server_connection =
+let test_evm_node_connection =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"]
-    ~title:"EVM proxy server connection"
+    ~title:"EVM node server connection"
   @@ fun protocol ->
   let* tezos_node, tezos_client = setup_l1 protocol in
   let* sc_rollup =
@@ -567,15 +560,15 @@ let test_evm_proxy_server_connection =
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:Constant.bootstrap1.alias
   in
-  let evm_proxy = Evm_proxy_server.create sc_rollup_node in
-  (* Tries to start the EVM proxy server without a listening rollup node. *)
-  let process = Evm_proxy_server.spawn_run evm_proxy in
+  let evm_node = Evm_node.create sc_rollup_node in
+  (* Tries to start the EVM node server without a listening rollup node. *)
+  let process = Evm_node.spawn_run evm_node in
   let* () = Process.check ~expect_failure:true process in
   (* Starts the rollup node. *)
   let* _ = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
-  (* Starts the EVM proxy server and asks its version. *)
-  let* () = Evm_proxy_server.run evm_proxy in
-  let*? process = evm_proxy_server_version evm_proxy in
+  (* Starts the EVM node server and asks its version. *)
+  let* () = Evm_node.run evm_node in
+  let*? process = evm_node_version evm_node in
   let* () = Process.check process in
   unit
 
@@ -624,12 +617,12 @@ let test_rpc_getBalance =
     ~tags:["evm"; "get_balance"]
     ~title:"RPC method eth_getBalance"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* balance =
     Eth_cli.balance
       ~account:Eth_account.bootstrap_accounts.(0).address
-      ~endpoint:evm_proxy_server_endpoint
+      ~endpoint:evm_node_endpoint
   in
   Check.((balance = default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
@@ -644,26 +637,24 @@ let test_rpc_getBlockByNumber =
     ~tags:["evm"; "get_block_by_number"]
     ~title:"RPC method eth_getBlockByNumber"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* block =
-    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
-  in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   unit
 
 let get_block_by_hash ?(full_tx_objects = false) evm_setup block_hash =
   let* block =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_setup.evm_proxy_server
+        evm_setup.evm_node
         {
           method_ = "eth_getBlockByHash";
           parameters = `A [`String block_hash; `Bool full_tx_objects];
         })
   in
-  return @@ (block |> Evm_proxy_server.extract_result |> Block.of_json)
+  return @@ (block |> Evm_node.extract_result |> Block.of_json)
 
 let test_rpc_getBlockByHash =
   Protocol.register_test
@@ -671,13 +662,9 @@ let test_rpc_getBlockByHash =
     ~tags:["evm"; "get_block_by_hash"]
     ~title:"RPC method eth_getBlockByHash"
   @@ fun protocol ->
-  let* ({evm_proxy_server; _} as evm_setup) =
-    setup_past_genesis ~admin:None protocol
-  in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* block =
-    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
-  in
+  let* ({evm_node; _} as evm_setup) = setup_past_genesis ~admin:None protocol in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   let* block' = get_block_by_hash evm_setup (Option.get block.hash) in
@@ -690,27 +677,23 @@ let test_l2_block_size_non_zero =
     ~tags:["evm"; "block"; "size"]
     ~title:"Block size is greater than zero"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* block =
-    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
-  in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
   Check.((block.size > 0l) int32)
     ~error_msg:"Unexpected block size, should be > 0, but got %%L" ;
   unit
 
 let transaction_count_request address =
-  Evm_proxy_server.
+  Evm_node.
     {
       method_ = "eth_getTransactionCount";
       parameters = `A [`String address; `String "latest"];
     }
 
-let get_transaction_count proxy_server address =
+let get_transaction_count evm_node address =
   let* transaction_count =
-    Evm_proxy_server.call_evm_rpc
-      proxy_server
-      (transaction_count_request address)
+    Evm_node.call_evm_rpc evm_node (transaction_count_request address)
   in
   return JSON.(transaction_count |-> "result" |> as_int64)
 
@@ -720,11 +703,9 @@ let test_rpc_getTransactionCount =
     ~tags:["evm"; "get_transaction_count"]
     ~title:"RPC method eth_getTransactionCount"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   let* transaction_count =
-    get_transaction_count
-      evm_proxy_server
-      Eth_account.bootstrap_accounts.(0).address
+    get_transaction_count evm_node Eth_account.bootstrap_accounts.(0).address
   in
   Check.((transaction_count = 0L) int64)
     ~error_msg:"Expected a nonce of %R, but got %L" ;
@@ -736,16 +717,14 @@ let test_rpc_getTransactionCountBatch =
     ~tags:["evm"; "get_transaction_count_as_batch"]
     ~title:"RPC method eth_getTransactionCount in batch"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   let* transaction_count =
-    get_transaction_count
-      evm_proxy_server
-      Eth_account.bootstrap_accounts.(0).address
+    get_transaction_count evm_node Eth_account.bootstrap_accounts.(0).address
   in
   let* transaction_count_batch =
     let* transaction_count =
-      Evm_proxy_server.batch_evm_rpc
-        evm_proxy_server
+      Evm_node.batch_evm_rpc
+        evm_node
         [transaction_count_request Eth_account.bootstrap_accounts.(0).address]
     in
     match JSON.as_list transaction_count with
@@ -763,18 +742,14 @@ let test_rpc_batch =
     ~tags:["evm"; "rpc"; "batch"]
     ~title:"RPC batch requests"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   let* transaction_count, chain_id =
     let transaction_count =
       transaction_count_request Eth_account.bootstrap_accounts.(0).address
     in
-    let chain_id =
-      Evm_proxy_server.{method_ = "eth_chainId"; parameters = `Null}
-    in
+    let chain_id = Evm_node.{method_ = "eth_chainId"; parameters = `Null} in
     let* results =
-      Evm_proxy_server.batch_evm_rpc
-        evm_proxy_server
-        [transaction_count; chain_id]
+      Evm_node.batch_evm_rpc evm_node [transaction_count; chain_id]
     in
     match JSON.as_list results with
     | [transaction_count; chain_id] ->
@@ -952,10 +927,10 @@ let test_l2_call_simple_storage =
     ~title:"Check L2 contract call"
   @@ fun protocol ->
   (* setup *)
-  let* ({evm_proxy_server; sc_rollup_client; _} as evm_setup) =
+  let* ({evm_node; sc_rollup_client; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
 
   (* deploy contract *)
@@ -1007,11 +982,11 @@ let test_l2_deploy_erc20 =
     ~title:"Check L2 erc20 contract deployment"
   @@ fun protocol ->
   (* setup *)
-  let* ({sc_rollup_client; evm_proxy_server; node; client; sc_rollup_node; _} as
+  let* ({sc_rollup_client; evm_node; node; client; sc_rollup_node; _} as
        evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let player = Eth_account.bootstrap_accounts.(1) in
 
@@ -1143,15 +1118,11 @@ type config_result = {chain_id : int64}
 
 let config_setup evm_setup =
   let web3_clientVersion =
-    Evm_proxy_server.{method_ = "web3_clientVersion"; parameters = `A []}
+    Evm_node.{method_ = "web3_clientVersion"; parameters = `A []}
   in
-  let chain_id =
-    Evm_proxy_server.{method_ = "eth_chainId"; parameters = `Null}
-  in
+  let chain_id = Evm_node.{method_ = "eth_chainId"; parameters = `Null} in
   let* results =
-    Evm_proxy_server.batch_evm_rpc
-      evm_setup.evm_proxy_server
-      [web3_clientVersion; chain_id]
+    Evm_node.batch_evm_rpc evm_setup.evm_node [web3_clientVersion; chain_id]
   in
   match JSON.as_list results with
   | [web3_clientVersion; chain_id] ->
@@ -1183,15 +1154,15 @@ let ensure_block_integrity ~block_result evm_setup =
 
 let get_block_by_number ?(full_tx_objects = false) evm_setup block_param =
   let* latest_block =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_setup.evm_proxy_server
+        evm_setup.evm_node
         {
           method_ = "eth_getBlockByNumber";
           parameters = `A [`String block_param; `Bool full_tx_objects];
         })
   in
-  return @@ (latest_block |> Evm_proxy_server.extract_result |> Block.of_json)
+  return @@ (latest_block |> Evm_node.extract_result |> Block.of_json)
 
 let latest_block ?(full_tx_objects = false) evm_setup =
   get_block_by_number ~full_tx_objects evm_setup "latest"
@@ -1217,22 +1188,22 @@ let get_tx_object ~endpoint ~tx_hash =
 
 let get_transaction_receipt ~full_evm_setup ~tx_hash =
   let* json =
-    Evm_proxy_server.call_evm_rpc
-      full_evm_setup.evm_proxy_server
+    Evm_node.call_evm_rpc
+      full_evm_setup.evm_node
       {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
   in
   return JSON.(json |-> "result" |> Transaction.transaction_receipt_of_json)
 
 let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
     full_evm_setup =
-  let endpoint = Evm_proxy_server.endpoint full_evm_setup.evm_proxy_server in
+  let endpoint = Evm_node.endpoint full_evm_setup.evm_node in
   let balance account = Eth_cli.balance ~account ~endpoint in
   let* sender_balance = balance sender.Eth_account.address in
   assert (sender_balance = transfer_result.sender_balance_after) ;
   let* receiver_balance = balance receiver.Eth_account.address in
   assert (receiver_balance = transfer_result.receiver_balance_after) ;
   let* sender_nonce =
-    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+    get_transaction_count full_evm_setup.evm_node sender.address
   in
   assert (sender_nonce = transfer_result.sender_nonce_after) ;
   let* tx_object = get_tx_object ~endpoint ~tx_hash:transfer_result.tx_hash in
@@ -1244,19 +1215,19 @@ let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
   unit
 
 let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
-  let endpoint = Evm_proxy_server.endpoint full_evm_setup.evm_proxy_server in
+  let endpoint = Evm_node.endpoint full_evm_setup.evm_node in
   let balance account = Eth_cli.balance ~account ~endpoint in
   let* sender_balance_before = balance sender.Eth_account.address in
   let* receiver_balance_before = balance receiver.Eth_account.address in
   let* sender_nonce_before =
-    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+    get_transaction_count full_evm_setup.evm_node sender.address
   in
   let* tx_hash = send ~sender ~receiver ~value ?data full_evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx:tx_hash in
   let* sender_balance_after = balance sender.address in
   let* receiver_balance_after = balance receiver.address in
   let* sender_nonce_after =
-    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+    get_transaction_count full_evm_setup.evm_node sender.address
   in
   let* tx_object = get_tx_object ~endpoint ~tx_hash in
   let* tx_receipt = get_transaction_receipt ~full_evm_setup ~tx_hash in
@@ -1346,12 +1317,12 @@ let test_rpc_txpool_content =
     ~tags:["evm"; "txpool_content"]
     ~title:"Check RPC txpool_content is available"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_evm_kernel ~admin:None protocol in
+  let* {evm_node; _} = setup_evm_kernel ~admin:None protocol in
   (* The content of the txpool is not relevant for now, this test only checks
      the the RPC is correct, i.e. an object containing both the `pending` and
      `queued` fields, containing the correct objects: addresses pointing to a
      mapping of nonces to transactions. *)
-  let* _result = Evm_proxy_server.txpool_content evm_proxy_server in
+  let* _result = Evm_node.txpool_content evm_node in
   unit
 
 let test_rpc_web3_clientVersion =
@@ -1360,16 +1331,12 @@ let test_rpc_web3_clientVersion =
     ~tags:["evm"; "client_version"]
     ~title:"Check RPC web3_clientVersion"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_evm_kernel ~admin:None protocol in
+  let* {evm_node; _} = setup_evm_kernel ~admin:None protocol in
   let* web3_clientVersion =
-    Evm_proxy_server.(
-      call_evm_rpc
-        evm_proxy_server
-        {method_ = "web3_clientVersion"; parameters = `A []})
+    Evm_node.(
+      call_evm_rpc evm_node {method_ = "web3_clientVersion"; parameters = `A []})
   in
-  let* server_version =
-    evm_proxy_server_version evm_proxy_server |> Runnable.run
-  in
+  let* server_version = evm_node_version evm_node |> Runnable.run in
   Check.(
     (JSON.(web3_clientVersion |-> "result" |> as_string)
     = JSON.as_string server_version)
@@ -1383,7 +1350,7 @@ let test_rpc_web3_sha3 =
     ~tags:["evm"; "sha3"]
     ~title:"Check RPC web3_sha3"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   (* From the example provided in
      https://ethereum.org/en/developers/docs/apis/json-rpc/#web3_sha3 *)
   let input_data = "0x68656c6c6f20776f726c64" in
@@ -1391,9 +1358,9 @@ let test_rpc_web3_sha3 =
     "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"
   in
   let* web3_sha3 =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_proxy_server
+        evm_node
         {method_ = "web3_sha3"; parameters = `A [`String input_data]})
   in
   Check.((JSON.(web3_sha3 |-> "result" |> as_string) = expected_reply) string)
@@ -1406,12 +1373,12 @@ let test_simulate =
     ~tags:["evm"; "simulate"]
     ~title:"A block can be simulated in the rollup node"
     (fun protocol ->
-      let* {evm_proxy_server; sc_rollup_client; _} =
+      let* {evm_node; sc_rollup_client; _} =
         setup_past_genesis ~admin:None protocol
       in
       let* json =
-        Evm_proxy_server.call_evm_rpc
-          evm_proxy_server
+        Evm_node.call_evm_rpc
+          evm_node
           {method_ = "eth_blockNumber"; parameters = `A []}
       in
       let block_number =
@@ -1452,7 +1419,7 @@ let test_full_blocks =
   let config =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
-  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+  let* {evm_node; sc_rollup_node; node; client; _} =
     setup_past_genesis ~config ~admin:None protocol
   in
   let txs =
@@ -1461,19 +1428,19 @@ let test_full_blocks =
     |> List.map (fun (tx, _hash) -> tx)
   in
   let* _requests, receipt, _hashes =
-    send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs
   in
   let* block =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_proxy_server
+        evm_node
         {
           method_ = "eth_getBlockByNumber";
           parameters =
             `A [`String (Format.sprintf "%#lx" receipt.blockNumber); `Bool true];
         })
   in
-  let block = block |> Evm_proxy_server.extract_result |> Block.of_json in
+  let block = block |> Evm_node.extract_result |> Block.of_json in
   let block_hash =
     match block.hash with
     | Some hash -> hash
@@ -1508,22 +1475,20 @@ let test_latest_block =
       "Check `evm_getBlockByNumber` works correctly when asking for the \
        `latest`"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   (* The first execution of the kernel actually builds two blocks: the genesis
      block and the block for the current inbox. As such, the latest block is
      always of level 1. *)
   let* latest_block =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_proxy_server
+        evm_node
         {
           method_ = "eth_getBlockByNumber";
           parameters = `A [`String "latest"; `Bool false];
         })
   in
-  let latest_block =
-    latest_block |> Evm_proxy_server.extract_result |> Block.of_json
-  in
+  let latest_block = latest_block |> Evm_node.extract_result |> Block.of_json in
   Check.((latest_block.Block.number = 1l) int32)
     ~error_msg:"Expected latest being block number %R, but got %L" ;
   unit
@@ -1534,18 +1499,18 @@ let test_eth_call_nullable_recipient =
     ~tags:["evm"; "eth_call"; "null"]
     ~title:"Check `eth_call.to` input can be null"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   let* call_result =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_proxy_server
+        evm_node
         {
           method_ = "eth_call";
           parameters = `A [`O [("to", `Null)]; `String "latest"];
         })
   in
   (* Check the RPC returns a `result`. *)
-  let _result = call_result |> Evm_proxy_server.extract_result in
+  let _result = call_result |> Evm_node.extract_result in
   unit
 
 let test_inject_100_transactions =
@@ -1557,18 +1522,18 @@ let test_inject_100_transactions =
   let config =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
-  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+  let* {evm_node; sc_rollup_node; node; client; _} =
     setup_past_genesis ~config ~admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   let* requests, receipt, _hashes =
-    send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs
   in
   let* block_with_100tx =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_proxy_server
+        evm_node
         {
           method_ = "eth_getBlockByNumber";
           parameters =
@@ -1577,7 +1542,7 @@ let test_inject_100_transactions =
         })
   in
   let block_with_100tx =
-    block_with_100tx |> Evm_proxy_server.extract_result |> Block.of_json
+    block_with_100tx |> Evm_node.extract_result |> Block.of_json
   in
   (match block_with_100tx.Block.transactions with
   | Block.Empty -> Test.fail "Expected a non empty block"
@@ -1589,13 +1554,11 @@ let test_inject_100_transactions =
 
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
   let* latest_evm_level =
-    Evm_proxy_server.(
-      call_evm_rpc
-        evm_proxy_server
-        {method_ = "eth_blockNumber"; parameters = `A []})
+    Evm_node.(
+      call_evm_rpc evm_node {method_ = "eth_blockNumber"; parameters = `A []})
   in
   let latest_evm_level =
-    latest_evm_level |> Evm_proxy_server.extract_result |> JSON.as_int32
+    latest_evm_level |> Evm_node.extract_result |> JSON.as_int32
   in
   (* At each loop, the kernel reads the previous block. Until the patch, the
      kernel failed to read the previous block if there was more than 64 hash,
@@ -1613,7 +1576,7 @@ let test_eth_call_large =
     ~title:"eth_estimateGas with a large amount of data"
     (fun protocol ->
       (* setup *)
-      let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+      let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
       let sender = Eth_account.bootstrap_accounts.(0) in
 
       (* large request *)
@@ -1626,9 +1589,9 @@ let test_eth_call_large =
 
       (* make call to proxy *)
       let* call_result =
-        Evm_proxy_server.(
+        Evm_node.(
           call_evm_rpc
-            evm_proxy_server
+            evm_node
             {
               method_ = "eth_call";
               parameters = `A [`O eth_call; `String "latest"];
@@ -1636,7 +1599,7 @@ let test_eth_call_large =
       in
 
       (* Check the RPC returns a `result`. *)
-      let r = call_result |> Evm_proxy_server.extract_result in
+      let r = call_result |> Evm_node.extract_result in
       Check.((JSON.as_string r = "0x") string)
         ~error_msg:"Expected result %R, but got %L" ;
 
@@ -1649,7 +1612,7 @@ let test_estimate_gas =
     ~title:"eth_estimateGas for contract creation"
     (fun protocol ->
       (* setup *)
-      let* {evm_proxy_server; _} = setup_past_genesis protocol ~admin:None in
+      let* {evm_node; _} = setup_past_genesis protocol ~admin:None in
 
       (* large request *)
       let data = read_file simple_storage.bin in
@@ -1657,14 +1620,14 @@ let test_estimate_gas =
 
       (* make call to proxy *)
       let* call_result =
-        Evm_proxy_server.(
+        Evm_node.(
           call_evm_rpc
-            evm_proxy_server
+            evm_node
             {method_ = "eth_estimateGas"; parameters = `A [`O eth_call]})
       in
 
       (* Check the RPC returns a `result`. *)
-      let r = call_result |> Evm_proxy_server.extract_result in
+      let r = call_result |> Evm_node.extract_result in
       Check.((JSON.as_int r = 23423) int)
         ~error_msg:"Expected result greater than %R, but got %L" ;
 
@@ -1677,7 +1640,7 @@ let test_estimate_gas_additionnal_field =
     ~title:"eth_estimateGas allows additional fields"
     (fun protocol ->
       (* setup *)
-      let* {evm_proxy_server; _} = setup_past_genesis protocol ~admin:None in
+      let* {evm_node; _} = setup_past_genesis protocol ~admin:None in
 
       (* large request *)
       let data = read_file simple_storage.bin in
@@ -1695,14 +1658,14 @@ let test_estimate_gas_additionnal_field =
 
       (* make call to proxy *)
       let* call_result =
-        Evm_proxy_server.(
+        Evm_node.(
           call_evm_rpc
-            evm_proxy_server
+            evm_node
             {method_ = "eth_estimateGas"; parameters = `A [`O eth_call]})
       in
 
       (* Check the RPC returns a `result`. *)
-      let r = call_result |> Evm_proxy_server.extract_result in
+      let r = call_result |> Evm_node.extract_result in
       Check.((JSON.as_int r = 23423) int)
         ~error_msg:"Expected result greater than %R, but got %L" ;
 
@@ -1715,7 +1678,7 @@ let test_eth_call_storage_contract_rollup_node =
     ~title:"Try to call a view (directly through proxy)"
     (fun protocol ->
       (* setup *)
-      let* ({evm_proxy_server; endpoint; _} as evm_setup) =
+      let* ({evm_node; endpoint; _} as evm_setup) =
         setup_past_genesis ~admin:None protocol
       in
 
@@ -1741,16 +1704,16 @@ let test_eth_call_storage_contract_rollup_node =
 
       (* make call to proxy *)
       let* call_result =
-        Evm_proxy_server.(
+        Evm_node.(
           call_evm_rpc
-            evm_proxy_server
+            evm_node
             {
               method_ = "eth_call";
               parameters = `A [`O eth_call; `String "latest"];
             })
       in
 
-      let r = call_result |> Evm_proxy_server.extract_result in
+      let r = call_result |> Evm_node.extract_result in
       Check.(
         (JSON.as_string r
        = "0x0000000000000000000000000000000000000000000000000000000000000000")
@@ -1762,15 +1725,15 @@ let test_eth_call_storage_contract_rollup_node =
 
       (* make call to proxy *)
       let* call_result =
-        Evm_proxy_server.(
+        Evm_node.(
           call_evm_rpc
-            evm_proxy_server
+            evm_node
             {
               method_ = "eth_call";
               parameters = `A [`O eth_call; `String "latest"];
             })
       in
-      let r = call_result |> Evm_proxy_server.extract_result in
+      let r = call_result |> Evm_node.extract_result in
       Check.(
         (JSON.as_string r
        = "0x000000000000000000000000000000000000000000000000000000000000002a")
@@ -1784,11 +1747,11 @@ let test_eth_call_storage_contract_proxy =
     ~tags:["evm"; "simulate"]
     ~title:"Try to call a view (directly through rollup node)"
     (fun protocol ->
-      let* ({sc_rollup_client; evm_proxy_server; _} as evm_setup) =
+      let* ({sc_rollup_client; evm_node; _} as evm_setup) =
         setup_past_genesis ~admin:None protocol
       in
 
-      let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+      let endpoint = Evm_node.endpoint evm_node in
       let sender = Eth_account.bootstrap_accounts.(0) in
 
       (* deploy contract *)
@@ -1834,23 +1797,23 @@ let test_eth_call_storage_contract_eth_cli =
     ~title:"Try to call a view through an ethereum client"
     (fun protocol ->
       (* setup *)
-      let* ({evm_proxy_server; endpoint; sc_rollup_node; client; node; _} as
-           evm_setup) =
+      let* ({evm_node; endpoint; sc_rollup_node; client; node; _} as evm_setup)
+          =
         setup_past_genesis ~admin:None protocol
       in
 
       (* sanity *)
       let* call_result =
-        Evm_proxy_server.(
+        Evm_node.(
           call_evm_rpc
-            evm_proxy_server
+            evm_node
             {
               method_ = "eth_call";
               parameters = `A [`O [("to", `Null)]; `String "latest"];
             })
       in
       (* Check the RPC returns a `result`. *)
-      let _result = call_result |> Evm_proxy_server.extract_result in
+      let _result = call_result |> Evm_node.extract_result in
 
       let sender = Eth_account.bootstrap_accounts.(0) in
 
@@ -2144,7 +2107,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
          sc_rollup_node;
          sc_rollup_client;
          sc_rollup_address;
-         evm_proxy_server;
+         evm_node;
          l1_contracts;
          _;
        } =
@@ -2213,7 +2176,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
       sc_rollup_client,
       node,
       client,
-      evm_proxy_server,
+      evm_node,
       kernel_boot_wasm_before_upgrade )
 
 let test_kernel_upgrade_to_debug =
@@ -2235,12 +2198,12 @@ let test_kernel_upgrade_evm_to_evm =
   @@ fun protocol ->
   let base_installee = "./" in
   let installee = "evm_kernel" in
-  let* sc_rollup_node, _, node, client, evm_proxy_server, _ =
+  let* sc_rollup_node, _, node, client, evm_node, _ =
     gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
   (* We ensure the upgrade went well by checking if the kernel still produces
      blocks. *)
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let endpoint = Evm_node.endpoint evm_node in
   check_block_progression
     ~sc_rollup_node
     ~node
@@ -2335,7 +2298,7 @@ let test_kernel_upgrade_failing_migration =
          sc_rollup_client,
          node,
          client,
-         evm_proxy_server,
+         evm_node,
          original_kernel_boot_wasm ) =
     gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
@@ -2361,7 +2324,7 @@ let test_kernel_upgrade_failing_migration =
   (* We ensure that the fallback mechanism went well by checking if the
      kernel still produces blocks since it has booted back to the previous,
      original kernel. *)
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let endpoint = Evm_node.endpoint evm_node in
   check_block_progression
     ~sc_rollup_node
     ~node
@@ -2377,36 +2340,32 @@ let test_check_kernel_upgrade_nonce =
   @@ fun protocol ->
   let base_installee = "./" in
   let installee = "evm_kernel" in
-  let* _, _, _, _, evm_proxy_server, _ =
+  let* _, _, _, _, evm_node, _ =
     gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
   let* upgrade_nonce_result =
-    Evm_proxy_server.call_evm_rpc
-      evm_proxy_server
-      Evm_proxy_server.{method_ = "tez_upgradeNonce"; parameters = `Null}
+    Evm_node.call_evm_rpc
+      evm_node
+      Evm_node.{method_ = "tez_upgradeNonce"; parameters = `Null}
   in
   let upgrade_nonce =
-    upgrade_nonce_result |> Evm_proxy_server.extract_result |> JSON.as_int32
+    upgrade_nonce_result |> Evm_node.extract_result |> JSON.as_int32
   in
   Check.((upgrade_nonce = Int32.of_int 2) int32)
     ~error_msg:(sf "Expected upgrade nonce should be %%R, but got %%L") ;
   unit
 
 let send_raw_transaction_request raw_tx =
-  Evm_proxy_server.
+  Evm_node.
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
-let send_raw_transaction proxy_server raw_tx =
+let send_raw_transaction evm_node raw_tx =
   let* response =
-    Evm_proxy_server.call_evm_rpc
-      proxy_server
-      (send_raw_transaction_request raw_tx)
+    Evm_node.call_evm_rpc evm_node (send_raw_transaction_request raw_tx)
   in
-  let hash =
-    response |> Evm_proxy_server.extract_result |> JSON.as_string_opt
-  in
+  let hash = response |> Evm_node.extract_result |> JSON.as_string_opt in
   let error_message =
-    response |> Evm_proxy_server.extract_error_message |> JSON.as_string_opt
+    response |> Evm_node.extract_error_message |> JSON.as_string_opt
   in
   match (hash, error_message) with
   | Some hash, _ -> return (Ok hash)
@@ -2418,14 +2377,14 @@ let test_rpc_sendRawTransaction =
     ~__FILE__
     ~tags:["evm"; "tx_hash"]
     ~title:
-      "Ensure EVM proxy returns appropriate hash for any given transactions."
+      "Ensure EVM node returns appropriate hash for any given transactions."
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
   let* hashes =
     Lwt_list.map_p
       (fun (tx_raw, _) ->
-        let* hash = send_raw_transaction evm_proxy_server tx_raw in
+        let* hash = send_raw_transaction evm_node tx_raw in
         let hash = Result.get_ok hash in
         return hash)
       txs
@@ -2442,16 +2401,16 @@ let by_block_arg_string by =
 
 let get_transaction_by_block_arg_and_index_request ~by arg index =
   let by = by_block_arg_string by in
-  Evm_proxy_server.
+  Evm_node.
     {
       method_ = "eth_getTransactionByBlock" ^ by ^ "AndIndex";
       parameters = `A [`String arg; `String index];
     }
 
-let get_transaction_by_block_arg_and_index ~by proxy_server block_hash index =
+let get_transaction_by_block_arg_and_index ~by evm_node block_hash index =
   let* transaction_object =
-    Evm_proxy_server.call_evm_rpc
-      proxy_server
+    Evm_node.call_evm_rpc
+      evm_node
       (get_transaction_by_block_arg_and_index_request ~by block_hash index)
   in
   return
@@ -2462,7 +2421,7 @@ let test_rpc_getTransactionByBlockArgAndIndex ~by protocol =
   let config =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
-  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+  let* {evm_node; sc_rollup_node; node; client; _} =
     setup_past_genesis ~config ~admin:None protocol
   in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
@@ -2471,7 +2430,7 @@ let test_rpc_getTransactionByBlockArgAndIndex ~by protocol =
       ~sc_rollup_node
       ~node
       ~client
-      ~evm_proxy_server
+      ~evm_node
       (List.map fst txs)
   in
   Lwt_list.iter_s
@@ -2481,7 +2440,7 @@ let test_rpc_getTransactionByBlockArgAndIndex ~by protocol =
           ~sc_rollup_node
           ~node
           ~client
-          (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash)
+          (wait_for_transaction_receipt ~evm_node ~transaction_hash)
           ()
       in
       let block_arg, index =
@@ -2493,7 +2452,7 @@ let test_rpc_getTransactionByBlockArgAndIndex ~by protocol =
       let* transaction_object =
         get_transaction_by_block_arg_and_index
           ~by
-          evm_proxy_server
+          evm_node
           block_arg
           (Int32.to_string index)
       in
@@ -2590,12 +2549,10 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
-  let* evm_proxy_server =
-    Evm_proxy_server.init ~mode:`Production evm_setup.sc_rollup_node
-  in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* evm_node = Evm_node.init ~mode:`Production evm_setup.sc_rollup_node in
+  let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
-    scenario_prior ~evm_setup:{evm_setup with evm_proxy_server; endpoint}
+    scenario_prior ~evm_setup:{evm_setup with evm_node; endpoint}
   in
   (* Upgrade the kernel. *)
   let next_kernel_base_installee = "./" in
@@ -2766,8 +2723,8 @@ let test_deposit_dailynet =
       smart_rollup_node_extra_args
   in
 
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* evm_node = Evm_node.init sc_rollup_node in
+  let endpoint = Evm_node.endpoint evm_node in
 
   (* Deposit tokens to the EVM rollup. *)
   let amount_mutez = Tez.of_mutez_int 100_000_000 in
@@ -2794,24 +2751,24 @@ let test_rpc_sendRawTransaction_nonce_too_low =
     ~tags:["evm"; "nonce"]
     ~title:"Returns an error if the nonce is too low"
   @@ fun protocol ->
-  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+  let* {evm_node; sc_rollup_node; node; client; _} =
     setup_past_genesis ~admin:None protocol
   in
   (* Nonce: 0 *)
   let raw_tx =
     "0xf86c80825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a96a038294f867266c767aee6c3b54a0c444368fb8d5e90353219bce1da78de16aea4a018a7d3c58ddb1f6b33bad5dde106843acfbd6467e5df181d22270229dcfdf601"
   in
-  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let* result = send_raw_transaction evm_node raw_tx in
   let transaction_hash = Result.get_ok result in
   let* _ =
     wait_for_application
       ~sc_rollup_node
       ~node
       ~client
-      (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash)
+      (wait_for_transaction_receipt ~evm_node ~transaction_hash)
       ()
   in
-  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let* result = send_raw_transaction evm_node raw_tx in
   let error_message = Result.get_error result in
   Check.(
     ((error_message = "Nonce too low.") string)
@@ -2824,12 +2781,12 @@ let test_rpc_sendRawTransaction_nonce_too_high =
     ~tags:["evm"; "nonce"]
     ~title:"Accepts transactions with nonce too high."
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   (* Nonce: 1 *)
   let raw_tx =
     "0xf86c01825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a95a0a349864bedc9b84aea88cda197e96538c62c242286ead58eb7180a611f850237a01206525ff16ae5b708ee02b362f9b4d7565e0d7e9b4c536d7ef7dec81cda3ac7"
   in
-  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let* result = send_raw_transaction evm_node raw_tx in
   Check.(
     ((Result.is_ok result = true) bool) ~error_msg:"The transaction should fail") ;
   unit
@@ -2928,23 +2885,23 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
     ~tags:["evm"; "chain_id"]
     ~title:"Returns an error if the chainId is not correct."
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   (* Nonce: 0, chainId: 4242*)
   let raw_tx =
     "0xf86a8080831e8480940000000000000000000000000000000000000000888ac7230489e8000080822148a0e09f1fb4920f2e64a274b83d925890dd0b109fdf31f2811a781e918118daf34aa00f425e9a93bd92d710d3d323998b093a8c7d497d2af688c062a8099b076813e8"
   in
-  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let* result = send_raw_transaction evm_node raw_tx in
   let error_message = Result.get_error result in
   Check.(
     ((error_message = "Invalid chain id.") string)
       ~error_msg:"The transaction should fail") ;
   unit
 
-let tez_kernelVersion evm_proxy_server =
+let tez_kernelVersion evm_node =
   let* json =
-    Evm_proxy_server.call_evm_rpc
-      evm_proxy_server
-      Evm_proxy_server.{method_ = "tez_kernelVersion"; parameters = `Null}
+    Evm_node.call_evm_rpc
+      evm_node
+      Evm_node.{method_ = "tez_kernelVersion"; parameters = `Null}
   in
   return JSON.(json |-> "result" |> as_string)
 
@@ -2954,11 +2911,9 @@ let test_kernel_upgrade_version_change =
     ~tags:["evm"; "upgrade"; "version"]
     ~title:"Kernel version changes after an upgrade"
   @@ fun protocol ->
-  let scenario_prior ~evm_setup =
-    tez_kernelVersion evm_setup.evm_proxy_server
-  in
+  let scenario_prior ~evm_setup = tez_kernelVersion evm_setup.evm_node in
   let scenario_after ~evm_setup ~sanity_check:old =
-    let* new_ = tez_kernelVersion evm_setup.evm_proxy_server in
+    let* new_ = tez_kernelVersion evm_setup.evm_node in
     Check.((old <> new_) string)
       ~error_msg:"The kernel version must change after an upgrade" ;
     unit
@@ -2976,15 +2931,9 @@ let test_transaction_storage_before_and_after_migration =
   in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
   let raw_txs, tx_hashes = List.split txs in
-  let scenario_prior
-      ~evm_setup:{sc_rollup_node; node; client; evm_proxy_server; _} =
+  let scenario_prior ~evm_setup:{sc_rollup_node; node; client; evm_node; _} =
     let* _requests, _receipt, _hashes =
-      send_n_transactions
-        ~sc_rollup_node
-        ~node
-        ~client
-        ~evm_proxy_server
-        raw_txs
+      send_n_transactions ~sc_rollup_node ~node ~client ~evm_node raw_txs
     in
     return ()
   in
@@ -3015,7 +2964,7 @@ let test_reboot =
     ~tags:["evm"; "reboot"; "loop"; Tag.flaky]
     ~title:"Check that the kernel can handle too many txs for a single run"
   @@ fun protocol ->
-  let* {evm_proxy_server; sc_rollup_node; node; client; sc_rollup_client; _} =
+  let* {evm_node; sc_rollup_node; node; client; sc_rollup_client; _} =
     setup_past_genesis ~admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
@@ -3028,20 +2977,15 @@ let test_reboot =
     |> String.trim |> String.split_on_char '\n'
   in
   let* _, _transfer_receipt, _ =
-    send_n_transactions
-      ~sc_rollup_node
-      ~node
-      ~client
-      ~evm_proxy_server
-      transfers
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_node transfers
   in
   let* requests, receipt, _hashes =
-    send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs
   in
   let* block_with_many_txs =
-    Evm_proxy_server.(
+    Evm_node.(
       call_evm_rpc
-        evm_proxy_server
+        evm_node
         {
           method_ = "eth_getBlockByNumber";
           parameters =
@@ -3050,7 +2994,7 @@ let test_reboot =
         })
   in
   let block_with_many_txs =
-    block_with_many_txs |> Evm_proxy_server.extract_result |> Block.of_json
+    block_with_many_txs |> Evm_node.extract_result |> Block.of_json
   in
   (match block_with_many_txs.Block.transactions with
   | Block.Empty -> Test.fail "Expected a non empty block"
@@ -3075,13 +3019,11 @@ let test_reboot =
 
 let block_transaction_count_by ~by arg =
   let method_ = "eth_getBlockTransactionCountBy" ^ by_block_arg_string by in
-  Evm_proxy_server.{method_; parameters = `A [`String arg]}
+  Evm_node.{method_; parameters = `A [`String arg]}
 
-let get_block_transaction_count_by proxy_server ~by arg =
+let get_block_transaction_count_by evm_node ~by arg =
   let* transaction_count =
-    Evm_proxy_server.call_evm_rpc
-      proxy_server
-      (block_transaction_count_by ~by arg)
+    Evm_node.call_evm_rpc evm_node (block_transaction_count_by ~by arg)
   in
   return JSON.(transaction_count |-> "result" |> as_int64)
 
@@ -3096,7 +3038,7 @@ let test_rpc_getBlockTransactionCountBy =
   let config =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
-  let* ({evm_proxy_server; sc_rollup_node; node; client; _} as evm_setup) =
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
     setup_past_genesis ~config ~admin:None protocol
   in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
@@ -3105,7 +3047,7 @@ let test_rpc_getBlockTransactionCountBy =
       ~sc_rollup_node
       ~node
       ~client
-      ~evm_proxy_server
+      ~evm_node
       (List.map fst txs)
   in
   let* block = get_block_by_hash evm_setup receipt.blockHash in
@@ -3116,7 +3058,7 @@ let test_rpc_getBlockTransactionCountBy =
     | Full l -> Int64.of_int @@ List.length l
   in
   let* transaction_count =
-    get_block_transaction_count_by evm_proxy_server ~by:`Hash receipt.blockHash
+    get_block_transaction_count_by evm_node ~by:`Hash receipt.blockHash
   in
   Check.((transaction_count = expected_count) int64)
     ~error_msg:
@@ -3124,7 +3066,7 @@ let test_rpc_getBlockTransactionCountBy =
        got %L" ;
   let* transaction_count =
     get_block_transaction_count_by
-      evm_proxy_server
+      evm_node
       ~by:`Number
       (Int32.to_string receipt.blockNumber)
   in
@@ -3136,13 +3078,11 @@ let test_rpc_getBlockTransactionCountBy =
 
 let uncle_count_by_block_arg_request ~by arg =
   let method_ = "eth_getUncleCountByBlock" ^ by_block_arg_string by in
-  Evm_proxy_server.{method_; parameters = `A [`String arg]}
+  Evm_node.{method_; parameters = `A [`String arg]}
 
-let get_uncle_count_by_block_arg proxy_server ~by arg =
+let get_uncle_count_by_block_arg evm_node ~by arg =
   let* uncle_count =
-    Evm_proxy_server.call_evm_rpc
-      proxy_server
-      (uncle_count_by_block_arg_request ~by arg)
+    Evm_node.call_evm_rpc evm_node (uncle_count_by_block_arg_request ~by arg)
   in
   return JSON.(uncle_count |-> "result" |> as_int64)
 
@@ -3154,23 +3094,18 @@ let test_rpc_getUncleCountByBlock =
       "RPC methods eth_getUncleCountByBlockHash and \
        eth_getUncleCountByBlockNumber"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let* block =
-    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
-  in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
   let* uncle_count =
-    get_uncle_count_by_block_arg
-      evm_proxy_server
-      ~by:`Hash
-      (Option.get block.hash)
+    get_uncle_count_by_block_arg evm_node ~by:`Hash (Option.get block.hash)
   in
   Check.((uncle_count = Int64.zero) int64)
     ~error_msg:
       "Expected %R uncles with eth_getUncleCountByBlockHash, but got %L" ;
   let* uncle_count =
     get_uncle_count_by_block_arg
-      evm_proxy_server
+      evm_node
       ~by:`Number
       (Int32.to_string block.number)
   in
@@ -3181,16 +3116,16 @@ let test_rpc_getUncleCountByBlock =
 
 let uncle_by_block_arg_and_index_request ~by arg index =
   let by = by_block_arg_string by in
-  Evm_proxy_server.
+  Evm_node.
     {
       method_ = "eth_getUncleByBlock" ^ by ^ "AndIndex";
       parameters = `A [`String arg; `String index];
     }
 
-let get_uncle_by_block_arg_and_index ~by proxy_server arg index =
+let get_uncle_by_block_arg_and_index ~by evm_node arg index =
   let* block =
-    Evm_proxy_server.call_evm_rpc
-      proxy_server
+    Evm_node.call_evm_rpc
+      evm_node
       (uncle_by_block_arg_and_index_request ~by arg index)
   in
   let result = JSON.(block |-> "result") in
@@ -3205,16 +3140,14 @@ let test_rpc_getUncleByBlockArgAndIndex =
       "RPC methods eth_getUncleByBlockHashAndIndex and \
        eth_getUncleByBlockNumberAndIndex"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
   let block_id = "0" in
-  let* block =
-    Eth_cli.get_block ~block_id ~endpoint:evm_proxy_server_endpoint
-  in
+  let* block = Eth_cli.get_block ~block_id ~endpoint:evm_node_endpoint in
   let* uncle =
     get_uncle_by_block_arg_and_index
       ~by:`Hash
-      evm_proxy_server
+      evm_node
       (Option.get block.hash)
       block_id
   in
@@ -3222,7 +3155,7 @@ let test_rpc_getUncleByBlockArgAndIndex =
   let* uncle =
     get_uncle_by_block_arg_and_index
       ~by:`Number
-      evm_proxy_server
+      evm_node
       (Int32.to_string block.number)
       block_id
   in
@@ -3261,7 +3194,7 @@ let test_cover_fees =
     ~title:"Transaction is invalid if sender cannot cover the fees"
   @@ fun protocol ->
   (* No bootstrap accounts, so no one has funds. *)
-  let* {evm_proxy_server; endpoint; sc_rollup_node; node; client; _} =
+  let* {evm_node; endpoint; sc_rollup_node; node; client; _} =
     setup_past_genesis ~bootstrap_accounts:[||] ~admin:None protocol
   in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
@@ -3271,7 +3204,7 @@ let test_cover_fees =
     "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
   in
   (* This should fail when the tx-pool check this. *)
-  let* hash_result = send_raw_transaction evm_proxy_server raw_transfer in
+  let* hash_result = send_raw_transaction evm_node raw_transfer in
   let hash =
     match hash_result with
     | Ok hash -> hash
@@ -3296,7 +3229,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
     ~tags:["evm"; "tx_nonce"]
     ~title:"Can submit many transactions."
   @@ fun protocol ->
-  let* {evm_proxy_server; node; client; sc_rollup_node; _} =
+  let* {evm_node; node; client; sc_rollup_node; _} =
     setup_past_genesis ~admin:None protocol
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
@@ -3304,21 +3237,21 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
   let tx_1 =
     "0xf86480825208831e84809400000000000000000000000000000000000000008080820a96a0718d24970c6d2fc794e972f4319caf24a939ff3d822959c7e6b022813d16c8c4a04535ad83a67307759569b1e2087b0b79f80d4502027b6d1d52e3c072634b3f8b"
   in
-  let* result = send_raw_transaction evm_proxy_server tx_1 in
+  let* result = send_raw_transaction evm_node tx_1 in
   let hash_1 = Result.get_ok result in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 1*)
   let tx_2 =
     "0xf86401825208831e84809400000000000000000000000000000000000000008080820a95a01f47f2ec950d998bd99f7ff656a7f13a385603373f0e96130290ba2869f56515a018bd20697ab1f3cd82891663c62f514de7b2deeee2ed569e85b3aa351e1b1c3b"
   in
-  let* result = send_raw_transaction evm_proxy_server tx_2 in
+  let* result = send_raw_transaction evm_node tx_2 in
   let hash_2 = Result.get_ok result in
   let* _ =
     wait_for_application
       ~sc_rollup_node
       ~node
       ~client
-      (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash:hash_1)
+      (wait_for_transaction_receipt ~evm_node ~transaction_hash:hash_1)
       ()
   in
   let* _ =
@@ -3326,7 +3259,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
       ~sc_rollup_node
       ~node
       ~client
-      (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash:hash_2)
+      (wait_for_transaction_receipt ~evm_node ~transaction_hash:hash_2)
       ()
   in
   unit
@@ -3338,7 +3271,7 @@ let test_rpc_sendRawTransaction_not_included =
     ~title:
       "Tx with nonce too high are not included without previous transactions."
   @@ fun protocol ->
-  let* {evm_proxy_server; node; client; sc_rollup_node; endpoint; _} =
+  let* {evm_node; node; client; sc_rollup_node; endpoint; _} =
     setup_past_genesis ~admin:None protocol
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
@@ -3351,7 +3284,7 @@ let test_rpc_sendRawTransaction_not_included =
       ~sc_rollup_node
       ~node
       ~client
-      (fun () -> send_raw_transaction evm_proxy_server tx)
+      (fun () -> send_raw_transaction evm_node tx)
       ()
   in
   let tx_hash = Result.get_ok result in
@@ -3369,14 +3302,12 @@ let test_rpc_gasPrice =
     ~tags:["evm"; "gas_price"]
     ~title:"RPC methods eth_gasPrice"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
   let expected_gas_price = 21_000l in
   let* gas_price =
-    Evm_proxy_server.(
+    Evm_node.(
       let* price =
-        call_evm_rpc
-          evm_proxy_server
-          {method_ = "eth_gasPrice"; parameters = `A []}
+        call_evm_rpc evm_node {method_ = "eth_gasPrice"; parameters = `A []}
       in
       return JSON.(price |-> "result" |> as_int64))
   in
@@ -3403,7 +3334,7 @@ let test_rpc_getStorageAt =
     ~title:"RPC methods eth_getStorageAt"
   @@ fun protocol ->
   (* setup *)
-  let* ({endpoint; evm_proxy_server; _} as evm_setup) =
+  let* ({endpoint; evm_node; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3419,10 +3350,10 @@ let test_rpc_getStorageAt =
   let* tx = send_foo_mapping_storage address sender evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx in
   let* hex_value =
-    Evm_proxy_server.(
+    Evm_node.(
       let* value =
         call_evm_rpc
-          evm_proxy_server
+          evm_node
           {
             method_ = "eth_getStorageAt";
             parameters = `A [`String address; `String "0x0"; `String "latest"];
@@ -3434,10 +3365,10 @@ let test_rpc_getStorageAt =
     ~error_msg:"Expected %R, but got %L" ;
   let pos = Helpers.mapping_position sender.address 1 in
   let* hex_value =
-    Evm_proxy_server.(
+    Evm_node.(
       let* value =
         call_evm_rpc
-          evm_proxy_server
+          evm_node
           {
             method_ = "eth_getStorageAt";
             parameters = `A [`String address; `String pos; `String "latest"];
@@ -3607,9 +3538,9 @@ let test_originate_evm_kernel_and_dump_pvm_state =
   in
   check_dump_rpc ()
 
-let register_evm_proxy_server ~protocols =
+let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
-  test_evm_proxy_server_connection protocols ;
+  test_evm_node_connection protocols ;
   test_consistent_block_hashes protocols ;
   test_rpc_getBalance protocols ;
   test_rpc_getBlockByNumber protocols ;
@@ -3671,5 +3602,5 @@ let register_evm_proxy_server ~protocols =
   test_rpc_sendRawTransaction_not_included protocols
 
 let register ~protocols =
-  register_evm_proxy_server ~protocols ;
+  register_evm_node ~protocols ;
   register_evm_migration ~protocols
