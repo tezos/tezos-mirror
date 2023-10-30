@@ -366,6 +366,8 @@ fn parse_ty_with_entrypoints(
         | micheline_instructions!()
         | micheline_literals!()
         | micheline_values!() => unexpected()?,
+
+        App(other, ..) => todo!("Unhandled type {other}"),
     };
     if let Option::Some(eps) = entrypoints {
         // we just ensured it's an application of some type primitive
@@ -980,6 +982,8 @@ pub(crate) fn typecheck_instruction(
         (App(CHECK_SIGNATURE, [], _), [.., _, _, _]) => no_overload!(CHECK_SIGNATURE),
         (App(CHECK_SIGNATURE, [], _), [] | [_] | [_, _]) => no_overload!(CHECK_SIGNATURE, len 3),
         (App(CHECK_SIGNATURE, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })

@@ -83,6 +83,7 @@ macro_rules! micheline_types {
                 | Prim::string
                 | Prim::operation
                 | Prim::unit
+                | Prim::never
                 | Prim::address
                 | Prim::chain_id
                 | Prim::pair
@@ -92,9 +93,23 @@ macro_rules! micheline_types {
                 | Prim::contract
                 | Prim::map
                 | Prim::bytes
+                | Prim::bls12_381_g1
+                | Prim::bls12_381_g2
+                | Prim::bls12_381_fr
+                | Prim::ticket
+                | Prim::sapling_state
+                | Prim::sapling_transaction
+                | Prim::sapling_transaction_deprecated
+                | Prim::chest
+                | Prim::chest_key
                 | Prim::key
                 | Prim::key_hash
-                | Prim::signature,
+                | Prim::signature
+                | Prim::lambda
+                | Prim::timestamp
+                | Prim::tx_rollup_l2_address
+                | Prim::set
+                | Prim::big_map,
             ..,
         )
     };
@@ -112,7 +127,10 @@ macro_rules! micheline_literals {
 /// matches.
 macro_rules! micheline_fields {
     () => {
-        Micheline::App(Prim::parameter | Prim::storage | Prim::code, ..)
+        Micheline::App(
+            Prim::parameter | Prim::storage | Prim::code | Prim::view | Prim::constant,
+            ..,
+        )
     };
 }
 
@@ -124,9 +142,13 @@ macro_rules! micheline_instructions {
             Prim::PUSH
                 | Prim::INT
                 | Prim::GT
+                | Prim::GE
                 | Prim::LE
+                | Prim::LT
                 | Prim::EQ
+                | Prim::NEQ
                 | Prim::LOOP
+                | Prim::LOOP_LEFT
                 | Prim::DIP
                 | Prim::ADD
                 | Prim::DROP
@@ -137,24 +159,94 @@ macro_rules! micheline_instructions {
                 | Prim::FAILWITH
                 | Prim::DUP
                 | Prim::UNIT
+                | Prim::CAST
+                | Prim::RENAME
+                | Prim::ISNAT
+                | Prim::NAT
+                | Prim::BYTES
                 | Prim::CAR
                 | Prim::CDR
                 | Prim::PAIR
                 | Prim::SOME
                 | Prim::COMPARE
+                | Prim::ADDRESS
+                | Prim::CONTRACT
                 | Prim::AMOUNT
                 | Prim::NIL
+                | Prim::MEM
                 | Prim::GET
                 | Prim::UPDATE
+                | Prim::GET_AND_UPDATE
+                | Prim::SIZE
                 | Prim::UNPAIR
+                | Prim::NONE
                 | Prim::CONS
                 | Prim::ITER
                 | Prim::CHAIN_ID
-                | Prim::SELF
                 | Prim::SWAP
+                | Prim::SELF
+                | Prim::PACK
+                | Prim::UNPACK
+                | Prim::BLAKE2B
+                | Prim::KECCAK
+                | Prim::SHA256
+                | Prim::SHA512
+                | Prim::SHA3
+                | Prim::PAIRING_CHECK
+                | Prim::OPEN_CHEST
+                | Prim::VIEW
+                | Prim::BALANCE
+                | Prim::NOW
+                | Prim::SOURCE
+                | Prim::SENDER
+                | Prim::SLICE
+                | Prim::TICKET_DEPRECATED
+                | Prim::TICKET
+                | Prim::READ_TICKET
+                | Prim::SPLIT_TICKET
+                | Prim::JOIN_TICKETS
+                | Prim::DIG
+                | Prim::DUG
+                | Prim::LEVEL
+                | Prim::SELF_ADDRESS
+                | Prim::NEVER
+                | Prim::STEPS_TO_QUOTA
                 | Prim::CHECK_SIGNATURE
+                | Prim::CONCAT
+                | Prim::CREATE_ACCOUNT
+                | Prim::CREATE_CONTRACT
+                | Prim::IMPLICIT_ACCOUNT
+                | Prim::TRANSFER_TOKENS
                 | Prim::SET_DELEGATE
-                | Prim::TRANSFER_TOKENS,
+                | Prim::EMIT
+                | Prim::HASH_KEY
+                | Prim::EMPTY_SET
+                | Prim::EMPTY_MAP
+                | Prim::EMPTY_BIG_MAP
+                | Prim::MIN_BLOCK_TIME
+                | Prim::VOTING_POWER
+                | Prim::TOTAL_VOTING_POWER
+                | Prim::SAPLING_EMPTY_STATE
+                | Prim::SAPLING_VERIFY_UPDATE
+                | Prim::ABS
+                | Prim::NEG
+                | Prim::SUB
+                | Prim::SUB_MUTEZ
+                | Prim::MUL
+                | Prim::EDIV
+                | Prim::LSL
+                | Prim::LSR
+                | Prim::EXEC
+                | Prim::APPLY
+                | Prim::LAMBDA
+                | Prim::LAMBDA_REC
+                | Prim::LEFT
+                | Prim::RIGHT
+                | Prim::MAP
+                | Prim::NOT
+                | Prim::AND
+                | Prim::XOR
+                | Prim::OR,
             ..,
         )
     };
@@ -174,6 +266,7 @@ macro_rules! micheline_values {
                 | Prim::Elt
                 | Prim::Left
                 | Prim::Right
+                | Prim::Lambda_rec
                 | Prim::Transfer_tokens
                 | Prim::Set_delegate,
             ..,
