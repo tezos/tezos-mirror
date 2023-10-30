@@ -342,7 +342,7 @@ mod tests {
             BlockConstants::first_block(U256::zero(), U256::one(), U256::from(21000));
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockHost>();
-        let config = Config::london();
+        let config = Config::shanghai();
 
         if let Some(Transfer { source, value, .. }) = transfer {
             set_balance(

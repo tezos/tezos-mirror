@@ -1684,7 +1684,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
 
         // This is a randomly generated address. It has been used for testing legacy address
         // generation with zero nonce using Ethereum. To replicate (with new address):
@@ -1719,7 +1719,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
@@ -1753,7 +1753,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
@@ -1790,7 +1790,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(28349_u64);
 
         // We use an origin distinct from caller for testing purposes
@@ -1849,7 +1849,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(28349_u64);
 
         let mut handler = EvmHandler::new(
@@ -1943,7 +1943,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(2340);
 
         let mut handler = EvmHandler::new(
@@ -2043,7 +2043,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(8213);
 
         let mut handler = EvmHandler::new(
@@ -2130,7 +2130,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(444);
 
         let mut handler = EvmHandler::new(
@@ -2196,7 +2196,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(117);
 
         let mut handler = EvmHandler::new(
@@ -2242,7 +2242,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(118);
 
         let mut handler = EvmHandler::new(
@@ -2299,7 +2299,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -2358,7 +2358,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -2424,7 +2424,7 @@ mod test {
             BlockConstants::first_block(U256::zero(), U256::one(), U256::from(21000));
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
+        let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
         let handler = EvmHandler::new(

@@ -10,6 +10,7 @@
 - Transaction can no longer be overwritten nor reincluded (implicit transaction size limit now
   becomes ~1200 chunks). (!10337)
 - Produce outbox messages withdrawing funds. (!10063)
+- EVM execution configuration was bumped from London to Shanghai. (!10591)
 
 ### EVM Node
 
