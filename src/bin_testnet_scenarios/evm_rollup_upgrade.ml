@@ -180,7 +180,7 @@ let upgrade_kernel ~configuration_path ~testnet () =
       ~mode:upgrade_config.evm_config.mode
       ~operator
   in
-  let* smart_rollup_address, smart_rollup_node, _evm_proxy_server =
+  let* smart_rollup_address, smart_rollup_node, _evm_node =
     Evm_rollup.setup_evm_infra
       ~config:upgrade_config.evm_config
       ~operator
