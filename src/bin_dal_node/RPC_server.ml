@@ -191,9 +191,11 @@ module P2P = struct
     let*! () = Node_context.P2P.disconnect_peer ctxt ~wait:q#wait peer in
     return_unit
 
-  let get_points ctxt () () = Node_context.P2P.get_points ctxt
+  let get_points ctxt q () =
+    Node_context.P2P.get_points ~connected:q#connected ctxt
 
-  let get_points_info ctxt () () = Node_context.P2P.get_points_info ctxt
+  let get_points_info ctxt q () =
+    Node_context.P2P.get_points_info ~connected:q#connected ctxt
 
   module Gossipsub = struct
     let get_topics ctxt () () =

@@ -313,7 +313,7 @@ module P2P = struct
       ; output : P2p_point.Id.t list
       ; prefix : unit
       ; params : unit
-      ; query : unit >
+      ; query : < connected : bool > >
       service =
     Tezos_rpc.Service.get_service
       ~description:"Get list of points"
@@ -327,7 +327,7 @@ module P2P = struct
       ; output : (P2p_point.Id.t * P2p_point.Info.t) list
       ; prefix : unit
       ; params : unit
-      ; query : unit >
+      ; query : < connected : bool > >
       service =
     Tezos_rpc.Service.get_service
       ~description:"Get list of known points and their corresponding info"

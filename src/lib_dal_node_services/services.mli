@@ -218,7 +218,7 @@ module P2P : sig
     ; output : P2p_point.Id.t list
     ; prefix : unit
     ; params : unit
-    ; query : unit >
+    ; query : < connected : bool > >
     service
 
   val get_points_info :
@@ -227,7 +227,7 @@ module P2P : sig
     ; output : (P2p_point.Id.t * P2p_point.Info.t) list
     ; prefix : unit
     ; params : unit
-    ; query : unit >
+    ; query : < connected : bool > >
     service
 
   module Gossipsub : sig

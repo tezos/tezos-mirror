@@ -126,10 +126,12 @@ module Transport_layer : sig
   val disconnect_peer :
     t -> ?wait:bool -> Crypto_box.Public_key_hash.t -> unit Lwt.t
 
-  val get_points : t -> P2p_point.Id.t list tzresult Lwt.t
+  val get_points : ?connected:bool -> t -> P2p_point.Id.t list tzresult Lwt.t
 
   val get_points_info :
-    t -> (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
+    ?connected:bool ->
+    t ->
+    (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
 end
 
 (** This module implements the list of hooks that allow interconnecting the

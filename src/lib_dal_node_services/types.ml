@@ -419,6 +419,15 @@ let wait_query =
   |+ flag "wait" (fun t -> t#wait)
   |> seal
 
+let connected_query =
+  let open Tezos_rpc.Query in
+  query (fun connected ->
+      object
+        method connected = connected
+      end)
+  |+ flag "connected" (fun t -> t#connected)
+  |> seal
+
 let slot_id_query =
   let open Tezos_rpc in
   let open Query in
