@@ -43,12 +43,18 @@
    regression testing *)
 let hooks = Tezos_regression.hooks
 
-let title_tag_of_test_mode = function
-  | `Client -> (`Client, "client")
-  | `Client_data_dir_proxy_server -> (`Client, "proxy_server_data_dir")
-  | `Client_rpc_proxy_server -> (`Client, "proxy_server_rpc")
-  | `Light -> (`Light, "light")
-  | `Proxy -> (`Proxy, "proxy")
+(* From a test mode, return:
+   - the client mode to use;
+   - what to add in the test title;
+   - what ~uses to add to the test. *)
+let metadata_of_test_mode = function
+  | `Client -> (`Client, "client", [])
+  | `Client_data_dir_proxy_server ->
+      (`Client, "proxy_server_data_dir", [Constant.octez_proxy_server])
+  | `Client_rpc_proxy_server ->
+      (`Client, "proxy_server_rpc", [Constant.octez_proxy_server])
+  | `Light -> (`Light, "light", [])
+  | `Proxy -> (`Proxy, "proxy", [])
 
 let patch_protocol_parameters protocol = function
   | None -> Lwt.return_none
@@ -93,11 +99,12 @@ let endpoint_of_test_mode_tag node = function
    implicit argument to specify the list of protocols to test. *)
 let check_rpc_regression ~test_mode_tag ~test_function ?supports
     ?parameter_overrides ?nodes_args ?event_sections_levels sub_group =
-  let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
+  let client_mode_tag, title_tag, uses = metadata_of_test_mode test_mode_tag in
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
     ~tags:["rpc"; title_tag; sub_group]
+    ~uses:(fun _protocol -> uses)
     ?supports
   @@ fun protocol ->
   let* parameter_file =
@@ -122,11 +129,12 @@ let check_rpc_regression ~test_mode_tag ~test_function ?supports
 (* Like [check_rpc_regression], but does not register a regression tests *)
 let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
     sub_group =
-  let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
+  let client_mode_tag, title_tag, uses = metadata_of_test_mode test_mode_tag in
   Protocol.register_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC tests: %s" title_tag sub_group)
     ~tags:["rpc"; title_tag; sub_group]
+    ~uses:(fun _protocol -> uses)
   @@ fun protocol ->
   let* parameter_file =
     patch_protocol_parameters protocol parameter_overrides
