@@ -31,6 +31,7 @@ let
 
     # Cross-compilation for RISC-V
     sources.riscv64Pkgs.clangStdenv.cc
+    sources.riscv64Pkgs.libiconvReal
   ];
 
   mainPackage = (import ./default.nix).overrideAttrs (old: {
