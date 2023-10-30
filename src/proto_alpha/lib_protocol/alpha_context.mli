@@ -2078,6 +2078,11 @@ module Receipt : sig
 
   val frozen_baker : Signature.public_key_hash -> frozen_staker
 
+  val frozen_single :
+    staker:Contract.t -> delegate:Signature.public_key_hash -> frozen_staker
+
+  val frozen_shared : delegate:Signature.public_key_hash -> frozen_staker
+
   type 'token balance =
     | Contract : Contract.t -> Tez.t balance
     | Block_fees : Tez.t balance

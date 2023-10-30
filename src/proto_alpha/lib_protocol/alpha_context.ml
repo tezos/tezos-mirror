@@ -507,6 +507,10 @@ module Receipt = struct
 
   let frozen_baker = Frozen_staker_repr.baker
 
+  let frozen_single = Frozen_staker_repr.single
+
+  let frozen_shared = Frozen_staker_repr.shared
+
   include Receipt_repr
 end
 

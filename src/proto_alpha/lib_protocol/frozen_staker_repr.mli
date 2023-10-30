@@ -18,6 +18,10 @@ type t =
 
 val baker : Signature.public_key_hash -> t
 
+val single : staker:Contract_repr.t -> delegate:Signature.public_key_hash -> t
+
+val shared : delegate:Signature.public_key_hash -> t
+
 val of_staker : Staker_repr.t -> t
 
 val encoding : t Data_encoding.t

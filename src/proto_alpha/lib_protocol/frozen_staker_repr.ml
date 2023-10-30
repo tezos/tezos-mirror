@@ -11,6 +11,10 @@ type t =
 
 let baker pkh = Single {staker = Contract_repr.Implicit pkh; delegate = pkh}
 
+let single ~staker ~delegate = Single {staker; delegate}
+
+let shared ~delegate = Shared {delegate}
+
 let of_staker (staker : Staker_repr.t) =
   match staker with
   | Single (staker, delegate) -> Single {staker; delegate}
