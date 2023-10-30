@@ -20,6 +20,7 @@ COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-i
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/released-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/experimental-executables tezos/script-inputs/
+COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
