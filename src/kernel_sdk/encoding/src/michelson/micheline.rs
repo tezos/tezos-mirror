@@ -421,8 +421,8 @@ mod test {
     #[test]
     fn micheline_pair_decode() {
         let test = vec![
-            7, // Prim_2
-            7, // Prim tag
+            7, // Prim_2 (no annots)
+            7, // Prim tag: Pair
             1, // String tag
             0, 0, 0, 3, // String size
             b'r', b'e', b'd', // string contents
@@ -445,8 +445,8 @@ mod test {
     #[test]
     fn micheline_pair_encode() {
         let expected = vec![
-            7, // Prim_2
-            7, // Prim tag
+            7, // Prim_2 (no annots)
+            7, // Prim tag: Pair
             0, // int encoding tag
             2, // amount
             1, // String tag
