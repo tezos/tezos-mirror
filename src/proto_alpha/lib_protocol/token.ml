@@ -99,7 +99,12 @@ let credit ctxt receiver amount origin =
             in
             (ctxt, Commitments bpkh)
         | `Frozen_deposits staker ->
-            let+ ctxt = Stake_storage.add_frozen_stake ctxt staker amount in
+            let+ ctxt =
+              Stake_storage.add_frozen_stake_only_call_from_token
+                ctxt
+                staker
+                amount
+            in
             (ctxt, Deposits staker)
         | `Unstaked_frozen_deposits (staker, cycle) ->
             let+ ctxt =

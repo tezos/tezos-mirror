@@ -232,7 +232,7 @@ let add_shared_frozen_stake ctxt delegate amount =
         let+ staked_frozen = Tez_repr.(staked_frozen +? staked_part) in
         Full_staking_balance_repr.make ~own_frozen ~staked_frozen ~delegated)
 
-let add_frozen_stake ctxt staker amount =
+let add_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
   | Staker_repr.Single (contract, delegate)
     when Contract_repr.(contract = Implicit delegate) ->

@@ -60,7 +60,7 @@ val add_delegated_stake :
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-val add_frozen_stake :
+val add_frozen_stake_only_call_from_token :
   Raw_context.t ->
   Staker_repr.staker ->
   Tez_repr.t ->
