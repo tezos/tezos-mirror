@@ -95,18 +95,18 @@ has_encoding!(MichelineBytes, MICHELINE_BYTES_ENCODING, {
     Encoding::Custom
 });
 
+impl<const PRIM_TAG: u8> HasEncoding for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
+    fn encoding() -> Encoding {
+        Encoding::Custom
+    }
+}
+
 impl<Arg1, Arg2, const PRIM_TAG: u8> HasEncoding
     for MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>
 where
     Arg1: Debug + PartialEq + Eq,
     Arg2: Debug + PartialEq + Eq,
 {
-    fn encoding() -> Encoding {
-        Encoding::Custom
-    }
-}
-
-impl<const PRIM_TAG: u8> HasEncoding for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
     fn encoding() -> Encoding {
         Encoding::Custom
     }
@@ -133,6 +133,15 @@ impl NomReader for MichelineBytes {
     }
 }
 
+impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        map(
+            tag([MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG]),
+            |_prim| MichelinePrimNoArgsNoAnnots {},
+        )(input)
+    }
+}
+
 impl<Arg1, Arg2, const PRIM_TAG: u8> NomReader
     for MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>
 where
@@ -149,15 +158,6 @@ where
             arg1,
             arg2,
         })(input)
-    }
-}
-
-impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
-        map(
-            tag([MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG]),
-            |_prim| MichelinePrimNoArgsNoAnnots {},
-        )(input)
     }
 }
 
@@ -184,6 +184,12 @@ impl BinWriter for MichelineBytes {
     }
 }
 
+impl<const PRIM_TAG: u8> BinWriter for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        bin_write_prim_no_args_no_annots::<{ PRIM_TAG }>(output)
+    }
+}
+
 impl<Arg1, Arg2, const PRIM_TAG: u8> BinWriter
     for MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>
 where
@@ -194,12 +200,6 @@ where
         bin_write_prim_2_args_no_annots::<_, _, { PRIM_TAG }>(
             &self.arg1, &self.arg2, output,
         )
-    }
-}
-
-impl<const PRIM_TAG: u8> BinWriter for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
-    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_no_args_no_annots::<{ PRIM_TAG }>(output)
     }
 }
 
@@ -234,6 +234,15 @@ pub(crate) fn nom_read_micheline_int(input: NomInput) -> NomResult<Zarith> {
 // -------------------------
 // Serialization Combinators
 // -------------------------
+/// Write `PRIM_TAG` into an `obj1` encoding, prefixed with the
+/// [MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG].
+pub(crate) fn bin_write_prim_no_args_no_annots<const PRIM_TAG: u8>(
+    output: &mut Vec<u8>,
+) -> BinResult {
+    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG], output);
+    Ok(())
+}
+
 /// Write `PRIM_TAG`, `arg1` & `arg2` into an `obj3` encoding, prefixed with the
 /// [MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG].
 pub(crate) fn bin_write_prim_2_args_no_annots<Arg1, Arg2, const PRIM_TAG: u8>(
@@ -250,13 +259,6 @@ where
     arg1.bin_write(output)?;
     arg2.bin_write(output)?;
 
-    Ok(())
-}
-
-pub(crate) fn bin_write_prim_no_args_no_annots<const PRIM_TAG: u8>(
-    output: &mut Vec<u8>,
-) -> BinResult {
-    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG], output);
     Ok(())
 }
 
