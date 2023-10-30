@@ -198,7 +198,10 @@ let cycle_end ctxt last_cycle =
       ~new_cycle
   in
   let* ctxt = update_forbidden_delegates ctxt ~new_cycle in
-  let* ctxt, autostake_balance_updates = adjust_frozen_stakes ctxt in
+  let* ctxt, autostake_balance_updates =
+    if Raw_context.adaptive_issuance_enable ctxt then return (ctxt, [])
+    else adjust_frozen_stakes ctxt
+  in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
