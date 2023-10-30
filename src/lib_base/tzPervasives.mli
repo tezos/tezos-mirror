@@ -90,6 +90,7 @@ module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
 module P2p_rejection = P2p_rejection
+module P2p_params = P2p_params
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 module Block_hash = Tezos_crypto.Hashed.Block_hash
