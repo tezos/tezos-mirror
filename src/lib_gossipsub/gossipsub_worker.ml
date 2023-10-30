@@ -80,6 +80,15 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         received = exchanged_stats ();
         sent = exchanged_stats ();
       }
+
+    let counter_update = function
+      | `Incr -> 1
+      | `Decr -> -1
+      | `Plus n -> n
+      | `Minus n -> -n
+
+    let update_num_topics t delta =
+      t.num_topics <- t.num_topics + counter_update delta
   end
 
   type exchanged_stats = Stats.exchanged_stats = private {
@@ -259,6 +268,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_join topic = function
     | state, GS.Already_joined -> state
     | state, Joining_topic {to_graft} ->
+        Stats.update_num_topics state.stats `Incr ;
         let peers = View.(view state.gossip_state |> get_connected_peers) in
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
@@ -274,6 +284,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_leave topic = function
     | state, GS.Not_joined -> state
     | state, Leaving_topic {to_prune; noPX_peers} ->
+        Stats.update_num_topics state.stats `Decr ;
         let gstate = state.gossip_state in
         let view = View.view gstate in
         let peers = View.get_connected_peers view in
