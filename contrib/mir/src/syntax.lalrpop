@@ -34,6 +34,7 @@ extern {
         "amount" => Tok::Prim(TztPrim(TzP::amount)),
         number => Tok::Number(<i128>),
         string => Tok::String(<String>),
+        bytes => Tok::Bytes(<Vec<u8>>),
         ann => Tok::Annotation,
         "parameter" => Tok::Prim(PT::Prim(Prim::parameter)),
         "storage" => Tok::Prim(PT::Prim(Prim::storage)),
@@ -139,7 +140,8 @@ boolean: bool = {
 atomic_value: Value = {
   <n:number> => Value::Number(n),
   <b:boolean> => Value::Boolean(b),
-  <string> => Value::String(<>),
+  string => Value::String(<>),
+  bytes => Value::Bytes(<>),
   "Unit" => Value::Unit,
   "None" => Value::Option(None),
 }

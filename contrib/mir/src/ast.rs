@@ -83,6 +83,7 @@ pub enum Value {
     Seq(Vec<Value>),
     Elt(Box<(Value, Value)>),
     Or(Box<Or<Value, Value>>),
+    Bytes(Vec<u8>),
 }
 
 impl Value {
@@ -127,6 +128,7 @@ valuefrom! {
   <> bool, Value::Boolean;
   <> String, Value::String;
   <> (), |_| Value::Unit;
+  <> Vec<u8>, Value::Bytes;
   <L, R> (L, R), |(l, r): (L, R)| Value::new_pair(l.into(), r.into());
   <L, R> Elt<L, R>, |Elt(l, r): Elt<L, R>| Value::new_elt(l.into(), r.into());
   <T> Option<T>, |x: Option<T>| Value::new_option(x.map(Into::into));
