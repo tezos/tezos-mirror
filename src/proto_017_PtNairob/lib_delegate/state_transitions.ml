@@ -133,11 +133,9 @@ let preendorse state proposal =
     Events.(emit attempting_preendorse_proposal proposal.block.hash)
     >>= fun () ->
     let new_state =
-      (* We await for the block to be applied before updating its
-         locked values. *)
-      if state.level_state.is_latest_proposal_applied then
-        update_current_phase state Awaiting_preendorsements
-      else update_current_phase state Awaiting_application
+      (* We have detected a new proposal that needs to be preattested.
+         We switch to the `Awaiting_preendorsements` phase. *)
+      update_current_phase state Awaiting_preendorsements
     in
     Lwt.return (new_state, make_preendorse_action state proposal)
 
@@ -218,6 +216,18 @@ let has_already_been_handled state new_proposal =
   && state.level_state.is_latest_proposal_applied
 
 let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6648
+     Do not handle proposals that have been applied already.
+  *)
+  (* We need to avoid to send preendorsements, if we are in phases were
+     preendorsements have been sent already. This is needed to avoid switching
+     back from Awaiting_endorsements to Awaiting_preendorsements. *)
+  let may_preendorse state proposal =
+    match state.round_state.current_phase with
+    | Idle -> preendorse state proposal
+    | _ -> do_nothing state
+  in
+
   let current_level = state.level_state.current_level in
   let new_proposal_level = new_proposal.block.shell.level in
   let current_proposal = state.level_state.latest_proposal in
@@ -280,28 +290,26 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
               then
                 (* when the new head has the same payload as our
                    [locked_round], we accept it and preendorse *)
-                preendorse new_state new_proposal
+                may_preendorse new_state new_proposal
               else
                 (* The payload is different *)
                 match new_proposal.block.prequorum with
                 | Some {round; _} when Round.(locked_round.round < round) ->
                     (* This PQC is above our locked_round, we can preendorse it *)
-                    preendorse new_state new_proposal
+                    may_preendorse new_state new_proposal
                 | _ ->
                     (* We shouldn't preendorse this proposal, but we
                        should at least watch (pre)quorums events on it
                        but only when it is applied otherwise we await
                        for the proposal to be applied. *)
-                    if is_proposal_applied then
-                      let new_state =
-                        update_current_phase new_state Awaiting_preendorsements
-                      in
-                      Lwt.return (new_state, Watch_proposal)
-                    else do_nothing new_state)
+                    let new_state =
+                      update_current_phase new_state Awaiting_preendorsements
+                    in
+                    Lwt.return (new_state, Watch_proposal))
           | None ->
               (* Otherwise, we did not lock on any payload, thus we can
                  preendorse it *)
-              preendorse new_state new_proposal)
+              may_preendorse new_state new_proposal)
   else
     (* Last case: new_proposal_level > current_level *)
     (* Possible scenarios:
@@ -313,7 +321,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
     let compute_new_state ~current_round ~delegate_slots
         ~next_level_delegate_slots =
       let round_state =
-        {current_round; current_phase = Idle; delayed_prequorum = None}
+        {current_round; current_phase = Idle; delayed_quorum = None}
       in
       let level_state =
         {
@@ -393,25 +401,6 @@ and may_switch_branch ~is_proposal_applied state new_proposal =
            shouldn't happen but do nothing anyway. *)
         Events.(emit branch_proposal_has_same_prequorum ()) >>= fun () ->
         do_nothing state
-
-let may_register_early_prequorum state ((candidate, _) as received_prequorum) =
-  if
-    Block_hash.(
-      candidate.Operation_worker.hash
-      <> state.level_state.latest_proposal.block.hash)
-  then
-    Events.(
-      emit
-        unexpected_pqc_while_waiting_for_application
-        (candidate.hash, state.level_state.latest_proposal.block.hash))
-    >>= fun () -> do_nothing state
-  else
-    Events.(emit pqc_while_waiting_for_application candidate.hash) >>= fun () ->
-    let new_round_state =
-      {state.round_state with delayed_prequorum = Some received_prequorum}
-    in
-    let new_state = {state with round_state = new_round_state} in
-    do_nothing new_state
 
 (** In the association map [delegate_slots], the function returns an
     optional pair ([delegate], [endorsing_slot]) if for the current
@@ -699,9 +688,6 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
         unexpected_prequorum_received
         (candidate.hash, latest_proposal.block.hash))
     >>= fun () -> do_nothing state
-  else if not state.level_state.is_latest_proposal_applied then
-    Events.(emit handling_prequorum_on_non_applied_proposal ()) >>= fun () ->
-    do_nothing state
   else
     let prequorum =
       {
@@ -742,6 +728,9 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
 
 let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
   let latest_proposal = state.level_state.latest_proposal in
+  let is_latest_proposal_applied =
+    state.level_state.is_latest_proposal_applied
+  in
   if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
     Events.(
@@ -750,52 +739,76 @@ let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
         (candidate.hash, latest_proposal.block.hash))
     >>= fun () -> do_nothing state
   else
-    let new_level_state =
+    let new_round_state, new_level_state =
       match state.level_state.elected_block with
-      | None ->
+      | None when is_latest_proposal_applied ->
+          (* The elected proposal has been applied. Record the elected block
+               and transition to the Idle phase, as there is nothing left to do.
+          *)
           let elected_block =
             Some {proposal = latest_proposal; endorsement_qc}
           in
-          {state.level_state with elected_block}
+          let new_level_state = {state.level_state with elected_block} in
+          let new_round_state = {state.round_state with current_phase = Idle} in
+          (new_round_state, new_level_state)
+      | None ->
+          (* A quorum has been reached, but the elected proposal has not been
+             applied yet by the node. Transition in the `Awaiting_application`
+             phase, and do not save the elected block in the state. Instead,
+             keep track that an early quorum has been reached at this round.
+             This avoids the proposer of a block at the next level to inject a
+             proposal before the node has been applied the proposal elected at
+             the current level. *)
+          let new_round_state =
+            {
+              state.round_state with
+              current_phase = Awaiting_application;
+              delayed_quorum = Some endorsement_qc;
+            }
+          in
+          (new_round_state, state.level_state)
       | Some _ ->
           (* If we already have an elected block, do not update it: the
-             earliest, the better. *)
-          state.level_state
+             earlier, the better. We do not need to record the quorum either,
+              as this won't be used to elect a new block. *)
+          (state.round_state, state.level_state)
     in
-    let new_round_state = {state.round_state with current_phase = Idle} in
     let new_state =
       {state with round_state = new_round_state; level_state = new_level_state}
     in
     do_nothing new_state
 
 let handle_expected_applied_proposal (state : Baking_state.t) =
+  (* This code is triggered only when in the `Awaiting_application`phase, which
+     in turn is reached only if a quorum has been met but the
+     block has not been applied by the node. As a consequence, the only
+     thing that is left to do at this stage is to update the elected block
+     and transition to the Idle phase, as there is nothing left to do. *)
   let new_level_state =
     {state.level_state with is_latest_proposal_applied = true}
   in
   let new_state = {state with level_state = new_level_state} in
-  match new_state.round_state.delayed_prequorum with
-  | None ->
-      (* The application arrived before the prequorum: just wait for the prequorum. *)
-      let new_state = update_current_phase new_state Awaiting_preendorsements in
-      do_nothing new_state
-  | Some (candidate, preendorsement_qc) ->
-      (* The application arrived after the prequorum: handle the
-         prequorum received earlier.
-         Start by resetting the delayed_prequorum *)
-      let new_round_state =
-        {new_state.round_state with delayed_prequorum = None}
-      in
-      let new_state =
-        {
-          state with
-          level_state = new_level_state;
-          round_state = new_round_state;
-        }
-      in
-      prequorum_reached_when_awaiting_preendorsements
+  let new_state =
+    match new_state.level_state.elected_block with
+    | None ->
+        (* We do not have an elected block for this level. We need to update it. *)
+        let latest_proposal = state.level_state.latest_proposal in
+        let endorsement_qc =
+          match state.round_state.delayed_quorum with
+          | None -> assert false
+          | Some endorsement_qc -> endorsement_qc
+        in
+        let elected_block = Some {proposal = latest_proposal; endorsement_qc} in
+        let new_level_state = {state.level_state with elected_block} in
+        (* The application arrived before the prequorum: just wait for the prequorum. *)
+        {state with level_state = new_level_state}
+    | Some _ ->
+        (* We already have an elected block at this level. We do not need to update
+            it. The earlier, the better. *)
         new_state
-        candidate
-        preendorsement_qc
+  in
+  let new_state = update_current_phase new_state Idle in
+  do_nothing new_state
 
 (* Hypothesis:
    - The state is not to be modified outside this module
@@ -876,8 +889,6 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       else
         Events.(emit new_valid_proposal_while_waiting_for_qc ()) >>= fun () ->
         handle_proposal ~is_proposal_applied:false state proposal
-  | Awaiting_application, Prequorum_reached (candidate, preendorsement_qc) ->
-      may_register_early_prequorum state (candidate, preendorsement_qc)
   | Awaiting_preendorsements, Prequorum_reached (candidate, preendorsement_qc)
     ->
       prequorum_reached_when_awaiting_preendorsements
@@ -889,7 +900,7 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   (* Unreachable cases *)
   | Idle, (Prequorum_reached _ | Quorum_reached _)
   | Awaiting_preendorsements, Quorum_reached _
-  | Awaiting_endorsements, Prequorum_reached _
+  | (Awaiting_application | Awaiting_endorsements), Prequorum_reached _
   | Awaiting_application, Quorum_reached _ ->
       (* This cannot/should not happen *)
       do_nothing state
