@@ -63,7 +63,7 @@ pub struct MichelinePrimNoArgsNoAnnots<const PRIM_TAG: u8>;
 ///
 /// Encoded as an `obj3`, prefixed by [MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG], with fields:
 /// - `prim` - the `PRIM_TAG`
-/// - `arg2` - the first argument
+/// - `arg1` - the first argument
 /// - `arg2` - the second argument
 #[derive(Debug, PartialEq, Eq)]
 pub struct MichelinePrim2ArgsNoAnnots<Arg1, Arg2, const PRIM_TAG: u8>
