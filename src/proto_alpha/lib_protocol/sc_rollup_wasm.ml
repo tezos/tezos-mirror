@@ -444,12 +444,17 @@ module V2_0_0 = struct
           let* s = get in
           let* s = lift (WASM_machine.reveal_step content_bytes s) in
           set s
-      | PS.Reveal (PS.Dal_parameters _) ->
+      | PS.Reveal (PS.Dal_parameters dal_parameters) ->
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6544
              reveal_dal_parameters result for slow execution PVM. *)
-          (* This should not happen as long as [Reveal_dal_parameters] is disabled
-             in {!Constant_parametric_level.sc_rollup_reveal_activation_level}. *)
-          assert false
+          let dal_parameters_bytes =
+            Data_encoding.Binary.to_bytes_exn
+              Sc_rollup_dal_parameters_repr.encoding
+              dal_parameters
+          in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step dal_parameters_bytes s) in
+          set s
 
     let set_input input = state_of @@ set_input_state input
 
