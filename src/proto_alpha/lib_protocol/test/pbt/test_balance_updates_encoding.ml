@@ -60,10 +60,11 @@ let frozen_staker =
   let open Gen in
   oneofl
     [
-      Frozen_staker_repr.Shared {delegate = default_delegate};
+      Frozen_staker_repr.shared ~delegate:default_delegate;
       Frozen_staker_repr.baker default_delegate;
-      Frozen_staker_repr.Single
-        {staker = default_contract; delegate = default_delegate};
+      Frozen_staker_repr.single
+        ~staker:default_contract
+        ~delegate:default_delegate;
     ]
 
 let deposits =

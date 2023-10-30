@@ -17,8 +17,8 @@ let shared ~delegate = Shared {delegate}
 
 let of_staker (staker : Staker_repr.t) =
   match staker with
-  | Single (staker, delegate) -> Single {staker; delegate}
-  | Shared delegate -> Shared {delegate}
+  | Single (staker, delegate) -> single ~staker ~delegate
+  | Shared delegate -> shared ~delegate
 
 let encoding =
   let open Data_encoding in

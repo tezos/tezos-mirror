@@ -9,7 +9,7 @@
    of its staker, or both the delegate and all its stakers at
    once. We need to distinguish these cases to enforce the staking
    over baking limit. *)
-type t =
+type t = private
   | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
       (** A single staker, either the delegate itself or one of its
        staker. *)

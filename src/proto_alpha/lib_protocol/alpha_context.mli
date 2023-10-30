@@ -2072,7 +2072,7 @@ module Receipt : sig
     | Single of Contract.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
 
-  type frozen_staker =
+  type frozen_staker = private
     | Single of {staker : Contract.t; delegate : Signature.public_key_hash}
     | Shared of {delegate : Signature.public_key_hash}
 
