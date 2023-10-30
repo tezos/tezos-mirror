@@ -48,6 +48,8 @@ let smart_rollup_node = "./octez-smart-rollup-node"
 
 let octez_evm_node = "./octez-evm-node"
 
+let octez_signer = "./octez-signer"
+
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)
