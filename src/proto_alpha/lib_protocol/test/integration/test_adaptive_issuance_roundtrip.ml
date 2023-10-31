@@ -1728,9 +1728,10 @@ module Rewards = struct
     in
     begin_test ~activate_ai:true ~burn_rewards:true constants ["delegate"]
     --> set_delegate_params "delegate" init_params
-    --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
-    --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
-    --> save_current_rate --> wait_ai_activation
+    (* --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L)) *)
+    (* --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L)) *)
+    --> save_current_rate
+    --> wait_ai_activation
     --> (Tag "increase stake, decrease rate" --> next_cycle
          --> loop rate_var_lag (stake "delegate" delta --> next_cycle)
          --> loop 10 cycle_stake
