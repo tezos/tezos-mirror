@@ -903,7 +903,11 @@ let snapshot_balances snap_name names_list : (t, t) scenarios =
       return {state with snapshot_balances})
 
 (** Check balances against a previously defined snapshot *)
-let check_snapshot_balances snap_name : (t, t) scenarios =
+let check_snapshot_balances
+    ?(f =
+      fun ~name:_ ~old_balance ~new_balance ->
+        assert_balance_equal ~loc:__LOC__ old_balance new_balance) snap_name :
+    (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_unit (fun (_block, state) ->
       Log.debug
@@ -927,7 +931,7 @@ let check_snapshot_balances snap_name : (t, t) scenarios =
                 let new_balance =
                   balance_of_account name state.State.account_map
                 in
-                assert_balance_equal ~loc:__LOC__ old_balance new_balance)
+                f ~name ~old_balance ~new_balance)
               snapshot_balances
           in
           return_unit)
