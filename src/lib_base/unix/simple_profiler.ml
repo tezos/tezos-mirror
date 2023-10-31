@@ -216,8 +216,17 @@ let pp_delta_t ppf t =
   if s <> 0 || m <> 0 || h <> 0 then Format.fprintf ppf "%ds" s ;
   Format.fprintf ppf "%d.%03dms" ms mus
 
-let pp_line nindent ppf id n t t0 =
+let pp_line ?toplevel_timestamp nindent ppf id n t t0 =
   let indent = Stdlib.List.init nindent (fun _ -> "  ") in
+  let () =
+    Option.iter
+      (fun t ->
+        let time =
+          WithExceptions.Option.get ~loc:__LOC__ (Ptime.of_float_s t.wall)
+        in
+        Format.fprintf ppf "%a@," Time.System.pp_hum time)
+      toplevel_timestamp
+  in
   let indentsym =
     String.concat
       ""
@@ -241,16 +250,22 @@ let pp_line nindent ppf id n t t0 =
   | None -> Format.fprintf ppf "@,"
   | Some t0 -> Format.fprintf ppf " +%a@," pp_delta_t t0.wall
 
-let rec pp_report t0 nident ppf {aggregated; recorded} =
+let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
   StringMap.iter
     (fun id {count = n; total = Span d; children; node_lod = _} ->
       pp_line nident ppf id n d None ;
-      pp_report t0 (nident + 1) ppf {recorded = []; aggregated = children})
+      pp_report
+        ~toplevel_call:false
+        t0
+        (nident + 1)
+        ppf
+        {recorded = []; aggregated = children})
     aggregated ;
   List.iter
     (fun (id, {start = t; duration = Span d; contents; item_lod = _}) ->
-      pp_line nident ppf id 1 d (Some (t -* t0)) ;
-      pp_report t (nident + 1) ppf contents)
+      let toplevel_timestamp = if toplevel_call then Some t else None in
+      pp_line ?toplevel_timestamp nident ppf id 1 d (Some (t -* t0)) ;
+      pp_report ~toplevel_call:false t (nident + 1) ppf contents)
     recorded
 
 let pp_report ?t0 ppf report =
