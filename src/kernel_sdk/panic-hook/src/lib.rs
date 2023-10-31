@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -20,8 +21,7 @@ extern crate std;
 
 extern crate alloc;
 
-use alloc::format;
-use core::{option::Option::Some, panic::PanicInfo};
+use core::panic::PanicInfo;
 
 /// Prints the panic info to the host's *debug log*, and then aborts.
 ///
@@ -33,10 +33,10 @@ pub fn panic_handler(info: &PanicInfo) {
         let message = if let Some(message) =
             info.payload().downcast_ref::<alloc::string::String>()
         {
-            format!("Kernel panic {:?} at {:?}", message, info.location())
+            alloc::format!("Kernel panic {:?} at {:?}", message, info.location())
         } else {
             let message = info.payload().downcast_ref::<&str>();
-            format!("Kernel panic {:?} at {:?}", message, info.location())
+            alloc::format!("Kernel panic {:?} at {:?}", message, info.location())
         };
 
         #[cfg(any(target_arch = "wasm32", target_arch = "riscv64"))]
