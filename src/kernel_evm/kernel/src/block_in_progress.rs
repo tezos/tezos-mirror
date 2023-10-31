@@ -9,9 +9,12 @@ use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::inbox::Transaction;
+use crate::safe_storage::KernelRuntime;
 use crate::storage;
+use crate::storage::{EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS};
 use crate::tick_model;
 use anyhow::Context;
+use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
@@ -22,6 +25,7 @@ use tezos_ethereum::transaction::{
     TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::Bloom;
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -247,11 +251,26 @@ impl BlockInProgress {
         self.estimated_ticks += tick_model::ticks_of_invalid_transaction();
     }
 
-    pub fn finalize_and_store<Host: Runtime>(
+    fn safe_store_get_hash<Host: KernelRuntime>(
+        host: &mut Host,
+        path: Option<RefPath>,
+    ) -> Result<Vec<u8>, anyhow::Error> {
+        match host.store_get_hash(path) {
+            Ok(hash) => Ok(hash),
+            _ => Ok(L2Block::dummy_hash()),
+        }
+    }
+
+    pub fn finalize_and_store<Host: KernelRuntime>(
         self,
         host: &mut Host,
     ) -> Result<L2Block, anyhow::Error> {
         let timestamp = current_timestamp(host);
+        let state_root = Self::safe_store_get_hash(host, Some(EVM_ACCOUNTS_PATH))?;
+        let receipts_root =
+            Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_RECEIPTS))?;
+        let transactions_root =
+            Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_OBJECTS))?;
         let new_block = L2Block {
             timestamp,
             gas_used: self.cumulative_gas,
@@ -261,6 +280,9 @@ impl BlockInProgress {
                 timestamp,
                 self.parent_hash,
                 self.logs_bloom,
+                transactions_root,
+                state_root,
+                receipts_root,
             )
         };
         storage::store_current_block(host, &new_block)

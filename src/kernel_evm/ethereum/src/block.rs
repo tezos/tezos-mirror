@@ -70,9 +70,9 @@ pub struct L2Block {
     pub hash: H256,
     pub parent_hash: H256,
     pub logs_bloom: Bloom,
-    pub transactions_root: Option<OwnedHash>,
-    pub state_root: Option<OwnedHash>,
-    pub receipts_root: Option<OwnedHash>,
+    pub transactions_root: OwnedHash,
+    pub state_root: OwnedHash,
+    pub receipts_root: OwnedHash,
     pub miner: Option<OwnedHash>,
     pub extra_data: Option<OwnedHash>,
     pub gas_limit: Option<u64>,
@@ -82,24 +82,33 @@ pub struct L2Block {
 }
 
 impl L2Block {
+    const DUMMY_HASH: &str = "00000000000000000000000000000000";
     const BLOCK_HASH_SIZE: usize = 32;
 
     fn dummy_block_hash() -> H256 {
         H256([0; L2Block::BLOCK_HASH_SIZE])
     }
 
+    pub fn dummy_hash() -> OwnedHash {
+        L2Block::DUMMY_HASH.into()
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         number: U256,
         transactions: Vec<TransactionHash>,
         timestamp: Timestamp,
         parent_hash: H256,
         logs_bloom: Bloom,
+        transactions_root: OwnedHash,
+        state_root: OwnedHash,
+        receipts_root: OwnedHash,
     ) -> Self {
         let hash = Self::hash(
             parent_hash,
-            &None,
-            &None,
-            &None,
+            &state_root,
+            &transactions_root,
+            &receipts_root,
             &logs_bloom,
             &None,
             number,
@@ -115,6 +124,9 @@ impl L2Block {
             timestamp,
             transactions,
             logs_bloom,
+            transactions_root,
+            state_root,
+            receipts_root,
             ..Self::default()
         }
     }
@@ -135,9 +147,9 @@ impl L2Block {
     #[allow(clippy::too_many_arguments)]
     fn hash(
         parent_hash: H256,
-        state_root: &Option<OwnedHash>,
-        transactions_root: &Option<OwnedHash>,
-        receipts_root: &Option<OwnedHash>,
+        state_root: &OwnedHash,
+        transactions_root: &OwnedHash,
+        receipts_root: &OwnedHash,
         logs_bloom: &Bloom,
         miner: &Option<OwnedHash>,
         number: U256,
@@ -148,9 +160,9 @@ impl L2Block {
     ) -> H256 {
         let header = [
             hex::encode(parent_hash),
-            hex_of_option(state_root),
-            hex_of_option(transactions_root),
-            hex_of_option(receipts_root),
+            hex::encode(state_root),
+            hex::encode(transactions_root),
+            hex::encode(receipts_root),
             hex::encode(logs_bloom),
             hex_of_option(miner),
             hex::encode(bytes_of_u256(number)),
@@ -171,9 +183,9 @@ impl Default for L2Block {
             hash: H256::default(),
             parent_hash: L2Block::dummy_block_hash(),
             logs_bloom: Bloom::default(),
-            transactions_root: None,
-            state_root: None,
-            receipts_root: None,
+            transactions_root: L2Block::dummy_hash(),
+            state_root: L2Block::dummy_hash(),
+            receipts_root: L2Block::dummy_hash(),
             miner: None,
             extra_data: None,
             gas_limit: None,
@@ -191,9 +203,9 @@ impl Encodable for L2Block {
         s.append(&self.hash);
         s.append(&self.parent_hash);
         s.append(&self.logs_bloom);
-        append_option_explicit(s, &self.transactions_root, RlpStream::append);
-        append_option_explicit(s, &self.state_root, RlpStream::append);
-        append_option_explicit(s, &self.receipts_root, RlpStream::append);
+        s.append(&self.transactions_root);
+        s.append(&self.state_root);
+        s.append(&self.receipts_root);
         append_option_explicit(s, &self.miner, RlpStream::append);
         append_option_explicit(s, &self.extra_data, RlpStream::append);
         append_option_explicit(s, &self.gas_limit, append_u64_le);
@@ -215,18 +227,11 @@ impl Decodable for L2Block {
                 let parent_hash: H256 =
                     decode_field_h256(&next(&mut it)?, "parent_hash")?;
                 let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
-                let transactions_root: Option<OwnedHash> = decode_option_explicit(
-                    &next(&mut it)?,
-                    "transactions_root",
-                    decode_field,
-                )?;
-                let state_root: Option<OwnedHash> =
-                    decode_option_explicit(&next(&mut it)?, "state_root", decode_field)?;
-                let receipts_root: Option<OwnedHash> = decode_option_explicit(
-                    &next(&mut it)?,
-                    "receipts_root",
-                    decode_field,
-                )?;
+                let transactions_root: OwnedHash =
+                    decode_field(&next(&mut it)?, "transactions_root")?;
+                let state_root: OwnedHash = decode_field(&next(&mut it)?, "state_root")?;
+                let receipts_root: OwnedHash =
+                    decode_field(&next(&mut it)?, "receipts_root")?;
                 let miner: Option<OwnedHash> =
                     decode_option_explicit(&next(&mut it)?, "miner", decode_field)?;
                 let extra_data: Option<OwnedHash> =
