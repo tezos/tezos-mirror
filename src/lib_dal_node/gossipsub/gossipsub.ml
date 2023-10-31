@@ -141,6 +141,16 @@ module Transport_layer = struct
           pool
         |> return
 
+  let get_point_info p2p point =
+    let open Lwt_result_syntax in
+    match P2p.pool p2p with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some pool ->
+        Option.map
+          P2p_point_state.info_of_point_info
+          (P2p_pool.Points.info pool point)
+        |> return
+
   let get_peers ?(connected = true) p2p =
     let open Lwt_result_syntax in
     match P2p.pool p2p with
