@@ -13,6 +13,7 @@
 - The implementation of `write_debug` in the `MockHost` no longer prefixes the debug message
   with `DEBUG:` and do not print a newline by default.
 - Correctly initialise `MockHost::reboots_remaining` flag for testing outside of `run_level` api.
+- Add `Runtime::reveal_dal_parameters` to let a kernel request DAL parameters from the L1.
 
 ### Installer client/kernel
 
