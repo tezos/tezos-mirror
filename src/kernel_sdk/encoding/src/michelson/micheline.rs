@@ -23,6 +23,8 @@ use std::fmt::Debug;
 pub const MICHELINE_INT_TAG: u8 = 0;
 /// String encoding case tag.
 pub const MICHELINE_STRING_TAG: u8 = 1;
+/// Sequence encoding case tag.
+pub const MICHELINE_SEQ_TAG: u8 = 2;
 /// no-argument primitive (without annotations) encoding case tag.
 pub const MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG: u8 = 3;
 /// no-argument primitive (with annotations) encoding case tag.
@@ -146,6 +148,7 @@ pub enum Node {
     Int(Zarith),
     String(String),
     Bytes(Vec<u8>),
+    Seq(Vec<Node>),
     Prim {
         prim_tag: u8,
         args: Vec<Node>,
@@ -534,6 +537,13 @@ impl Node {
             ),
         ))(input)
     }
+    fn nom_read_seq(input: NomInput) -> NomResult<Node> {
+        let parse = preceded(
+            tag([MICHELINE_SEQ_TAG]),
+            nom_read::dynamic(nom_read::list(Node::nom_read)),
+        );
+        map(parse, Node::Seq)(input)
+    }
 }
 
 impl NomReader for Node {
@@ -542,6 +552,7 @@ impl NomReader for Node {
             map(nom_read_micheline_int, Node::Int),
             map(nom_read_micheline_string, Node::String),
             map(nom_read_micheline_bytes(nom_read::bytes), Node::Bytes),
+            Self::nom_read_seq,
             Self::nom_read_app,
         ))(input)
     }
@@ -634,6 +645,7 @@ impl BinWriter for Node {
             Node::Int(i) => bin_write_micheline_int(i, output),
             Node::String(s) => bin_write_micheline_string(&s, output),
             Node::Bytes(s) => bin_write_micheline_bytes(enc::bytes)(s.as_slice(), output),
+            Node::Seq(args) => bin_write_micheline_seq(args, output),
             Node::Prim {
                 prim_tag,
                 args,
@@ -855,6 +867,16 @@ pub(crate) fn bin_write_micheline_int(data: &Zarith, output: &mut Vec<u8>) -> Bi
         data,
         output,
     )
+}
+
+pub(crate) fn bin_write_micheline_seq(
+    args: &Vec<Node>,
+    output: &mut Vec<u8>,
+) -> BinResult {
+    enc::put_bytes(&[MICHELINE_SEQ_TAG], output);
+    enc::dynamic(enc::list(Node::bin_write))(args, output)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1278,6 +1300,51 @@ mod test {
             args: vec![unit.into(), 0.into(), 0.into()],
             annots: Some(":foo".into()),
         };
+
+        let mut bin = Vec::new();
+        test.bin_write(&mut bin).unwrap();
+
+        assert_eq!(expected, bin);
+    }
+
+    #[test]
+    fn micheline_seq_decode() {
+        // Decode `{Unit; 0; 0}`
+        let test = vec![
+            2, // Seq tag
+            0, 0, 0, 6,  // length of args
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+            0,  // Int tag
+            0,  // 0
+            0,  // Int tag
+            0,  // 0
+        ];
+
+        let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let expected = Node::Seq(vec![unit.into(), 0.into(), 0.into()]);
+
+        let (remaining_input, optnatfoo) = NomReader::nom_read(test.as_slice()).unwrap();
+
+        assert!(remaining_input.is_empty());
+        assert_eq!(expected, optnatfoo);
+    }
+
+    #[test]
+    fn micheline_seq_encode() {
+        let expected = vec![
+            2, // Seq tag
+            0, 0, 0, 6,  // length of args
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+            0,  // Int tag
+            0,  // 0
+            0,  // Int tag
+            0,  // 0
+        ];
+
+        let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let test = Node::Seq(vec![unit.into(), 0.into(), 0.into()]);
 
         let mut bin = Vec::new();
         test.bin_write(&mut bin).unwrap();
