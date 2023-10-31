@@ -31,8 +31,8 @@ let
 
     # Cross-compilation for RISC-V
     sources.riscv64Pkgs.clangStdenv.cc
-    sources.riscv64Pkgs.libiconvReal
-  ];
+  ]
+  ++ (pkgs.lib.optional pkgs.stdenv.isDarwin sources.riscv64Pkgs.libiconvReal);
 
   mainPackage = (import ./default.nix).overrideAttrs (old: {
     # This makes the shell load faster.
