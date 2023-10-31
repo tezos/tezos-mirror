@@ -912,7 +912,7 @@ let check_snapshot_balances
   exec_unit (fun (_block, state) ->
       Log.debug
         ~color:low_debug_color
-        "Checking equality of balances between \"%s\" and now"
+        "Checking evolution of balances between \"%s\" and now"
         snap_name ;
       let snapshot_balances =
         String.Map.find snap_name state.State.snapshot_balances
@@ -1771,13 +1771,140 @@ module Rewards = struct
        ]
 end
 
+module Autostaking = struct
+  let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
+      ~new_balance compare =
+    let old_b, new_b =
+      match part with
+      | `staked -> (old_balance.staked_b, new_balance.staked_b)
+      | `unstaked_frozen ->
+          (old_balance.unstaked_frozen_b, new_balance.unstaked_frozen_b)
+      | `unstaked_finalizable ->
+          ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_finalizable_b,
+            Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_finalizable_b )
+    in
+    if List.mem ~equal:String.equal name for_accounts then
+      if compare new_b old_b then return_unit
+      else (
+        Log.debug ~color:Log_module.warning_color "Balances changes failed:@." ;
+        Log.debug "@[<v 2>Old Balance@ %a@]@." balance_pp old_balance ;
+        Log.debug "@[<v 2>New Balance@ %a@]@." balance_pp new_balance ;
+        failwith "%s Unexpected stake evolution for %s" loc name)
+    else raise Not_found
+
+  let delegate = "delegate"
+
+  and delegator1 = "delegator1"
+
+  and delegator2 = "delegator2"
+
+  let setup ~activate_ai =
+    let constants = init_constants () in
+    begin_test ~activate_ai constants [delegate]
+    --> add_account_with_funds
+          delegator1
+          "__bootstrap__"
+          (Amount (Tez.of_mutez 2_000_000_000L))
+    --> add_account_with_funds
+          delegator2
+          "__bootstrap__"
+          (Amount (Tez.of_mutez 2_000_000_000L))
+    --> next_cycle
+    --> (if activate_ai then wait_ai_activation else next_cycle)
+    --> snapshot_balances "before delegation" [delegate]
+    --> set_delegate delegator1 (Some delegate)
+    --> check_snapshot_balances "before delegation"
+    --> next_cycle
+
+  let test_autostaking =
+    Tag "No Ai" --> setup ~activate_ai:false
+    --> check_snapshot_balances
+          ~f:
+            (assert_balance_evolution
+               ~loc:__LOC__
+               ~for_accounts:[delegate]
+               ~part:`staked
+               Q.gt)
+          "before delegation"
+    --> snapshot_balances "before second delegation" [delegate]
+    --> (Tag "increase delegation"
+         --> set_delegate delegator2 (Some delegate)
+         --> next_cycle
+         --> check_snapshot_balances
+               ~f:
+                 (assert_balance_evolution
+                    ~loc:__LOC__
+                    ~for_accounts:[delegate]
+                    ~part:`staked
+                    Q.gt)
+               "before second delegation"
+        |+ Tag "constant delegation"
+           --> snapshot_balances "after stake change" [delegate]
+           --> wait_n_cycles 8
+           --> check_snapshot_balances "after stake change"
+        |+ Tag "decrease delegation"
+           --> set_delegate delegator1 None
+           --> next_cycle
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`staked
+                      Q.lt)
+                 "before second delegation"
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_frozen
+                      Q.gt)
+                 "before second delegation"
+           --> snapshot_balances "after unstake" [delegate]
+           --> next_cycle
+           --> check_snapshot_balances "after unstake"
+           --> wait_n_cycles 3
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_frozen
+                      Q.lt)
+                 "after unstake"
+           (* finalizable are auto-finalize with one cycle shift *)
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_finalizable
+                      Q.gt)
+                 "after unstake"
+           --> snapshot_balances "before finalisation" [delegate]
+           --> next_cycle
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_finalizable
+                      Q.lt)
+                 "before finalisation")
+    |+ Tag "Yes AI" --> setup ~activate_ai:true
+       --> check_snapshot_balances "before delegation"
+
+  let tests = tests_of_scenarios [("Test auto-staking", test_autostaking)]
+end
+
 let tests =
   (tests_of_scenarios
   @@ [
        ("Test expected error in assert failure", test_expected_error);
        ("Test init", init_scenario () --> Action (fun _ -> return_unit));
      ])
-  @ Roundtrip.tests @ Rewards.tests
+  @ Roundtrip.tests @ Rewards.tests @ Autostaking.tests
 
 let () =
   Alcotest_lwt.run
