@@ -206,6 +206,8 @@ module P2P = struct
   let get_peers_info ctxt q () =
     Node_context.P2P.get_peers_info ~connected:q#connected ctxt
 
+  let get_peer_info ctxt peer () () = Node_context.P2P.get_peer_info ctxt peer
+
   module Gossipsub = struct
     let get_topics ctxt () () =
       let open Lwt_result_syntax in
@@ -324,6 +326,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.P2P.get_peers_info
        (P2P.get_peers_info ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.P2P.Peers.get_peer_info
+       (P2P.get_peer_info ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
