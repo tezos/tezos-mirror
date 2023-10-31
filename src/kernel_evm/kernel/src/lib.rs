@@ -13,8 +13,8 @@ use primitive_types::U256;
 use storage::{
     read_admin, read_base_fee_per_gas, read_chain_id, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_ticketer, store_base_fee_per_gas, store_chain_id, store_kernel_upgrade_nonce,
-    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_ticketer, store_base_fee_per_gas, store_chain_id, store_kernel_version,
+    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -156,14 +156,7 @@ fn upgrade<Host: Runtime>(
 ) -> Result<(), anyhow::Error> {
     // TODO: #5873
     // reboot before upgrade just in case
-    let upgrade_status = upgrade_kernel(host, kernel_upgrade.preimage_hash)
-        .context("Failed to upgrade kernel");
-    if upgrade_status.is_ok() {
-        let kernel_upgrade_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
-        store_kernel_upgrade_nonce(host, kernel_upgrade_nonce)
-            .context("Failed to store kernel upgrade nonce")?;
-    }
-    upgrade_status
+    upgrade_kernel(host, kernel_upgrade.preimage_hash).context("Failed to upgrade kernel")
 }
 
 pub fn stage_two<Host: KernelRuntime>(
@@ -352,7 +345,6 @@ mod tests {
     use crate::{
         blueprint::{Blueprint, Queue, QueueElement},
         inbox::{KernelUpgrade, Transaction, TransactionContent},
-        parsing::UPGRADE_NONCE_SIZE,
         stage_two, storage,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
@@ -475,7 +467,6 @@ mod tests {
         }
         // the upgrade mechanism should not start otherwise it will fail
         let broken_kernel_upgrade = KernelUpgrade {
-            nonce: [0u8; UPGRADE_NONCE_SIZE],
             preimage_hash: [0u8; PREIMAGE_HASH_SIZE],
         };
         let queue = Queue {

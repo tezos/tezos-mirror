@@ -195,7 +195,6 @@ mod tests {
 
     use super::*;
     use crate::inbox::TransactionContent::Ethereum;
-    use crate::parsing::UPGRADE_NONCE_SIZE;
     use primitive_types::{H160, H256, U256};
     use rlp::Rlp;
     use tezos_ethereum::{
@@ -319,7 +318,6 @@ mod tests {
             proposal,
         ];
         let kernel_upgrade = Some(KernelUpgrade {
-            nonce: [3; UPGRADE_NONCE_SIZE],
             preimage_hash: [3; PREIMAGE_HASH_SIZE],
         });
         let queue = Queue {

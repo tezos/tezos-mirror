@@ -67,8 +67,6 @@ pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 32 // Transaction hash size
             - 32; // Chunk hash size
 
-pub const UPGRADE_NONCE_SIZE: usize = 2;
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Input {
     SimpleTransaction(Box<Transaction>),
@@ -185,19 +183,12 @@ impl InputResult {
             return Self::Unparsable;
         }
 
-        // Next UPGRADE_NONCE_SIZE bytes is the incoming kernel upgrade nonce
-        let (nonce, remaining) = parsable!(split_at(bytes, UPGRADE_NONCE_SIZE));
-        let nonce: [u8; UPGRADE_NONCE_SIZE] = parsable!(nonce.try_into().ok());
         // Next PREIMAGE_HASH_SIZE bytes is the preimage hash
-        let (preimage_hash, remaining) =
-            parsable!(split_at(remaining, PREIMAGE_HASH_SIZE));
+        let (preimage_hash, remaining) = parsable!(split_at(bytes, PREIMAGE_HASH_SIZE));
         let preimage_hash: [u8; PREIMAGE_HASH_SIZE] =
             parsable!(preimage_hash.try_into().ok());
         if remaining.is_empty() {
-            Self::Input(Input::Upgrade(KernelUpgrade {
-                nonce,
-                preimage_hash,
-            }))
+            Self::Input(Input::Upgrade(KernelUpgrade { preimage_hash }))
         } else {
             Self::Unparsable
         }

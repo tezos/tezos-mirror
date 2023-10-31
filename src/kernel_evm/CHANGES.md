@@ -36,6 +36,7 @@
 - Compute real block hashes. (!10442)
 - EVM evaluation framework (testing for the EVM execution) is now available. (!10221)
 - Compute {state,transactions,receipt}_root in block. (!10545)
+- Upgrade nonce is no longer needed, only the preimage root hash. (!12345)
 
 ## Version fc06d63568b1be253088ff5d6e422fd80ed3d2c2
 
