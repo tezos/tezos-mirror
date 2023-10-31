@@ -33,10 +33,6 @@ pub mod constants {
     // Overapproximation of ticks used in signature verification.
     pub const TICKS_FOR_CRYPTO: u64 = 25_000_000;
 
-    /// Overapproximation of the ticks used by the kernel to process a transaction
-    /// before checking or execution.
-    pub const TRANSACTION_OVERHEAD: u64 = 1_000_000;
-
     /// Safety margin the kernel enforce to avoid approaching the maximum number
     /// of ticks.
     pub const SAFETY_MARGIN: u64 = 2_000_000_000;
@@ -94,12 +90,12 @@ pub mod constants {
 }
 
 fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
+    let tx_data_size = transaction.data_size();
     match &transaction.content {
-        crate::inbox::TransactionContent::Deposit(_) => {
-            ticks_of_deposit(constants::TICKS_FOR_DEPOSIT)
-        }
+        crate::inbox::TransactionContent::Deposit(_) => constants::TICKS_FOR_DEPOSIT,
         crate::inbox::TransactionContent::Ethereum(eth) => {
             average_ticks_of_gas(eth.gas_limit)
+                .saturating_add(ticks_of_transaction_overhead(tx_data_size))
         }
     }
 }
@@ -115,18 +111,15 @@ pub fn estimate_remaining_ticks_for_transaction_execution(
         .saturating_sub(ticks)
 }
 
-fn ticks_of_deposit(resulting_ticks: u64) -> u64 {
-    resulting_ticks.saturating_add(constants::TRANSACTION_OVERHEAD)
-}
-
 /// Estimation of the number of ticks it takes to execute a given amount of gas.
 /// Takes into account the crypto, but not the overheads of a transaction, such
 /// as registering a valid transaction.
 pub fn average_ticks_of_gas(gas: u64) -> u64 {
     gas.saturating_mul(constants::TICKS_PER_GAS)
-        .saturating_add(constants::TRANSACTION_OVERHEAD)
 }
 
+/// Estimation of the number of ticks used up for executing a transaction
+/// besides executing the opcodes.
 fn ticks_of_transaction_overhead(tx_data_size: u64) -> u64 {
     // analysis was done using the object size. It is approximated from the
     // data size
@@ -153,7 +146,7 @@ pub fn ticks_of_invalid_transaction(tx_data_size: u64) -> u64 {
 
 /// Adds the possible overhead this is not accounted during the validation of
 /// the transaction. Transaction evaluation (the interpreter) accounts for the
-/// ticks itself.
+/// ticks itself [resulting_ticks].
 pub fn ticks_of_valid_transaction(
     transaction: &Transaction,
     resulting_ticks: u64,
@@ -164,7 +157,7 @@ pub fn ticks_of_valid_transaction(
         }
         // Ticks are already spent during the validation of the transaction (see
         // apply.rs).
-        crate::inbox::TransactionContent::Deposit(_) => ticks_of_deposit(resulting_ticks),
+        crate::inbox::TransactionContent::Deposit(_) => resulting_ticks,
     }
 }
 
