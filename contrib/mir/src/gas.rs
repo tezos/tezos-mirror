@@ -236,6 +236,7 @@ pub mod interpret_cost {
             (c + compare(&l.0, &r.0)? + compare(&l.1, &r.1)?).as_gas_cost()
         };
         let cmp_option = Checked::from(10u32);
+        const ADDRESS_SIZE: usize = 20 + 31; // hash size + max entrypoint size
         Ok(match (v1, v2) {
             (V::Nat(l), V::Nat(r)) => {
                 // NB: eventually when using BigInts, use BigInt::bits() &c
@@ -257,6 +258,7 @@ pub mod interpret_cost {
                 (Some(l), Some(r)) => cmp_option + compare(l, r)?,
             }
             .as_gas_cost()?,
+            (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
             _ => unreachable!("Comparison of incomparable values"),
         })
     }

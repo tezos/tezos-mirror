@@ -13,6 +13,7 @@ impl PartialOrd for TypedValue {
             (Pair(l), Pair(r)) => l.partial_cmp(r),
             (Option(x), Option(y)) => x.as_deref().partial_cmp(&y.as_deref()),
             (Or(x), Or(y)) => x.as_ref().partial_cmp(y.as_ref()),
+            (Address(l), Address(r)) => l.partial_cmp(r),
             _ => None,
         }
     }
@@ -92,6 +93,46 @@ mod tests {
     }
 
     #[test]
+    fn compare_addrs() {
+        // ordering was verified against octez-client, see script below
+        let ordered_addrs = [
+            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+            "tz1SNL5w4RFRbCWRMB4yDWvoRQrPQxZmNzeQ",
+            "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy",
+            "tz1WPGZjP9eHGqD9DkiRJ1xGRU1wEMY19AAF",
+            "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%bar",
+            "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%defauls",
+            "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j",
+            "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%defaulu",
+            "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%foo",
+            "tz1hHGTh6Yk4k7d2PiTcBUeMvw6fJCFikedv",
+            "tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH%bar",
+            "tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH",
+            "tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH%foo",
+            "tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r%bar",
+            "tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r",
+            "tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r%foo",
+            "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN%bar",
+            "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN",
+            "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN%foo",
+            "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%bar",
+            "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye",
+            "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo",
+            "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf%bar",
+            "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf",
+            "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf%foo",
+        ]
+        .map(|x| TypedValue::Address(crate::ast::Address::from_base58_check(x).unwrap()));
+
+        for (i, addr_i) in ordered_addrs.iter().enumerate() {
+            for (j, addr_j) in ordered_addrs.iter().enumerate() {
+                assert_eq!(addr_i.partial_cmp(addr_j), i.partial_cmp(&j));
+                assert_eq!(addr_i.cmp(addr_j), i.cmp(&j));
+            }
+        }
+    }
+
+    #[test]
     #[should_panic(expected = "Comparing incomparable values in TypedValue")]
     fn compare_different_comparable() {
         // Comparable panics on different types
@@ -99,3 +140,48 @@ mod tests {
         let _ = Bool(true).cmp(&Int(5)); //panics
     }
 }
+
+/*
+Script to verify address ordering. Should print "with -1" for all checked address pairs.
+
+```
+#!/bin/bash
+
+addrs=(
+  "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw"
+  "tz1SNL5w4RFRbCWRMB4yDWvoRQrPQxZmNzeQ"
+  "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy"
+  "tz1WPGZjP9eHGqD9DkiRJ1xGRU1wEMY19AAF"
+  "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%bar"
+  "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%defauls"
+  "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j"
+  "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%defaulu"
+  "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%foo"
+  "tz1hHGTh6Yk4k7d2PiTcBUeMvw6fJCFikedv"
+  "tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH%bar"
+  "tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH"
+  "tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH%foo"
+  "tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r%bar"
+  "tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r"
+  "tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r%foo"
+  "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN%bar"
+  "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN"
+  "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN%foo"
+  "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%bar"
+  "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye"
+  "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo"
+  "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf%bar"
+  "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf"
+  "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf%foo"
+)
+
+prev=""
+for addr in "${addrs[@]}"; do
+  if [ -n "$prev" ]; then
+    echo $prev $addr
+    octez-client --mode mockup run script 'parameter address; storage address; code { UNPAIR; SWAP; COMPARE; FAILWITH }' on storage "\"$prev\"" and input "\"$addr\"" 2>&1 | grep '^with'
+  fi
+  prev="$addr"
+done
+```
+*/
