@@ -142,6 +142,12 @@ module Transport_layer : sig
     ?connected:bool ->
     t ->
     (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
+
+  (** [get_peers ?connected t] returns a list of peers. If [connected]
+      is [true] (default), it returns only the peers we are connected
+      to. Otherwise, it returns a list of known peers (peers for which we
+      were already successfully connected in the past.) *)
+  val get_peers : ?connected:bool -> t -> P2p_peer.Id.t list tzresult Lwt.t
 end
 
 (** This module implements the list of hooks that allow interconnecting the

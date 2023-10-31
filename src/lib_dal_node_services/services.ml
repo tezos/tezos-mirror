@@ -316,7 +316,7 @@ module P2P = struct
       ; query : < connected : bool > >
       service =
     Tezos_rpc.Service.get_service
-      ~description:"Get list of points"
+      ~description:"Get the list of known points"
       ~query:connected_query
       ~output:Data_encoding.(list (obj1 (req "point" P2p_point.Id.encoding)))
       (open_root / "points")
@@ -330,7 +330,7 @@ module P2P = struct
       ; query : < connected : bool > >
       service =
     Tezos_rpc.Service.get_service
-      ~description:"Get list of known points and their corresponding info"
+      ~description:"Get the list of known points and their corresponding info"
       ~query:connected_query
       ~output:
         Data_encoding.(
@@ -339,6 +339,20 @@ module P2P = struct
                (req "point" P2p_point.Id.encoding)
                (req "info" P2p_point.Info.encoding)))
       (open_root / "points" / "info")
+
+  let get_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_peer.Id.t list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service =
+    Tezos_rpc.Service.get_service
+      ~description:"Get the list of known peers"
+      ~query:connected_query
+      ~output:Data_encoding.(list (obj1 (req "peer" P2p_peer.Id.encoding)))
+      (open_root / "peers")
 
   module Gossipsub = struct
     let open_root = open_root / "gossipsub"
@@ -352,7 +366,7 @@ module P2P = struct
         ; query : unit >
         service =
       Tezos_rpc.Service.get_service
-        ~description:"get the topics this node is currently subscribed to"
+        ~description:"Get the topics this node is currently subscribed to"
         ~query:Tezos_rpc.Query.empty
         ~output:(Data_encoding.list Types.Topic.encoding)
         (open_root / "topics")

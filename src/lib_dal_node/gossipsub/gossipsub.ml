@@ -143,6 +143,17 @@ module Transport_layer = struct
             (point, info) :: acc)
           pool
         |> return
+
+  let get_peers ?(connected = true) p2p =
+    let open Lwt_result_syntax in
+    match P2p.pool p2p with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some pool ->
+        let folder =
+          if connected then P2p_pool.Peers.fold_connected
+          else P2p_pool.Peers.fold_known
+        in
+        folder ~init:[] ~f:(fun peer _info acc -> peer :: acc) pool |> return
 end
 
 module Transport_layer_hooks = Gs_transport_connection
