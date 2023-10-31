@@ -137,7 +137,7 @@ test:
 	@make -C ${DEMO_DIR} test
 
 .PHONY: check
-check:
+check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${RISC_V_SANDBOX_DIR} check
 	@make -C ${RISC_V_INTERPRETER_DIR} check

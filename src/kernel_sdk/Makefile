@@ -20,10 +20,12 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
+RISCV_OPTS = --target riscv64gc-unknown-none-elf --no-default-features --features proto-alpha
+
 SDK_VERSION := "0.2.1"
 
 .PHONY: check
-check: installer-template publish-check doc
+check: installer-template publish-check doc riscv-check
 	@cargo fmt --check
 	@cargo clippy --all-targets --all-features -- --deny warnings
 	@cargo check --no-default-features
@@ -46,6 +48,11 @@ publish-check: installer-template
 	@cargo check -p tezos-smart-rollup-installer-config
 	@cargo check -p tezos-smart-rollup-installer
 	@cargo check -p tezos-smart-rollup
+
+.PHONY: riscv-check
+riscv-check:
+	@cargo check -p tezos-smart-rollup-core $(RISCV_OPTS)
+	@cargo check -p tezos-smart-rollup-panic-hook $(RISCV_OPTS)
 
 .PHONY: build
 build: installer-template
@@ -70,11 +77,11 @@ test:
 
 .PHONY: doc
 doc:
-	@cargo doc  --no-deps --all-features
+	@cargo doc --no-deps --all-features
 
 .PHONY: build-deps
 build-deps:
-	@rustup target add wasm32-unknown-unknown $(NATIVE_TARGET)
+	@rustup target add wasm32-unknown-unknown riscv64gc-unknown-none-elf $(NATIVE_TARGET)
 
 .PHONY: build-dev-deps
 build-dev-deps: build-deps
