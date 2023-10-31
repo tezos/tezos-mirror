@@ -6,6 +6,7 @@
 /******************************************************************************/
 
 pub mod comparable;
+pub mod michelson_address;
 pub mod michelson_list;
 pub mod or;
 pub mod parsed;
@@ -13,6 +14,7 @@ pub mod typechecked;
 
 use std::collections::BTreeMap;
 
+pub use michelson_address::*;
 pub use michelson_list::MichelsonList;
 pub use or::Or;
 pub use parsed::{ParsedInstruction, ParsedStage};
@@ -156,6 +158,7 @@ pub enum TypedValue {
     List(MichelsonList<TypedValue>),
     Map(BTreeMap<TypedValue, TypedValue>),
     Or(Box<Or<TypedValue, TypedValue>>),
+    Address(Address),
 }
 
 pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
@@ -189,6 +192,7 @@ pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
         TV::Option(None) => V::Option(None),
         TV::Option(Some(r)) => V::new_option(Some(typed_value_to_value_optimized(*r))),
         TV::Or(x) => V::new_or(x.map(typed_value_to_value_optimized)),
+        TV::Address(x) => V::Bytes(x.to_bytes_vec()),
     }
 }
 

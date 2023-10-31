@@ -97,6 +97,16 @@ pub mod tc_cost {
     // Taken to be the same as VERIFY_TYPE_STEP, but that's a guess
     pub const TYPE_PROP_STEP: u32 = 60;
 
+    // corresponds to cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls in the
+    // protocol. the protocol computes cost as
+    // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
+    pub const KEY_HASH_READABLE: u32 = 3200;
+
+    // corresponds to cost_ENCODING_PUBLIC_KEY_HASH_bls in the
+    // protocol. the protocol computes cost as
+    // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
+    pub const KEY_HASH_OPTIMIZED: u32 = 80;
+
     fn variadic(depth: u16) -> Result<u32, OutOfGas> {
         let depth = Checked::from(depth as u32);
         (depth * 50).as_gas_cost()
