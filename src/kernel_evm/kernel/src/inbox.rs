@@ -127,6 +127,13 @@ impl Transaction {
         // all details of tick model stay in the same module
         tick_model::estimate_ticks_for_transaction(self)
     }
+
+    pub fn data_size(&self) -> u64 {
+        match &self.content {
+            TransactionContent::Deposit(_) => 0,
+            TransactionContent::Ethereum(e) => e.data.len() as u64,
+        }
+    }
 }
 
 impl Encodable for Transaction {

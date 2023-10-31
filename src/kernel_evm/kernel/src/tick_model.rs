@@ -23,8 +23,9 @@ pub mod constants {
     /// Maximum number of reboots for a level as set by the PVM.
     pub(crate) const _MAX_NUMBER_OF_REBOOTS: u32 = 1_000;
 
-    /// Overapproximation of the amount of ticks for a deposit.
-    pub const TICKS_FOR_DEPOSIT: u64 = TICKS_FOR_CRYPTO;
+    /// Overapproximation of the amount of ticks for a deposit. Should take
+    /// everything into account, execution and registering
+    pub const TICKS_FOR_DEPOSIT: u64 = 2_000_000;
 
     /// Overapproximation of the amount of ticks per gas unit.
     pub const TICKS_PER_GAS: u64 = 2000;
@@ -83,6 +84,13 @@ pub mod constants {
     /// (nb of logs + nb of topics)
     pub const BLOOM_TICKS_INTERCEPT: u64 = 10000;
     pub const BLOOM_TICKS_COEF: u64 = 85000;
+
+    /// The number of ticks used during transaction execution doing something
+    /// other than executing an opcode is overapproximated by an affine function
+    /// of the size of a transaction object
+    pub const TRANSACTION_OVERHEAD_INTERCEPT: u64 = 1_150_000;
+    pub const TRANSACTION_OVERHEAD_COEF: u64 = 880;
+    pub const TRANSFERT_OBJ_SIZE: u64 = 347;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
@@ -96,9 +104,12 @@ pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
     }
 }
 
-pub fn estimate_remaining_ticks_for_transaction_execution(ticks: u64) -> u64 {
+pub fn estimate_remaining_ticks_for_transaction_execution(
+    ticks: u64,
+    tx_data_size: u64,
+) -> u64 {
     constants::MAX_ALLOWED_TICKS
-        .saturating_sub(constants::TRANSACTION_OVERHEAD)
+        .saturating_sub(ticks_of_transaction_overhead(tx_data_size))
         .saturating_sub(ticks)
 }
 
@@ -111,6 +122,15 @@ pub fn average_ticks_of_gas(gas: u64) -> u64 {
         .saturating_add(constants::TRANSACTION_OVERHEAD)
 }
 
+fn ticks_of_transaction_overhead(tx_data_size: u64) -> u64 {
+    // analysis was done using the object size. It is approximated from the
+    // data size
+    let tx_obj_size = tx_data_size + constants::TRANSFERT_OBJ_SIZE;
+    tx_obj_size
+        .saturating_mul(constants::TRANSACTION_OVERHEAD_COEF)
+        .saturating_add(constants::TRANSACTION_OVERHEAD_INTERCEPT)
+}
+
 /// Check that a transaction can fit inside the tick limit
 pub fn estimate_would_overflow(estimated_ticks: u64, transaction: &Transaction) -> bool {
     estimate_ticks_for_transaction(transaction).saturating_add(estimated_ticks)
@@ -119,11 +139,11 @@ pub fn estimate_would_overflow(estimated_ticks: u64, transaction: &Transaction) 
 
 /// An invalid transaction could not be transmitted to the VM, eg. the nonce
 /// was wrong, or the signature verification failed.
-pub fn ticks_of_invalid_transaction() -> u64 {
+pub fn ticks_of_invalid_transaction(tx_data_size: u64) -> u64 {
     // If the transaction is invalid, only the base cost is considered.
     constants::BASE_GAS
         .saturating_mul(constants::TICKS_PER_GAS)
-        .saturating_add(constants::TRANSACTION_OVERHEAD)
+        .saturating_add(ticks_of_transaction_overhead(tx_data_size))
 }
 
 /// Adds the possible overhead this is not accounted during the validation of
@@ -135,7 +155,7 @@ pub fn ticks_of_valid_transaction(
 ) -> u64 {
     match &transaction.content {
         crate::inbox::TransactionContent::Ethereum(_) => {
-            ticks_of_valid_transaction_ethereum(resulting_ticks)
+            ticks_of_valid_transaction_ethereum(resulting_ticks, transaction.data_size())
         }
         // Ticks are already spent during the validation of the transaction (see
         // apply.rs).
@@ -146,10 +166,13 @@ pub fn ticks_of_valid_transaction(
 /// A valid transaction is a transaction that could be transmitted to
 /// evm_execution. It can succeed (with or without effect on the state)
 /// or fail (if the VM encountered an error).
-pub fn ticks_of_valid_transaction_ethereum(resulting_ticks: u64) -> u64 {
+pub fn ticks_of_valid_transaction_ethereum(
+    resulting_ticks: u64,
+    tx_data_size: u64,
+) -> u64 {
     resulting_ticks
         .saturating_add(constants::TICKS_FOR_CRYPTO)
-        .saturating_add(constants::TRANSACTION_OVERHEAD)
+        .saturating_add(ticks_of_transaction_overhead(tx_data_size))
 }
 
 pub fn bloom_size(logs: &[tezos_ethereum::Log]) -> usize {

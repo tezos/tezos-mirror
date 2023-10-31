@@ -247,8 +247,8 @@ impl BlockInProgress {
         Ok(())
     }
 
-    pub fn account_for_invalid_transaction(&mut self) {
-        self.estimated_ticks += tick_model::ticks_of_invalid_transaction();
+    pub fn account_for_invalid_transaction(&mut self, tx_data_size: u64) {
+        self.estimated_ticks += tick_model::ticks_of_invalid_transaction(tx_data_size);
     }
 
     fn safe_store_get_hash<Host: KernelRuntime>(
