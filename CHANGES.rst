@@ -128,7 +128,11 @@ Smart Rollup WASM Debugger
 - Support special directives using ``write_debug`` host function in the
   profiler, prefixed with ``__wasm_debugger__::``. Support
   ``start_section(<data>)`` and ``end_section(<data>)`` to count ticks in
-  specific sections. (:gl:`!10149`)
+
+- Partially support the installer configuration of the Smart Rollup SDK, i.e.
+  support only the instruction ``Set``. The configuration can be passed to
+  the debugger via the option ``--installer-config`` and will initialize the
+  storage with this configuration. (MR :gl:`!9641`)
 
 Data Availability Committee (DAC)
 ---------------------------------

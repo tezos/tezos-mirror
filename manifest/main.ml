@@ -8264,12 +8264,12 @@ let _octez_scoru_wasm_debugger =
         octez_clic;
         tree_encoding;
         octez_base_unix;
-        yaml;
         (* The debugger always rely on proto_alpha, as such the client is always
            available. *)
         Protocol.(client_exn alpha);
         octez_scoru_wasm;
         octez_scoru_wasm_helpers |> open_;
+        octez_smart_rollup_lib;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
         octez_version_value;
