@@ -572,13 +572,13 @@ impl BinWriter for MichelineBytes {
 
 impl<const PRIM_TAG: u8> BinWriter for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_no_args_no_annots::<{ PRIM_TAG }>(output)
+        bin_write_prim_no_args_no_annots(PRIM_TAG, output)
     }
 }
 
 impl<const PRIM_TAG: u8> BinWriter for MichelinePrimNoArgsSomeAnnots<PRIM_TAG> {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_no_args_some_annots::<{ PRIM_TAG }>(&self.annots, output)
+        bin_write_prim_no_args_some_annots(PRIM_TAG, &self.annots, output)
     }
 }
 
@@ -587,7 +587,7 @@ where
     Arg: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_1_arg_no_annots::<_, { PRIM_TAG }>(&self.arg, output)
+        bin_write_prim_1_arg_no_annots(PRIM_TAG, &self.arg, output)
     }
 }
 
@@ -596,11 +596,7 @@ where
     Arg: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_1_arg_some_annots::<_, { PRIM_TAG }>(
-            &self.arg,
-            &self.annots,
-            output,
-        )
+        bin_write_prim_1_arg_some_annots(PRIM_TAG, &self.arg, &self.annots, output)
     }
 }
 
@@ -611,9 +607,7 @@ where
     Arg2: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_2_args_no_annots::<_, _, { PRIM_TAG }>(
-            &self.arg1, &self.arg2, output,
-        )
+        bin_write_prim_2_args_no_annots(PRIM_TAG, &self.arg1, &self.arg2, output)
     }
 }
 
@@ -624,7 +618,8 @@ where
     Arg2: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_2_args_some_annots::<_, _, { PRIM_TAG }>(
+        bin_write_prim_2_args_some_annots(
+            PRIM_TAG,
             &self.arg1,
             &self.arg2,
             &self.annots,
@@ -666,20 +661,22 @@ pub(crate) fn nom_read_micheline_int(input: NomInput) -> NomResult<Zarith> {
 // -------------------------
 /// Write `PRIM_TAG` into an `obj1` encoding, prefixed with the
 /// [MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_no_args_no_annots<const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_no_args_no_annots(
+    prim_tag: u8,
     output: &mut Vec<u8>,
 ) -> BinResult {
-    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, prim_tag], output);
     Ok(())
 }
 
 /// Write `PRIM_TAG` & `annots` into an `obj2` encoding, prefixed with the
 /// [MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_no_args_some_annots<const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_no_args_some_annots(
+    prim_tag: u8,
     annots: &str,
     output: &mut Vec<u8>,
 ) -> BinResult {
-    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, prim_tag], output);
 
     enc::string(annots, output)?;
 
@@ -688,14 +685,15 @@ pub(crate) fn bin_write_prim_no_args_some_annots<const PRIM_TAG: u8>(
 
 /// Write `PRIM_TAG` & `arg` into an `obj2` encoding, prefixed with the
 /// [MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_1_arg_no_annots<Arg, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_1_arg_no_annots<Arg>(
+    prim_tag: u8,
     arg: &Arg,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
     Arg: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, prim_tag], output);
 
     arg.bin_write(output)?;
 
@@ -704,7 +702,8 @@ where
 
 /// Write `PRIM_TAG`, `arg` & `annots` into an `obj3` encoding, prefixed with the
 /// [MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_1_arg_some_annots<Arg, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_1_arg_some_annots<Arg>(
+    prim_tag: u8,
     arg: &Arg,
     annots: &str,
     output: &mut Vec<u8>,
@@ -712,7 +711,7 @@ pub(crate) fn bin_write_prim_1_arg_some_annots<Arg, const PRIM_TAG: u8>(
 where
     Arg: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, prim_tag], output);
 
     arg.bin_write(output)?;
     enc::string(annots, output)?;
@@ -722,7 +721,8 @@ where
 
 /// Write `PRIM_TAG`, `arg1` & `arg2` into an `obj3` encoding, prefixed with the
 /// [MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_2_args_no_annots<Arg1, Arg2, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_2_args_no_annots<Arg1, Arg2>(
+    prim_tag: u8,
     arg1: &Arg1,
     arg2: &Arg2,
     output: &mut Vec<u8>,
@@ -731,7 +731,7 @@ where
     Arg1: BinWriter,
     Arg2: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG, prim_tag], output);
 
     arg1.bin_write(output)?;
     arg2.bin_write(output)?;
@@ -741,7 +741,8 @@ where
 
 /// Write `PRIM_TAG`, `arg1`, `arg2` & `annots` into an `obj4` encoding, prefixed with the
 /// [MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_2_args_some_annots<Arg1, Arg2, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_2_args_some_annots<Arg1, Arg2>(
+    prim_tag: u8,
     arg1: &Arg1,
     arg2: &Arg2,
     annots: &str,
@@ -751,7 +752,7 @@ where
     Arg1: BinWriter,
     Arg2: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG, prim_tag], output);
 
     arg1.bin_write(output)?;
     arg2.bin_write(output)?;
