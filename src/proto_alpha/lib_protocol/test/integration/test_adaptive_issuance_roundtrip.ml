@@ -216,6 +216,17 @@ module State = struct
     | None -> raise Not_found
     | Some (name, acc) -> (name, acc)
 
+  let liquid_delegated ~name state =
+    let open Result_syntax in
+    String.Map.fold_e
+      (fun _delegator account acc ->
+        match account.delegate with
+        | Some delegate when not @@ String.equal delegate name -> return acc
+        | None -> return acc
+        | _ -> Tez.(acc +? account.liquid))
+      state.account_map
+      Tez.zero
+
   (** Returns true iff account is a delegate *)
   let is_self_delegate (account_name : string) (state : t) : bool =
     let acc = find_account account_name state in
@@ -401,8 +412,79 @@ module State = struct
   let pop_pending_operations state =
     ({state with pending_operations = []}, state.pending_operations)
 
+  let apply_autostake ~name ~old_cycle
+      ({
+         pkh = _;
+         contract = _;
+         delegate;
+         parameters = _;
+         liquid = _;
+         bonds = _;
+         frozen_deposits;
+         unstaked_frozen;
+         unstaked_finalizable;
+         staking_delegator_numerator = _;
+         staking_delegate_denominator = _;
+       } :
+        account_state) state =
+    let open Result_syntax in
+    if Some name <> delegate then return state
+    else
+      let* current_liquid_delegated = liquid_delegated ~name state in
+      let current_frozen = Frozen_tez.total_current frozen_deposits in
+      let current_unstaked_frozen_delegated =
+        Unstaked_frozen.sum_current unstaked_frozen
+      in
+      let current_unstaked_final_delegated =
+        Unstaked_finalizable.total unstaked_finalizable
+      in
+      let power =
+        Tez.(
+          current_liquid_delegated +! current_frozen
+          +! current_unstaked_frozen_delegated
+          +! current_unstaked_final_delegated
+          |> to_mutez |> Z.of_int64)
+      in
+      let optimal =
+        Tez.of_z
+          (Z.cdiv
+             power
+             (Z.of_int (state.constants.limit_of_delegation_over_baking + 1)))
+      in
+      let autostaked =
+        Int64.(sub (Tez.to_mutez optimal) (Tez.to_mutez current_frozen))
+      in
+      (* stake or unstake *)
+      let new_state =
+        if autostaked > 0L then
+          apply_stake (Test_tez.of_mutez_exn autostaked) name state
+        else if autostaked < 0L then
+          apply_unstake
+            old_cycle
+            (Test_tez.of_mutez_exn Int64.(neg autostaked))
+            name
+            state
+        else state
+      in
+      return @@ apply_finalize name new_state
+
   (** Applies when baking the last block of a cycle *)
-  let apply_end_cycle _current_cycle state : t =
+  let apply_end_cycle current_cycle block state : t tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let* launch_cycle_opt =
+      Context.get_adaptive_issuance_launch_cycle (B block)
+    in
+    let*? state =
+      match launch_cycle_opt with
+      | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) -> ok state
+      | None | Some _ ->
+          Environment.wrap_tzresult
+          @@ String.Map.fold_e
+               (fun name account state ->
+                 apply_autostake ~name ~old_cycle:current_cycle account state)
+               state.account_map
+               state
+    in
     (* Apply parameter changes *)
     let state, param_requests =
       List.fold_left
@@ -430,7 +512,7 @@ module State = struct
                }))
         state
     in
-    {state with param_requests}
+    return {state with param_requests}
 
   (** Applies when baking the first block of a cycle.
       Technically nothing special happens, but we need to update the unslashable unstakes
@@ -723,7 +805,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
   (* Dawn of a new cycle *)
   let* state =
     if not (Block.last_block_of_cycle block) then return state
-    else return @@ State.apply_end_cycle current_cycle state
+    else State.apply_end_cycle current_cycle block state
   in
   (* First block of a new cycle *)
   let new_current_cycle = Block.current_cycle block in
