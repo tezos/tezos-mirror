@@ -722,12 +722,6 @@ let check_all_balances block state : unit tzresult Lwt.t =
   let* actual_total_supply = Context.get_total_supply (B block) in
   Assert.equal_tez ~loc:__LOC__ actual_total_supply total_supply
 
-(** Apply rewards in state + check *)
-let apply_rewards ~(baker : string) block state : State.t tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let* state = State.apply_rewards ~baker block state in
-  return state
-
 let check_issuance_rpc block : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* We assume one block per minute *)
@@ -838,6 +832,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return (block, state)
     else return (block', state)
   in
+  let* state = State.apply_rewards ~baker:baker_name block state in
   (* First block of a new cycle *)
   let new_current_cycle = Block.current_cycle block in
   let* state =
@@ -850,7 +845,6 @@ let bake ?baker : t -> t tzresult Lwt.t =
         (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
       return @@ State.apply_new_cycle new_current_cycle state)
   in
-  let* state = apply_rewards ~baker:baker_name block state in
   (* Dawn of a new cycle *)
   let* state =
     if not (Block.last_block_of_cycle block) then return state
@@ -955,7 +949,14 @@ let check_rate_evolution (f : Q.t -> Q.t -> bool) : (t, t) scenarios =
       | None -> failwith "check_rate_evolution: no rate previously saved"
       | Some previous_rate ->
           if f previous_rate new_rate then return_unit
-          else failwith "check_rate_evolution: assertion failed")
+          else
+            failwith
+              "check_rate_evolution: assertion failed@.previous rate: %a@.new \
+               rate: %a"
+              Q.pp_print
+              previous_rate
+              Q.pp_print
+              new_rate)
 
 (* ======== Operations ======== *)
 
@@ -1733,10 +1734,10 @@ module Rewards = struct
     in
     begin_test ~activate_ai:true ~burn_rewards:true constants ["delegate"]
     --> set_delegate_params "delegate" init_params
-    (* --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L)) *)
-    (* --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L)) *)
-    --> save_current_rate
-    --> wait_ai_activation
+    --> save_current_rate --> wait_ai_activation
+    (* We stake about 50% of the total supply *)
+    --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> (Tag "increase stake, decrease rate" --> next_cycle
          --> loop rate_var_lag (stake "delegate" delta --> next_cycle)
          --> loop 10 cycle_stake
