@@ -25,7 +25,7 @@ pub enum ParserError {
 
 #[allow(dead_code)]
 pub fn parse(src: &str) -> Result<ParsedInstructionBlock, ParseError<usize, Tok, ParserError>> {
-    syntax::instructionBlockParser::new().parse(spanned_lexer(src))
+    syntax::InstructionBlockParser::new().parse(spanned_lexer(src))
 }
 
 #[allow(dead_code)]
@@ -83,6 +83,15 @@ fn spanned_lexer(
             Ok(tok) => Ok((span.start, tok, span.end)),
             Err(err) => Err(err.into()),
         })
+}
+
+/// Validate a number is a 10-bit unsigned integer.
+pub fn validate_u10(n: i128) -> Result<u16, ParserError> {
+    let res = u16::try_from(n).map_err(|_| ParserError::ExpectedU10(n))?;
+    if res >= 1024 {
+        return Err(ParserError::ExpectedU10(n));
+    }
+    Ok(res)
 }
 
 #[cfg(test)]
