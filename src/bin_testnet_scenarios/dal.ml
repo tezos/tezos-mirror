@@ -211,8 +211,8 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
    - `levels`: to specify for how many levels to publish slots
    - `peers`: to specify additional DAL bootstrap peers
 *)
-let scenario_without_rollup_node node dal_node client proto_parameters
-    num_levels keys =
+let scenario_without_rollup_node node dal_node client _network_name
+    proto_parameters num_levels keys =
   let num_accounts = List.length keys in
   let key_indices = range 0 (num_accounts - 1) in
   let dal_parameters =
@@ -278,16 +278,17 @@ let scenario_without_rollup_node node dal_node client proto_parameters
     avg_att ;
   unit
 
+let prepare_installer_kernel rollup_node =
+  Sc_rollup_helpers.prepare_installer_kernel
+    ~base_installee:"./"
+    ~preimages_dir:
+      (Filename.concat (Sc_rollup_node.data_dir rollup_node) "wasm_2_0_0")
+    "dal_echo_kernel"
+
 (* Originate a rollup with alias [rollup_alias] running the "dal_echo_kernel" on
    the given [rollup_node]. *)
 let originate_rollup client rollup_node rollup_alias =
-  let* boot_sector =
-    Sc_rollup_helpers.prepare_installer_kernel
-      ~base_installee:"./"
-      ~preimages_dir:
-        (Filename.concat (Sc_rollup_node.data_dir rollup_node) "wasm_2_0_0")
-      "dal_echo_kernel"
-  in
+  let* boot_sector = prepare_installer_kernel rollup_node in
   let* rollup_address =
     Client.Sc_rollup.originate
       ~force:true (* because the alias might have already been used *)
@@ -314,8 +315,8 @@ let originate_rollup client rollup_node rollup_alias =
    The additional `originate` argument is used to specify whether the rollup
    should be re-originated (if given) or not (if missing).
 *)
-let scenario_with_rollup_node node dal_node client proto_parameters num_levels
-    keys =
+let scenario_with_rollup_node node dal_node client network_name proto_parameters
+    num_levels keys =
   let dal_parameters =
     Dal.Parameters.from_protocol_parameters proto_parameters
   in
@@ -323,7 +324,10 @@ let scenario_with_rollup_node node dal_node client proto_parameters num_levels
   let lag = dal_parameters.attestation_lag in
   let number_of_slots = dal_parameters.number_of_slots in
 
-  let originate = Cli.get ~default:None (fun _ -> Some (Some ())) "originate" in
+  let originate =
+    Cli.get ~default:None (fun _ -> Some (Some ())) "originate"
+    |> Option.is_some
+  in
   let rollup_alias = "dal_echo_rollup" in
   let rollup_node =
     Sc_rollup_node.create
@@ -333,15 +337,32 @@ let scenario_with_rollup_node node dal_node client proto_parameters num_levels
       ~base_dir:(Client.base_dir client)
       ~default_operator:Wallet.Airdrop.giver_alias
   in
+
+  let rollup_backup =
+    Filename.get_temp_dir_name () // (network_name ^ "-rollup")
+  in
+  let tezt_rollup_data_dir = Sc_rollup_node.data_dir rollup_node in
   let* () =
-    match originate with
-    | None ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6506
-           Currently, we have to re-originate because otherwise the rollup node
-           will try to process levels for which the DAL node was not running and
-           it will fail. *)
-        unit
-    | Some () -> originate_rollup client rollup_node rollup_alias
+    match Cli.get ~default:None (fun _ -> Some (Some ())) "load" with
+    | Some () when not originate ->
+        if Sys.file_exists rollup_backup then (
+          Log.info
+            "Loading rollup data-dir from %s in current tezt workspace..."
+            rollup_backup ;
+          Process.run "cp" ["-rT"; rollup_backup; tezt_rollup_data_dir])
+        else (
+          Log.info "Expected rollup data-dir %s does not exist." rollup_backup ;
+          unit)
+    | _ -> unit
+  in
+  let* () =
+    if originate then originate_rollup client rollup_node rollup_alias
+    else
+      (* We still need to let the installer prepare the reveal preimages for the
+         DAL echo kernel to be correctly executed: recall that we originated a
+         rollup running the installer kernel, not the echo kernel. *)
+      let* _boot_sector = prepare_installer_kernel rollup_node in
+      unit
   in
   let* () =
     Sc_rollup_node.run rollup_node rollup_alias ["--log-kernel-debug"]
@@ -419,8 +440,15 @@ let scenario_with_rollup_node node dal_node client proto_parameters num_levels
       check_slots_attested (published_level + 1)
   in
 
-  Lwt.join
-    [publish (); get_stored_slot first_level; check_slots_attested first_level]
+  let* () =
+    Lwt.join
+      [
+        publish (); get_stored_slot first_level; check_slots_attested first_level;
+      ]
+  in
+  match Cli.get ~default:None (fun _ -> Some (Some ())) "save" with
+  | None -> unit
+  | Some () -> Process.run "cp" ["-rT"; tezt_rollup_data_dir; rollup_backup]
 
 (* [load_and_save] returns two functions [load] and [save]. [save] can be used
    to save the current L1 and DAL nodes data-dirs in predefined locations, while
@@ -435,16 +463,19 @@ let load_and_save node dal_node network_name network_arg load_arg save_arg =
     let load_l1_dir, load_dal_dir =
       match load_arg with
       | Some () ->
-          if Sys.file_exists l1_backup then
-            if Sys.file_exists dal_backup then (true, true)
+          let load_l1, load_dal =
+            if Sys.file_exists l1_backup then
+              if Sys.file_exists dal_backup then (true, true)
+              else (
+                Log.info "Expected DAL data-dir %s does not exist." dal_backup ;
+                (true, false))
             else (
-              Log.info "Expected DAL data-dir %s does not exist." dal_backup ;
-              (true, false))
-          else (
-            Log.info "Expected L1 data-dir %s does not exist." l1_backup ;
-            (* Even if the DAL backup exists, we don't load it, because the DAL
-               config depends on the L1 config. *)
-            (false, false))
+              Log.info "Expected L1 data-dir %s does not exist." l1_backup ;
+              (* Even if the DAL backup exists, we don't load it, because the DAL
+                 config depends on the L1 config. *)
+              (false, false))
+          in
+          (load_l1, load_dal)
       | None -> (false, false)
     in
     let* () =
@@ -458,7 +489,14 @@ let load_and_save node dal_node network_name network_arg load_arg save_arg =
         Log.info "Initializing L1 node..." ;
         Node.config_init
           node
-          [network_arg; Expected_pow 26; Synchronisation_threshold 2])
+          [
+            network_arg;
+            Expected_pow 26;
+            Synchronisation_threshold 2;
+            (* use the archive mode so that the rollup node can retrieve the
+               inbox for old blocks *)
+            History_mode Archive;
+          ])
     in
     if load_dal_dir then (
       Log.info
@@ -532,6 +570,12 @@ let run_scenario network kind scenario =
 
   let node = Node.create [] in
   let dal_node = Dal_node.create ~node () in
+  let client =
+    Client.create
+      ~base_dir:(Wallet.default_wallet network)
+      ~endpoint:(Node node)
+      ()
+  in
   let load, save =
     load_and_save node dal_node network_name network_arg load save
   in
@@ -555,12 +599,6 @@ let run_scenario network kind scenario =
   let* () = save ~restart:true in
 
   Log.info "Make sure the wallet is usable." ;
-  let client =
-    Client.create
-      ~base_dir:(Wallet.default_wallet network)
-      ~endpoint:(Node node)
-      ()
-  in
   let aliases =
     List.map (fun i -> "slot-producer-" ^ string_of_int i) key_indices
   in
@@ -573,7 +611,9 @@ let run_scenario network kind scenario =
   in
 
   Log.info "Setup finished. Now running the scenario-specific part." ;
-  let* () = scenario node dal_node client proto_parameters num_levels keys in
+  let* () =
+    scenario node dal_node client network_name proto_parameters num_levels keys
+  in
 
   save ~restart:false
 
