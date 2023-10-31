@@ -5,7 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
-use super::{Instruction, Stage, TypedValue};
+use super::{Instruction, Stage, Type, TypedValue};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TypecheckedStage {}
@@ -16,6 +16,7 @@ impl Stage for TypecheckedStage {
     type NilType = ();
     type GetOverload = overloads::Get;
     type UpdateOverload = overloads::Update;
+    type FailwithType = Type;
 }
 
 pub type TypecheckedInstruction = Instruction<TypecheckedStage>;

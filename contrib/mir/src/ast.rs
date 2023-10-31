@@ -188,6 +188,7 @@ pub trait Stage {
       NilType,
       GetOverload,
       UpdateOverload,
+      FailwithType,
     }
 }
 
@@ -204,7 +205,7 @@ pub enum Instruction<T: Stage> {
     Loop(Vec<Instruction<T>>),
     Push(T::PushValue),
     Swap,
-    Failwith,
+    Failwith(T::FailwithType),
     Unit,
     Car,
     Cdr,

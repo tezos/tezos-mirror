@@ -16,6 +16,7 @@ impl Stage for ParsedStage {
     type NilType = Type;
     type GetOverload = ();
     type UpdateOverload = ();
+    type FailwithType = ();
 }
 
 pub type ParsedInstruction = Instruction<ParsedStage>;

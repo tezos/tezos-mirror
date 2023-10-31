@@ -327,14 +327,14 @@ fn typecheck_instruction(
         }
         (I::Swap, [] | [_]) => no_overload!(SWAP, len 2),
 
-        (I::Failwith, [.., _]) => {
+        (I::Failwith(..), [.., _]) => {
             let ty = pop!();
-            ensure_packable(ty)?;
+            ensure_packable(&ty)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
-            I::Failwith
+            I::Failwith(ty)
         }
-        (I::Failwith, []) => no_overload!(FAILWITH, len 1),
+        (I::Failwith(..), []) => no_overload!(FAILWITH, len 1),
 
         (I::Unit, ..) => {
             stack.push(T::Unit);
@@ -534,11 +534,11 @@ fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcEr
     }
 }
 
-fn ensure_packable(ty: Type) -> Result<(), TcError> {
+fn ensure_packable(ty: &Type) -> Result<(), TcError> {
     if ty.is_packable() {
         Ok(())
     } else {
-        Err(TcError::TypeNotPackable(ty))
+        Err(TcError::TypeNotPackable(ty.clone()))
     }
 }
 
@@ -821,8 +821,8 @@ mod typecheck_tests {
     #[test]
     fn test_failwith() {
         assert_eq!(
-            typecheck_instruction(Failwith, &mut Ctx::default(), &mut tc_stk![Type::Int]),
-            Ok(Failwith)
+            typecheck_instruction(Failwith(()), &mut Ctx::default(), &mut tc_stk![Type::Int]),
+            Ok(Failwith(Type::Int))
         );
     }
 
@@ -1593,7 +1593,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_failwith_short() {
-        too_short_test(Failwith, Prim::FAILWITH, 1);
+        too_short_test(Failwith(()), Prim::FAILWITH, 1);
     }
 
     #[test]
