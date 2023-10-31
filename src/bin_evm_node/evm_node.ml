@@ -279,7 +279,7 @@ let data_parameter =
     ~desc:"Data to prepare and chunk with the EVM rollup format"
     Params.string
 
-let main_command =
+let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
@@ -291,7 +291,8 @@ let main_command =
        cors_allowed_origins_arg
        cors_allowed_headers_arg
        verbose_arg)
-    (prefixes ["run"; "with"; "endpoint"] @@ rollup_node_endpoint_param @@ stop)
+    (prefixes ["run"; "proxy"; "with"; "endpoint"]
+    @@ rollup_node_endpoint_param @@ stop)
     (fun (version, rpc_addr, rpc_port, cors_origins, cors_headers, verbose)
          rollup_node_endpoint
          () ->
@@ -385,7 +386,7 @@ let chunker_command =
       print_chunks rollup_address data)
 
 (* List of program commands *)
-let commands = [main_command; chunker_command]
+let commands = [proxy_command; chunker_command]
 
 let global_options = Tezos_clic.no_options
 
