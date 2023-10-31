@@ -13,6 +13,26 @@ use crate::ast::*;
 pub type TypeStack = Stack<Type>;
 pub type IStack = Stack<TypedValue>;
 
+/// Possibly failed type stack. Stacks are considered failed after
+/// always-failing instructions. A failed stack can be unified (in terms of
+/// typechecking) with any other stack.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum FailingTypeStack {
+    Ok(TypeStack),
+    Failed,
+}
+
+impl FailingTypeStack {
+    /// Try to access a mutable reference to the underlying `TypeStack`, return
+    /// `err` if the stack is failed.
+    pub fn access_mut<E>(&mut self, err: E) -> Result<&mut TypeStack, E> {
+        match self {
+            FailingTypeStack::Ok(ok) => Ok(ok),
+            FailingTypeStack::Failed => Err(err),
+        }
+    }
+}
+
 /// Construct a `Stack` with the given content. Note that stack top is the
 /// _rightmost_ element.
 #[macro_export]
@@ -22,14 +42,20 @@ macro_rules! stk {
     };
 }
 
-pub use stk;
+/// Construct a `FailingTypeStack` with the given content. Note that stack top is the
+/// _rightmost_ element. Called `tc_stk` as it's used in the typechecker.
+#[macro_export]
+macro_rules! tc_stk {
+    [$($args:tt)*] => {
+        $crate::stack::FailingTypeStack::Ok($crate::stack::stk![$($args)*])
+    };
+}
+
+pub use {stk, tc_stk};
 
 /// A stack abstraction based on `Vec`.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Stack<T> {
-    data: Vec<T>,
-    failed: bool,
-}
+pub struct Stack<T>(Vec<T>);
 
 impl<T> Stack<T> {
     /// Allocate a new empty stack.
@@ -41,10 +67,7 @@ impl<T> Stack<T> {
     /// directly. Last `Vec` element will end up on the top of the stack. O(1)
     /// complexity.
     fn stack_from_vec(data: Vec<T>) -> Self {
-        Stack {
-            data,
-            failed: false,
-        }
+        Stack(data)
     }
 
     /// Convert stack index to vec index.
@@ -53,37 +76,19 @@ impl<T> Stack<T> {
         len.checked_sub(i + 1).expect("out of bounds stack access")
     }
 
-    fn data(&self) -> &Vec<T> {
-        assert!(!self.failed);
-        &self.data
-    }
-
-    fn data_mut(&mut self) -> &mut Vec<T> {
-        assert!(!self.failed);
-        &mut self.data
-    }
-
-    pub fn is_failed(&self) -> bool {
-        self.failed
-    }
-
-    pub fn fail(&mut self) {
-        self.failed = true;
-    }
-
     /// Push an element onto the top of the stack.
     pub fn push(&mut self, elt: T) {
-        self.data_mut().push(elt)
+        self.0.push(elt)
     }
 
     /// Pop an element off the top of the stack.
     pub fn pop(&mut self) -> Option<T> {
-        self.data_mut().pop()
+        self.0.pop()
     }
 
     /// Get the stack's element count.
     pub fn len(&self) -> usize {
-        self.data().len()
+        self.0.len()
     }
 
     /// Removes the specified number of elements from the top of the stack in
@@ -92,14 +97,14 @@ impl<T> Stack<T> {
     /// Panics if the `size` is larger than length of the stack.
     pub fn drop_top(&mut self, size: usize) {
         let len = self.len();
-        self.data_mut()
+        self.0
             .truncate(len.checked_sub(size).expect("size too large in drop_top"));
     }
 
     /// Borrow the stack content as an immutable slice. Note that stack top is
     /// the _rightmost_ element.
     pub fn as_slice(&self) -> &[T] {
-        self.data().as_slice()
+        self.0.as_slice()
     }
 
     /// Split off the top `size` elements of the stack into a new `Stack`.
@@ -108,7 +113,7 @@ impl<T> Stack<T> {
     pub fn split_off(&mut self, size: usize) -> Stack<T> {
         let len = self.len();
         Self::stack_from_vec(
-            self.data_mut()
+            self.0
                 .split_off(len.checked_sub(size).expect("size too large in split_off")),
         )
     }
@@ -116,7 +121,7 @@ impl<T> Stack<T> {
     /// Move elements from `other` to the top of the stack. New stack top is the
     /// top of `other`. Note that elements are moved out of `other`.
     pub fn append(&mut self, other: &mut Stack<T>) {
-        self.data_mut().append(other.data_mut())
+        self.0.append(&mut other.0)
     }
 
     /// Swap two elements in the stack, identified by their index from the top,
@@ -124,12 +129,12 @@ impl<T> Stack<T> {
     pub fn swap(&mut self, i1: usize, i2: usize) {
         let i1v = self.vec_index(i1);
         let i2v = self.vec_index(i2);
-        self.data_mut().swap(i1v, i2v)
+        self.0.swap(i1v, i2v)
     }
 
     /// Iterator over the stack content, starting from the top.
     pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.data().iter().rev()
+        self.0.iter().rev()
     }
 }
 
@@ -200,7 +205,7 @@ impl<T> Index<usize> for Stack<T> {
     /// Index into the stack. The top's index is `0`. Returns an immutable
     /// reference to the element.
     fn index(&self, index: usize) -> &Self::Output {
-        self.data().index(self.vec_index(index))
+        self.0.index(self.vec_index(index))
     }
 }
 
@@ -209,7 +214,7 @@ impl<T> IndexMut<usize> for Stack<T> {
     /// reference to the element.
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         let i = self.vec_index(index);
-        self.data_mut().index_mut(i)
+        self.0.index_mut(i)
     }
 }
 
@@ -365,22 +370,5 @@ mod tests {
         let mut stk = stk![1, 2, 3, 4, 5];
         stk[2] = 42;
         assert_eq!(stk, stk![1, 2, 42, 4, 5]);
-    }
-
-    #[test]
-    fn fail_stack() {
-        let mut stk = stk![1, 2, 3, 4, 5];
-        assert!(!stk.is_failed());
-        stk.fail();
-        assert!(stk.is_failed());
-    }
-
-    #[test]
-    #[should_panic(expected = "assertion failed: !self.failed")]
-    fn fail_stack_access() {
-        let mut stk = stk![1, 2, 3, 4, 5];
-        stk.fail();
-        assert!(stk.is_failed());
-        stk.pop();
     }
 }
