@@ -93,7 +93,7 @@ pub mod constants {
     pub const TRANSFERT_OBJ_SIZE: u64 = 347;
 }
 
-pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
+fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
     match &transaction.content {
         crate::inbox::TransactionContent::Deposit(_) => {
             ticks_of_deposit(constants::TICKS_FOR_DEPOSIT)
@@ -104,6 +104,8 @@ pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
     }
 }
 
+/// Estimation of the number of ticks the kernel can safely spend in the
+/// execution of the opcodes.
 pub fn estimate_remaining_ticks_for_transaction_execution(
     ticks: u64,
     tx_data_size: u64,
@@ -117,6 +119,9 @@ fn ticks_of_deposit(resulting_ticks: u64) -> u64 {
     resulting_ticks.saturating_add(constants::TRANSACTION_OVERHEAD)
 }
 
+/// Estimation of the number of ticks it takes to execute a given amount of gas.
+/// Takes into account the crypto, but not the overheads of a transaction, such
+/// as registering a valid transaction.
 pub fn average_ticks_of_gas(gas: u64) -> u64 {
     gas.saturating_mul(constants::TICKS_PER_GAS)
         .saturating_add(constants::TRANSACTION_OVERHEAD)
@@ -166,10 +171,7 @@ pub fn ticks_of_valid_transaction(
 /// A valid transaction is a transaction that could be transmitted to
 /// evm_execution. It can succeed (with or without effect on the state)
 /// or fail (if the VM encountered an error).
-pub fn ticks_of_valid_transaction_ethereum(
-    resulting_ticks: u64,
-    tx_data_size: u64,
-) -> u64 {
+fn ticks_of_valid_transaction_ethereum(resulting_ticks: u64, tx_data_size: u64) -> u64 {
     resulting_ticks
         .saturating_add(constants::TICKS_FOR_CRYPTO)
         .saturating_add(ticks_of_transaction_overhead(tx_data_size))
