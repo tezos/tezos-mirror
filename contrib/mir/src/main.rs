@@ -25,6 +25,7 @@ mod tests {
     use crate::gas::Gas;
     use crate::interpreter;
     use crate::parser;
+    use crate::parser::parse_contract_script;
     use crate::stack::stk;
     use crate::typechecker;
 
@@ -211,6 +212,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn vote_contract() {
+        let mut ctx = Ctx {
+            amount: 5_000_000,
+            ..Ctx::default()
+        };
+        let interp_res = parse_contract_script(VOTE_SRC)
+            .unwrap()
+            .typecheck(&mut ctx)
+            .unwrap()
+            .interpret(
+                &mut ctx,
+                "foo".into(),
+                vec![Elt("bar", 0), Elt("baz", 0), Elt("foo", 0)].into(),
+            );
+        use TypedValue as TV;
+        match interp_res.unwrap() {
+            (_, TV::Map(m)) => {
+                assert_eq!(m.get(&TV::String("foo".to_owned())).unwrap(), &TV::Int(1))
+            }
+            _ => panic!("unexpected contract output"),
+        }
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
@@ -237,4 +262,22 @@ mod tests {
             LOOP { SWAP ; DUP 2 ; ADD ; DIP 2 { PUSH int -1 ; ADD } ; DUP 3 ; GT } ;
             DIP { DROP 2 } }
           { DIP { DROP } } }";
+
+    const VOTE_SRC: &str = "{
+          parameter (string %vote);
+          storage (map string int);
+          code {
+              AMOUNT;
+              PUSH mutez 5000000;
+              COMPARE; GT;
+              IF { { UNIT; FAILWITH } } {};
+              DUP; DIP { CDR; DUP }; CAR; DUP;
+              DIP {
+                  GET; { IF_NONE { { UNIT ; FAILWITH } } {} };
+                  PUSH int 1; ADD; SOME
+              };
+              UPDATE;
+              NIL operation; PAIR
+          }
+      }";
 }

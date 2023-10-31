@@ -112,6 +112,42 @@ impl Value {
     }
 }
 
+macro_rules! valuefrom {
+    ($( <$($gs:ident),*> $ty:ty, $cons:expr );* $(;)*) => {
+        $(
+        impl<$($gs),*> From<$ty> for Value where $($gs: Into<Value>),* {
+            fn from(x: $ty) -> Self {
+                $cons(x)
+            }
+        }
+        )*
+    };
+}
+
+/// Simple helper for constructing Elt values:
+///
+/// ```
+/// let val: Value = Elt("foo", 3).into()
+/// ```
+pub struct Elt<K, V>(pub K, pub V);
+
+valuefrom! {
+  <> i128, Value::Number;
+  <> bool, Value::Boolean;
+  <> String, Value::String;
+  <> (), |_| Value::Unit;
+  <L, R> (L, R), |(l, r): (L, R)| Value::new_pair(l.into(), r.into());
+  <L, R> Elt<L, R>, |Elt(l, r): Elt<L, R>| Value::new_elt(l.into(), r.into());
+  <T> Option<T>, |x: Option<T>| Value::new_option(x.map(Into::into));
+  <T> Vec<T>, |x: Vec<T>| Value::Seq(x.into_iter().map(Into::into).collect());
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Value::String(s.to_owned())
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TypedValue {
     Int(i128),

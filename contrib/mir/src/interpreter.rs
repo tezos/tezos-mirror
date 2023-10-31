@@ -20,6 +20,41 @@ pub enum InterpretError {
     FailedWith(TypedValue),
 }
 
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ContractInterpretError {
+    #[error("failed typechecking input: {0}")]
+    TcError(#[from] crate::typechecker::TcError),
+    #[error("runtime failure while running the contract: {0}")]
+    InterpretError(#[from] crate::interpreter::InterpretError),
+}
+
+#[allow(dead_code)]
+impl ContractScript<TypecheckedStage> {
+    /// Interpret a typechecked contract script using the provided parameter and
+    /// storage. Parameter and storage are given as untyped `Value`s, as this
+    /// allows ensuring they satisfy the types expected by the script.
+    pub fn interpret(
+        &self,
+        ctx: &mut crate::context::Ctx,
+        parameter: Value,
+        storage: Value,
+    ) -> Result<(Vec<TypedValue>, TypedValue), ContractInterpretError> {
+        let in_ty = Type::new_pair(self.parameter.clone(), self.storage.clone());
+        let in_val = Value::new_pair(parameter, storage);
+        let tc_val = in_val.typecheck(ctx, &in_ty)?;
+        let mut stack = stk![tc_val];
+        self.code.interpret(ctx, &mut stack)?;
+        use TypedValue as V;
+        match stack.pop().expect("empty execution stack") {
+            V::Pair(bx, storage) => match *bx {
+                V::List(vec) => Ok((vec, *storage)),
+                v => panic!("expected `list operation`, got {:?}", v),
+            },
+            v => panic!("expected `pair 'a 'b`, got {:?}", v),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub fn interpret(
     ast: &TypecheckedAST,
@@ -27,10 +62,16 @@ pub fn interpret(
     stack: &mut IStack,
 ) -> Result<(), InterpretError> {
     for i in ast {
-        interpret_one(i, ctx, stack)?;
+        i.interpret(ctx, stack)?;
     }
     ctx.gas.consume(interpret_cost::INTERPRET_RET)?;
     Ok(())
+}
+
+impl TypecheckedInstruction {
+    fn interpret(&self, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
+        interpret_one(self, ctx, stack)
+    }
 }
 
 fn unreachable_state() -> ! {
