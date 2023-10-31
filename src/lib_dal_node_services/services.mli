@@ -212,6 +212,24 @@ module P2P : sig
     ; query : < wait : bool > >
     service
 
+  val get_points :
+    < meth : [`GET]
+    ; input : unit
+    ; output : P2p_point.Id.t list
+    ; prefix : unit
+    ; params : unit
+    ; query : < connected : bool > >
+    service
+
+  val get_points_info :
+    < meth : [`GET]
+    ; input : unit
+    ; output : (P2p_point.Id.t * P2p_point.Info.t) list
+    ; prefix : unit
+    ; params : unit
+    ; query : < connected : bool > >
+    service
+
   module Gossipsub : sig
     val get_topics :
       < meth : [`GET]

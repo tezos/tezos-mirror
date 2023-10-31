@@ -170,6 +170,23 @@ module P2P : sig
       it may occur that a discconnection takes several minutes. *)
   val disconnect_peer : t -> ?wait:bool -> P2p_peer.Id.t -> unit Lwt.t
 
+  (** [get_points ?connected t] returns a list of points. If
+      [connected] is [true] (default), it returns only points we are
+      currently connected. Otherwise, it returns a list of known
+      points (points for which we were already successfully connected
+      in the past.) *)
+  val get_points : ?connected:bool -> t -> P2p_point.Id.t list tzresult Lwt.t
+
+  (** [get_points_info ?connected t] returns a list of info for
+      points. If [connected] is [true] (default), it returns only info
+      for points we are currently connected. Otherwise, it returns a
+      list of infos for known points (points for which we were already
+      successfully connected in the past.) *)
+  val get_points_info :
+    ?connected:bool ->
+    t ->
+    (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
+
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list

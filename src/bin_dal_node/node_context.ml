@@ -196,6 +196,12 @@ module P2P = struct
   let disconnect_peer {transport_layer; _} ?wait peer =
     Gossipsub.Transport_layer.disconnect_peer transport_layer ?wait peer
 
+  let get_points ?connected {transport_layer; _} =
+    Gossipsub.Transport_layer.get_points ?connected transport_layer
+
+  let get_points_info ?connected {transport_layer; _} =
+    Gossipsub.Transport_layer.get_points_info ?connected transport_layer
+
   module Gossipsub = struct
     let get_topics {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in

@@ -160,3 +160,5 @@ val set_disconnected :
 val set_expected_peer_id : 'conn Info.t -> P2p_peer.Id.t -> unit
 
 val get_expected_peer_id : 'conn Info.t -> P2p_peer.Id.t option
+
+val info_of_point_info : 'conn Info.t -> P2p_point.Info.t

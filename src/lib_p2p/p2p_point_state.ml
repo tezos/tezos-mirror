@@ -244,3 +244,27 @@ let set_expected_peer_id point_info id =
   point_info.Info.expected_peer_id <- Some id
 
 let get_expected_peer_id point_info = point_info.Info.expected_peer_id
+
+let info_of_point_info i =
+  let open P2p_point.Info in
+  let open P2p_point.State in
+  let state =
+    match get i with
+    | Requested _ -> Requested
+    | Accepted {current_peer_id; _} -> Accepted current_peer_id
+    | Running {current_peer_id; _} -> Running current_peer_id
+    | Disconnected -> Disconnected
+  in
+  Info.
+    {
+      trusted = trusted i;
+      state;
+      reconnection_time = reconnection_time i;
+      last_failed_connection = last_failed_connection i;
+      last_rejected_connection = last_rejected_connection i;
+      last_established_connection = last_established_connection i;
+      last_disconnection = last_disconnection i;
+      last_seen = last_seen i;
+      last_miss = last_miss i;
+      expected_peer_id = get_expected_peer_id i;
+    }
