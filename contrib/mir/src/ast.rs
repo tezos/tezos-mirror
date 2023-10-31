@@ -22,11 +22,11 @@ pub enum Type {
     Mutez,
     String,
     Unit,
-    Pair(Box<Type>, Box<Type>),
+    Pair(Box<(Type, Type)>),
     Option(Box<Type>),
     List(Box<Type>),
     Operation,
-    Map(Box<Type>, Box<Type>),
+    Map(Box<(Type, Type)>),
 }
 
 impl Type {
@@ -36,7 +36,7 @@ impl Type {
             List(..) | Map(..) => false,
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(l, r) => l.is_comparable() && r.is_comparable(),
+            Pair(p) => p.0.is_comparable() && p.1.is_comparable(),
             Option(x) => x.is_comparable(),
         }
     }
@@ -46,8 +46,9 @@ impl Type {
         match self {
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(l, r) => l.is_packable() && r.is_packable(),
-            Option(x) | List(x) | Map(_, x) => x.is_packable(),
+            Pair(p) => p.0.is_packable() && p.1.is_packable(),
+            Option(x) | List(x) => x.is_packable(),
+            Map(m) => m.1.is_packable(),
         }
     }
 
@@ -62,15 +63,15 @@ impl Type {
             Type::String => 1,
             Type::Unit => 1,
             Type::Operation => 1,
-            Type::Pair(l, r) => 1 + l.size_for_gas() + r.size_for_gas(),
+            Type::Pair(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Type::Option(x) => 1 + x.size_for_gas(),
             Type::List(x) => 1 + x.size_for_gas(),
-            Type::Map(k, v) => 1 + k.size_for_gas() + v.size_for_gas(),
+            Type::Map(m) => 1 + m.0.size_for_gas() + m.1.size_for_gas(),
         }
     }
 
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Box::new(l), Box::new(r))
+        Self::Pair(Box::new((l, r)))
     }
 
     pub fn new_option(x: Self) -> Self {
@@ -82,7 +83,7 @@ impl Type {
     }
 
     pub fn new_map(k: Self, v: Self) -> Self {
-        Self::Map(Box::new(k), Box::new(v))
+        Self::Map(Box::new((k, v)))
     }
 }
 
@@ -92,15 +93,15 @@ pub enum Value {
     Boolean(bool),
     String(String),
     Unit,
-    Pair(Box<Value>, Box<Value>),
+    Pair(Box<(Value, Value)>),
     Option(Option<Box<Value>>),
     Seq(Vec<Value>),
-    Elt(Box<Value>, Box<Value>),
+    Elt(Box<(Value, Value)>),
 }
 
 impl Value {
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Box::new(l), Box::new(r))
+        Self::Pair(Box::new((l, r)))
     }
 
     pub fn new_option(x: Option<Self>) -> Self {
@@ -108,7 +109,7 @@ impl Value {
     }
 
     pub fn new_elt(k: Self, v: Self) -> Self {
-        Self::Elt(Box::new(k), Box::new(v))
+        Self::Elt(Box::new((k, v)))
     }
 }
 
@@ -156,7 +157,7 @@ pub enum TypedValue {
     Bool(bool),
     String(String),
     Unit,
-    Pair(Box<TypedValue>, Box<TypedValue>),
+    Pair(Box<(TypedValue, TypedValue)>),
     Option(Option<Box<TypedValue>>),
     List(Vec<TypedValue>),
     Map(BTreeMap<TypedValue, TypedValue>),
@@ -164,7 +165,7 @@ pub enum TypedValue {
 
 impl TypedValue {
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Box::new(l), Box::new(r))
+        Self::Pair(Box::new((l, r)))
     }
 
     pub fn new_option(x: Option<Self>) -> Self {

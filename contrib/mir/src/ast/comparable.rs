@@ -10,7 +10,7 @@ impl PartialOrd for TypedValue {
             (Bool(a), Bool(b)) => a.partial_cmp(b),
             (String(a), String(b)) => a.partial_cmp(b),
             (Unit, Unit) => Some(std::cmp::Ordering::Equal),
-            (Pair(l1, r1), Pair(l2, r2)) => (l1, r1).partial_cmp(&(l2, r2)),
+            (Pair(l), Pair(r)) => l.partial_cmp(r),
             (Option(x), Option(y)) => x.as_deref().partial_cmp(&y.as_deref()),
             _ => None,
         }
