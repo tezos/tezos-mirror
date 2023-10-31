@@ -59,6 +59,12 @@ impl<'a> From<Vec<u8>> for Micheline<'a> {
     }
 }
 
+impl<'a> From<()> for Micheline<'a> {
+    fn from(_: ()) -> Self {
+        Micheline::App(Prim::Unit, &[], NO_ANNS)
+    }
+}
+
 impl<'a> From<bool> for Micheline<'a> {
     fn from(x: bool) -> Self {
         Micheline::prim0(if x { Prim::True } else { Prim::False })
