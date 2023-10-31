@@ -3832,6 +3832,44 @@ let test_rpc_getLogs =
   Check.((List.length new_logs = 0) int) ~error_msg:"Expected %R logs, got %L" ;
   unit
 
+let test_tx_pool_replacing_transactions =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "tx_pool"]
+    ~title:"Transactions can be replaced"
+  @@ fun protocol ->
+  let* {evm_node; sc_rollup_node; node; client; _} =
+    setup_past_genesis ~admin:None protocol
+  in
+  let bob = Eth_account.bootstrap_accounts.(0) in
+  let* bob_nonce = get_transaction_count evm_node bob.address in
+  (* nonce: 0, private_key: bootstrappe_account(0), amount: 10; max_fees: 21000*)
+  let tx_a =
+    "0xf86b80825208825208940000000000000000000000000000000000000000888ac7230489e8000080820a95a05fc733145b2066166e074bc42239a7312b2358f5cbf9ce17bab404abd1dfaff0a0493e763aa933d3eb724d75f9ad6fb4bbffdf3d54568d44d6f70cfcf0a07dc4f8"
+  in
+  (* nonce: 0, private_key: bootstrappe_account(0), amount: 5; max_fees: 30000*)
+  let tx_b =
+    "0xf86b80827530825208940000000000000000000000000000000000000000884563918244f4000080820a96a008410806e7a3c6b403bbfa99d82886e5460921a664410eaea5fe99050c4dc63da031c3eb45ac8a42600b27029d1c910b4c0006f1f435a29f91626964a8cf25da3f"
+  in
+  (* Send the transactions to the proxy*)
+  let* result = send_raw_transaction evm_node tx_a in
+  let _tx_a_hash = Result.get_ok result in
+  let* result = send_raw_transaction evm_node tx_b in
+  let tx_b_hash = Result.get_ok result in
+  let* receipt =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt ~evm_node ~transaction_hash:tx_b_hash)
+      ()
+  in
+  let* new_bob_nonce = get_transaction_count evm_node bob.address in
+  Check.((receipt.status = true) bool) ~error_msg:"Transaction has failed" ;
+  Check.((new_bob_nonce = Int64.(add bob_nonce one)) int64)
+    ~error_msg:"Bob has sent more than one transaction" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -3898,7 +3936,8 @@ let register_evm_node ~protocols =
   test_originate_evm_kernel_and_dump_pvm_state protocols ;
   test_l2_call_inter_contract protocols ;
   test_rpc_getLogs protocols ;
-  test_log_index protocols
+  test_log_index protocols ;
+  test_tx_pool_replacing_transactions protocols
 
 let register ~protocols = register_evm_node ~protocols
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6591
