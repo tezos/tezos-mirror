@@ -412,9 +412,24 @@ module State = struct
   let pop_pending_operations state =
     ({state with pending_operations = []}, state.pending_operations)
 
+  let log_model_autostake name pkh old_cycle op ~optimal amount =
+    Log.debug
+      "Model Autostaking: at end of cycle %a, %s(%a) to reach optimal stake %a \
+       %s %a"
+      Cycle.pp
+      old_cycle
+      name
+      Signature.Public_key_hash.pp
+      pkh
+      Tez.pp
+      optimal
+      op
+      Tez.pp
+      (Tez.of_mutez_exn amount)
+
   let apply_autostake ~name ~old_cycle
       ({
-         pkh = _;
+         pkh;
          contract = _;
          delegate;
          parameters = _;
@@ -428,7 +443,12 @@ module State = struct
        } :
         account_state) state =
     let open Result_syntax in
-    if Some name <> delegate then return state
+    if Some name <> delegate then (
+      Log.debug
+        "Model Autostaking: %s <> %s, noop@."
+        name
+        (Option.value ~default:"None" delegate) ;
+      return state)
     else
       let* current_liquid_delegated = liquid_delegated ~name state in
       let current_frozen = Frozen_tez.total_current frozen_deposits in
@@ -456,21 +476,38 @@ module State = struct
       in
       (* stake or unstake *)
       let new_state =
-        if autostaked > 0L then
-          apply_stake (Test_tez.of_mutez_exn autostaked) name state
-        else if autostaked < 0L then
+        if autostaked > 0L then (
+          log_model_autostake ~optimal name pkh old_cycle "stake" autostaked ;
+          apply_stake (Test_tez.of_mutez_exn autostaked) name state)
+        else if autostaked < 0L then (
+          log_model_autostake
+            ~optimal
+            name
+            pkh
+            old_cycle
+            "unstake"
+            (Int64.neg autostaked) ;
           apply_unstake
             old_cycle
             (Test_tez.of_mutez_exn Int64.(neg autostaked))
             name
-            state
-        else state
+            state)
+        else (
+          log_model_autostake
+            ~optimal
+            name
+            pkh
+            old_cycle
+            "only finalize"
+            autostaked ;
+          state)
       in
       return @@ apply_finalize name new_state
 
   (** Applies when baking the last block of a cycle *)
   let apply_end_cycle current_cycle block state : t tzresult Lwt.t =
     let open Lwt_result_syntax in
+    Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
     let* launch_cycle_opt =
       Context.get_adaptive_issuance_launch_cycle (B block)
     in
