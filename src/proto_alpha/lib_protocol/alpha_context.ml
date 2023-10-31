@@ -505,6 +505,8 @@ module Receipt = struct
     | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
     | Shared of {delegate : Signature.public_key_hash}
 
+  let frozen_baker = Frozen_staker_repr.baker
+
   include Receipt_repr
 end
 

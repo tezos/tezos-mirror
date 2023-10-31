@@ -9,6 +9,8 @@ type t =
   | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
   | Shared of {delegate : Signature.public_key_hash}
 
+let baker pkh = Single {staker = Contract_repr.Implicit pkh; delegate = pkh}
+
 let of_staker (staker : Staker_repr.t) =
   match staker with
   | Single (staker, delegate) -> Single {staker; delegate}

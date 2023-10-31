@@ -16,6 +16,8 @@ type t =
   | Shared of {delegate : Signature.public_key_hash}
       (** The delegate and all its stakers simultaneously. *)
 
+val baker : Signature.public_key_hash -> t
+
 val of_staker : Staker_repr.t -> t
 
 val encoding : t Data_encoding.t
