@@ -726,7 +726,6 @@ let check_all_balances block state : unit tzresult Lwt.t =
 let apply_rewards ~(baker : string) block state : State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* state = State.apply_rewards ~baker block state in
-  let* () = check_all_balances block state in
   return state
 
 let check_issuance_rpc block : unit tzresult Lwt.t =
@@ -839,11 +838,6 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return (block, state)
     else return (block', state)
   in
-  (* Dawn of a new cycle *)
-  let* state =
-    if not (Block.last_block_of_cycle block) then return state
-    else State.apply_end_cycle current_cycle block state
-  in
   (* First block of a new cycle *)
   let new_current_cycle = Block.current_cycle block in
   let* state =
@@ -857,6 +851,12 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return @@ State.apply_new_cycle new_current_cycle state)
   in
   let* state = apply_rewards ~baker:baker_name block state in
+  (* Dawn of a new cycle *)
+  let* state =
+    if not (Block.last_block_of_cycle block) then return state
+    else State.apply_end_cycle current_cycle block state
+  in
+  let* () = check_all_balances block state in
   return (block, state)
 
 (** Bake until a cycle is reached, using [bake] instead of [Block.bake]
@@ -1406,7 +1406,7 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false) () =
      - AI not activated (and staker = delegate)
     Any scenario that begins with this will be triplicated.
  *)
-let init_scenario ?reward_per_block () =
+let init_scenario ?(force_ai = true) ?reward_per_block () =
   let constants = init_constants ?reward_per_block () in
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
@@ -1415,21 +1415,26 @@ let init_scenario ?reward_per_block () =
     let name = if self_stake then "staker" else "delegate" in
     begin_test ~activate_ai constants [name]
     --> set_delegate_params name init_params
-    --> stake name (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> set_baker "__bootstrap__"
   in
-  (Tag "AI activated"
-   --> (Tag "self stake" --> begin_test ~activate_ai:true ~self_stake:true
-       |+ Tag "external stake"
-          --> begin_test ~activate_ai:true ~self_stake:false
-          --> add_account_with_funds
-                "staker"
-                "delegate"
-                (Amount (Tez.of_mutez 2_000_000_000_000L))
-          --> set_delegate "staker" (Some "delegate"))
-   --> wait_ai_activation
-  |+ Tag "AI deactivated, self stake"
-     --> begin_test ~activate_ai:false ~self_stake:true)
+  let ai_activated =
+    Tag "AI activated"
+    --> (Tag "self stake" --> begin_test ~activate_ai:true ~self_stake:true
+        |+ Tag "external stake"
+           --> begin_test ~activate_ai:true ~self_stake:false
+           --> add_account_with_funds
+                 "staker"
+                 "delegate"
+                 (Amount (Tez.of_mutez 2_000_000_000_000L))
+           --> set_delegate "staker" (Some "delegate"))
+    --> wait_ai_activation
+  in
+
+  let ai_deactivated =
+    Tag "AI deactivated, self stake"
+    --> begin_test ~activate_ai:false ~self_stake:true
+  in
+  (if force_ai then ai_activated else ai_activated |+ ai_deactivated)
   --> next_block
 
 module Roundtrip = struct
