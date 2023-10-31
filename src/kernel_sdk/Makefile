@@ -52,7 +52,15 @@ publish-check: installer-template
 .PHONY: riscv-check
 riscv-check:
 	@cargo check -p tezos-smart-rollup-core $(RISCV_OPTS)
+	@cargo check -p tezos-smart-rollup-host $(RISCV_OPTS)
+	@cargo check -p tezos-smart-rollup-debug $(RISCV_OPTS)
 	@cargo check -p tezos-smart-rollup-panic-hook $(RISCV_OPTS)
+	@cargo check -p tezos-smart-rollup-entrypoint $(RISCV_OPTS)
+	@cargo check -p tezos-smart-rollup-encoding $(RISCV_OPTS)
+	# @cargo check -p tezos-smart-rollup-storage $(RISCV_OPTS)
+	# @cargo check -p tezos-smart-rollup-mock $(RISCV_OPTS)
+	@cargo check -p tezos-smart-rollup --target riscv64gc-unknown-none-elf --no-default-features --features proto-alpha-no-mock
+
 
 .PHONY: build
 build: installer-template

@@ -7,16 +7,16 @@ edition = "2021"
 version = "*"
 optional = true
 
-[dependencies.tezos-smart-rollup-core]
-path = "../../kernel_sdk/core"
-version = "0.2.1"
-default-features = false
-features = ["proto-alpha"]
-
 [dependencies.tezos-smart-rollup-panic-hook]
 path = "../../kernel_sdk/panic-hook"
 version = "0.2.1"
 default-features = false
+
+[dependencies.tezos-smart-rollup]
+path = "../../kernel_sdk/sdk"
+version = "0.2.1"
+default-features = false
+features = ["debug_alloc", "proto-alpha-no-mock"]
 
 [features]
 default = ["bare-metal"]

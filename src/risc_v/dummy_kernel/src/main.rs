@@ -9,12 +9,12 @@ extern crate std;
 mod actual_main;
 mod dumb_alloc;
 
-use tezos_smart_rollup_core::rollup_host::RollupHost;
+use tezos_smart_rollup::core_unsafe::rollup_host::RollupHost;
 
 #[inline]
 fn main_wrapper() -> ! {
     #[cfg(target_arch = "riscv64")]
-    use tezos_smart_rollup_core::riscv64_syscalls::exit;
+    use tezos_smart_rollup::core_unsafe::riscv64_syscalls::exit;
 
     #[cfg(not(target_arch = "riscv64"))]
     use std::process::exit;
@@ -27,7 +27,7 @@ fn main_wrapper() -> ! {
 #[cfg(all(target_arch = "riscv64", target_os = "none"))]
 mod bare_metal {
     use crate::dumb_alloc;
-    use tezos_smart_rollup_core::riscv64_syscalls::exit;
+    use tezos_smart_rollup::core_unsafe::riscv64_syscalls::exit;
 
     // This code runs before the main.
     #[riscv_rt::pre_init]

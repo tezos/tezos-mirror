@@ -22,11 +22,8 @@ path = "../host"
 version = "0.2.1"
 default-features = false
 
-[dev-dependencies.tezos-smart-rollup-core]
-path = "../core"
-version = "0.2.1"
-features = ["testing"]
-
 [features]
 default = ["alloc"]
 alloc = []
+testing = ["tezos-smart-rollup-core/testing"]
+proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha"]
