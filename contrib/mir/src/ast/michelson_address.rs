@@ -74,6 +74,20 @@ impl Address {
     }
 }
 
+impl TryFrom<&[u8]> for Address {
+    type Error = AddressError;
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Self::from_bytes(value)
+    }
+}
+
+impl TryFrom<&str> for Address {
+    type Error = AddressError;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::from_base58_check(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
