@@ -81,7 +81,7 @@ const print_list = function (src) {
 }
 
 const chunk_data = function (src) {
-    run_chunker_command = `${CHUNKER} chunk data "${src}" --mode dev`
+    run_chunker_command = `${CHUNKER} chunk data "${src}" --version dev`
     chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
     return chunked_message.split("\n").slice(1, -1);
 }
