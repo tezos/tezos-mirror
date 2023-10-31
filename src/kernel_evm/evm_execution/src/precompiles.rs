@@ -309,6 +309,8 @@ mod tests {
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_mock::MockHost;
 
+    const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000;
+
     fn set_balance(
         host: &mut MockHost,
         evm_account_storage: &mut EthereumAccountStorage,
@@ -360,6 +362,7 @@ mod tests {
             &block,
             &config,
             &precompiles,
+            DUMMY_ALLOCATED_TICKS,
         );
 
         let is_static = true;
@@ -395,6 +398,8 @@ mod tests {
             logs: vec![],
             result: Some(expected_hash),
             withdrawals: vec![],
+            // TODO (#6426): estimate the ticks consumption of precompiled contracts
+            estimated_ticks_used: 0,
         };
 
         assert_eq!(Ok(expected), result);
@@ -420,6 +425,8 @@ mod tests {
             logs: vec![],
             result: Some(expected_hash),
             withdrawals: vec![],
+            // TODO (#6426): estimate the ticks consumption of precompiled contracts
+            estimated_ticks_used: 0,
         };
 
         assert_eq!(Ok(expected), result);
@@ -469,6 +476,8 @@ mod tests {
                 target: expected_target,
                 amount: 100.into(),
             }],
+            // TODO (#6426): estimate the ticks consumption of precompiled contracts
+            estimated_ticks_used: 0,
         };
 
         assert_eq!(Ok(expected), result);
@@ -519,6 +528,8 @@ mod tests {
                 target: expected_target,
                 amount: 100.into(),
             }],
+            // TODO (#6426): estimate the ticks consumption of precompiled contracts
+            estimated_ticks_used: 0,
         };
 
         assert_eq!(Ok(expected), result);
@@ -550,6 +561,8 @@ mod tests {
             logs: vec![],
             result: None,
             withdrawals: vec![],
+            // TODO (#6426): estimate the ticks consumption of precompiled contracts
+            estimated_ticks_used: 0,
         };
 
         assert_eq!(Ok(expected), result);
@@ -572,6 +585,8 @@ mod tests {
             logs: vec![],
             result: None,
             withdrawals: vec![],
+            // TODO (#6426): estimate the ticks consumption of precompiled contracts
+            estimated_ticks_used: 0,
         };
 
         let result = execute_precompiled(target, input, transfer, Some(21000));

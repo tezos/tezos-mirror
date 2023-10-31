@@ -367,6 +367,7 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
                     gas_limit,
                     transaction_value,
                     pay_for_gas,
+                    u64::MAX, // don't account for ticks during the test
                 );
 
                 match &exec_result {

@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::apply_transaction;
+use crate::apply::{apply_transaction, ExecutionInfo};
 use crate::blueprint::{Queue, QueueElement};
 use crate::current_timestamp;
 use crate::error::Error;
@@ -21,6 +21,7 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use primitive_types::{H256, U256};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
+use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 use tezos_ethereum::block::BlockConstants;
 
@@ -77,6 +78,10 @@ fn compute<Host: Runtime>(
         }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
 
+        // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
+        let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
+            block_in_progress.estimated_ticks,
+        );
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match apply_transaction(
@@ -87,12 +92,18 @@ fn compute<Host: Runtime>(
             block_in_progress.index,
             evm_account_storage,
             accounts_index,
+            allocated_ticks,
         )? {
-            Some((receipt_info, object_info)) => {
+            Some(ExecutionInfo {
+                receipt_info,
+                object_info,
+                estimated_ticks_used,
+            }) => {
                 block_in_progress.register_valid_transaction(
                     &transaction,
                     object_info,
                     receipt_info,
+                    estimated_ticks_used,
                     host,
                 )?;
                 log!(
