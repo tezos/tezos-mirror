@@ -40,8 +40,8 @@ module Transport_layer = struct
 
   type t =
     ( Interface.p2p_message,
-      Interface.peer_metadata,
-      Interface.connection_metadata )
+      Types.P2P.Metadata.Peer.t,
+      Types.P2P.Metadata.Connection.t )
     P2p.t
 
   let create =
@@ -66,17 +66,14 @@ module Transport_layer = struct
         | Some _ -> Some (snd public_addr)
       in
       let connection_metadata =
-        {
-          Transport_layer_interface.advertised_net_addr;
-          advertised_net_port;
-          is_bootstrap_peer;
-        }
+        Types.P2P.Metadata.Connection.
+          {advertised_net_addr; advertised_net_port; is_bootstrap_peer}
       in
       P2p.create
         ~config
         ~limits
-        Interface.peer_meta_config
-        (Interface.conn_meta_config connection_metadata)
+        Types.P2P.Metadata.Peer.config
+        (Types.P2P.Metadata.Connection.config connection_metadata)
       @@ Interface.message_config ~network_name
 
   let activate ?(additional_points = []) p2p =

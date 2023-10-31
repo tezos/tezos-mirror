@@ -60,26 +60,6 @@ type p2p_message =
       message_id : Types.Message_id.t;
     }
 
-(** {!peer_metadata} is not used. So, its value is [unit]. *)
-type peer_metadata = unit
-
-(** {!connection_metadata} type. Currently, peers are using them to exchange
-    their public net addresses and ports on which they can be reached. The
-    {!advertised_net_port} is not mandatory, as it is already sent via the first
-    P2P message after a connection is authenticated. But, we decide to duplicate
-    the information here for consistency. The [is_bootstrap_peer] indicates
-    whether the remote peer has a bootstrap profile or not. *)
-type connection_metadata = {
-  advertised_net_addr : P2p_addr.t option;
-  advertised_net_port : int option;
-  is_bootstrap_peer : bool;
-}
-
 (** A P2P message config is parameterized by the network's name. *)
 val message_config :
   network_name:string -> p2p_message P2p_params.message_config
-
-val peer_meta_config : peer_metadata P2p_params.peer_meta_config
-
-val conn_meta_config :
-  connection_metadata -> connection_metadata P2p_params.conn_meta_config

@@ -149,7 +149,7 @@ let new_connections_handler gs_worker p2p_layer peer conn =
   let P2p_connection.Info.{incoming; id_point = addr, port_opt; _} =
     P2p.connection_info p2p_layer conn
   in
-  let {Transport_layer_interface.is_bootstrap_peer = bootstrap; _} =
+  let Types.P2P.Metadata.Connection.{is_bootstrap_peer = bootstrap; _} =
     P2p.connection_remote_metadata p2p_layer conn
   in
   let pool_opt = P2p.pool p2p_layer in
@@ -195,7 +195,8 @@ let px_of_peer p2p_layer peer =
      is covered by {!P2p.connection_remote_metadata}. But if the IP address is
      not explicitly given, we rely on the function {!P2p.connection_info
      p2p_layer conn}. *)
-  let {advertised_net_addr; advertised_net_port; is_bootstrap_peer = _} =
+  let Types.P2P.Metadata.Connection.
+        {advertised_net_addr; advertised_net_port; is_bootstrap_peer = _} =
     P2p.connection_remote_metadata p2p_layer conn
   in
   let {P2p_connection.Info.id_point = conn_addr, conn_port_opt; _} =
