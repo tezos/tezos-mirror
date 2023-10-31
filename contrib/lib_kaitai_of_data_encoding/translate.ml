@@ -246,6 +246,8 @@ let rec seq_field_of_data_encoding :
       seq_field_of_tups enums types tid_gen encoding
   | List {length_limit; length_encoding; elts} ->
       seq_field_of_collection enums types length_limit length_encoding elts id
+  | Array {length_limit; length_encoding; elts} ->
+      seq_field_of_collection enums types length_limit length_encoding elts id
   | Obj f -> seq_field_of_field enums types f
   | Objs {kind = _; left; right} ->
       let enums, types, left = seq_field_of_data_encoding enums types left id in
