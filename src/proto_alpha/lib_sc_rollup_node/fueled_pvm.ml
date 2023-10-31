@@ -91,6 +91,15 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
     let dal_attestation_lag = constants.dal.attestation_lag in
+    let dal_parameters =
+      Sc_rollup.Dal_parameters.
+        {
+          number_of_slots = Int64.of_int constants.dal.number_of_slots;
+          attestation_lag = Int64.of_int dal_attestation_lag;
+          slot_size = Int64.of_int constants.dal.cryptobox_parameters.slot_size;
+          page_size = Int64.of_int constants.dal.cryptobox_parameters.page_size;
+        }
+    in
     let reveal_builtins request =
       match Sc_rollup.Wasm_2_0_0PVM.decode_reveal request with
       | Reveal_raw_data hash -> (
@@ -132,10 +141,13 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                  We return empty string in this case, as done in the slow executon. *)
               Lwt.return ""
           | Ok (Some b) -> Lwt.return (Bytes.to_string b))
-      | Reveal_dal_parameters _ ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6543
-             Support reveal_dal_parameters in fast execution PVM. *)
-          assert false
+      | Reveal_dal_parameters {published_level = _} ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
+             Support revealing historical DAL parameters. *)
+          Lwt.return
+            (Data_encoding.Binary.to_string_exn
+               Sc_rollup.Dal_parameters.encoding
+               dal_parameters)
     in
     let eval_tick fuel failing_ticks state =
       let max_steps = F.max_ticks fuel in
@@ -246,10 +258,16 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | None -> abort state fuel current_tick
           | Some fuel ->
               go fuel (Int64.succ current_tick) failing_ticks next_state)
-      | Needs_reveal (Reveal_dal_parameters _) ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6544
-             Support reveal_dal_parameters in slow execution PVM. *)
-          assert false
+      | Needs_reveal (Reveal_dal_parameters {published_level = _}) -> (
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
+             Support revealing historical DAL parameters. *)
+          let*! next_state =
+            PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
+          in
+          match F.consume F.one_tick_consumption fuel with
+          | None -> abort state fuel current_tick
+          | Some fuel ->
+              go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Initial | First_after _ ->
           complete state fuel current_tick failing_ticks
     in
