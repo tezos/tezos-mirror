@@ -514,3 +514,17 @@ module P2P = struct
     end
   end
 end
+
+module Gossipsub = struct
+  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
+
+  let connection_encoding =
+    let open Data_encoding in
+    conv
+      (fun {topics; direct; outbound} -> (topics, direct, outbound))
+      (fun (topics, direct, outbound) -> {topics; direct; outbound})
+      (obj3
+         (req "topics" (list Topic.encoding))
+         (req "direct" bool)
+         (req "outbound" bool))
+end

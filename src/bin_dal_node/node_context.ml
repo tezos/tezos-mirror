@@ -212,5 +212,20 @@ module P2P = struct
     let get_topics {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in
       Gossipsub.Worker.GS.Topic.Map.bindings state.mesh |> List.rev_map fst
+
+    let get_connections {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Introspection.Connections.fold
+        (fun peer connection acc ->
+          ( peer,
+            Types.Gossipsub.
+              {
+                topics = Gossipsub.Worker.GS.Topic.Set.elements connection.topics;
+                direct = connection.direct;
+                outbound = connection.outbound;
+              } )
+          :: acc)
+        state.connections
+        []
   end
 end

@@ -295,3 +295,11 @@ module P2P : sig
     end
   end
 end
+
+module Gossipsub : sig
+  (** See {!Tezos_gossipsub.Introspection.connection}. Ideally we should reuse
+      that type, but that would require a new dependency to be added. *)
+  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
+
+  val connection_encoding : connection Data_encoding.t
+end

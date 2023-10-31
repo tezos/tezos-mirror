@@ -257,5 +257,14 @@ module P2P : sig
       ; params : unit
       ; query : unit >
       service
+
+    val get_connections :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Peer.t * Types.Gossipsub.connection) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
   end
 end
