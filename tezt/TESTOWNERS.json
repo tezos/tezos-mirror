@@ -29,7 +29,7 @@
     ],
     "path_patterns": [
       "^src/lib_aplonk",
-      "^src/lib_distributed_aplonk"
+      "^src/lib_distributed_plonk"
     ]
   },
   "etherlink": {
