@@ -5,18 +5,17 @@
 /*                                                                            */
 /******************************************************************************/
 
-mod ast;
-mod context;
-mod gas;
-mod interpreter;
-mod irrefutable_match;
-mod lexer;
-mod parser;
-mod stack;
-mod syntax;
-mod typechecker;
-
-fn main() {}
+pub mod ast;
+pub mod context;
+pub mod gas;
+pub mod interpreter;
+pub mod irrefutable_match;
+pub mod lexer;
+pub mod parser;
+pub mod stack;
+pub mod syntax;
+pub mod typechecker;
+pub mod tzt;
 
 #[cfg(test)]
 mod tests {

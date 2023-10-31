@@ -127,7 +127,7 @@ macro_rules! valuefrom {
 
 /// Simple helper for constructing Elt values:
 ///
-/// ```
+/// ```text
 /// let val: Value = Elt("foo", 3).into()
 /// ```
 pub struct Elt<K, V>(pub K, pub V);
@@ -161,6 +161,52 @@ pub enum TypedValue {
     Option(Option<Box<TypedValue>>),
     List(Vec<TypedValue>),
     Map(BTreeMap<TypedValue, TypedValue>),
+}
+
+pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
+    use TypedValue as TV;
+    use Value as V;
+    match tv {
+        TV::Int(i) => V::Number(i),
+        TV::Nat(u) => V::Number(u.try_into().unwrap()),
+        TV::Mutez(u) => V::Number(u.try_into().unwrap()),
+        TV::Bool(b) => V::Boolean(b),
+        TV::String(s) => V::String(s),
+        TV::Unit => V::Unit,
+        // This transformation for pairs deviates from the optimized representation of the
+        // reference implementation, because reference implementation optimizes the size of combs
+        // and uses an untyped representation that is the shortest.
+        TV::Pair(b) => V::new_pair(
+            typed_value_to_value_optimized(b.0),
+            typed_value_to_value_optimized(b.1),
+        ),
+        TV::List(l) => V::Seq(l.into_iter().map(typed_value_to_value_optimized).collect()),
+        TV::Map(m) => V::Seq(
+            m.into_iter()
+                .map(|(key, val)| {
+                    V::new_elt(
+                        typed_value_to_value_optimized(key),
+                        typed_value_to_value_optimized(val),
+                    )
+                })
+                .collect(),
+        ),
+        TV::Option(None) => V::Option(None),
+        TV::Option(Some(r)) => V::new_option(Some(typed_value_to_value_optimized(*r))),
+    }
+}
+
+// Note that there are more than one way to do this conversion. Here we use the optimized untyped
+// representation as the target, since that is what the typed to untyped conversion during a
+// FAILWITH call does in the reference implementation, and this logic is primarly used in the
+// corresponding section of MIR now.
+//
+// TODO: This implementation will be moved to interpreter in the context of issue,
+// https://gitlab.com/tezos/tezos/-/issues/6504
+impl From<TypedValue> for Value {
+    fn from(tv: TypedValue) -> Self {
+        typed_value_to_value_optimized(tv)
+    }
 }
 
 impl TypedValue {

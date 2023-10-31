@@ -17,7 +17,7 @@ use crate::lexer::Prim;
 use crate::stack::*;
 
 /// Typechecker error type.
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum TcError {
     #[error("type stacks not equal: {0:?} != {1:?}")]
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
@@ -51,7 +51,7 @@ pub enum TcError {
     TypeNotPackable(Type),
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum NoMatchingOverloadReason {
     #[error("stack too short, expected {expected}")]
     StackTooShort { expected: usize },
@@ -65,7 +65,7 @@ pub enum NoMatchingOverloadReason {
     TypeNotComparable(Type),
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum StacksNotEqualReason {
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
@@ -73,7 +73,7 @@ pub enum StacksNotEqualReason {
     LengthsDiffer(usize, usize),
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
 
@@ -440,7 +440,7 @@ impl Value {
     }
 }
 
-fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcError> {
+pub fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcError> {
     use Type::*;
     use TypedValue as TV;
     use Value as V;
