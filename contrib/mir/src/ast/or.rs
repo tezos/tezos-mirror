@@ -5,7 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
 pub enum Or<L, R> {
     Left(L),
     Right(R),
