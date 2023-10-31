@@ -360,6 +360,13 @@ fn interpret_one(
             ctx.gas.consume(interpret_cost::CHAIN_ID)?;
             stack.push(V::ChainId(ctx.chain_id.clone()));
         }
+        I::ISelf => {
+            ctx.gas.consume(interpret_cost::SELF)?;
+            stack.push(V::Contract(Address {
+                hash: ctx.self_address.clone(),
+                entrypoint: Entrypoint::default(),
+            }));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -1304,6 +1311,22 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::CHAIN_ID + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn self_instr() {
+        let stk = &mut stk![];
+        let ctx = &mut Ctx {
+            self_address: "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap(),
+            ..Ctx::default()
+        };
+        assert_eq!(interpret(&vec![ISelf], ctx, stk), Ok(()));
+        assert_eq!(
+            stk,
+            &stk![TypedValue::Contract(
+                "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap()
+            )]
         );
     }
 }

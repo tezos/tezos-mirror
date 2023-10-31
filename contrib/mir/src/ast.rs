@@ -281,6 +281,8 @@ pub enum Instruction<T: Stage> {
     Iter(T::IterOverload, Vec<Instruction<T>>),
     IfLeft(Vec<Instruction<T>>, Vec<Instruction<T>>),
     ChainId,
+    /// `ISelf` because `Self` is a reserved keyword
+    ISelf,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

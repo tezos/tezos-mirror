@@ -248,6 +248,7 @@ pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
         gas: crate::gas::Gas::default(),
         amount: test.amount.unwrap_or_default(),
         chain_id: test.chain_id.unwrap_or(Ctx::default().chain_id),
+        self_address: Ctx::default().self_address,
     };
     let execution_result = execute_tzt_test_code(test.code, &mut ctx, None, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
