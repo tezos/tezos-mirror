@@ -127,7 +127,7 @@ mod tests {
         assert_eq!(
             typechecker::typecheck(ast, &mut Ctx::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
-                instr: "DUP",
+                instr: crate::lexer::Prim::DUP,
                 stack: stk![Type::Int, Type::Int, Type::Int],
                 reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 4 })
             })

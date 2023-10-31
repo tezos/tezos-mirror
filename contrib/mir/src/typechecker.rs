@@ -13,6 +13,7 @@ use crate::context::Ctx;
 use crate::gas;
 use crate::gas::OutOfGas;
 use crate::irrefutable_match::irrefutable_match;
+use crate::lexer::Prim;
 use crate::stack::*;
 
 /// Typechecker error type.
@@ -42,7 +43,7 @@ pub enum TcError {
     DuplicateElements(Type),
     #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {}", x)))]
     NoMatchingOverload {
-        instr: &'static str,
+        instr: Prim,
         stack: TypeStack,
         reason: Option<NoMatchingOverloadReason>,
     },
@@ -133,40 +134,13 @@ macro_rules! nothing_to_none {
     };
 }
 
-// This is a bit more complex than I'd like to, but if we want to capture the
-// offending stack in its entirety, we _have_ to match on it and handle errors
-// before popping. The alternative is to clone whole stack on each instruction,
-// which doesn't sound good. -- @lierdakil
-macro_rules! checked_pop {
-    ($instr:literal, $stack:expr, $pat:pat => $res:expr $(, $reason:expr)?) => {
-        match $stack.as_slice() {
-            #[allow(unused_variables)]
-            [.., $pat] => match $stack.pop().unwrap() {
-                $pat => Ok($res),
-                #[allow(unreachable_patterns)]
-                _ => unreachable!(),
-            }
-            [] => Err(TcError::NoMatchingOverload {
-                instr: $instr,
-                stack: $stack.clone(),
-                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 }),
-            }),
-            #[allow(unused_variables, unreachable_patterns)]
-            [.., t] => Err(TcError::NoMatchingOverload {
-                instr: $instr,
-                stack: $stack.clone(),
-                reason: nothing_to_none!($($reason($stack.pop().unwrap()))?),
-            }),
-        }
-    };
-}
-
 fn typecheck_instruction(
     i: ParsedInstruction,
     ctx: &mut Ctx,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<TypecheckedInstruction, TcError> {
     use Instruction as I;
+    use NoMatchingOverloadReason as NMOR;
     use Type as T;
 
     let stack = opt_stack.access_mut(TcError::FailNotInTail)?;
@@ -193,48 +167,66 @@ fn typecheck_instruction(
         };
     }
 
+    // Error handling when stack isn't matched for an instruction. Two forms:
+    // no_overload!(instr, len <n>) -- when stack is too short, where <n> is expected length
+    // no_overload!(instr, <expr>) -- otherwise, where <expr> is Into<NoMatchingOverloadReason>,
+    // and is optional.
+    macro_rules! no_overload {
+        ($instr:ident, len $expected_len:expr) => {
+            {
+                return Err(TcError::NoMatchingOverload {
+                    instr: Prim::$instr,
+                    stack: stack.clone(),
+                    reason: Some(NoMatchingOverloadReason::StackTooShort {
+                        expected: $expected_len
+                    }),
+                })
+            }
+        };
+        ($instr:ident$(, $reason:expr)?) => {
+            {
+                return Err(TcError::NoMatchingOverload {
+                    instr: Prim::$instr,
+                    stack: stack.clone(),
+                    reason: nothing_to_none!($($reason.into())?)
+                })
+            }
+        };
+    }
+
     ctx.gas.consume(gas::tc_cost::INSTR_STEP)?;
 
-    Ok(match i {
-        I::Add(..) => {
-            ensure_stack_len("ADD", stack, 2)?;
-            match stack.as_slice() {
-                [.., T::Nat, T::Nat] => {
-                    stack.pop();
-                    I::Add(overloads::Add::NatNat)
-                }
-                [.., T::Int, T::Int] => {
-                    stack.pop();
-                    I::Add(overloads::Add::IntInt)
-                }
-                [.., T::Nat, T::Int] => {
-                    stack.pop();
-                    stack[0] = T::Int;
-                    I::Add(overloads::Add::IntNat)
-                }
-                [.., T::Int, T::Nat] => {
-                    stack.pop();
-                    I::Add(overloads::Add::NatInt)
-                }
-                [.., T::Mutez, T::Mutez] => {
-                    stack.pop();
-                    I::Add(overloads::Add::MutezMutez)
-                }
-                _ => {
-                    return Err(TcError::NoMatchingOverload {
-                        instr: "ADD",
-                        stack: stack.clone(),
-                        reason: None,
-                    })
-                }
-            }
+    Ok(match (i, stack.as_slice()) {
+        (I::Add(..), [.., T::Nat, T::Nat]) => {
+            pop!();
+            I::Add(overloads::Add::NatNat)
         }
-        I::Dip(opt_height, nested) => {
+        (I::Add(..), [.., T::Int, T::Int]) => {
+            pop!();
+            I::Add(overloads::Add::IntInt)
+        }
+        (I::Add(..), [.., T::Nat, T::Int]) => {
+            pop!();
+            stack[0] = T::Int;
+            I::Add(overloads::Add::IntNat)
+        }
+        (I::Add(..), [.., T::Int, T::Nat]) => {
+            pop!();
+            I::Add(overloads::Add::NatInt)
+        }
+        (I::Add(..), [.., T::Mutez, T::Mutez]) => {
+            pop!();
+            I::Add(overloads::Add::MutezMutez)
+        }
+        (I::Add(..), [.., _, _]) => no_overload!(ADD),
+        (I::Add(..), [_] | []) => no_overload!(ADD, len 2),
+
+        (I::Dip(opt_height, nested), ..) => {
             let protected_height = opt_height.unwrap_or(1) as usize;
 
             ctx.gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
-            ensure_stack_len("DIP", stack, protected_height)?;
+            ensure_stack_len(Prim::DIP, stack, protected_height)?;
             // Here we split off the protected portion of the stack, typecheck the code with the
             // remaining unprotected part, then append the protected portion back on top.
             let mut protected = stack.split_off(protected_height);
@@ -244,29 +236,34 @@ fn typecheck_instruction(
                 .append(&mut protected);
             I::Dip(opt_height, nested)
         }
-        I::Drop(opt_height) => {
+
+        (I::Drop(opt_height), ..) => {
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
             ctx.gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
-            ensure_stack_len("DROP", stack, drop_height)?;
+            ensure_stack_len(Prim::DROP, stack, drop_height)?;
             stack.drop_top(drop_height);
             I::Drop(opt_height)
         }
+
         // DUP instruction requires an argument that is > 0.
-        I::Dup(Some(0)) => return Err(TcError::Dup0),
-        I::Dup(opt_height) => {
+        (I::Dup(Some(0)), ..) => return Err(TcError::Dup0),
+        (I::Dup(opt_height), ..) => {
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
-            ensure_stack_len("DUP", stack, dup_height)?;
+            ensure_stack_len(Prim::DUP, stack, dup_height)?;
             stack.push(stack[dup_height - 1].clone());
             I::Dup(opt_height)
         }
-        I::Gt => {
-            checked_pop!("GT", stack, T::Int => (), |t| TypesNotEqual(T::Int, t).into())?;
-            stack.push(T::Bool);
+
+        (I::Gt, [.., T::Int]) => {
+            stack[0] = T::Bool;
             I::Gt
         }
-        I::If(nested_t, nested_f) => {
-            checked_pop!("IF", stack, T::Bool => (), |t| TypesNotEqual(T::Bool, t).into())?;
-            // Check if top is bool
+        (I::Gt, [.., t]) => no_overload!(GT, TypesNotEqual(T::Int, t.clone())),
+        (I::Gt, []) => no_overload!(GT, len 1),
+
+        (I::If(nested_t, nested_f), [.., T::Bool]) => {
+            // pop the bool off the stack
+            pop!();
             // Clone the stack so that we have a copy to run one branch on.
             // We can run the other branch on the live stack.
             let mut f_opt_stack = opt_stack.clone();
@@ -276,9 +273,12 @@ fn typecheck_instruction(
             unify_stacks(ctx, opt_stack, f_opt_stack)?;
             I::If(nested_t, nested_f)
         }
-        I::IfNone(when_none, when_some) => {
-            // Check if top is option 'ty
-            let ty = checked_pop!("IF_NONE", stack, T::Option(ty) => ty, NoMatchingOverloadReason::ExpectedOption)?;
+        (I::If(..), [.., t]) => no_overload!(IF, TypesNotEqual(T::Bool, t.clone())),
+        (I::If(..), []) => no_overload!(IF, len 1),
+
+        (I::IfNone(when_none, when_some), [.., T::Option(..)]) => {
+            // Extract option type
+            pop!(T::Option, ty);
             // Clone the some_stack as we need to push a type on top of it
             let mut some_stack: TypeStack = stack.clone();
             some_stack.push(*ty);
@@ -289,17 +289,22 @@ fn typecheck_instruction(
             unify_stacks(ctx, opt_stack, some_opt_stack)?;
             I::IfNone(when_none, when_some)
         }
-        I::Int => {
-            checked_pop!("INT", stack, T::Nat => ())?;
-            stack.push(Type::Int);
+        (I::IfNone(..), [.., t]) => no_overload!(IF_NONE, NMOR::ExpectedOption(t.clone())),
+        (I::IfNone(..), []) => no_overload!(IF_NONE, len 1),
+
+        (I::Int, [.., T::Nat]) => {
+            stack[0] = Type::Int;
             I::Int
         }
-        I::Loop(nested) => {
+        (I::Int, [.., _]) => no_overload!(INT),
+        (I::Int, []) => no_overload!(INT, len 1),
+
+        (I::Loop(nested), [.., T::Bool]) => {
             // copy stack for unifying with it later
             let opt_copy = FailingTypeStack::Ok(stack.clone());
-            // Check if top is bool
-            checked_pop!("LOOP", stack, T::Bool => (), |t| TypesNotEqual(T::Bool, t).into())?;
-            // Typecheck with the current stack
+            // Pop the bool off the top
+            pop!();
+            // Typecheck body with the current stack
             let nested = typecheck(nested, ctx, opt_stack)?;
             // If the starting stack and result stack unify, all is good.
             unify_stacks(ctx, opt_stack, opt_copy)?;
@@ -307,55 +312,69 @@ fn typecheck_instruction(
             opt_stack.access_mut(()).ok().map(Stack::pop);
             I::Loop(nested)
         }
-        I::Push((t, v)) => {
+        (I::Loop(..), [.., ty]) => no_overload!(LOOP, TypesNotEqual(T::Bool, ty.clone())),
+        (I::Loop(..), []) => no_overload!(LOOP, len 1),
+
+        (I::Push((t, v)), ..) => {
             let v = typecheck_value(ctx, &t, v)?;
-            stack.push(t.to_owned());
+            stack.push(t);
             I::Push(v)
         }
-        I::Swap => {
-            ensure_stack_len("SWAP", stack, 2)?;
+
+        (I::Swap, [.., _, _]) => {
             stack.swap(0, 1);
             I::Swap
         }
-        I::Failwith => {
-            ensure_stack_len("FAILWITH", stack, 1)?;
+        (I::Swap, [] | [_]) => no_overload!(SWAP, len 2),
+
+        (I::Failwith, [.., _]) => {
             let ty = pop!();
             ensure_packable(ty)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
             I::Failwith
         }
-        I::Unit => {
+        (I::Failwith, []) => no_overload!(FAILWITH, len 1),
+
+        (I::Unit, ..) => {
             stack.push(T::Unit);
             I::Unit
         }
-        I::Car => {
-            let l = checked_pop!("CAR", stack, T::Pair(l, _) => *l, NoMatchingOverloadReason::ExpectedPair)?;
-            stack.push(l);
+
+        (I::Car, [.., T::Pair(..)]) => {
+            pop!(T::Pair, l, _r);
+            stack.push(*l);
             I::Car
         }
-        I::Cdr => {
-            let r = checked_pop!("CDR", stack, T::Pair(_, r) => *r, NoMatchingOverloadReason::ExpectedPair)?;
-            stack.push(r);
+        (I::Car, [.., ty]) => no_overload!(CAR, NMOR::ExpectedPair(ty.clone())),
+        (I::Car, []) => no_overload!(CAR, len 1),
+
+        (I::Cdr, [.., T::Pair(..)]) => {
+            pop!(T::Pair, _l, r);
+            stack.push(*r);
             I::Cdr
         }
-        I::Pair => {
-            ensure_stack_len("PAIR", stack, 2)?;
+        (I::Cdr, [.., ty]) => no_overload!(CDR, NMOR::ExpectedPair(ty.clone())),
+        (I::Cdr, []) => no_overload!(CDR, len 1),
+
+        (I::Pair, [.., _, _]) => {
             let (l, r) = (pop!(), pop!());
             stack.push(Type::new_pair(l, r));
             I::Pair
         }
-        I::ISome => {
-            let ty = checked_pop!("SOME", stack, ty => ty)?;
+        (I::Pair, [] | [_]) => no_overload!(PAIR, len 2),
+
+        (I::ISome, [.., _]) => {
+            let ty = pop!();
             stack.push(T::new_option(ty));
             I::ISome
         }
-        I::Compare => {
-            ensure_stack_len("COMPARE", stack, 2)?;
-            let (t, u) = (&stack[0], &stack[1]);
+        (I::ISome, []) => no_overload!(SOME, len 1),
+
+        (I::Compare, [.., u, t]) => {
             ensure_ty_eq(ctx, t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
-                    instr: "COMPARE",
+                    instr: Prim::COMPARE,
                     stack: stack.clone(),
                     reason: Some(e.into()),
                 },
@@ -363,71 +382,54 @@ fn typecheck_instruction(
             })?;
             if !t.is_comparable() {
                 return Err(TcError::NoMatchingOverload {
-                    instr: "COMPARE",
+                    instr: Prim::COMPARE,
                     stack: stack.clone(),
                     reason: Some(NoMatchingOverloadReason::TypeNotComparable(t.clone())),
                 });
             }
-            stack.pop();
+            pop!();
             stack[0] = T::Int;
             I::Compare
         }
-        I::Amount => {
+        (I::Compare, [] | [_]) => no_overload!(COMPARE, len 2),
+
+        (I::Amount, ..) => {
             stack.push(T::Mutez);
             I::Amount
         }
-        I::Nil(ty) => {
+
+        (I::Nil(ty), ..) => {
             stack.push(T::new_list(ty));
             I::Nil(())
         }
-        I::Get(..) => {
-            ensure_stack_len("GET", stack, 2)?;
-            match stack.as_slice() {
-                [.., T::Map(..), _] => {
-                    let kty_ = pop!();
-                    pop!(T::Map, kty, vty);
-                    ensure_ty_eq(ctx, &kty, &kty_)?;
-                    // can only fail if the typechecker is invoked on invalid
-                    // types, i.e. where `map` key is non-comparable
-                    ensure_comparable(&kty)?;
-                    stack.push(T::new_option(*vty));
-                    I::Get(overloads::Get::Map)
-                }
-                _ => {
-                    return Err(TcError::NoMatchingOverload {
-                        instr: "GET",
-                        stack: stack.clone(),
-                        reason: None,
-                    })
-                }
-            }
+
+        (I::Get(..), [.., T::Map(..), _]) => {
+            let kty_ = pop!();
+            pop!(T::Map, kty, vty);
+            ensure_ty_eq(ctx, &kty, &kty_)?;
+            // can only fail if the typechecker is invoked on invalid types,
+            // i.e. where `map` key is non-comparable
+            ensure_comparable(&kty)?;
+            stack.push(T::new_option(*vty));
+            I::Get(overloads::Get::Map)
         }
-        I::Update(..) => {
-            ensure_stack_len("UPDATE", stack, 3)?;
-            match stack.as_slice() {
-                [.., T::Map(..), _, _] => {
-                    let kty_ = pop!();
-                    let vty_new = pop!();
-                    pop!(T::Map, kty, vty);
-                    ensure_ty_eq(ctx, &kty, &kty_)?;
-                    ensure_ty_eq(ctx, &T::new_option(*vty), &vty_new)?;
-                    // can only fail if the typechecker is invoked on invalid
-                    // types, i.e. where `map` key is non-comparable
-                    ensure_comparable(&kty)?;
-                    let boxed_vty = irrefutable_match!(vty_new; T::Option);
-                    stack.push(T::Map(kty, boxed_vty));
-                    I::Update(overloads::Update::Map)
-                }
-                _ => {
-                    return Err(TcError::NoMatchingOverload {
-                        instr: "UPDATE",
-                        stack: stack.clone(),
-                        reason: None,
-                    })
-                }
-            }
+        (I::Get(..), [.., _, _]) => no_overload!(GET),
+        (I::Get(..), [] | [_]) => no_overload!(GET, len 2),
+
+        (I::Update(..), [.., T::Map(kty, vty), T::Option(vty_new), kty_]) => {
+            ensure_ty_eq(ctx, kty, kty_)?;
+            ensure_ty_eq(ctx, vty, vty_new)?;
+            // can only fail if the typechecker is invoked on invalid types,
+            // i.e. where `map` key is non-comparable
+            ensure_comparable(kty)?;
+            pop!();
+            pop!();
+            I::Update(overloads::Update::Map)
         }
-        I::Seq(nested) => I::Seq(typecheck(nested, ctx, opt_stack)?),
+        (I::Update(..), [.., _, _, _]) => no_overload!(UPDATE),
+        (I::Update(..), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
+
+        (I::Seq(nested), ..) => I::Seq(typecheck(nested, ctx, opt_stack)?),
     })
 }
 
@@ -515,7 +517,7 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
 
 /// Ensures type stack is at least of the required length, otherwise returns
 /// `Err(StackTooShort)`.
-fn ensure_stack_len(instr: &'static str, stack: &TypeStack, l: usize) -> Result<(), TcError> {
+fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcError> {
     if stack.len() >= l {
         Ok(())
     } else {
@@ -978,7 +980,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck(parse("{ CAR }").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
-                instr: "CAR",
+                instr: Prim::CAR,
                 stack: stk![Type::Unit],
                 reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Unit)),
             })
@@ -991,7 +993,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck(parse("{ CDR }").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
-                instr: "CDR",
+                instr: Prim::CDR,
                 stack: stk![Type::Unit],
                 reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Unit)),
             })
@@ -1060,7 +1062,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::NoMatchingOverload {
-                instr: "IF_NONE",
+                instr: Prim::IF_NONE,
                 stack: stk![Type::Int],
                 reason: Some(NoMatchingOverloadReason::ExpectedOption(Type::Int)),
             })
@@ -1101,7 +1103,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::NoMatchingOverload {
-                instr: "COMPARE",
+                instr: Prim::COMPARE,
                 stack: stk![Type::Int, Type::Nat],
                 reason: Some(TypesNotEqual(Type::Nat, Type::Int).into())
             })
@@ -1364,7 +1366,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Err(TypesNotEqual(Type::new_option(Type::String), Type::new_option(Type::Nat)).into())
+            Err(TypesNotEqual(Type::String, Type::Nat).into())
         );
     }
 
