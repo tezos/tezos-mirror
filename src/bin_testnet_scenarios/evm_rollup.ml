@@ -132,13 +132,9 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
   (* EVM Kernel installation level. *)
   let* current_level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level rollup_node current_level in
-  let* evm_proxy_server =
-    Evm_proxy_server.init ~mode:`Development ?runner rollup_node
-  in
-  Log.info
-    "Proxy server API is available at %s."
-    (Evm_proxy_server.endpoint evm_proxy_server) ;
-  return (rollup_address, rollup_node, evm_proxy_server)
+  let* evm_node = Evm_node.init ~mode:`Development ?runner rollup_node in
+  Log.info "Node API is available at %s." (Evm_node.endpoint evm_node) ;
+  return (rollup_address, rollup_node, evm_node)
 
 let check_operator_balance ~node ~client ~mode ~operator =
   let min_balance =
@@ -163,7 +159,7 @@ let deploy_evm_rollup ~configuration_path ~(testnet : unit -> Testnet.t) () =
   let* client, node = Helpers.setup_octez_node ~testnet () in
   let* operator = Client.gen_and_show_keys client in
   let* () = check_operator_balance ~node ~client ~mode:config.mode ~operator in
-  let* _rollup_address, _rollup_node, _evm_proxy_server =
+  let* _rollup_address, _rollup_node, _evm_node =
     setup_evm_infra ~config ~operator node client
   in
   stop_or_keep_going ~config ~node

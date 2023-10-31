@@ -76,7 +76,7 @@ let install_finalizer_dev server =
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   Format.printf "Server exited with code %d\n%!" exit_status ;
-  let+ () = Evm_proxy_lib_dev.Tx_pool.shutdown () in
+  let+ () = Evm_node_lib_dev.Tx_pool.shutdown () in
   Format.printf "Shutting down Tx-Pool\n%!"
 
 let callback_log server conn req body =
@@ -93,21 +93,21 @@ let callback_log server conn req body =
     (Cohttp_lwt.Body.of_string body_str)
 
 module Event = struct
-  let section = ["evm_proxy_server"]
+  let section = ["evm_node"]
 
   let event_starting =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"start_evm_proxy_server"
-      ~msg:"starting the EVM proxy server"
+      ~name:"start_evm_node"
+      ~msg:"starting the EVM node"
       ~level:Notice
       ()
 
   let event_is_ready =
     Internal_event.Simple.declare_2
       ~section
-      ~name:"evm_proxy_server_is_ready"
-      ~msg:"the EVM proxy server is listening to {addr}:{port}"
+      ~name:"evm_node_is_ready"
+      ~msg:"the EVM node is listening to {addr}:{port}"
       ~level:Notice
       ("addr", Data_encoding.string)
       ("port", Data_encoding.uint16)
@@ -115,7 +115,7 @@ end
 
 let rollup_node_config_prod ~rollup_node_endpoint =
   let open Lwt_result_syntax in
-  let open Evm_proxy_lib_prod in
+  let open Evm_node_lib_prod in
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
   end) in
@@ -124,7 +124,7 @@ let rollup_node_config_prod ~rollup_node_endpoint =
 
 let rollup_node_config_dev ~rollup_node_endpoint =
   let open Lwt_result_syntax in
-  let open Evm_proxy_lib_dev in
+  let open Evm_node_lib_dev in
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
   end) in
@@ -133,12 +133,12 @@ let rollup_node_config_dev ~rollup_node_endpoint =
 
 let prod_directory ~verbose rollup_node_config =
   let open Lwt_result_syntax in
-  let open Evm_proxy_lib_prod in
+  let open Evm_node_lib_prod in
   return @@ Services.directory ~verbose rollup_node_config
 
 let dev_directory ~verbose rollup_node_config =
   let open Lwt_result_syntax in
-  let open Evm_proxy_lib_dev in
+  let open Evm_node_lib_dev in
   return @@ Services.directory ~verbose rollup_node_config
 
 let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
@@ -205,14 +205,14 @@ let rpc_addr_arg =
   Tezos_clic.arg
     ~long:"rpc-addr"
     ~placeholder:"ADDR"
-    ~doc:"The EVM proxy server rpc address."
+    ~doc:"The EVM node server rpc address."
     Params.string
 
 let rpc_port_arg =
   Tezos_clic.arg
     ~long:"rpc-port"
     ~placeholder:"PORT"
-    ~doc:"The EVM proxy server rpc port."
+    ~doc:"The EVM node server rpc port."
     Params.int
 
 let cors_allowed_headers_arg =
@@ -233,22 +233,22 @@ let mode_arg =
   Tezos_clic.arg
     ~long:"mode"
     ~placeholder:"MODE"
-    ~doc:"The EVM proxy server mode, it's either prod or dev."
+    ~doc:"The EVM node mode, it's either prod or dev."
     Params.mode
 
 let verbose_arg =
   Tezos_clic.switch
     ~short:'v'
     ~long:"verbose"
-    ~doc:"If verbose is set, the proxy will display the responses to RPCs."
+    ~doc:"If verbose is set, the node will display the responses to RPCs."
     ()
 
 let rollup_node_endpoint_param =
   Tezos_clic.param
     ~name:"rollup-node-endpoint"
     ~desc:
-      "The smart rollup node endpoint address (as ADDR:PORT) the proxy server \
-       will communicate with, or [mockup] if you want to use mock values."
+      "The smart rollup node endpoint address (as ADDR:PORT) the node will \
+       communicate with."
     Params.rollup_node_endpoint
 
 let rollup_address_arg =
@@ -314,7 +314,7 @@ let main_command =
             let* rollup_config =
               rollup_node_config_prod ~rollup_node_endpoint
             in
-            let* () = Evm_proxy_lib_prod.Tx_pool.start rollup_config in
+            let* () = Evm_node_lib_prod.Tx_pool.start rollup_config in
             let* directory =
               prod_directory ~verbose:config.verbose rollup_config
             in
@@ -325,7 +325,7 @@ let main_command =
             return_unit
         | Dev ->
             let* rollup_config = rollup_node_config_dev ~rollup_node_endpoint in
-            let* () = Evm_proxy_lib_dev.Tx_pool.start rollup_config in
+            let* () = Evm_node_lib_dev.Tx_pool.start rollup_config in
             let* directory =
               dev_directory ~verbose:config.verbose rollup_config
             in
@@ -341,21 +341,21 @@ let main_command =
 
 let make_prod_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
-  let open Evm_proxy_lib_prod in
+  let open Evm_node_lib_prod in
   let*? _, messages =
     Rollup_node.make_encoded_messages
       ~smart_rollup_address
-      (Evm_proxy_lib_prod_encoding.Ethereum_types.hex_of_string s)
+      (Evm_node_lib_prod_encoding.Ethereum_types.hex_of_string s)
   in
   return messages
 
 let make_dev_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
-  let open Evm_proxy_lib_dev in
+  let open Evm_node_lib_dev in
   let*? _, messages =
     Rollup_node.make_encoded_messages
       ~smart_rollup_address
-      (Evm_proxy_lib_dev_encoding.Ethereum_types.hex_of_string s)
+      (Evm_node_lib_dev_encoding.Ethereum_types.hex_of_string s)
   in
   return messages
 

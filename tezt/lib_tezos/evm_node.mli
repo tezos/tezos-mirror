@@ -25,16 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** EVM proxy server state. *)
+(** EVM node server state. *)
 type t
 
-(** [create ?runner ?mode ?rpc_addr ?rpc_port rollup_node] creates an EVM proxy server.
+(** [create ?runner ?mode ?rpc_addr ?rpc_port rollup_node] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to ["127.0.0.1"] and a fresh port is
     chosen if [rpc_port] is not set.
 
-    To use the proxy on development set [mode] to [`Development]. Otherwise to
+    To use the node on development set [mode] to [`Development]. Otherwise to
     set it to the one on production set [mode] to [`Production].
 
     The server communicates with a rollup-node and sets its endpoint via
@@ -48,11 +48,11 @@ val create :
   Sc_rollup_node.t ->
   t
 
-(** [run proxy_server] launches the EVM proxy server with the arguments
+(** [run evm_node] launches the EVM node server with the arguments
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
-(** [init ?runner ?mode ?rpc_addr ?rpc_port rollup_node] creates an EVM proxy server
+(** [init ?runner ?mode ?rpc_addr ?rpc_port rollup_node] creates an EVM node server
     with {!create} and runs it with {!run}. *)
 val init :
   ?runner:Runner.t ->
@@ -62,22 +62,22 @@ val init :
   Sc_rollup_node.t ->
   t Lwt.t
 
-(** [spawn_run proxy_server] same as {!run} but spawns a process. *)
+(** [spawn_run evm_node] same as {!run} but spawns a process. *)
 val spawn_run : t -> Process.t
 
-(** [endpoint proxy_server] returns the endpoint to communicate with the
-    [proxy_server]. *)
+(** [endpoint evm_node] returns the endpoint to communicate with the
+    [evm_node]. *)
 val endpoint : t -> string
 
 (** JSON-RPC request. *)
 type request = {method_ : string; parameters : JSON.u}
 
-(** [call_evm_rpc proxy_server ~request] sends a JSON-RPC request to the
-    [proxy_server], for the given [request]. *)
+(** [call_evm_rpc evm_node ~request] sends a JSON-RPC request to the
+    [evm_node], for the given [request]. *)
 val call_evm_rpc : t -> request -> JSON.t Lwt.t
 
-(** [batch_evm_rpc proxy_server ~requests] sends multiple JSON-RPC requests to the
-    [proxy_server], for the given [requests]. *)
+(** [batch_evm_rpc evm_node ~requests] sends multiple JSON-RPC requests to the
+    [evm_node], for the given [requests]. *)
 val batch_evm_rpc : t -> request list -> JSON.t Lwt.t
 
 (** [extract_result json] expects a JSON-RPC `result` and returns the value. *)
@@ -86,7 +86,7 @@ val extract_result : JSON.t -> JSON.t
 (** [extract_error_message json] expects a JSON-RPC `error.message` and returns the value. *)
 val extract_error_message : JSON.t -> JSON.t
 
-(** [fetch_contract_code proxy_server contract] returns the code associated to
+(** [fetch_contract_code evm_node contract] returns the code associated to
     the given contract in the rollup. *)
 val fetch_contract_code : t -> string -> string Lwt.t
 
@@ -94,6 +94,6 @@ val fetch_contract_code : t -> string -> string Lwt.t
     to transactions. *)
 type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
 
-(** [txpool_content proxy_server] returns the transaction hash and nonce
+(** [txpool_content evm_node] returns the transaction hash and nonce
     contained in the `pending` and `queued` pools. *)
 val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t

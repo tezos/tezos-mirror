@@ -7,13 +7,13 @@
 
 (** Testing
     -------
-    Component:    Bin_evm_proxy
-    Invocation:   dune exec src/bin_evm_proxy/test/main.exe -- --file test_ethbloom.ml
+    Component:    Bin_evm_node
+    Invocation:   dune exec src/bin_evm_node/test/main.exe -- --file test_ethbloom.ml
     Subject:      Tests for implementation of Ethereum bloom filters
 *)
 
-open Evm_proxy_lib_dev_encoding
-open Evm_proxy_lib_dev.Ethbloom
+open Evm_node_lib_dev_encoding
+open Evm_node_lib_dev.Ethbloom
 open Ethereum_types
 
 let test_empty_is_empty () =

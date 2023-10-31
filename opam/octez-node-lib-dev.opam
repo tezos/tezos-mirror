@@ -12,13 +12,12 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-version"
-  "octez-evm-proxy-lib-prod"
-  "octez-evm-proxy-lib-dev"
-  "octez-evm-proxy-lib-dev-encoding"
+  "octez-node-lib-dev-encoding"
+  "lwt-exit"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup"
+synopsis: "An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup [dev version]"
