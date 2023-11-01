@@ -7,11 +7,21 @@
 
 use logos::Logos;
 
+/// Expand to the first argument if not empty; otherwise, the second argument.
+macro_rules! coalesce {
+    (, $r:expr) => {
+        $r
+    };
+    ($l:expr, $r:expr) => {
+        $l
+    };
+}
+
 /// Takes a list of primitive names, creates a simple `enum` with the names
 /// provided, and defines `FromStr` implementation using stringified
 /// representation of the identifiers.
 macro_rules! defprim {
-    ($ty:ident; $($prim:ident),* $(,)*) => {
+    ($ty:ident; $($(#[token($str:expr)])? $prim:ident),* $(,)*) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         pub enum $ty {
@@ -20,7 +30,11 @@ macro_rules! defprim {
 
         impl std::fmt::Display for $ty {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{:?}", &self)
+                match self {
+                    $(
+                        $ty::$prim => write!(f, "{}", coalesce!($($str)?, stringify!($prim))),
+                    )*
+                }
             }
         }
 
@@ -28,7 +42,7 @@ macro_rules! defprim {
           type Err = PrimError;
           fn from_str(s: &str) -> Result<Self, Self::Err> {
               match s {
-                $(stringify!($prim) => Ok($ty::$prim),)*
+                $(coalesce!($($str)?, stringify!($prim)) => Ok($ty::$prim),)*
                 _ => Err(PrimError(s.to_owned()))
               }
           }
@@ -111,6 +125,8 @@ defprim! {
     MutezOverflow,
     GeneralOverflow,
     StaticError,
+    #[token("self")]
+    self_,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -204,7 +204,7 @@ pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
 
 // Note that there are more than one way to do this conversion. Here we use the optimized untyped
 // representation as the target, since that is what the typed to untyped conversion during a
-// FAILWITH call does in the reference implementation, and this logic is primarly used in the
+// FAILWITH call does in the reference implementation, and this logic is primarily used in the
 // corresponding section of MIR now.
 //
 // TODO: This implementation will be moved to interpreter in the context of issue,

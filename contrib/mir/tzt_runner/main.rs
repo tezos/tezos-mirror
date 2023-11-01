@@ -164,6 +164,23 @@ mod tztrunner_tests {
         );
     }
 
+    #[test]
+    fn test_runner_self_parameter() {
+        assert_eq!(
+            run_tzt_test(
+                parse_tzt_test(
+                    r#"code { SELF };
+                    input {};
+                    parameter int;
+                    self "KT1Wr7sqVqpbuELSD5xpTBPSCjyNRFj9Xpba";
+                    output { Stack_elt (contract int) "KT1Wr7sqVqpbuELSD5xpTBPSCjyNRFj9Xpba" }"#,
+                )
+                .unwrap()
+            ),
+            Ok(())
+        );
+    }
+
     const TZT_SAMPLE_ADD: &str = "code { ADD } ;
         input { Stack_elt int 5 ; Stack_elt int 5 } ;
         output { Stack_elt int 10 }";
