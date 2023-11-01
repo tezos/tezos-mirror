@@ -23,10 +23,7 @@ pub type TestStack = Vec<(Type, TypedValue)>;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum TztTestError {
-    StackMismatch(
-        (FailingTypeStack, Stack<Value>),
-        (FailingTypeStack, Stack<Value>),
-    ),
+    StackMismatch((FailingTypeStack, IStack), (FailingTypeStack, IStack)),
     UnexpectedError(TestError),
     UnexpectedSuccess(ErrorExpectation, IStack),
     ExpectedDifferentError(ErrorExpectation, TestError),
@@ -118,10 +115,7 @@ impl TryFrom<Vec<TztEntity>> for TztTest {
                     "output",
                     &mut m_output,
                     match tzt_output {
-                        TztSuccess(stk) => {
-                            typecheck_stack(stk.clone())?;
-                            ExpectSuccess(stk)
-                        }
+                        TztSuccess(stk) => ExpectSuccess(typecheck_stack(stk)?),
                         TztError(error_exp) => ExpectError(error_exp),
                     },
                 )?,
@@ -161,7 +155,7 @@ pub enum TestError {
 /// the code in a test.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TestExpectation {
-    ExpectSuccess(Vec<(Type, Value)>),
+    ExpectSuccess(Vec<(Type, TypedValue)>),
     ExpectError(ErrorExpectation),
 }
 
