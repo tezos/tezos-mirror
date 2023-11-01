@@ -844,6 +844,12 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
       time_to_bake_at_next_level state at_round
+  | _, Timeout Time_to_forge_block ->
+      (* TODO: When its time to forge, we should start forging block.
+         This rountine does not need to be blocking. We can store the
+         forging process in state then continue.
+      *)
+      do_nothing state
   | Idle, New_head_proposal proposal ->
       let* () =
         Events.(
