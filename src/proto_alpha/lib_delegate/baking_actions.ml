@@ -136,9 +136,14 @@ type block_to_bake = {
   force_apply : bool;
 }
 
+type inject_block_kind =
+  | Forge_and_inject of block_to_bake
+  | Inject_only of signed_block
+
 type action =
   | Do_nothing
-  | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
+  | Inject_block of {kind : inject_block_kind; updated_state : state}
+  | Forge_block of {block_to_bake : block_to_bake; updated_state : state}
   | Inject_preattestations of {
       preattestations : (consensus_key_and_delegate * consensus_content) list;
     }
@@ -167,7 +172,11 @@ type t = action
 
 let pp_action fmt = function
   | Do_nothing -> Format.fprintf fmt "do nothing"
-  | Inject_block _ -> Format.fprintf fmt "inject block"
+  | Inject_block {kind; _} -> (
+      match kind with
+      | Forge_and_inject _ -> Format.fprintf fmt "forge and inject block"
+      | Inject_only _ -> Format.fprintf fmt "inject forged block")
+  | Forge_block _ -> Format.fprintf fmt "forge_block"
   | Inject_preattestations _ -> Format.fprintf fmt "inject preattestations"
   | Inject_attestations _ -> Format.fprintf fmt "inject attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
@@ -900,8 +909,16 @@ let rec perform_action ~state_recorder state (action : action) =
   | Do_nothing ->
       let* () = state_recorder ~new_state:state in
       return state
-  | Inject_block {block_to_bake; updated_state} ->
-      inject_block state ~state_recorder block_to_bake ~updated_state
+  | Inject_block {kind; updated_state} -> (
+      match kind with
+      | Forge_and_inject block_to_bake ->
+          inject_block state ~state_recorder block_to_bake ~updated_state
+      | Inject_only _signed_block ->
+          (* TODO: implement inject only action*)
+          raise Not_found)
+  | Forge_block _ ->
+      (* TODO: implement forge block action*)
+      raise Not_found
   | Inject_preattestations {preattestations} ->
       let* () = inject_consensus_vote state preattestations `Preattestation in
       perform_action ~state_recorder state Watch_proposal

@@ -281,12 +281,25 @@ module State_transitions = struct
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
 
-  let proposing_fresh_block =
+  let preparing_fresh_block =
     declare_2
       ~section
-      ~name:"proposing_fresh_block"
+      ~name:"preparing_fresh_block"
       ~level:Info
-      ~msg:"proposing fresh block for {delegate} at round {round}"
+      ~msg:"preparing fresh block for {delegate} at round {round}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Round.pp
+      ("round", Round.encoding)
+
+  let found_preemptively_forged_block =
+    declare_2
+      ~section
+      ~name:"found_preemptively_forged_block"
+      ~level:Info
+      ~msg:
+        "found preemptively forged block. no need to forge block for \
+         {delegate} at round {round}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Round.pp
