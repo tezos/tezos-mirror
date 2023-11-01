@@ -33,7 +33,8 @@ exports.transfer = function (playera, playerb, amount) {
     tx.nonce = playera.nonce;
     playera.nonce += 1;
     tx.to = playerb.addr;
-    tx.value = amount;
+    // Enforce amount to be in Eth, not Wei
+    tx.value = Math.round(amount * 1_000_000_000_000_000_000);
     tx.gasLimit = 21000;
     let rawTx = sign(tx, playera.privateKey)
     return rawTx.rawTx;
@@ -44,7 +45,7 @@ exports.create = function (player, amount, data) {
     tx.nonce = player.nonce;
     let address = legacy_contract_address(player.addr, player.nonce);
     player.nonce += 1;
-    tx.value = amount;
+    tx.value = Math.round(amount * 1_000_000_000_000_000_000);
     tx.data = data;
     let rawTx = sign(tx, player.privateKey)
     return {
@@ -58,7 +59,7 @@ exports.send = function (player, contract_addr, amount, data, gasLimit = undefin
     tx.nonce = player.nonce;
     player.nonce += 1;
     tx.to = contract_addr;
-    tx.value = amount;
+    tx.value = Math.round(amount * 1_000_000_000_000_000_000);
     tx.data = data;
     tx.gasLimit = gasLimit == undefined ? transfer_prototype_json.gasLimit : gasLimit;
     let rawTx = sign(tx, player.privateKey)
