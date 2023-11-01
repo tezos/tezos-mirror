@@ -13,6 +13,7 @@ pub mod type_props;
 
 use type_props::TypeProperty;
 
+use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas;
@@ -58,6 +59,10 @@ pub enum TcError {
     ChainIdError(#[from] ChainIdError),
     #[error("SELF instruction is forbidden in this context")]
     SelfForbidden,
+    #[error("no such entrypoint: {0}")]
+    NoSuchEntrypoint(Entrypoint),
+    #[error("unexpected implicit account parameter type: {0:?}")]
+    UnexpectedImplicitAccountType(Type),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -709,6 +714,31 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
         (T::Address, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::Address(Address::from_bytes(&bs)?)
+        }
+        (T::Contract(ty), addr) => {
+            let t_addr = irrefutable_match!(typecheck_value(ctx, &T::Address, addr)?; TV::Address);
+            match t_addr.hash {
+                AddressHash::Tz1(_)
+                | AddressHash::Tz2(_)
+                | AddressHash::Tz3(_)
+                | AddressHash::Tz4(_) => {
+                    if !t_addr.is_default_ep() {
+                        return Err(TcError::NoSuchEntrypoint(t_addr.entrypoint));
+                    }
+                    ctx.gas.consume(gas::tc_cost::ty_eq(
+                        ty.size_for_gas(),
+                        T::Unit.size_for_gas(),
+                    )?)?;
+                    match ty.as_ref() {
+                        T::Unit => {}
+                        ty => return Err(TcError::UnexpectedImplicitAccountType(ty.clone())),
+                    }
+                }
+                AddressHash::Kt1(_) | AddressHash::Sr1(_) => {
+                    // TODO: verify against ctx
+                }
+            }
+            TV::Contract(t_addr)
         }
         (T::ChainId, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::CHAIN_ID_READABLE)?;

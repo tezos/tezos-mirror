@@ -10,6 +10,12 @@ use super::AddressError;
 #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
 pub struct Entrypoint(String);
 
+impl std::fmt::Display for Entrypoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // NB: default entrypoint is represented as literal "default", because it
 // affects comparision for addresses.
 const DEFAULT_EP_NAME: &str = "default";
