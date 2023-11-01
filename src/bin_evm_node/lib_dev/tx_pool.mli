@@ -16,3 +16,8 @@ val shutdown : unit -> unit Lwt.t
 (** [add raw_tx] adds a raw eth transaction to the tx-pool. *)
 val add :
   Ethereum_types.hex -> (Ethereum_types.hash, string) result tzresult Lwt.t
+
+(** [nonce address] returns the nonce of the user
+    Returns the first gap in the tx-pool, or the nonce stored on the rollup 
+    if no transactions are in the pool. *)
+val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t

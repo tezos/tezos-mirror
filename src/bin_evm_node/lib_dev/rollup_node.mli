@@ -46,7 +46,8 @@ module type S = sig
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
   (** [nonce address] returns the [address]'s nonce. *)
-  val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+  val nonce :
+    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t
 
   (** [code address] returns the [address]'s code. *)
   val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t

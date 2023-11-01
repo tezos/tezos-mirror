@@ -289,10 +289,9 @@ module RPC = struct
     let open Lwt_result_syntax in
     let key = Durable_storage_path.Accounts.nonce address in
     let+ answer = call_service ~base durable_state_value () {key} () in
-    match answer with
-    | Some bytes ->
-        Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
-    | None -> Ethereum_types.Qty Z.zero
+    answer
+    |> Option.map (fun bytes ->
+           bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)
 
   let code base address =
     let open Lwt_result_syntax in
@@ -588,7 +587,8 @@ module type S = sig
 
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
-  val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+  val nonce :
+    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t
 
   val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
 

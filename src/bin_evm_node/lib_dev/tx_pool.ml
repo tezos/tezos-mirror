@@ -62,6 +62,24 @@ module Pool = struct
   let remove pkey predicate t =
     let _txs, t = partition pkey predicate t in
     t
+
+  (** Returns the next nonce for a given user.
+      Returns the given nonce if the user does not have any transactions in the pool. *)
+  let next_nonce pkey current_nonce (t : t) =
+    let {transactions; global_index = _} = t in
+    let txs = Pkey_map.find pkey transactions |> Option.value ~default:[] in
+    let rec aux current_nonce = function
+      | [] -> current_nonce
+      | {nonce; _} :: txs ->
+          if current_nonce > nonce then aux current_nonce txs
+          else if current_nonce = nonce then
+            let (Qty current_nonce) = current_nonce in
+            (aux [@tailcall])
+              Z.(add current_nonce one |> Ethereum_types.quantity_of_z)
+              txs
+          else current_nonce
+    in
+    aux current_nonce txs
 end
 
 module Types = struct
@@ -168,6 +186,7 @@ let on_head state block_height =
     Lwt_list.map_p
       (fun address ->
         let* nonce = Rollup_node.nonce address in
+        let nonce = Option.value ~default:(Qty Z.zero) nonce in
         Lwt.return_ok (address, nonce))
       addresses
   in
@@ -343,3 +362,15 @@ let add raw_tx =
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w (Request.Add_transaction raw_tx)
   |> handle_request_error
+
+let nonce pkey =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
+  let* current_nonce = Rollup_node.nonce pkey in
+  let next_nonce =
+    match current_nonce with
+    | None -> Ethereum_types.Qty Z.zero
+    | Some current_nonce -> Pool.next_nonce pkey current_nonce pool
+  in
+  return next_nonce
