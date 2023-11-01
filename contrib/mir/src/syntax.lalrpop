@@ -296,7 +296,8 @@ tztEntity : TztEntity = {
   "output" "(" "generalOverflow" <a1:number> <a2:number> ")" => Output(TztError(InterpreterError(GeneralOverflow(a1, a2)))),
   "output" "(" "StaticError" <s:string> ")" => Output(TztError(TypecheckerError(Some(s)))),
   "output" "(" "StaticError" "_"  ")" => Output(TztError(TypecheckerError(None))),
-  "amount" <m:mutezAmount> => TztEntity::Amount(m)
+  "amount" <m:mutezAmount> => TztEntity::Amount(m),
+  "chain_id" <value_expr> => TztEntity::ChainId(<>),
 }
 
 pub tztTestEntities : Vec<TztEntity> = semicolonSepSeq<tztEntity>;
