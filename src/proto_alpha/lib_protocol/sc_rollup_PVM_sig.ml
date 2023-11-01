@@ -212,15 +212,15 @@ module Input_hash =
       let size = Some 20
     end)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/6573
-   Remove the `published_level` parameter from the Reveal_dal_page for now. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+   Consider supporting revealing historical DAL parameters. *)
 type reveal =
   | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata
   | Request_dal_page of Dal_slot_repr.Page.t
-  | Reveal_dal_parameters of {published_level : Raw_level_repr.t}
+  | Reveal_dal_parameters
       (** Request DAL parameters that were used for the slots published at
-          [published_level]. *)
+          the current inbox level. *)
 
 let reveal_encoding =
   let open Data_encoding in
@@ -256,13 +256,9 @@ let reveal_encoding =
     case
       ~title:"Reveal_dal_parameters"
       (Tag 3)
-      (obj2
-         (kind "reveal_dal_parameters")
-         (req "published_level" Raw_level_repr.encoding))
-      (function
-        | Reveal_dal_parameters {published_level} -> Some ((), published_level)
-        | _ -> None)
-      (fun ((), published_level) -> Reveal_dal_parameters {published_level})
+      (obj1 (kind "reveal_dal_parameters"))
+      (function Reveal_dal_parameters -> Some () | _ -> None)
+      (fun () -> Reveal_dal_parameters)
   in
   union [case_raw_data; case_metadata; case_dal_page; case_dal_parameters]
 
@@ -281,7 +277,7 @@ let is_reveal_enabled_predicate
         | Blake2B -> t.raw_data.blake2B)
     | Reveal_metadata -> t.metadata
     | Request_dal_page _ -> t.dal_page
-    | Reveal_dal_parameters _ -> t.dal_parameters
+    | Reveal_dal_parameters -> t.dal_parameters
   in
   Raw_level_repr.(current_block_level >= activation_level)
 
@@ -345,12 +341,7 @@ let pp_reveal fmt = function
   | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
   | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
-  | Reveal_dal_parameters {published_level} ->
-      Format.fprintf
-        fmt
-        "Reveal DAL parameters for published level %a"
-        Raw_level_repr.pp
-        published_level
+  | Reveal_dal_parameters -> Format.pp_print_string fmt "Reveal DAL parameters"
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -377,10 +368,8 @@ let reveal_equal p1 p2 =
   | Reveal_metadata, _ -> false
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | Request_dal_page _, _ -> false
-  | ( Reveal_dal_parameters {published_level = l1},
-      Reveal_dal_parameters {published_level = l2} ) ->
-      Raw_level_repr.equal l1 l2
-  | Reveal_dal_parameters _, _ -> false
+  | Reveal_dal_parameters, Reveal_dal_parameters -> true
+  | Reveal_dal_parameters, _ -> false
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =

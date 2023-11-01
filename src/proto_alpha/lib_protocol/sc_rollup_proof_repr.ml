@@ -56,7 +56,7 @@ type reveal_proof =
       page_id : Dal_slot_repr.Page.t;
       proof : Dal_slot_repr.History.proof;
     }
-  | Dal_parameters_proof of {published_level : Raw_level_repr.t}
+  | Dal_parameters_proof
 
 let reveal_proof_encoding =
   let open Data_encoding in
@@ -100,13 +100,9 @@ let reveal_proof_encoding =
     case
       ~title:"dal parameters proof"
       (Tag 3)
-      (obj2
-         (req "reveal_proof_kind" (constant "dal_parameters_proof"))
-         (req "published_level" Raw_level_repr.encoding))
-      (function
-        | Dal_parameters_proof {published_level} -> Some ((), published_level)
-        | _ -> None)
-      (fun ((), published_level) -> Dal_parameters_proof {published_level})
+      (obj1 (req "reveal_proof_kind" (constant "dal_parameters_proof")))
+      (function Dal_parameters_proof -> Some () | _ -> None)
+      (fun () -> Dal_parameters_proof)
   in
   union [case_raw_data; case_metadata_proof; case_dal_page; case_dal_parameters]
 
@@ -349,7 +345,7 @@ let valid (type state proof output)
           dal_snapshot
           proof
         |> Lwt.return
-    | Some (Reveal_proof (Dal_parameters_proof {published_level = _})) ->
+    | Some (Reveal_proof Dal_parameters_proof) ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
            Support revealing historical DAL parameters.
 
@@ -400,12 +396,9 @@ let valid (type state proof output)
         check
           (Dal_slot_repr.Page.equal page_id pid)
           "Dal proof's page ID is not the one expected in input request."
-    | ( Some (Reveal_proof (Dal_parameters_proof {published_level = l1})),
-        Needs_reveal (Reveal_dal_parameters {published_level = l2}) ) ->
-        check
-          (Raw_level_repr.equal l1 l2)
-          "Dal reveal parameters proof's published level is not the one \
-           expected in input request."
+    | ( Some (Reveal_proof Dal_parameters_proof),
+        Needs_reveal Reveal_dal_parameters ) ->
+        return_unit
     | None, (Initial | First_after _ | Needs_reveal _)
     | Some _, No_input_required
     | Some (Inbox_proof _), Needs_reveal _
@@ -524,10 +517,10 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~page_info
           ~get_history
           confirmed_slots_history
-    | Needs_reveal (Reveal_dal_parameters {published_level}) ->
+    | Needs_reveal Reveal_dal_parameters ->
         let open Dal_with_history in
         return
-          ( Some (Reveal_proof (Dal_parameters_proof {published_level})),
+          ( Some (Reveal_proof Dal_parameters_proof),
             Some
               Sc_rollup_PVM_sig.(
                 Reveal

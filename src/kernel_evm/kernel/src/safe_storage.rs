@@ -250,8 +250,8 @@ impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut Intern
     }
 
     #[cfg(feature = "proto-alpha")]
-    fn reveal_dal_parameters(&self, published_level: i32) -> RollupDalParameters {
-        self.0.reveal_dal_parameters(published_level)
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.0.reveal_dal_parameters()
     }
 
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {

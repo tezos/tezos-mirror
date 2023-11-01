@@ -3119,7 +3119,7 @@ module Sc_rollup : sig
     | Reveal_raw_data of Sc_rollup_reveal_hash.t
     | Reveal_metadata
     | Request_dal_page of Dal.Page.t
-    | Reveal_dal_parameters of {published_level : Raw_level_repr.t}
+    | Reveal_dal_parameters
 
   type is_reveal_enabled = current_block_level:Raw_level.t -> reveal -> bool
 
@@ -3683,7 +3683,7 @@ module Sc_rollup : sig
           page_id : Dal.Page.t;
           proof : Dal.Slots_history.proof;
         }
-      | Dal_parameters_proof of {published_level : Raw_level.t}
+      | Dal_parameters_proof
 
     type input_proof =
       | Inbox_proof of {
