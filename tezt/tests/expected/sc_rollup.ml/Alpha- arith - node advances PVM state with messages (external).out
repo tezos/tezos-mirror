@@ -38,9 +38,6 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.597 units (will add 100 for safety)
@@ -68,12 +65,6 @@ This sequence of operations was run:
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\007"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -103,12 +94,6 @@ This sequence of operations was run:
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\n"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.635 units (will add 100 for safety)
@@ -136,12 +121,6 @@ This sequence of operations was run:
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\r"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -171,12 +150,6 @@ This sequence of operations was run:
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\016"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.635 units (will add 100 for safety)
@@ -204,12 +177,6 @@ This sequence of operations was run:
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\019"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -239,12 +206,6 @@ This sequence of operations was run:
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\022"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.635 units (will add 100 for safety)
@@ -272,12 +233,6 @@ This sequence of operations was run:
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\025"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -307,12 +262,6 @@ This sequence of operations was run:
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\028"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.635 units (will add 100 for safety)
@@ -341,12 +290,6 @@ This sequence of operations was run:
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\031"
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.673 units (will add 100 for safety)
@@ -374,6 +317,3 @@ This sequence of operations was run:
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\""
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"

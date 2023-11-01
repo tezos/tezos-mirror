@@ -90,15 +90,6 @@ val rpc_get_rich :
   (string * string) list ->
   JSON.t Runnable.process
 
-(** [ticks ?block client] gets the number of ticks for the PVM for the [block]
-    (default ["head"]). *)
-val ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process
-
-(** [state_hash ?block client] gets the corresponding PVM state hash for the
-    [block] (default ["head"]). *)
-val state_hash :
-  ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
-
 (** [state_value ?block client key] gets the corresponding PVM state value
     mapped to [key] for the [block] (default ["head"]). *)
 val state_value :

@@ -2931,7 +2931,7 @@ let test_reboot =
     ~tags:["evm"; "reboot"; "loop"; Tag.flaky]
     ~title:"Check that the kernel can handle too many txs for a single run"
   @@ fun protocol ->
-  let* {evm_node; sc_rollup_node; node; client; sc_rollup_client; _} =
+  let* {evm_node; sc_rollup_node; node; client; _} =
     setup_past_genesis ~admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
@@ -2970,7 +2970,7 @@ let test_reboot =
   | Block.Hash hashes ->
       Check.((List.length hashes = List.length requests) int)
         ~error_msg:"Expected %R transactions in the latest block, got %L") ;
-  let*! tick_number = Sc_rollup_client.ticks sc_rollup_client in
+  let* tick_number = Sc_rollup_rpc.ticks sc_rollup_node in
   let max_tick =
     Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
   in

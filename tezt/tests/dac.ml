@@ -304,10 +304,8 @@ let sample_payload example_filename =
 
 let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
 
-let assert_state_changed ?block sc_rollup_client prev_state_hash =
-  let*! state_hash =
-    Sc_rollup_client.state_hash ?block ~hooks sc_rollup_client
-  in
+let assert_state_changed ?block sc_rollup_node prev_state_hash =
+  let* state_hash = Sc_rollup_rpc.state_hash ?block sc_rollup_node in
   Check.(state_hash <> prev_state_hash)
     Check.string
     ~error_msg:"State hash has not changed (%L <> %R)" ;
@@ -1630,11 +1628,9 @@ module Tx_kernel_e2e = struct
     Lwt.return_unit
 
   (* Send a deposit into the rollup. *)
-  let test_deposit ~client ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address
+  let test_deposit ~client ~sc_rollup_node ~sc_rollup_address
       ~mint_and_deposit_contract level tz4_address =
-    let*! prev_state_hash =
-      Sc_rollup_client.state_hash ~hooks sc_rollup_client
-    in
+    let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
     let* () =
       (* Internal message through forwarder *)
       let arg =
@@ -1656,7 +1652,7 @@ module Tx_kernel_e2e = struct
     let* _ =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + 1)
     in
-    let* () = assert_state_changed sc_rollup_client prev_state_hash in
+    let* () = assert_state_changed sc_rollup_node prev_state_hash in
     Lwt.return @@ (level + 1)
 
   let rec bake_until cond client sc_rollup_node =
@@ -1820,16 +1816,14 @@ module Tx_kernel_e2e = struct
         level;
       }
 
-  let send_message_and_wait_for_level ~level ~sc_rollup_client ~sc_rollup_node
-      ~client ~hooks hex_encoded_message =
-    let*! prev_state_hash =
-      Sc_rollup_client.state_hash ~hooks sc_rollup_client
-    in
+  let send_message_and_wait_for_level ~level ~sc_rollup_node ~client
+      hex_encoded_message =
+    let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
     let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
     let* () = send_message client (sf "hex:[%S]" hex_encoded_message) in
     let level = level + 1 in
     let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
-    let* () = assert_state_changed sc_rollup_client prev_state_hash in
+    let* () = assert_state_changed sc_rollup_node prev_state_hash in
     return {prev_state_hash; prev_ticks; level}
 
   let verify_outbox_answer ~withdrawal_level ~sc_rollup_node ~sc_rollup_client
@@ -2001,7 +1995,6 @@ module Tx_kernel_e2e = struct
       test_deposit
         ~client
         ~sc_rollup_node
-        ~sc_rollup_client
         ~sc_rollup_address
         ~mint_and_deposit_contract
         level
@@ -2035,10 +2028,8 @@ module Tx_kernel_e2e = struct
     let* {level; _} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         l1_external_message
     in
 
@@ -2047,10 +2038,8 @@ module Tx_kernel_e2e = struct
     let* {prev_state_hash; prev_ticks; level = withdrawal_level} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         withdraw_message
     in
     let* _, last_lcc_level =
@@ -2076,7 +2065,7 @@ module Tx_kernel_e2e = struct
     in
 
     let block = string_of_int next_lcc_level in
-    let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
+    let* () = assert_state_changed ~block sc_rollup_node prev_state_hash in
     let* () = assert_ticks_advanced ~block sc_rollup_node prev_ticks in
 
     (* EXECUTE withdrawal *)
@@ -2176,7 +2165,6 @@ module Tx_kernel_e2e = struct
       test_deposit
         ~client
         ~sc_rollup_node
-        ~sc_rollup_client
         ~sc_rollup_address
         ~mint_and_deposit_contract
         level
@@ -2234,10 +2222,8 @@ module Tx_kernel_e2e = struct
     let* {level; _} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         l1_external_message
     in
 
@@ -2246,10 +2232,8 @@ module Tx_kernel_e2e = struct
     let* {prev_state_hash; prev_ticks; level = withdrawal_level} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         withdraw_message
     in
     let* _, last_lcc_level =
@@ -2274,7 +2258,7 @@ module Tx_kernel_e2e = struct
         sc_rollup_node
     in
     let block = string_of_int next_lcc_level in
-    let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
+    let* () = assert_state_changed ~block sc_rollup_node prev_state_hash in
     let* () = assert_ticks_advanced ~block sc_rollup_node prev_ticks in
 
     (* EXECUTE withdrawal *)
