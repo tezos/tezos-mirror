@@ -94,11 +94,7 @@ val generate_seed_nonce_hash :
   (Nonce_hash.t * Nonce.t) option tzresult Lwt.t
 
 val inject_block :
-  state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
-  state ->
-  block_to_bake ->
-  updated_state:state ->
-  state tzresult Lwt.t
+  updated_state:state -> state -> signed_block -> state tzresult Lwt.t
 
 val sign_consensus_votes :
   state ->
