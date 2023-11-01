@@ -1262,13 +1262,13 @@ mod test {
         // Since we execute an invalid instruction (for a static call that is) we spend
         // _all_ the gas.
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 86653,
+            gas_used: 85630,
             is_success: false,
             new_address: None,
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 262376000,
+            estimated_ticks_used: 258284000,
         }));
 
         // assert that call fails
@@ -1348,13 +1348,13 @@ mod test {
         // Since we execute an invalid instruction (for a static call that is), we
         // expect to spend _all_ the gas.
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 86653,
+            gas_used: 85630,
             is_success: false,
             new_address: None,
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 262376000,
+            estimated_ticks_used: 258284000,
         }));
 
         // assert that call fails

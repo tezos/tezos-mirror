@@ -888,6 +888,24 @@ let shanghai_storage =
     bin = kernel_inputs_path ^ "/shanghai_storage.bin";
   }
 
+(** The info for the Callee contract.
+    See [src\kernel_evm\solidity_examples\caller_callee.sol] *)
+let callee =
+  {
+    label = "callee";
+    abi = kernel_inputs_path ^ "/callee.abi";
+    bin = kernel_inputs_path ^ "/callee.bin";
+  }
+
+(** The info for the Caller contract.
+    See [src\kernel_evm\solidity_examples\caller_callee.sol] *)
+let caller =
+  {
+    label = "caller";
+    abi = kernel_inputs_path ^ "/caller.abi";
+    bin = kernel_inputs_path ^ "/caller.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -3505,6 +3523,77 @@ let test_originate_evm_kernel_and_dump_pvm_state =
   in
   check_dump_rpc ()
 
+(** Test that a contract can be called,
+    and that the call can modify the storage.  *)
+let test_l2_call_inter_contract =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_deploy"; "l2_call"; "inter_contract"]
+    ~title:"Check L2 inter contract call"
+  @@ fun protocol ->
+  (* setup *)
+  let* ({evm_node; sc_rollup_client; sc_rollup_node; node; client; _} as
+       evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+
+  (* deploy Callee contract *)
+  let* callee_address, _tx = deploy ~contract:callee ~sender evm_setup in
+
+  (* set 20 directly in the Callee *)
+  let* tx =
+    let call_set_directly (sender : Eth_account.t) n =
+      Eth_cli.contract_send
+        ~source_private_key:sender.private_key
+        ~endpoint
+        ~abi_label:callee.label
+        ~address:callee_address
+        ~method_call:(Printf.sprintf "setX(%d)" n)
+    in
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_set_directly sender 20)
+      ()
+  in
+
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* () = check_storage_size sc_rollup_client ~address:callee_address 1 in
+  let* () =
+    check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:20
+  in
+
+  (* deploy caller contract *)
+  let* caller_address, _tx = deploy ~contract:caller ~sender evm_setup in
+
+  (* set 10 through the caller *)
+  let* tx =
+    let call_set_from_caller (sender : Eth_account.t) n =
+      Eth_cli.contract_send
+        ~source_private_key:sender.private_key
+        ~endpoint
+        ~abi_label:caller.label
+        ~address:caller_address
+        ~method_call:(Printf.sprintf "setX(\"%s\", %d)" callee_address n)
+    in
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_set_from_caller sender 10)
+      ()
+  in
+
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* () = check_storage_size sc_rollup_client ~address:callee_address 1 in
+  let* () =
+    check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:10
+  in
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -3564,7 +3653,9 @@ let register_evm_node ~protocols =
   test_accounts_double_indexing protocols ;
   test_validation_result protocols ;
   test_rpc_sendRawTransaction_with_consecutive_nonce protocols ;
-  test_rpc_sendRawTransaction_not_included protocols
+  test_rpc_sendRawTransaction_not_included protocols ;
+  test_originate_evm_kernel_and_dump_pvm_state protocols ;
+  test_l2_call_inter_contract protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
