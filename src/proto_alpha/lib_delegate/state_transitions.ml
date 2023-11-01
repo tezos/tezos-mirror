@@ -346,6 +346,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           delegate_slots;
           next_level_delegate_slots;
           next_level_proposed_round = None;
+          next_forged_block = None;
         }
       in
       (* recursive call with the up-to-date state to handle the new

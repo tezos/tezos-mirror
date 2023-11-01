@@ -727,6 +727,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round = None;
+      next_forged_block = None;
     }
   in
   let* round_state =
