@@ -1282,6 +1282,9 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
     | PS.Dal_parameters _ ->
         (* Should not happen as requesting DAL parameters is disabled
            in the arith PVM. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6563
+           Support reveal DAL parameters in arith PVM in order to test
+           the refutation game for revealing DAL parameters. *)
         assert false
 
   let ticked m =

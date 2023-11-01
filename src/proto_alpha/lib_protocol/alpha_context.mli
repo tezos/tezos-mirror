@@ -3683,6 +3683,7 @@ module Sc_rollup : sig
           page_id : Dal.Page.t;
           proof : Dal.Slots_history.proof;
         }
+      | Dal_parameters_proof of {published_level : Raw_level.t}
 
     type input_proof =
       | Inbox_proof of {
@@ -3743,6 +3744,8 @@ module Sc_rollup : sig
         val dal_parameters : Dal.parameters
 
         val dal_attestation_lag : int
+
+        val dal_number_of_slots : int
       end
     end
 
@@ -3756,6 +3759,7 @@ module Sc_rollup : sig
       Dal.Slots_history.t ->
       Dal.parameters ->
       dal_attestation_lag:int ->
+      dal_number_of_slots:int ->
       is_reveal_enabled:is_reveal_enabled ->
       'proof t ->
       (input option * input_request) tzresult Lwt.t
@@ -3864,6 +3868,7 @@ module Sc_rollup : sig
       Kind.t ->
       Dal.parameters ->
       dal_attestation_lag:int ->
+      dal_number_of_slots:int ->
       stakers:Index.t ->
       Metadata.t ->
       t ->

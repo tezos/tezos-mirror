@@ -738,6 +738,7 @@ let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
        dal_snapshot
        dal_parameters.cryptobox_parameters
        ~dal_attestation_lag:dal_parameters.attestation_lag
+       ~dal_number_of_slots:dal_parameters.number_of_slots
        ~is_reveal_enabled
        {proof with pvm_step}
 
