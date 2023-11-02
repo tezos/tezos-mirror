@@ -23,6 +23,7 @@ pub mod account_storage;
 pub mod handler;
 pub mod precompiles;
 pub mod storage;
+pub mod tick_model_opcodes;
 pub mod transaction;
 
 pub use evm::Config;
