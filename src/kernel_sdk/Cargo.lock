@@ -1281,6 +1281,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "proptest",
+ "regex",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",

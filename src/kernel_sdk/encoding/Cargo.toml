@@ -29,6 +29,7 @@ time = { version = "0.3", features = [
 proptest = { version = "1.0", optional = true }
 hex = { version = "0.4.3", optional = true }
 thiserror = { version = "1.0", optional = true }
+regex = { version = "1.4.6", optional = true }
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
@@ -41,10 +42,10 @@ version = "0.2.2"
 default-features = false
 
 [features]
-default = ["alloc", "tezos-encoding", "crypto", "bls"]
+default = ["alloc", "tezos-encoding", "crypto", "bls" ]
 testing = ["crypto", "num-bigint", "num-traits", "proptest"]
 crypto = ["tezos_crypto_rs"]
 bls = ["tezos_crypto_rs/bls"]
-alloc = ["crypto", "thiserror", "hex", "num-traits", "num-bigint"]
+alloc = ["crypto", "thiserror", "hex", "num-traits", "num-bigint", "regex"]
 tezos-encoding = ["tezos_data_encoding", "tezos_data_encoding_derive", "time"]
 proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha"]
