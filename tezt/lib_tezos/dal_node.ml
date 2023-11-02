@@ -177,9 +177,9 @@ let wait_for_ready dal_node =
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create_from_endpoint ?(path = Constant.octez_dal_node) ?name ?color
-    ?data_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr
-    ?public_addr ?metrics_addr ~l1_node_endpoint () =
+let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
+    ?color ?data_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port
+    ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -221,9 +221,9 @@ let create_from_endpoint ?(path = Constant.octez_dal_node) ?name ?color
   dal_node
 
 (* TODO: have rpc_addr here, like for others. *)
-let create ?(path = Constant.octez_dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?public_addr ?metrics_addr
-    ~node () =
+let create ?(path = Uses.path Constant.octez_dal_node) ?name ?color ?data_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?public_addr
+    ?metrics_addr ~node () =
   create_from_endpoint
     ~path
     ?name
