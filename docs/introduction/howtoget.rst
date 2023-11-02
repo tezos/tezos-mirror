@@ -478,7 +478,7 @@ another location (such as ``/usr/local/bin``), the Octez binaries may
 prompt you to install the Zcash parameter files. The easiest way is to
 download and run this script::
 
-   wget https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+   wget https://raw.githubusercontent.com/zcash/zcash/713fc761dd9cf4c9087c37b078bdeab98697bad2/zcutil/fetch-params.sh
    chmod +x fetch-params.sh
    ./fetch-params.sh
 
