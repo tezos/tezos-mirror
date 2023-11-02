@@ -154,6 +154,7 @@ function run_profiler(path) {
                 bip_read,
                 receipt_size,
                 opcodes,
+                bloom_size
             });
         });
     })
