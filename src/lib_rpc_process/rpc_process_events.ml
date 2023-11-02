@@ -71,6 +71,14 @@ let new_head =
     ~level:Notice
     ("level", Data_encoding.int32)
 
+let new_applied_block =
+  declare_1
+    ~section
+    ~name:"new_applied_block"
+    ~msg:"New applied block received ({level})"
+    ~level:Notice
+    ("level", Data_encoding.int32)
+
 let start_synchronization =
   declare_2
     ~section
@@ -89,10 +97,18 @@ let shutting_head_daemon =
     ~level:Info
     ()
 
-let synchronized =
+let store_synchronized =
+  declare_0
+    ~section
+    ~name:"store_synchronized"
+    ~msg:"Store synchronized"
+    ~level:Notice
+    ()
+
+let store_synchronized_on_head =
   declare_2
     ~section
-    ~name:"synchronized"
+    ~name:"store_synchronized_on_head"
     ~msg:"Store synchronized on head {hash} ({level})"
     ~level:Notice
     ~pp1:Block_hash.pp_short

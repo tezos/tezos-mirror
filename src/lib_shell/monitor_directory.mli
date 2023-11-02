@@ -33,6 +33,17 @@ val monitor_head :
   ; .. > ->
   (Block_hash.t * Block_header.t) Tezos_rpc.Answer.t Lwt.t
 
+val applied_blocks :
+  applied_blocks_watcher:
+    (Store.chain_store * Store.Block.t) Lwt_stream.t * Lwt_watcher.stopper ->
+  < chains : Chain_services.chain trace
+  ; next_protocols : Protocol_hash.t trace
+  ; protocols : Protocol_hash.t trace
+  ; .. > ->
+  (Chain_id.t * Block_hash.t * Block_header.t * Operation.t trace trace)
+  Tezos_rpc.Answer.t
+  Lwt.t
+
 val build_rpc_directory :
   commit_info:Octez_node_version.commit_info ->
   Validator.t ->

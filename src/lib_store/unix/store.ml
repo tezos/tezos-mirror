@@ -2885,75 +2885,71 @@ let get_chain_store store chain_id =
   in
   loop chain_store
 
-let sync ?(last_status = Block_store_status.create_idle_status) ~trigger_hash
-    (store : store) =
+let sync ?(last_status = Block_store_status.create_idle_status) (store : store)
+    =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_store_sync) () in
   let sync_start = Time.System.now () in
   let main_chain_store = main_chain_store store in
-  let*! already_synced = Block.is_known main_chain_store trigger_hash in
+  (*FIXME: https://gitlab.com/tezos/tezos/-/issues/7250
+    We should synchronization only when the head is not in sync.
+  *)
   let* store, current_status, cleanups =
-    if already_synced then
-      (* Nothing to do, the block is already known, and thus, the
-         store was already synchronized. *)
-      let*! () = Store_events.(emit store_already_sync) () in
-      return (store, last_status, fun () -> Lwt.return_unit)
-    else
-      let*! head_before_sync = Chain.current_head main_chain_store in
-      let store_dir = store.store_dir in
-      let chain_id = Chain_id.of_block_hash (genesis main_chain_store).block in
-      let chain_dir = Naming.chain_dir store_dir chain_id in
-      let* current_head_data =
-        Stored_data.load (Naming.current_head_file chain_dir)
-      in
-      let*! current_head_hash, _ = Stored_data.get current_head_data in
-      (* current_head_hash is availalbe in synchronized store *)
-      let* new_block_store, current_status, cleanups =
-        Block_store.sync ~last_status main_chain_store.block_store
-      in
-      let* new_chain_state =
-        if Block_store_status.equal last_status current_status then
-          (* When no merge occured since the last sync, we only need to
-             sync:
-             - current_head
-             - invalid_blocks
-             - protocols (if a new protocol is detected) *)
-          let*! () = Store_events.(emit store_quick_sync) () in
-          let* invalid_blocks_data =
-            Stored_data.load (Naming.invalid_blocks_file chain_dir)
-          in
-          let* chain_store = get_chain_store store chain_id in
-          let* current_head = Block.read_block chain_store current_head_hash in
-          Shared.use main_chain_store.chain_state (fun chain_state ->
-              let* protocol_levels_data =
-                if
-                  Block.proto_level head_before_sync
-                  = Block.proto_level current_head
-                then return chain_state.protocol_levels_data
-                else Stored_data.load (Naming.protocol_levels_file chain_dir)
-              in
-              return
-                {
-                  chain_state with
-                  current_head_data;
-                  current_head;
-                  protocol_levels_data;
-                  invalid_blocks_data;
-                })
-        else
-          (* Status has changed, synchronize everything. *)
-          let*! () = Store_events.(emit store_full_sync) () in
-          Chain.load_chain_state chain_dir new_block_store
-      in
-      let new_main_chain_store =
-        {
-          main_chain_store with
-          block_store = new_block_store;
-          chain_state = Shared.create new_chain_state;
-        }
-      in
-      store.main_chain_store <- Some new_main_chain_store ;
-      return (store, current_status, cleanups)
+    let*! head_before_sync = Chain.current_head main_chain_store in
+    let store_dir = store.store_dir in
+    let chain_id = Chain_id.of_block_hash (genesis main_chain_store).block in
+    let chain_dir = Naming.chain_dir store_dir chain_id in
+    let* current_head_data =
+      Stored_data.load (Naming.current_head_file chain_dir)
+    in
+    let*! current_head_hash, _ = Stored_data.get current_head_data in
+    (* current_head_hash is available in synchronized store *)
+    let* new_block_store, current_status, cleanups =
+      Block_store.sync ~last_status main_chain_store.block_store
+    in
+    let* new_chain_state =
+      if Block_store_status.equal last_status current_status then
+        (* When no merge occurred since the last sync, we only need to
+           sync:
+           - current_head
+           - invalid_blocks
+           - protocols (if a new protocol is detected) *)
+        let*! () = Store_events.(emit store_quick_sync) () in
+        let* invalid_blocks_data =
+          Stored_data.load (Naming.invalid_blocks_file chain_dir)
+        in
+        let* chain_store = get_chain_store store chain_id in
+        let* current_head = Block.read_block chain_store current_head_hash in
+        Shared.use main_chain_store.chain_state (fun chain_state ->
+            let* protocol_levels_data =
+              if
+                Block.proto_level head_before_sync
+                = Block.proto_level current_head
+              then return chain_state.protocol_levels_data
+              else Stored_data.load (Naming.protocol_levels_file chain_dir)
+            in
+            return
+              {
+                chain_state with
+                current_head_data;
+                current_head;
+                protocol_levels_data;
+                invalid_blocks_data;
+              })
+      else
+        (* Status has changed, synchronize everything. *)
+        let*! () = Store_events.(emit store_full_sync) () in
+        Chain.load_chain_state chain_dir new_block_store
+    in
+    let new_main_chain_store =
+      {
+        main_chain_store with
+        block_store = new_block_store;
+        chain_state = Shared.create new_chain_state;
+      }
+    in
+    store.main_chain_store <- Some new_main_chain_store ;
+    return (store, current_status, cleanups)
   in
   let sync_end = Time.System.now () in
   let sync_time = Ptime.diff sync_end sync_start in

@@ -228,13 +228,9 @@ val init :
     is useful to keep track of a store opened in readonly mode that is
     updated by another read/write instance.
     [?last_status] gives a hint regarding the previous synchronization
-    to speed up the process.
-    [trigger_hash] corresponds to the last block that aims to be
-    stored in the store instance to synchronize -- it is typically set
-    as the last head to synchronize with. *)
+    to speed up the process. *)
 val sync :
   ?last_status:Block_store_status.t ->
-  trigger_hash:Block_hash.t ->
   t ->
   (t * Block_store_status.t * (unit -> unit Lwt.t)) tzresult Lwt.t
 
