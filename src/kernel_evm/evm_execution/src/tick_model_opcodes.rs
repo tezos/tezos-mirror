@@ -13,7 +13,9 @@
 use evm::Opcode;
 
 // Default ticks per gas value
-const DEFAULT_TICKS_PER_GAS: u64 = 2000;
+const DEFAULT_TICKS_PER_GAS: u64 = 10000;
+
+const ARITHMETIC_TICKS_PER_GAS: u64 = 3600;
 
 // Average: 4710; Standard deviation: 0
 const MODEL_0X00: u64 = 4710;
@@ -31,25 +33,25 @@ const MODEL_0X03: u64 = 3959;
 const MODEL_0X04: u64 = 3411;
 
 // No data
-const MODEL_0X05: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X05: u64 = ARITHMETIC_TICKS_PER_GAS;
 
 // Average: 3439; Standard deviation: 238
 const MODEL_0X06: u64 = 3915;
 
 // No data
-const MODEL_0X07: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X07: u64 = ARITHMETIC_TICKS_PER_GAS;
 
 // No data
-const MODEL_0X08: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X08: u64 = ARITHMETIC_TICKS_PER_GAS;
 
 // No data
-const MODEL_0X09: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X09: u64 = ARITHMETIC_TICKS_PER_GAS;
 
 // Average: 4633; Standard deviation: 1
 const MODEL_0X0A: u64 = 4635;
 
 // No data
-const MODEL_0X0B: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X0B: u64 = ARITHMETIC_TICKS_PER_GAS;
 
 // Average: 3592; Standard deviation: 1
 const MODEL_0X10: u64 = 3594;
@@ -90,8 +92,8 @@ const MODEL_0X1B: u64 = 11862;
 // Average: 12879; Standard deviation: 841
 const MODEL_0X1C: u64 = 14561;
 
-// No data
-const MODEL_0X1D: u64 = DEFAULT_TICKS_PER_GAS;
+// No data, approximated from SHL (0x1B) and SHR (0x1C)
+const MODEL_0X1D: u64 = 13000;
 
 // Average: 4259; Standard deviation: 174
 const MODEL_0X20: u64 = 4607;
@@ -180,8 +182,8 @@ const MODEL_0X51: u64 = 16023;
 // Average: 13540; Standard deviation: 4406
 const MODEL_0X52: u64 = 22352;
 
-// No data
-const MODEL_0X53: u64 = DEFAULT_TICKS_PER_GAS;
+// No data, correspond to opcode MSTORE8, approximated by the value for MSTORE
+const MODEL_0X53: u64 = MODEL_0X52;
 
 // Average: 2178; Standard deviation: 51
 const MODEL_0X54: u64 = 2280;
@@ -208,7 +210,7 @@ const MODEL_0X5A: u64 = 2969;
 const MODEL_0X5B: u64 = 3354;
 
 // No data
-const MODEL_0X5F: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X5F: u64 = PUSH_DEFAULT;
 
 // Average: 1474; Standard deviation: 64
 const MODEL_0X60: u64 = 1602;
@@ -222,89 +224,96 @@ const MODEL_0X62: u64 = 2679;
 // Average: 1574; Standard deviation: 0
 const MODEL_0X63: u64 = 1574;
 
-// No data
-const MODEL_0X64: u64 = DEFAULT_TICKS_PER_GAS;
+/// PUSH instruction are from 5F to 7F. For those we have no data for,
+/// we take the maximum value for the PUSH instruction we have.
+const PUSH_DEFAULT: u64 = 2680;
 
 // No data
-const MODEL_0X65: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X64: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X66: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X65: u64 = PUSH_DEFAULT;
+
+// No data
+const MODEL_0X66: u64 = PUSH_DEFAULT;
 
 // Average: 1698; Standard deviation: 491
 const MODEL_0X67: u64 = 2680;
 
 // No data
-const MODEL_0X68: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X68: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X69: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X69: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X6A: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X6A: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X6B: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X6B: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X6C: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X6C: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X6D: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X6D: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X6E: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X6E: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X6F: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X6F: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X70: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X70: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X71: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X71: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X72: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X72: u64 = PUSH_DEFAULT;
 
 // Average: 1841; Standard deviation: 538
 const MODEL_0X73: u64 = 2917;
 
 // No data
-const MODEL_0X74: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X74: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X75: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X75: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X76: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X76: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X77: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X77: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X78: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X78: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X79: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X79: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X7A: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X7A: u64 = PUSH_DEFAULT;
 
 // Average: 1875; Standard deviation: 66
 const MODEL_0X7B: u64 = 2007;
 
 // No data
-const MODEL_0X7C: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X7C: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X7D: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X7D: u64 = PUSH_DEFAULT;
 
 // No data
-const MODEL_0X7E: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X7E: u64 = PUSH_DEFAULT;
 
 // Average: 1963; Standard deviation: 6
 const MODEL_0X7F: u64 = 1975;
+
+/// DUP are opcodes 80 to 8f. We use the maximum we have as default value.
+const DUP_DEFAULT: u64 = 1500;
 
 // Average: 1442; Standard deviation: 59
 const MODEL_0X80: u64 = 1560;
@@ -346,13 +355,16 @@ const MODEL_0X8B: u64 = 1446;
 const MODEL_0X8C: u64 = 1444;
 
 // No data
-const MODEL_0X8D: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X8D: u64 = DUP_DEFAULT;
 
 // No data
-const MODEL_0X8E: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X8E: u64 = DUP_DEFAULT;
 
 // No data
-const MODEL_0X8F: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X8F: u64 = DUP_DEFAULT;
+
+/// SWAP opcodes are 90 to 9f. We use maximum as default value.
+const SWAP_DEFAULT: u64 = 1427;
 
 // Average: 1425; Standard deviation: 1
 const MODEL_0X90: u64 = 1427;
@@ -382,28 +394,28 @@ const MODEL_0X97: u64 = 1427;
 const MODEL_0X98: u64 = 1425;
 
 // No data
-const MODEL_0X99: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X99: u64 = SWAP_DEFAULT;
 
 // No data
-const MODEL_0X9A: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X9A: u64 = SWAP_DEFAULT;
 
 // No data
-const MODEL_0X9B: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X9B: u64 = SWAP_DEFAULT;
 
 // No data
-const MODEL_0X9C: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X9C: u64 = SWAP_DEFAULT;
 
 // No data
-const MODEL_0X9D: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X9D: u64 = SWAP_DEFAULT;
 
 // No data
-const MODEL_0X9E: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X9E: u64 = SWAP_DEFAULT;
 
 // No data
-const MODEL_0X9F: u64 = DEFAULT_TICKS_PER_GAS;
+const MODEL_0X9F: u64 = SWAP_DEFAULT;
 
-// No data
-const MODEL_0XA0: u64 = DEFAULT_TICKS_PER_GAS;
+// No data, approximated from the other logs (a0 to a4)
+const MODEL_0XA0: u64 = 200;
 
 // Average: 92; Standard deviation: 11
 const MODEL_0XA1: u64 = 114;
@@ -423,8 +435,8 @@ const MODEL_0XF0: u64 = 34;
 // Average: 25; Standard deviation: 331
 const MODEL_0XF1: u64 = 687;
 
-// No data
-const MODEL_0XF2: u64 = DEFAULT_TICKS_PER_GAS;
+// No data, approximated from CALL
+const MODEL_0XF2: u64 = 700;
 
 // Average: 45825; Standard deviation: 1917
 const MODEL_0XF3: u64 = 49659;
