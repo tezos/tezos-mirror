@@ -6,6 +6,7 @@ const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
 // const { ChartConfiguration } = require('chart')
 const fs = require('fs')
 const fetch = require('./fetch')
+const block_finalization = require('./block_finalization')
 
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
@@ -26,7 +27,8 @@ function init_analysis() {
         nb_call: 0,
         nb_transfer: 0,
         kernel_runs: [],
-        fetch_data: []
+        fetch_data: [],
+        block_finalization: []
 
     };
     return empty
@@ -37,6 +39,10 @@ function print_analysis(infos) {
     console.info(`Fetch Analysis`)
     console.info(`----------------------------------`)
     let error_fetch = fetch.print_fetch_analysis(infos)
+    console.info(`-------------------------------------------------------`)
+    console.info(`Block Finalization Analysis`)
+    console.info(`----------------------------------`)
+    let error_block_finalization = block_finalization.print_analysis(infos)
     console.info(`-------------------------------------------------------`)
     console.info(`Kernels infos`)
     console.info(`----------------------------------`)
@@ -54,8 +60,10 @@ function print_analysis(infos) {
     console.info(`Number of transfers: ${infos.nb_transfer}`)
     console.info(`Number of create/call: ${infos.nb_call}`)
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
+    console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
-    return error_fetch
+    return error_fetch + error_block_finalization
+
 }
 
 function process_record(record, acc) {
@@ -70,6 +78,8 @@ function process_bench_record(record, acc) {
         acc.init = Math.max(acc.init, record.interpreter_init_ticks)
     }
     if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
+
+    // Adds info needed for fetch analysis
     if (!isNaN(record.fetch_blueprint_ticks) && !isNaN(record.nb_tx)) {
         acc.fetch_data.push({
             ticks: record.fetch_blueprint_ticks,
@@ -77,6 +87,21 @@ function process_bench_record(record, acc) {
             nb_tx: record.nb_tx,
             benchmark_name: record.benchmark_name
         })
+    }
+
+    // Adds infos needed for block finalization analysis
+    if (!isNaN(record.inbox_size)) {
+        acc.block_finalization.push(record)
+    }
+    if (!isNaN(record.block_finalize)) {
+        // add block_finalize info to last record if same benchmark
+        let last_record = acc.block_finalization.pop()
+        if (last_record.benchmark_name == record.benchmark_name) {
+            last_record.block_finalize = record.block_finalize
+            acc.block_finalization.push(last_record)
+        } else {
+            console.error("[Error] couldn't find correct finalize information")
+        }
     }
 }
 
