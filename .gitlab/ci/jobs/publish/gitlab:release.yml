@@ -10,5 +10,8 @@ gitlab:release:
     - build:static-x86_64-linux-binaries
     - build:static-arm64-linux-binaries
     - docker:merge_manifests
+  variables:
+    SOURCE_PATH: "octez_source/"
   script:
+    - ./scripts/ci/create_octez_source.sh
     - ./scripts/ci/gitlab-release.sh
