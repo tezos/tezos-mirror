@@ -388,7 +388,7 @@ module P2P = struct
       ; query : < connected : bool > >
       service =
     Tezos_rpc.Service.get_service
-      ~description:"Get list of known peers and their corresponding info"
+      ~description:"Get list of known peers and their corresponding info."
       ~query:connected_query
       ~output:
         Data_encoding.(
@@ -428,7 +428,7 @@ module P2P = struct
         ; query : unit >
         service =
       Tezos_rpc.Service.get_service
-        ~description:"Get the topics this node is currently subscribed to"
+        ~description:"Get the topics this node is currently subscribed to."
         ~query:Tezos_rpc.Query.empty
         ~output:(Data_encoding.list Types.Topic.encoding)
         (open_root / "topics")
@@ -442,7 +442,7 @@ module P2P = struct
         ; query : unit >
         service =
       Tezos_rpc.Service.get_service
-        ~description:"Get this node's currently active connections"
+        ~description:"Get this node's currently active connections."
         ~query:Tezos_rpc.Query.empty
         ~output:
           Data_encoding.(
@@ -470,5 +470,28 @@ module P2P = struct
                  (req "peer" Types.Peer.encoding)
                  (req "score" Types.Score.encoding)))
         (open_root / "scores")
+
+    let get_topics_peers :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Types.Topic.t * Types.Peer.t list) list
+        ; prefix : unit
+        ; params : unit
+        ; query : < subscribed : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Get an association list between each topic subscribed to by the \
+           connected peers and the remote peers subscribed to that topic. If \
+           the 'subscribed' flag is given, then restrict the output to the \
+           topics this node is subscribed to."
+        ~query:subscribed_query
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "topic" Types.Topic.encoding)
+                 (req "peers" (list Types.Peer.encoding))))
+        (open_root / "topics" / "peers")
   end
 end

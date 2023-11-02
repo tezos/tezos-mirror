@@ -217,7 +217,30 @@ module P2P = struct
   module Gossipsub = struct
     let get_topics {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in
-      Gossipsub.Worker.GS.Topic.Map.bindings state.mesh |> List.rev_map fst
+      Gossipsub.Worker.GS.Topic.Map.fold
+        (fun topic _peers acc -> topic :: acc)
+        state.mesh
+        []
+
+    let get_topics_peers ~subscribed ctx =
+      let state = Gossipsub.Worker.state ctx.gs_worker in
+      let topic_to_peers_map =
+        Gossipsub.Worker.GS.Introspection.Connections.peers_per_topic_map
+          state.connections
+      in
+      let subscribed_topics = lazy (get_topics ctx) in
+      Gossipsub.Worker.GS.Topic.Map.fold
+        (fun topic peers acc ->
+          if
+            (not subscribed)
+            || List.mem
+                 ~equal:Types.Topic.equal
+                 topic
+                 (Lazy.force subscribed_topics)
+          then (topic, Gossipsub.Worker.GS.Peer.Set.elements peers) :: acc
+          else acc)
+        topic_to_peers_map
+        []
 
     let get_connections {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in

@@ -217,6 +217,8 @@ module Make (C : AUTOMATON_CONFIG) :
     val iter : (Peer.t -> connection -> unit) -> t -> unit
 
     val peers_in_topic : Topic.t -> t -> Peer.Set.t
+
+    val peers_per_topic_map : t -> Peer.Set.t Topic.Map.t
   end = struct
     type t = {
       peer_to_conn : connection Peer.Map.t;
@@ -311,6 +313,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let peers_in_topic topic map =
       Topic.Map.find topic map.topic_to_peers
       |> Option.value ~default:Peer.Set.empty
+
+    let peers_per_topic_map t = t.topic_to_peers
   end
 
   type fanout_peers = {peers : Peer.Set.t; last_published_time : time}

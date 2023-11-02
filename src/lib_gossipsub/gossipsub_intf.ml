@@ -909,6 +909,8 @@ module type AUTOMATON = sig
       val iter : (Peer.t -> connection -> unit) -> t -> unit
 
       val peers_in_topic : Topic.t -> t -> Peer.Set.t
+
+      val peers_per_topic_map : t -> Peer.Set.t Topic.Map.t
     end
 
     module Message_cache : sig

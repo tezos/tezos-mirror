@@ -213,6 +213,13 @@ module P2P = struct
       let open Lwt_result_syntax in
       return @@ Node_context.P2P.Gossipsub.get_topics ctxt
 
+    let get_topics_peers ctxt q () =
+      let open Lwt_result_syntax in
+      return
+      @@ Node_context.P2P.Gossipsub.get_topics_peers
+           ~subscribed:q#subscribed
+           ctxt
+
     let get_connections ctxt () () =
       let open Lwt_result_syntax in
       return @@ Node_context.P2P.Gossipsub.get_connections ctxt
@@ -286,6 +293,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_topics
        (P2P.Gossipsub.get_topics ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_topics_peers
+       (P2P.Gossipsub.get_topics_peers ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_connections

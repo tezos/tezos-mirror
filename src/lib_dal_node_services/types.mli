@@ -223,6 +223,8 @@ val wait_query : < wait : bool > Resto.Query.t
 
 val connected_query : < connected : bool > Resto.Query.t
 
+val subscribed_query : < subscribed : bool > Resto.Query.t
+
 val opt_header_status_query : header_status option Resto.Query.t
 
 val slot_encoding : Cryptobox.slot Data_encoding.t
