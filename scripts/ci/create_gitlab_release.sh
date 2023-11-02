@@ -59,6 +59,8 @@ fi
 # Enable release-cli verbose mode
 export DEBUG='true'
 
+echo "Creating release"
+
 release-cli create \
   --name="${gitlab_release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
@@ -66,3 +68,5 @@ release-cli create \
   --assets-link="{\"name\":\"Announcement\",\"url\":\"https://tezos.gitlab.io/releases/version-${gitlab_release_major_version}.html\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Docker image\",\"url\":\"${docker_image_url}\",\"link_type\":\"image\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_package_url}\",\"link_type\":\"package\"}"
+
+echo "Released"

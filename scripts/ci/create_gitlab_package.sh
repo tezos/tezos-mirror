@@ -83,18 +83,30 @@ git --version
 # Verify the placeholder %(describe:tags) is available
 git describe --tags
 # Create tarball
-git archive "${CI_COMMIT_TAG}" --format=tar | bzip2 > "${source_tarball}"
+git add "$SOURCE_PATH"
+stash="$(git stash create)"
+echo "Stach created"
+cd "$SOURCE_PATH"
+echo "Creating archive"
+git archive "$stash" --format=tar "./" | bzip2 > "${source_tarball}"
+echo "Archive created"
 
 # Check tarball is valid
 tar -tjf "${source_tarball}" > /dev/null
+echo "Tarball valid"
 
 # Verify git expanded placeholders in archive
-tar -Oxf "${source_tarball}" src/lib_version/exe/get_git_info.ml | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
+tar -Oxvf "${source_tarball}" src/lib_version/exe/get_git_info.ml | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
+echo "Expanded placeholders in archvie verified"
 
 # Checksums
 sha256sum "${source_tarball}" > "${source_tarball}.sha256"
 sha512sum "${source_tarball}" > "${source_tarball}.sha512"
 
+echo "Uploading packages"
+
 gitlab_upload "${source_tarball}" "${source_tarball}"
 gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256"
 gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512"
+
+echo "Packages uploaded"
