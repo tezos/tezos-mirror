@@ -23,5 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [collect pool] registers metrics collections of [pool] *)
-val collect : ('msg, 'peer, 'conn) P2p_pool.t -> unit
+(** [collect pool io_sched] registers metrics collections of [pool] and
+    [io_sched]. *)
+val collect : ('msg, 'peer, 'conn) P2p_pool.t -> P2p_io_scheduler.t -> unit
