@@ -50,6 +50,147 @@ module Node_metrics = struct
       name
 end
 
+module GS = struct
+  let subsystem = "gs"
+
+  let metric ~help ~name collector =
+    let info =
+      {
+        Prometheus.MetricInfo.name =
+          Prometheus.MetricName.v
+            (String.concat "_" [namespace; subsystem; name]);
+        help;
+        metric_type = Gauge;
+        label_names = [];
+      }
+    in
+    let collect () =
+      Prometheus.LabelSetMap.singleton
+        []
+        [Prometheus.Sample_set.sample (collector ())]
+    in
+    (info, collect)
+
+  let add_metric (info, collector) =
+    Prometheus.CollectorRegistry.(register default) info collector
+
+  let gs_stats = ref (Gossipsub.Worker.Introspection.empty_stats ())
+
+  let count_topics =
+    metric
+      ~name:"count_topics"
+      ~help:"The number of topics of the node"
+      (fun () -> float !gs_stats.count_topics)
+
+  let count_connections =
+    metric
+      ~name:"count_connections"
+      ~help:"Count the number connections of the node"
+      (fun () -> float !gs_stats.count_connections)
+
+  let count_bootstrap_connections =
+    metric
+      ~name:"count_bootstrap_connections"
+      ~help:"Count the number of bootstrap connections of the node"
+      (fun () -> float !gs_stats.count_bootstrap_connections)
+
+  let count_received_valid_messages =
+    metric
+      ~name:"count_received_valid_messages"
+      ~help:
+        "Count the number of received valid application messages by the node"
+      (fun () -> float !gs_stats.count_recv_valid_app_messages)
+
+  let count_received_invalid_messages =
+    metric
+      ~name:"count_received_invalid_messages"
+      ~help:"Count the number of receivedvalid application messages by the node"
+      (fun () -> float !gs_stats.count_recv_invalid_app_messages)
+
+  let count_received_unknown_validity_messages =
+    metric
+      ~name:"count_received_unknown_validity_messages"
+      ~help:
+        "Count the number of received application messages by the node with \
+         unknown validity"
+      (fun () -> float !gs_stats.count_recv_unknown_validity_app_messages)
+
+  let count_received_grafts =
+    metric
+      ~name:"count_received_grafts"
+      ~help:"Count the number of received grafts by the node"
+      (fun () -> float !gs_stats.count_recv_grafts)
+
+  let count_received_prunes =
+    metric
+      ~name:"count_received_prunes"
+      ~help:"Count the number of received prunes by the node"
+      (fun () -> float !gs_stats.count_recv_prunes)
+
+  let count_received_ihaves =
+    metric
+      ~name:"count_received_ihaves"
+      ~help:"Count the number of received ihaves by the node"
+      (fun () -> float !gs_stats.count_recv_ihaves)
+
+  let count_received_iwants =
+    metric
+      ~name:"count_received_iwants"
+      ~help:"Count the number of received iwants by the node"
+      (fun () -> float !gs_stats.count_recv_iwants)
+
+  let count_sent_messages =
+    metric
+      ~name:"count_sent_messages"
+      ~help:"Count the number of sent application messages by the node"
+      (fun () -> float !gs_stats.count_sent_app_messages)
+
+  let count_sent_grafts =
+    metric
+      ~name:"count_sent_grafts"
+      ~help:"Count the number of sent grafts by the node"
+      (fun () -> float !gs_stats.count_sent_grafts)
+
+  let count_sent_prunes =
+    metric
+      ~name:"count_sent_prunes"
+      ~help:"Count the number of sent prunes by the node"
+      (fun () -> float !gs_stats.count_sent_prunes)
+
+  let count_sent_ihaves =
+    metric
+      ~name:"count_sent_ihaves"
+      ~help:"Count the number of sent ihaves by the node"
+      (fun () -> float !gs_stats.count_sent_ihaves)
+
+  let count_sent_iwants =
+    metric
+      ~name:"count_sent_iwants"
+      ~help:"Count the number of sent iwants by the node"
+      (fun () -> float !gs_stats.count_sent_iwants)
+
+  let metrics =
+    [
+      count_topics;
+      count_connections;
+      count_bootstrap_connections;
+      count_received_valid_messages;
+      count_received_invalid_messages;
+      count_received_unknown_validity_messages;
+      count_received_grafts;
+      count_received_prunes;
+      count_received_ihaves;
+      count_received_iwants;
+      count_sent_messages;
+      count_sent_grafts;
+      count_sent_prunes;
+      count_sent_ihaves;
+      count_sent_iwants;
+    ]
+
+  let () = List.iter add_metric metrics
+end
+
 let shard_stored () =
   Prometheus.Counter.inc_one Node_metrics.number_of_stored_shards
 
@@ -75,3 +216,7 @@ let sample_time ~sampling_frequency ~to_sample ~metric_updater =
     let after = Time.System.now () in
     Ptime.diff after before |> Ptime.Span.to_float_s |> metric_updater ;
     res
+
+let collect_gossipsub_metrics gs_worker =
+  Prometheus.CollectorRegistry.(register_pre_collect default) (fun () ->
+      GS.gs_stats := Gossipsub.Worker.stats gs_worker)

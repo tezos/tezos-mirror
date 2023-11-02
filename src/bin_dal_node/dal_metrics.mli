@@ -29,3 +29,7 @@ val sample_time :
   to_sample:(unit -> 'a) ->
   metric_updater:(float -> unit) ->
   'a
+
+(** [collect_gossipsub_metrics gs_worker] allows to periodically collect metrics
+    from the given GS Worker state. *)
+val collect_gossipsub_metrics : Gossipsub.Worker.t -> unit

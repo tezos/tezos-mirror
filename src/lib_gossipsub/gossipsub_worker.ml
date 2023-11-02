@@ -61,7 +61,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       mutable count_recv_iwants : int;
     }
 
-    let empty () =
+    let empty_stats () =
       {
         count_topics = 0;
         count_connections = 0;
@@ -740,7 +740,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       status = Starting;
       state =
         {
-          stats = Introspection.empty ();
+          stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
           connected_bootstrap_peers = Peer.Set.empty;
           events_stream = Stream.empty ();

@@ -1211,6 +1211,8 @@ module type WORKER = sig
       mutable count_recv_iwants : int;
           (** Count successfully received & processed iwants. *)
     }
+
+    val empty_stats : unit -> stats
   end
 
   val stats : t -> Introspection.stats
