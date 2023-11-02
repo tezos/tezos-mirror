@@ -141,6 +141,12 @@ module Span : sig
   val mul : t -> int -> t
 end
 
+module Score : sig
+  type t = float
+
+  include ENCODABLE with type t := t
+end
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
    Use a bitset instead, when available in the standard library. *)
 

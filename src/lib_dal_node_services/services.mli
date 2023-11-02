@@ -277,5 +277,14 @@ module P2P : sig
       ; params : unit
       ; query : unit >
       service
+
+    val get_scores :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Peer.t * Types.Score.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
   end
 end

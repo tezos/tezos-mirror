@@ -426,5 +426,24 @@ module P2P = struct
                  (req "peer" Types.Peer.encoding)
                  (req "connection" Types.Gossipsub.connection_encoding)))
         (open_root / "connections")
+
+    let get_scores :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Types.Peer.t * Types.Score.t) list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:"Get the scores of the peers with a known score."
+        ~query:Tezos_rpc.Query.empty
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "peer" Types.Peer.encoding)
+                 (req "score" Types.Score.encoding)))
+        (open_root / "scores")
   end
 end

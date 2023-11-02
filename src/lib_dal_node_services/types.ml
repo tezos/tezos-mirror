@@ -228,6 +228,12 @@ module Span = struct
          (obj1 (req "span" int16))
 end
 
+module Score = struct
+  type t = float
+
+  let encoding = Data_encoding.float
+end
+
 (* Declaration of types used as inputs and/or outputs. *)
 type slot_id = {slot_level : level; slot_index : slot_index}
 
