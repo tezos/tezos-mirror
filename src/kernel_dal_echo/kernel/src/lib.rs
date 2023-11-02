@@ -5,6 +5,7 @@
 
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_entrypoint::kernel_entry;
+use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -65,31 +66,10 @@ fn process_slot(
     }
 }
 
-#[derive(Debug)]
-struct Parameters {
-    attestation_lag: u32,
-    slot_size: usize,
-    page_size: usize,
-    slot_indexes: Vec<u8>,
-}
-
-fn get_parameters() -> Parameters {
-    // By default use the current sandbox parameters.
-    let default_attestation_lag = 4;
-    let default_slot_size = 32768;
-    let default_page_size = 128;
+fn get_slot_indexes_from_env() -> Vec<u8> {
     // By default track slot index 0.
     let default_slot_indexes = vec![0];
 
-    let attestation_lag = option_env!("ATTESTATION_LAG")
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(default_attestation_lag);
-    let slot_size = option_env!("SLOT_SIZE")
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(default_slot_size);
-    let page_size = option_env!("PAGE_SIZE")
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(default_page_size);
     let slot_indexes = match option_env!("SLOT_INDEXES") {
         None => default_slot_indexes,
         Some(s) => s
@@ -99,30 +79,34 @@ fn get_parameters() -> Parameters {
             .unwrap_or(default_slot_indexes),
     };
 
-    Parameters {
-        attestation_lag,
-        slot_size,
-        page_size,
-        slot_indexes,
-    }
+    slot_indexes
 }
 
 pub fn entry(host: &mut impl Runtime) {
-    let parameters = get_parameters();
+    let parameters = host.reveal_dal_parameters();
     debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);
-    let Parameters {
+    let RollupDalParameters {
+        number_of_slots: _,
         attestation_lag,
         slot_size,
         page_size,
-        slot_indexes,
     } = parameters;
+
+    let slot_indexes = get_slot_indexes_from_env();
+
     match host.read_input() {
         Ok(Some(message)) => {
             let level = message.level;
-            let published_level = (level - attestation_lag) as i32;
-            let num_pages = slot_size / page_size;
+            let published_level = (level as i32) - (attestation_lag as i32);
+            let num_pages = (slot_size / page_size) as usize;
             for slot_index in slot_indexes {
-                process_slot(host, published_level, num_pages, page_size, slot_index);
+                process_slot(
+                    host,
+                    published_level,
+                    num_pages,
+                    page_size as usize,
+                    slot_index,
+                );
             }
         }
         Ok(None) => {
