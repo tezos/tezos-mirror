@@ -21,10 +21,7 @@ use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
     TransactionType, TRANSACTION_HASH_SIZE,
 };
-use tezos_ethereum::{
-    rlp_helpers::*,
-    tx_signature::{rlp_decode_opt, TxSignature},
-};
+use tezos_ethereum::{rlp_helpers::*, tx_signature::TxSignature};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -407,8 +404,16 @@ fn migrate_receipts_and_objects<Host: Runtime>(host: &mut Host) -> Result<(), Er
                 expected: TRANSACTION_HASH_SIZE,
                 actual: bytes.len(),
             })?;
-        migrate_one_receipt(host, &tx_hash)?;
-        migrate_one_object(host, &tx_hash)?;
+        let left = migrate_one_receipt(host, &tx_hash);
+        let right = migrate_one_object(host, &tx_hash);
+        match (left, right) {
+            (Ok(()), Ok(())) => (),
+            // We have transactions indexed multiple times, the
+            // migration fail for both the receipt and the object
+            // because we try to migrate twice.
+            (Err(_), Err(_)) => (),
+            (Err(err), _) | (_, Err(err)) => return Err(err),
+        }
     }
     Ok(())
 }
