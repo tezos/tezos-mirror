@@ -83,7 +83,8 @@ git --version
 # Verify the placeholder %(describe:tags) is available
 git describe --tags
 # Create tarball
-git archive "${CI_COMMIT_TAG}" --format=tar | bzip2 > "${source_tarball}"
+stash="$(git stash create)"
+git archive "${stash}" --format=tar "$SOURCE_PATH" | bzip2 > "${source_tarball}"
 
 # Check tarball is valid
 tar -tjf "${source_tarball}" > /dev/null
