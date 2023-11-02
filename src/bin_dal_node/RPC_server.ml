@@ -177,6 +177,10 @@ module Profile_handlers = struct
         |> Errors.to_tzresult)
 end
 
+let version ctxt () () =
+  let open Lwt_result_syntax in
+  Node_context.version ctxt |> return
+
 module P2P = struct
   let connect ctxt q point =
     Node_context.P2P.connect ctxt ?timeout:q#timeout point
@@ -289,6 +293,7 @@ let register_new :
        Tezos_rpc.Directory.gen_register
        Services.monitor_shards
        (Slots_handlers.monitor_shards ctxt)
+  |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_topics

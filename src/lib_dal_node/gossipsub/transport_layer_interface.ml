@@ -140,15 +140,25 @@ module P2p_message_V1 = struct
           Message_with_header {message; topic; message_id});
     ]
 
+  let distributed_db_version = Distributed_db_version.zero
+
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5638
 
      Decide how to safely choose the node db version. *)
-  let distributed_db_versions = [Distributed_db_version.zero]
+  let distributed_db_versions = [distributed_db_version]
 
   let message_config ~network_name : p2p_message P2p_params.message_config =
     let chain_name = Distributed_db_version.Name.of_string network_name in
     {encoding; chain_name; distributed_db_versions}
 end
+
+let version ~network_name =
+  Network_version.
+    {
+      chain_name = Distributed_db_version.Name.of_string network_name;
+      distributed_db_version = P2p_message_V1.distributed_db_version;
+      p2p_version = P2p_version.one;
+    }
 
 (* Exposed interface *)
 

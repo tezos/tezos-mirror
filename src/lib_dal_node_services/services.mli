@@ -183,6 +183,15 @@ val monitor_shards :
   ; query : unit >
   service
 
+val version :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.Version.t
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
 module P2P : sig
   (** A service to initiate a connection with another point. *)
   val post_connect :

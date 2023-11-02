@@ -186,6 +186,10 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
          instead of [int list] *)
       Stdlib.List.init offset (fun i -> start_index + i)
 
+let version {config; _} =
+  let network_name = config.Configuration_file.network_name in
+  Types.Version.make ~network_version:(Gossipsub.version ~network_name)
+
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =
     Gossipsub.Transport_layer.connect transport_layer ?timeout point
