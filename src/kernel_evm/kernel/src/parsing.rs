@@ -21,7 +21,9 @@ use tezos_smart_rollup_encoding::{
     inbox::{
         ExternalMessageFrame, InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer,
     },
-    michelson::{ticket::UnitTicket, MichelsonBytes, MichelsonInt, MichelsonPair},
+    michelson::{
+        ticket::UnitTicket, MichelsonBytes, MichelsonInt, MichelsonOr, MichelsonPair,
+    },
 };
 use tezos_smart_rollup_host::input::Message;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -98,9 +100,9 @@ pub enum InputResult {
     Unparsable,
 }
 
-pub type RollupType = MichelsonPair<
-    MichelsonPair<MichelsonBytes, UnitTicket>,
-    MichelsonPair<MichelsonInt, MichelsonBytes>,
+pub type RollupType = MichelsonOr<
+    MichelsonOr<MichelsonPair<MichelsonBytes, UnitTicket>, MichelsonBytes>,
+    MichelsonBytes,
 >;
 
 impl InputResult {
@@ -297,15 +299,23 @@ impl InputResult {
         }
 
         let source = transfer.sender;
-        let receiver = transfer.payload.0 .0;
-        let ticket = transfer.payload.0 .1;
-        let gas_price = transfer.payload.1 .0;
-        let extra_bytes = transfer.payload.1 .1 .0;
 
-        if extra_bytes.is_empty() {
-            Self::parse_deposit(host, ticket, receiver, gas_price, ticketer)
-        } else {
-            Self::parse_kernel_upgrade(source, admin, &extra_bytes)
+        match transfer.payload {
+            MichelsonOr::Left(left) => match left {
+                MichelsonOr::Left(MichelsonPair(receiver, ticket)) => {
+                    Self::parse_deposit(
+                        host,
+                        ticket,
+                        receiver,
+                        MichelsonInt::from(0),
+                        ticketer,
+                    )
+                }
+                MichelsonOr::Right(_extra) => Self::Unparsable,
+            },
+            MichelsonOr::Right(MichelsonBytes(upgrade)) => {
+                Self::parse_kernel_upgrade(source, admin, &upgrade)
+            }
         }
     }
 
