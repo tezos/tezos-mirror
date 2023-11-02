@@ -33,11 +33,17 @@ pub mod v1_primitives {
     /// `("Left", D_Left)` case tag.
     pub const LEFT_TAG: u8 = 5;
 
+    /// `("None", D_None)` case tag.
+    pub const NONE_TAG: u8 = 6;
+
     /// `("Pair", D_PAIR)` case tag.
     pub const PAIR_TAG: u8 = 7;
 
     /// `("Right", D_Right)` case tag.
     pub const RIGHT_TAG: u8 = 8;
+
+    /// `("Some", D_Some)` case tag.
+    pub const SOME_TAG: u8 = 9;
 
     /// unit encoding case tag.
     pub const UNIT_TAG: u8 = 11;
@@ -66,6 +72,7 @@ where
     Arg1: Michelson,
 {
 }
+impl<Arg> Michelson for MichelsonOption<Arg> where Arg: Michelson {}
 
 /// Michelson *unit* encoding.
 #[derive(Debug, PartialEq, Eq)]
@@ -95,6 +102,12 @@ where
     /// The *Right* case
     Right(Arg1),
 }
+
+/// Michelson *option* encoding.  #[derive(Debug, PartialEq, Eq)] pub
+#[derive(Debug, PartialEq, Eq)]
+pub struct MichelsonOption<Arg>(pub Option<Arg>)
+where
+    Arg: Debug + PartialEq + Eq;
 
 /// Michelson String encoding.
 #[derive(Debug, PartialEq, Eq)]
@@ -170,6 +183,15 @@ where
     }
 }
 
+impl<Arg> HasEncoding for MichelsonOption<Arg>
+where
+    Arg: Debug + PartialEq + Eq,
+{
+    fn encoding() -> Encoding {
+        Encoding::Custom
+    }
+}
+
 impl HasEncoding for MichelsonString {
     fn encoding() -> Encoding {
         Encoding::Custom
@@ -236,6 +258,24 @@ where
             map(
                 MichelinePrim1ArgNoAnnots::<_, { prim::RIGHT_TAG }>::nom_read,
                 |MichelinePrim1ArgNoAnnots { arg }| Self::Right(arg),
+            ),
+        ))(input)
+    }
+}
+
+impl<Arg> NomReader for MichelsonOption<Arg>
+where
+    Arg: NomReader + Debug + PartialEq + Eq,
+{
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        alt((
+            map(
+                MichelinePrimNoArgsNoAnnots::<{ prim::NONE_TAG }>::nom_read,
+                |_prim| Self(None),
+            ),
+            map(
+                MichelinePrim1ArgNoAnnots::<_, { prim::SOME_TAG }>::nom_read,
+                |MichelinePrim1ArgNoAnnots { arg }| Self(Some(arg)),
             ),
         ))(input)
     }
@@ -347,6 +387,22 @@ where
 {
     fn from(micheline: MichelinePrim1ArgNoAnnots<Arg1, { prim::RIGHT_TAG }>) -> Self {
         Self::Right(micheline.arg)
+    }
+}
+
+impl<Arg> BinWriter for MichelsonOption<Arg>
+where
+    Arg: BinWriter + Debug + PartialEq + Eq,
+{
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        match self {
+            MichelsonOption(None) => {
+                bin_write_prim_no_args_no_annots(prim::NONE_TAG, output)
+            }
+            MichelsonOption(Some(arg)) => {
+                bin_write_prim_1_arg_no_annots(prim::SOME_TAG, arg, output)
+            }
+        }
     }
 }
 
