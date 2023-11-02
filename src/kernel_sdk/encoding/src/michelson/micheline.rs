@@ -42,6 +42,84 @@ pub const MICHELINE_PRIM_GENERIC_TAG: u8 = 9;
 /// Bytes encoding case tag.
 pub const MICHELINE_BYTES_TAG: u8 = 10;
 
+// -----------
+// Annotations
+// -----------
+
+mod annots {
+    use regex::Regex;
+    use std::fmt;
+    use tezos_data_encoding::enc::{self, BinResult, BinWriter};
+    use tezos_data_encoding::nom::{self as nom_read, NomError, NomReader, NomResult};
+
+    #[derive(Debug, PartialEq, Eq, Clone)]
+    pub struct Annotation(String);
+
+    #[derive(Debug, PartialEq, Eq, Clone, Default)]
+    pub struct Annotations(Vec<Annotation>);
+
+    impl fmt::Display for Annotation {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Annotation(s) = self;
+            write!(f, "{}", s)
+        }
+    }
+
+    impl fmt::Display for Annotations {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Annotations(vec) = self;
+            match vec.as_slice() {
+                [] => (),
+                [a, rest @ ..] => {
+                    a.fmt(f)?;
+                    for a in rest {
+                        f.write_str(" ")?;
+                        a.fmt(f)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+
+    impl BinWriter for Annotations {
+        fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+            enc::string(self.to_string(), output)
+        }
+    }
+
+    impl NomReader for Annotations {
+        fn nom_read(input: &[u8]) -> NomResult<Self> {
+            // TODO: #6665
+            // this does two passes over the input buffer (up to `dynamic` size)
+            // could be done in a single pass instead, but for future work
+            // (would require replacing the regex too, with a handwritten parser).
+            use nom::error::ParseError;
+
+            let (remaining, anns) = nom_read::string(input)?;
+            let re =
+                Regex::new(r"^[@:$&%!?][a-zA-Z0-9_.%@]*$").expect("Expected valid regex");
+
+            anns.split(' ')
+                .filter(|&x| !x.is_empty()) // needed for the empty string
+                .map(|ann| {
+                    if re.is_match(ann) {
+                        Ok(Annotation(ann.into()))
+                    } else {
+                        Err(nom::Err::Error(NomError::from_error_kind(
+                            input,
+                            nom::error::ErrorKind::RegexpMatch,
+                        )))
+                    }
+                })
+                .collect::<Result<Vec<Annotation>, nom::Err<NomError>>>()
+                .map(|anns| (remaining, Annotations(anns)))
+        }
+    }
+}
+
+use annots::Annotations;
+
 // -----
 // TYPES
 // -----
@@ -78,7 +156,7 @@ pub struct MichelinePrimNoArgsNoAnnots<const PRIM_TAG: u8>;
 /// - `annots` - the annotations
 #[derive(Debug, PartialEq, Eq)]
 pub struct MichelinePrimNoArgsSomeAnnots<const PRIM_TAG: u8> {
-    pub(crate) annots: String,
+    pub(crate) annots: Annotations,
 }
 
 /// lib_micheline *prim-1 no annotations* encoding.
@@ -106,7 +184,7 @@ where
     Arg: Debug + PartialEq + Eq,
 {
     pub(crate) arg: Arg,
-    pub(crate) annots: String,
+    pub(crate) annots: Annotations,
 }
 
 /// lib_micheline *prim-2 no annotations* encoding.
@@ -140,7 +218,7 @@ where
 {
     pub(crate) arg1: Arg1,
     pub(crate) arg2: Arg2,
-    pub(crate) annots: String,
+    pub(crate) annots: Annotations,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -152,7 +230,7 @@ pub enum Node {
     Prim {
         prim_tag: u8,
         args: Vec<Node>,
-        annots: Option<String>,
+        annots: Option<Annotations>,
     },
 }
 
@@ -371,7 +449,7 @@ impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsSomeAnnots<PRIM_TAG> {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, PRIM_TAG]),
-            nom_read::string,
+            Annotations::nom_read,
         );
 
         map(parse, |annots| MichelinePrimNoArgsSomeAnnots { annots })(input)
@@ -399,7 +477,7 @@ where
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, PRIM_TAG]),
-            pair(Arg::nom_read, nom_read::string),
+            pair(Arg::nom_read, Annotations::nom_read),
         );
 
         map(parse, |(arg, annots)| MichelinePrim1ArgSomeAnnots {
@@ -437,7 +515,7 @@ where
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG, PRIM_TAG]),
-            pair(Arg1::nom_read, pair(Arg2::nom_read, nom_read::string)),
+            pair(Arg1::nom_read, pair(Arg2::nom_read, Annotations::nom_read)),
         );
 
         map(parse, |(arg1, (arg2, annots))| {
@@ -480,7 +558,7 @@ impl Node {
             ),
             nom_read_app_aux(
                 MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG,
-                nom_read::string,
+                Annotations::nom_read,
                 |(prim_tag, annots)| Prim {
                     prim_tag,
                     args: vec![],
@@ -498,7 +576,7 @@ impl Node {
             ),
             nom_read_app_aux(
                 MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG,
-                pair(Self::nom_read, nom_read::string),
+                pair(Self::nom_read, Annotations::nom_read),
                 |(prim_tag, (arg, annots))| Prim {
                     prim_tag,
                     args: vec![arg],
@@ -516,7 +594,7 @@ impl Node {
             ),
             nom_read_app_aux(
                 MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG,
-                tuple((Self::nom_read, Self::nom_read, nom_read::string)),
+                tuple((Self::nom_read, Self::nom_read, Annotations::nom_read)),
                 |(prim_tag, (arg1, arg2, annots))| Prim {
                     prim_tag,
                     args: vec![arg1, arg2],
@@ -527,7 +605,7 @@ impl Node {
                 MICHELINE_PRIM_GENERIC_TAG,
                 pair(
                     nom_read::dynamic(nom_read::list(Node::nom_read)),
-                    nom_read::string,
+                    Annotations::nom_read,
                 ),
                 |(prim_tag, (args, annots))| Prim {
                     prim_tag,
@@ -650,7 +728,7 @@ impl BinWriter for Node {
                 prim_tag,
                 args,
                 annots,
-            } => match (args.as_slice(), annots.as_deref()) {
+            } => match (args.as_slice(), annots) {
                 ([], None) => bin_write_prim_no_args_no_annots(*prim_tag, output),
                 ([], Some(annots)) => {
                     bin_write_prim_no_args_some_annots(*prim_tag, annots, output)
@@ -665,12 +743,15 @@ impl BinWriter for Node {
                 ([arg0, arg1], Some(annots)) => bin_write_prim_2_args_some_annots(
                     *prim_tag, arg0, arg1, annots, output,
                 ),
-                (_, annots) => bin_write_prim_generic(
+                (_, None) => bin_write_prim_generic(
                     *prim_tag,
                     args,
-                    annots.unwrap_or_default(),
+                    &Annotations::default(),
                     output,
                 ),
+                (_, Some(annots)) => {
+                    bin_write_prim_generic(*prim_tag, args, annots, output)
+                }
             },
         }
     }
@@ -721,12 +802,12 @@ pub(crate) fn bin_write_prim_no_args_no_annots(
 /// [MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG].
 pub(crate) fn bin_write_prim_no_args_some_annots(
     prim_tag: u8,
-    annots: &str,
+    annots: &Annotations,
     output: &mut Vec<u8>,
 ) -> BinResult {
     enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, prim_tag], output);
 
-    enc::string(annots, output)?;
+    annots.bin_write(output)?;
 
     Ok(())
 }
@@ -753,7 +834,7 @@ where
 pub(crate) fn bin_write_prim_1_arg_some_annots<Arg>(
     prim_tag: u8,
     arg: &Arg,
-    annots: &str,
+    annots: &Annotations,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
@@ -762,7 +843,7 @@ where
     enc::put_bytes(&[MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, prim_tag], output);
 
     arg.bin_write(output)?;
-    enc::string(annots, output)?;
+    annots.bin_write(output)?;
 
     Ok(())
 }
@@ -793,7 +874,7 @@ pub(crate) fn bin_write_prim_2_args_some_annots<Arg1, Arg2>(
     prim_tag: u8,
     arg1: &Arg1,
     arg2: &Arg2,
-    annots: &str,
+    annots: &Annotations,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
@@ -804,7 +885,7 @@ where
 
     arg1.bin_write(output)?;
     arg2.bin_write(output)?;
-    enc::string(annots, output)?;
+    annots.bin_write(output)?;
 
     Ok(())
 }
@@ -814,7 +895,7 @@ where
 pub(crate) fn bin_write_prim_generic<Arg>(
     prim_tag: u8,
     args: &Vec<Arg>,
-    annots: &str,
+    annots: &Annotations,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
@@ -822,7 +903,7 @@ where
 {
     enc::put_bytes(&[MICHELINE_PRIM_GENERIC_TAG, prim_tag], output);
     enc::dynamic(enc::list(Arg::bin_write))(args, output)?;
-    enc::string(annots, output)?;
+    Annotations::bin_write(annots, output)?;
 
     Ok(())
 }
@@ -883,6 +964,55 @@ pub(crate) fn bin_write_micheline_seq(
 mod test {
     use super::*;
 
+    // Conversion from %str to Annotations is only implemented to
+    // simplify writing tests. That's why it is not exposed outside
+    // this test module.
+
+    #[derive(Debug)]
+    pub enum AnnotationsFromStringError {
+        StringEncodingError(String),
+        AnnotationsDecodingError(Vec<u8>),
+    }
+
+    impl TryFrom<&str> for Annotations {
+        type Error = AnnotationsFromStringError;
+
+        fn try_from(s: &str) -> Result<Self, Self::Error> {
+            let mut buf = Vec::new();
+            enc::string(s, &mut buf)
+                .map_err(|_| AnnotationsFromStringError::StringEncodingError(s.into()))?;
+            let (_remaining, annots) = Self::nom_read(&buf).map_err(|_| {
+                AnnotationsFromStringError::AnnotationsDecodingError(buf.clone())
+            })?;
+            Ok(annots)
+        }
+    }
+
+    #[test]
+    fn micheline_no_annots_encode_decode() {
+        assert_eq!("".split(' ').collect::<Vec<&str>>(), vec![""]);
+        let tests: Vec<(&str, &[u8])> = vec![
+            ("", b"\0\0\0\0"),
+            (":foo", b"\0\0\0\x04:foo"),
+            (":foo @bar", b"\0\0\0\x09:foo @bar"),
+            (":foo @bar %baz", b"\0\0\0\x0e:foo @bar %baz"),
+        ];
+
+        for (s, bytes) in tests {
+            let annots =
+                Annotations::try_from(s).expect("Expect valid annotation string");
+
+            let mut bin = Vec::new();
+            annots.bin_write(&mut bin).unwrap();
+            assert_eq!(bin, bytes);
+
+            let (remaining_input, decoded): (&[u8], Annotations) =
+                NomReader::nom_read(bytes).unwrap();
+            assert!(remaining_input.is_empty());
+            assert_eq!(decoded, annots);
+        }
+    }
+
     // z_bignum test cases from tezedge/tezos-encoding, prefixed by
     // the micheline_int tag (0)
     const MICHELINE_INT_ENCODING: &[(&str, &str)] = &[
@@ -936,6 +1066,19 @@ mod test {
     }
 
     #[test]
+    fn micheline_empty_string_encode() {
+        let test = "";
+        let mut expected = vec![1, 0, 0, 0, 0];
+        expected.append(&mut test.as_bytes().to_vec());
+
+        let mut bin = Vec::new();
+
+        MichelineString(test.into()).bin_write(&mut bin).unwrap();
+
+        assert_eq!(expected, bin);
+    }
+
+    #[test]
     fn micheline_string_encode() {
         let test = "the quick brown fox jumps over the lazy dog";
         let mut expected = vec![1, 0, 0, 0, 43];
@@ -946,6 +1089,19 @@ mod test {
         MichelineString(test.into()).bin_write(&mut bin).unwrap();
 
         assert_eq!(expected, bin);
+    }
+
+    #[test]
+    fn micheline_empty_string_decode() {
+        let expected = "";
+        let mut test = vec![1, 0, 0, 0, 0];
+        test.append(&mut expected.as_bytes().to_vec());
+
+        let (input_remaining, value) =
+            MichelineString::nom_read(test.as_slice()).unwrap();
+
+        assert!(input_remaining.is_empty());
+        assert_eq!(MichelineString(expected.into()), value);
     }
 
     #[test]
@@ -1033,9 +1189,8 @@ mod test {
             b':', b'f', b'o', b'o', // annotation
         ];
 
-        let expected = MichelinePrimNoArgsSomeAnnots::<98> {
-            annots: ":foo".into(),
-        };
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
+        let expected = MichelinePrimNoArgsSomeAnnots::<98> { annots };
 
         let (remaining_input, natfoo) = NomReader::nom_read(test.as_slice()).unwrap();
 
@@ -1052,9 +1207,8 @@ mod test {
             b':', b'f', b'o', b'o', // annotation
         ];
 
-        let test = MichelinePrimNoArgsSomeAnnots::<98> {
-            annots: ":foo".into(),
-        };
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
+        let test = MichelinePrimNoArgsSomeAnnots::<98> { annots };
 
         let mut bin = Vec::new();
         test.bin_write(&mut bin).unwrap();
@@ -1112,10 +1266,8 @@ mod test {
         ];
 
         let nat = MichelinePrimNoArgsNoAnnots::<98> {};
-        let expected = MichelinePrim1ArgSomeAnnots::<_, 99> {
-            arg: nat,
-            annots: ":foo".into(),
-        };
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
+        let expected = MichelinePrim1ArgSomeAnnots::<_, 99> { arg: nat, annots };
 
         let (remaining_input, optnatfoo) = NomReader::nom_read(test.as_slice()).unwrap();
 
@@ -1135,10 +1287,8 @@ mod test {
         ];
 
         let nat = MichelinePrimNoArgsNoAnnots::<98> {};
-        let test = MichelinePrim1ArgSomeAnnots::<_, 99> {
-            arg: nat,
-            annots: ":foo".into(),
-        };
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
+        let test = MichelinePrim1ArgSomeAnnots::<_, 99> { arg: nat, annots };
 
         let mut bin = Vec::new();
         test.bin_write(&mut bin).unwrap();
@@ -1209,10 +1359,11 @@ mod test {
 
         let nat = MichelinePrimNoArgsNoAnnots::<98> {};
         let int = MichelinePrimNoArgsNoAnnots::<91> {};
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
         let expected = MichelinePrim2ArgsSomeAnnots::<_, _, 100> {
             arg1: nat,
             arg2: int,
-            annots: ":foo".into(),
+            annots,
         };
 
         let (remaining_input, optnatfoo) = NomReader::nom_read(test.as_slice()).unwrap();
@@ -1236,10 +1387,11 @@ mod test {
 
         let nat = MichelinePrimNoArgsNoAnnots::<98> {};
         let int = MichelinePrimNoArgsNoAnnots::<91> {};
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
         let test = MichelinePrim2ArgsSomeAnnots::<_, _, 100> {
             arg1: nat,
             arg2: int,
-            annots: ":foo".into(),
+            annots,
         };
 
         let mut bin = Vec::new();
@@ -1266,10 +1418,11 @@ mod test {
         ];
 
         let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
         let expected = Node::Prim {
             prim_tag: 7,
             args: vec![unit.into(), 0.into(), 0.into()],
-            annots: Some(":foo".into()),
+            annots: Some(annots),
         };
 
         let (remaining_input, optnatfoo) = NomReader::nom_read(test.as_slice()).unwrap();
@@ -1295,10 +1448,11 @@ mod test {
         ];
 
         let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let annots: Annotations = Annotations::try_from(":foo").unwrap();
         let test = Node::Prim {
             prim_tag: 7,
             args: vec![unit.into(), 0.into(), 0.into()],
-            annots: Some(":foo".into()),
+            annots: Some(annots),
         };
 
         let mut bin = Vec::new();
