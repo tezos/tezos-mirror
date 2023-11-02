@@ -7,8 +7,8 @@ use crate::error::Error;
 use crate::error::StorageError::InvalidLoadValue;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
-    block_path, index_block, init_blocks_index, init_transaction_hashes_index,
-    object_path, read_current_block_number, read_storage_version, receipt_path,
+    block_path, init_blocks_index, init_transaction_hashes_index, object_path,
+    read_current_block_number, read_storage_version, receipt_path, store_block_by_hash,
     store_rlp, store_storage_version, STORAGE_VERSION,
 };
 use ethbloom::Bloom;
@@ -155,10 +155,29 @@ fn migrate_one_block<Host: Runtime>(
         transactions: old_block.transactions,
     };
     // Write new block
-    store_rlp(&new_block, host, &path)
+    store_block_by_hash(host, &new_block)
 }
 
 fn migrate_blocks<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    // When we migrated the blocks in the previous upgrade, we re-indexed by mistake
+    // all the blocks.
+    // Therefore:
+    // - /evm/blocks/indexes/0 -> 0x00..00
+    // - /evm/blocks/indexes/772940 -> 0x00..00
+    //
+    // One other way to understand is: |indexes| = HEAD * 2.
+    //
+    // There are two ways to fix this problem.
+    // 1. Remove the extra indexes and relocate the misplaced ones. Closer to
+    //    what we would do in production.
+    // 2. Recompute all the indexes because we know how block hashes work. Much
+    //    easier to implement because you start from scratch again.
+    //
+    // This function fixes the block indexes using the second approach.
+
+    let index = init_blocks_index()?;
+    host.store_delete(&index.path)?;
+
     let head = read_current_block_number(host)?.as_u32();
     for number in 0..(head + 1) {
         let hash: H256 = H256(U256::from(number).into());
@@ -190,37 +209,6 @@ fn replace_genesis_parent_hash<Host: Runtime>(host: &mut Host) -> Result<(), Err
     // Write again genesis block. We go through `store_rlp` to avoid
     // an additional indexing of the block.
     store_rlp(&block, host, &path)
-}
-
-// When we migrated the blocks in the previous upgrade, we re-indexed by mistake
-// all the blocks.
-// Therefore:
-// - /evm/blocks/indexes/0 -> 0x00..00
-// - /evm/blocks/indexes/772940 -> 0x00..00
-//
-// One other way to understand is: |indexes| = HEAD * 2.
-//
-// There are two ways to fix this problem.
-// 1. Remove the extra indexes and relocate the misplaced ones. Closer to
-//    what we would do in production.
-// 2. Recompute all the indexes because we know how block hashes work. Much
-//    easier to implement because you start from scratch again.
-//
-// This function fixes the block indexes using the second approach.
-fn fix_block_indexes<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    let mut index = init_blocks_index()?;
-
-    // Remove current indexes.
-    host.store_delete(&index.path)?;
-
-    // Repush all blocks to indexes.
-    let head = read_current_block_number(host)?.as_u32();
-    for number in 0..(head + 1) {
-        let hash: H256 = H256(U256::from(number).into());
-        index_block(host, &hash, &mut index)?;
-    }
-
-    Ok(())
 }
 
 // The Transaction Receipt used to include the block hash.
@@ -438,8 +426,6 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
         migrate_receipts_and_objects(host)?;
 
         replace_genesis_parent_hash(host)?;
-
-        fix_block_indexes(host)?;
 
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
