@@ -7,7 +7,7 @@ const CREATE_STORAGE_CUTOFF = 600_000
 
 const MLR = require("ml-regression-multivariate-linear")
 
-module.exports = { is_transfer, is_create, is_transaction, BASE_GAS, make_lr, print_lr, print_summary_errors }
+module.exports = { is_transfer, is_create, is_transaction, BASE_GAS, make_lr, print_lr, print_summary_errors, print_model, predict_linear_model }
 
 function is_transfer(record) {
     return record.gas_cost == BASE_GAS
@@ -43,14 +43,23 @@ function print_lr(lr, var_name = "size") {
     else return "no linear regression available"
 }
 
-function print_summary_errors(data, compute_error) {
+function print_summary_errors(data, compute_error, prefix = "") {
     let max_error_current = 0;
     let nb_error = 0
     for (datum of data) {
         let error = compute_error(datum)
         if (error > 0) nb_error += 1
-        max_error_current = Math.max(max_error_current, error)
+        if (!isNaN(error)) max_error_current = Math.max(max_error_current, error)
     }
-    console.log(`nb of errors: ${nb_error} ; maximum error: ${max_error_current} ticks`)
+    console.log(`${prefix} nb of errors: ${nb_error} ; maximum error: ${max_error_current} ticks`)
     return nb_error
+}
+
+function print_model(model, var_name) {
+    return `Y = ${model.intercept} + ${model.coef} * ${var_name}`
+}
+
+function predict_linear_model(model, x) {
+    if (isNaN(x)) return model.intercept
+    return model.intercept + model.coef * x
 }

@@ -7,6 +7,7 @@ const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
 const fs = require('fs')
 const fetch = require('./fetch')
 const block_finalization = require('./block_finalization')
+const tx_register = require('./tx_register')
 
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
@@ -28,7 +29,8 @@ function init_analysis() {
         nb_transfer: 0,
         kernel_runs: [],
         fetch_data: [],
-        block_finalization: []
+        block_finalization: [],
+        tx_register: [],
 
     };
     return empty
@@ -43,6 +45,10 @@ function print_analysis(infos) {
     console.info(`Block Finalization Analysis`)
     console.info(`----------------------------------`)
     let error_block_finalization = block_finalization.print_analysis(infos)
+    console.info(`-------------------------------------------------------`)
+    console.info(`Transaction Registering Analysis`)
+    console.info(`----------------------------------`)
+    let error_register = tx_register.print_analysis(infos)
     console.info(`-------------------------------------------------------`)
     console.info(`Kernels infos`)
     console.info(`----------------------------------`)
@@ -62,7 +68,7 @@ function print_analysis(infos) {
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
-    return error_fetch + error_block_finalization
+    return error_fetch + error_block_finalization + error_register
 
 }
 
@@ -109,6 +115,10 @@ function process_transaction_record(record, acc) {
     acc.signatures.push(record.signature_verification_ticks)
     if (is_transfer(record)) process_transfer(record, acc)
     else process_execution(record, acc)
+
+    // Adds infos for tx registration analysis
+    if (!isNaN(record.tx_size) && !isNaN(record.store_transaction_object_ticks))
+        acc.tx_register.push(record)
 }
 
 function process_transfer(record, acc) {
