@@ -389,5 +389,24 @@ module P2P = struct
         ~query:Tezos_rpc.Query.empty
         ~output:(Data_encoding.list Types.Topic.encoding)
         (open_root / "topics")
+
+    let get_connections :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Types.Peer.t * Types.Gossipsub.connection) list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:"Get this node's currently active connections"
+        ~query:Tezos_rpc.Query.empty
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "peer" Types.Peer.encoding)
+                 (req "connection" Types.Gossipsub.connection_encoding)))
+        (open_root / "connections")
   end
 end

@@ -206,5 +206,8 @@ module P2P : sig
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list
+
+    (** [get_connections t] returns the list of connections. *)
+    val get_connections : t -> (Types.Peer.t * Types.Gossipsub.connection) list
   end
 end
