@@ -25,6 +25,8 @@ pub const MICHELINE_INT_TAG: u8 = 0;
 pub const MICHELINE_STRING_TAG: u8 = 1;
 /// no-argument primitive (without annotations) encoding case tag.
 pub const MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG: u8 = 3;
+/// 1-argument primitive (without annotations) encoding case tag.
+pub const MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG: u8 = 5;
 /// 2-argument primitive (without annotations) encoding case tag.
 pub const MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG: u8 = 7;
 /// Bytes encoding case tag.
@@ -58,6 +60,19 @@ pub struct MichelineBytes(pub Vec<u8>);
 /// - `prim` - the `PRIM_TAG`
 #[derive(Debug, PartialEq, Eq)]
 pub struct MichelinePrimNoArgsNoAnnots<const PRIM_TAG: u8>;
+
+/// lib_micheline *prim-1 no annotations* encoding.
+///
+/// Encoded as an `obj2`, prefixed by [MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG], with fields:
+/// - `prim` - the `PRIM_TAG`
+/// - `arg` - the argument
+#[derive(Debug, PartialEq, Eq)]
+pub struct MichelinePrim1ArgNoAnnots<Arg, const PRIM_TAG: u8>
+where
+    Arg: Debug + PartialEq + Eq,
+{
+    pub(crate) arg: Arg,
+}
 
 /// lib_micheline *prim-2 no annotations* encoding.
 ///
@@ -101,6 +116,15 @@ impl<const PRIM_TAG: u8> HasEncoding for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
     }
 }
 
+impl<Arg, const PRIM_TAG: u8> HasEncoding for MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>
+where
+    Arg: Debug + PartialEq + Eq,
+{
+    fn encoding() -> Encoding {
+        Encoding::Custom
+    }
+}
+
 impl<Arg1, Arg2, const PRIM_TAG: u8> HasEncoding
     for MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>
 where
@@ -139,6 +163,20 @@ impl<const PRIM_TAG: u8> NomReader for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
             tag([MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG]),
             |_prim| MichelinePrimNoArgsNoAnnots {},
         )(input)
+    }
+}
+
+impl<Arg, const PRIM_TAG: u8> NomReader for MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>
+where
+    Arg: NomReader + Debug + PartialEq + Eq,
+{
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        let parse = preceded(
+            tag([MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, PRIM_TAG]),
+            Arg::nom_read,
+        );
+
+        map(parse, |arg| MichelinePrim1ArgNoAnnots { arg })(input)
     }
 }
 
@@ -187,6 +225,15 @@ impl BinWriter for MichelineBytes {
 impl<const PRIM_TAG: u8> BinWriter for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
         bin_write_prim_no_args_no_annots::<{ PRIM_TAG }>(output)
+    }
+}
+
+impl<Arg, const PRIM_TAG: u8> BinWriter for MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>
+where
+    Arg: BinWriter + Debug + PartialEq + Eq,
+{
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        bin_write_prim_1_arg_no_annots::<_, { PRIM_TAG }>(&self.arg, output)
     }
 }
 
@@ -240,6 +287,22 @@ pub(crate) fn bin_write_prim_no_args_no_annots<const PRIM_TAG: u8>(
     output: &mut Vec<u8>,
 ) -> BinResult {
     enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG], output);
+    Ok(())
+}
+
+/// Write `PRIM_TAG` & `arg` into an `obj2` encoding, prefixed with the
+/// [MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG].
+pub(crate) fn bin_write_prim_1_arg_no_annots<Arg, const PRIM_TAG: u8>(
+    arg: &Arg,
+    output: &mut Vec<u8>,
+) -> BinResult
+where
+    Arg: BinWriter,
+{
+    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, PRIM_TAG], output);
+
+    arg.bin_write(output)?;
+
     Ok(())
 }
 
@@ -441,6 +504,43 @@ mod test {
         ];
 
         let test = MichelinePrimNoArgsNoAnnots::<11> {};
+
+        let mut bin = Vec::new();
+        test.bin_write(&mut bin).unwrap();
+
+        assert_eq!(expected, bin);
+    }
+
+    #[test]
+    fn micheline_some_decode() {
+        let test = vec![
+            5, // Prim_1 (no annots)
+            9, // Prim tag: Some
+            1, // String tag
+            0, 0, 0, 3, // String size
+            b'r', b'e', b'd', // string contents
+        ];
+
+        let expected = MichelinePrim1ArgNoAnnots::<_, 9> {
+            arg: MichelineString("red".into()),
+        };
+
+        let (remaining_input, some) = NomReader::nom_read(test.as_slice()).unwrap();
+
+        assert!(remaining_input.is_empty());
+        assert_eq!(expected, some);
+    }
+
+    #[test]
+    fn micheline_some_encode() {
+        let expected = vec![
+            5, // Prim_1 (no annots)
+            9, // Prim tag: Some
+            0, // int encoding tag
+            2, // amount
+        ];
+
+        let test = MichelinePrim1ArgNoAnnots::<MichelineInt, 9> { arg: 2.into() };
 
         let mut bin = Vec::new();
         test.bin_write(&mut bin).unwrap();
