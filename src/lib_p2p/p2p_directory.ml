@@ -26,40 +26,7 @@
 
 let info_of_point_info = P2p_point_state.info_of_point_info
 
-let info_of_peer_info pool i =
-  let open P2p_peer.Info in
-  let open P2p_peer.State in
-  let state, id_point =
-    match P2p_peer_state.get i with
-    | Accepted {current_point; _} -> (Accepted, Some current_point)
-    | Running {current_point; _} -> (Running, Some current_point)
-    | Disconnected -> (Disconnected, None)
-  in
-  let peer_id = P2p_peer_state.Info.peer_id i in
-  let score = P2p_pool.Peers.get_score pool peer_id in
-  let conn_opt = P2p_pool.Connection.find_by_peer_id pool peer_id in
-  let stat =
-    match conn_opt with
-    | None -> P2p_stat.empty
-    | Some conn -> P2p_conn.stat conn
-  in
-  let meta_opt = Option.map P2p_conn.remote_metadata conn_opt in
-  P2p_peer_state.Info.
-    {
-      score;
-      trusted = trusted i;
-      conn_metadata = meta_opt;
-      peer_metadata = peer_metadata i;
-      state;
-      id_point;
-      stat;
-      last_failed_connection = last_failed_connection i;
-      last_rejected_connection = last_rejected_connection i;
-      last_established_connection = last_established_connection i;
-      last_disconnection = last_disconnection i;
-      last_seen = last_seen i;
-      last_miss = last_miss i;
-    }
+let info_of_peer_info = P2p_pool.Peers.info_of_peer_info
 
 let build_rpc_directory net =
   let open Lwt_result_syntax in

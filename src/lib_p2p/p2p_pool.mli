@@ -276,6 +276,13 @@ module Peers : sig
 
   (** [get_greylisted_list t] returns the list of all the greylisted peers *)
   val get_greylisted_list : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t list
+
+  (** [info_of_peer_info t peer] returns the peer info from the peer
+      state info. *)
+  val info_of_peer_info :
+    ('msg, 'peer, 'conn) t ->
+    (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t ->
+    ('peer, 'conn) P2p_peer.Info.t
 end
 
 (** {1 Functions on [Points]} *)

@@ -466,9 +466,10 @@ module P2P = struct
     module Peer = struct
       type t = unit
 
+      let encoding = Data_encoding.unit
+
       let config : t P2p_params.peer_meta_config =
         let empty () = () in
-        let encoding = Data_encoding.unit in
         let score (_ : t) = 1.0 in
         {peer_meta_encoding = encoding; peer_meta_initial = empty; score}
     end
@@ -499,6 +500,17 @@ module P2P = struct
             private_node = (fun _cfg -> false);
             conn_meta_value = (fun () -> cfg);
           }
+    end
+  end
+
+  module Peer = struct
+    module Info = struct
+      type t = (Metadata.Peer.t, Metadata.Connection.t) P2p_peer.Info.t
+
+      let encoding =
+        P2p_peer.Info.encoding
+          Metadata.Peer.encoding
+          Metadata.Connection.encoding
     end
   end
 end

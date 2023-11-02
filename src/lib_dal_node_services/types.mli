@@ -286,4 +286,12 @@ module P2P : sig
       val config : t -> t P2p_params.conn_meta_config
     end
   end
+
+  module Peer : sig
+    module Info : sig
+      type t = (Metadata.Peer.t, Metadata.Connection.t) P2p_peer.Info.t
+
+      include ENCODABLE with type t := t
+    end
+  end
 end

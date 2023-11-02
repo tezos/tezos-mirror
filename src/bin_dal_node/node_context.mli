@@ -193,6 +193,16 @@ module P2P : sig
       we were already successfully connected in the past.) *)
   val get_peers : ?connected:bool -> t -> P2p_peer.Id.t list tzresult Lwt.t
 
+  (** [get_peers_info ?connected t] returns a list of info for
+      peers. If [connected] is [true] (default), it returns only info
+      for peers we are currently connected. Otherwise, it returns a
+      list of infos for known peers (peers for which we were already
+      successfully connected in the past.) *)
+  val get_peers_info :
+    ?connected:bool ->
+    t ->
+    (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list tzresult Lwt.t
+
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list
