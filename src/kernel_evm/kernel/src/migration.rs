@@ -3,13 +3,15 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::cmp;
+
 use crate::error::Error;
 use crate::error::StorageError::InvalidLoadValue;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
     block_path, init_blocks_index, init_transaction_hashes_index, object_path,
     read_current_block_number, read_storage_version, receipt_path, store_block_by_hash,
-    store_rlp, store_storage_version, STORAGE_VERSION,
+    store_rlp, store_storage_version, EVM_BLOCKS, STORAGE_VERSION,
 };
 use ethbloom::Bloom;
 use ethereum::Log;
@@ -23,7 +25,10 @@ use tezos_ethereum::transaction::{
 };
 use tezos_ethereum::{rlp_helpers::*, tx_signature::TxSignature};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+
+use tezos_evm_logging::{log, Level::Debug};
 
 pub enum MigrationStatus {
     None,
@@ -155,7 +160,74 @@ fn migrate_one_block<Host: Runtime>(
     store_block_by_hash(host, &new_block)
 }
 
-fn migrate_blocks<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+pub const MAX_MIGRATABLE_BLOCKS_PER_REBOOT: usize = 5000;
+
+const NEXT_BLOCK_NUMBER_TO_MIGRATE: RefPath =
+    RefPath::assert_from(b"/__migration/block_number");
+
+pub fn store_next_block_number_to_migrate<Host: Runtime>(
+    host: &mut Host,
+    block_number: U256,
+) -> Result<(), Error> {
+    let mut le_block_number: [u8; 32] = [0; 32];
+    block_number.to_little_endian(&mut le_block_number);
+    host.store_write_all(&NEXT_BLOCK_NUMBER_TO_MIGRATE, &le_block_number)
+        .map_err(Error::from)
+}
+
+pub fn read_next_block_number_to_migrate<Host: Runtime>(
+    host: &mut Host,
+) -> Result<U256, Error> {
+    match host.store_read_all(&NEXT_BLOCK_NUMBER_TO_MIGRATE) {
+        Ok(next_block_number_to_migrate) => {
+            Ok(U256::from_little_endian(&next_block_number_to_migrate))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(U256::zero()),
+        Err(e) => Err(Error::from(e)),
+    }
+}
+
+pub fn delete_next_block_number_to_migrate<Host: Runtime>(
+    host: &mut Host,
+) -> Result<(), Error> {
+    match host.store_delete(&NEXT_BLOCK_NUMBER_TO_MIGRATE) {
+        Ok(()) | Err(RuntimeError::PathNotFound) => Ok(()),
+        Err(e) => Err(Error::from(e)),
+    }
+}
+
+const TMP_BLOCK_MIGRATION: RefPath = RefPath::assert_from(b"/__migration/blocks");
+
+pub fn store_old_blocks<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    host.store_copy(&EVM_BLOCKS, &TMP_BLOCK_MIGRATION)
+        .map_err(Error::from)
+}
+
+pub fn commit_block_migration_changes<Host: Runtime>(
+    host: &mut Host,
+    success: bool,
+) -> Result<(), Error> {
+    if success {
+        match host.store_delete(&TMP_BLOCK_MIGRATION) {
+            Ok(()) | Err(RuntimeError::PathNotFound) => Ok(()),
+            Err(e) => Err(Error::from(e)),
+        }
+    } else {
+        host.store_move(&TMP_BLOCK_MIGRATION, &EVM_BLOCKS)
+            .map_err(Error::from)
+    }
+}
+
+fn migrate_blocks<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
+    let head = read_current_block_number(host)?;
+    let next_block_number_to_migrate =
+        read_next_block_number_to_migrate(host)?.as_usize();
+
+    // There is nothing to migrate anymore
+    if next_block_number_to_migrate > head.as_usize() {
+        return Ok(MigrationStatus::Done);
+    }
+
     // When we migrated the blocks in the previous upgrade, we re-indexed by mistake
     // all the blocks.
     // Therefore:
@@ -171,16 +243,40 @@ fn migrate_blocks<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     //    easier to implement because you start from scratch again.
     //
     // This function fixes the block indexes using the second approach.
+    // The indexes are reset at the beginning of the migration
+    if next_block_number_to_migrate == 0 {
+        let index = init_blocks_index()?;
+        host.store_delete(&index.path)?;
+        store_old_blocks(host)?;
+    }
 
-    let index = init_blocks_index()?;
-    host.store_delete(&index.path)?;
+    let max_migration_threshold =
+        next_block_number_to_migrate + MAX_MIGRATABLE_BLOCKS_PER_REBOOT - 1;
+    let last_block_to_migrate = cmp::min(max_migration_threshold, head.as_usize());
 
-    let head = read_current_block_number(host)?.as_u32();
-    for number in 0..(head + 1) {
+    log!(
+        host,
+        Debug,
+        "Migration of L2 blocks from {} to {} begins",
+        next_block_number_to_migrate,
+        last_block_to_migrate
+    );
+    for number in next_block_number_to_migrate..=last_block_to_migrate {
         let hash: H256 = H256(U256::from(number).into());
         migrate_one_block(host, hash)?;
     }
-    Ok(())
+    log!(
+        host,
+        Debug,
+        "L2 blocks from {} to {} have been migrated",
+        next_block_number_to_migrate,
+        last_block_to_migrate
+    );
+
+    store_next_block_number_to_migrate(host, (last_block_to_migrate + 1).into())?;
+
+    host.mark_for_reboot()?;
+    Ok(MigrationStatus::InProgress)
 }
 
 // The genesis block hash 0x00..00, its parent hash is itself.
@@ -430,11 +526,19 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
 
-        migrate_blocks(host)?;
+        match migrate_blocks(host)? {
+            MigrationStatus::Done | MigrationStatus::None => (),
+            MigrationStatus::InProgress => return Ok(MigrationStatus::InProgress),
+        }
 
         migrate_receipts_and_objects(host)?;
 
         replace_genesis_parent_hash(host)?;
+
+        // At the end, after blocks and transaction migrations are done we have to clean
+        // up the temporary paths used for migration
+        delete_next_block_number_to_migrate(host)?;
+        commit_block_migration_changes(host, true)?;
 
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
@@ -450,6 +554,7 @@ pub fn storage_migration<Host: Runtime>(
     migration_result.map_err(|_| {
         // Something went wrong during the migration.
         // The fallback mechanism is triggered to retrograde to the previous kernel.
+        let _ = commit_block_migration_changes(host, false);
 
         Error::UpgradeError(Fallback)
     })
