@@ -72,7 +72,7 @@ let signer_simple_test =
     ~__FILE__
     ~title:"signer test"
     ~tags:["node"; "baker"; "tz1"]
-    ~uses:(fun _ -> [Constant.octez_signer])
+    ~uses:(fun protocol -> [Constant.octez_signer; Protocol.baker protocol])
   @@ fun protocol ->
   let* _ =
     signer_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)

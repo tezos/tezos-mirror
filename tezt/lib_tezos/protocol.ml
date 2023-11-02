@@ -85,7 +85,7 @@ let protocol_dependent_uses ~tag ~path protocol =
 
 let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
-let baker proto = "./octez-baker-" ^ daemon_name proto
+let baker = protocol_dependent_uses ~tag:"baker_" ~path:"./octez-baker-"
 
 let sc_rollup_client proto = "./octez-smart-rollup-client-" ^ daemon_name proto
 

@@ -86,7 +86,7 @@ val parameter_file : ?constants:constants -> t -> string
 val accuser : t -> Uses.t
 
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
-val baker : t -> string
+val baker : t -> Uses.t
 
 (** Get the path of the smart rollup client of a protocol, such as
     ["./octez-smart-rollup-client-alpha"]. *)

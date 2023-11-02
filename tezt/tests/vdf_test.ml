@@ -237,7 +237,11 @@ let init_test ?parameter_file protocol =
  * with no VDF daemon in order to check that RANDAO randomness is computed
  * on chain in the absence of a VDF revelation. *)
 let vdf_cycles : Protocol.t list -> unit =
-  Protocol.register_test ~__FILE__ ~title:"VDF daemon" ~tags:["vdf"]
+  Protocol.register_test
+    ~__FILE__
+    ~title:"VDF daemon"
+    ~tags:["vdf"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let n_cycles = 2 in
   let* node, client, blocks_per_cycle, nonce_revelation_threshold =
@@ -337,6 +341,7 @@ let vdf_cancel : Protocol.t list -> unit =
     ~__FILE__
     ~title:"Cancelling VDF computation"
     ~tags:["vdf"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   (* Override the `vdf_difficulty` constant in order ensure that
    * a VDF computation started in the last block of a cycle will not be finished
