@@ -46,15 +46,11 @@ let previous_context (node_ctxt : _ Node_context.t)
     return (Context.empty node_ctxt.context)
   else Node_context.checkout_context node_ctxt predecessor.Layer1.hash
 
-let start_workers (configuration : Configuration.t)
-    (plugin : (module Protocol_plugin_sig.S)) (node_ctxt : _ Node_context.t) =
+let start_workers (plugin : (module Protocol_plugin_sig.S))
+    (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   let* () = Publisher.init node_ctxt in
-  let* () =
-    match Node_context.get_operator node_ctxt Batching with
-    | None -> return_unit
-    | Some signer -> Batcher.init plugin configuration.batcher ~signer node_ctxt
-  in
+  let* () = Batcher.init plugin node_ctxt in
   let* () = Refutation_coordinator.init node_ctxt in
   return_unit
 
@@ -405,7 +401,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
         ~retention_period:configuration.injector.retention_period
         ~allowed_attempts:configuration.injector.attempts
     in
-    let* () = start_workers configuration plugin node_ctxt in
+    let* () = start_workers plugin node_ctxt in
     Lwt.dont_wait
       (fun () ->
         let*! r = Metrics.metrics_serve configuration.metrics_addr in
