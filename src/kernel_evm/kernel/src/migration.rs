@@ -315,7 +315,11 @@ impl Decodable for OldTransactionObject {
                 let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
                 let index: u32 = decode_field(&next(&mut it)?, "index")?;
                 let value: U256 = decode_field_u256_le(&next(&mut it)?, "value")?;
-                let signature = rlp_decode_opt(&mut it)?;
+                let v_bytes: Vec<u8> = next(&mut it)?.as_val()?;
+                let v: U256 = U256::from_big_endian(&v_bytes);
+                let r: H256 = decode_field_h256(&next(&mut it)?, "r")?;
+                let s: H256 = decode_field_h256(&next(&mut it)?, "s")?;
+                let signature = TxSignature::new(v, r, s).ok();
                 Ok(OldTransactionObject {
                     block_hash,
                     block_number,
