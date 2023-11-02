@@ -77,6 +77,8 @@ function compute_results(opcode, opcode_data) {
         .filter((x) => !!x);
     results.sort((a, b) => a - b);
 
+    if (results.length == 0) { return null };
+
     /// Extract all the meaningful data
     let sum = sumArray(results);
     let average = sum / results.length;
@@ -118,7 +120,10 @@ function compute_results(opcode, opcode_data) {
 function compute_opcodes_analysis_results(result) {
     let analysis = [];
     for (const opcode in result) {
-        analysis[opcode] = compute_results(opcode, result[opcode]);
+        let results = compute_results(opcode, result[opcode]);
+        if (results !== null) {
+            analysis[opcode] = results;
+        }
     }
     return analysis;
 }
@@ -139,7 +144,7 @@ function merge_all_benchmark_opcodes(results) {
 }
 
 function opcode_to_string(n) {
-    return '0x' + n.toString(16);
+    return '0x' + (n < 16 ? "0" : "") + n.toString(16);
 }
 
 function produce_opcodes_csv(result, file) {
@@ -214,7 +219,7 @@ function create_constant(opcode, average, deviation) {
 
 function create_constant_without_data(opcode) {
     let comment = "// No data";
-    let constant = `const ${constant_name(opcode)}: u64 = ${default_constant_name}`;
+    let constant = `const ${constant_name(opcode)}: u64 = ${default_constant_name};`;
     return comment + "\n" + constant + "\n"
 
 }
@@ -233,7 +238,7 @@ function match_branch(opcode, no_gas) {
 function opcode_fn(branches) {
     let branches2 = branches.join("\n");
     let fn = `pub fn ticks(opcode: &Opcode, gas: u64) -> u64 {
-      match *opcode.as_u8() {
+      match opcode.as_u8() {
         ${branches2}
         _ => ${default_constant_name} * gas,
         }
