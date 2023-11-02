@@ -4,7 +4,8 @@
 
 const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
 // const { ChartConfiguration } = require('chart')
-const fs = require('fs');
+const fs = require('fs')
+const fetch = require('./fetch')
 
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
@@ -24,13 +25,18 @@ function init_analysis() {
         nb_kernel_run: 0,
         nb_call: 0,
         nb_transfer: 0,
-        kernel_runs: []
+        kernel_runs: [],
+        fetch_data: []
 
     };
     return empty
 }
 
 function print_analysis(infos) {
+    console.info(`-------------------------------------------------------`)
+    console.info(`Fetch Analysis`)
+    console.info(`----------------------------------`)
+    let error_fetch = fetch.print_fetch_analysis(infos)
     console.info(`-------------------------------------------------------`)
     console.info(`Kernels infos`)
     console.info(`----------------------------------`)
@@ -49,7 +55,7 @@ function print_analysis(infos) {
     console.info(`Number of create/call: ${infos.nb_call}`)
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
     console.info(`-------------------------------------------------------`)
-
+    return error_fetch
 }
 
 function process_record(record, acc) {
@@ -64,6 +70,14 @@ function process_bench_record(record, acc) {
         acc.init = Math.max(acc.init, record.interpreter_init_ticks)
     }
     if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
+    if (!isNaN(record.fetch_blueprint_ticks) && !isNaN(record.nb_tx)) {
+        acc.fetch_data.push({
+            ticks: record.fetch_blueprint_ticks,
+            size: record.inbox_size,
+            nb_tx: record.nb_tx,
+            benchmark_name: record.benchmark_name
+        })
+    }
 }
 
 function process_transaction_record(record, acc) {
@@ -87,11 +101,11 @@ function process_execution(record, acc) {
 
 function check_result(infos) {
     const tickPerGas = infos.sputnik_ticks / infos.total_gas
-    print_analysis(infos)
-    const is_error = tickPerGas > 2000
+    let nb_errors = print_analysis(infos)
+    const is_error = nb_errors > 0
     if (is_error) {
         console.info(`-------------------------------------------------------`)
-        console.error(`WARNING: tpg too high (${tickPerGas})`)
+        console.error(`WARNING: too many model underestimation (${nb_errors})`)
         console.info(`-------------------------------------------------------`)
         return 1
     } else {
