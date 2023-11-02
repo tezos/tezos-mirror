@@ -77,10 +77,12 @@ fn compute<Host: Runtime>(
             return Ok(ComputationResult::RebootNeeded);
         }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
+        let data_size: u64 = transaction.data_size();
 
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
             block_in_progress.estimated_ticks,
+            data_size,
         );
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
@@ -114,7 +116,7 @@ fn compute<Host: Runtime>(
                 );
             }
             None => {
-                block_in_progress.account_for_invalid_transaction();
+                block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
                     host,
                     Debug,

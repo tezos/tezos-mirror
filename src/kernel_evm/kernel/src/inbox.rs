@@ -13,7 +13,6 @@ use crate::storage::{
     get_and_increment_deposit_nonce, remove_chunked_transaction,
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
-use crate::tick_model;
 use crate::Error;
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
@@ -121,11 +120,11 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    /// give an approximation of the number of ticks necessary to process the
-    /// transaction. Overapproximated using the [gas_limit] and benchmarks
-    pub fn estimate_ticks(&self) -> u64 {
-        // all details of tick model stay in the same module
-        tick_model::estimate_ticks_for_transaction(self)
+    pub fn data_size(&self) -> u64 {
+        match &self.content {
+            TransactionContent::Deposit(_) => 0,
+            TransactionContent::Ethereum(e) => e.data.len() as u64,
+        }
     }
 }
 

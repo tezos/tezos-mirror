@@ -7,14 +7,12 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
-use crate::tick_model::constants::{
-    MAX_ALLOWED_TICKS, MAX_TRANSACTION_GAS_LIMIT, TRANSACTION_OVERHEAD,
-};
+use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
     current_timestamp, parsable, parsing, retrieve_base_fee_per_gas, retrieve_chain_id,
-    CONFIG,
+    tick_model, CONFIG,
 };
 
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
@@ -39,8 +37,6 @@ pub const MAX_EVALUATION_GAS: u64 = MAX_TRANSACTION_GAS_LIMIT;
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
 pub const VALIDATION_TAG: u8 = 0x01;
-/// Maximum number of ticks allocated for a single transaction
-pub const MAX_TICKS_ALLOCATED: u64 = MAX_ALLOWED_TICKS - TRANSACTION_OVERHEAD;
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
@@ -103,6 +99,12 @@ impl Evaluation {
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
         let precompiles = precompiles::precompile_set::<Host>();
         let default_caller = H160::zero();
+        let tx_data_size = self.data.len() as u64;
+        let allocated_ticks =
+            tick_model::estimate_remaining_ticks_for_transaction_execution(
+                0,
+                tx_data_size,
+            );
         let outcome = evm_execution::run_transaction(
             host,
             &block_constants,
@@ -117,7 +119,7 @@ impl Evaluation {
                 .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
             self.value,
             false,
-            MAX_TICKS_ALLOCATED,
+            allocated_ticks,
         )
         .map_err(Error::Simulation)?;
         Ok(outcome)
