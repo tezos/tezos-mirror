@@ -3,8 +3,8 @@
     "tags": [
       "binaries"
     ],
-    "path_prefixes": [
-      "devtools/yes_wallet"
+    "path_patterns": [
+      "^devtools/yes_wallet"
     ]
   },
   "layer1": {
@@ -15,10 +15,10 @@
       "transaction",
       "transfer"
     ],
-    "path_prefixes": [
-      "src/lib_requester",
-      "src/proto_alpha/lib_delegate",
-      "devtools/yes_wallet"
+    "path_patterns": [
+      "^src/lib_requester",
+      "^src/proto_alpha/lib_delegate",
+      "^devtools/yes_wallet"
     ]
   },
   "tezos2": {
@@ -26,9 +26,9 @@
       "dac",
       "dac_node"
     ],
-    "path_prefixes": [
-      "src/lib_aplonk",
-      "src/lib_distributed_aplonk"
+    "path_patterns": [
+      "^src/lib_aplonk",
+      "^src/lib_distributed_aplonk"
     ]
   },
   "etherlink": {
@@ -39,6 +39,6 @@
       "refutation",
       "commitment"
     ],
-    "path_prefixes": []
+    "path_patterns": []
   }
 }
