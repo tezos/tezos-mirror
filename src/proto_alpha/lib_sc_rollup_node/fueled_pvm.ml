@@ -141,9 +141,9 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                  We return empty string in this case, as done in the slow executon. *)
               Lwt.return ""
           | Ok (Some b) -> Lwt.return (Bytes.to_string b))
-      | Reveal_dal_parameters {published_level = _} ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
-             Support revealing historical DAL parameters. *)
+      | Reveal_dal_parameters ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+             Consider supporting revealing of historical DAL parameters. *)
           Lwt.return
             (Data_encoding.Binary.to_string_exn
                Sc_rollup.Dal_parameters.encoding
@@ -258,9 +258,9 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | None -> abort state fuel current_tick
           | Some fuel ->
               go fuel (Int64.succ current_tick) failing_ticks next_state)
-      | Needs_reveal (Reveal_dal_parameters {published_level = _}) -> (
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
-             Support revealing historical DAL parameters. *)
+      | Needs_reveal Reveal_dal_parameters -> (
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+             Consider supporting revealing of historical DAL parameters. *)
           let*! next_state =
             PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
           in

@@ -55,7 +55,7 @@ type reveal_proof =
     }
       (** The existence or not of a confirmed slot for a given page ID when the
           [input_requested] is the [Needs_reveal Request_dal_page]. *)
-  | Dal_parameters_proof of {published_level : Raw_level_repr.t}
+  | Dal_parameters_proof
       (** Proof for revealing DAL parameters that were used for the slots
           published at [published_level]. The [published_level] parameter
           enables the kernel to retrieve historical DAL parameters,

@@ -202,7 +202,7 @@ pub trait Runtime {
 
     /// Reveal the DAL parameters.
     #[cfg(feature = "proto-alpha")]
-    fn reveal_dal_parameters(&self, published_level: i32) -> RollupDalParameters;
+    fn reveal_dal_parameters(&self) -> RollupDalParameters;
 
     /// Return the size of value stored at `path`
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError>;
@@ -632,14 +632,10 @@ where
     }
 
     #[cfg(feature = "proto-alpha")]
-    fn reveal_dal_parameters(&self, published_level: i32) -> RollupDalParameters {
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
         let mut destination = [0u8; DAL_PARAMETERS_SIZE];
         // This will match the encoding declared for revealing DAL parameters in the Tezos protocol.
-        let payload: &[u8] = &[
-            &[3u8], // tag
-            published_level.to_be_bytes().as_ref(),
-        ]
-        .concat();
+        let payload: &[u8] = &[3u8]; // tag
 
         let bytes_read = unsafe {
             SmartRollupCore::reveal(
@@ -1373,7 +1369,7 @@ mod tests {
             });
 
         // Act
-        let result = mock.reveal_dal_parameters(0);
+        let result = mock.reveal_dal_parameters();
 
         // Assert
         assert_eq!(expected_dal_parameters, result);
