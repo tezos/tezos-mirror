@@ -39,6 +39,7 @@ val create :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?listen_addr:string ->
+  ?public_addr:string ->
   ?metrics_addr:string ->
   node:Node.t ->
   unit ->
@@ -53,6 +54,7 @@ val create_from_endpoint :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?listen_addr:string ->
+  ?public_addr:string ->
   ?metrics_addr:string ->
   l1_node_endpoint:Client.endpoint ->
   unit ->

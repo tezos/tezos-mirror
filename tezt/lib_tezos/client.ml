@@ -541,50 +541,68 @@ let spawn_version client = spawn_command client ["--version"]
 let version client = spawn_version client |> Process.check
 
 let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
-    (key : Account.key) =
+    (secret_key : Account.secret_key) ~alias =
   let sk_uri =
-    match key.secret_key with
-    | Encrypted _ -> Account.uri_of_secret_key key.secret_key
+    match secret_key with
+    | Encrypted _ -> Account.uri_of_secret_key secret_key
     | Unencrypted _ -> Test.fail "Unencrypted key"
   in
   spawn_command_with_stdin
     ?hooks
     ?endpoint
     client
-    (["import"; "secret"; "key"; key.alias; sk_uri]
+    (["import"; "secret"; "key"; alias; sk_uri]
     @ if force then ["--force"] else [])
 
 let import_encrypted_secret_key ?hooks ?force ?endpoint client
-    (key : Account.key) ~password =
+    (secret_key : Account.secret_key) ~alias ~password =
   let process, output_channel =
-    spawn_import_encrypted_secret_key ?hooks ?force ?endpoint client key
+    spawn_import_encrypted_secret_key
+      ?hooks
+      ?force
+      ?endpoint
+      client
+      secret_key
+      ~alias
   in
   let* () = Lwt_io.write_line output_channel password in
   let* () = Lwt_io.close output_channel in
   Process.check process
 
-let spawn_import_secret_key ?endpoint client (key : Account.key) =
+let spawn_import_secret_key ?(force = false) ?endpoint client
+    (secret_key : Account.secret_key) ~alias =
   let sk_uri =
-    "unencrypted:"
-    ^ Account.require_unencrypted_secret_key ~__LOC__ key.secret_key
+    "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ secret_key
   in
-  spawn_command ?endpoint client ["import"; "secret"; "key"; key.alias; sk_uri]
-
-let spawn_import_signer_key ?endpoint ?(force = false) client
-    (key : Account.key) signer_uri =
-  let uri = Uri.with_path signer_uri key.public_key_hash in
+  let force = if force then ["--force"] else [] in
   spawn_command
     ?endpoint
     client
-    (["import"; "secret"; "key"; key.alias; Uri.to_string uri]
+    (["import"; "secret"; "key"; alias; sk_uri] @ force)
+
+let spawn_import_signer_key ?endpoint ?(force = false) client ~public_key_hash
+    ~alias signer_uri =
+  let uri = Uri.with_path signer_uri public_key_hash in
+  spawn_command
+    ?endpoint
+    client
+    (["import"; "secret"; "key"; alias; Uri.to_string uri]
     @ if force then ["--force"] else [])
 
-let import_signer_key ?endpoint ?force client key signer_uri =
-  spawn_import_signer_key ?endpoint ?force client key signer_uri
+let import_signer_key ?endpoint ?force client ~public_key_hash ~alias signer_uri
+    =
+  spawn_import_signer_key
+    ?endpoint
+    ?force
+    client
+    ~public_key_hash
+    ~alias
+    signer_uri
   |> Process.check
 
-let import_secret_key ?endpoint client key =
-  spawn_import_secret_key ?endpoint client key |> Process.check
+let import_secret_key ?force ?endpoint client secret_key ~alias =
+  spawn_import_secret_key ?force ?endpoint client secret_key ~alias
+  |> Process.check
 
 let spawn_import_keys_from_mnemonic ?endpoint ?(force = false)
     ?(encrypt = false) client ~alias =
@@ -924,7 +942,7 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
 
 let id = ref 0
 
-let spawn_gen_keys ?alias ?sig_alg client =
+let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
   let alias =
     match alias with
     | None ->
@@ -932,12 +950,13 @@ let spawn_gen_keys ?alias ?sig_alg client =
         sf "tezt_%d" !id
     | Some alias -> alias
   in
-  ( spawn_command client @@ ["gen"; "keys"; alias]
+  let force = if force then ["--force"] else [] in
+  ( spawn_command client @@ ["gen"; "keys"; alias] @ force
     @ optional_arg "sig" Fun.id sig_alg,
     alias )
 
-let gen_keys ?alias ?sig_alg client =
-  let p, alias = spawn_gen_keys ?alias ?sig_alg client in
+let gen_keys ?force ?alias ?sig_alg client =
+  let p, alias = spawn_gen_keys ?force ?alias ?sig_alg client in
   let* () = Process.check p in
   return alias
 

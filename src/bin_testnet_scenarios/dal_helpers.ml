@@ -184,7 +184,9 @@ module Wallet = struct
             "edsk3AWajGUgzzGi3UrQiNWeRZR1YMRYVxfe642AFSKBTFXaoJp5hu";
       }
 
-    let register_giver client = Client.import_secret_key client giver_account
+    let register_giver client =
+      let Account.{alias; secret_key; _} = giver_account in
+      Client.import_secret_key client ~alias secret_key
 
     let perform_transfers ~amount ~keys client =
       let* counter =
