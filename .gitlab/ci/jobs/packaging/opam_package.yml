@@ -800,10 +800,6 @@ opam:octez-smart-rollup-node-lib:
   variables:
     package: octez-smart-rollup-node-lib
 
-# Ignoring unreleased package octez-smart-rollup-sequencer.
-
-# Ignoring unreleased package octez-smart-rollup-sequencer-node.
-
 opam:octez-smart-rollup-wasm-debugger:
   extends:
     - .opam_template
@@ -832,8 +828,6 @@ opam:octez-version:
     package: octez-version
 
 # Ignoring unreleased package octogram.
-
-# Ignoring unreleased package scoru-sequencer-test.
 
 opam:tezos-benchmark:
   extends:
