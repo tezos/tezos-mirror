@@ -628,6 +628,42 @@ where
     }
 }
 
+impl BinWriter for Node {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        match self {
+            Node::Int(i) => bin_write_micheline_int(i, output),
+            Node::String(s) => bin_write_micheline_string(&s, output),
+            Node::Bytes(s) => bin_write_micheline_bytes(enc::bytes)(s.as_slice(), output),
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } => match (args.as_slice(), annots.as_deref()) {
+                ([], None) => bin_write_prim_no_args_no_annots(*prim_tag, output),
+                ([], Some(annots)) => {
+                    bin_write_prim_no_args_some_annots(*prim_tag, annots, output)
+                }
+                ([arg], None) => bin_write_prim_1_arg_no_annots(*prim_tag, arg, output),
+                ([arg], Some(annots)) => {
+                    bin_write_prim_1_arg_some_annots(*prim_tag, arg, annots, output)
+                }
+                ([arg0, arg1], None) => {
+                    bin_write_prim_2_args_no_annots(*prim_tag, arg0, arg1, output)
+                }
+                ([arg0, arg1], Some(annots)) => bin_write_prim_2_args_some_annots(
+                    *prim_tag, arg0, arg1, annots, output,
+                ),
+                (_, annots) => bin_write_prim_generic(
+                    *prim_tag,
+                    args,
+                    annots.unwrap_or_default(),
+                    output,
+                ),
+            },
+        }
+    }
+}
+
 // ---------------------------
 // Deserialization Combinators
 // ---------------------------
@@ -756,6 +792,24 @@ where
 
     arg1.bin_write(output)?;
     arg2.bin_write(output)?;
+    enc::string(annots, output)?;
+
+    Ok(())
+}
+
+/// Write `PRIM_TAG`, `args` & `annots` into an `obj3` encoding, prefixed with the
+/// [MICHELINE_PRIM_GENERIC_TAG].
+pub(crate) fn bin_write_prim_generic<Arg>(
+    prim_tag: u8,
+    args: &Vec<Arg>,
+    annots: &str,
+    output: &mut Vec<u8>,
+) -> BinResult
+where
+    Arg: BinWriter,
+{
+    enc::put_bytes(&[MICHELINE_PRIM_GENERIC_TAG, prim_tag], output);
+    enc::dynamic(enc::list(Arg::bin_write))(args, output)?;
     enc::string(annots, output)?;
 
     Ok(())
@@ -1200,6 +1254,35 @@ mod test {
 
         assert!(remaining_input.is_empty());
         assert_eq!(expected, optnatfoo);
+    }
+
+    #[test]
+    fn micheline_pair3_annot_encode() {
+        let expected = vec![
+            9, // Prim_generic
+            7, // Prim tag: Pair
+            0, 0, 0, 6,  // length of args
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+            0,  // Int tag
+            0,  // 0
+            0,  // Int tag
+            0,  // 0
+            0, 0, 0, 4, // length of the annotation string
+            b':', b'f', b'o', b'o', // annotation
+        ];
+
+        let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let test = Node::Prim {
+            prim_tag: 7,
+            args: vec![unit.into(), 0.into(), 0.into()],
+            annots: Some(":foo".into()),
+        };
+
+        let mut bin = Vec::new();
+        test.bin_write(&mut bin).unwrap();
+
+        assert_eq!(expected, bin);
     }
 
     fn hex_to_bigint(s: &str) -> num_bigint::BigInt {
