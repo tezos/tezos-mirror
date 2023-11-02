@@ -102,7 +102,7 @@ let create ?name ?color ?event_pipe ?base_dir ?uri ?runner
   in
   let signer =
     create
-      ~path:Constant.octez_signer
+      ~path:(Uses.path Constant.octez_signer)
       ?name:(Some name)
       ?color
       ?event_pipe

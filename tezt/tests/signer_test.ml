@@ -71,7 +71,8 @@ let signer_simple_test =
   Protocol.register_test
     ~__FILE__
     ~title:"signer test"
-    ~tags:["node"; "baker"; "signer"; "tz1"]
+    ~tags:["node"; "baker"; "tz1"]
+    ~uses:(fun _ -> [Constant.octez_signer])
   @@ fun protocol ->
   let* _ =
     signer_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)
@@ -82,7 +83,8 @@ let signer_bls_test =
   Protocol.register_test
     ~__FILE__
     ~title:"BLS signer test"
-    ~tags:["node"; "baker"; "signer"; "bls"]
+    ~tags:["node"; "baker"; "bls"]
+    ~uses:(fun _ -> [Constant.octez_signer])
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   let* signer = Signer.init ~keys:[Constant.tz4_account] () in
