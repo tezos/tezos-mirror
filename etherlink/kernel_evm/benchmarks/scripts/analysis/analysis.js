@@ -8,6 +8,7 @@ const fs = require('fs')
 const fetch = require('./fetch')
 const block_finalization = require('./block_finalization')
 const tx_register = require('./tx_register')
+const tx_overhead = require('./tx_overhead')
 
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
@@ -31,6 +32,7 @@ function init_analysis() {
         fetch_data: [],
         block_finalization: [],
         tx_register: [],
+        tx_overhead: []
 
     };
     return empty
@@ -49,6 +51,11 @@ function print_analysis(infos) {
     console.info(`Transaction Registering Analysis`)
     console.info(`----------------------------------`)
     let error_register = tx_register.print_analysis(infos)
+    console.info(`-------------------------------------------------------`)
+    console.info(`Transaction Overhead Analysis`)
+    console.info(`----------------------------------`)
+    // model is known to fall short as an overapproximation
+    let _error_tx_overhead = tx_overhead.print_analysis(infos)
     console.info(`-------------------------------------------------------`)
     console.info(`Kernels infos`)
     console.info(`----------------------------------`)
@@ -119,6 +126,10 @@ function process_transaction_record(record, acc) {
     // Adds infos for tx registration analysis
     if (!isNaN(record.tx_size) && !isNaN(record.store_transaction_object_ticks))
         acc.tx_register.push(record)
+
+    // Adds infos for transaction overhead analysis
+    if (!isNaN(record.tx_size) && !isNaN(record.sputnik_runtime_ticks) && !isNaN(record.run_transaction_ticks))
+        acc.tx_overhead.push(record)
 }
 
 function process_transfer(record, acc) {
