@@ -1173,27 +1173,43 @@ module type WORKER = sig
   val pp_app_output : Format.formatter -> app_output -> unit
 
   (** Introspection and stats facilities *)
-  type exchanged_stats = private {
-    mutable num_valid_messages : int;
-    mutable num_invalid_messages : int;
-    mutable num_unknown_messages_validity : int;
-    mutable num_grafts : int;
-    mutable num_prunes : int;
-    mutable num_ihaves : int;
-    mutable num_iwants : int;
-  }
+  module Introspection : sig
+    type messages_stats = private {
+      mutable count_valid_messages : int;
+          (** Count messages that are known to be valid. *)
+      mutable count_invalid_messages : int;
+          (** Count messages that are known to be invalid. *)
+      mutable count_unknown_validity_messages : int;
+          (** Count messages we won't validate. *)
+      mutable count_grafts : int;
+          (** Count sent/successfully received & processed grafts. *)
+      mutable count_prunes : int;
+          (** Count sent/successfully received & processed prunes. *)
+      mutable count_ihaves : int;
+          (** Count sent/successfully received & processed ihaves. *)
+      mutable count_iwants : int;
+          (** Count sent/successfully received & processed iwants. *)
+    }
 
-  type stats = private {
-    mutable num_topics : int;
-    mutable num_connections : int;
-    mutable num_bootstrap_connections : int;
-    received : exchanged_stats;
-        (** In case of received, we only count the messages that would
-            succeed. *)
-    sent : exchanged_stats;
-  }
+    type stats = private {
+      mutable count_topics : int;
+          (** Counts the number of topics of the node. It's the diff between Join
+            and Leave topics events. *)
+      mutable count_connections : int;
+          (** Counts the number of connections of the node. It's the diff between
+            New_connection and Disconnection events. *)
+      mutable count_bootstrap_connections : int;
+          (** Counts the number of connections of the node to bootstrap
+            peers. It's a refinement of [count_connections] for when the remote
+            peer declares itself as a bootstrap peer. *)
+      count_sent : messages_stats;  (** Stats about sent messages. *)
+      count_received : messages_stats;
+          (** Stats about received messages. In this case we only count the
+            messages that would succeed. *)
+    }
+  end
 
-  val stats : t -> stats
+  val stats : t -> Introspection.stats
 
   val state : t -> GS.Introspection.view
 end
