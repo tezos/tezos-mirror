@@ -24,25 +24,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezos_client = "./octez-client"
+let octez_client = "./octez-client"
 
-let tezos_admin_client = "./octez-admin-client"
+let octez_admin_client = "./octez-admin-client"
 
-let tezos_node = "./octez-node"
+let octez_node = "./octez-node"
 
-let tezos_proxy_server = "./octez-proxy-server"
+let octez_proxy_server = "./octez-proxy-server"
 
-let tezos_codec = "./octez-codec"
+let octez_codec = "./octez-codec"
 
-let tezos_snoop = "./octez-snoop"
+let octez_snoop = "./octez-snoop"
 
-let tezos_protocol_compiler = "./octez-protocol-compiler"
+let octez_protocol_compiler = "./octez-protocol-compiler"
 
-let dal_node = "./octez-dal-node"
+let octez_dal_node = "./octez-dal-node"
 
-let dac_node = "./octez-dac-node"
+let octez_dac_node = "./octez-dac-node"
 
-let smart_rollup_node = "./octez-smart-rollup-node"
+let octez_dac_client = "./octez-dac-client"
+
+let octez_smart_rollup_node = "./octez-smart-rollup-node"
+
+let octez_evm_node = "./octez-evm-node"
+
+let octez_signer = "./octez-signer"
 
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?

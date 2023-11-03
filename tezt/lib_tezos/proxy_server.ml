@@ -91,11 +91,11 @@ let spawn ?rpc_port ?(args = []) node =
   Process.spawn
     ~name:Parameters.base_default_name
     ~color:Parameters.default_colors.(0)
-    Constant.tezos_proxy_server
+    Constant.octez_proxy_server
     args
 
 let create ?runner ?name ?rpc_port ?(args = []) node =
-  let path = Constant.tezos_proxy_server in
+  let path = Constant.octez_proxy_server in
   let user_arguments =
     List.map
       (function

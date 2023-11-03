@@ -47,8 +47,6 @@ let rpc_port = function
 
 let next_name = ref 1
 
-let default_path = "./octez-dac-client"
-
 let fresh_name () =
   let index = !next_name in
   incr next_name ;
@@ -62,7 +60,7 @@ let create_with_endpoint ?runner ?name ?path ?base_dir
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
-  let path = Option.value ~default:default_path path in
+  let path = Option.value ~default:Constant.octez_dac_client path in
   {name; path; dac_node = endpoint; base_dir; color; runner}
 
 let create ?runner ?name ?path ?base_dir ?color dac_node =

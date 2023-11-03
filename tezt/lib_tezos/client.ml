@@ -130,8 +130,8 @@ let address ?(hostname = false) ?from peer =
   | Some endpoint ->
       Runner.address ~hostname ?from:(runner endpoint) (runner peer)
 
-let create_with_mode ?runner ?(path = Constant.tezos_client)
-    ?(admin_path = Constant.tezos_admin_client) ?name
+let create_with_mode ?runner ?(path = Constant.octez_client)
+    ?(admin_path = Constant.octez_admin_client) ?name
     ?(color = Log.Color.FG.blue) ?base_dir mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
