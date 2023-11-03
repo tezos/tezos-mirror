@@ -1058,6 +1058,9 @@ module type WORKER_CONFIGURATION = sig
     (** Returns and removes all available elements of the stream l without
         blocking. *)
     val get_available : 'a t -> 'a list
+
+    (** Returns the number of elements in the stream. *)
+    val length : 'a t -> int
   end
 end
 

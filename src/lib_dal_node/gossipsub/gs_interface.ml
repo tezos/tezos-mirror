@@ -119,24 +119,39 @@ module Worker_config :
 
      Use Seq_s instead of Lwt_stream to implement module Stream. *)
   module Stream = struct
-    type 'a t = {stream : 'a Lwt_stream.t; pusher : 'a option -> unit}
+    type 'a t = {
+      stream : 'a Lwt_stream.t;
+      pusher : 'a option -> unit;
+      mutable length : int;
+          (* The [length] field counts the number of elements in the stream. It
+             is incremented on calls to {!push}, decremented on succesful calls to
+             {!get}, and reset on calls to {!get_available}. *)
+    }
 
     let empty () =
       let stream, pusher = Lwt_stream.create () in
-      {stream; pusher}
+      {stream; pusher; length = 0}
 
-    let push e t = t.pusher (Some e)
+    let push e t =
+      t.pusher (Some e) ;
+      t.length <- t.length + 1
 
     let pop t =
       let open Lwt_syntax in
       let* r = Lwt_stream.get t.stream in
       match r with
-      | Some r -> Lwt.return r
+      | Some r ->
+          t.length <- t.length - 1 ;
+          Lwt.return r
       | None ->
           Stdlib.failwith
             "Invariant: None values are never pushed in the stream"
 
-    let get_available t = Lwt_stream.get_available t.stream
+    let get_available t =
+      t.length <- 0 ;
+      Lwt_stream.get_available t.stream
+
+    let length t = t.length
   end
 end
 
