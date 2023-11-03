@@ -34,7 +34,7 @@ risc-v-interpreter:
 	@make -C $(RISC_V_INTERPRETER_DIR) build
 
 evm_kernel_unstripped.wasm::
-	@make -C src/kernel_evm EXCLUDE_MEMBER=evm-evaluation build
+	@make -C src/kernel_evm build
 	@cp src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
 
 evm_kernel.wasm:: evm_kernel_unstripped.wasm
