@@ -574,9 +574,17 @@ pub fn commit_tx_receipts_changes<Host: Runtime>(
     }
 }
 
+fn has_txs<Host: Runtime>(host: &mut Host) -> bool {
+    matches!(host.store_has(&EVM_TRANSACTIONS_OBJECTS), Ok(Some(_)))
+}
+
 fn migrate_receipts_and_objects<Host: Runtime>(
     host: &mut Host,
 ) -> Result<MigrationStatus, Error> {
+    if !has_txs(host) {
+        return Ok(MigrationStatus::None);
+    }
+
     let indexed_transaction_hashes = init_transaction_hashes_index()?;
     let tx_len = indexed_transaction_hashes.length(host)?;
 
