@@ -309,13 +309,26 @@ module Inner = struct
     let page_length_domain, _, _ = FFT.select_fft_domain page_length in
     slot_size / page_size * page_length_domain
 
-  let ensure_validity ~slot_size ~page_size ~erasure_encoded_polynomial_length
-      ~max_polynomial_length ~redundancy_factor ~number_of_shards ~shard_length
+  let ensure_validity ~slot_size ~page_size ~redundancy_factor ~number_of_shards
       ~srs_g1_length ~srs_g2_length =
     let open Result_syntax in
     let assert_result condition error_message =
       if not condition then fail (`Fail (error_message ())) else return_unit
     in
+    let max_polynomial_length =
+      slot_as_polynomial_length ~slot_size ~page_size
+    in
+    let erasure_encoded_polynomial_length =
+      redundancy_factor * max_polynomial_length
+    in
+    let* () =
+      assert_result (number_of_shards > 0) (fun () ->
+          Format.asprintf
+            "The number of shards must be a strictly positive integer. Given: \
+             %d"
+            number_of_shards)
+    in
+    let shard_length = erasure_encoded_polynomial_length / number_of_shards in
     let* () =
       assert_result
         (is_power_of_two slot_size)
@@ -446,13 +459,16 @@ module Inner = struct
     let domain_length = 2 * max_polynomial_length / shard_length in
     let* () =
       assert_result
-        ((1 lsl Z.(log2 (of_int domain_length))) = domain_length)
-        (* The computation of shard proofs further require the domain_length to
+        (domain_length <> 0 && domain_length land (domain_length - 1) = 0)
+        (* The computation of shard proofs further require the [domain_length] to
            be a power of two for correct FFT sizing, even though we could relax
            the constraint to a product of primes dividing the order of the group
            G1 thanks to the Prime Factorization Algorithm, as we currently do with
            the FFTs on scalar elements, if the need arises. *)
           (fun () ->
+          (* [domain_length = 2 * max_polynomial_length / shard_length
+                            = 2 * max_polynomial_length / (redundancy_factor * max_polynomial_length / number_of_shards)
+                            = 2 * number_of_shards / redundancy_factor] *)
           Format.asprintf
             "The ratio (2 * number of shards / redundancy factor) must be a \
              power of two. Got 2 * %d / %d = %d"
@@ -501,11 +517,8 @@ module Inner = struct
       ensure_validity
         ~slot_size
         ~page_size
-        ~erasure_encoded_polynomial_length
-        ~max_polynomial_length
         ~redundancy_factor
         ~number_of_shards
-        ~shard_length
         ~srs_g1_length:(Srs_g1.size raw.srs_g1)
         ~srs_g2_length:(Srs_g2.size raw.srs_g2)
     in
@@ -1295,13 +1308,6 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let max_polynomial_length =
-      slot_as_polynomial_length ~slot_size ~page_size
-    in
-    let erasure_encoded_polynomial_length =
-      redundancy_factor * max_polynomial_length
-    in
-    let shard_length = erasure_encoded_polynomial_length / number_of_shards in
     let open Result_syntax in
     (let* raw =
        match !initialisation_parameters with
@@ -1311,16 +1317,15 @@ module Internal_for_tests = struct
      ensure_validity
        ~slot_size
        ~page_size
-       ~erasure_encoded_polynomial_length
-       ~max_polynomial_length
        ~redundancy_factor
        ~number_of_shards
-       ~shard_length
        ~srs_g1_length:(Srs_g1.size raw.srs_g1)
        ~srs_g2_length:(Srs_g2.size raw.srs_g2))
     |> function
     | Ok _ -> true
     | _ -> false
+
+  let slot_as_polynomial_length = slot_as_polynomial_length
 end
 
 module Config = struct

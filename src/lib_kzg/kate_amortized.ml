@@ -220,7 +220,8 @@ let preprocess_multiple_multi_reveals t =
      [l = t.shard_length] here). *)
   assert (t.max_polynomial_length mod t.shard_length = 0) ;
   let domain_length = 2 * t.max_polynomial_length / t.shard_length in
-  (* The length of the discrete Fourier transforms is a power of two,
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/6585
+     The length of the discrete Fourier transforms is a power of two,
      though we could relax the constraints to a product of primes dividing
      the order of the group G1 thanks to the Prime Factorization Algorithm
      as we currently do with the FFTs on scalar elements. *)
