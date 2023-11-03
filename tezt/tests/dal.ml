@@ -2788,7 +2788,8 @@ let register_end_to_end_tests ~protocols =
         ~activation_timestamp:(Ago activation_timestamp)
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags:["e2e"; network]
-        ~uses:(fun protocol -> [Protocol.baker protocol])
+        ~uses:(fun protocol ->
+          [Protocol.baker protocol; Protocol.sc_rollup_client protocol])
         title
         (e2e_test_script
            ~number_of_dal_slots
@@ -4207,19 +4208,23 @@ let register ~protocols =
   (* Tests with all nodes *)
   scenario_with_all_nodes
     "rollup_node_downloads_slots"
+    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
     rollup_node_stores_dal_slots
     protocols ;
   scenario_with_all_nodes
     "rollup_node_applies_dal_pages"
+    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   scenario_with_all_nodes
     "test reveal_dal_page in fast exec wasm pvm"
+    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
     ~pvm_name:"wasm_2_0_0"
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
   scenario_with_all_nodes
     "test tx_kernel"
+    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
     ~pvm_name:"wasm_2_0_0"
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;

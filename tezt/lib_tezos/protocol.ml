@@ -87,7 +87,10 @@ let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
 let baker = protocol_dependent_uses ~tag:"baker_" ~path:"./octez-baker-"
 
-let sc_rollup_client proto = "./octez-smart-rollup-client-" ^ daemon_name proto
+let sc_rollup_client =
+  protocol_dependent_uses
+    ~tag:"smart_rollup_client_"
+    ~path:"./octez-smart-rollup-client-"
 
 let encoding_prefix = function
   | Alpha -> "alpha"
