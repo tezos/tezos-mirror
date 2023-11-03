@@ -1174,23 +1174,8 @@ module type WORKER = sig
 
   (** Introspection and stats facilities *)
   module Introspection : sig
-    type messages_stats = private {
-      mutable count_valid_messages : int;
-          (** Count messages that are known to be valid. *)
-      mutable count_invalid_messages : int;
-          (** Count messages that are known to be invalid. *)
-      mutable count_unknown_validity_messages : int;
-          (** Count messages we won't validate. *)
-      mutable count_grafts : int;
-          (** Count sent/successfully received & processed grafts. *)
-      mutable count_prunes : int;
-          (** Count sent/successfully received & processed prunes. *)
-      mutable count_ihaves : int;
-          (** Count sent/successfully received & processed ihaves. *)
-      mutable count_iwants : int;
-          (** Count sent/successfully received & processed iwants. *)
-    }
-
+    (** A record containing some stats about what happened in the Gossipsub
+        worker.  *)
     type stats = private {
       mutable count_topics : int;
           (** Counts the number of topics of the node. It's the diff between Join
@@ -1202,10 +1187,25 @@ module type WORKER = sig
           (** Counts the number of connections of the node to bootstrap
             peers. It's a refinement of [count_connections] for when the remote
             peer declares itself as a bootstrap peer. *)
-      count_sent : messages_stats;  (** Stats about sent messages. *)
-      count_received : messages_stats;
-          (** Stats about received messages. In this case we only count the
-            messages that would succeed. *)
+      mutable count_sent_app_messages : int;  (** Count sent app messages. *)
+      mutable count_sent_grafts : int;  (** Count sent grafts. *)
+      mutable count_sent_prunes : int;  (** Count sent prunes. *)
+      mutable count_sent_ihaves : int;  (** Count sent ihaves. *)
+      mutable count_sent_iwants : int;  (** Count sent iwants. *)
+      mutable count_recv_valid_app_messages : int;
+          (** Count received app messages that are known to be valid. *)
+      mutable count_recv_invalid_app_messages : int;
+          (** Count received app messages that are known to be invalid. *)
+      mutable count_recv_unknown_validity_app_messages : int;
+          (** Count received app messages we won't validate. *)
+      mutable count_recv_grafts : int;
+          (** Count successfully received & processed grafts. *)
+      mutable count_recv_prunes : int;
+          (** Count successfully received & processed prunes. *)
+      mutable count_recv_ihaves : int;
+          (** Count successfully received & processed ihaves. *)
+      mutable count_recv_iwants : int;
+          (** Count successfully received & processed iwants. *)
     }
   end
 

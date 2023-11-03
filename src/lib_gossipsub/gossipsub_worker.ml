@@ -43,42 +43,41 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   module Message = GS.Message
 
   module Introspection = struct
-    type messages_stats = {
-      mutable count_valid_messages : int;
-      mutable count_invalid_messages : int;
-      mutable count_unknown_validity_messages : int;
-      mutable count_grafts : int;
-      mutable count_prunes : int;
-      mutable count_ihaves : int;
-      mutable count_iwants : int;
-    }
-
     type stats = {
       mutable count_topics : int;
       mutable count_connections : int;
       mutable count_bootstrap_connections : int;
-      count_sent : messages_stats;
-      count_received : messages_stats;
+      mutable count_sent_app_messages : int;
+      mutable count_sent_grafts : int;
+      mutable count_sent_prunes : int;
+      mutable count_sent_ihaves : int;
+      mutable count_sent_iwants : int;
+      mutable count_recv_valid_app_messages : int;
+      mutable count_recv_invalid_app_messages : int;
+      mutable count_recv_unknown_validity_app_messages : int;
+      mutable count_recv_grafts : int;
+      mutable count_recv_prunes : int;
+      mutable count_recv_ihaves : int;
+      mutable count_recv_iwants : int;
     }
-
-    let messages_stats () =
-      {
-        count_valid_messages = 0;
-        count_invalid_messages = 0;
-        count_unknown_validity_messages = 0;
-        count_grafts = 0;
-        count_prunes = 0;
-        count_ihaves = 0;
-        count_iwants = 0;
-      }
 
     let empty () =
       {
         count_topics = 0;
         count_connections = 0;
         count_bootstrap_connections = 0;
-        count_received = messages_stats ();
-        count_sent = messages_stats ();
+        count_sent_app_messages = 0;
+        count_sent_grafts = 0;
+        count_sent_prunes = 0;
+        count_sent_ihaves = 0;
+        count_sent_iwants = 0;
+        count_recv_valid_app_messages = 0;
+        count_recv_invalid_app_messages = 0;
+        count_recv_unknown_validity_app_messages = 0;
+        count_recv_grafts = 0;
+        count_recv_prunes = 0;
+        count_recv_ihaves = 0;
+        count_recv_iwants = 0;
       }
 
     let counter_update = function
@@ -97,29 +96,47 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       t.count_bootstrap_connections <-
         t.count_bootstrap_connections + counter_update delta
 
-    let update_count_grafts exch delta =
-      exch.count_grafts <- exch.count_grafts + counter_update delta
+    let update_count_recv_grafts t delta =
+      t.count_recv_grafts <- t.count_recv_grafts + counter_update delta
 
-    let update_count_prunes exch delta =
-      exch.count_prunes <- exch.count_prunes + counter_update delta
+    let update_count_recv_prunes t delta =
+      t.count_recv_prunes <- t.count_recv_prunes + counter_update delta
 
-    let update_count_ihaves exch delta =
-      exch.count_ihaves <- exch.count_ihaves + counter_update delta
+    let update_count_recv_ihaves t delta =
+      t.count_recv_ihaves <- t.count_recv_ihaves + counter_update delta
 
-    let update_count_iwants exch delta =
-      exch.count_iwants <- exch.count_iwants + counter_update delta
+    let update_count_recv_iwants t delta =
+      t.count_recv_iwants <- t.count_recv_iwants + counter_update delta
 
-    let update_count_invalid_messages exch delta =
-      exch.count_invalid_messages <-
-        exch.count_invalid_messages + counter_update delta
+    let update_count_recv_invalid_app_messages t delta =
+      t.count_recv_invalid_app_messages <-
+        t.count_recv_invalid_app_messages + counter_update delta
 
-    let update_count_unknown_validity_messages exch delta =
-      exch.count_unknown_validity_messages <-
-        exch.count_unknown_validity_messages + counter_update delta
+    let update_count_recv_unknown_validity_app_messages t delta =
+      t.count_recv_unknown_validity_app_messages <-
+        t.count_recv_unknown_validity_app_messages + counter_update delta
 
-    let update_count_valid_messages exch delta =
-      exch.count_valid_messages <-
-        exch.count_valid_messages + counter_update delta
+    let update_count_recv_valid_app_messages t delta =
+      t.count_recv_valid_app_messages <-
+        t.count_recv_valid_app_messages + counter_update delta
+
+    let update_count_sent_grafts t delta =
+      t.count_sent_grafts <- t.count_sent_grafts + counter_update delta
+
+    let update_count_sent_prunes t delta =
+      t.count_sent_prunes <- t.count_sent_prunes + counter_update delta
+
+    let update_count_sent_ihaves t delta =
+      t.count_sent_ihaves <- t.count_sent_ihaves + counter_update delta
+
+    let update_count_sent_iwants t delta =
+      t.count_sent_iwants <- t.count_sent_iwants + counter_update delta
+
+    let update_count_sent_app_messages t delta =
+      t.count_sent_app_messages <-
+        t.count_sent_app_messages + counter_update delta
+
+    (* *)
   end
 
   type 'a cancellation_handle = {
@@ -212,16 +229,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let update_sent_stats stats = function
       | Out_message {p2p_message; to_peer = _} -> (
           match p2p_message with
-          | Graft _ ->
-              Introspection.(update_count_grafts stats.count_sent `Incr)
-          | Prune _ ->
-              Introspection.(update_count_prunes stats.count_sent `Incr)
-          | IHave _ ->
-              Introspection.(update_count_ihaves stats.count_sent `Incr)
-          | IWant _ ->
-              Introspection.(update_count_iwants stats.count_sent `Incr)
+          | Graft _ -> Introspection.update_count_sent_grafts stats `Incr
+          | Prune _ -> Introspection.update_count_sent_prunes stats `Incr
+          | IHave _ -> Introspection.update_count_sent_ihaves stats `Incr
+          | IWant _ -> Introspection.update_count_sent_iwants stats `Incr
           | Message_with_header _ ->
-              Introspection.(update_count_valid_messages stats.count_sent `Incr)
+              Introspection.update_count_sent_app_messages stats `Incr
           | Subscribe _ | Unsubscribe _ -> ())
       | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
@@ -277,9 +290,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       peers based on various criteria (bad score, connection expired, ...). *)
   let handle_receive_message received_message = function
     | state, GS.Route_message {to_route} ->
-        Introspection.update_count_valid_messages
-          state.stats.count_received
-          `Incr ;
+        Introspection.update_count_recv_valid_app_messages state.stats `Incr ;
         let ({sender = _; topic; message_id; message} : GS.receive_message) =
           received_message
         in
@@ -291,14 +302,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         state
     | state, GS.Already_received | state, GS.Not_subscribed -> state
     | state, GS.Unknown_validity ->
-        Introspection.update_count_unknown_validity_messages
-          state.stats.count_received
+        Introspection.update_count_recv_unknown_validity_app_messages
+          state.stats
           `Incr ;
         state
     | state, GS.Invalid_message ->
-        Introspection.update_count_invalid_messages
-          state.stats.count_received
-          `Incr ;
+        Introspection.update_count_recv_invalid_app_messages state.stats `Incr ;
         state
 
   (** From the worker's perspective, the outcome of joining a new topic from the
@@ -408,7 +417,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       match output with
       | GS.Peer_already_in_mesh | Unexpected_grafting_peer -> ()
       | Grafting_successfully ->
-          Introspection.(update_count_grafts state.stats.count_received `Incr) ;
+          Introspection.update_count_recv_grafts state.stats `Incr ;
           ()
       | Peer_filtered | Unsubscribed_topic | Grafting_direct_peer
       | Grafting_peer_with_negative_score | Peer_backed_off ->
@@ -416,7 +425,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       | Mesh_full ->
           (* We consider this case as a successful graft, although the peer is
              pruned immediately. *)
-          Introspection.(update_count_grafts state.stats.count_received `Incr) ;
+          Introspection.update_count_recv_grafts state.stats `Incr ;
           do_prune ~do_px:true
     in
     state
@@ -437,9 +446,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       [IWant] message. *)
   let handle_ihave ({peer; _} : GS.ihave) = function
     | state, GS.Message_requested_message_ids message_ids ->
-        Introspection.(
-          update_count_ihaves state.stats.count_received
-          @@ `Plus (List.length message_ids)) ;
+        Introspection.update_count_recv_ihaves state.stats
+        @@ `Plus (List.length message_ids) ;
         if not (List.is_empty message_ids) then
           emit_p2p_message state (IWant {message_ids}) (Seq.return peer) ;
         state
@@ -463,8 +471,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           (fun message_id status ->
             match status with
             | `Message message ->
-                Introspection.(
-                  update_count_iwants state.stats.count_received `Incr) ;
+                Introspection.update_count_recv_iwants state.stats `Incr ;
                 let topic = Message_id.get_topic message_id in
                 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5415
 
@@ -499,11 +506,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         forget_all state ;
         state
     | state, (Ignore_PX_score_too_low _ | No_PX) ->
-        Introspection.(update_count_prunes state.stats.count_received `Incr) ;
+        Introspection.update_count_recv_prunes state.stats `Incr ;
         forget_all state ;
         state
     | state, GS.PX peers ->
-        Introspection.(update_count_prunes state.stats.count_received `Incr) ;
+        Introspection.update_count_recv_prunes state.stats `Incr ;
         emit_p2p_output
           state
           ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
