@@ -19,11 +19,11 @@ build-dev-deps: build-deps
 
 .PHONY: test
 test:
-	@cargo test --no-default-features --features libc
+	@cargo test --no-default-features
 
 .PHONY: run
 run:
-	@cargo run --no-default-features --features libc
+	@cargo run --no-default-features
 
 .PHONY: check
 check:

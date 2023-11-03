@@ -3,18 +3,6 @@
 ///! Implements Linux system calls
 ///! See https://git.musl-libc.org/cgit/musl/tree/arch/riscv64/syscall_arch.h
 
-#[cfg(not(target_os = "none"))]
-mod from_libc {
-    /// Write data to a file descriptor.
-    pub fn write(fd: i64, buf: *const u8, count: usize) -> i64 {
-        unsafe { libc::write(fd as i32, buf as *const libc::c_void, count) as i64 }
-    }
-
-    pub fn exit(code: i32) -> ! {
-        unsafe { libc::exit(code) }
-    }
-}
-
 #[cfg(target_os = "none")]
 mod bare_metal {
     use core::arch::asm;
@@ -60,9 +48,6 @@ mod bare_metal {
         unreachable!()
     }
 }
-
-#[cfg(not(target_os = "none"))]
-pub use from_libc::*;
 
 #[cfg(target_os = "none")]
 pub use bare_metal::*;

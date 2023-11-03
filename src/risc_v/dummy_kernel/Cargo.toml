@@ -21,4 +21,3 @@ default-features = false
 [features]
 default = ["bare-metal"]
 bare-metal = ["riscv-rt"]
-libc = ["tezos-smart-rollup-core/libc"]
