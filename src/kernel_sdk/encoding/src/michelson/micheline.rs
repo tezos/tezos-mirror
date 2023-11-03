@@ -449,7 +449,7 @@ pub(crate) fn bin_write_prim_no_args_no_annots<const PRIM_TAG: u8>(
 /// Write `PRIM_TAG` & `annots` into an `obj2` encoding, prefixed with the
 /// [MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG].
 pub(crate) fn bin_write_prim_no_args_some_annots<const PRIM_TAG: u8>(
-    annots: &String,
+    annots: &str,
     output: &mut Vec<u8>,
 ) -> BinResult {
     enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, PRIM_TAG], output);
@@ -479,7 +479,7 @@ where
 /// [MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG].
 pub(crate) fn bin_write_prim_1_arg_some_annots<Arg, const PRIM_TAG: u8>(
     arg: &Arg,
-    annots: &String,
+    annots: &str,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
@@ -517,7 +517,7 @@ where
 pub(crate) fn bin_write_prim_2_args_some_annots<Arg1, Arg2, const PRIM_TAG: u8>(
     arg1: &Arg1,
     arg2: &Arg2,
-    annots: &String,
+    annots: &str,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
