@@ -50,7 +50,7 @@ let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000000));
 let create = utils.create(player1, 0, create_data);
 txs.push(create.tx);
-txs.push(utils.send(player1, create.addr, 0, batchMint_data, gasLimit));
-txs.push(utils.send(player1, create.addr, 0, safeBatchTransferFrom_data, gasLimit));
+txs.push(utils.send(player1, create.addr, 0, batchMint_data, { gasLimit }));
+txs.push(utils.send(player1, create.addr, 0, safeBatchTransferFrom_data, { gasLimit }));
 
 utils.print_bench([txs]);

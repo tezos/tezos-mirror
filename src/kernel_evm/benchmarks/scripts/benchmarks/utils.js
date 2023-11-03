@@ -28,8 +28,11 @@ const print_full = function (rawTx) {
     console.log("s = " + rawTx.signature.slice(32, 64).toString('hex'));
 }
 
-exports.transfer = function (playera, playerb, amount) {
-    let tx = { ...transfer_prototype_json };
+exports.transfer = function (playera, playerb, amount, options = {}) {
+    let tx = { 
+        ...transfer_prototype_json,
+        ...options 
+    };
     tx.nonce = playera.nonce;
     playera.nonce += 1;
     tx.to = playerb.addr;
@@ -40,8 +43,11 @@ exports.transfer = function (playera, playerb, amount) {
     return rawTx.rawTx;
 }
 
-exports.create = function (player, amount, data) {
-    let tx = { ...create_prototype_json };
+exports.create = function (player, amount, data, options = {}) {
+    let tx = { 
+        ...create_prototype_json,
+        ...options,
+    };
     tx.nonce = player.nonce;
     let address = legacy_contract_address(player.addr, player.nonce);
     player.nonce += 1;
@@ -54,14 +60,16 @@ exports.create = function (player, amount, data) {
     };
 }
 
-exports.send = function (player, contract_addr, amount, data, gasLimit = undefined) {
-    let tx = { ...transfer_prototype_json };
+exports.send = function (player, contract_addr, amount, data, options = {}) {
+    let tx = { 
+        ...transfer_prototype_json,
+        ...options 
+    };
     tx.nonce = player.nonce;
     player.nonce += 1;
     tx.to = contract_addr;
     tx.value = Math.round(amount * 1_000_000_000_000_000_000);
     tx.data = data;
-    tx.gasLimit = gasLimit == undefined ? transfer_prototype_json.gasLimit : gasLimit;
     let rawTx = sign(tx, player.privateKey)
     return rawTx.rawTx;
 }
