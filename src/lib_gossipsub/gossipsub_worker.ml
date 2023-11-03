@@ -42,6 +42,103 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   module Message_id = GS.Message_id
   module Message = GS.Message
 
+  module Introspection = struct
+    type stats = {
+      mutable count_topics : int;
+      mutable count_connections : int;
+      mutable count_bootstrap_connections : int;
+      mutable count_sent_app_messages : int;
+      mutable count_sent_grafts : int;
+      mutable count_sent_prunes : int;
+      mutable count_sent_ihaves : int;
+      mutable count_sent_iwants : int;
+      mutable count_recv_valid_app_messages : int;
+      mutable count_recv_invalid_app_messages : int;
+      mutable count_recv_unknown_validity_app_messages : int;
+      mutable count_recv_grafts : int;
+      mutable count_recv_prunes : int;
+      mutable count_recv_ihaves : int;
+      mutable count_recv_iwants : int;
+    }
+
+    let empty () =
+      {
+        count_topics = 0;
+        count_connections = 0;
+        count_bootstrap_connections = 0;
+        count_sent_app_messages = 0;
+        count_sent_grafts = 0;
+        count_sent_prunes = 0;
+        count_sent_ihaves = 0;
+        count_sent_iwants = 0;
+        count_recv_valid_app_messages = 0;
+        count_recv_invalid_app_messages = 0;
+        count_recv_unknown_validity_app_messages = 0;
+        count_recv_grafts = 0;
+        count_recv_prunes = 0;
+        count_recv_ihaves = 0;
+        count_recv_iwants = 0;
+      }
+
+    let counter_update = function
+      | `Incr -> 1
+      | `Decr -> -1
+      | `Plus n -> n
+      | `Minus n -> -n
+
+    let update_count_topics t delta =
+      t.count_topics <- t.count_topics + counter_update delta
+
+    let update_count_connections t delta =
+      t.count_connections <- t.count_connections + counter_update delta
+
+    let update_count_bootstrap_connections t delta =
+      t.count_bootstrap_connections <-
+        t.count_bootstrap_connections + counter_update delta
+
+    let update_count_recv_grafts t delta =
+      t.count_recv_grafts <- t.count_recv_grafts + counter_update delta
+
+    let update_count_recv_prunes t delta =
+      t.count_recv_prunes <- t.count_recv_prunes + counter_update delta
+
+    let update_count_recv_ihaves t delta =
+      t.count_recv_ihaves <- t.count_recv_ihaves + counter_update delta
+
+    let update_count_recv_iwants t delta =
+      t.count_recv_iwants <- t.count_recv_iwants + counter_update delta
+
+    let update_count_recv_invalid_app_messages t delta =
+      t.count_recv_invalid_app_messages <-
+        t.count_recv_invalid_app_messages + counter_update delta
+
+    let update_count_recv_unknown_validity_app_messages t delta =
+      t.count_recv_unknown_validity_app_messages <-
+        t.count_recv_unknown_validity_app_messages + counter_update delta
+
+    let update_count_recv_valid_app_messages t delta =
+      t.count_recv_valid_app_messages <-
+        t.count_recv_valid_app_messages + counter_update delta
+
+    let update_count_sent_grafts t delta =
+      t.count_sent_grafts <- t.count_sent_grafts + counter_update delta
+
+    let update_count_sent_prunes t delta =
+      t.count_sent_prunes <- t.count_sent_prunes + counter_update delta
+
+    let update_count_sent_ihaves t delta =
+      t.count_sent_ihaves <- t.count_sent_ihaves + counter_update delta
+
+    let update_count_sent_iwants t delta =
+      t.count_sent_iwants <- t.count_sent_iwants + counter_update delta
+
+    let update_count_sent_app_messages t delta =
+      t.count_sent_app_messages <-
+        t.count_sent_app_messages + counter_update delta
+
+    (* *)
+  end
+
   type 'a cancellation_handle = {
     schedule_cancellation : unit -> 'a Monad.t;
         (** A handle for a cancellable looping monad. When
@@ -112,6 +209,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       and a stream of events to process. It also has two output streams to
       communicate with the application and P2P layers. *)
   type worker_state = {
+    stats : Introspection.stats;
     gossip_state : GS.state;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
@@ -127,26 +225,40 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let emit_app_output state e = Stream.push e state.app_output_stream
 
-  let emit_p2p_output {connected_bootstrap_peers; p2p_output_stream; _}
-      ~mk_output =
-    let maybe_emit to_peer =
-      let message = mk_output to_peer in
-      let do_emit =
-        (not (Peer.Set.mem to_peer connected_bootstrap_peers))
-        ||
-        match message with
-        | Out_message {p2p_message; to_peer = _} -> (
-            match p2p_message with
-            | Message_with_header _ | IHave _ | IWant _ ->
-                (* Don't emit app messages, send IHave messages or respond to
-                   IWant if the remote peer has a bootstrap profile. *)
-                false
-            | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
-        | Connect _ | Disconnect _ | Forget _ | Kick _ -> true
-      in
-      if do_emit then Stream.push message p2p_output_stream
+  let emit_p2p_output =
+    let update_sent_stats stats = function
+      | Out_message {p2p_message; to_peer = _} -> (
+          match p2p_message with
+          | Graft _ -> Introspection.update_count_sent_grafts stats `Incr
+          | Prune _ -> Introspection.update_count_sent_prunes stats `Incr
+          | IHave _ -> Introspection.update_count_sent_ihaves stats `Incr
+          | IWant _ -> Introspection.update_count_sent_iwants stats `Incr
+          | Message_with_header _ ->
+              Introspection.update_count_sent_app_messages stats `Incr
+          | Subscribe _ | Unsubscribe _ -> ())
+      | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
-    Seq.iter maybe_emit
+    fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
+      let maybe_emit to_peer =
+        let message = mk_output to_peer in
+        let do_emit =
+          (not (Peer.Set.mem to_peer connected_bootstrap_peers))
+          ||
+          match message with
+          | Out_message {p2p_message; to_peer = _} -> (
+              match p2p_message with
+              | Message_with_header _ | IHave _ | IWant _ ->
+                  (* Don't emit app messages, send IHave messages or respond to
+                     IWant if the remote peer has a bootstrap profile. *)
+                  false
+              | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
+          | Connect _ | Disconnect _ | Forget _ | Kick _ -> true
+        in
+        if do_emit then (
+          update_sent_stats stats message ;
+          Stream.push message p2p_output_stream)
+      in
+      Seq.iter maybe_emit
 
   let emit_p2p_message state p2p_message =
     emit_p2p_output state ~mk_output:(fun to_peer ->
@@ -178,6 +290,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       peers based on various criteria (bad score, connection expired, ...). *)
   let handle_receive_message received_message = function
     | state, GS.Route_message {to_route} ->
+        Introspection.update_count_recv_valid_app_messages state.stats `Incr ;
         let ({sender = _; topic; message_id; message} : GS.receive_message) =
           received_message
         in
@@ -187,10 +300,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let has_joined = View.(has_joined topic @@ view state.gossip_state) in
         if has_joined then emit_app_output state message_with_header ;
         state
-    | state, GS.Already_received
-    | state, GS.Not_subscribed
-    | state, GS.Invalid_message
+    | state, GS.Already_received | state, GS.Not_subscribed -> state
     | state, GS.Unknown_validity ->
+        Introspection.update_count_recv_unknown_validity_app_messages
+          state.stats
+          `Incr ;
+        state
+    | state, GS.Invalid_message ->
+        Introspection.update_count_recv_invalid_app_messages state.stats `Incr ;
         state
 
   (** From the worker's perspective, the outcome of joining a new topic from the
@@ -200,6 +317,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_join topic = function
     | state, GS.Already_joined -> state
     | state, Joining_topic {to_graft} ->
+        Introspection.update_count_topics state.stats `Incr ;
         let peers = View.(view state.gossip_state |> get_connected_peers) in
         (* It's important to send [Subscribe] before [Graft], as the other peer
            would ignore the [Graft] message if we did not subscribe to the
@@ -215,6 +333,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_leave topic = function
     | state, GS.Not_joined -> state
     | state, Leaving_topic {to_prune; noPX_peers} ->
+        Introspection.update_count_topics state.stats `Decr ;
         let gstate = state.gossip_state in
         let view = View.view gstate in
         let peers = View.get_connected_peers view in
@@ -241,8 +360,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_new_connection peer ~bootstrap = function
     | state, GS.Peer_already_known -> state
     | state, Peer_added ->
+        Introspection.update_count_connections state.stats `Incr ;
         let connected_bootstrap_peers =
-          if bootstrap then Peer.Set.add peer state.connected_bootstrap_peers
+          if bootstrap then (
+            Introspection.update_count_bootstrap_connections state.stats `Incr ;
+            Peer.Set.add peer state.connected_bootstrap_peers)
           else state.connected_bootstrap_peers
         in
         let state = {state with connected_bootstrap_peers} in
@@ -258,6 +380,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         {!GS.remove_peer}. *)
   let handle_disconnection peer = function
     | state, GS.Removing_peer ->
+        Introspection.update_count_connections state.stats `Decr ;
+        if Peer.Set.mem peer state.connected_bootstrap_peers then
+          Introspection.update_count_bootstrap_connections state.stats `Decr ;
         {
           state with
           connected_bootstrap_peers =
@@ -290,13 +415,18 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
        the backoffs accordingly in the automaton. *)
     let () =
       match output with
-      | GS.Peer_already_in_mesh | Unexpected_grafting_peer
+      | GS.Peer_already_in_mesh | Unexpected_grafting_peer -> ()
       | Grafting_successfully ->
+          Introspection.update_count_recv_grafts state.stats `Incr ;
           ()
       | Peer_filtered | Unsubscribed_topic | Grafting_direct_peer
       | Grafting_peer_with_negative_score | Peer_backed_off ->
           do_prune ~do_px:false
-      | Mesh_full -> do_prune ~do_px:true
+      | Mesh_full ->
+          (* We consider this case as a successful graft, although the peer is
+             pruned immediately. *)
+          Introspection.update_count_recv_grafts state.stats `Incr ;
+          do_prune ~do_px:true
     in
     state
 
@@ -316,6 +446,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       [IWant] message. *)
   let handle_ihave ({peer; _} : GS.ihave) = function
     | state, GS.Message_requested_message_ids message_ids ->
+        Introspection.update_count_recv_ihaves state.stats
+        @@ `Plus (List.length message_ids) ;
         if not (List.is_empty message_ids) then
           emit_p2p_message state (IWant {message_ids}) (Seq.return peer) ;
         state
@@ -339,6 +471,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           (fun message_id status ->
             match status with
             | `Message message ->
+                Introspection.update_count_recv_iwants state.stats `Incr ;
                 let topic = Message_id.get_topic message_id in
                 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5415
 
@@ -361,16 +494,23 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       automaton removes that peer from the given topic's mesh. It also filters
       the given collection of alternative peers to connect to. The worker then
       asks the P2P part to connect to those peeers. *)
-  let handle_prune ~from_peer input_px = function
-    | ( state,
-        ( GS.Prune_topic_not_tracked | Peer_not_in_mesh
-        | Ignore_PX_score_too_low _ | No_PX ) ) ->
-        emit_p2p_output
-          state
-          ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
-          input_px ;
+  let handle_prune ~from_peer input_px =
+    let forget_all state =
+      emit_p2p_output
+        state
+        ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
+        input_px
+    in
+    function
+    | state, (GS.Prune_topic_not_tracked | Peer_not_in_mesh) ->
+        forget_all state ;
+        state
+    | state, (Ignore_PX_score_too_low _ | No_PX) ->
+        Introspection.update_count_recv_prunes state.stats `Incr ;
+        forget_all state ;
         state
     | state, GS.PX peers ->
+        Introspection.update_count_recv_prunes state.stats `Incr ;
         emit_p2p_output
           state
           ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
@@ -600,6 +740,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       status = Starting;
       state =
         {
+          stats = Introspection.empty ();
           gossip_state = GS.make rng limits parameters;
           connected_bootstrap_peers = Peer.Set.empty;
           events_stream = Stream.empty ();
@@ -608,6 +749,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           events_logging;
         };
     }
+
+  let stats t = t.state.stats
 
   let p2p_output_stream t = t.state.p2p_output_stream
 
