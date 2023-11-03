@@ -199,8 +199,6 @@ end
 module Kernel_version :
   METHOD with type m_input = unit and type m_output = string
 
-module Upgrade_nonce : METHOD with type m_input = unit and type m_output = int32
-
 module Network_id : METHOD with type m_input = unit and type m_output = string
 
 module Chain_id :
@@ -215,6 +213,14 @@ module Get_balance :
   METHOD
     with type m_input = Ethereum_types.address * Ethereum_types.block_param
      and type m_output = Ethereum_types.quantity
+
+module Get_storage_at :
+  METHOD
+    with type m_input =
+      Ethereum_types.address
+      * Ethereum_types.quantity
+      * Ethereum_types.block_param
+     and type m_output = Ethereum_types.hex
 
 module Block_number :
   METHOD

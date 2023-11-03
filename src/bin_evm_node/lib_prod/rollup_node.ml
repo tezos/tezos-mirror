@@ -33,29 +33,56 @@ let max_input_size = 4095
 
 let smart_rollup_address_size = 20
 
+let transaction_tag_size = 1
+
+let framing_protocol_tag_size = 1
+
 type transaction =
   | Simple of string
-  | NewChunked of (string * int)
+  | NewChunked of (string * int * string)
   | Chunk of string
 
 let encode_transaction ~smart_rollup_address kind =
   let data =
     match kind with
     | Simple data -> "\000" ^ data
-    | NewChunked (hash, len) ->
+    | NewChunked (tx_hash, len, all_chunk_hashes) ->
         let number_of_chunks_bytes = Ethereum_types.u16_to_bytes len in
-        "\001" ^ hash ^ number_of_chunks_bytes
+        "\001" ^ tx_hash ^ number_of_chunks_bytes ^ all_chunk_hashes
     | Chunk data -> "\002" ^ data
   in
   "\000" ^ smart_rollup_address ^ data
+
+let chunk_transaction ~tx_hash ~tx_raw =
+  let open Result_syntax in
+  let size_per_chunk =
+    max_input_size - framing_protocol_tag_size - smart_rollup_address_size
+    - transaction_tag_size - 2 (* Index as u16 *)
+    - (Ethereum_types.transaction_hash_size * 2)
+  in
+  let* chunks = String.chunk_bytes size_per_chunk (Bytes.of_string tx_raw) in
+  let all_chunk_hashes, chunks =
+    List.fold_left_i
+      (fun i (all_chunk_hashes, chunks) chunk ->
+        let chunk_hash = Ethereum_types.hash_raw_tx chunk in
+        let all_chunk_hashes = all_chunk_hashes ^ chunk_hash in
+        let chunk =
+          Chunk (tx_hash ^ Ethereum_types.u16_to_bytes i ^ chunk_hash ^ chunk)
+        in
+        (all_chunk_hashes, chunk :: chunks))
+      ("", [])
+      chunks
+  in
+  let new_chunk_transaction =
+    NewChunked (tx_hash, List.length chunks, all_chunk_hashes)
+  in
+  return (tx_hash, new_chunk_transaction :: chunks)
 
 let make_evm_inbox_transactions tx_raw =
   let open Result_syntax in
   let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
   (* Maximum size describes the maximum size of [tx_raw] to fit
      in a simple transaction. *)
-  let transaction_tag_size = 1 in
-  let framing_protocol_tag_size = 1 in
   let maximum_size =
     max_input_size - framing_protocol_tag_size - smart_rollup_address_size
     - transaction_tag_size - Ethereum_types.transaction_hash_size
@@ -63,23 +90,9 @@ let make_evm_inbox_transactions tx_raw =
   let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
   if String.length tx_raw <= maximum_size then
     (* Simple transaction, fits in a single input. *)
-    let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
     let tx = Simple (tx_hash ^ tx_raw) in
     return (tx_hash, [tx])
-  else
-    let size_per_chunk =
-      max_input_size - framing_protocol_tag_size - smart_rollup_address_size
-      - transaction_tag_size - 2 (* Index as u16 *)
-      - Ethereum_types.transaction_hash_size
-    in
-    let* chunks = String.chunk_bytes size_per_chunk (Bytes.of_string tx_raw) in
-    let new_chunk_transaction = NewChunked (tx_hash, List.length chunks) in
-    let chunks =
-      List.mapi
-        (fun i chunk -> Chunk (tx_hash ^ Ethereum_types.u16_to_bytes i ^ chunk))
-        chunks
-    in
-    return (tx_hash, new_chunk_transaction :: chunks)
+  else chunk_transaction ~tx_hash ~tx_raw
 
 let make_encoded_messages ~smart_rollup_address tx_raw =
   let open Result_syntax in
@@ -103,9 +116,9 @@ module Durable_storage_path = struct
 
   let chain_id = EVM.make "/chain_id"
 
-  let kernel_version = EVM.make "/kernel_version"
+  let base_fee_per_gas = EVM.make "/base_fee_per_gas"
 
-  let upgrade_nonce = EVM.make "/upgrade_nonce"
+  let kernel_version = EVM.make "/kernel_version"
 
   module Accounts = struct
     let accounts = EVM.make "/eth_accounts"
@@ -116,6 +129,8 @@ module Durable_storage_path = struct
 
     let code = "/code"
 
+    let storage = "/storage"
+
     let account (Address (Hex s)) = accounts ^ "/" ^ s
 
     let balance address = account address ^ balance
@@ -123,6 +138,8 @@ module Durable_storage_path = struct
     let nonce address = account address ^ nonce
 
     let code address = account address ^ code
+
+    let storage address index = account address ^ storage ^ "/" ^ index
   end
 
   module Block = struct
@@ -272,10 +289,9 @@ module RPC = struct
     let open Lwt_result_syntax in
     let key = Durable_storage_path.Accounts.nonce address in
     let+ answer = call_service ~base durable_state_value () {key} () in
-    match answer with
-    | Some bytes ->
-        Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
-    | None -> Ethereum_types.Qty Z.zero
+    answer
+    |> Option.map (fun bytes ->
+           bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)
 
   let code base address =
     let open Lwt_result_syntax in
@@ -329,42 +345,80 @@ module RPC = struct
   let current_block_number base () =
     block_number base Durable_storage_path.Block.Current
 
+  let un_qty (Qty z) = z
+
   let transaction_receipt base (Hash (Hex tx_hash)) =
     let open Lwt_result_syntax in
-    let+ bytes =
+    (* We use a mock block hash to decode the rest of the receipt,
+       so that we can get the number to query for the actual block
+       hash. *)
+    let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+    let* opt_receipt =
       inspect_durable_and_decode_opt
         base
         (Durable_storage_path.Transaction_receipt.receipt tx_hash)
-        Fun.id
+        (Ethereum_types.transaction_receipt_from_rlp mock_block_hash)
     in
-    match bytes with
-    | Some bytes -> Some (Ethereum_types.transaction_receipt_from_rlp bytes)
-    | None -> None
+    match opt_receipt with
+    | Some temp_receipt ->
+        let+ blockHash =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Indexes.blocks_by_number
+               (Nth (un_qty temp_receipt.blockNumber)))
+            decode_block_hash
+        in
+        Some {temp_receipt with blockHash}
+    | None -> return_none
 
   let transaction_object base (Hash (Hex tx_hash)) =
     let open Lwt_result_syntax in
-    let+ bytes =
+    (* We use a mock block hash to decode the rest of the receipt,
+       so that we can get the number to query for the actual block
+       hash. *)
+    let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+    let* opt_object =
       inspect_durable_and_decode_opt
         base
         (Durable_storage_path.Transaction_object.object_ tx_hash)
-        Fun.id
+        (Ethereum_types.transaction_object_from_rlp mock_block_hash)
     in
-    match bytes with
-    | Some bytes -> Some (Ethereum_types.transaction_object_from_rlp bytes)
-    | None -> None
+    match opt_object with
+    | Some temp_object ->
+        let+ blockHash =
+          inspect_durable_and_decode
+            base
+            (Durable_storage_path.Indexes.blocks_by_number
+               (Nth (un_qty temp_object.blockNumber)))
+            decode_block_hash
+        in
+        Some {temp_object with blockHash}
+    | None -> return_none
 
-  let full_transactions transactions base =
+  let transaction_object_with_block_hash base block_hash (Hash (Hex tx_hash)) =
+    inspect_durable_and_decode_opt
+      base
+      (Durable_storage_path.Transaction_object.object_ tx_hash)
+      (Ethereum_types.transaction_object_from_rlp block_hash)
+
+  let full_transactions block_hash transactions base =
     let open Lwt_result_syntax in
     match transactions with
     | TxHash hashes ->
-        let+ objects = List.filter_map_es (transaction_object base) hashes in
+        let+ objects =
+          List.filter_map_es
+            (transaction_object_with_block_hash base block_hash)
+            hashes
+        in
         TxFull objects
     | TxFull _ -> return transactions
 
   let populate_tx_objects ~full_transaction_object base block =
     let open Lwt_result_syntax in
     if full_transaction_object then
-      let* transactions = full_transactions block.transactions base in
+      let* transactions =
+        full_transactions block.hash block.transactions base
+      in
       return {block with transactions}
     else return block
 
@@ -420,15 +474,17 @@ module RPC = struct
   let chain_id base () =
     inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
 
+  let base_fee_per_gas base () =
+    inspect_durable_and_decode
+      base
+      Durable_storage_path.base_fee_per_gas
+      decode_number
+
   let kernel_version base () =
     inspect_durable_and_decode
       base
       Durable_storage_path.kernel_version
       Bytes.to_string
-
-  let upgrade_nonce base () =
-    inspect_durable_and_decode base Durable_storage_path.upgrade_nonce (fun i ->
-        Bytes.get_uint16_le i 0)
 
   let simulate_call base call =
     let open Lwt_result_syntax in
@@ -505,6 +561,25 @@ module RPC = struct
         }
     in
     Simulation.is_tx_valid r
+
+  let storage_at base address (Qty pos) =
+    let open Lwt_result_syntax in
+    let pad32left0 s =
+      let open Ethereum_types in
+      (* Strip 0x *)
+      let (Hex s) = hex_of_string s in
+      let len = String.length s in
+      (* This is a Hex string of 32 bytes, therefore the length is 64 *)
+      String.make (64 - len) '0' ^ s
+    in
+    let index = Z.format "#x" pos |> pad32left0 in
+    let key = Durable_storage_path.Accounts.storage address index in
+    let+ answer = call_service ~base durable_state_value () {key} () in
+    match answer with
+    | Some bytes ->
+        Bytes.to_string bytes |> Hex.of_string |> Hex.show
+        |> Ethereum_types.hex_of_string
+    | None -> Ethereum_types.Hex (pad32left0 "0")
 end
 
 module type S = sig
@@ -512,7 +587,8 @@ module type S = sig
 
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
-  val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+  val nonce :
+    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t
 
   val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
 
@@ -544,16 +620,22 @@ module type S = sig
 
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 
-  val kernel_version : unit -> string tzresult Lwt.t
+  val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
 
-  val upgrade_nonce : unit -> int tzresult Lwt.t
+  val kernel_version : unit -> string tzresult Lwt.t
 
   val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
 
   val estimate_gas :
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 
-  val is_tx_valid : Ethereum_types.hex -> (unit, string) result tzresult Lwt.t
+  val is_tx_valid :
+    Ethereum_types.hex -> (Ethereum_types.address, string) result tzresult Lwt.t
+
+  val storage_at :
+    Ethereum_types.address ->
+    Ethereum_types.quantity ->
+    Ethereum_types.hex tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -585,13 +667,15 @@ end) : S = struct
 
   let chain_id = RPC.chain_id Base.base
 
-  let kernel_version = RPC.kernel_version Base.base
+  let base_fee_per_gas = RPC.base_fee_per_gas Base.base
 
-  let upgrade_nonce = RPC.upgrade_nonce Base.base
+  let kernel_version = RPC.kernel_version Base.base
 
   let simulate_call = RPC.simulate_call Base.base
 
   let estimate_gas = RPC.estimate_gas Base.base
 
   let is_tx_valid = RPC.is_tx_valid Base.base
+
+  let storage_at = RPC.storage_at Base.base
 end

@@ -208,20 +208,6 @@ module Kernel_version = MethodMaker (struct
   let method_ = "tez_kernelVersion"
 end)
 
-module Upgrade_nonce = MethodMaker (struct
-  type method_
-
-  type input = unit
-
-  type output = int32
-
-  let input_encoding = Data_encoding.unit
-
-  let output_encoding = Data_encoding.int32
-
-  let method_ = "tez_upgradeNonce"
-end)
-
 module Network_id = MethodMaker (struct
   type method_
 
@@ -278,6 +264,23 @@ module Get_balance = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_getBalance"
+end)
+
+module Get_storage_at = MethodMaker (struct
+  open Ethereum_types
+
+  type method_
+
+  type input = address * quantity * block_param
+
+  type output = hex
+
+  let input_encoding =
+    Data_encoding.tup3 address_encoding quantity_encoding block_param_encoding
+
+  let output_encoding = hex_encoding
+
+  let method_ = "eth_getStorageAt"
 end)
 
 module Block_number = MethodMaker (struct
@@ -650,11 +653,11 @@ end)
 let methods : (module METHOD) list =
   [
     (module Kernel_version);
-    (module Upgrade_nonce);
     (module Network_id);
     (module Chain_id);
     (module Accounts);
     (module Get_balance);
+    (module Get_storage_at);
     (module Block_number);
     (module Get_block_by_number);
     (module Get_block_by_hash);
