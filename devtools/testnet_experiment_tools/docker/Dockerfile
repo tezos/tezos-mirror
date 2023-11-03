@@ -34,6 +34,7 @@ FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as bare
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
+ARG GIT_HISTORY_FILE
 
 # Open Container Initiative
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md
@@ -49,4 +50,4 @@ LABEL org.opencontainers.image.authors="contact@nomadic-labs.com" \
 
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin/ /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
-
+COPY --chown=tezos:nogroup ${GIT_HISTORY_FILE} /home/tezos/git_history
