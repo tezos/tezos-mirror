@@ -1170,6 +1170,10 @@ module type WORKER = sig
       application layer. *)
   val app_output_stream : t -> app_output Stream.t
 
+  (** [input_events_stream t] returns the input stream in which we push events
+      to be processed by the worker. *)
+  val input_events_stream : t -> event Stream.t
+
   (** [is_subscribed t topic] checks whether [topic] is in the mesh of [t]. *)
   val is_subscribed : t -> GS.Topic.t -> bool
 
