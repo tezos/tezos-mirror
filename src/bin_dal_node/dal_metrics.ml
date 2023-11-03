@@ -108,6 +108,8 @@ module GS = struct
 
     let count_peers_per_topic = ref []
 
+    let scores_of_peer = ref []
+
     let topic_as_label Types.Topic.{pkh; slot_index} =
       Format.asprintf
         "topic__pkh-%a__slot_index-%d }"
@@ -131,6 +133,14 @@ module GS = struct
             (topic_as_label topic, W.GS.Peer.Set.cardinal peers |> float)
             :: accu)
           gs_state.mesh
+          [] ;
+      scores_of_peer :=
+        W.GS.Peer.Map.fold
+          (fun peer score accu ->
+            ( Format.asprintf "%a" W.GS.Peer.pp peer,
+              W.GS.Score.(value score |> Internal_for_tests.to_float) )
+            :: accu)
+          gs_state.scores
           []
   end
 
@@ -267,6 +277,13 @@ module GS = struct
       ~label_name:"count_peers_per_topic"
       (fun () -> !Stats.count_peers_per_topic)
 
+  let scores_of_peer =
+    labeled_metric
+      ~name:"scores_of_peer"
+      ~help:"Return the score of peer connected to the node."
+      ~label_name:"scores_of_peer"
+      (fun () -> !Stats.scores_of_peer)
+
   let metrics =
     [
       (* Metrics about the stats gathered by the worker *)
@@ -291,6 +308,7 @@ module GS = struct
       app_output_stream_length;
       (* Other metrics about GS automaton's state *)
       count_peers_per_topic;
+      scores_of_peer;
     ]
 
   let () = List.iter add_metric metrics
