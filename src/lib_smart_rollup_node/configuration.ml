@@ -219,7 +219,9 @@ let default_gc_parameters =
     frequency_in_blocks = 100l;
   }
 
-let default_history_mode = Full
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6576
+   Set to Full after initial evaluation on testnets. *)
+let default_history_mode = Archive
 
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
