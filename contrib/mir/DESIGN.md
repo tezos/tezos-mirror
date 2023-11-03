@@ -79,3 +79,10 @@ Alternative designs:
   Ultimately, trying to consume gas post-exhaustion was deemed to always
   indicate a logic error, and thus, instead of masking such errors, a decision
   was made to panic instead.
+
+`DUP` instruction's gas consumption is treated as constant, following the
+example of the Tezos protocol. However, it's not fully consistent with its
+implementation, which copies the value, thus incurring O(n) cost for things like
+pairs and lists. Until we have a proper gas model for MIR and a benchmarking
+set-up, this is left as is -- in any case, gas model will need some adjustments
+later.
