@@ -135,7 +135,9 @@ val setup_rollup :
   ?mode:Sc_rollup_node.mode ->
   ?boot_sector:string ->
   ?parameters_ty:string ->
+  ?src:string ->
   ?operator:string ->
+  ?operators:(Sc_rollup_node.purpose * string) list ->
   ?data_dir:string ->
   ?rollup_node_name:string ->
   ?whitelist:string list ->

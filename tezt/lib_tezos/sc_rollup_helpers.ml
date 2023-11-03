@@ -266,9 +266,9 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
    A rollup node has a configuration file that must be initialized.
 *)
 let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
-    ?boot_sector ?(parameters_ty = "string")
-    ?(operator = Constant.bootstrap1.alias) ?data_dir ?rollup_node_name
-    ?whitelist tezos_node tezos_client =
+    ?boot_sector ?(parameters_ty = "string") ?(src = Constant.bootstrap1.alias)
+    ?operator ?operators ?data_dir ?rollup_node_name ?whitelist tezos_node
+    tezos_client =
   let* sc_rollup =
     originate_sc_rollup
       ?hooks
@@ -277,7 +277,7 @@ let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       ~parameters_ty
       ?alias
       ?whitelist
-      ~src:operator
+      ~src
       tezos_client
   in
   let sc_rollup_node =
@@ -286,7 +286,8 @@ let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       tezos_node
       ?data_dir
       ~base_dir:(Client.base_dir tezos_client)
-      ~default_operator:operator
+      ?default_operator:operator
+      ?operators
       ?name:rollup_node_name
   in
   let rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in

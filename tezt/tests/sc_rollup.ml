@@ -156,7 +156,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
-    ?rollup_node_name ?whitelist_enable ?whitelist ?operator
+    ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
     {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
@@ -174,6 +174,11 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?whitelist_enable
       protocol
   in
+  let operator =
+    if Option.is_none operator && Option.is_none operators then
+      Some Constant.bootstrap1.alias
+    else operator
+  in
   let* rollup_node, rollup_client, sc_rollup =
     setup_rollup
       ~protocol
@@ -185,6 +190,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?rollup_node_name
       ?whitelist
       ?operator
+      ?operators
       tezos_node
       tezos_client
   in
