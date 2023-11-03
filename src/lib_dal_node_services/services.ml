@@ -291,7 +291,7 @@ module P2P = struct
       ~description:"Disconnect from a point"
       ~query:wait_query
       ~output:Data_encoding.unit
-      (open_root / "point" /: P2p_point.Id.rpc_arg / "disconnect")
+      (open_root / "points" / "disconnect" /: P2p_point.Id.rpc_arg)
 
   let delete_disconnect_peer :
       < meth : [`DELETE]
@@ -305,7 +305,7 @@ module P2P = struct
       ~description:"Disconnect from a peer"
       ~query:wait_query
       ~output:Data_encoding.unit
-      (open_root / "peer" /: P2p_peer.Id.rpc_arg / "disconnect")
+      (open_root / "peers" / "disconnect" /: P2p_peer.Id.rpc_arg)
 
   let get_points :
       < meth : [`GET]
@@ -355,7 +355,7 @@ module P2P = struct
         ~description:"Get info of the requested point"
         ~query:Tezos_rpc.Query.empty
         ~output:Data_encoding.(obj1 (req "info" P2p_point.Info.encoding))
-        (open_root / "points" / "info" /: P2p_point.Id.rpc_arg)
+        (open_root / "by-id" /: P2p_point.Id.rpc_arg)
   end
 
   let get_peers :
