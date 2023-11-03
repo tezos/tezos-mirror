@@ -21,10 +21,7 @@ use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
     TransactionType, TRANSACTION_HASH_SIZE,
 };
-use tezos_ethereum::{
-    rlp_helpers::*,
-    tx_signature::{rlp_decode_opt, TxSignature},
-};
+use tezos_ethereum::{rlp_helpers::*, tx_signature::TxSignature};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -315,7 +312,11 @@ impl Decodable for OldTransactionObject {
                 let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
                 let index: u32 = decode_field(&next(&mut it)?, "index")?;
                 let value: U256 = decode_field_u256_le(&next(&mut it)?, "value")?;
-                let signature = rlp_decode_opt(&mut it)?;
+                let v_bytes: Vec<u8> = next(&mut it)?.as_val()?;
+                let v: U256 = U256::from_big_endian(&v_bytes);
+                let r: H256 = decode_field_h256(&next(&mut it)?, "r")?;
+                let s: H256 = decode_field_h256(&next(&mut it)?, "s")?;
+                let signature = TxSignature::new(v, r, s).ok();
                 Ok(OldTransactionObject {
                     block_hash,
                     block_number,
@@ -403,8 +404,16 @@ fn migrate_receipts_and_objects<Host: Runtime>(host: &mut Host) -> Result<(), Er
                 expected: TRANSACTION_HASH_SIZE,
                 actual: bytes.len(),
             })?;
-        migrate_one_receipt(host, &tx_hash)?;
-        migrate_one_object(host, &tx_hash)?;
+        let left = migrate_one_receipt(host, &tx_hash);
+        let right = migrate_one_object(host, &tx_hash);
+        match (left, right) {
+            (Ok(()), Ok(())) => (),
+            // We have transactions indexed multiple times, the
+            // migration fail for both the receipt and the object
+            // because we try to migrate twice.
+            (Err(_), Err(_)) => (),
+            (Err(err), _) | (_, Err(err)) => return Err(err),
+        }
     }
     Ok(())
 }
