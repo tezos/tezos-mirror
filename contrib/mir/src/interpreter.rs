@@ -243,6 +243,12 @@ fn interpret_one(
             let r = pop!();
             stack.push(V::new_pair(l, r));
         }
+        I::Unpair => {
+            ctx.gas.consume(interpret_cost::UNPAIR)?;
+            let (l, r) = *pop!(V::Pair);
+            stack.push(r);
+            stack.push(l);
+        }
         I::ISome => {
             ctx.gas.consume(interpret_cost::SOME)?;
             let v = pop!();
@@ -674,6 +680,13 @@ mod interpreter_tests {
         let mut stack = stk![V::Nat(42), V::Bool(false)]; // NB: bool is top
         assert!(interpret(&vec![Pair], &mut Ctx::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_pair(V::Bool(false), V::Nat(42))]);
+    }
+
+    #[test]
+    fn unpair() {
+        let mut stack = stk![V::new_pair(V::Bool(false), V::Nat(42))];
+        assert!(interpret(&vec![Unpair], &mut Ctx::default(), &mut stack).is_ok());
+        assert_eq!(stack, stk![V::Nat(42), V::Bool(false)]);
     }
 
     #[test]
