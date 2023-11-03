@@ -11,7 +11,6 @@ use crate::inbox::Transaction;
 /// This doesn't apply to inherited constants from the PVM, e.g. maximum
 /// number of reboots.
 pub mod constants {
-
     /// Maximum number of ticks for a kernel run as set by the PVM
     pub(crate) const MAX_TICKS: u64 = 11_000_000_000;
 
@@ -33,9 +32,18 @@ pub mod constants {
     // Overapproximation of ticks used in signature verification.
     pub const TICKS_FOR_CRYPTO: u64 = 25_000_000;
 
+    /// Overapproximation using an upper bound of the number of ticks needed to
+    /// store a queue before rebooting.
+    /// The bound is calculated using a model linear in size of encoding of the
+    /// queue, and applying to a queue of size 512kB, which correspond to a full
+    /// inbox. This value doesn't take into account the facts that the encoding
+    /// is not the same in the inbox, and that some transactions have been
+    /// executed already.
+    pub const QUEUE_STORING_UPPER_BOUND: u64 = 1_000_000_000;
+
     /// Safety margin the kernel enforce to avoid approaching the maximum number
     /// of ticks.
-    pub const SAFETY_MARGIN: u64 = 2_000_000_000;
+    pub const SAFETY_MARGIN: u64 = QUEUE_STORING_UPPER_BOUND + 1_000_000_000;
 
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
@@ -49,16 +57,25 @@ pub mod constants {
     /// Overapproximation of the upper bound of the number of ticks used to
     /// fetch the inbox. Considers an inbox with the size of a full block, and
     /// apply a tick model affine in the size of the inbox.
-    pub const FETCH_UPPER_BOUND: u64 = 350_000_000;
+    /// NOT USED BUT KEPT FOR DOCUMENTATION
+    // pub const FETCH_UPPER_BOUND: u64 = 350_000_000;
+
+    /// Overapproximation of the upper bound of the number of ticks used to
+    /// read the queue from storage. Considers a queue with the same size as the
+    /// maximum inbox
+    /// size (512kB) and apply a tick model affine in the size
+    /// of the queue.
+    pub const QUEUE_READ_UPPER_BOUND: u64 = 500_000_000;
 
     /// Overapproximation of the number of ticks used in kernel initialization
     pub const KERNEL_INITIALIZATION: u64 = 50_000_000;
 
     /// Overapproximation of the number of ticks the kernel uses to initialise and
-    /// reload its state.
-    /// TODO: #6091
-    /// Hidden hypothesis here: BIP reading is equivalent to fetch (TBV)
-    pub const INITIALISATION_OVERHEAD: u64 = FETCH_UPPER_BOUND + KERNEL_INITIALIZATION;
+    /// reload its state. Uses the maximum between reading the queue and reading
+    /// the inbox, and adds the kernel initialization.
+    /// max(FETCH_UPPER_BOUND, QUEUE_READ_UPPER_BOUND)
+    pub const INITIALISATION_OVERHEAD: u64 =
+        QUEUE_READ_UPPER_BOUND + KERNEL_INITIALIZATION;
 
     /// Overapproximation of the upper bound of the number of ticks used to
     /// finalize a block. Considers a block corresponding to an inbox full of
