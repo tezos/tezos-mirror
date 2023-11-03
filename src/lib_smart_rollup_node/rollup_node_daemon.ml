@@ -327,18 +327,11 @@ let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
   (* At the start of the rollup node when in bailout mode check that there is
      an operator who has stake, otherwise stop the node *)
   if Node_context.is_bailout node_ctxt then
-    let operator =
-      Node_context.get_operator node_ctxt Configuration.Operating
-    in
+    let operator = Node_context.get_operator node_ctxt Purpose.Operating in
     match operator with
     | None ->
         (* this case can't happen because the bailout mode needs a operator to start*)
-        tzfail
-          (Configuration.Missing_mode_operators
-             {
-               mode = Configuration.string_of_mode Bailout;
-               missing_operators = [Configuration.string_of_purpose Operating];
-             })
+        tzfail (Purpose.Missing_operator Operating)
     | Some operating_pkh -> (
         let module Plugin = (val state.plugin) in
         let* last_published_commitment =
@@ -362,12 +355,10 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let start () =
     let signers =
-      Configuration.Operator_purpose_map.bindings node_ctxt.config.operators
+      Purpose.Map.bindings node_ctxt.config.operators
       |> List.fold_left
            (fun acc (purpose, operator) ->
-             let operation_kinds =
-               Configuration.operation_kinds_of_purpose purpose
-             in
+             let operation_kinds = Purpose.operation_kind purpose in
              let operation_kinds =
                match Signature.Public_key_hash.Map.find operator acc with
                | None -> operation_kinds
@@ -471,7 +462,8 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   protect start ~on_error:(function
       | Rollup_node_errors.(
           ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-          | Operator_not_in_whitelist | Configuration.Missing_mode_operators _ ))
+          | Operator_not_in_whitelist | Purpose.Missing_operator _
+          | Purpose.Too_many_operators _ ))
         :: _ as e ->
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
@@ -568,7 +560,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
-    Operator_purpose_map.iter_es
+    Purpose.Map.iter_es
       (fun _purpose operator ->
         let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
         ())
@@ -586,9 +578,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
   let* predecessor =
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
-  let publisher =
-    Configuration.Operator_purpose_map.find Operating configuration.operators
-  in
+  let publisher = Purpose.Map.find Operating configuration.operators in
 
   let* protocol, plugin = plugin_of_first_block cctxt head in
   let module Plugin = (val plugin) in

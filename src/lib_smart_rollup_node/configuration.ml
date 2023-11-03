@@ -34,23 +34,6 @@ type mode =
   | Operator
   | Custom of Operation_kind.t list
 
-type purpose =
-  | Operating
-  | Batching
-  | Cementing
-  | Recovering
-  | Executing_outbox
-
-let purposes = [Operating; Batching; Cementing; Recovering; Executing_outbox]
-
-module Operator_purpose_map = Map.Make (struct
-  type t = purpose
-
-  let compare = Stdlib.compare
-end)
-
-type operators = Signature.Public_key_hash.t Operator_purpose_map.t
-
 type batcher = {
   simulate : bool;
   min_batch_elements : int;
@@ -68,7 +51,7 @@ type history_mode = Archive | Full
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
-  operators : operators;
+  operators : Purpose.operators;
   rpc_addr : string;
   rpc_port : int;
   metrics_addr : string option;
@@ -93,33 +76,9 @@ type t = {
   cors : Resto_cohttp.Cors.t;
 }
 
-type error +=
-  | Missing_mode_operators of {mode : string; missing_operators : string list}
-  | Empty_operation_kinds_for_custom_mode
+type error += Empty_operation_kinds_for_custom_mode
 
 let () =
-  register_error_kind
-    ~id:"sc_rollup.node.missing_mode_operators"
-    ~title:"Missing operators for the chosen mode"
-    ~description:"Missing operators for the chosen mode."
-    ~pp:(fun ppf (mode, missing_operators) ->
-      Format.fprintf
-        ppf
-        "@[<hov>Missing operators %a for mode %s.@]"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-           Format.pp_print_string)
-        missing_operators
-        mode)
-    `Permanent
-    Data_encoding.(
-      obj2 (req "mode" string) (req "missing_operators" (list string)))
-    (function
-      | Missing_mode_operators {mode; missing_operators} ->
-          Some (mode, missing_operators)
-      | _ -> None)
-    (fun (mode, missing_operators) ->
-      Missing_mode_operators {mode; missing_operators}) ;
   register_error_kind
     ~id:"sc_rollup_node.empty_operation_kinds_for_custom_mode"
     ~title:"Empty operation kinds for custom mode"
@@ -262,62 +221,12 @@ let default_gc_parameters =
 
 let default_history_mode = Full
 
-let string_of_purpose = function
-  | Operating -> "operating"
-  | Batching -> "batching"
-  | Cementing -> "cementing"
-  | Recovering -> "recovering"
-  | Executing_outbox -> "executing_outbox"
-
-let purpose_of_string = function
-  (* For backward compability:
-     "publish", "refute", "timeout" -> Operating
-     "add_messages" -> Batching
-     "cement" -> Cementing
-  *)
-  | "operating" | "publish" | "refute" | "timeout" -> Some Operating
-  | "batching" | "add_messages" -> Some Batching
-  | "cementing" | "cement" -> Some Cementing
-  | "recovering" -> Some Recovering
-  | "executing_outbox" -> Some Executing_outbox
-  | _ -> None
-
-let purpose_of_string_exn s =
-  match purpose_of_string s with
-  | Some p -> p
-  | None -> invalid_arg ("purpose_of_string " ^ s)
-
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
 let history_mode_of_string = function
   | "archive" -> Archive
   | "full" -> Full
   | s -> invalid_arg ("history_mode_of_string " ^ s)
-
-let make_purpose_map ~default bindings =
-  let map = Operator_purpose_map.of_seq @@ List.to_seq bindings in
-  match default with
-  | None -> map
-  | Some default ->
-      List.fold_left
-        (fun map purpose ->
-          Operator_purpose_map.update purpose (fun _ -> Some default) map)
-        map
-        purposes
-
-let operator_purpose_map_encoding value_encoding =
-  let open Data_encoding in
-  conv
-    Operator_purpose_map.bindings
-    (fun l -> List.to_seq l |> Operator_purpose_map.of_seq)
-    (Utils.dictionary_encoding
-       ~keys:purposes
-       ~string_of_key:string_of_purpose
-       ~key_of_string:purpose_of_string_exn
-       ~value_encoding)
-
-let operators_encoding =
-  operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
 
 let modes =
   [
@@ -619,7 +528,7 @@ let encoding : t Data_encoding.t =
              "smart-rollup-node-operator"
              ~description:
                "Operators that sign operations of the smart rollup, by purpose"
-             operators_encoding)
+             Purpose.operators_encoding)
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
           (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
           (opt "metrics-addr" ~description:"Metrics address" string)
@@ -666,30 +575,10 @@ let encoding : t Data_encoding.t =
              (dft "history-mode" history_mode_encoding default_history_mode)
              (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
 
-(* For each purpose, it returns a list of associated operation kinds *)
-let operation_kinds_of_purpose : purpose -> Operation_kind.t list = function
-  | Batching -> [Add_messages]
-  | Cementing -> [Cement]
-  | Operating -> [Publish; Refute; Timeout]
-  | Recovering -> [Recover]
-  | Executing_outbox -> [Execute_outbox_message]
-
-(* Maps a list of operation kinds to their corresponding purposes,
-   based on their presence in the input list. *)
-let purposes_of_operation_kinds (operation_kinds : Operation_kind.t list) :
-    purpose list =
-  List.filter
-    (fun purpose ->
-      let expected_operation_kinds = operation_kinds_of_purpose purpose in
-      List.exists
-        (fun kind -> List.mem ~equal:Stdlib.( = ) kind expected_operation_kinds)
-        operation_kinds)
-    purposes
-
 (** Maps a mode to their corresponding purposes. The Custom mode
     returns each purposes where it has at least one operation kind
     from (i.e. {!purposes_of_operation_kinds}). *)
-let purposes_of_mode mode =
+let purposes_of_mode mode : Purpose.t list =
   match mode with
   | Observer -> []
   | Batcher -> [Batching]
@@ -697,41 +586,17 @@ let purposes_of_mode mode =
   | Bailout -> [Operating; Cementing; Recovering]
   | Maintenance -> [Operating; Cementing; Executing_outbox]
   | Operator -> [Operating; Cementing; Executing_outbox; Batching]
-  | Custom op_kinds -> purposes_of_operation_kinds op_kinds
+  | Custom op_kinds -> Purpose.of_operation_kind op_kinds
 
 let operation_kinds_of_mode mode =
   match mode with
   | Custom op_kinds -> op_kinds
   | _ ->
       let purposes = purposes_of_mode mode in
-      List.map operation_kinds_of_purpose purposes |> List.flatten
+      List.map Purpose.operation_kind purposes |> List.flatten
 
-let check_mode config =
-  let open Result_syntax in
-  let check_purposes purposes =
-    let missing_operators =
-      List.filter
-        (fun p -> not (Operator_purpose_map.mem p config.operators))
-        purposes
-    in
-    if missing_operators <> [] then
-      let mode = string_of_mode config.mode in
-      let missing_operators = List.map string_of_purpose missing_operators in
-      tzfail (Missing_mode_operators {mode; missing_operators})
-    else return_unit
-  in
-  let narrow_purposes purposes =
-    let* () = check_purposes purposes in
-    let operators =
-      Operator_purpose_map.filter
-        (fun op_purpose _ -> List.mem ~equal:Stdlib.( = ) op_purpose purposes)
-        config.operators
-    in
-    return {config with operators}
-  in
-  match config.mode with
-  | Custom [] -> tzfail Empty_operation_kinds_for_custom_mode
-  | _ as mode -> narrow_purposes (purposes_of_mode mode)
+let check_custom_mode mode =
+  error_when (mode = Custom []) Empty_operation_kinds_for_custom_mode
 
 let can_inject mode (op_kind : Operation_kind.t) =
   let allowed_operations = operation_kinds_of_mode mode in
@@ -778,21 +643,18 @@ let load ~data_dir =
   config
 
 module Cli = struct
-  let make_operators operators =
-    let purposed_operators, default_operators =
-      List.partition_map
-        (function
-          | `Purpose p_operator -> Left p_operator
-          | `Default operator -> Right operator)
-        operators
-    in
-    let default_operator =
-      match default_operators with
-      | [] -> None
-      | [default_operator] -> Some default_operator
-      | _ -> Stdlib.failwith "Multiple default operators"
-    in
-    make_purpose_map purposed_operators ~default:default_operator
+  let get_purposed_and_default_operators operators =
+    let open Result_syntax in
+    List.fold_left_e
+      (fun (purposed_operator, default_operator_opt) -> function
+        | `Purpose p_operator ->
+            return (p_operator :: purposed_operator, default_operator_opt)
+        | `Default operator ->
+            if Option.is_none default_operator_opt then
+              return (purposed_operator, Some operator)
+            else tzfail (error_of_fmt "Multiple default operators"))
+      ([], None)
+      operators
 
   let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
       ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
@@ -800,61 +662,68 @@ module Cli = struct
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
       ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers =
-    let operators = make_operators operators in
-    let config =
-      {
-        sc_rollup_address;
-        boot_sector_file;
-        operators;
-        rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
-        rpc_port = Option.value ~default:default_rpc_port rpc_port;
-        reconnection_delay =
-          Option.value ~default:default_reconnection_delay reconnection_delay;
-        dal_node_endpoint;
-        dac_observer_endpoint;
-        dac_timeout;
-        metrics_addr;
-        fee_parameters = Operation_kind.Map.empty;
-        mode;
-        loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
-        batcher = default_batcher;
-        injector =
-          {
-            retention_period =
-              Option.value
-                ~default:default_injector.retention_period
-                injector_retention_period;
-            attempts =
-              Option.value ~default:default_injector.attempts injector_attempts;
-            injection_ttl =
-              Option.value ~default:default_injector.injection_ttl injection_ttl;
-          };
-        l1_blocks_cache_size = default_l1_blocks_cache_size;
-        l2_blocks_cache_size = default_l2_blocks_cache_size;
-        prefetch_blocks = None;
-        index_buffer_size;
-        irmin_cache_size;
-        log_kernel_debug;
-        no_degraded;
-        gc_parameters =
-          {
-            frequency_in_blocks =
-              Option.value
-                ~default:default_gc_parameters.frequency_in_blocks
-                gc_frequency;
-          };
-        history_mode = Option.value ~default:default_history_mode history_mode;
-        cors =
-          Resto_cohttp.Cors.
-            {
-              allowed_headers =
-                Option.value ~default:default.allowed_headers allowed_headers;
-              allowed_origins =
-                Option.value ~default:default.allowed_origins allowed_origins;
-            };
-      }
+    let open Result_syntax in
+    let* purposed_operator, default_operator =
+      get_purposed_and_default_operators operators
     in
-    check_mode config
+    let* operators =
+      Purpose.make_operator
+        ?default_operator
+        ~needed_purposes:(purposes_of_mode mode)
+        purposed_operator
+    in
+    let+ () = check_custom_mode mode in
+    {
+      sc_rollup_address;
+      boot_sector_file;
+      operators;
+      rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
+      rpc_port = Option.value ~default:default_rpc_port rpc_port;
+      reconnection_delay =
+        Option.value ~default:default_reconnection_delay reconnection_delay;
+      dal_node_endpoint;
+      dac_observer_endpoint;
+      dac_timeout;
+      metrics_addr;
+      fee_parameters = Operation_kind.Map.empty;
+      mode;
+      loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
+      batcher = default_batcher;
+      injector =
+        {
+          retention_period =
+            Option.value
+              ~default:default_injector.retention_period
+              injector_retention_period;
+          attempts =
+            Option.value ~default:default_injector.attempts injector_attempts;
+          injection_ttl =
+            Option.value ~default:default_injector.injection_ttl injection_ttl;
+        };
+      l1_blocks_cache_size = default_l1_blocks_cache_size;
+      l2_blocks_cache_size = default_l2_blocks_cache_size;
+      prefetch_blocks = None;
+      index_buffer_size;
+      irmin_cache_size;
+      log_kernel_debug;
+      no_degraded;
+      gc_parameters =
+        {
+          frequency_in_blocks =
+            Option.value
+              ~default:default_gc_parameters.frequency_in_blocks
+              gc_frequency;
+        };
+      history_mode = Option.value ~default:default_history_mode history_mode;
+      cors =
+        Resto_cohttp.Cors.
+          {
+            allowed_headers =
+              Option.value ~default:default.allowed_headers allowed_headers;
+            allowed_origins =
+              Option.value ~default:default.allowed_origins allowed_origins;
+          };
+    }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
       ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
@@ -863,16 +732,20 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
       ~allowed_origins ~allowed_headers =
-    let new_operators = make_operators operators in
-    (* Merge operators *)
-    let operators =
-      Operator_purpose_map.merge
-        (fun _purpose -> Option.either)
-        new_operators
+    let open Result_syntax in
+    let mode = Option.value ~default:configuration.mode mode in
+    let* () = check_custom_mode mode in
+    let* purposed_operator, default_operator =
+      get_purposed_and_default_operators operators
+    in
+    let* operators =
+      Purpose.replace_operator
+        ?default_operator
+        ~needed_purposes:(purposes_of_mode mode)
+        purposed_operator
         configuration.operators
     in
-
-    let configuration =
+    return
       {
         configuration with
         sc_rollup_address =
@@ -882,7 +755,7 @@ module Cli = struct
         boot_sector_file =
           Option.either boot_sector_file configuration.boot_sector_file;
         operators;
-        mode = Option.value ~default:configuration.mode mode;
+        mode;
         rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
         rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
         dal_node_endpoint =
@@ -937,8 +810,6 @@ module Cli = struct
                   allowed_origins;
             };
       }
-    in
-    check_mode configuration
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
       ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint

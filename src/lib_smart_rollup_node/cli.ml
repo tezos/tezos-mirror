@@ -48,7 +48,7 @@ let operator_param next =
   let open Lwt_result_syntax in
   let format_purpose_list purposes =
     let pp_purpose fmt purpose =
-      Format.pp_print_string fmt (Configuration.string_of_purpose purpose)
+      Format.pp_print_string fmt (Purpose.to_string purpose)
     in
     Format.asprintf
       "Public key hash, or alias, of a smart rollup node operator. An operator \
@@ -60,7 +60,7 @@ let operator_param next =
   in
   Tezos_clic.param
     ~name:"operator"
-    ~desc:(format_purpose_list Configuration.purposes)
+    ~desc:(format_purpose_list Purpose.all)
     ( Tezos_clic.parameter @@ fun cctxt s ->
       let parse_pkh s =
         let from_alias s = Client_keys.Public_key_hash.find cctxt s in
@@ -79,7 +79,7 @@ let operator_param next =
           let+ pkh = parse_pkh s in
           `Default pkh
       | [purpose; operator_s] -> (
-          match Configuration.purpose_of_string purpose with
+          match Purpose.of_string purpose with
           | Some purpose ->
               let+ pkh = parse_pkh operator_s in
               `Purpose (purpose, pkh)
