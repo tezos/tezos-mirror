@@ -71,6 +71,29 @@ module GS = struct
     in
     (info, collect)
 
+  let labeled_metric ~help ~name ~label_name collectors =
+    let info =
+      {
+        Prometheus.MetricInfo.name =
+          Prometheus.MetricName.v
+            (String.concat "_" [namespace; subsystem; name]);
+        help;
+        metric_type = Gauge;
+        label_names = [Prometheus.LabelName.v label_name];
+      }
+    in
+    let collect () =
+      List.fold_left
+        (fun acc (label, value) ->
+          Prometheus.LabelSetMap.add
+            [label]
+            [Prometheus.Sample_set.sample value]
+            acc)
+        Prometheus.LabelSetMap.empty
+        (collectors ())
+    in
+    (info, collect)
+
   let add_metric (info, collector) =
     Prometheus.CollectorRegistry.(register default) info collector
 
@@ -83,6 +106,15 @@ module GS = struct
 
     let app_output_stream_length = ref 0
 
+    let count_peers_per_topic = ref []
+
+    let topic_as_label Types.Topic.{pkh; slot_index} =
+      Format.asprintf
+        "topic__pkh-%a__slot_index-%d }"
+        Signature.Public_key_hash.pp
+        pkh
+        slot_index
+
     let set gs_worker =
       let module W = Gossipsub.Worker in
       gs_stats := W.stats gs_worker ;
@@ -91,7 +123,15 @@ module GS = struct
       p2p_output_streams_length :=
         W.p2p_output_stream gs_worker |> W.Stream.length ;
       app_output_stream_length :=
-        W.app_output_stream gs_worker |> W.Stream.length
+        W.app_output_stream gs_worker |> W.Stream.length ;
+      let gs_state = W.state gs_worker in
+      count_peers_per_topic :=
+        W.GS.Topic.Map.fold
+          (fun topic peers accu ->
+            (topic_as_label topic, W.GS.Peer.Set.cardinal peers |> float)
+            :: accu)
+          gs_state.mesh
+          []
   end
 
   (* Metrics about the stats gathered by the worker *)
@@ -216,6 +256,17 @@ module GS = struct
          application output stream"
       (fun () -> float !Stats.app_output_stream_length)
 
+  (* Labeled Metrics for the gossipsub automaton's state *)
+
+  let count_peers_per_topic =
+    labeled_metric
+      ~name:"count_peers_per_topic"
+      ~help:
+        "The number of peers the node is connected to per topic in the \
+         mesh"
+      ~label_name:"count_peers_per_topic"
+      (fun () -> !Stats.count_peers_per_topic)
+
   let metrics =
     [
       (* Metrics about the stats gathered by the worker *)
@@ -238,6 +289,8 @@ module GS = struct
       input_events_stream_length;
       p2p_output_streams_length;
       app_output_stream_length;
+      (* Other metrics about GS automaton's state *)
+      count_peers_per_topic;
     ]
 
   let () = List.iter add_metric metrics
