@@ -16,7 +16,6 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
-use crate::block_in_progress::BlockInProgress;
 use crate::error::{Error, StorageError};
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::block::L2Block;
@@ -814,47 +813,6 @@ pub fn store_kernel_version<Host: Runtime>(
         .map_err(Error::from)
 }
 
-pub fn store_block_in_progress<Host: Runtime>(
-    host: &mut Host,
-    block: &BlockInProgress,
-) -> Result<(), anyhow::Error> {
-    let bytes: &[u8] = &block.rlp_bytes();
-    log!(
-        host,
-        Debug,
-        "Storing Block in Progress of size {}",
-        bytes.len()
-    );
-    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, bytes)
-        .context("Failed to store BlockInProgress")
-}
-
-pub fn read_block_in_progress<Host: Runtime>(
-    host: &mut Host,
-) -> Result<BlockInProgress, anyhow::Error> {
-    let bytes = host
-        .store_read_all(&EVM_BLOCK_IN_PROGRESS)
-        .context("Failed to read stored BlockInProgress")?;
-    log!(
-        host,
-        Debug,
-        "Reading Block in Progress of size {}",
-        bytes.len()
-    );
-    let decoder = Rlp::new(bytes.as_slice());
-    BlockInProgress::decode(&decoder).context("Failed to decode stored BlockInProgress")
-}
-
-pub fn delete_block_in_progress<Host: Runtime>(
-    host: &mut Host,
-) -> Result<(), anyhow::Error> {
-    if host.store_read(&REBOOTED, 0, 0).is_ok() {
-        host.store_delete(&EVM_BLOCK_IN_PROGRESS)
-            .context("Failed to delete Block in progress")?
-    }
-    Ok(())
-}
-
 pub fn add_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     host.store_write(&REBOOTED, &[1], 0)
         .context("Failed to set reboot flag")
@@ -874,7 +832,9 @@ pub fn store_queue<Host: Runtime>(
     queue: &Queue,
 ) -> Result<(), anyhow::Error> {
     let queue_path = OwnedPath::from(QUEUE_IN_PROGRESS);
-    host.store_write_all(&queue_path, &queue.rlp_bytes())
+    let bytes = &queue.rlp_bytes();
+    log!(host, Debug, "Storing Queue of size {}", bytes.len());
+    host.store_write_all(&queue_path, bytes)
         .context("Failed to store current queue")
 }
 
@@ -883,6 +843,7 @@ pub fn read_queue<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error
     let bytes = host
         .store_read_all(&queue_path)
         .context("Failed to read current queue")?;
+    log!(host, Debug, "Reading Queue of size {}", bytes.len());
     let decoder = Rlp::new(bytes.as_slice());
     Queue::decode(&decoder).context("Failed to decode current queue")
 }
