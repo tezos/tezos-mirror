@@ -220,6 +220,11 @@ let preprocess_multiple_multi_reveals t =
      [l = t.shard_length] here). *)
   assert (t.max_polynomial_length mod t.shard_length = 0) ;
   let domain_length = 2 * t.max_polynomial_length / t.shard_length in
+  (* The length of the discrete Fourier transforms is a power of two,
+     though we could relax the constraints to a product of primes dividing
+     the order of the group G1 thanks to the Prime Factorization Algorithm
+     as we currently do with the FFTs on scalar elements. *)
+  assert (domain_length <> 0 && domain_length land (domain_length - 1) = 0) ;
   let domain = Domain.build domain_length in
   (* Computes
      points = srs_{m-j-l} srs_{m-j-2l} srs_{m-j-3l} ... srs_{m-j-ql=r}

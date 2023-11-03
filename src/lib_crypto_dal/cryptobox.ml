@@ -428,19 +428,45 @@ module Inner = struct
             max_polynomial_length
             srs_g1_length)
     in
+    let* () =
+      assert_result
+        (let shard_length =
+           erasure_encoded_polynomial_length / number_of_shards
+         in
+         let srs_g2_expected_length =
+           max max_polynomial_length shard_length + 1
+         in
+         srs_g2_expected_length <= srs_g2_length)
+        (fun () ->
+          Format.asprintf
+            "SRS on G2 size is too small. Expected more than %d. Got %d"
+            max_polynomial_length
+            srs_g2_length)
+    in
+    let domain_length = 2 * max_polynomial_length / shard_length in
+    let* () =
+      assert_result
+        ((1 lsl Z.(log2 (of_int domain_length))) = domain_length)
+        (* The computation of shard proofs further require the domain_length to
+           be a power of two for correct FFT sizing, even though we could relax
+           the constraint to a product of primes dividing the order of the group
+           G1 thanks to the Prime Factorization Algorithm, as we currently do with
+           the FFTs on scalar elements, if the need arises. *)
+          (fun () ->
+          Format.asprintf
+            "The ratio (2 * number of shards / redundancy factor) must be a \
+             power of two. Got 2 * %d / %d = %d"
+            number_of_shards
+            redundancy_factor
+            domain_length)
+    in
     assert_result
-      (let shard_length =
-         erasure_encoded_polynomial_length / number_of_shards
-       in
-       let srs_g2_expected_length =
-         max max_polynomial_length shard_length + 1
-       in
-       srs_g2_expected_length <= srs_g2_length)
+      (max_polynomial_length mod shard_length = 0)
       (fun () ->
         Format.asprintf
-          "SRS on G2 size is too small. Expected more than %d. Got %d"
+          "The length of a shard must divide %d. Got %d"
           max_polynomial_length
-          srs_g2_length)
+          shard_length)
 
   type parameters = Dal_config.parameters = {
     redundancy_factor : int;
