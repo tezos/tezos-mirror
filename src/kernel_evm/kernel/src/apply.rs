@@ -23,9 +23,9 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_OUTPUT_SIZE;
 use tezos_smart_rollup_encoding::contract::Contract;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
-use tezos_smart_rollup_encoding::michelson::ticket::UnitTicket;
+use tezos_smart_rollup_encoding::michelson::ticket::{FA2_1Ticket, Ticket};
 use tezos_smart_rollup_encoding::michelson::{
-    MichelsonContract, MichelsonPair, MichelsonUnit,
+    MichelsonContract, MichelsonOption, MichelsonPair,
 };
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_encoding::outbox::OutboxMessageTransaction;
@@ -411,8 +411,12 @@ fn post_withdrawals<Host: Runtime>(
             return Err(Error::InvalidConversion);
         };
 
-        let ticket = UnitTicket::new(destination.clone(), MichelsonUnit, amount)?;
-        let parameters = MichelsonPair::<MichelsonContract, UnitTicket>(
+        let ticket: FA2_1Ticket = Ticket::new(
+            destination.clone(),
+            MichelsonPair(0.into(), MichelsonOption(None)),
+            amount,
+        )?;
+        let parameters = MichelsonPair::<MichelsonContract, FA2_1Ticket>(
             MichelsonContract(withdrawal.target.clone()),
             ticket,
         );

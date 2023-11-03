@@ -1,5 +1,5 @@
 { parameter
-    (or (ticket %callback unit)
+    (or (ticket %callback (pair nat (option bytes)))
         (pair %deposit (address %evm_address) (bytes %l2_address))) ;
   storage
     (pair (address %exchanger)
@@ -11,7 +11,7 @@
              SWAP ;
              IF_NONE { PUSH string "Callback on non-locked deposit" ; FAILWITH } {} ;
              UNPAIR ;
-             CONTRACT (or (or (pair bytes (ticket unit)) bytes) bytes) ;
+             CONTRACT (or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes) ;
              IF_NONE { PUSH string "Invalid rollup address" ; FAILWITH } {} ;
              PUSH mutez 0 ;
              DIG 4 ;

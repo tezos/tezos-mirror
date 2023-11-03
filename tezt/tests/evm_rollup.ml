@@ -37,7 +37,8 @@ open Sc_rollup_helpers
 
 let pvm_kind = "wasm_2_0_0"
 
-let evm_type = "or (or (pair bytes (ticket unit)) bytes) bytes"
+let evm_type =
+  "or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes"
 
 let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
 
