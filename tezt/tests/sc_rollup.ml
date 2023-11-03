@@ -5066,6 +5066,116 @@ let custom_mode_empty_operation_kinds ~kind =
     ~exit_code:1
     ~msg:(rex "Operation kinds for custom mode are empty.")
 
+(* adds multiple batcher keys for a rollup node runs in batcher mode
+   and make sure all keys are used to sign batches and injected in a
+   block. *)
+let test_multiple_batcher_key ~kind =
+  test_l1_scenario
+    ~kind
+    {
+      variant = None;
+      tags = ["node"; "mode"; "batcher"];
+      description = "multiple keys set for batcher";
+    }
+  @@ fun protocol sc_rollup tezos_node client ->
+  (* nb_of_batcher * msg_per_batch * msg_size = expected_block_size
+     16 * 8 * 4000 = 512000
+     16 * 8 * 4095 = 524160 *)
+  let nb_of_batcher = 16 in
+  let msg_per_batch = 8 in
+  let msg_size = 4000 in
+  let* operators, multiple_transfers_json_batch =
+    let str_amount = Tez.to_string (Tez.of_int 1000) in
+    fold nb_of_batcher ([], []) (fun _i (keys, json_batch_dest) ->
+        let* key = Client.gen_and_show_keys client in
+        let json_batch_dest =
+          `O
+            [("destination", `String key.alias); ("amount", `String str_amount)]
+          :: json_batch_dest
+        in
+        let keys = (Sc_rollup_node.Batching, key.public_key_hash) :: keys in
+        return (keys, json_batch_dest))
+  in
+  let*! () =
+    Client.multiple_transfers
+      ~giver:Constant.bootstrap1.alias
+      ~json_batch:(JSON.encode_u (`A multiple_transfers_json_batch))
+      ~burn_cap:(Tez.of_int 2)
+      client
+  in
+  let* _ = Client.bake_for_and_wait client in
+  let* sc_rollup_node, sc_rollup_client, _sc_rollup =
+    setup_rollup
+      ~protocol
+      ~parameters_ty:"string"
+      ~kind
+      ~mode:Batcher
+      ~operators
+      ~sc_rollup
+      tezos_node
+      client
+  in
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
+  let batch () =
+    let msg_cpt = ref 0 in
+    (* create batch with different payloads so the logs show
+       differents messages. *)
+    List.init msg_per_batch (fun _ ->
+        msg_cpt := !msg_cpt + 1 ;
+        String.make msg_size @@ Char.chr (97 + !msg_cpt))
+  in
+  let* _hashes =
+    Lwt.all @@ List.init nb_of_batcher
+    @@ fun _ ->
+    Runnable.run @@ Sc_rollup_client.inject sc_rollup_client (batch ())
+  in
+  let* _ = Client.bake_for_and_wait client
+  and* () =
+    let nb_injected = ref 0 in
+    Sc_rollup_node.wait_for sc_rollup_node "injected_ops.v0" @@ fun _json ->
+    nb_injected := !nb_injected + 1 ;
+    if !nb_injected >= nb_of_batcher then Some () else None
+  in
+  let* block =
+    let event_name = "included.v0" in
+    bake_until_event ~event_name ~timeout:30. client
+    @@ Sc_rollup_node.wait_for sc_rollup_node event_name
+    @@ fun json -> Some JSON.(json |-> "block" |> as_string)
+  in
+  let* block_operations_json =
+    Node.RPC.call tezos_node @@ RPC.get_chain_block_operations ~block ()
+  in
+  let check_msgs_nb_and_return_pkhs pkhs op_json =
+    let contents_list = JSON.(op_json |-> "contents" |> as_list) in
+    let src =
+      List.find_map
+        (fun contents ->
+          let kind = JSON.(contents |-> "kind" |> as_string) in
+          if kind = "smart_rollup_add_messages" then (
+            let nb_msgs =
+              JSON.(contents |-> "message" |> as_list |> List.length)
+            in
+            Check.(nb_msgs = msg_per_batch)
+              Check.int
+              ~error_msg:"%L found where %R were expected" ;
+            let src = JSON.(contents |-> "source" |> as_string) in
+            Some src)
+          else None)
+        contents_list
+    in
+    match src with Some src -> src :: pkhs | None -> pkhs
+  in
+  let manager_ops = JSON.(block_operations_json |=> 3 |> as_list) in
+  let pkhs = List.fold_left check_msgs_nb_and_return_pkhs [] manager_ops in
+  Check.(
+    List.sort String.compare pkhs
+    = List.sort String.compare (List.map snd operators))
+    Check.(list string)
+    ~error_msg:"%L found where %R were expected" ;
+  unit
+
 let register_riscv () =
   test_rollup_node_boots_into_initial_state [Protocol.Alpha] ~kind:"riscv" ;
   test_commitment_scenario
@@ -5224,6 +5334,7 @@ let register ~kind ~protocols =
   bailout_mode_fail_operator_no_stake ~kind protocols ;
   bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
   custom_mode_empty_operation_kinds ~kind protocols ;
+  test_multiple_batcher_key ~kind protocols ;
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.
