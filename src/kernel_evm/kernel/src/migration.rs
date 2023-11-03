@@ -444,7 +444,6 @@ fn migrate_one_receipt<Host: Runtime>(
 ) -> Result<(), Error> {
     let path = receipt_path(receipt_hash)?;
     let bytes = host.store_read_all(&path)?;
-    host.store_delete(&path)?;
     // Read old receipt
     let old_receipt = OldTransactionReceipt::from_rlp_bytes(&bytes)?;
     let new_receipt = TransactionReceipt {
@@ -463,6 +462,7 @@ fn migrate_one_receipt<Host: Runtime>(
         status: old_receipt.status,
     };
     // Write new receipt
+    host.store_delete(&path)?;
     store_rlp(&new_receipt, host, &path)
 }
 
@@ -472,7 +472,6 @@ fn migrate_one_object<Host: Runtime>(
 ) -> Result<(), Error> {
     let path = object_path(tx_hash)?;
     let bytes = host.store_read_all(&path)?;
-    host.store_delete(&path)?;
     // Read old object
     let old_object = OldTransactionObject::from_rlp_bytes(&bytes)?;
     let new_receipt = TransactionObject {
@@ -489,6 +488,7 @@ fn migrate_one_object<Host: Runtime>(
         signature: old_object.signature,
     };
     // Write new receipt
+    host.store_delete(&path)?;
     store_rlp(&new_receipt, host, &path)
 }
 
