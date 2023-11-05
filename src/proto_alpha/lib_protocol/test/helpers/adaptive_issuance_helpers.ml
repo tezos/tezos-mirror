@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let join_errors e1 e2 =
+  let open Lwt_result_syntax in
+  match (e1, e2) with
+  | Ok (), Ok () -> return_unit
+  | Error e, Ok () | Ok (), Error e -> fail e
+  | Error e1, Error e2 -> fail (e1 @ e2)
+
 (** Tez manipulation module *)
 module Tez = struct
   include Protocol.Alpha_context.Tez
@@ -503,7 +510,7 @@ let balance_update_pp fmt
     Z.pp_print
     b_staking_delegate_denominator_b
 
-let assert_balance_equal ~loc
+let assert_balance_equal ~loc account_name
     {
       liquid_b = a_liquid_b;
       bonds_b = a_bonds_b;
@@ -523,34 +530,65 @@ let assert_balance_equal ~loc
       staking_delegate_denominator_b = b_staking_delegate_denominator_b;
     } =
   let open Lwt_result_syntax in
-  let* () = Assert.equal_tez ~loc a_liquid_b b_liquid_b in
-  let* () = Assert.equal_tez ~loc a_bonds_b b_bonds_b in
+  let f s = Format.asprintf "%s: %s" account_name s in
   let* () =
-    Assert.equal_tez
-      ~loc
-      (Partial_tez.to_tez a_staked_b)
-      (Partial_tez.to_tez b_staked_b)
-  in
-  let* () =
-    Assert.equal_tez
-      ~loc
-      (Partial_tez.to_tez a_unstaked_frozen_b)
-      (Partial_tez.to_tez b_unstaked_frozen_b)
-  in
-  let* () =
-    Assert.equal_tez ~loc a_unstaked_finalizable_b b_unstaked_finalizable_b
-  in
-  let* () =
-    Assert.equal_z
-      ~loc
-      a_staking_delegator_numerator_b
-      b_staking_delegator_numerator_b
-  in
-  let* () =
-    Assert.equal_z
-      ~loc
-      a_staking_delegate_denominator_b
-      b_staking_delegate_denominator_b
+    List.fold_left
+      (fun a b ->
+        let*! a in
+        let*! b in
+        join_errors a b)
+      return_unit
+      [
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Liquid balances do not match")
+          Tez.pp
+          a_liquid_b
+          b_liquid_b;
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Bonds balances do not match")
+          Tez.pp
+          a_bonds_b
+          b_bonds_b;
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Staked balances do not match")
+          Tez.pp
+          (Partial_tez.to_tez ~round_up:false a_staked_b)
+          (Partial_tez.to_tez ~round_up:false b_staked_b);
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Unstaked frozen balances do not match")
+          Tez.pp
+          (Partial_tez.to_tez ~round_up:false a_unstaked_frozen_b)
+          (Partial_tez.to_tez ~round_up:false b_unstaked_frozen_b);
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Unstaked finalizable balances do not match")
+          Tez.pp
+          a_unstaked_finalizable_b
+          b_unstaked_finalizable_b;
+        Assert.equal
+          ~loc
+          Z.equal
+          (f "Staking delegator numerators do not match")
+          Z.pp_print
+          a_staking_delegator_numerator_b
+          b_staking_delegator_numerator_b;
+        Assert.equal
+          ~loc
+          Z.equal
+          (f "Staking delegate denominators do not match")
+          Z.pp_print
+          a_staking_delegate_denominator_b
+          b_staking_delegate_denominator_b;
+      ]
   in
   return_unit
 
@@ -833,9 +871,17 @@ let assert_balance_check ~loc ctxt account_name account_map =
       let balance, total_balance =
         balance_and_total_balance_of_account account_name account_map
       in
-      let* () = assert_balance_equal ~loc balance_ctxt balance in
-      let* () = Assert.equal_tez ~loc total_balance_ctxt total_balance in
-      return_unit
+      let*! r1 = assert_balance_equal ~loc account_name balance_ctxt balance in
+      let*! r2 =
+        Assert.equal
+          ~loc
+          Tez.equal
+          (Format.asprintf "%s : Total balances do not match" account_name)
+          Tez.pp
+          total_balance_ctxt
+          total_balance
+      in
+      join_errors r1 r2
 
 let get_launch_cycle ~loc blk =
   let open Lwt_result_syntax in
