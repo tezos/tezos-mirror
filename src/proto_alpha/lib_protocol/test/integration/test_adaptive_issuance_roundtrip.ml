@@ -1025,7 +1025,13 @@ let begin_test ~activate_ai ?(burn_rewards = false)
           ~when_different_lengths:[Inconsistent_number_of_bootstrap_accounts]
           (fun account_map name contract ->
             let liquid = Tez.(Account.default_initial_balance -! init_staked) in
-            let frozen_deposits = Frozen_tez.init init_staked name in
+            let frozen_deposits = Frozen_tez.init init_staked name name in
+            let frozen_rights =
+              List.fold_left
+                (fun map cycle -> CycleMap.add cycle init_staked map)
+                CycleMap.empty
+                Cycle.(root ---> add root constants.preserved_cycles)
+            in
             let pkh = Context.Contract.pkh contract in
             let account =
               init_account
@@ -1035,6 +1041,7 @@ let begin_test ~activate_ai ?(burn_rewards = false)
                 ~parameters:default_params
                 ~liquid
                 ~frozen_deposits
+                ~frozen_rights
                 ()
             in
             let account_map = String.Map.add name account account_map in
