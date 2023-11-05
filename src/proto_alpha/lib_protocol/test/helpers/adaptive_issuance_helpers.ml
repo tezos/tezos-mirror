@@ -94,7 +94,6 @@ module Cycle = Protocol.Alpha_context.Cycle
 (** [Frozen_tez] represents frozen stake and frozen unstaked funds.
     Properties:
     - sum of all current partial tez is an integer
-    - slashing is always a portion of initial
     - Can only add integer amounts
     - Can always subtract integer amount (if lower than frozen amount)
     - If subtracting partial amount, must be the whole frozen amount (for given contract).
@@ -104,105 +103,157 @@ module Cycle = Protocol.Alpha_context.Cycle
 module Frozen_tez = struct
   (* The map in current maps the stakers' name with their staked value.
      It contains only delegators of the delegate which owns the frozen tez *)
-  type t = {initial : Tez.t; current : Partial_tez.t String.Map.t}
+  type t = {
+    delegate : string;
+    initial : Tez.t;
+    self_current : Tez.t;
+    co_current : Partial_tez.t String.Map.t;
+  }
 
-  let zero = {initial = Tez.zero; current = String.Map.empty}
-
-  let init amount account =
+  let zero =
     {
-      initial = amount;
-      current = String.Map.singleton account (Partial_tez.of_tez amount);
+      delegate = "";
+      initial = Tez.zero;
+      self_current = Tez.zero;
+      co_current = String.Map.empty;
+    }
+
+  let init amount account delegate =
+    if account = delegate then
+      {
+        delegate;
+        initial = amount;
+        self_current = amount;
+        co_current = String.Map.empty;
+      }
+    else
+      {
+        delegate;
+        initial = amount;
+        self_current = Tez.zero;
+        co_current = String.Map.singleton account (Partial_tez.of_tez amount);
+      }
+
+  let union a b =
+    assert (a.delegate = b.delegate) ;
+    {
+      delegate = a.delegate;
+      initial = Tez.(a.initial +! b.initial);
+      self_current = Tez.(a.self_current +! b.self_current);
+      co_current =
+        String.Map.union
+          (fun _ x y -> Some Partial_tez.(x + y))
+          a.co_current
+          b.co_current;
     }
 
   let get account frozen_tez =
-    match String.Map.find account frozen_tez.current with
-    | None -> Partial_tez.zero
-    | Some p -> p
+    if account = frozen_tez.delegate then
+      Partial_tez.of_tez frozen_tez.self_current
+    else
+      match String.Map.find account frozen_tez.co_current with
+      | None -> Partial_tez.zero
+      | Some p -> p
 
-  let union a b =
-    {
-      initial = Tez.(a.initial +! b.initial);
-      current =
-        String.Map.union
-          (fun _ x y -> Some Partial_tez.(x + y))
-          a.current
-          b.current;
-    }
-
-  let total_current_q current =
+  let total_co_current_q co_current =
     String.Map.fold
       (fun _ x acc -> Partial_tez.(x + acc))
-      current
+      co_current
       Partial_tez.zero
 
   let total_current a =
-    let r = total_current_q a.current in
+    let r = total_co_current_q a.co_current in
     let tez, rem = Partial_tez.to_tez_rem r in
     assert (Q.(equal rem zero)) ;
-    tez
+    Tez.(tez +! a.self_current)
 
-  let add_q_to_all_current quantity current =
-    let s = total_current_q current in
+  let add_q_to_all_co_current quantity co_current =
+    let s = total_co_current_q co_current in
     let f p_amount =
       let q = Q.div p_amount s in
       Partial_tez.add p_amount (Q.mul quantity q)
     in
-    String.Map.map f current
+    String.Map.map f co_current
 
   (* For rewards, distribute equally *)
   let add_tez_to_all_current tez a =
-    let quantity = Partial_tez.of_tez tez in
-    let current = add_q_to_all_current quantity a.current in
-    {a with current}
+    let self_portion = Tez.ratio a.self_current (total_current a) in
+    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round_up:true in
+    let co_quantity = Partial_tez.of_tez Tez.(tez -! self_quantity) in
+    let co_current = add_q_to_all_co_current co_quantity a.co_current in
+    {a with co_current; self_current = Tez.(a.self_current +! self_quantity)}
 
   (* For slashing, slash equally *)
   let sub_tez_from_all_current tez a =
-    let s = total_current_q a.current in
-    if Partial_tez.(geq (of_tez tez) s) then {a with current = String.Map.empty}
+    let self_portion = Tez.ratio a.self_current (total_current a) in
+    let self_quantity =
+      Tez.mul_q tez self_portion |> Tez.of_q ~round_up:false
+    in
+    let self_current =
+      if Tez.(self_quantity >= a.self_current) then Tez.zero
+      else Tez.(a.self_current -! self_quantity)
+    in
+    let co_quantity = Tez.(tez -! self_quantity) in
+    let s = total_co_current_q a.co_current in
+    if Partial_tez.(geq (of_tez co_quantity) s) then
+      {a with self_current; co_current = String.Map.empty}
     else
       let f p_amount =
         let q = Q.div p_amount s in
-        Partial_tez.sub p_amount (Tez.mul_q tez q)
+        Partial_tez.sub p_amount (Tez.mul_q co_quantity q)
         (* > 0 *)
       in
-      {a with current = String.Map.map f a.current}
+      {a with self_current; co_current = String.Map.map f a.co_current}
 
   (* Adds frozen to account. Happens each stake in frozen deposits *)
   let add_current amount account a =
-    {
-      a with
-      current =
-        String.Map.update
-          account
-          (function
-            | None -> Some (Partial_tez.of_tez amount)
-            | Some q -> Some Partial_tez.(add q (of_tez amount)))
-          a.current;
-    }
+    if account = a.delegate then
+      {a with self_current = Tez.(a.self_current +! amount)}
+    else
+      {
+        a with
+        co_current =
+          String.Map.update
+            account
+            (function
+              | None -> Some (Partial_tez.of_tez amount)
+              | Some q -> Some Partial_tez.(add q (of_tez amount)))
+            a.co_current;
+      }
 
   (* Adds frozen to account. Happens each unstake to unstaked frozen deposits *)
-  let add_init amount account a = union a (init amount account)
+  let add_init amount account a = union a (init amount account a.delegate)
 
   (* Allows amount greater than current frozen amount.
      Happens each unstake in frozen deposits *)
   let sub_current amount account a =
-    match String.Map.find account a.current with
-    | None -> (a, Tez.zero)
-    | Some frozen ->
-        let amount_q = Partial_tez.of_tez amount in
-        if Q.(geq amount_q frozen) then
-          let removed, remainder = Partial_tez.to_tez_rem frozen in
-          let current = String.Map.remove account a.current in
-          let current = add_q_to_all_current remainder current in
-          ({a with current}, removed)
-        else
-          let current =
-            String.Map.add account Q.(frozen - amount_q) a.current
-          in
-          ({a with current}, amount)
+    if account = a.delegate then
+      let amount = Tez.min amount a.self_current in
+      ({a with self_current = Tez.(a.self_current -! amount)}, amount)
+    else
+      match String.Map.find account a.co_current with
+      | None -> (a, Tez.zero)
+      | Some frozen ->
+          let amount_q = Partial_tez.of_tez amount in
+          if Q.(geq amount_q frozen) then
+            let removed, remainder = Partial_tez.to_tez_rem frozen in
+            let co_current = String.Map.remove account a.co_current in
+            let co_current = add_q_to_all_co_current remainder co_current in
+            ({a with co_current}, removed)
+          else
+            let co_current =
+              String.Map.add account Q.(frozen - amount_q) a.co_current
+            in
+            ({a with co_current}, amount)
 
-  (* Refresh initial amount at beginning of cycle *)
-  let refresh_at_new_cycle a = {a with initial = total_current a}
+  let slash base_amount (pct : Protocol.Int_percentage.t) a =
+    let pct_times_100 = (pct :> int) in
+    let slashed_amount =
+      Tez.mul_q base_amount Q.(pct_times_100 // 100) |> Tez.of_q ~round_up:false
+    in
+    let total_current = total_current a in
+    let slashed_amount_final = Tez.min slashed_amount total_current in
+    (sub_tez_from_all_current slashed_amount a, slashed_amount_final)
 end
 
 (** Representation of Unstaked frozen deposits *)
@@ -226,7 +277,8 @@ module Unstaked_frozen = struct
 
   (* Happens each unstake operation *)
   let rec add_unstake cycle amount account = function
-    | [] -> [(cycle, Frozen_tez.init amount account)]
+    (* fun trick: use "" as delegate, because even the delegate has to share in ufd *)
+    | [] -> [(cycle, Frozen_tez.init amount account "")]
     | (c, a) :: t ->
         if Cycle.equal c cycle then
           (c, Frozen_tez.add_init amount account a) :: t
@@ -245,9 +297,18 @@ module Unstaked_frozen = struct
           let amount, rest = pop_cycle cycle t in
           (amount, (c, a) :: rest)
 
-  (* Refresh initial amount at beginning of cycle (unused) *)
-  let refresh_at_new_cycle l =
-    List.map (fun (c, t) -> (c, Frozen_tez.refresh_at_new_cycle t)) l
+  let slash ~preserved_cycles slashed_cycle pct_times_100 a =
+    List.map
+      (fun (c, frozen) ->
+        if Cycle.(c > slashed_cycle || add c preserved_cycles < slashed_cycle)
+        then ((c, frozen), Tez.zero)
+        else
+          let ufd, slashed =
+            Frozen_tez.slash frozen.Frozen_tez.initial pct_times_100 frozen
+          in
+          ((c, ufd), slashed))
+      a
+    |> List.split
 end
 
 (** Representation of unstaked finalizable tez *)
@@ -262,7 +323,9 @@ module Unstaked_finalizable = struct
   (* Called when unstaked frozen for some cycle becomes finalizable *)
   let add_from_frozen (frozen : Frozen_tez.t) {map; remainder} =
     let map_rounded_down =
-      String.Map.map (fun qt -> Partial_tez.to_tez qt) frozen.current
+      String.Map.map
+        (fun qt -> Partial_tez.to_tez ~round_up:false qt)
+        frozen.co_current
     in
     let map =
       String.Map.union (fun _ a b -> Some Tez.(a +! b)) map map_rounded_down
