@@ -922,8 +922,17 @@ let set_baker baker : (t, t) scenarios =
       let {pkh; _} = State.find_account baker state in
       return {state with State.baking_policy = Some (Block.By_account pkh)})
 
-(** Unsets the de facto baker, baking policy returns to default ([By round 0]) *)
-let unset_baker : (t, t) scenarios =
+(** Exclude a list of delegates from baking *)
+let exclude_bakers bakers : (t, t) scenarios =
+  exec_state (fun (_block, state) ->
+      let bakers_pkh =
+        List.map (fun baker -> (State.find_account baker state).pkh) bakers
+      in
+      return
+        {state with State.baking_policy = Some (Block.Excluding bakers_pkh)})
+
+(** Unsets the baking policy, it returns to default ([By_round 0]) *)
+let unset_baking_policy : (t, t) scenarios =
   exec_state (fun (_block, state) ->
       return {state with State.baking_policy = None})
 
@@ -1014,6 +1023,12 @@ let next_block =
   exec (fun input ->
       Log.info ~color:action_color "[Next block]" ;
       bake input)
+
+(** Bake a single block with a specific baker *)
+let next_block_with_baker baker =
+  exec (fun input ->
+      Log.info ~color:action_color "[Next block (baker %s)]" baker ;
+      bake ~baker input)
 
 (** Bake until the end of a cycle *)
 let next_cycle =
