@@ -73,14 +73,15 @@ let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
   let last_cycle_to_apply_slash = Cycle_repr.add from_cycle preserved_cycles in
   (* [slashing_history] is sorted so slashings always happen in the same order. *)
   List.fold_left
-    (fun amount (slashing_cycle, slashing_percentage) ->
+    (fun remain (slashing_cycle, slashing_percentage) ->
       if
         Cycle_repr.(
           slashing_cycle >= first_cycle_to_apply_slash
           && slashing_cycle <= last_cycle_to_apply_slash)
       then
-        Tez_repr.mul_percentage amount (Int_percentage.neg slashing_percentage)
-      else amount)
+        Tez_repr.(sub_opt remain (mul_percentage amount slashing_percentage))
+        |> Option.value ~default:Tez_repr.zero
+      else remain)
     amount
     slashing_history
 
