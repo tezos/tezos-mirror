@@ -51,7 +51,8 @@ module Tez = struct
 
   let of_z a = Z.to_int64 a |> of_mutez
 
-  let of_q a = Q.to_bigint a |> of_z
+  let of_q ~round_up Q.{num; den} =
+    (if round_up then Z.cdiv num den else Z.div num den) |> of_z
 
   let ratio num den =
     Q.make (Z.of_int64 (to_mutez num)) (Z.of_int64 (to_mutez den))
@@ -71,9 +72,7 @@ module Partial_tez = struct
     let tez, rem = Z.div_rem num den in
     (Tez.of_z tez, rem /// den)
 
-  let to_tez ?(round_up = false) a =
-    let tez, rem = to_tez_rem a in
-    if round_up && Q.(gt rem zero) then Tez.(tez +! one_mutez) else tez
+  let to_tez ~round_up = Tez.of_q ~round_up
 
   let get_rem a = snd (to_tez_rem a)
 
@@ -772,8 +771,8 @@ let balance_and_total_balance_of_account account_name account_map =
   ( balance,
     Tez.(
       liquid_b +! bonds_b
-      +! Partial_tez.to_tez staked_b
-      +! Partial_tez.to_tez unstaked_frozen_b
+      +! Partial_tez.to_tez ~round_up:false staked_b
+      +! Partial_tez.to_tez ~round_up:false unstaked_frozen_b
       +! unstaked_finalizable_b) )
 
 let get_balance_from_context ctxt contract =
