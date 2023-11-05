@@ -112,23 +112,6 @@ end
 
 open Log_module
 
-(** Double attestation helpers *)
-let order_attestations ~correct_order op1 op2 =
-  let oph1 = Protocol.Alpha_context.Operation.hash op1 in
-  let oph2 = Protocol.Alpha_context.Operation.hash op2 in
-  let c = Operation_hash.compare oph1 oph2 in
-  if correct_order then if c < 0 then (op1, op2) else (op2, op1)
-  else if c < 0 then (op2, op1)
-  else (op1, op2)
-
-let double_attestation ctxt ?(correct_order = true) op1 op2 =
-  let e1, e2 = order_attestations ~correct_order op1 op2 in
-  Op.double_attestation ctxt e1 e2
-
-let double_preattestation ctxt ?(correct_order = true) op1 op2 =
-  let e1, e2 = order_attestations ~correct_order op1 op2 in
-  Op.double_preattestation ctxt e1 e2
-
 (** Aliases for tez values *)
 type tez_quantity =
   | Half
@@ -176,6 +159,19 @@ let default_params =
       Q.(Int32.to_int edge_of_baking_over_staking_billionth // 1_000_000_000);
   }
 
+type double_signing_kind =
+  | Double_baking
+  | Double_attesting
+  | Double_preattesting
+
+type double_signing_state = {
+  culprit : Signature.Public_key_hash.t;
+  kind : double_signing_kind;
+  evidence : Context.t -> Protocol.Alpha_context.packed_operation;
+  denounced : bool;
+  level : Int32.t;
+}
+
 (** Module for the [State.t] type of asserted information about the system during a test. *)
 module State = struct
   (** Type of the state *)
@@ -191,6 +187,9 @@ module State = struct
     saved_rate : Q.t option;
     burn_rewards : bool;
     pending_operations : Protocol.Alpha_context.packed_operation list;
+    pending_slashes :
+      (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list;
+    double_signings : double_signing_state list;
   }
 
   (** Expected number of cycles before staking parameters get applied *)
@@ -391,8 +390,37 @@ module State = struct
     in
     update_map ~log_updates ~f:(String.Map.map update_account) state
 
-  (* TODO *)
-  let apply_slashing _pct _delegate_name (state : t) : t = state
+  let apply_slashing
+      ( culprit,
+        Protocol.Denunciations_repr.{rewarded; misbehaviour; misbehaviour_cycle}
+      ) current_cycle (state : t) : t * Tez.t =
+    let account_map, total_burnt =
+      apply_slashing
+        (culprit, {rewarded; misbehaviour; misbehaviour_cycle})
+        current_cycle
+        state.constants
+        state.account_map
+    in
+    (* TODO: add culprit's stakers *)
+    let log_updates =
+      List.map
+        (fun x -> fst @@ find_account_from_pkh x state)
+        [culprit; rewarded]
+    in
+    let state = update_map ~log_updates ~f:(fun _ -> account_map) state in
+    (state, total_burnt)
+
+  let apply_all_slashes_at_cycle_end current_cycle (state : t) : t =
+    let state, total_burnt =
+      List.fold_left
+        (fun (acc_state, acc_total) x ->
+          let state, burnt = apply_slashing x current_cycle acc_state in
+          (state, Tez.(acc_total +! burnt)))
+        (state, Tez.zero)
+        state.pending_slashes
+    in
+    let total_supply = Tez.(state.total_supply -! total_burnt) in
+    {state with pending_slashes = []; total_supply}
 
   (** Given an account name and new account state, updates [state] accordingly
       Preferably use other specific update functions *)
@@ -513,6 +541,18 @@ module State = struct
     let* launch_cycle_opt =
       Context.get_adaptive_issuance_launch_cycle (B block)
     in
+    (* Sets initial frozen for future cycle *)
+    let state =
+      update_map
+        ~f:
+          (update_frozen_rights_cycle
+             (Cycle.add current_cycle (state.constants.preserved_cycles + 1)))
+        state
+    in
+    (* Apply all slashes. They also apply to the frozen rights computed above,
+       for "reasons" related to snapshoting and the way slashes are applied to it *)
+    let state = apply_all_slashes_at_cycle_end current_cycle state in
+    (* Apply autostaking *)
     let*? state =
       match launch_cycle_opt with
       | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) -> ok state
@@ -539,19 +579,7 @@ module State = struct
         (state, [])
         state.param_requests
     in
-    (* Refresh initial amount of frozen deposits at cycle end *)
-    let state =
-      update_map
-        ~f:
-          (String.Map.map (fun x ->
-               {
-                 x with
-                 frozen_deposits =
-                   Frozen_tez.refresh_at_new_cycle x.frozen_deposits;
-               }))
-        state
-    in
-    return {state with param_requests}
+    {state with param_requests}
 
   (** Applies when baking the first block of a cycle.
       Technically nothing special happens, but we need to update the unslashable unstakes
@@ -1070,6 +1098,8 @@ let begin_test ~activate_ai ?(burn_rewards = false)
             saved_rate = None;
             burn_rewards;
             pending_operations = [];
+            pending_slashes = [];
+            double_signings = [];
           }
       in
       let* () = check_all_balances block state in
