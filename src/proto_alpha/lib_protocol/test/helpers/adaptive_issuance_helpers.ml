@@ -882,6 +882,123 @@ let balance_and_total_balance_of_account account_name account_map =
       +! Partial_tez.to_tez ~round_up:false unstaked_frozen_b
       +! unstaked_finalizable_b) )
 
+let apply_slashing
+    ( culprit,
+      Protocol.Denunciations_repr.{rewarded; misbehaviour; misbehaviour_cycle}
+    ) current_cycle constants account_map =
+  let find_account_name_from_pkh_exn pkh account_map =
+    match
+      Option.map
+        fst
+        String.Map.(
+          choose
+          @@ filter
+               (fun _ account ->
+                 Signature.Public_key_hash.equal pkh account.pkh)
+               account_map)
+    with
+    | None -> assert false
+    | Some x -> x
+  in
+  let culprit_name = find_account_name_from_pkh_exn culprit account_map in
+  let rewarded_name = find_account_name_from_pkh_exn rewarded account_map in
+  let slashed_cycle =
+    match misbehaviour_cycle with
+    | Current -> current_cycle
+    | Previous ->
+        Cycle.pred current_cycle
+        |> Option.value_f ~default:(fun _ -> assert false)
+  in
+  let slashed_pct =
+    match misbehaviour with
+    | Double_baking ->
+        constants
+          .Protocol.Alpha_context.Constants.Parametric
+           .percentage_of_frozen_deposits_slashed_per_double_baking
+    | Double_attesting ->
+        constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+  in
+  let get_total_supply acc_map =
+    String.Map.fold
+      (fun k _ tot ->
+        let _, tt = balance_and_total_balance_of_account k acc_map in
+        Tez.(tt +! tot))
+      acc_map
+      Tez.zero
+  in
+  let total_before_slash = get_total_supply account_map in
+  let slash_culprit
+      ({frozen_deposits; unstaked_frozen; frozen_rights; _} as acc) =
+    let base_rights =
+      CycleMap.find slashed_cycle frozen_rights
+      |> Option.value ~default:Tez.zero
+    in
+    let frozen_deposits, slashed_frozen =
+      Frozen_tez.slash base_rights slashed_pct frozen_deposits
+    in
+    let unstaked_frozen, slashed_unstaked =
+      Unstaked_frozen.slash
+        ~preserved_cycles:constants.preserved_cycles
+        slashed_cycle
+        slashed_pct
+        unstaked_frozen
+    in
+    ( {acc with frozen_deposits; unstaked_frozen},
+      slashed_frozen :: slashed_unstaked )
+  in
+  let culprit_account =
+    String.Map.find culprit_name account_map
+    |> Option.value_f ~default:(fun () -> raise Not_found)
+  in
+  let slashed_culprit_account, total_slashed = slash_culprit culprit_account in
+  let account_map =
+    update_account
+      ~f:(fun _ -> slashed_culprit_account)
+      culprit_name
+      account_map
+  in
+  let update_frozen_rights_with_slash ({frozen_rights; _} as acc) =
+    let cycle_to_slash =
+      Cycle.add current_cycle (constants.preserved_cycles + 1)
+    in
+    let frozen_rights =
+      CycleMap.update
+        cycle_to_slash
+        (function
+          | None -> None
+          | Some x ->
+              Some
+                (Tez.mul_q
+                   x
+                   Q.((Protocol.Int_percentage.neg slashed_pct :> int) // 100)
+                |> Tez.of_q ~round_up:false))
+        frozen_rights
+    in
+    {acc with frozen_rights}
+  in
+  let account_map =
+    update_account ~f:update_frozen_rights_with_slash culprit_name account_map
+  in
+  let total_after_slash = get_total_supply account_map in
+  let portion_reward =
+    constants.adaptive_issuance.global_limit_of_staking_over_baking + 2
+  in
+  (* For each container slashed, the snitch gets a reward transferred. It gets rounded
+     down each time *)
+  let reward_to_snitch =
+    List.map
+      (fun x -> Tez.mul_q x Q.(1 // portion_reward) |> Tez.of_q ~round_up:false)
+      total_slashed
+    |> List.fold_left Tez.( +! ) Tez.zero
+  in
+  let account_map =
+    add_liquid_rewards reward_to_snitch rewarded_name account_map
+  in
+  let actual_total_burnt_amount =
+    Tez.(total_before_slash -! total_after_slash -! reward_to_snitch)
+  in
+  (account_map, actual_total_burnt_amount)
+
 (* Given cycle is the cycle for which the rights are computed, usually current + preserved cycles *)
 let update_frozen_rights_cycle cycle account_map =
   String.Map.map
