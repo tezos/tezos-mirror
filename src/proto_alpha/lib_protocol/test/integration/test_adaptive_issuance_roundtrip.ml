@@ -1724,10 +1724,19 @@ let test_expected_error =
              [Inconsistent_number_of_bootstrap_accounts])
            (exec (fun _ -> failwith "")))
 
-let init_constants ?reward_per_block ?(deactivate_dynamic = false) () =
+let init_constants ?reward_per_block ?(deactivate_dynamic = false)
+    ?blocks_per_cycle ?(force_snapshot_at_end = false) () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
+  (* default for tests: 12 *)
+  let blocks_per_cycle =
+    Option.value ~default:default_constants.blocks_per_cycle blocks_per_cycle
+  in
+  let blocks_per_stake_snapshot =
+    if force_snapshot_at_end then blocks_per_cycle
+    else default_constants.blocks_per_stake_snapshot
+  in
   let issuance_weights =
     Protocol.Alpha_context.Constants.Parametric.
       {
@@ -1761,6 +1770,8 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false) () =
     minimal_block_delay;
     cost_per_byte;
     adaptive_issuance;
+    blocks_per_cycle;
+    blocks_per_stake_snapshot;
   }
 
 (** Initialization of scenarios with 3 cases:
