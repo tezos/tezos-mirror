@@ -2285,13 +2285,273 @@ module Autostaking = struct
   let tests = tests_of_scenarios [("Test auto-staking", test_autostaking)]
 end
 
+module Slashing = struct
+  let test_simple_slash =
+    let constants = init_constants () in
+    begin_test
+      ~activate_ai:true
+      constants
+      ["delegate"; "bootstrap1"; "bootstrap2"]
+    --> (Tag "No AI" --> next_cycle
+        |+ Tag "Yes AI" --> next_block --> wait_ai_activation)
+    --> (Tag "double baking" --> double_bake "delegate"
+        |+ Tag "double attesting" --> double_attest "delegate"
+        |+ Tag "double preattesting" --> double_preattest "delegate")
+    --> snapshot_balances "before slash" ["delegate"]
+    --> ((Tag "denounce same cycle" --> make_denunciations ()
+         |+ Tag "denounce next cycle" --> next_cycle --> make_denunciations ())
+         --> check_snapshot_balances "before slash"
+         --> exec_unit check_pending_slashings
+         --> next_cycle
+         --> assert_failure (check_snapshot_balances "before slash")
+         --> exec_unit check_pending_slashings
+         --> next_block
+        |+ Tag "denounce too late" --> next_cycle --> next_cycle
+           --> assert_failure
+                 ~expected_error:(fun (_block, state) ->
+                   let ds = state.State.double_signings in
+                   let ds = match ds with [a] -> a | _ -> assert false in
+                   let kind =
+                     match ds.kind with
+                     | Double_baking -> Protocol.Validate_errors.Anonymous.Block
+                     | Double_attesting -> Attestation
+                     | Double_preattesting -> Preattestation
+                   in
+                   let level =
+                     Protocol.Alpha_context.Raw_level.of_int32_exn
+                       (Int32.succ ds.level)
+                   in
+                   let last_cycle =
+                     Cycle.add
+                       (Block.current_cycle_of_level
+                          ~blocks_per_cycle:
+                            state.State.constants.blocks_per_cycle
+                          ~current_level:ds.level)
+                       Protocol.Constants_repr.max_slashing_period
+                   in
+                   [
+                     Environment.Ecoproto_error
+                       (Protocol.Validate_errors.Anonymous.Outdated_denunciation
+                          {kind; level; last_cycle});
+                   ])
+                 (make_denunciations ())
+           --> check_snapshot_balances "before slash")
+
+  let check_is_forbidden baker = assert_failure (next_block_with_baker baker)
+
+  let check_is_not_forbidden baker =
+    exec (fun ((block, state) as input) ->
+        let baker = State.find_account baker state in
+        let* _ = Block.bake ~policy:(By_account baker.pkh) block in
+        return input)
+
+  let test_delegate_forbidden =
+    let constants = init_constants ~blocks_per_cycle:30l () in
+    begin_test
+      ~activate_ai:false
+      constants
+      ["delegate"; "bootstrap1"; "bootstrap2"]
+    --> set_baker "bootstrap1"
+    --> (Tag "Many double bakes"
+         --> loop_action 14 (double_bake_ "delegate")
+         --> (Tag "14 double bakes are not enough to forbid a delegate"
+              (*  7*14 = 98 *)
+              --> make_denunciations ()
+              --> check_is_not_forbidden "delegate"
+             |+ Tag "15 double bakes is one too many"
+                (*  7*15 = 105 > 100 *)
+                --> double_bake "delegate"
+                --> make_denunciations ()
+                --> check_is_forbidden "delegate")
+        |+ Tag "Two double attestations, in same cycle"
+           --> double_attest "delegate"
+           --> (Tag "very early first denounce" --> make_denunciations ()
+               |+ Empty)
+           --> double_attest "delegate"
+           --> check_is_not_forbidden "delegate"
+           --> make_denunciations ()
+           (* Is forbidden the moment the denunciations are included *)
+           --> check_is_forbidden "delegate"
+        |+ Tag "Two double attestations, in consecutive cycles"
+           --> double_attest "delegate"
+           --> (Tag "early first denounce" --> make_denunciations ()
+                --> next_cycle
+               |+ Tag "late first denounce" --> next_cycle
+                  --> make_denunciations ())
+           --> double_attest "delegate"
+           (* Forbidden iff the cycle of the denunciation and the previous one
+              contains enough double signing events (not denunciations)
+              to forbid the delegate *)
+           --> (Tag "early second denounce" --> make_denunciations ()
+                --> check_is_forbidden "delegate"
+               |+ Tag "late second denounce" --> next_cycle
+                  --> make_denunciations ()
+                  --> check_is_not_forbidden "delegate")
+        |+ Tag "Two double attestations, too far apart to forbid"
+           --> double_attest "delegate"
+           --> (Tag "early first denounce" --> make_denunciations ()
+                --> next_cycle
+               |+ Tag "late first denounce" --> next_cycle
+                  --> make_denunciations ())
+           --> next_cycle
+           --> double_attest "delegate"
+               (* Forbidden iff the cycle of the denunciation and the previous one
+                   contains enough double signing events (not denunciations)
+                  to forbid the delegate *)
+           --> (Tag "early second denounce" --> make_denunciations ()
+               |+ Tag "late second denounce" --> next_cycle
+                  --> make_denunciations ())
+           --> check_is_not_forbidden "delegate"
+        |+ Tag
+             "Two double attestations, in consecutive cycles, denounce out of \
+              order" --> double_attest "delegate" --> next_cycle
+           --> double_attest "delegate"
+           --> make_denunciations
+                 ~filter:(fun {level; denounced; _} ->
+                   (not denounced) && level > 10l)
+                 ()
+           --> make_denunciations
+                 ~filter:(fun {level; denounced; _} ->
+                   (not denounced) && level <= 10l)
+                 ()
+           --> check_is_forbidden "delegate")
+
+  let test_slash_unstake =
+    let constants = init_constants () in
+    begin_test
+      ~activate_ai:false
+      constants
+      ["delegate"; "bootstrap1"; "bootstrap2"]
+    --> set_baker "bootstrap1" --> next_cycle --> unstake "delegate" Half
+    --> next_cycle --> double_bake "delegate" --> make_denunciations ()
+    --> next_cycle --> double_bake "delegate" --> make_denunciations ()
+    --> wait_n_cycles 5
+    --> finalize_unstake "delegate"
+
+  let test_slash_monotonous_stake =
+    let scenario ~op ~early_d =
+      let constants =
+        init_constants ~force_snapshot_at_end:true ~blocks_per_cycle:8l ()
+      in
+      begin_test ~activate_ai:false constants ["delegate"]
+      --> next_cycle
+      --> loop
+            6
+            (op "delegate" (Amount (Tez.of_mutez 1_000_000_000L)) --> next_cycle)
+      --> loop
+            10
+            (op "delegate" (Amount (Tez.of_mutez 1_000_000_000L))
+            --> double_bake "delegate"
+            -->
+            if early_d then make_denunciations () --> next_cycle
+            else next_cycle --> make_denunciations ())
+    in
+    Tag "slashes with increasing stake"
+    --> (Tag "denounce early" --> scenario ~op:stake ~early_d:true
+        |+ Tag "denounce late" --> scenario ~op:stake ~early_d:false)
+    |+ Tag "slashes with decreasing stake"
+       --> (Tag "denounce early" --> scenario ~op:unstake ~early_d:true
+           |+ Tag "denounce late" --> scenario ~op:unstake ~early_d:false)
+
+  let test_slash_timing =
+    let constants =
+      init_constants ~force_snapshot_at_end:true ~blocks_per_cycle:8l ()
+    in
+    begin_test ~activate_ai:false constants ["delegate"]
+    --> next_cycle
+    --> (Tag "stake" --> stake "delegate" Half
+        |+ Tag "unstake" --> unstake "delegate" Half)
+    --> (Tag "with a first slash" --> double_bake "delegate"
+         --> make_denunciations ()
+        |+ Tag "without another slash" --> Empty)
+    --> List.fold_left
+          (fun acc i ->
+            acc |+ Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
+          Empty
+          [3; 4; 5; 6]
+    --> double_bake "delegate" --> make_denunciations () --> next_cycle
+
+  let init_scenario_with_delegators delegate_name delegators_list =
+    let constants = init_constants ~force_snapshot_at_end:true () in
+    let rec init_delegators = function
+      | [] -> Empty
+      | (delegator, amount) :: t ->
+          add_account_with_funds
+            delegator
+            delegate_name
+            (Amount (Tez.of_mutez amount))
+          --> set_delegate delegator (Some delegate_name)
+          --> init_delegators t
+    in
+    let init_params =
+      {
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.one;
+      }
+    in
+    begin_test ~activate_ai:true constants [delegate_name]
+    --> set_delegate_params "delegate" init_params
+    --> init_delegators delegators_list
+    --> next_block --> wait_ai_activation
+
+  let test_many_slashes =
+    let rec stake_unstake_for = function
+      | [] -> Empty
+      | staker :: t ->
+          stake staker Half --> unstake staker Half --> stake_unstake_for t
+    in
+    let slash delegate = double_bake delegate --> make_denunciations () in
+    Tag "double bake"
+    --> (Tag "solo delegate"
+        --> init_scenario_with_delegators
+              "delegate"
+              [("delegator", 1_234_567_891L)]
+        --> loop
+              10
+              (stake_unstake_for ["delegate"]
+              --> slash "delegate" --> next_cycle))
+  (* |+ Tag "delegate with one staker"
+        --> init_scenario_with_delegators
+              "delegate"
+              [("staker", 1_234_356_891L)]
+        --> loop
+              10
+              (stake_unstake_for ["delegate"; "staker"]
+              --> slash "delegate" --> next_cycle)
+     |+ Tag "delegate with three stakers"
+        --> init_scenario_with_delegators
+              "delegate"
+              [
+                ("staker1", 1_234_356_891L);
+                ("staker2", 1_234_356_890L);
+                ("staker3", 1_723_333_111L);
+              ]
+        --> loop
+              10
+              (stake_unstake_for
+                 ["delegate"; "staker1"; "staker2"; "staker3"]
+              --> slash "delegate" --> next_cycle)) *)
+
+  let tests =
+    tests_of_scenarios
+    @@ [
+         ("Test simple slashing", test_simple_slash);
+         ("Test slashed is forbidden", test_delegate_forbidden);
+         ("Test slash with unstake", test_slash_unstake);
+         ("Test slashes with simple varying stake", test_slash_monotonous_stake);
+         ( "Test multiple slashes with multiple stakes/unstakes",
+           test_many_slashes );
+         ("Test slash timing", test_slash_timing);
+       ]
+end
+
 let tests =
   (tests_of_scenarios
   @@ [
        ("Test expected error in assert failure", test_expected_error);
        ("Test init", init_scenario () --> Action (fun _ -> return_unit));
      ])
-  @ Roundtrip.tests @ Rewards.tests @ Autostaking.tests
+  @ Roundtrip.tests @ Rewards.tests @ Autostaking.tests @ Slashing.tests
 
 let () =
   Alcotest_lwt.run
