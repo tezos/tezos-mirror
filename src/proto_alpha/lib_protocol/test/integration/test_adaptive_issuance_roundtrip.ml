@@ -742,15 +742,28 @@ let exec_unit f =
 let check_all_balances block state : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let State.{account_map; total_supply; _} = state in
-  let* () =
-    String.Map.iter_es
-      (fun name _account ->
-        log_debug_balance name account_map ;
-        assert_balance_check ~loc:__LOC__ (B block) name account_map)
-      account_map
-  in
   let* actual_total_supply = Context.get_total_supply (B block) in
-  Assert.equal_tez ~loc:__LOC__ actual_total_supply total_supply
+  let*! r1 =
+    String.Map.fold_s
+      (fun name _account acc ->
+        log_debug_balance name account_map ;
+        let*! r =
+          assert_balance_check ~loc:__LOC__ (B block) name account_map
+        in
+        join_errors r acc)
+      account_map
+      Result.return_unit
+  in
+  let*! r2 =
+    Assert.equal
+      ~loc:__LOC__
+      Tez.equal
+      "Total supplies do not match"
+      Tez.pp
+      actual_total_supply
+      total_supply
+  in
+  join_errors r1 r2
 
 let check_issuance_rpc block : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
