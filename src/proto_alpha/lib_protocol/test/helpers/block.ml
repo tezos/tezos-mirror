@@ -1236,12 +1236,15 @@ let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
   in
   (b, metadata.liquidity_baking_toggle_ema)
 
-let current_cycle b =
-  let blocks_per_cycle = b.constants.blocks_per_cycle in
-  let current_level = b.header.shell.level in
+let current_cycle_of_level ~blocks_per_cycle ~current_level =
   let current_cycle = Int32.div current_level blocks_per_cycle in
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
   current_cycle
+
+let current_cycle b =
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
+  let current_level = b.header.shell.level in
+  current_cycle_of_level ~blocks_per_cycle ~current_level
 
 let last_block_of_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in
