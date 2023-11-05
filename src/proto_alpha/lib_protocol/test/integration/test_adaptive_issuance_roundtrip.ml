@@ -1595,6 +1595,7 @@ let check_failure_aux ?expected_error :
           Log.info ~color:assert_block_color "Rollback" ;
           return input
       | Some exp_e ->
+          let exp_e = exp_e input in
           if e = exp_e then (
             Log.info ~color:assert_block_color "Rollback" ;
             return input)
@@ -1714,12 +1715,13 @@ let add_account_with_funds name source amount =
 
 let test_expected_error =
   assert_failure
-    ~expected_error:[Exn (Failure "")]
+    ~expected_error:(fun _ -> [Exn (Failure "")])
     (exec (fun _ -> failwith ""))
   --> assert_failure
-        ~expected_error:[Unexpected_error]
+        ~expected_error:(fun _ -> [Unexpected_error])
         (assert_failure
-           ~expected_error:[Inconsistent_number_of_bootstrap_accounts]
+           ~expected_error:(fun _ ->
+             [Inconsistent_number_of_bootstrap_accounts])
            (exec (fun _ -> failwith "")))
 
 let init_constants ?reward_per_block ?(deactivate_dynamic = false) () =
