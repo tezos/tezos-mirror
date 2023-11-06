@@ -13,7 +13,7 @@ use tezos_smart_rollup_mock::MockHost;
 
 use bytes::Bytes;
 use hex_literal::hex;
-use primitive_types::H160;
+use primitive_types::{H160, U256};
 use primitives::{HashMap, B160, B256};
 use std::path::Path;
 use std::str::FromStr;
@@ -277,7 +277,6 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
         println!("\n[END] Accounts initialisation\n");
 
         let mut env = Env::default();
-        env.cfg.chain_id = 1; // Mainnet
 
         // BlockEnv
         env.block.number = unit.env.current_number;
@@ -285,14 +284,6 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
         env.block.timestamp = unit.env.current_timestamp;
         env.block.gas_limit = unit.env.current_gas_limit;
         env.block.basefee = unit.env.current_base_fee.unwrap_or_default();
-        env.block.difficulty = unit.env.current_difficulty;
-        // After the Merge prevrandao replaces mix_hash field in block and replaced
-        // difficulty opcode in EVM.
-        let mut prevrandao_bytes: [u8; 32] = [0; 32];
-        unit.env
-            .current_difficulty
-            .to_little_endian(&mut prevrandao_bytes);
-        env.block.prevrandao = Some(prevrandao_bytes.into());
 
         // TxEnv
         env.tx.caller = if let Some(caller) =
@@ -307,23 +298,17 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
             .transaction
             .gas_price
             .unwrap_or_else(|| unit.transaction.max_fee_per_gas.unwrap_or_default());
-        env.tx.gas_priority_fee = unit.transaction.max_priority_fee_per_gas;
 
         // post and execution
         for (spec_name, tests) in unit.post {
             let config = match spec_name {
-                // TODO: enable all configs when parallelization is enabled.
-                // SpecName::Berlin => Config::berlin(),
-                // SpecName::London => Config::london(),
-                // SpecName::Merge => Config::merge(),
                 SpecName::Shanghai => Config::shanghai(),
-                /* Other tests are ignored */ _ => continue,
+                // TODO: enable future configs when parallelization is enabled.
+                // Other tests are ignored
+                _ => continue,
             };
 
-            env.cfg.spec_id = spec_name.to_spec_id();
-
-            // TODO: use id
-            for (_id, test) in tests.into_iter().enumerate() {
+            for test in tests.into_iter() {
                 let gas_limit =
                     *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
                 let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
@@ -335,8 +320,6 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
                     .unwrap()
                     .clone();
                 env.tx.value = *unit.transaction.value.get(test.indexes.value).unwrap();
-
-                env.tx.access_list = Vec::new(); // TODO: not used for now
                 env.tx.transact_to = unit.transaction.to;
 
                 let block_constants = BlockConstants {
@@ -346,7 +329,7 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
                     timestamp: env.block.timestamp,
                     gas_limit: env.block.gas_limit.as_u64(),
                     base_fee_per_gas: env.block.basefee,
-                    chain_id: env.cfg.chain_id.into(),
+                    chain_id: U256::from(1337),
                 };
                 let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
                 let caller = env.tx.caller.to_fixed_bytes().into();

@@ -7,7 +7,7 @@ mod deserializer;
 
 use bytes::Bytes;
 use primitive_types::U256;
-use primitives::{HashMap, SpecId, B160, B256};
+use primitives::{HashMap, B160, B256};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
@@ -22,14 +22,6 @@ pub enum SpecName {
 }
 
 impl SpecName {
-    pub fn to_spec_id(&self) -> SpecId {
-        match self {
-            Self::Shanghai => SpecId::SHANGHAI,
-            Self::Cancun => SpecId::CANCUN,
-            Self::Unknown => panic!("Unknown spec"),
-        }
-    }
-
     // Custom `to_string`
     pub fn to_str(&self) -> String {
         let spec_str = match self {
@@ -128,43 +120,26 @@ pub struct TxPartIndices {
 pub struct UnitEnv {
     pub current_coinbase: B160,
     #[serde(default, deserialize_with = "deserialize_str_as_u256")]
-    pub current_difficulty: U256,
-    #[serde(deserialize_with = "deserialize_str_as_u256")]
     pub current_gas_limit: U256,
     #[serde(deserialize_with = "deserialize_str_as_u256")]
     pub current_number: U256,
     #[serde(deserialize_with = "deserialize_str_as_u256")]
     pub current_timestamp: U256,
     pub current_base_fee: Option<U256>,
-    pub previous_hash: B256,
 }
-
-#[derive(Debug, PartialEq, Eq, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct AccessListItem {
-    pub address: B160,
-    pub storage_keys: Vec<B256>,
-}
-
-// TODO: replace this by tezos_ethereum::access_list::AccessList
-// (make it "serde compatible")
-pub type AccessList = Vec<AccessListItem>;
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionParts {
     #[serde(deserialize_with = "deserialize_vec_as_vec_bytes")]
     pub data: Vec<Bytes>,
-    pub access_lists: Option<Vec<Option<AccessList>>>,
     pub gas_limit: Vec<U256>,
     pub gas_price: Option<U256>,
-    pub nonce: U256,
     pub secret_key: Option<B256>,
     #[serde(deserialize_with = "deserialize_maybe_empty")]
     pub to: Option<B160>,
     pub value: Vec<U256>,
     pub max_fee_per_gas: Option<U256>,
-    pub max_priority_fee_per_gas: Option<U256>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -172,17 +147,10 @@ pub struct TransactionParts {
 pub struct BlockEnv {
     pub number: U256,
     /// Coinbase or miner or address that created and signed the block.
-    /// Address where we are going to send gas spend
+    /// This is the receiver address of all the gas spent in the block.
     pub coinbase: B160,
     pub timestamp: U256,
-    /// Difficulty is removed and not used after Paris (aka TheMerge).
-    /// Value is replaced with prevrandao.
-    pub difficulty: U256,
-    /// Prevrandao is used after Paris (aka TheMerge) instead of the difficulty value.
-    /// NOTE: prevrandao can be found in block in place of mix_hash.
-    pub prevrandao: Option<B256>,
-    /// basefee is added in EIP1559 London upgrade
-    pub basefee: U256,
+    pub basefee: U256, // EIP1559
     pub gas_limit: U256,
 }
 
@@ -193,8 +161,6 @@ impl Default for BlockEnv {
             number: U256::zero(),
             coinbase: B160::zero(),
             timestamp: U256::from(1),
-            difficulty: U256::zero(),
-            prevrandao: Some(B256::zero()),
             basefee: U256::zero(),
         }
     }
@@ -207,14 +173,10 @@ pub struct TxEnv {
     pub caller: B160,
     pub gas_limit: u64,
     pub gas_price: U256,
-    pub gas_priority_fee: Option<U256>,
     pub transact_to: Option<B160>,
     pub value: U256,
     #[cfg_attr(feature = "serde", serde(with = "crate::utilities::serde_hex_bytes"))]
     pub data: Bytes,
-    pub chain_id: Option<u64>,
-    pub nonce: Option<u64>,
-    pub access_list: Vec<(B160, Vec<U256>)>,
 }
 
 impl Default for TxEnv {
@@ -223,30 +185,9 @@ impl Default for TxEnv {
             caller: B160::zero(),
             gas_limit: u64::MAX,
             gas_price: U256::zero(),
-            gas_priority_fee: None,
             transact_to: Some(B160::zero()), // will do nothing
             value: U256::zero(),
             data: Bytes::new(),
-            chain_id: None,
-            nonce: None,
-            access_list: Vec::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[non_exhaustive]
-pub struct CfgEnv {
-    pub chain_id: u64,
-    pub spec_id: SpecId,
-}
-
-impl Default for CfgEnv {
-    fn default() -> CfgEnv {
-        CfgEnv {
-            chain_id: 1,
-            spec_id: SpecId::LATEST,
         }
     }
 }
@@ -254,7 +195,6 @@ impl Default for CfgEnv {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Env {
-    pub cfg: CfgEnv,
     pub block: BlockEnv,
     pub tx: TxEnv,
 }
