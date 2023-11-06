@@ -247,7 +247,7 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Message_with_header {message; topic; message_id} ->
       Message_with_header {message; topic; message_id}
 
-let try_connect p2p_layer px_cache ~px ~origin =
+let try_connect_to_px p2p_layer px_cache ~px ~origin =
   let open Lwt_syntax in
   (* If there is some [point] associated to [px] and advertised by [origin]
      on the [px_cache], we will try to connect to it. *)
@@ -313,7 +313,8 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
           P2p.find_connection_by_peer_id p2p_layer peer
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
-      | Connect {px; origin} -> try_connect p2p_layer px_cache ~px ~origin
+      | Connect {px; origin = PX origin} ->
+          try_connect_to_px p2p_layer px_cache ~px ~origin
       | Forget {px; origin} ->
           let _p : P2p_point.Id.t option = PX_cache.drop px_cache ~px ~origin in
           return_unit

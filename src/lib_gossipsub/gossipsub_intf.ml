@@ -1112,6 +1112,9 @@ module type WORKER = sig
     | Join of GS.Topic.t
     | Leave of GS.Topic.t
 
+  (** A peer's origin is another peer (i.e. advertised via PX). *)
+  type peer_origin = PX of GS.Peer.t
+
   (** The different kinds of outputs that could be emitted by the worker for the
       P2P layer. *)
   type p2p_output =
@@ -1121,7 +1124,7 @@ module type WORKER = sig
         (** End the connection with the peer [peer]. *)
     | Kick of {peer : GS.Peer.t}
         (** Kick the peer [peer]: the peer is disconnected and blacklisted.*)
-    | Connect of {px : GS.Peer.t; origin : GS.Peer.t}
+    | Connect of {px : GS.Peer.t; origin : peer_origin}
         (** Inform the p2p_output messages processor that we want to connect to
             the peer [px] advertised by some other peer [origin]. *)
     | Forget of {px : GS.Peer.t; origin : GS.Peer.t}

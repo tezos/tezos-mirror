@@ -195,11 +195,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Join of Topic.t
     | Leave of Topic.t
 
+  type peer_origin = PX of Peer.t
+
   type p2p_output =
     | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
-    | Connect of {px : Peer.t; origin : Peer.t}
+    | Connect of {px : Peer.t; origin : peer_origin}
     | Forget of {px : Peer.t; origin : Peer.t}
 
   type app_output = message_with_header
@@ -520,7 +522,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         Introspection.update_count_recv_prunes state.stats `Incr ;
         emit_p2p_output
           state
-          ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
+          ~mk_output:(fun to_peer ->
+            Connect {px = to_peer; origin = PX from_peer})
           (Peer.Set.to_seq peers) ;
         (* Forget peers that were filtered out by the automaton. *)
         emit_p2p_output
@@ -820,7 +823,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Disconnect {peer} -> Format.fprintf fmt "Disconnect{peer=%a}" Peer.pp peer
     | Kick {peer} -> Format.fprintf fmt "Kick{peer=%a}" Peer.pp peer
     | Connect {px; origin} ->
-        Format.fprintf fmt "Connect{px=%a; origin=%a}" Peer.pp px Peer.pp origin
+        Format.fprintf
+          fmt
+          "Connect{px=%a; origin=%a}"
+          Peer.pp
+          px
+          (fun fmt origin -> match origin with PX peer -> Peer.pp fmt peer)
+          origin
     | Forget {px; origin} ->
         Format.fprintf fmt "Forget{px=%a; origin=%a}" Peer.pp px Peer.pp origin
     | Out_message {to_peer; p2p_message} ->
