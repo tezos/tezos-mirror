@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use primitives::SpecId;
-
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
     if data.contains('>') {
         u8::gt
@@ -24,17 +22,4 @@ pub fn purify_network(network: &str) -> String {
     let network = network.replace('<', "");
     let network = network.replace('>', "");
     network.replace('=', "")
-}
-
-pub fn network_to_specid(network: &str) -> SpecId {
-    let actual_network = if network == "EIP150" {
-        "Homestead"
-    } else if network == "EIP158" {
-        "Spurious"
-    } else if network.contains("Constantinople") {
-        "Petersburg"
-    } else {
-        network
-    };
-    SpecId::from(actual_network)
 }

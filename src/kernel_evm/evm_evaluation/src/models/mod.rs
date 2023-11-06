@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 mod deserializer;
+pub mod spec;
 
 use bytes::Bytes;
 use primitive_types::{H160, H256, U256};

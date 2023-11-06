@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::helpers::{network_to_specid, parse_and_get_cmp, purify_network};
+use crate::helpers::{parse_and_get_cmp, purify_network};
+use crate::models::spec::SpecId;
 use crate::models::{AccountInfoFiller, FillerSource, SpecName};
 
 use evm_execution::account_storage::EthereumAccount;
@@ -211,9 +212,8 @@ pub fn process<Host: Runtime>(
             for filler_network in filler_expectation.network {
                 let cmp_spec_id = parse_and_get_cmp(&filler_network);
                 let network = purify_network(&filler_network);
-                let check_network_id = network_to_specid(&network) as u8;
-                let current_network_config_id =
-                    network_to_specid(&spec_name.to_str()) as u8;
+                let check_network_id = SpecId::from(&network) as u8;
+                let current_network_config_id = SpecId::from(&spec_name.to_str()) as u8;
 
                 if !cmp_spec_id(&current_network_config_id, &check_network_id) {
                     continue;
