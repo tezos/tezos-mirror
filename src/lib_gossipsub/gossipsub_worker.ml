@@ -213,6 +213,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type worker_state = {
     stats : Introspection.stats;
     gossip_state : GS.state;
+    trusted_peers : Peer.Set.t;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
     p2p_output_stream : p2p_output Stream.t;
@@ -359,7 +360,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
       to that peer for each topic the local peer tracks. *)
-  let handle_new_connection peer ~bootstrap = function
+  let handle_new_connection peer ~bootstrap ~trusted = function
     | state, GS.Peer_already_known -> state
     | state, Peer_added ->
         Introspection.update_count_connections state.stats `Incr ;
@@ -369,7 +370,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             Peer.Set.add peer state.connected_bootstrap_peers)
           else state.connected_bootstrap_peers
         in
-        let state = {state with connected_bootstrap_peers} in
+        let trusted_peers =
+          if trusted then Peer.Set.add peer state.trusted_peers
+          else state.trusted_peers
+        in
+        let state = {state with connected_bootstrap_peers; trusted_peers} in
         View.(view state.gossip_state |> get_our_topics)
         |> List.iter (fun topic ->
                emit_p2p_message state (Subscribe {topic}) (Seq.return peer)) ;
@@ -621,7 +626,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | New_connection {peer; direct; trusted; bootstrap} ->
         GS.add_peer {direct; outbound = trusted; peer} gossip_state
         |> update_gossip_state state
-        |> handle_new_connection peer ~bootstrap
+        |> handle_new_connection peer ~bootstrap ~trusted
     | Disconnection {peer} ->
         GS.remove_peer {peer} gossip_state
         |> update_gossip_state state |> handle_disconnection peer
@@ -744,6 +749,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         {
           stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
+          trusted_peers = Peer.Set.empty;
           connected_bootstrap_peers = Peer.Set.empty;
           events_stream = Stream.empty ();
           p2p_output_stream = Stream.empty ();
