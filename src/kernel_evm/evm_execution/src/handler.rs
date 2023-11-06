@@ -172,13 +172,35 @@ mod benchmarks {
 
     // The start section for the opcodes expects a single byte which is the
     // current opcode.
-    static mut START_SECTION_MSG: [u8; 35] = *b"__wasm_debugger__::start_section(\0)";
+    static mut START_OPCODE_SECTION_MSG: [u8; 35] =
+        *b"__wasm_debugger__::start_section(\0)";
+
+    // The start section for the precompiles expects the address of the
+    // contract (20 bytes) and the size of the data (4 bytes).
+    static mut START_PRECOMPILE_SECTION_MSG: [u8; 58] =
+        *b"__wasm_debugger__::start_section(\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0)";
 
     #[inline(always)]
-    pub fn start_section<Host: Runtime>(host: &mut Host, opcode: &Opcode) {
+    pub fn start_opcode_section<Host: Runtime>(host: &mut Host, opcode: &Opcode) {
         unsafe {
-            START_SECTION_MSG[33] = opcode.as_u8();
-            host.write_debug(core::str::from_utf8_unchecked(&START_SECTION_MSG));
+            START_OPCODE_SECTION_MSG[33] = opcode.as_u8();
+            host.write_debug(core::str::from_utf8_unchecked(&START_OPCODE_SECTION_MSG));
+        }
+    }
+
+    #[inline(always)]
+    pub fn start_precompile_section<Host: Runtime>(
+        host: &mut Host,
+        address: H160,
+        input: &Vec<u8>,
+    ) {
+        unsafe {
+            START_PRECOMPILE_SECTION_MSG[33..53].copy_from_slice(&address.as_bytes());
+            START_PRECOMPILE_SECTION_MSG[53..57]
+                .copy_from_slice(&input.len().to_be_bytes());
+            host.write_debug(core::str::from_utf8_unchecked(
+                &START_PRECOMPILE_SECTION_MSG,
+            ));
         }
     }
 
@@ -188,19 +210,29 @@ mod benchmarks {
     //   continues to the next opcode (`STEP_CONTINUE`) or stops for a given
     //   reason, this reason being encoded in a byte. These values are described
     //   at the beginning of the `benchmarks` module.
-    static mut END_SECTION_MSG: [u8; 41] =
+    static mut END_OPCODE_SECTION_MSG: [u8; 41] =
         *b"__wasm_debugger__::end_section(\0\0\0\0\0\0\0\0\0)";
 
+    static mut END_PRECOMPILE_SECTION_MSG: [u8; 32] =
+        *b"__wasm_debugger__::end_section()";
+
     #[inline(always)]
-    pub fn end_section<Host: Runtime, T>(
+    pub fn end_opcode_section<Host: Runtime, T>(
         host: &mut Host,
         gas: u64,
         step_result: &Result<(), Capture<ExitReason, T>>,
     ) {
         unsafe {
-            END_SECTION_MSG[31..39].copy_from_slice(&gas.to_le_bytes());
-            END_SECTION_MSG[39] = step_exit_reason(step_result);
-            host.write_debug(core::str::from_utf8_unchecked(&END_SECTION_MSG));
+            END_OPCODE_SECTION_MSG[31..39].copy_from_slice(&gas.to_le_bytes());
+            END_OPCODE_SECTION_MSG[39] = step_exit_reason(step_result);
+            host.write_debug(core::str::from_utf8_unchecked(&END_OPCODE_SECTION_MSG));
+        }
+    }
+
+    #[inline(always)]
+    pub fn end_precompile_section<Host: Runtime>(host: &mut Host) {
+        unsafe {
+            host.write_debug(core::str::from_utf8_unchecked(&END_PRECOMPILE_SECTION_MSG));
         }
     }
 }
@@ -445,7 +477,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
             #[cfg(feature = "benchmark")]
             if let Some(opcode) = opcode {
-                benchmarks::start_section(self.host, &opcode);
+                benchmarks::start_opcode_section(self.host, &opcode);
             }
 
             // For now, these variables capturing the gas one will be marked
@@ -463,7 +495,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 let gas = gas_after - gas_before;
                 self.account_for_ticks(&opcode, gas)?;
                 #[cfg(feature = "benchmark")]
-                benchmarks::end_section(self.host, gas, &step_result);
+                benchmarks::end_opcode_section(self.host, gas, &step_result);
             };
 
             match step_result {
@@ -702,15 +734,22 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 }
             }
         }
+        #[cfg(feature = "benchmark")]
+        benchmarks::start_precompile_section(self.host, address, &input);
 
-        if let Some(precompile_result) = self.precompiles.execute(
+        let precompile_execution_result = self.precompiles.execute(
             self,
             address,
             &input,
             &transaction_context.context,
             self.is_static(),
             transfer,
-        ) {
+        );
+
+        #[cfg(feature = "benchmark")]
+        benchmarks::end_precompile_section(self.host);
+
+        if let Some(precompile_result) = precompile_execution_result {
             match precompile_result {
                 Ok(mut outcome) => {
                     self.add_withdrawals(&mut outcome.withdrawals)?;
