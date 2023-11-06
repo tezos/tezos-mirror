@@ -8,22 +8,18 @@ use evm_execution::precompiles::precompile_set;
 use evm_execution::{run_transaction, Config};
 
 use tezos_ethereum::block::BlockConstants;
-use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_mock::MockHost;
 
-use bytes::Bytes;
 use hex_literal::hex;
 use primitive_types::{H160, U256};
 use primitives::{HashMap, B160, B256};
 use std::path::Path;
-use std::str::FromStr;
 use thiserror::Error;
 
+use crate::fillers::process;
 use crate::models::{Env, FillerSource, SpecName, TestSuite};
 
-use crate::helpers::{
-    network_to_specid, parse_and_get_cmp, purify_network, u256_to_h256,
-};
+use crate::helpers::u256_to_h256;
 
 const MAP_CALLER_KEYS: [(B256, B160); 6] = [
     (
@@ -72,158 +68,6 @@ pub enum TestError {
     SerdeDeserializeYAML(#[from] serde_yaml::Error),
     #[error("Unknown private key: {private_key:?}")]
     UnknownPrivateKey { private_key: B256 },
-}
-
-fn process_fillers<Host: Runtime>(
-    host: &mut Host,
-    filler_source: FillerSource,
-    spec_name: &SpecName,
-) -> bool {
-    let mut good_state = true;
-    for (name, fillers) in filler_source.0.into_iter() {
-        println!("\nProcessing checks with filler: {}Filler\n", name);
-        for filler_expectation in fillers.expect {
-            for filler_network in filler_expectation.network {
-                let cmp_spec_id = parse_and_get_cmp(&filler_network);
-                let network = purify_network(&filler_network);
-                let check_network_id = network_to_specid(&network) as u8;
-                let current_network_config_id =
-                    network_to_specid(&spec_name.to_str()) as u8;
-
-                if !cmp_spec_id(&current_network_config_id, &check_network_id) {
-                    continue;
-                }
-
-                println!("CONFIG NETWORK ---- {}", spec_name.to_str());
-                println!("CHECK  NETWORK ---- {}\n", filler_network);
-
-                for (account, info) in filler_expectation.result.iter() {
-                    let hex_address = if account.contains("0x") {
-                        account.to_owned()
-                    } else {
-                        "0x".to_owned() + account
-                    };
-                    let address =
-                        H160::from_str(&hex_address).expect("Expect valid hex digit(s).");
-                    let account = EthereumAccount::from_address(&address).unwrap();
-                    let mut invalid_state = false;
-
-                    // Check when fields are available in the source filler file
-
-                    if let Some(_shouldnotexist) = &info.shouldnotexist {
-                        if account.balance(host).is_ok() {
-                            println!("Account {} should not exist.", hex_address);
-                            invalid_state = true;
-                        } else {
-                            println!("Account {} rightfully do not exist.", hex_address)
-                        }
-                    }
-
-                    if let Some(balance) = info.balance {
-                        match account.balance(host) {
-                            Ok(current_balance) => {
-                                if current_balance != balance {
-                                    invalid_state = true;
-                                    println!("Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance)
-                                } else {
-                                    println!("Account {}: balance matched.", hex_address)
-                                }
-                            }
-                            Err(_) => {
-                                invalid_state = true;
-                                println!(
-                                    "Account {} should have a balance.",
-                                    hex_address
-                                );
-                            }
-                        }
-                    }
-
-                    if let Some(code) = &info.code {
-                        match account.code(host) {
-                            Ok(current_code) => {
-                                let current_code: Bytes = current_code.into();
-                                if current_code != code {
-                                    invalid_state = true;
-                                    println!("Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code)
-                                } else {
-                                    println!("Account {}: code matched.", hex_address)
-                                }
-                            }
-                            Err(_) => {
-                                invalid_state = true;
-                                println!("Account {} should have a code.", hex_address);
-                            }
-                        }
-                    }
-
-                    if let Some(nonce) = info.nonce {
-                        match account.nonce(host) {
-                            Ok(current_nonce) => {
-                                if current_nonce != nonce.into() {
-                                    invalid_state = true;
-                                    println!("Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce)
-                                } else {
-                                    println!("Account {}: nonce matched.", hex_address)
-                                }
-                            }
-                            Err(_) => {
-                                invalid_state = true;
-                                println!("Account {} should have a nonce.", hex_address);
-                            }
-                        }
-                    }
-
-                    if let Some(storage) = &info.storage {
-                        if storage.is_empty() {
-                            println!(
-                                "Account {}: storage matched (both empty).",
-                                hex_address
-                            )
-                        }
-                        for (index, value) in storage.iter() {
-                            match account.get_storage(host, &u256_to_h256(index)) {
-                                Ok(current_storage_value) => {
-                                    let storage_value = u256_to_h256(value);
-                                    if current_storage_value != storage_value {
-                                        invalid_state = true;
-                                        println!("Account {}: storage don't match current one, {} was expected, but got {}.", hex_address, storage_value, current_storage_value)
-                                    } else {
-                                        println!(
-                                            "Account {}: storage matched.",
-                                            hex_address
-                                        )
-                                    }
-                                }
-                                Err(_) => {
-                                    invalid_state = true;
-                                    println!(
-                                        "Account {} should have a storage.",
-                                        hex_address
-                                    );
-                                }
-                            }
-                        }
-                    }
-
-                    if invalid_state {
-                        // One invalid state will cause the entire test to be a failure
-                        good_state = false;
-                        println!("==> [INVALID STATE]\n")
-                    } else {
-                        println!("==> [CORRECT STATE]\n")
-                    }
-                }
-            }
-        }
-    }
-    if good_state {
-        println!("TX INTERPRETATION: GOOD STATE")
-    } else {
-        println!("TX INTERPRETATION: BAD STATE")
-    }
-
-    good_state
 }
 
 pub fn run_test(path: &Path) -> Result<(), TestError> {
@@ -374,14 +218,9 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
                 // check the state after the execution of the result
                 successful_outcome = match filler_source.clone() {
                     Some(filler_source) => {
-                        let new_outcome =
-                            process_fillers(&mut host, filler_source, &spec_name);
-                        if successful_outcome {
-                            new_outcome
-                        } else {
-                            // if the outcome was a failure once it will stay a failure
-                            successful_outcome
-                        }
+                        let new_outcome = process(&mut host, filler_source, &spec_name);
+                        // if the outcome was a failure once it will stay a failure
+                        successful_outcome && new_outcome
                     }
                     None => {
                         println!(
