@@ -506,6 +506,8 @@ module Internal_for_tests : sig
   (** [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
+
+  val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4380

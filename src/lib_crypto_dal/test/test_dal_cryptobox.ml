@@ -88,7 +88,15 @@ module Test = struct
     let* redundancy_factor_log2 = int_range 1 max_redundancy_factor_log2 in
     let* slot_size_log2 = int_range size_offset_log2 max_slot_size_log2 in
     let* page_size_log2 = int_range 0 (slot_size_log2 - size_offset_log2) in
-    let* number_of_shards_log2 = int_range 0 max_number_of_shards_log2 in
+    let polynomial_length =
+      Cryptobox.Internal_for_tests.slot_as_polynomial_length
+        ~slot_size:(1 lsl slot_size_log2)
+        ~page_size:(1 lsl page_size_log2)
+    in
+    let erasure_encoded_polynomial_length =
+      polynomial_length * (1 lsl redundancy_factor_log2)
+    in
+    let* number_of_shards = int_range 0 erasure_encoded_polynomial_length in
     let slot_size = 1 lsl slot_size_log2 in
     let* data = bytes_size (int_range 0 slot_size) in
     let padding_threshold = Bytes.length data in
@@ -113,7 +121,7 @@ module Test = struct
          (return slot_size)
          (return (1 lsl page_size_log2))
          (return (1 lsl redundancy_factor_log2))
-         (return (1 lsl number_of_shards_log2))
+         (return number_of_shards)
          (return padding_threshold)
          (return slot))
 
@@ -431,6 +439,23 @@ module Test = struct
         |> function
         | Ok () -> true
         | _ -> false)
+
+  let test_shard_proofs_invalid_parameter () =
+    (* The following parameters used to be accepted by the [ensure_validity]
+       function, while they were actually unsupported (they indeed break an
+       invariant and trigger a runtime exception). *)
+    init () ;
+    let params =
+      {
+        slot_size = 512;
+        page_size = 256;
+        redundancy_factor = 8;
+        number_of_shards = 88;
+        padding_threshold = 512;
+        slot = Bytes.create 512;
+      }
+    in
+    assert (ensure_validity params = false)
 
   let test_shard_proof_invalid =
     let open QCheck2 in
@@ -967,7 +992,9 @@ let test =
       Alcotest.test_case test_name `Quick test_func)
     [
       ("find_trusted_setup_files", Test.find_trusted_setup_files);
-      ("find_trusted_setup_files_failure", Test.find_trusted_setup_files_failure)
+      ("find_trusted_setup_files_failure", Test.find_trusted_setup_files_failure);
+      ( "shard_proofs_invalid_parameter",
+        Test.test_shard_proofs_invalid_parameter )
       (*("test_collision_page_size", Test.test_collision_page_size);*);
     ]
 
