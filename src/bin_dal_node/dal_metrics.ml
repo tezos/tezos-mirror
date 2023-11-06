@@ -82,17 +82,7 @@ module GS = struct
         label_names = [Prometheus.LabelName.v label_name];
       }
     in
-    let collect () =
-      List.fold_left
-        (fun acc (label, value) ->
-          Prometheus.LabelSetMap.add
-            [label]
-            [Prometheus.Sample_set.sample value]
-            acc)
-        Prometheus.LabelSetMap.empty
-        (collectors ())
-    in
-    (info, collect)
+    (info, collectors)
 
   let add_metric (info, collector) =
     Prometheus.CollectorRegistry.(register default) info collector
@@ -106,9 +96,13 @@ module GS = struct
 
     let app_output_stream_length = ref 0
 
-    let count_peers_per_topic = ref []
+    let count_peers_per_topic :
+        Prometheus.Sample_set.sample trace Prometheus.LabelSetMap.t ref =
+      ref Prometheus.LabelSetMap.empty
 
-    let scores_of_peer = ref []
+    let scores_of_peer :
+        Prometheus.Sample_set.sample trace Prometheus.LabelSetMap.t ref =
+      ref Prometheus.LabelSetMap.empty
 
     let topic_as_label Types.Topic.{pkh; slot_index} =
       Format.asprintf
@@ -127,21 +121,33 @@ module GS = struct
       app_output_stream_length :=
         W.app_output_stream gs_worker |> W.Stream.length ;
       let gs_state = W.state gs_worker in
+      (* For [count_peers_per_topic] and [scores_of_peer], we store directly the
+         data in the format required by Prometheus to avoid re-folding on the
+         data again. *)
       count_peers_per_topic :=
         W.GS.Topic.Map.fold
           (fun topic peers accu ->
-            (topic_as_label topic, W.GS.Peer.Set.cardinal peers |> float)
-            :: accu)
+            Prometheus.LabelSetMap.add
+              [topic_as_label topic]
+              [
+                W.GS.Peer.Set.cardinal peers
+                |> float |> Prometheus.Sample_set.sample;
+              ]
+              accu)
           gs_state.mesh
-          [] ;
+          Prometheus.LabelSetMap.empty ;
       scores_of_peer :=
         W.GS.Peer.Map.fold
           (fun peer score accu ->
-            ( Format.asprintf "%a" W.GS.Peer.pp peer,
-              W.GS.Score.(value score |> Internal_for_tests.to_float) )
-            :: accu)
+            Prometheus.LabelSetMap.add
+              [Format.asprintf "%a" W.GS.Peer.pp peer]
+              [
+                W.GS.Score.(value score |> Internal_for_tests.to_float)
+                |> Prometheus.Sample_set.sample;
+              ]
+              accu)
           gs_state.scores
-          []
+          Prometheus.LabelSetMap.empty
   end
 
   (* Metrics about the stats gathered by the worker *)
