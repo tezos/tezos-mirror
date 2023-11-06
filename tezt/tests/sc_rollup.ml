@@ -1062,7 +1062,10 @@ let test_rollup_node_boots_into_initial_state ~kind =
     Check.int
     ~error_msg:"Unexpected initial tick count (%L = %R)" ;
 
-  let* status = Sc_rollup_helpers.status sc_rollup_node in
+  let* status =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_status ()
+  in
   let expected_status =
     match kind with
     | "arith" -> "Halted"

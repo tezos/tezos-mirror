@@ -20,3 +20,6 @@ let get_global_block_total_ticks ?(block = "head") () =
 
 let get_global_block_state_current_level ?(block = "head") () =
   make GET ["global"; "block"; block; "state_current_level"] JSON.as_int
+
+let get_global_block_status ?(block = "head") () =
+  make GET ["global"; "block"; block; "status"] JSON.as_string

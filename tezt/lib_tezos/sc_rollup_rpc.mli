@@ -23,3 +23,7 @@ val get_global_block_total_ticks : ?block:string -> unit -> int RPC_core.t
     PVM state current level for the [block] (default ["head"]). *)
 val get_global_block_state_current_level :
   ?block:string -> unit -> int RPC_core.t
+
+(** RPC: [GET global/block/<block>/status]  gets the corresponding PVM status for 
+    the [block] (default ["head"]). *)
+val get_global_block_status : ?block:string -> unit -> string RPC_core.t

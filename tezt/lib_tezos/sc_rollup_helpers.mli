@@ -365,10 +365,6 @@ val wait_for_injecting_event :
 
 val injecting_refute_event : 'a -> Sc_rollup_node.t -> unit Lwt.t
 
-(** [status ?block sc_rollup_node] gets the corresponding PVM status for the [block]
-    (default ["head"]). *)
-val status : ?block:string -> Sc_rollup_node.t -> string Lwt.t
-
 (** [outbox ?block outbox_level sc_rollup_node] gets the rollup outbox of
    [outbox_level] as known to the [block] (default ["cemented"] which
    is the block corresponding to the last cemented level). *)
