@@ -6,10 +6,9 @@
 mod deserializer;
 
 use bytes::Bytes;
-use primitive_types::{H256, U256};
-use primitives::{HashMap, B160, B256};
+use primitive_types::{H160, H256, U256};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::models::deserializer::*;
 
@@ -53,7 +52,7 @@ pub struct TestSuite(pub BTreeMap<String, TestUnit>);
 pub struct TestUnit {
     pub _info: Info,
     pub env: UnitEnv,
-    pub pre: HashMap<B160, AccountInfo>,
+    pub pre: HashMap<H160, AccountInfo>,
     pub post: BTreeMap<SpecName, Vec<Test>>,
     pub transaction: TransactionParts,
 }
@@ -102,11 +101,11 @@ pub struct Info {
 pub struct Test {
     pub expect_exception: Option<String>,
     /// Post state hash
-    pub hash: B256,
+    pub hash: H256,
     /// Indexes
     pub indexes: TxPartIndices,
     // logs
-    pub logs: B256,
+    pub logs: H256,
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_opt_str_as_bytes")]
     pub txbytes: Option<Bytes>,
@@ -122,7 +121,7 @@ pub struct TxPartIndices {
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnitEnv {
-    pub current_coinbase: B160,
+    pub current_coinbase: H160,
     pub current_gas_limit: U256,
     pub current_number: U256,
     pub current_timestamp: U256,
@@ -136,9 +135,9 @@ pub struct TransactionParts {
     pub data: Vec<Bytes>,
     pub gas_limit: Vec<U256>,
     pub gas_price: Option<U256>,
-    pub secret_key: Option<B256>,
+    pub secret_key: Option<H256>,
     #[serde(deserialize_with = "deserialize_maybe_empty")]
-    pub to: Option<B160>,
+    pub to: Option<H160>,
     pub value: Vec<U256>,
     pub max_fee_per_gas: Option<U256>,
 }
@@ -149,7 +148,7 @@ pub struct BlockEnv {
     pub number: U256,
     /// Coinbase or miner or address that created and signed the block.
     /// This is the receiver address of all the gas spent in the block.
-    pub coinbase: B160,
+    pub coinbase: H160,
     pub timestamp: U256,
     pub basefee: U256, // EIP1559
     pub gas_limit: U256,
@@ -160,7 +159,7 @@ impl Default for BlockEnv {
         BlockEnv {
             gas_limit: U256::MAX,
             number: U256::zero(),
-            coinbase: B160::zero(),
+            coinbase: H160::zero(),
             timestamp: U256::from(1),
             basefee: U256::zero(),
         }
@@ -171,10 +170,10 @@ impl Default for BlockEnv {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TxEnv {
     /// Caller or Author or tx signer
-    pub caller: B160,
+    pub caller: H160,
     pub gas_limit: u64,
     pub gas_price: U256,
-    pub transact_to: Option<B160>,
+    pub transact_to: Option<H160>,
     pub value: U256,
     #[cfg_attr(feature = "serde", serde(with = "crate::utilities::serde_hex_bytes"))]
     pub data: Bytes,
@@ -183,10 +182,10 @@ pub struct TxEnv {
 impl Default for TxEnv {
     fn default() -> TxEnv {
         TxEnv {
-            caller: B160::zero(),
+            caller: H160::zero(),
             gas_limit: u64::MAX,
             gas_price: U256::zero(),
-            transact_to: Some(B160::zero()), // will do nothing
+            transact_to: Some(H160::zero()), // will do nothing
             value: U256::zero(),
             data: Bytes::new(),
         }
@@ -203,7 +202,6 @@ pub struct Env {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use primitives::B160;
     use serde_json::Error;
 
     #[test]
@@ -221,12 +219,12 @@ mod tests {
     }
 
     #[test]
-    pub fn serialize_b160() -> Result<(), Error> {
+    pub fn serialize_h160() -> Result<(), Error> {
         let json = r#"{"_item":"0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba"}"#;
 
         #[derive(Deserialize, Debug)]
         pub struct Test {
-            _item: B160,
+            _item: H160,
         }
 
         let out: Test = serde_json::from_str(json)?;

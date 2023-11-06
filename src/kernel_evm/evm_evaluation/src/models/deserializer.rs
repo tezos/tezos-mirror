@@ -4,12 +4,12 @@
 // SPDX-License-Identifier: MIT
 
 use bytes::Bytes;
-use primitive_types::{H256, U256};
-use primitives::{HashMap, B160};
+use primitive_types::{H160, H256, U256};
 use serde::{
     de::{self, Error},
     Deserialize,
 };
+use std::collections::HashMap;
 use std::str::FromStr;
 
 pub fn deserialize_str_as_u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
@@ -62,7 +62,7 @@ where
     Ok(out)
 }
 
-pub fn deserialize_maybe_empty<'de, D>(deserializer: D) -> Result<Option<B160>, D::Error>
+pub fn deserialize_maybe_empty<'de, D>(deserializer: D) -> Result<Option<H160>, D::Error>
 where
     D: de::Deserializer<'de>,
 {
@@ -70,7 +70,7 @@ where
     if string.is_empty() {
         return Ok(None);
     }
-    Ok(Some(B160::from_str(&string).map_err(D::Error::custom)?))
+    Ok(Some(H160::from_str(&string).map_err(D::Error::custom)?))
 }
 
 pub fn deserialize_str_as_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
