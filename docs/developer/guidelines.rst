@@ -14,11 +14,11 @@ Documentation guidelines are presented for different scales: functions, modules,
 Comments within the code
 ------------------------
 
-The OCaml code should include comments facilitating the comprehension and the maintenance.
+The OCaml code should include comments facilitating comprehension and maintenance.
 
 Towards this goal, comments are useful in the code wherever they bring important information that is not easily deducible from the code itself, such as: explaining the high-level goal of a code fragment, justifying an unusual pattern of code, exhibiting an  invariant, etc. See also rule :ref:`rule_dont_repeat_the_code`.
 
-Additionnally, the main syntactic constructs in the code should be commented as follows.
+Additionally, the main syntactic constructs in the code should be commented as follows.
 
 Modules:
 
@@ -42,7 +42,7 @@ Functions and methods:
 
 Constants, variables, variants, and struct fields:
 
-- Purpose and definition of this data. Most useful comments not just expand its name using the same words, but rather describe the data including details that could not be included in its name.
+- Purpose and definition of this data. Useful comments do not just expand a name using the same words, but rather describe the data including details that could not be included in its name.
 - If there is an associated measurement unit, define it in the comment, unless it is contained in the name, e.g.,  ``TIMEOUT_MS`` for a timeout in milliseconds.
 
 .. _todo_fixme:
@@ -50,7 +50,7 @@ Constants, variables, variants, and struct fields:
 TODO/FIXME comments
 ~~~~~~~~~~~~~~~~~~~
 
-During the :ref:`code review process <code_review>`, follow-up issues may be created to improve some piece of code that already implement its specification (e.g., optimize, refactor, or bring a potentially useful generalization).
+During the :ref:`code review process <code_review>`, follow-up issues may be created to improve some piece of code that already implements its specification (e.g., optimize, refactor, or bring a potentially useful generalization).
 When the place of the future evolution is known in advance (e.g. a given function), you should mark it with a ``TODO`` comment of the form:
 
 .. code-block:: ocaml
@@ -290,8 +290,8 @@ Fortunately, a few techniques may greatly increase the maintainability of commen
 
 * Place comments near the concerned code.
 
-  Comments are more probably updated if they are placed at the "natural" place where developers would look for them.
-  For interface comments, the position of docstring is already defined by Odoc: on the definition of the module, function, or variable.
+  Comments are more likely to be updated if they are placed at the "natural" place where developers would look for them.
+  For interface comments, the position of docstrings is already defined by Odoc: on the definition of the module, function, or variable.
   Implementation comments should be placed near the code they describe; avoid placing all the comments at the beginning of the file, unless their scope is the whole file.
 
 * Stay at a high level.
@@ -311,21 +311,21 @@ Fortunately, a few techniques may greatly increase the maintainability of commen
   * In other cases, the documentation needed near some piece of code is already available outside the code. For instance, a user-visible client command or node RPC should not duplicate explanations in the user reference.
 
     Most such cases are handled in Octez by automatically generating the reference manual from the code.
-    When this is not the case, comments in the code should refer to the outside sources instead of duplicating them, by using: web links to the technical documentation, to GitLab repositories, or to third-party websites when appropriate (e.g. Wikpedia for known concepts).
+    When this is not the case, comments in the code should refer to the outside sources instead of duplicating them, by using: web links to the technical documentation, to GitLab repositories, or to third-party websites when appropriate (e.g. Wikipedia for known concepts).
 
-  * Another important case are comments describing a cross-module design decision or property.
+  * Another important case is comments describing a cross-module design decision or property.
 
     Duplication can be avoided here by using cross-references, as described above.
     However, if all the modules belong to the same library, you could rather place the comments in a ``index.mld`` file describing the library, and refer to that file in all the needed places, using Odoc-checked cross-references.
 
 * Envision cohesive documentation.
 
-  * When writing online technical documentation, refer whenever needed to code artefacts: module APIs, gitlab entities in the Octez repository, or source files, using our Sphinx-checked :ref:`custom roles <custom_sphinx_roles>`.
+  * When writing online technical documentation, refer whenever needed to code artefacts: module APIs, GitLab entities in the Octez repository, or source files, using our Sphinx-checked :ref:`custom roles <custom_sphinx_roles>`.
 
-  * More generally, including various kinds of checked cross-references in the documentation makes it more cohesive, and more robust to maintenance.
-    Indeed, the more checked links you include in the documentation (from comments to related code elements, from comments to ``.mld`` files and back, from external documentation to code and back, to external websites, etc.), the more are chances that the documentation will be updated along with the code, when some links brake.
+  * More generally, including various kinds of checked cross-references in the documentation makes it more cohesive, more robust and easier to maintain.
+    Indeed, the more checked links you include in the documentation (from comments to related code elements, from comments to ``.mld`` files and back, from external documentation to code and back, to external websites, etc.), the more are chances that the documentation will be updated along with the code, when some links break.
 
-    Our documentation tools (Odoc and Sphinx, currently) provide support for such cohesive documentation which is probably more advanced than the average, so you can take advantage from it.
+    Our documentation tools (Odoc and Sphinx, currently) provide support for such cohesive documentation which is probably more advanced than the average, so take advantage from it!
 
 Logging vs comments
 ~~~~~~~~~~~~~~~~~~~
@@ -358,7 +358,7 @@ For details on logging, see :ref:`logging_levels`.
 Comment first
 ~~~~~~~~~~~~~
 
-This section is by no means a rule to comply with, but just some arguments, advocated by John Ousterhout [1]_, for a documentation practice consisting in writing most comments *before* the code, or *along with* the code.
+This section is by no means a rule to comply with, but just some arguments, advocated by John Ousterhout [1]_, for a documentation practice consisting in writing most comments *before* writing the code, or *while* writing the code.
 These arguments are left to the appreciation of each developer.
 
 Most comments, including all the docstrings that describe interfaces, are more related to the software design phase than to the other phases of software development such as coding, testing, releasing.
@@ -814,17 +814,17 @@ Check the :package-api:`online documentation <octez-libs/Tezos_lwt_result_stdlib
 Naming
 ------
 
-Good names help maintainters quickly understanding the code by concisely suggesting what a variable represents or what a function computes.
+Good names help maintainers quickly understand the code by concisely suggesting what a variable represents or what a function computes.
 
 This implies that good names precisely evoke the denoted value(s), without being longer than necessary:
 
 * *precision*: avoid using too generic names such as "buffer", "counter", or "result"; give instead some hint about what is stored, counted, or computed.
-* *consciseness*: as you cannot put everything into a name, select the most important notion(s), and avoid redundant words (using or not abbreviations is up to you; it's just about avoiding names longer than necessary).
+* *concision*: as you cannot put everything into a name, select the most important notion(s), and avoid redundant words (abbreviating or not is up to you; it's just about avoiding names longer than necessary).
   For instance, suffixing the name with its type such as "..._list" is not needed since the IDE can tell its type; just using plural is usually enough.
   On the contrary, it is useful to add details to the type, such as "..._dir" or "..._title" for a value of type string.
 
 Beyond choosing good individual names, it is also important to ensure *consistency* of naming.
-For example, if within a same module, "operation" is used sometimes for Michelson operations and other times for arithmetic operations, this introduces some ambiguity, that can be solved by refining the naming scheme.
+For example, if within a same module, "operation" is used sometimes for Michelson operations and other times for arithmetic operations, this introduces ambiguity, that can be solved by refining the naming scheme.
 
 Other coding conventions
 ------------------------
