@@ -50,8 +50,6 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-type slot_header = {level : int; commitment : string; index : int}
-
 type simulation_result = {
   state_hash : string;
   status : string;
@@ -332,18 +330,6 @@ let gc_info ?hooks sc_client =
        last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
        first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
      }
-
-let dal_slot_headers ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
-  |> Runnable.map (fun json ->
-         JSON.(
-           as_list json
-           |> List.map (fun obj ->
-                  {
-                    level = obj |> get "level" |> as_int;
-                    commitment = obj |> get "commitment" |> as_string;
-                    index = obj |> get "index" |> as_int;
-                  })))
 
 let get_dal_processed_slots ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "processed_slots"]

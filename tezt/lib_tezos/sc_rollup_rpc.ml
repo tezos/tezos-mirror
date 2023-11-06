@@ -49,3 +49,16 @@ let get_global_block_num_messages = get_global_block_aux ~path:["num_messages"]
 let get_global_tezos_head () = make GET ["global"; "tezos_head"] Fun.id
 
 let get_global_tezos_level () = make GET ["global"; "tezos_level"] Fun.id
+
+type slot_header = {level : int; commitment : string; index : int}
+
+let get_global_block_dal_slot_headers ?(block = "head") () =
+  make GET ["global"; "block"; block; "dal"; "slot_headers"] (fun json ->
+      JSON.(
+        as_list json
+        |> List.map (fun obj ->
+               {
+                 level = obj |-> "level" |> as_int;
+                 commitment = obj |-> "commitment" |> as_string;
+                 index = obj |-> "index" |> as_int;
+               })))

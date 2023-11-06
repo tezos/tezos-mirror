@@ -42,8 +42,6 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-type slot_header = {level : int; commitment : string; index : int}
-
 type simulation_result = {
   state_hash : string;
   status : string;
@@ -188,14 +186,6 @@ val commitment :
 
 (** [gc_info client] returns garbage collection information. *)
 val gc_info : ?hooks:Process.hooks -> t -> gc_info Runnable.process
-
-(** [dal_slot_headers ?block client] returns the dal slot headers of the
-    [block] (default ["head"]). *)
-val dal_slot_headers :
-  ?hooks:Process.hooks ->
-  ?block:string ->
-  t ->
-  slot_header list Runnable.process
 
 (** [get_dal_processed_slots ?block client] returns the slots indices that have
     been marked by the rollup node as confirmed or unconfirmed for block [block]

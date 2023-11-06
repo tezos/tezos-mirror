@@ -58,3 +58,10 @@ val get_global_tezos_head : unit -> JSON.t RPC_core.t
 
 (** RPC: [GET global/tezos_level]. *)
 val get_global_tezos_level : unit -> JSON.t RPC_core.t
+
+type slot_header = {level : int; commitment : string; index : int}
+
+(** RPC: [GET global/block/<block>/dal/slot_headers] returns the dal slot headers
+    of the [block] (default ["head"]).  *)
+val get_global_block_dal_slot_headers :
+  ?block:string -> unit -> slot_header list RPC_core.t
