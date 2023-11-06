@@ -998,7 +998,7 @@ let bake_n ?baking_mode ?policy ?liquidity_baking_toggle_vote
 
 let rec bake_while_with_metadata ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote
-    ?(invariant = fun _ -> return_unit) predicate b =
+    ?(invariant = fun _ -> return_unit) ?previous_metadata predicate b =
   let open Lwt_result_syntax in
   let* () = invariant b in
   let* new_block, (metadata, _) =
@@ -1015,21 +1015,28 @@ let rec bake_while_with_metadata ?baking_mode ?policy
       ?policy
       ?liquidity_baking_toggle_vote
       ?adaptive_issuance_vote
+      ~previous_metadata:metadata
       ~invariant
       predicate
       new_block
-  else return b
+  else return (b, (previous_metadata, metadata))
+
+let bake_while_with_metadata = bake_while_with_metadata ?previous_metadata:None
 
 let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
     ?adaptive_issuance_vote ?invariant predicate b =
-  bake_while_with_metadata
-    ?baking_mode
-    ?policy
-    ?liquidity_baking_toggle_vote
-    ?adaptive_issuance_vote
-    ?invariant
-    (fun block _metadata -> predicate block)
-    b
+  let open Lwt_result_syntax in
+  let* b, _ =
+    bake_while_with_metadata
+      ?baking_mode
+      ?policy
+      ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote
+      ?invariant
+      (fun block _metadata -> predicate block)
+      b
+  in
+  return b
 
 let bake_until_level ?baking_mode ?policy ?liquidity_baking_toggle_vote
     ?adaptive_issuance_vote level b =
@@ -1247,9 +1254,24 @@ let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   in
   bake ?baking_mode ?policy final_block_of_previous_cycle
 
+let bake_until_cycle_with_metadata ?baking_mode ?policy cycle (b : t) =
+  bake_while_with_metadata
+    ?baking_mode
+    ?policy
+    (fun block _ -> Cycle.(current_cycle block < cycle))
+    b
+
 let bake_until_cycle_end ?baking_mode ?policy b =
   let cycle = current_cycle b in
   bake_until_cycle ?baking_mode ?policy (Cycle.succ cycle) b
+
+let bake_until_cycle_end_with_metadata ?baking_mode ?policy b =
+  let open Lwt_result_syntax in
+  let cycle = current_cycle b in
+  let* blk, (eoc_metadata, nxt_metadata) =
+    bake_until_cycle_with_metadata ?baking_mode ?policy (Cycle.succ cycle) b
+  in
+  return (blk, eoc_metadata, nxt_metadata)
 
 let bake_until_n_cycle_end ?policy n b =
   let cycle = current_cycle b in

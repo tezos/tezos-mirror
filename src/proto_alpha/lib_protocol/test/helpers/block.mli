@@ -331,7 +331,11 @@ val bake_while :
   block tzresult Lwt.t
 
 (* Same as [bake_while] but the predicate also has access to the
-   metadata resulting from the application of the block. *)
+   metadata resulting from the application of the block.
+
+   optionnal metadata of the last block stisfying the condition and metadata of
+   the last block (which don't) are returned together with the block.
+*)
 val bake_while_with_metadata :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
@@ -340,7 +344,8 @@ val bake_while_with_metadata :
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> block_header_metadata -> bool) ->
   block ->
-  block tzresult Lwt.t
+  (block * (block_header_metadata option * block_header_metadata)) tzresult
+  Lwt.t
 
 val current_cycle : block -> Cycle.t
 
@@ -350,6 +355,14 @@ val last_block_of_cycle : block -> bool
     that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
 val bake_until_cycle_end :
   ?baking_mode:baking_mode -> ?policy:baker_policy -> t -> t tzresult Lwt.t
+
+(** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
+    that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
+val bake_until_cycle_end_with_metadata :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  block ->
+  (block * block_header_metadata option * block_header_metadata) tzresult Lwt.t
 
 (** Bakes enough blocks to end [n] cycles. *)
 val bake_until_n_cycle_end :
