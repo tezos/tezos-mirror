@@ -179,7 +179,10 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         Sc_rollup_node.RPC.call sc_rollup_node
         @@ Sc_rollup_rpc.get_global_block_state_hash ()
       in
-      let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+      let* prev_ticks =
+        Sc_rollup_node.RPC.call sc_rollup_node
+        @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+      in
       let message = sf "%d %d + value" i ((i + 2) * 2) in
       let* () =
         match forwarder with
@@ -245,7 +248,10 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         Check.string
         ~error_msg:"State hash has not changed (%L <> %R)" ;
 
-      let* ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+      let* ticks =
+        Sc_rollup_node.RPC.call sc_rollup_node
+        @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+      in
       Check.(ticks >= prev_ticks)
         Check.int
         ~error_msg:"Tick counter did not advance (%L >= %R)" ;

@@ -1624,7 +1624,10 @@ module Tx_kernel_e2e = struct
   end
 
   let assert_ticks_advanced ?block sc_rollup_node prev_ticks =
-    let* ticks = Sc_rollup_helpers.total_ticks ?block sc_rollup_node in
+    let* ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ?block ()
+    in
     Check.(ticks > prev_ticks)
       Check.int
       ~error_msg:"Tick counter did not advance (%L > %R)" ;
@@ -1828,7 +1831,10 @@ module Tx_kernel_e2e = struct
       Sc_rollup_node.RPC.call sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
-    let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+    let* prev_ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+    in
     let* () = send_message client (sf "hex:[%S]" hex_encoded_message) in
     let level = level + 1 in
     let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in

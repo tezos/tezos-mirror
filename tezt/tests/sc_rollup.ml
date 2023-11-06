@@ -1054,7 +1054,10 @@ let test_rollup_node_boots_into_initial_state ~kind =
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+  let* ticks =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
   Check.(ticks = 0)
     Check.int
     ~error_msg:"Unexpected initial tick count (%L = %R)" ;
@@ -1112,7 +1115,10 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       Sc_rollup_node.RPC.call sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
-    let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+    let* prev_ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+    in
     let message = sf "%d %d + value" i ((i + 2) * 2) in
     let* () =
       match forwarder with
@@ -1181,7 +1187,10 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     Check.(state_hash <> prev_state_hash)
       Check.string
       ~error_msg:"State hash has not changed (%L <> %R)" ;
-    let* ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+    let* ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+    in
     Check.(ticks >= prev_ticks)
       Check.int
       ~error_msg:"Tick counter did not advance (%L >= %R)" ;

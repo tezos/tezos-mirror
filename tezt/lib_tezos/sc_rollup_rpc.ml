@@ -14,3 +14,6 @@ let get_global_block_ticks ?(block = "head") () =
 
 let get_global_block_state_hash ?(block = "head") () =
   make GET ["global"; "block"; block; "state_hash"] JSON.as_string
+
+let get_global_block_total_ticks ?(block = "head") () =
+  make GET ["global"; "block"; block; "total_ticks"] JSON.as_int
