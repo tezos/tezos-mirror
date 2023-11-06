@@ -19,8 +19,6 @@ use thiserror::Error;
 use crate::fillers::process;
 use crate::models::{Env, FillerSource, SpecName, TestSuite};
 
-use crate::helpers::u256_to_h256;
-
 const MAP_CALLER_KEYS: [(B256, B160); 6] = [
     (
         B256(hex!(
@@ -114,9 +112,7 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
             account.set_code(&mut host, &info.code).unwrap();
             println!("Code was set for {}", address);
             for (index, value) in info.storage.iter() {
-                account
-                    .set_storage(&mut host, &u256_to_h256(index), &u256_to_h256(value))
-                    .unwrap();
+                account.set_storage(&mut host, index, value).unwrap();
             }
         }
         println!("\n[END] Accounts initialisation\n");

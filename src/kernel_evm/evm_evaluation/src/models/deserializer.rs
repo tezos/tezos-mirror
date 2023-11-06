@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: MIT
 
 use bytes::Bytes;
-use primitive_types::U256;
-use primitives::B160;
+use primitive_types::{H256, U256};
+use primitives::{HashMap, B160};
 use serde::{
     de::{self, Error},
     Deserialize,
@@ -92,6 +92,52 @@ where
 {
     #[derive(Debug, Deserialize)]
     struct WrappedValue(#[serde(deserialize_with = "deserialize_str_as_bytes")] Bytes);
+
+    Option::<WrappedValue>::deserialize(deserializer).map(
+        |opt_wrapped: Option<WrappedValue>| {
+            opt_wrapped.map(|wrapped: WrappedValue| wrapped.0)
+        },
+    )
+}
+
+pub fn deserialize_u256_as_h256<'de, D>(deserializer: D) -> Result<H256, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let value = U256::deserialize(deserializer)?;
+
+    let mut h256 = H256::zero();
+    value.to_big_endian(h256.as_bytes_mut());
+
+    Ok(h256)
+}
+
+pub fn deserialize_h256_hashmap<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<H256, H256>, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    #[derive(Debug, Deserialize, PartialEq, Eq, Hash)]
+    struct WrappedValue(#[serde(deserialize_with = "deserialize_u256_as_h256")] H256);
+
+    HashMap::<WrappedValue, WrappedValue>::deserialize(deserializer).map(
+        |map_wrapped: HashMap<WrappedValue, WrappedValue>| {
+            map_wrapped.iter().map(|(w1, w2)| (w1.0, w2.0)).collect()
+        },
+    )
+}
+
+pub fn deserialize_opt_h256_hashmap<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<H256, H256>>, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    #[derive(Debug, Deserialize, PartialEq, Eq)]
+    struct WrappedValue(
+        #[serde(deserialize_with = "deserialize_h256_hashmap")] HashMap<H256, H256>,
+    );
 
     Option::<WrappedValue>::deserialize(deserializer).map(
         |opt_wrapped: Option<WrappedValue>| {

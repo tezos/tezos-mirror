@@ -2,14 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use primitive_types::{H256, U256};
 use primitives::SpecId;
-
-pub fn u256_to_h256(value: &U256) -> H256 {
-    let mut ret = H256::zero();
-    value.to_big_endian(ret.as_bytes_mut());
-    ret
-}
 
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
     if data.contains('>') {

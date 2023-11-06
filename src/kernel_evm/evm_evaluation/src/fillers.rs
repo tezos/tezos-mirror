@@ -2,9 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::helpers::{
-    network_to_specid, parse_and_get_cmp, purify_network, u256_to_h256,
-};
+use crate::helpers::{network_to_specid, parse_and_get_cmp, purify_network};
 use crate::models::{AccountInfoFiller, FillerSource, SpecName};
 
 use evm_execution::account_storage::EthereumAccount;
@@ -120,10 +118,10 @@ fn check_storage<Host: Runtime>(
             println!("Account {}: storage matched (both empty).", hex_address)
         }
         for (index, value) in storage.iter() {
-            match account.get_storage(host, &u256_to_h256(index)) {
+            match account.get_storage(host, index) {
                 Ok(current_storage_value) => {
-                    let storage_value = u256_to_h256(value);
-                    if current_storage_value != storage_value {
+                    let storage_value = value;
+                    if current_storage_value != *storage_value {
                         *invalid_state = true;
                         println!("Account {}: storage don't match current one, {} was expected, but got {}.", hex_address, storage_value, current_storage_value)
                     } else {

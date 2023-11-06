@@ -6,7 +6,7 @@
 mod deserializer;
 
 use bytes::Bytes;
-use primitive_types::U256;
+use primitive_types::{H256, U256};
 use primitives::{HashMap, B160, B256};
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -42,7 +42,8 @@ pub struct AccountInfo {
     pub code: Bytes,
     #[serde(deserialize_with = "deserialize_str_as_u64")]
     pub nonce: u64,
-    pub storage: HashMap<U256, U256>,
+    #[serde(deserialize_with = "deserialize_h256_hashmap")]
+    pub storage: HashMap<H256, H256>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -83,7 +84,10 @@ pub struct AccountInfoFiller {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "deserialize_opt_str_as_u64")]
     pub nonce: Option<u64>,
-    pub storage: Option<HashMap<U256, U256>>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_opt_h256_hashmap")]
+    pub storage: Option<HashMap<H256, H256>>,
     pub shouldnotexist: Option<String>,
 }
 
