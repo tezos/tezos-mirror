@@ -255,7 +255,7 @@ let make_arguments node =
     metrics_addr node;
   ]
 
-let do_runlike_command ?env node arguments =
+let do_runlike_command ?env ?(event_level = `Debug) node arguments =
   if node.status <> Not_running then
     Test.fail "DAL node %s is already running" node.name ;
   let on_terminate _status =
@@ -268,16 +268,17 @@ let do_runlike_command ?env node arguments =
      * [make_arguments] seems incomplete
      * refactoring possible in [spawn_config_init] *)
   let arguments = arguments @ make_arguments node in
-  run ?env node {ready = false} arguments ~on_terminate
+  run ?env ~event_level node {ready = false} arguments ~on_terminate
 
-let run ?env node =
+let run ?env ?event_level node =
   do_runlike_command
     ?env
+    ?event_level
     node
     ["run"; "--data-dir"; node.persistent_state.data_dir]
 
-let run ?(wait_ready = true) ?env node =
-  let* () = run ?env node in
+let run ?(wait_ready = true) ?env ?event_level node =
+  let* () = run ?env ?event_level node in
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in
   return ()
 
