@@ -27,10 +27,6 @@ open Gossipsub_intf
 
 (** This module allows to compute a score for each peers. *)
 
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/4967
-
-   This is incomplete *)
-
 module Make
     (Span : SPAN)
     (Time : TIME with type span = Span.t)
