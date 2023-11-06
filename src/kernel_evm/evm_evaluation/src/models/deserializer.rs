@@ -43,16 +43,6 @@ where
     )
 }
 
-pub fn deserialize_str_as_u256<'de, D>(deserializer: D) -> Result<U256, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    let string = String::deserialize(deserializer)?;
-    let output = string.parse().unwrap();
-
-    Ok(output)
-}
-
 pub fn deserialize_vec_as_vec_bytes<'de, D>(
     deserializer: D,
 ) -> Result<Vec<Bytes>, D::Error>

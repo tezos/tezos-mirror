@@ -119,11 +119,8 @@ pub struct TxPartIndices {
 #[serde(rename_all = "camelCase")]
 pub struct UnitEnv {
     pub current_coinbase: B160,
-    #[serde(default, deserialize_with = "deserialize_str_as_u256")]
     pub current_gas_limit: U256,
-    #[serde(deserialize_with = "deserialize_str_as_u256")]
     pub current_number: U256,
-    #[serde(deserialize_with = "deserialize_str_as_u256")]
     pub current_timestamp: U256,
     pub current_base_fee: Option<U256>,
 }
