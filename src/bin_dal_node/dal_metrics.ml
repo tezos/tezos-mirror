@@ -100,7 +100,7 @@ module GS = struct
         Prometheus.Sample_set.sample trace Prometheus.LabelSetMap.t ref =
       ref Prometheus.LabelSetMap.empty
 
-    let scores_of_peer :
+    let scores_of_peers :
         Prometheus.Sample_set.sample trace Prometheus.LabelSetMap.t ref =
       ref Prometheus.LabelSetMap.empty
 
@@ -111,7 +111,9 @@ module GS = struct
         pkh
         slot_index
 
-    let set gs_worker =
+    (* This function is called by Prometheus to collect Gossipsub data every X
+       seconds, where X is the refresh frequency of the Prometeus server. *)
+    let collectors_callback gs_worker =
       let module W = Gossipsub.Worker in
       gs_stats := W.stats gs_worker ;
       input_events_stream_length :=
@@ -121,7 +123,7 @@ module GS = struct
       app_output_stream_length :=
         W.app_output_stream gs_worker |> W.Stream.length ;
       let gs_state = W.state gs_worker in
-      (* For [count_peers_per_topic] and [scores_of_peer], we store directly the
+      (* For [count_peers_per_topic] and [scores_of_peers], we store directly the
          data in the format required by Prometheus to avoid re-folding on the
          data again. *)
       count_peers_per_topic :=
@@ -136,7 +138,7 @@ module GS = struct
               accu)
           gs_state.mesh
           Prometheus.LabelSetMap.empty ;
-      scores_of_peer :=
+      scores_of_peers :=
         W.GS.Peer.Map.fold
           (fun peer score accu ->
             Prometheus.LabelSetMap.add
@@ -277,18 +279,16 @@ module GS = struct
   let count_peers_per_topic =
     labeled_metric
       ~name:"count_peers_per_topic"
-      ~help:
-        "The number of peers the node is connected to per topic in the \
-         mesh"
+      ~help:"The number of peers the node is connected to per topic in the mesh"
       ~label_name:"count_peers_per_topic"
       (fun () -> !Stats.count_peers_per_topic)
 
-  let scores_of_peer =
+  let scores_of_peers =
     labeled_metric
-      ~name:"scores_of_peer"
-      ~help:"Return the score of peer connected to the node."
-      ~label_name:"scores_of_peer"
-      (fun () -> !Stats.scores_of_peer)
+      ~name:"scores_of_peers"
+      ~help:"The score of peers connected to the node"
+      ~label_name:"scores_of_peers"
+      (fun () -> !Stats.scores_of_peers)
 
   let metrics =
     [
@@ -314,7 +314,7 @@ module GS = struct
       app_output_stream_length;
       (* Other metrics about GS automaton's state *)
       count_peers_per_topic;
-      scores_of_peer;
+      scores_of_peers;
     ]
 
   let () = List.iter add_metric metrics
@@ -348,4 +348,4 @@ let sample_time ~sampling_frequency ~to_sample ~metric_updater =
 
 let collect_gossipsub_metrics gs_worker =
   Prometheus.CollectorRegistry.(register_pre_collect default) (fun () ->
-      GS.Stats.set gs_worker)
+      GS.Stats.collectors_callback gs_worker)
