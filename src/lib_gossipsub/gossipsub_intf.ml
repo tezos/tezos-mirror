@@ -1100,7 +1100,7 @@ module type WORKER = sig
     | New_connection of {
         peer : GS.Peer.t;
         direct : bool;
-        outbound : bool;
+        trusted : bool;
         bootstrap : bool;
       }
     | Disconnection of {peer : GS.Peer.t}

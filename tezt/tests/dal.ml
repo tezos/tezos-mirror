@@ -2777,14 +2777,14 @@ let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
 
-let check_new_connection_event ~main_node ~other_node ~is_outbound =
+let check_new_connection_event ~main_node ~other_node ~is_trusted =
   wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
       let*?? () =
         check_expected
           JSON.(Dal_node.read_identity other_node |-> "peer_id" |> as_string)
           JSON.(event |-> "peer" |> as_string)
       in
-      check_expected is_outbound JSON.(event |-> "outbound" |> as_bool))
+      check_expected is_trusted JSON.(event |-> "trusted" |> as_bool))
 
 let check_disconnection_event dal_node ~peer_id =
   wait_for_gossipsub_worker_event
@@ -3032,7 +3032,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     check_new_connection_event
       ~main_node:dal_node1
       ~other_node:dal_node2
-      ~is_outbound:false
+      ~is_trusted:false
   in
   let* () = Dal_node.run dal_node2 in
   conn_ev_in_node1
@@ -3525,13 +3525,13 @@ let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
     check_new_connection_event
       ~main_node:dal_node2
       ~other_node:dal_node3
-      ~is_outbound:false
+      ~is_trusted:false
   in
   let check_conn_event_from_3_to_2 =
     check_new_connection_event
       ~main_node:dal_node3
       ~other_node:dal_node2
-      ~is_outbound:false
+      ~is_trusted:false
   in
   Log.info "Bake two times to finalize a block." ;
   let* () = Client.bake_for_and_wait client in

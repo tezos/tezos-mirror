@@ -146,7 +146,7 @@ end
     implements a way to mitigate this risk, but not the Go implementation.
 *)
 let new_connections_handler gs_worker p2p_layer peer conn =
-  let P2p_connection.Info.{incoming; id_point = addr, port_opt; _} =
+  let P2p_connection.Info.{id_point = addr, port_opt; _} =
     P2p.connection_info p2p_layer conn
   in
   let Types.P2P.Metadata.Connection.{is_bootstrap_peer = bootstrap; _} =
@@ -164,13 +164,13 @@ let new_connections_handler gs_worker p2p_layer peer conn =
     Option.fold port_opt ~none:false ~some:(fun port ->
         fold_pool_opt P2p_pool.Points.get_trusted (addr, port))
   in
-  let outbound = (not incoming) && (trusted_peer || trusted_point) in
+  let trusted = trusted_peer || trusted_point in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
 
      Add the ability to have direct peers. *)
   let direct = false in
   Worker.(
-    New_connection {peer; direct; outbound; bootstrap} |> p2p_input gs_worker)
+    New_connection {peer; direct; trusted; bootstrap} |> p2p_input gs_worker)
 
 (** This handler forwards information about P2P disconnections to the Gossipsub
     worker. *)
