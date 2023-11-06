@@ -231,6 +231,10 @@ module P2P = struct
     let get_scores ctxt () () =
       let open Lwt_result_syntax in
       return @@ Node_context.P2P.Gossipsub.get_scores ctxt
+
+    let get_backoffs ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_backoffs ctxt
   end
 end
 
@@ -310,6 +314,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_scores
        (P2P.Gossipsub.get_scores ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_backoffs
+       (P2P.Gossipsub.get_backoffs ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.post_connect

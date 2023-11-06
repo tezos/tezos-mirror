@@ -231,5 +231,9 @@ module P2P : sig
 
     (** [get_scores t] returns the score of peers with a known score. *)
     val get_scores : t -> (Types.Peer.t * Types.Score.t) list
+
+    (** [get_backoffs t] returns the backoffs of peers with a backoff. *)
+    val get_backoffs :
+      t -> (Types.Topic.t * (Types.Peer.t * Types.Time.t) list) list
   end
 end

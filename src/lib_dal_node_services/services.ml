@@ -483,6 +483,30 @@ module P2P = struct
             list (obj2 (req "peer" Peer.encoding) (req "score" Score.encoding)))
         (open_root / "scores")
 
+    let get_backoffs :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Topic.t * (Peer.t * Time.t) list) list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:"Get the backoffs of the peers with a backoff, per topic."
+        ~query:Tezos_rpc.Query.empty
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "topic" Topic.encoding)
+                 (req
+                    "backoffs"
+                    (list
+                       (obj2
+                          (req "peer" Peer.encoding)
+                          (req "backoff" Tezos_base.Time.System.encoding))))))
+        (open_root / "backoffs")
+
     let get_topics_peers :
         < meth : [`GET]
         ; input : unit
