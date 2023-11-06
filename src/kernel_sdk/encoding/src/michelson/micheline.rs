@@ -139,12 +139,133 @@ where
     pub(crate) annots: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Node {
+    Int(Zarith),
+    String(String),
+    Bytes(Vec<u8>),
+    Prim {
+        prim_tag: u8,
+        args: Vec<Node>,
+        annots: Option<String>,
+    },
+}
+
+impl From<MichelineInt> for Node {
+    fn from(i: MichelineInt) -> Self {
+        let MichelineInt(i) = i;
+        Node::Int(i)
+    }
+}
+
+impl From<MichelineString> for Node {
+    fn from(s: MichelineString) -> Self {
+        let MichelineString(s) = s;
+        Node::String(s)
+    }
+}
+
+impl From<MichelineBytes> for Node {
+    fn from(s: MichelineBytes) -> Self {
+        let MichelineBytes(s) = s;
+        Node::Bytes(s)
+    }
+}
+
+impl<const PRIM_TAG: u8> From<MichelinePrimNoArgsNoAnnots<PRIM_TAG>> for Node {
+    fn from(_: MichelinePrimNoArgsNoAnnots<PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![],
+            annots: None,
+        }
+    }
+}
+
+impl<const PRIM_TAG: u8> From<MichelinePrimNoArgsSomeAnnots<PRIM_TAG>> for Node {
+    fn from(a: MichelinePrimNoArgsSomeAnnots<PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![],
+            annots: Some(a.annots),
+        }
+    }
+}
+
+impl<Arg, const PRIM_TAG: u8> From<MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>> for Node
+where
+    Arg: Debug + PartialEq + Eq,
+    Node: From<Arg>,
+{
+    fn from(a: MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg.into()],
+            annots: None,
+        }
+    }
+}
+
+impl<Arg, const PRIM_TAG: u8> From<MichelinePrim1ArgSomeAnnots<Arg, PRIM_TAG>> for Node
+where
+    Arg: Debug + PartialEq + Eq,
+    Node: From<Arg>,
+{
+    fn from(a: MichelinePrim1ArgSomeAnnots<Arg, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg.into()],
+            annots: Some(a.annots),
+        }
+    }
+}
+
+impl<Arg1, Arg2, const PRIM_TAG: u8>
+    From<MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>> for Node
+where
+    Arg1: Debug + PartialEq + Eq,
+    Arg2: Debug + PartialEq + Eq,
+    Node: From<Arg1>,
+    Node: From<Arg2>,
+{
+    fn from(a: MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg1.into(), a.arg2.into()],
+            annots: None,
+        }
+    }
+}
+
+impl<Arg1, Arg2, const PRIM_TAG: u8>
+    From<MichelinePrim2ArgsSomeAnnots<Arg1, Arg2, PRIM_TAG>> for Node
+where
+    Arg1: Debug + PartialEq + Eq,
+    Arg2: Debug + PartialEq + Eq,
+    Node: From<Arg1>,
+    Node: From<Arg2>,
+{
+    fn from(a: MichelinePrim2ArgsSomeAnnots<Arg1, Arg2, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg1.into(), a.arg2.into()],
+            annots: Some(a.annots),
+        }
+    }
+}
+
 // ----------
 // CONVERSION
 // ----------
 impl From<i32> for MichelineInt {
     fn from(int: i32) -> Self {
         MichelineInt(Zarith(int.into()))
+    }
+}
+
+impl From<i32> for Node {
+    fn from(int: i32) -> Self {
+        Node::Int(Zarith(int.into()))
     }
 }
 
