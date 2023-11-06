@@ -959,6 +959,7 @@ let bls12_381 =
   public_lib
     "bls12-381"
     ~path:"src/lib_bls12_381"
+    ~available:(N_ary_and [No_32; No_ppc; No_s390x])
     ~synopsis:
       "Implementation of the BLS12-381 curve (wrapper for the Blst library)"
     ~modules:
