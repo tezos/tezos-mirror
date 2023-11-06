@@ -10,7 +10,7 @@
 //! [lib_micheline]: <https://gitlab.com/tezos/tezos/-/blob/9028b797894a5d9db38bc61a20abb793c3778316/src/lib_micheline/micheline_encoding.ml>
 use nom::bytes::complete::tag;
 use nom::combinator::map;
-use nom::sequence::{pair, preceded};
+use nom::sequence::{pair, preceded, tuple};
 use tezos_data_encoding::enc::{self, BinResult, BinSerializer, BinWriter};
 use tezos_data_encoding::encoding::{Encoding, HasEncoding};
 use tezos_data_encoding::has_encoding;
@@ -35,6 +35,8 @@ pub const MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG: u8 = 6;
 pub const MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG: u8 = 7;
 /// 2-argument primitive (with annotations) encoding case tag.
 pub const MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG: u8 = 8;
+/// any primitive (with or without annotations) encoding case tag.
+pub const MICHELINE_PRIM_GENERIC_TAG: u8 = 9;
 /// Bytes encoding case tag.
 pub const MICHELINE_BYTES_TAG: u8 = 10;
 
@@ -438,6 +440,110 @@ where
         map(parse, |(arg1, (arg2, annots))| {
             MichelinePrim2ArgsSomeAnnots { arg1, arg2, annots }
         })(input)
+    }
+}
+
+// Auxilary function for deserializing a `Node` in the `Prim` case.
+// `micheline_prim_tag` should be one of the `MICHELINE_PRIM_*` tags
+// and is expected to be the first byte of the input.  The next byte
+// is interpreter as the tag for the primitive, and then the `next`
+// parser is used to parse the arguments and annotations of the
+// primitive application.
+fn nom_read_app_aux<'a, T>(
+    micheline_prim_tag: u8,
+    next: impl FnMut(NomInput<'a>) -> NomResult<T>,
+    into: impl Fn((u8, T)) -> Node,
+) -> impl FnMut(NomInput<'a>) -> NomResult<Node> {
+    use nom::number::complete::u8;
+
+    preceded(tag([micheline_prim_tag]), map(pair(u8, next), into))
+}
+
+impl Node {
+    fn nom_read_app(input: NomInput) -> NomResult<Node> {
+        use nom::branch::alt;
+        use nom::combinator::success;
+        use Node::Prim;
+
+        alt((
+            nom_read_app_aux(
+                MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG,
+                success(()),
+                |(prim_tag, ())| Prim {
+                    prim_tag,
+                    args: vec![],
+                    annots: None,
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG,
+                nom_read::string,
+                |(prim_tag, annots)| Prim {
+                    prim_tag,
+                    args: vec![],
+                    annots: Some(annots),
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG,
+                Self::nom_read,
+                |(prim_tag, arg)| Prim {
+                    prim_tag,
+                    args: vec![arg],
+                    annots: None,
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG,
+                pair(Self::nom_read, nom_read::string),
+                |(prim_tag, (arg, annots))| Prim {
+                    prim_tag,
+                    args: vec![arg],
+                    annots: Some(annots),
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG,
+                pair(Self::nom_read, Self::nom_read),
+                |(prim_tag, (arg1, arg2))| Prim {
+                    prim_tag,
+                    args: vec![arg1, arg2],
+                    annots: None,
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG,
+                tuple((Self::nom_read, Self::nom_read, nom_read::string)),
+                |(prim_tag, (arg1, arg2, annots))| Prim {
+                    prim_tag,
+                    args: vec![arg1, arg2],
+                    annots: Some(annots),
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_GENERIC_TAG,
+                pair(
+                    nom_read::dynamic(nom_read::list(Node::nom_read)),
+                    nom_read::string,
+                ),
+                |(prim_tag, (args, annots))| Prim {
+                    prim_tag,
+                    args,
+                    annots: Some(annots),
+                },
+            ),
+        ))(input)
+    }
+}
+
+impl NomReader for Node {
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        nom::branch::alt((
+            map(nom_read_micheline_int, Node::Int),
+            map(nom_read_micheline_string, Node::String),
+            map(nom_read_micheline_bytes(nom_read::bytes), Node::Bytes),
+            Self::nom_read_app,
+        ))(input)
     }
 }
 
@@ -1063,6 +1169,36 @@ mod test {
         test.bin_write(&mut bin).unwrap();
 
         assert_eq!(expected, bin);
+    }
+
+    #[test]
+    fn micheline_pair3_annot_decode() {
+        // Decode `Pair :foo Unit 0 0`
+        let test = vec![
+            9, // Prim_generic
+            7, // Prim tag: Pair
+            0, 0, 0, 6,  // length of args
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+            0,  // Int tag
+            0,  // 0
+            0,  // Int tag
+            0,  // 0
+            0, 0, 0, 4, // length of the annotation string
+            b':', b'f', b'o', b'o', // annotation
+        ];
+
+        let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let expected = Node::Prim {
+            prim_tag: 7,
+            args: vec![unit.into(), 0.into(), 0.into()],
+            annots: Some(":foo".into()),
+        };
+
+        let (remaining_input, optnatfoo) = NomReader::nom_read(test.as_slice()).unwrap();
+
+        assert!(remaining_input.is_empty());
+        assert_eq!(expected, optnatfoo);
     }
 
     fn hex_to_bigint(s: &str) -> num_bigint::BigInt {
