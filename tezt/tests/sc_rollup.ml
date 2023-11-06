@@ -4296,11 +4296,11 @@ let test_messages_processed_by_commitment ~kind =
   let* {commitment = {inbox_level; _}; hash = _} =
     get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-
   let* current_level =
-    Sc_rollup_helpers.state_current_level
-      ~block:(string_of_int inbox_level)
-      sc_rollup_node
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_current_level
+         ~block:(string_of_int inbox_level)
+         ()
   in
   Check.((current_level = inbox_level) int)
     ~error_msg:
