@@ -437,7 +437,8 @@ module Inner = struct
            so t.max_polynomial_length coefficients. *)
         (fun () ->
           Format.asprintf
-            "SRS on G1 size is too small. Expected more than %d. Got %d"
+            "SRS on G1 size is too small. Expected more than %d. Got %d. Hint: \
+             you can reduce the size of a slot."
             max_polynomial_length
             srs_g1_length)
     in
@@ -452,7 +453,8 @@ module Inner = struct
          srs_g2_expected_length <= srs_g2_length)
         (fun () ->
           Format.asprintf
-            "SRS on G2 size is too small. Expected more than %d. Got %d"
+            "SRS on G2 size is too small. Expected more than %d. Got %d. Hint: \
+             you can increase the number of shards/number of pages."
             max_polynomial_length
             srs_g2_length)
     in
