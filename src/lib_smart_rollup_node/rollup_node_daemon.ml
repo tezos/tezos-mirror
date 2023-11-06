@@ -216,6 +216,35 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       in
       return_unit
 
+let missing_data_error trace =
+  TzTrace.fold
+    (fun acc error ->
+      match acc with
+      | Some _ -> acc
+      | None -> (
+          match error with
+          | Octez_crawler.Layer_1.Cannot_find_predecessor hash -> Some hash
+          | _ -> acc))
+    None
+    trace
+
+let report_missing_data result =
+  match result with
+  | Ok _ -> result
+  | Error trace -> (
+      match missing_data_error trace with
+      | None -> result
+      | Some hash ->
+          Error
+            (TzTrace.cons
+               (Error_monad.error_of_fmt
+                  "The L1 node does not have required information before block \
+                   %a. Consider using an L1 node in archive mode or with more \
+                   history using, e.g., --history-mode full:50"
+                  Block_hash.pp
+                  hash)
+               trace))
+
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
    also processes any missing blocks that were not processed. *)
 let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
@@ -235,23 +264,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let*! reorg =
     Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
   in
-  let*? reorg =
-    match reorg with
-    | Error trace
-      when TzTrace.fold
-             (fun yes error ->
-               yes
-               ||
-               match error with
-               | Octez_crawler.Layer_1.Cannot_find_predecessor _ -> true
-               | _ -> false)
-             false
-             trace ->
-        (* The reorganization could not be computed entirely because of missing
-           info on the Layer 1. We fallback to a recursive process_l1_block. *)
-        Ok {Reorg.no_reorg with new_chain = [stripped_head]}
-    | _ -> reorg
-  in
+  let*? reorg = report_missing_data reorg in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
      Rollback state information on reorganization, i.e. for
      reorg.old_chain. *)
