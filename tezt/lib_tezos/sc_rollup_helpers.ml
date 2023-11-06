@@ -1125,7 +1125,10 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     loser_deposits_json ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
-  let* _value = Sc_rollup_rpc.state_hash sc_rollup_node in
+  let* _value =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ()
+  in
   List.iter Lwt.cancel (restart_promise :: gather_promises) ;
   (* Capture dissections *)
   Hashtbl.to_seq_values dissections

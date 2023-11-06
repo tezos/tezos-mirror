@@ -242,7 +242,10 @@ module Tx_kernel = struct
 end
 
 let assert_state_changed ?block sc_rollup_node prev_state_hash =
-  let* state_hash = Sc_rollup_rpc.state_hash ?block sc_rollup_node in
+  let* state_hash =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ?block ()
+  in
   Check.(state_hash <> prev_state_hash)
     Check.string
     ~error_msg:"State hash has not changed (%L <> %R)" ;
@@ -412,7 +415,10 @@ let tx_kernel_e2e setup protocol =
   in
 
   (* Send transfers *)
-  let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
+  let* prev_state_hash =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ()
+  in
   let* () = send_message client (sf "hex:[%S]" transfer_message) in
   let level = level + 1 in
 
@@ -455,7 +461,10 @@ let tx_kernel_e2e setup protocol =
       |> hex_encode)
   in
   (* Send withdrawal *)
-  let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
+  let* prev_state_hash =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ()
+  in
   let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
   let* () = send_message client (sf "hex:[%S]" withdraw_message) in
   let level = level + 1 in
