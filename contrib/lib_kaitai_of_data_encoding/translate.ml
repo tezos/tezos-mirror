@@ -384,6 +384,10 @@ let rec seq_field_of_data_encoding :
   | Check_size {limit = _; encoding} ->
       (* TODO: Add a guard for check size.*)
       seq_field_of_data_encoding enums types encoding id
+  | Delayed mk ->
+      (* TODO: once data-encoding is monorepoed: remove delayed and have "cached" *)
+      let e = mk () in
+      seq_field_of_data_encoding enums types e id
   | _ -> failwith "Not implemented"
 
 and seq_field_of_tups :
