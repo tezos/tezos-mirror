@@ -81,7 +81,11 @@ module Transport_layer = struct
     let () = P2p.activate p2p in
     List.iter_s
       (fun point ->
-        let* (_ : _ P2p.connection tzresult) = P2p.connect p2p point in
+        (* Connections to points given by the user at startup (in config file
+           or via --peer options) are trusted. *)
+        let* (_ : _ P2p.connection tzresult) =
+          P2p.connect ~trusted:true p2p point
+        in
         return_unit)
       additional_points
 
@@ -90,8 +94,13 @@ module Transport_layer = struct
     match P2p.connect_handler p2p with
     | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some connect_handler ->
-        let* _conn =
-          P2p_connect_handler.connect ?timeout connect_handler point
+        (* Connections to points explicitly given by the user are trusted. *)
+        let* (_conn : _ P2p_conn.t) =
+          P2p_connect_handler.connect
+            ~trusted:true
+            ?timeout
+            connect_handler
+            point
         in
         return_unit
 
