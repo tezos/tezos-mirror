@@ -287,7 +287,8 @@ module P2P = struct
             object
               method timeout = timeout
             end)
-        |+ opt_field "timeout" Time.System.Span.rpc_arg (fun t -> t#timeout)
+        |+ opt_field "timeout" Tezos_base.Time.System.Span.rpc_arg (fun t ->
+               t#timeout)
         |> seal)
       ~input:P2p_point.Id.encoding
       ~output:Data_encoding.unit
