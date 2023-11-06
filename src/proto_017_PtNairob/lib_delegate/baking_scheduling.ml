@@ -111,13 +111,16 @@ let timestamp_of_round state ~predecessor_timestamp ~predecessor_round ~round =
   (* If it already exists, just fetch from the memoization table. *)
   | Some ts -> ok ts
 
+let sleep_until_ptime ptime =
+  let delay = Ptime.diff ptime (Time.System.now ()) in
+  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
+  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+
 (** The function is blocking until it is [time]. *)
 let sleep_until time =
   (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
   let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Time.System.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+  sleep_until_ptime time
 
 (* Only allocate once the termination promise *)
 let terminated = Lwt_exit.clean_up_starts >|= fun _ -> `Termination
@@ -543,6 +546,38 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
         wait_end_of_round ~delta next_round
     | None -> wait_end_of_round next_round
   in
+  let should_wait_to_forge_block (_next_baking_time, next_baking_round) =
+    Option.is_some state.level_state.elected_block
+    && Round.compare Round.zero next_baking_round = 0
+    && Option.is_none state.level_state.next_forged_block
+  in
+  let waiting_to_forge_block (next_baking_time, _next_baking_round) =
+    Events.(emit first_baker_of_next_level ()) >>= fun () ->
+    let now = Time.System.now () in
+    let next_baking_ptime = Time.System.of_protocol_exn next_baking_time in
+    let pre_emptive_forge_time =
+      state.global_state.config.pre_emptive_forge_time
+    in
+    let next_forging_ptime =
+      match Ptime.sub_span next_baking_ptime pre_emptive_forge_time with
+      | Some ptime -> ptime
+      | None ->
+          (* This branch can only be reached if the Ptime operations above
+             fail. In practice, it should be unreachable. *)
+          assert false
+    in
+    let delay = Ptime.diff next_forging_ptime now in
+    match sleep_until_ptime next_forging_ptime with
+    | None ->
+        Events.(emit no_need_to_wait_to_forge_block ()) >>= fun () ->
+        return (Lwt.return Time_to_forge_block)
+    | Some t ->
+        Events.(
+          emit
+            waiting_to_forge_block
+            (delay, Time.System.to_protocol next_forging_ptime))
+        >>= fun () -> return (t >>= fun () -> Lwt.return Time_to_forge_block)
+  in
   (* TODO: re-use what has been done in round_synchronizer.ml *)
   (* Compute the timestamp of the next possible round. *)
   let next_round = compute_next_round_time state in
@@ -563,8 +598,13 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
       | None -> wait_end_of_round next_round
       | Some _elected_block -> delay_next_round_timeout next_round)
   (* There is no timestamp for a successor round but there is for a
-     future baking slot, we will wait to bake. *)
-  | None, Some next_baking -> wait_baking_time_next_level next_baking
+     future baking slot. If we are the next level baker at round 0,
+     quorum has been reached for this level, and no block being forged,
+     we will wait to forge, otherwise we will wait to bake *)
+  | None, Some next_baking ->
+      if should_wait_to_forge_block next_baking then
+        waiting_to_forge_block next_baking
+      else wait_baking_time_next_level next_baking
   (* We choose the earliest timestamp between waiting to bake and
      waiting for the next round. *)
   | ( Some ((next_round_time, next_round) as next_round_info),
@@ -581,7 +621,10 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
       if
         Time.Protocol.(
           next_baking_time < add next_round_time next_round_duration)
-      then wait_baking_time_next_level next_baking
+      then
+        if should_wait_to_forge_block next_baking then
+          waiting_to_forge_block next_baking
+        else wait_baking_time_next_level next_baking
       else
         (* same observation is in the [(Some next_round, None)] case *)
         delay_next_round_timeout next_round_info
@@ -631,12 +674,15 @@ let create_dal_node_rpc_ctxt endpoint =
   new RPC_client_unix.http_ctxt rpc_config media_types
 
 let create_initial_state cctxt ?(synchronize = true) ~chain config
-    operation_worker ~(current_proposal : Baking_state.proposal) delegates =
+    operation_worker ~(current_proposal : Baking_state.proposal) ?constants
+    delegates =
   (* FIXME? consider saved endorsable value *)
   let open Protocol in
   let open Baking_state in
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+  (match constants with
+  | Some c -> return c
+  | None -> Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0))
   >>=? fun constants ->
   create_round_durations constants >>?= fun round_durations ->
   Baking_state.(
@@ -698,6 +744,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round = None;
+      next_forged_block = None;
     }
   in
   (if synchronize then
@@ -788,7 +835,7 @@ let perform_sanity_check cctxt ~chain_id =
   >>=? fun _ -> return_unit
 
 let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
-    ?(on_error = fun _ -> return_unit) ~chain config delegates =
+    ?(on_error = fun _ -> return_unit) ?constants ~chain config delegates =
   let open Lwt_result_syntax in
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   perform_sanity_check cctxt ~chain_id >>=? fun () ->
@@ -812,6 +859,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     config
     operation_worker
     ~current_proposal
+    ?constants
     delegates
   >>=? fun initial_state ->
   let cloned_block_stream = Lwt_stream.clone heads_stream in

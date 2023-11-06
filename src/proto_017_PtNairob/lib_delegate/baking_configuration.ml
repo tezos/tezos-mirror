@@ -94,6 +94,7 @@ type t = {
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
   dal_node_endpoint : Uri.t option;
+  pre_emptive_forge_time : Time.System.Span.t;
 }
 
 let default_fees_config =
@@ -128,6 +129,8 @@ let default_state_recorder_config = Memory
 
 let default_extra_operations = None
 
+let default_pre_emptive_forge_time = Time.System.Span.of_seconds_exn 0.
+
 let default_config =
   {
     fees = default_fees_config;
@@ -141,6 +144,7 @@ let default_config =
     state_recorder = default_state_recorder_config;
     extra_operations = default_extra_operations;
     dal_node_endpoint = None;
+    pre_emptive_forge_time = default_pre_emptive_forge_time;
   }
 
 let make ?(minimal_fees = default_fees_config.minimal_fees)
@@ -153,7 +157,8 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(liquidity_baking = default_liquidity_baking_config)
     ?(force_apply = default_force_apply) ?(force = default_force)
     ?(state_recorder = default_state_recorder_config) ?extra_operations
-    ?dal_node_endpoint () =
+    ?dal_node_endpoint
+    ?(pre_emptive_forge_time = default_pre_emptive_forge_time) () =
   let fees =
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
   in
@@ -174,6 +179,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     state_recorder;
     extra_operations;
     dal_node_endpoint;
+    pre_emptive_forge_time;
   }
 
 let fees_config_encoding : fees_config Data_encoding.t =
@@ -295,6 +301,7 @@ let encoding : t Data_encoding.t =
               state_recorder;
               extra_operations;
               dal_node_endpoint;
+              pre_emptive_forge_time;
             } ->
          ( ( fees,
              validation,
@@ -304,7 +311,8 @@ let encoding : t Data_encoding.t =
              liquidity_baking,
              force_apply,
              force,
-             state_recorder ),
+             state_recorder,
+             pre_emptive_forge_time ),
            (extra_operations, dal_node_endpoint) ))
        (fun ( ( fees,
                 validation,
@@ -314,7 +322,8 @@ let encoding : t Data_encoding.t =
                 liquidity_baking,
                 force_apply,
                 force,
-                state_recorder ),
+                state_recorder,
+                pre_emptive_forge_time ),
               (extra_operations, dal_node_endpoint) ) ->
          {
            fees;
@@ -328,9 +337,10 @@ let encoding : t Data_encoding.t =
            state_recorder;
            extra_operations;
            dal_node_endpoint;
+           pre_emptive_forge_time;
          })
        (merge_objs
-          (obj9
+          (obj10
              (req "fees" fees_config_encoding)
              (req "validation" validation_config_encoding)
              (req "nonce" nonce_config_encoding)
@@ -341,7 +351,8 @@ let encoding : t Data_encoding.t =
              (req "liquidity_baking" liquidity_baking_config_encoding)
              (req "force_apply" force_apply_config_encoding)
              (req "force" force_config_encoding)
-             (req "state_recorder" state_recorder_config_encoding))
+             (req "state_recorder" state_recorder_config_encoding)
+             (req "pre_emptive_forge_time" Time.System.Span.encoding))
           (obj2
              (opt "extra_operations" Operations_source.encoding)
              (opt "dal_node_endpoint" Tezos_rpc.Encoding.uri_encoding)))

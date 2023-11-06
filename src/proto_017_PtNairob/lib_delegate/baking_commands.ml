@@ -376,6 +376,24 @@ let per_block_vote_file_arg =
          if file_exists then return file
          else tzfail (Liquidity_baking_vote.Block_vote_file_not_found file)))
 
+let pre_emptive_forge_time_arg =
+  Tezos_clic.arg
+    ~long:"pre-emptive-forge-time"
+    ~placeholder:"seconds"
+    ~doc:
+      "Sets the pre-emptive forge time optimization, in seconds. When set, the \
+       baker, if it is the next level round 0 proposer, will start forging \
+       after quorum has been reached in the current level while idly waiting \
+       for it to end. When it is its time to propose, the baker will inject \
+       the pre-emptively forged block immediately, allowing more time for the \
+       network to reach quorum on it. Operators should note that the higher \
+       this value `t`, the lower the operation inclusion window (specifically \
+       `block_time - t`) which may lead to lower baking rewards. Defaults to \
+       15/% of block time. Set to 0 to ignore pre-emptive forging."
+    (Tezos_clic.parameter (fun _ s ->
+         try return (Q.of_string s)
+         with _ -> failwith "pre-emptive-forge-time expected int or float."))
+
 let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let open Lwt_syntax in
   let default_filename = Liquidity_baking_vote.default_vote_json_filename in
@@ -395,7 +413,7 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args11
+  Tezos_clic.args12
     pidfile_arg
     minimal_fees_arg
     minimal_nanotez_per_gas_unit_arg
@@ -407,6 +425,7 @@ let baker_args =
     operations_arg
     endpoint_arg
     state_recorder_switch_arg
+    pre_emptive_forge_time_arg
 
 let run_baker
     ( pidfile,
@@ -419,7 +438,8 @@ let run_baker
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
-      state_recorder ) baking_mode sources cctxt =
+      state_recorder,
+      pre_emptive_forge_time ) baking_mode sources cctxt =
   may_lock_pidfile pidfile @@ fun () ->
   (if per_block_vote_file = None then
    (* If the liquidity baking file was not explicitly given, we
@@ -449,6 +469,7 @@ let run_baker
     ~liquidity_baking
     ?extra_operations
     ?dal_node_endpoint
+    ?pre_emptive_forge_time
     ~force_apply
     ?context_path
     ~chain:cctxt#chain
