@@ -27,3 +27,9 @@ val get_global_block_state_current_level :
 (** RPC: [GET global/block/<block>/status]  gets the corresponding PVM status for 
     the [block] (default ["head"]). *)
 val get_global_block_status : ?block:string -> unit -> string RPC_core.t
+
+(** RPC: [GET global/block/<block>/outbox/<outbox_level>/messages] gets the rollup 
+   outbox of [outbox_level] as known to the [block] (default ["cemented"] which
+   is the block corresponding to the last cemented level). *)
+val get_global_block_outbox :
+  ?block:string -> outbox_level:int -> unit -> JSON.t RPC_core.t

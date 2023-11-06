@@ -23,3 +23,9 @@ let get_global_block_state_current_level ?(block = "head") () =
 
 let get_global_block_status ?(block = "head") () =
   make GET ["global"; "block"; block; "status"] JSON.as_string
+
+let get_global_block_outbox ?(block = "cemented") ~outbox_level () =
+  make
+    GET
+    ["global"; "block"; block; "outbox"; string_of_int outbox_level; "messages"]
+    Fun.id

@@ -1953,7 +1953,8 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
         Test.fail "Looked for an outbox for 10 levels, stopping the loop"
       else
         let* outbox =
-          Sc_rollup_helpers.outbox ~outbox_level:level' sc_rollup_node
+          Sc_rollup_node.RPC.call sc_rollup_node
+          @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:level' ()
         in
         if
           JSON.is_null outbox

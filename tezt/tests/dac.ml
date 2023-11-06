@@ -1844,7 +1844,8 @@ module Tx_kernel_e2e = struct
   let verify_outbox_answer ~withdrawal_level ~sc_rollup_node ~sc_rollup_client
       ~sc_rollup_address ~client =
     let* outbox =
-      Sc_rollup_helpers.outbox ~outbox_level:withdrawal_level sc_rollup_node
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:withdrawal_level ()
     in
     Log.info "Outbox is %s" @@ JSON.encode outbox ;
     let* answer =

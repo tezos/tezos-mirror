@@ -364,9 +364,3 @@ val wait_for_injecting_event :
   ?tags:string list -> ?count:int -> Sc_rollup_node.t -> int Lwt.t
 
 val injecting_refute_event : 'a -> Sc_rollup_node.t -> unit Lwt.t
-
-(** [outbox ?block outbox_level sc_rollup_node] gets the rollup outbox of
-   [outbox_level] as known to the [block] (default ["cemented"] which
-   is the block corresponding to the last cemented level). *)
-val outbox :
-  ?block:string -> outbox_level:int -> Sc_rollup_node.t -> JSON.t Lwt.t

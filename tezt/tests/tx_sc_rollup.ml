@@ -507,7 +507,8 @@ let tx_kernel_e2e setup protocol =
 
   (* EXECUTE withdrawal *)
   let* outbox =
-    Sc_rollup_helpers.outbox ~outbox_level:withdrawal_level sc_rollup_node
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:withdrawal_level ()
   in
   Log.info "Outbox is %s" @@ JSON.encode outbox ;
   let execute_outbox_proof ~message_index =
