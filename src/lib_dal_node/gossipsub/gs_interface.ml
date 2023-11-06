@@ -27,8 +27,6 @@
 open Gossipsub_intf
 module Types = Tezos_dal_node_services.Types
 
-type peer = P2p_peer.Id.t
-
 module Validate_message_hook = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
 
@@ -73,7 +71,7 @@ module Automaton_config :
     with type Time.t = Ptime.t
      and type Span.t = Types.Span.t
      and type Time.span = Types.Span.t
-     and type Subconfig.Peer.t = peer
+     and type Subconfig.Peer.t = Types.Peer.t
      and type Subconfig.Topic.t = Types.Topic.t
      and type Subconfig.Message_id.t = Types.Message_id.t
      and type Subconfig.Message.t = Types.Message.t = struct
