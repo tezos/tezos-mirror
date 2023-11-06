@@ -24,6 +24,11 @@ deb_web_path=$(curl -fsSL -X GET \
                     "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_deb_package_name}" \
            | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
 
+rpm_web_path=$(curl -fsSL -X GET \
+                    -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_rpm_package_name}" \
+           | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
+
 if [ -z "${web_path}" ]
 then
   echo "Error: could not find package matching version ${gitlab_package_version}"
@@ -38,6 +43,14 @@ then
   exit 1
 else
   gitlab_deb_packages_url="https://${CI_SERVER_HOST}${deb_web_path}"
+fi
+
+if [ -z "${rpm_web_path}" ]
+then
+  echo "Error: could not find rpm package matching version ${gitlab_package_version}"
+  exit 1
+else
+  gitlab_rpm_packages_url="https://${CI_SERVER_HOST}${rpm_web_path}"
 fi
 
 if [ "${CI_PROJECT_NAMESPACE}" = "tezos" ]
@@ -79,4 +92,5 @@ release-cli create \
   --assets-link="{\"name\":\"Announcement\",\"url\":\"https://tezos.gitlab.io/releases/version-${gitlab_release_major_version}.html\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Docker image\",\"url\":\"${docker_image_url}\",\"link_type\":\"image\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}" \
-  --assets-link="{\"name\":\"Debian packages\",\"url\":\"${gitlab_deb_packages_url}\",\"link_type\":\"package\"}"
+  --assets-link="{\"name\":\"Debian packages\",\"url\":\"${gitlab_deb_packages_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Red Hat packages\",\"url\":\"${gitlab_rpm_packages_url}\",\"link_type\":\"package\"}"

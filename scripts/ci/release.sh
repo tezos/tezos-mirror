@@ -12,6 +12,7 @@ script_inputs_dir="$src_dir/script-inputs"
 
 binaries="$(cat "$script_inputs_dir/released-executables")"
 deb_packages="$(ls ./octez-*.deb)"
+rpm_packages="$(ls ./octez-*.rpm)"
 
 ### Compute GitLab release names
 
@@ -49,6 +50,7 @@ fi
 
 gitlab_package_name="${CI_PROJECT_NAME}-${gitlab_release_no_v}"
 gitlab_deb_package_name="${CI_PROJECT_NAME}-debian-${gitlab_release_no_v}"
+gitlab_rpm_package_name="${CI_PROJECT_NAME}-redhat-${gitlab_release_no_v}"
 
 # X.Y or X.Y-rcZ
 gitlab_package_version="${gitlab_release_no_v}"

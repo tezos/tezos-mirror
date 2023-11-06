@@ -15,6 +15,7 @@ set -eu
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_package_name}/${gitlab_package_version}"
 gitlab_deb_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_deb_package_name}/${gitlab_package_version}"
+gitlab_rpm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_rpm_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
@@ -66,6 +67,14 @@ do
   for package in ${deb_packages}
   do
     gitlab_upload "${package}" "${package}" "${gitlab_deb_package_url}"
+  done
+
+  echo "Upload rpm packages (${architecture})"
+
+  # Loop over rpm packages
+  for package in ${rpm_packages}
+  do
+    gitlab_upload "./${package}" "${package}" "${gitlab_rpm_package_url}"
   done
 
   echo "Upload tarball with all binaries (${architecture})"
