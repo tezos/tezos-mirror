@@ -300,6 +300,50 @@ Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-i
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 
+
+History modes
+-------------
+
+The rollup node can be configured (1) to remove data on disk that is not needed
+anymore for the correct operation of a rollup node (i.e. to still be able to
+play all refutation games that could occur) or (2) to keep the full history of the
+rollup and the L2 chain since the rollup genesis.
+
+The history mode can be set on the command line with ``--history-mode <mode>`` or
+in the configuration file with:
+
+.. code:: json
+
+   {
+     "history-mode" : "<mode>"
+   }
+
+Full mode
+"""""""""
+
+The *full* history mode makes the rollup node keep its history since the last
+cemented commitment (LCC). Everything before the LCC (both the context containing the PVM state
+and the rollup node store containing the L2 chain) is
+automatically deleted periodically by a *garbage collection* phase.
+
+
+Archive mode
+""""""""""""
+
+When configured in *archive* mode, a rollup node will keep all history since the
+origination of the rollup. This mode can be useful for
+applications that require to regularly access historical data before the LCC,
+i.e. for application that need more than two weeks of history.
+
+This mode can be chosen e.g. on the command line with ``--history-mode
+archive``.
+
+Note that an archive node can be converted to a full node but not the other way
+around. The conversion will happen automatically if the history mode is changed
+in the configuration file or command line.
+
+This is the default history mode.
+
 Workflows
 ---------
 
