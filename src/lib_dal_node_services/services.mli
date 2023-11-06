@@ -230,6 +230,17 @@ module P2P : sig
     ; query : < connected : bool > >
     service
 
+  module Points : sig
+    val get_point_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_point.Info.t
+      ; prefix : unit
+      ; params : unit * P2p_point.Id.t
+      ; query : unit >
+      service
+  end
+
   val get_peers :
     < meth : [`GET]
     ; input : unit

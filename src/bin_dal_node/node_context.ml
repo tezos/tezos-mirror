@@ -202,6 +202,9 @@ module P2P = struct
   let get_points_info ?connected {transport_layer; _} =
     Gossipsub.Transport_layer.get_points_info ?connected transport_layer
 
+  let get_point_info {transport_layer; _} point =
+    Gossipsub.Transport_layer.get_point_info transport_layer point
+
   let get_peers ?connected {transport_layer; _} =
     Gossipsub.Transport_layer.get_peers ?connected transport_layer
 

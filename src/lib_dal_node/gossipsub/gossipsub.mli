@@ -143,6 +143,11 @@ module Transport_layer : sig
     t ->
     (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
 
+  (** [get_point_info t point] returns the info of the corresponding
+      point if found. *)
+  val get_point_info :
+    t -> P2p_point.Id.t -> P2p_point.Info.t option tzresult Lwt.t
+
   (** [get_peers ?connected t] returns a list of peers. If [connected]
       is [true] (default), it returns only the peers we are connected
       to. Otherwise, it returns a list of known peers (peers for which we
