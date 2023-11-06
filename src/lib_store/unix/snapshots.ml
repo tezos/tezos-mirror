@@ -1138,8 +1138,17 @@ end = struct
     let really_write fd = Lwt_cstruct.(complete (write fd))
   end
 
-  module HR = Tar.HeaderReader (Lwt) (Reader)
-  module HW = Tar.HeaderWriter (Lwt) (Writer)
+  module HR = struct
+    include Tar.HeaderReader (Lwt) (Reader)
+
+    let read ic = read ~level:Posix ic
+  end
+
+  module HW = struct
+    include Tar.HeaderWriter (Lwt) (Writer)
+
+    let write oc = write ~level:Posix oc
+  end
 
   type file = {header : Tar.Header.t; data_ofs : Int64.t}
 
@@ -1154,7 +1163,7 @@ end = struct
     let* fd =
       Lwt_unix.openfile file Unix.[O_WRONLY; O_CREAT] snapshot_rw_file_perm
     in
-    let data_pos = Int64.of_int Header.length in
+    let data_pos = Int64.of_int (Header.length * 3) in
     let* _ = Lwt_unix.LargeFile.lseek fd data_pos SEEK_SET in
     Lwt.return {current_pos = 0L; data_pos; fd}
 
@@ -1168,44 +1177,54 @@ end = struct
     Lwt_unix.close t.fd
 
   (* Builds a tar header for the given sequence of bytes *)
-  let header_of_bytes ?level ~filename ~data_size (file : Lwt_unix.file_descr) :
+  let header_of_bytes ~filename ~data_size (file : Lwt_unix.file_descr) :
       Header.t Lwt.t =
     let open Lwt_syntax in
-    let level =
-      match level with None -> Tar.Header.V7 | Some level -> level
-    in
-    (* Use Posix by default instead of V7? *)
     let* stat = Lwt_unix.LargeFile.fstat file in
-    let* pwent = Lwt_unix.getpwuid stat.Lwt_unix.LargeFile.st_uid in
-    let* grent = Lwt_unix.getgrgid stat.Lwt_unix.LargeFile.st_gid in
     let file_mode = stat.Lwt_unix.LargeFile.st_perm in
     let user_id = stat.Lwt_unix.LargeFile.st_uid in
     let group_id = stat.Lwt_unix.LargeFile.st_gid in
     let mod_time = Int64.of_float stat.Lwt_unix.LargeFile.st_mtime in
     let link_indicator = Tar.Header.Link.Normal in
     let link_name = "" in
-    let uname = if level = V7 then "" else pwent.Lwt_unix.pw_name in
-    let gname = if level = V7 then "" else grent.Lwt_unix.gr_name in
-    let devmajor =
-      if level = Ustar then stat.Lwt_unix.LargeFile.st_dev else 0
+    let devmajor = 0 in
+    let devminor = 0 in
+    (* Enforce the extended header version (Posix aka pax). All tar
+       headers are then expected to be of size [Tar.Header.length * 3
+       = 512B x 3]. It is only necessary to set a single field to
+       trigger this behavior in the [Tar] library. *)
+    let extended =
+      Some
+        {
+          Tar.Header.Extended.access_time = None;
+          charset = None;
+          comment = None;
+          group_id = None;
+          gname = None;
+          header_charset = None;
+          link_path = None;
+          mod_time = None;
+          path = None;
+          file_size = Some data_size;
+          user_id = None;
+          uname = None;
+        }
     in
-    let devminor =
-      if level = Ustar then stat.Lwt_unix.LargeFile.st_rdev else 0
+    let header =
+      Tar.Header.make
+        ~file_mode
+        ~user_id
+        ~group_id
+        ~mod_time
+        ~link_indicator
+        ~link_name
+        ~devmajor
+        ~devminor
+        filename
+        data_size
     in
-    Lwt.return
-      (Tar.Header.make
-         ~file_mode
-         ~user_id
-         ~group_id
-         ~mod_time
-         ~link_indicator
-         ~link_name
-         ~uname
-         ~gname
-         ~devmajor
-         ~devminor
-         filename
-         data_size)
+    let header = {header with extended} in
+    Lwt.return header
 
   (* [finalize tar ~bytes_written ~filename] writes the header
      corresponding to the quantity of data given through
@@ -1216,7 +1235,8 @@ end = struct
     let open Lwt_syntax in
     (* Build the header based of the bytes_written *)
     let* header = header_of_bytes ~filename ~data_size:bytes_written t.fd in
-    let header_length = Int64.of_int Header.length in
+    (* We are building extended headers which are 512B x 3. *)
+    let header_length = Int64.of_int (Header.length * 3) in
     (* Compute and right the adequate padding for finalizing a block data *)
     let c = Tar.Header.zero_padding header in
     let zero_padding = Cstruct.to_bytes c in
@@ -1357,7 +1377,12 @@ end = struct
   let open_in ~file =
     let open Lwt_syntax in
     let* fd = Lwt_unix.openfile file Unix.[O_RDONLY] snapshot_ro_file_perm in
-    let data_pos = Int64.of_int Header.length in
+    (* We need to retrieve the first header's length. [Tar] will shift
+       the offset to the data location in the file: we can infer the
+       length from it. *)
+    let* _header = HR.read fd in
+    let* data_pos = Lwt_unix.LargeFile.lseek fd 0L SEEK_CUR in
+    let* _ = Lwt_unix.LargeFile.lseek fd 0L SEEK_SET in
     let files = None in
     Lwt.return {current_pos = 0L; data_pos; fd; files}
 
@@ -1453,22 +1478,22 @@ end = struct
               may_update_files t acc ;
               Lwt.return_none
           | Ok hdr ->
-              (* Header length can be 1024 if extended *)
+              (* Header length are 512B x 3 when extended (which is
+                 now the default). *)
               let* data_pos = Lwt_unix.LargeFile.lseek t.fd 0L SEEK_CUR in
               if hdr.file_name = filename then
                 Lwt.return_some {header = hdr; data_ofs = data_pos}
               else
-                let header_length = Int64.sub data_pos pos in
+                let header_length = Int64.(sub data_pos pos) in
                 let file_size = hdr.Tar.Header.file_size in
                 let padding =
                   Int64.of_int (Tar.Header.compute_zero_padding_length hdr)
                 in
-                let next_header =
-                  Int64.(add (add file_size padding) header_length)
+                let next_header_pos =
+                  Int64.(add pos (add (add file_size padding) header_length))
                 in
-                let* _ = Lwt_unix.LargeFile.lseek t.fd next_header SEEK_SET in
                 let h = {header = hdr; data_ofs = data_pos} in
-                loop (Int64.add pos next_header) (h :: acc)
+                loop next_header_pos (h :: acc)
         in
         loop 0L []
 
