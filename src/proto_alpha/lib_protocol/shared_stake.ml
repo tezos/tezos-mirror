@@ -32,6 +32,8 @@ let share ~rounding ~full_staking_balance amount =
 type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 
 (** Compute the reward distribution between frozen and spendable according to:
+    - the [full_staking_balance] of the delegate composed of the [own_frozen]
+      and [staked_frozen] parts (the delegated part is ignored).
     - the [stake] of the delegate composed of the [frozen] deposits and the
       [weighted_delegated] tokens.
     - the [edge_of_baking_over_staking_billionth] parameter set by the baker in 1_000_000_000th
@@ -40,8 +42,8 @@ type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 Preconditions:
  - 0 <= [edge_of_baking_over_staking_billionth]  <= 1_000_000_000
 *)
-let compute_reward_distrib ~stake ~edge_of_baking_over_staking_billionth
-    ~(rewards : Tez_repr.t) =
+let compute_reward_distrib ~full_staking_balance:_ ~stake
+    ~edge_of_baking_over_staking_billionth ~(rewards : Tez_repr.t) =
   let ({frozen; weighted_delegated} : Stake_repr.t) = stake in
   (* convert into Q *)
   let weighted_delegated =
@@ -86,11 +88,15 @@ let compute_reward_distrib ctxt delegate stake rewards =
   let* (delegate_parameter : Staking_parameters_repr.t) =
     Delegate_staking_parameters.of_delegate ctxt delegate
   in
+  let* full_staking_balance =
+    Stake_storage.get_full_staking_balance ctxt delegate
+  in
   let edge_of_baking_over_staking_billionth =
     delegate_parameter.edge_of_baking_over_staking_billionth
   in
   Lwt.return
   @@ compute_reward_distrib
+       ~full_staking_balance
        ~stake
        ~edge_of_baking_over_staking_billionth
        ~rewards
