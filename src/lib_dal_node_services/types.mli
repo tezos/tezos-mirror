@@ -311,3 +311,12 @@ module Gossipsub : sig
 
   val connection_encoding : connection Data_encoding.t
 end
+
+module Version : sig
+  type t = private {network_version : Network_version.t}
+
+  (** [make ~network_version] makes a version out of a [network_version]. *)
+  val make : network_version:Network_version.t -> t
+
+  include ENCODABLE with type t := t
+end

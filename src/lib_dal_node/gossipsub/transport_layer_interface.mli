@@ -63,3 +63,5 @@ type p2p_message =
 (** A P2P message config is parameterized by the network's name. *)
 val message_config :
   network_name:string -> p2p_message P2p_params.message_config
+
+val version : network_name:string -> Network_version.t

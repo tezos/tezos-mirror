@@ -181,3 +181,6 @@ module Transport_layer_hooks : sig
       (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
     unit Lwt.t
 end
+
+(** [version ~network_name] returns the current version of the P2P. *)
+val version : network_name:string -> Network_version.t

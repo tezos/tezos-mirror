@@ -252,6 +252,20 @@ let monitor_shards :
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(open_root / "monitor_shards")
 
+let version :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.Version.t
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:"version"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Types.Version.encoding
+    Tezos_rpc.Path.(open_root / "version")
+
 module P2P = struct
   open Tezos_rpc.Path
 

@@ -136,6 +136,9 @@ val fetch_assigned_shard_indices :
 val fetch_committee :
   t -> level:int32 -> Committee_cache.committee tzresult Lwt.t
 
+(** [version ctxt] returns the current version of the node *)
+val version : t -> Types.Version.t
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point
