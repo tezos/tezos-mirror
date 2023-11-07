@@ -177,6 +177,7 @@ let remove_shared_frozen_stake ctxt delegate amount =
         let* total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
         let* own_part =
           Tez_repr.mul_ratio
+            ~rounding:`Down
             amount
             ~num:(Tez_repr.to_mutez own_frozen)
             ~den:(Tez_repr.to_mutez total_frozen)
@@ -223,6 +224,7 @@ let add_shared_frozen_stake ctxt delegate amount =
         let* total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
         let* own_part =
           Tez_repr.mul_ratio
+            ~rounding:`Down
             amount
             ~num:(Tez_repr.to_mutez own_frozen)
             ~den:(Tez_repr.to_mutez total_frozen)

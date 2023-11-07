@@ -52,6 +52,7 @@ let apply_limits ctxt staking_parameters
   let allowed_staked_frozen =
     match
       Tez_repr.mul_ratio
+        ~rounding:`Down
         own_frozen
         ~num:limit_of_staking_over_baking_millionth
         ~den:1_000_000L

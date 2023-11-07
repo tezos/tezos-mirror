@@ -171,7 +171,7 @@ let div_exn t d =
   | Ok v -> v
   | Error _ -> invalid_arg "div_exn"
 
-let mul_ratio ?(rounding = `Down) tez ~num ~den =
+let mul_ratio ~rounding tez ~num ~den =
   let open Result_syntax in
   let (Tez_tag t) = tez in
   if num < 0L then tzfail (Negative_multiplicator (tez, num))
