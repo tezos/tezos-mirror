@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Elem, Manager};
+use std::mem;
 
 /// Dedicated region in a [`super::Backend`]
 pub trait Region<E> {
@@ -23,6 +24,9 @@ pub trait Region<E> {
 
     /// Update a subset of elements in the region starting at `index`.
     fn write_some(&mut self, index: usize, buffer: &[E]);
+
+    /// Update the element in the region and return the previous value.
+    fn replace(&mut self, index: usize, value: E) -> E;
 }
 
 impl<E: Elem, const LEN: usize> Region<E> for [E; LEN] {
@@ -92,6 +96,13 @@ impl<E: Elem, const LEN: usize> Region<E> for [E; LEN] {
             elem.to_stored_in_place();
         }
     }
+
+    fn replace(&mut self, index: usize, mut value: E) -> E {
+        value.to_stored_in_place();
+        let mut value = mem::replace(&mut self[index], value);
+        value.from_stored_in_place();
+        value
+    }
 }
 
 impl<E, T: Region<E>> Region<E> for &mut T {
@@ -123,6 +134,10 @@ impl<E, T: Region<E>> Region<E> for &mut T {
     #[inline(always)]
     fn write_some(&mut self, index: usize, buffer: &[E]) {
         (self as &mut T).write_some(index, buffer)
+    }
+
+    fn replace(&mut self, index: usize, value: E) -> E {
+        (self as &mut T).replace(index, value)
     }
 }
 
@@ -280,6 +295,17 @@ pub(crate) mod tests {
         let mut buffer = [0; 2];
         backend.read(0, &mut buffer);
         assert_eq!(buffer, [37, 13]);
+
+        // Replacing a value in the region must convert to and from stored format.
+        {
+            let mut region = backend.allocate(FlipperLayout::placed().into_location());
+            let old = region.replace(0, Flipper { a: 26, b: 74 });
+            assert_eq!(old, Flipper { a: 13, b: 37 });
+        }
+
+        let mut buffer = [0; 2];
+        backend.read(0, &mut buffer);
+        assert_eq!(buffer, [74, 26]);
 
         // Writing to sub-section must convert to stored format.
         {
