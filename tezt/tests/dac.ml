@@ -305,7 +305,10 @@ let sample_payload example_filename =
 let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
 
 let assert_state_changed ?block sc_rollup_node prev_state_hash =
-  let* state_hash = Sc_rollup_rpc.state_hash ?block sc_rollup_node in
+  let* state_hash =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ?block ()
+  in
   Check.(state_hash <> prev_state_hash)
     Check.string
     ~error_msg:"State hash has not changed (%L <> %R)" ;
@@ -1630,7 +1633,10 @@ module Tx_kernel_e2e = struct
   (* Send a deposit into the rollup. *)
   let test_deposit ~client ~sc_rollup_node ~sc_rollup_address
       ~mint_and_deposit_contract level tz4_address =
-    let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
+    let* prev_state_hash =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
+    in
     let* () =
       (* Internal message through forwarder *)
       let arg =
@@ -1818,7 +1824,10 @@ module Tx_kernel_e2e = struct
 
   let send_message_and_wait_for_level ~level ~sc_rollup_node ~client
       hex_encoded_message =
-    let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
+    let* prev_state_hash =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
+    in
     let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
     let* () = send_message client (sf "hex:[%S]" hex_encoded_message) in
     let level = level + 1 in

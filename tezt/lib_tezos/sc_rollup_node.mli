@@ -328,3 +328,8 @@ val change_node_mode : t -> mode -> t
     state of the WASM PVM from [sc_rollup_node]. *)
 val dump_durable_storage :
   sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
+
+(** Expose the RPC server address of this node as a foreign endpoint. *)
+val as_rpc_endpoint : t -> Endpoint.t
+
+module RPC : RPC_core.CALLERS with type uri_provider := t

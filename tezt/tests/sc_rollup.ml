@@ -1111,7 +1111,10 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
   in
   (* Called with monotonically increasing [i] *)
   let test_message i =
-    let* prev_state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
+    let* prev_state_hash =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
+    in
     let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
     let message = sf "%d %d + value" i ((i + 2) * 2) in
     let* () =
@@ -1174,7 +1177,10 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       | _otherwise -> raise (Invalid_argument kind)
     in
 
-    let* state_hash = Sc_rollup_rpc.state_hash sc_rollup_node in
+    let* state_hash =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
+    in
     Check.(state_hash <> prev_state_hash)
       Check.string
       ~error_msg:"State hash has not changed (%L <> %R)" ;
@@ -1416,8 +1422,14 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level
   and* _ = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Both rollup nodes have reached level %d." level ;
-  let* state_hash = Sc_rollup_rpc.state_hash sc_rollup_node
-  and* state_hash_other = Sc_rollup_rpc.state_hash sc_rollup_other_node in
+  let* state_hash =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ()
+  in
+  let* state_hash_other =
+    Sc_rollup_node.RPC.call sc_rollup_other_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ()
+  in
   Check.((state_hash = state_hash_other) string)
     ~error_msg:
       "State hash of other rollup node is %R but the first rollup node has %L" ;
@@ -1899,7 +1911,10 @@ let commitments_reproposal _protocol sc_rollup_node sc_rollup_client sc_rollup
     unit
   in
   let* () = check_sc_head hash1 in
-  let* state_hash1 = Sc_rollup_rpc.state_hash sc_rollup_node ~block:hash1 in
+  let* state_hash1 =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ~block:hash1 ()
+  in
   Log.info "Changing L1 node for rollup node (1st reorg)" ;
   let* () =
     Sc_rollup_node.change_node_and_restart
@@ -1910,7 +1925,10 @@ let commitments_reproposal _protocol sc_rollup_node sc_rollup_client sc_rollup
   in
   let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
   let* () = check_sc_head hash2 in
-  let* state_hash2 = Sc_rollup_rpc.state_hash sc_rollup_node ~block:hash2 in
+  let* state_hash2 =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ~block:hash2 ()
+  in
   Log.info
     "Changing L1 node for rollup node (2nd reorg), back to first node to \
      simulate reproposal of round 0" ;
@@ -2369,7 +2387,10 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
   let init_hash = JSON.(init_commitment |-> "compressed_state" |> as_string) in
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. rollup_node init_level in
-  let* node_state_hash = Sc_rollup_rpc.state_hash rollup_node in
+  let* node_state_hash =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ()
+  in
   Check.(
     (init_hash = node_state_hash)
       string

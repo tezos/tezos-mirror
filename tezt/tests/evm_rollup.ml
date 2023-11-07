@@ -2988,7 +2988,10 @@ let test_reboot =
   | Block.Hash hashes ->
       Check.((List.length hashes = List.length requests) int)
         ~error_msg:"Expected %R transactions in the latest block, got %L") ;
-  let* tick_number = Sc_rollup_rpc.ticks sc_rollup_node in
+  let* tick_number =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_ticks ()
+  in
   let max_tick =
     Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
   in
