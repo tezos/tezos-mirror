@@ -216,11 +216,6 @@ val simulate :
 val inject :
   ?hooks:Process_hooks.t -> t -> string list -> string list Runnable.process
 
-(** [batcher_queue client] returns the queue of messages, as pairs of message
-    hash and binary message, in the batcher. *)
-val batcher_queue :
-  ?hooks:Process_hooks.t -> t -> (string * string) list Runnable.process
-
 (** [get_batcher_msg client hash] fetches the message whose hash is [hash] from
     the queue. It returns the message together with the full JSON response
     including the status. *)

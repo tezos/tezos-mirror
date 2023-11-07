@@ -65,3 +65,7 @@ type slot_header = {level : int; commitment : string; index : int}
     of the [block] (default ["head"]).  *)
 val get_global_block_dal_slot_headers :
   ?block:string -> unit -> slot_header list RPC_core.t
+
+(** RPC: [GET local/batcher/queue] returns the queue of messages, as pairs of message
+    hash and binary message, in the batcher. *)
+val get_local_batcher_queue : unit -> (string * string) list RPC_core.t

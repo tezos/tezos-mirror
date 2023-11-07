@@ -391,15 +391,6 @@ let inject ?hooks sc_client messages =
   rpc_post ?hooks sc_client ["local"; "batcher"; "injection"] messages_json
   |> Runnable.map @@ fun obj -> JSON.as_list obj |> List.map JSON.as_string
 
-let batcher_queue ?hooks sc_client =
-  rpc_get ?hooks sc_client ["local"; "batcher"; "queue"]
-  |> Runnable.map @@ fun obj ->
-     JSON.as_list obj
-     |> List.map @@ fun o ->
-        let hash = JSON.(o |> get "hash" |> as_string) in
-        let hex_msg = JSON.(o |> get "message" |> get "content" |> as_string) in
-        (hash, Hex.to_string (`Hex hex_msg))
-
 let get_batcher_msg ?hooks sc_client msg_hash =
   rpc_get ?hooks sc_client ["local"; "batcher"; "queue"; msg_hash]
   |> Runnable.map @@ fun obj ->

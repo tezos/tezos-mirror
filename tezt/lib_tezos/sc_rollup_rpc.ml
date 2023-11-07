@@ -62,3 +62,11 @@ let get_global_block_dal_slot_headers ?(block = "head") () =
                  commitment = obj |-> "commitment" |> as_string;
                  index = obj |-> "index" |> as_int;
                })))
+
+let get_local_batcher_queue () =
+  make GET ["local"; "batcher"; "queue"] (fun json ->
+      JSON.as_list json
+      |> List.map @@ fun o ->
+         let hash = JSON.(o |-> "hash" |> as_string) in
+         let hex_msg = JSON.(o |-> "message" |-> "content" |> as_string) in
+         (hash, Hex.to_string (`Hex hex_msg)))
