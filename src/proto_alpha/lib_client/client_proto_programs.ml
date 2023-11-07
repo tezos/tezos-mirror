@@ -148,6 +148,8 @@ type simulation_params = {
   sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
+  other_contracts : RPC.Scripts.S.other_contract_description list option;
+  extra_big_maps : RPC.Scripts.S.extra_big_map_description list option;
 }
 
 type run_view_params = {
@@ -177,7 +179,18 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_view_params) =
   let open Lwt_result_syntax in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     contract;
     entrypoint;
   } =
@@ -187,22 +200,35 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
   Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
-    ?gas
+    ~gas
     ~contract
     ~entrypoint
     ~input:input.expanded
     ~chain_id
-    ?sender
-    ?payer
+    ~sender
+    ~payer
     ~unparsing_mode
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
 let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_script_view_params) =
   let open Lwt_result_syntax in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     contract;
     view;
     unlimited_gas;
@@ -213,24 +239,37 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
   Plugin.RPC.Scripts.run_script_view
     cctxt
     (chain, block)
-    ?gas
+    ~gas
     ~contract
     ~view
     ~input:input.expanded
     ~unlimited_gas
     ~chain_id
-    ?sender
-    ?payer
+    ~sender
+    ~payer
     ~unparsing_mode
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
   let open Lwt_result_syntax in
   let* chain_id = Chain_services.chain_id cctxt ~chain () in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     program;
     amount;
     balance;
@@ -241,30 +280,44 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     params
   in
   let amount = Option.value ~default:Tez.fifty_cents amount in
+  let entrypoint = Option.value ~default:Entrypoint.default entrypoint in
   Plugin.RPC.Scripts.run_code
     cctxt
     (chain, block)
-    ?gas
-    ?entrypoint
-    ~unparsing_mode
+    ~gas
+    ~entrypoint
+    ~unparsing_mode:(Some unparsing_mode)
     ~script:program.expanded
     ~storage:storage.expanded
     ~input:input.expanded
     ~amount
-    ?balance
+    ~balance
     ~chain_id
     ~sender
     ~payer
     ~self
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
   let open Lwt_result_syntax in
   let* chain_id = Chain_services.chain_id cctxt ~chain () in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     program;
     amount;
     balance;
@@ -275,52 +328,55 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     params
   in
   let amount = Option.value ~default:Tez.fifty_cents amount in
+  let entrypoint = Option.value ~default:Entrypoint.default entrypoint in
   Plugin.RPC.Scripts.trace_code
     cctxt
     (chain, block)
-    ?gas
-    ?entrypoint
-    ~unparsing_mode
+    ~gas
+    ~entrypoint
+    ~unparsing_mode:(Some unparsing_mode)
     ~script:program.expanded
     ~storage:storage.expanded
     ~input:input.expanded
     ~amount
-    ?balance
+    ~balance
     ~chain_id
     ~sender
     ~payer
     ~self
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
-let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
+let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ~gas ~legacy
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) () =
   Plugin.RPC.Scripts.typecheck_data
     cctxt
     (chain, block)
-    ?gas
-    ?legacy
+    ~gas
+    ~legacy
     ~data:data.expanded
     ~ty:ty.expanded
 
-let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
+let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ~gas ~legacy
     ~show_types (program : Michelson_v1_parser.parsed) =
   Plugin.RPC.Scripts.typecheck_code
     cctxt
     (chain, block)
-    ?gas
-    ?legacy
+    ~gas
+    ~legacy
     ~script:program.expanded
     ~show_types
 
-let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
+let script_size cctxt ~(chain : Chain_services.chain) ~block ~gas ~legacy
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed) () =
   Plugin.RPC.Scripts.script_size
     cctxt
     (chain, block)
-    ?gas
-    ?legacy
+    ~gas
+    ~legacy
     ~script:program.expanded
     ~storage:storage.expanded
 

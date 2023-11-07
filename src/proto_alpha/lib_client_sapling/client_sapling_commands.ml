@@ -81,6 +81,7 @@ let bound_data_of_public_key_hash cctxt dst =
     Plugin.RPC.Scripts.pack_data
       cctxt
       (cctxt#chain, cctxt#block)
+      ~gas:None
       ~data:micheline_bytes
       ~ty:micheline_pkh_type
   in

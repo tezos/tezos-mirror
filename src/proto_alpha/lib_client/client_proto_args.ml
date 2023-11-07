@@ -243,17 +243,20 @@ let binary_encoded_parameter ~name encoding =
   in
   file_or_text_parameter ~from_text ()
 
+let parse_micheline_parameter source =
+  Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+  @@
+  let tokens, lexing_errors =
+    Tezos_micheline.Micheline_parser.tokenize source
+  in
+  let ast, parsing_errors =
+    Tezos_micheline.Micheline_parser.parse_expression tokens
+  in
+  ((ast, source), lexing_errors @ parsing_errors)
+
 let micheline_parameter =
-  Tezos_clic.parameter (fun _ source ->
-      Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
-      @@
-      let tokens, lexing_errors =
-        Tezos_micheline.Micheline_parser.tokenize source
-      in
-      let ast, parsing_errors =
-        Tezos_micheline.Micheline_parser.parse_expression tokens
-      in
-      ((ast, source), lexing_errors @ parsing_errors))
+  Tezos_clic.parameter (fun (_ : full) source ->
+      parse_micheline_parameter source)
 
 let entrypoint_parameter =
   Tezos_clic.parameter (fun _ str ->
@@ -266,6 +269,36 @@ let init_arg =
     ~doc:"initial value of the contract's storage"
     ~default:"Unit"
     string_parameter
+
+let other_contracts_parameter =
+  Tezos_clic.parameter (fun _ source ->
+      let open Lwt_result_syntax in
+      let* micheline, source = parse_micheline_parameter source in
+      let*? l = Michelson_v1_stack.parse_other_contracts ~source micheline in
+      return l)
+
+let other_contracts_arg =
+  Tezos_clic.arg
+    ~doc:
+      {|types and addresses of extra contracts, formatted as {Contract "KT1..." <ty1>; Contract "KT1..." <ty2>; ...}|}
+    ~long:"other-contracts"
+    ~placeholder:"contracts"
+    other_contracts_parameter
+
+let extra_big_maps_parameter =
+  Tezos_clic.parameter (fun _ source ->
+      let open Lwt_result_syntax in
+      let* micheline, source = parse_micheline_parameter source in
+      let*? l = Michelson_v1_stack.parse_extra_big_maps ~source micheline in
+      return l)
+
+let extra_big_maps_arg =
+  Tezos_clic.arg
+    ~doc:
+      {|identifier and content of extra big maps, formatted as {Big_map <index> <key_type> <value_type> {Elt <key1> <value1>; Elt <key2> <value2>; ...}}|}
+    ~long:"extra-big-maps"
+    ~placeholder:"big maps"
+    extra_big_maps_parameter
 
 let global_constant_param ~name ~desc next =
   Tezos_clic.param ~name ~desc string_parameter next

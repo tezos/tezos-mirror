@@ -69,6 +69,9 @@ Client
 - Fixed indentation of the stacks outputted by the ``normalize stack``
   command. (MR :gl:`!9944`)
 
+- Added options to temporarily extend the context with other contracts
+  and extra big maps in Michelson commands. (MR :gl:`!9946`)
+
 Baker
 -----
 

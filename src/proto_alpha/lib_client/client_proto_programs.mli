@@ -41,6 +41,8 @@ type simulation_params = {
   sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
+  other_contracts : RPC.Scripts.S.other_contract_description list option;
+  extra_big_maps : RPC.Scripts.S.extra_big_map_description list option;
 }
 
 (* Parameters specific to simulations of TZIP4 views *)
@@ -144,8 +146,8 @@ val typecheck_data :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Gas.Arith.integral ->
-  ?legacy:bool ->
+  gas:Gas.Arith.integral option ->
+  legacy:bool ->
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
   unit ->
@@ -156,8 +158,8 @@ val typecheck_program :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Gas.Arith.integral ->
-  ?legacy:bool ->
+  gas:Gas.Arith.integral option ->
+  legacy:bool ->
   show_types:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t
@@ -178,8 +180,8 @@ val script_size :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Gas.Arith.integral ->
-  ?legacy:bool ->
+  gas:Gas.Arith.integral option ->
+  legacy:bool ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
   unit ->

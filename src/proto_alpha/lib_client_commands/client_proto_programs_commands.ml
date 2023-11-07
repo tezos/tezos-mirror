@@ -248,7 +248,7 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a script."
-      (args12
+      (args14
          trace_stack_switch
          amount_arg
          balance_arg
@@ -260,7 +260,9 @@ let commands () =
          entrypoint_arg
          (unparsing_mode_arg ~default:"Readable")
          now_arg
-         level_arg)
+         level_arg
+         other_contracts_arg
+         extra_big_maps_arg)
       (prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
@@ -279,7 +281,9 @@ let commands () =
              entrypoint,
              unparsing_mode,
              now,
-             level )
+             level,
+             other_contracts,
+             extra_big_maps )
            program
            storage
            input
@@ -299,7 +303,17 @@ let commands () =
                 program;
                 storage;
                 shared_params =
-                  {input; unparsing_mode; now; level; sender; payer; gas};
+                  {
+                    input;
+                    unparsing_mode;
+                    now;
+                    level;
+                    sender;
+                    payer;
+                    gas;
+                    other_contracts;
+                    extra_big_maps;
+                  };
                 entrypoint;
                 self;
               }
@@ -317,7 +331,17 @@ let commands () =
                 program;
                 storage;
                 shared_params =
-                  {input; unparsing_mode; now; level; sender; payer; gas};
+                  {
+                    input;
+                    unparsing_mode;
+                    now;
+                    level;
+                    sender;
+                    payer;
+                    gas;
+                    other_contracts;
+                    extra_big_maps;
+                  };
                 entrypoint;
                 self;
               }
@@ -349,7 +373,7 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~gas:original_gas
+            ~gas:(Some original_gas)
             ~legacy
             ~program
             ~storage
@@ -415,7 +439,7 @@ let commands () =
                         cctxt
                         ~chain:cctxt#chain
                         ~block:cctxt#block
-                        ~gas:original_gas
+                        ~gas:(Some original_gas)
                         ~legacy
                         ~show_types
                         program
@@ -452,7 +476,7 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~gas:original_gas
+            ~gas:(Some original_gas)
             ~legacy
             ~data
             ~ty
@@ -499,7 +523,7 @@ let commands () =
           Plugin.RPC.Scripts.pack_data
             cctxt
             (cctxt#chain, cctxt#block)
-            ~gas:original_gas
+            ~gas:(Some original_gas)
             ~data:data.expanded
             ~ty:typ.expanded
         in
@@ -698,7 +722,11 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to normalize a data expression."
-      (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
+      (args4
+         (unparsing_mode_arg ~default:"Readable")
+         legacy_switch
+         other_contracts_arg
+         extra_big_maps_arg)
       (prefixes ["normalize"; "data"]
       @@ param
            ~name:"data"
@@ -707,7 +735,10 @@ let commands () =
       @@ prefixes ["of"; "type"]
       @@ param ~name:"type" ~desc:"type of the data expression" data_parameter
       @@ stop)
-      (fun (unparsing_mode, legacy) data typ cctxt ->
+      (fun (unparsing_mode, legacy, other_contracts, extra_big_maps)
+           data
+           typ
+           cctxt ->
         let open Lwt_result_syntax in
         let*! r =
           Plugin.RPC.Scripts.normalize_data
@@ -717,6 +748,8 @@ let commands () =
             ~data:data.expanded
             ~ty:typ.expanded
             ~unparsing_mode
+            ~other_contracts
+            ~extra_big_maps
         in
         match r with
         | Ok expr ->
@@ -738,7 +771,11 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to normalize a typed Michelson stack."
-      (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
+      (args4
+         (unparsing_mode_arg ~default:"Readable")
+         legacy_switch
+         other_contracts_arg
+         extra_big_maps_arg)
       (prefixes ["normalize"; "stack"]
       @@ param
            ~name:"stack"
@@ -749,7 +786,9 @@ let commands () =
               of the stack is <val_1>."
            micheline_parameter
       @@ stop)
-      (fun (unparsing_mode, legacy) (stack, source) cctxt ->
+      (fun (unparsing_mode, legacy, other_contracts, extra_big_maps)
+           (stack, source)
+           cctxt ->
         let open Lwt_result_syntax in
         let*? stack = Michelson_v1_stack.parse_stack ~source stack in
         let*! r =
@@ -759,6 +798,8 @@ let commands () =
             ~legacy
             ~stack
             ~unparsing_mode
+            ~other_contracts
+            ~extra_big_maps
         in
         match r with
         | Ok expr ->
@@ -975,6 +1016,7 @@ let commands () =
                     ~block:cctxt#block
                     ~legacy
                     ~show_types:true
+                    ~gas:None
                     program
                 in
                 match r with
@@ -1062,6 +1104,8 @@ let commands () =
               ~block:cctxt#block
               ~data
               ~ty
+              ~gas:None
+              ~legacy:false
               ()
           in
           match r with
@@ -1137,13 +1181,15 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a TZIP-4 view."
-      (args6
+      (args8
          source_arg
          payer_arg
          run_gas_limit_arg
          (unparsing_mode_arg ~default:"Readable")
          now_arg
-         level_arg)
+         level_arg
+         other_contracts_arg
+         extra_big_maps_arg)
       (prefixes ["run"; "tzip4"; "view"]
       @@ param
            ~name:"entrypoint"
@@ -1156,20 +1202,37 @@ let commands () =
       @@ prefixes ["with"; "input"]
       @@ param ~name:"input" ~desc:"the input data" data_parameter
       @@ stop)
-      (fun (sender, payer, gas, unparsing_mode, now, level)
+      (fun ( sender,
+             payer,
+             gas,
+             unparsing_mode,
+             now,
+             level,
+             other_contracts,
+             extra_big_maps )
            entrypoint
            contract
            input
            cctxt ->
-        let open Lwt_syntax in
-        let* res =
+        let open Lwt_result_syntax in
+        let*! res =
           Client_proto_programs.run_view
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; sender; payer; gas};
+                {
+                  input;
+                  unparsing_mode;
+                  now;
+                  level;
+                  sender;
+                  payer;
+                  gas;
+                  other_contracts;
+                  extra_big_maps;
+                };
               contract;
               entrypoint;
             }
@@ -1178,14 +1241,16 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a Michelson view with Unit as input."
-      (args7
+      (args9
          source_arg
          payer_arg
          run_gas_limit_arg
          unlimited_gas_arg
          (unparsing_mode_arg ~default:"Readable")
          now_arg
-         level_arg)
+         level_arg
+         other_contracts_arg
+         extra_big_maps_arg)
       (prefixes ["run"; "view"]
       @@ param ~name:"view" ~desc:"the name of the view" string_parameter
       @@ prefixes ["on"; "contract"]
@@ -1193,7 +1258,15 @@ let commands () =
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ stop)
-      (fun (sender, payer, gas, unlimited_gas, unparsing_mode, now, level)
+      (fun ( sender,
+             payer,
+             gas,
+             unlimited_gas,
+             unparsing_mode,
+             now,
+             level,
+             other_contracts,
+             extra_big_maps )
            view
            contract
            cctxt ->
@@ -1209,7 +1282,17 @@ let commands () =
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; sender; payer; gas};
+                {
+                  input;
+                  unparsing_mode;
+                  now;
+                  level;
+                  sender;
+                  payer;
+                  gas;
+                  other_contracts;
+                  extra_big_maps;
+                };
               contract;
               view;
               unlimited_gas;
@@ -1219,14 +1302,16 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a Michelson view."
-      (args7
+      (args9
          source_arg
          payer_arg
          run_gas_limit_arg
          unlimited_gas_arg
          (unparsing_mode_arg ~default:"Readable")
          now_arg
-         level_arg)
+         level_arg
+         other_contracts_arg
+         extra_big_maps_arg)
       (prefixes ["run"; "view"]
       @@ param ~name:"view" ~desc:"the name of the view" string_parameter
       @@ prefixes ["on"; "contract"]
@@ -1239,20 +1324,38 @@ let commands () =
            ~desc:"the argument provided to the view"
            data_parameter
       @@ stop)
-      (fun (sender, payer, gas, unlimited_gas, unparsing_mode, now, level)
+      (fun ( sender,
+             payer,
+             gas,
+             unlimited_gas,
+             unparsing_mode,
+             now,
+             level,
+             other_contracts,
+             extra_big_maps )
            view
            contract
            input
            cctxt ->
-        let open Lwt_syntax in
-        let* res =
+        let open Lwt_result_syntax in
+        let*! res =
           Client_proto_programs.run_script_view
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; sender; payer; gas};
+                {
+                  input;
+                  unparsing_mode;
+                  now;
+                  level;
+                  sender;
+                  payer;
+                  gas;
+                  other_contracts;
+                  extra_big_maps;
+                };
               contract;
               view;
               unlimited_gas;
