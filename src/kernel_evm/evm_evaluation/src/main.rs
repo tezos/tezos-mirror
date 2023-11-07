@@ -12,7 +12,10 @@ use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
 };
+use structopt::StructOpt;
 use walkdir::{DirEntry, WalkDir};
+
+use crate::helpers::construct_folder_path;
 
 const SKIP_ANY: bool = true;
 
@@ -31,13 +34,38 @@ pub struct ReportValue {
     pub failures: u16,
 }
 
+#[derive(Debug, StructOpt)]
+#[structopt(name = "evm-evaluation", about = "Evaluate EVM's engine semantic.")]
+pub struct Opt {
+    #[structopt(
+        short = "d",
+        long = "eth-tests",
+        default_value = "tests",
+        about = "Specify the directory path of [ethereum/tests]. By default it will be 'tests/'."
+    )]
+    eth_tests: String,
+    #[structopt(
+        short = "s",
+        long = "sub-directory",
+        about = "Specify the sub directory of tests you want to execute."
+    )]
+    sub_dir: Option<String>,
+    #[structopt(
+        short = "t",
+        long = "test",
+        about = "Specify the name of the test to execute."
+    )]
+    test: Option<String>,
+}
+
 pub fn main() {
-    // Preliminary step:
-    // Clone https://github.com/ethereum/tests repo inside [engine_evaluation]
-    let folder_path = "tests/GeneralStateTests";
-    let test_files = find_all_json_tests(&PathBuf::from(folder_path));
+    let opt = Opt::from_args();
+    let folder_path =
+        construct_folder_path("GeneralStateTests", &opt.eth_tests, &opt.sub_dir);
+    let test_files = find_all_json_tests(&folder_path);
     let mut report_map: HashMap<String, ReportValue> = HashMap::new();
-    println!("Start running tests on: {:?}", folder_path);
+
+    println!("Start running tests on: {}", folder_path.to_str().unwrap());
     for test_file in test_files.into_iter() {
         let splitted_path: Vec<&str> = test_file.to_str().unwrap().split('/').collect();
         let report_key = splitted_path
@@ -47,6 +75,22 @@ pub fn main() {
         if !report_map.contains_key(report_key) {
             report_map.insert(report_key.to_owned(), ReportValue::default());
         }
+
+        if let Some(test) = &opt.test {
+            let mut file_name = PathBuf::from(test);
+            file_name.set_extension("json");
+            if test_file.file_name() == Some(OsStr::new(&file_name)) {
+                runner::run_test(
+                    &test_file,
+                    &mut report_map,
+                    report_key.to_owned(),
+                    &opt,
+                )
+                .unwrap();
+            }
+            continue;
+        }
+
         println!("---------- Test: {:?} ----------", test_file);
 
         if SKIP_ANY {
@@ -234,7 +278,8 @@ pub fn main() {
             }
         }
 
-        runner::run_test(&test_file, &mut report_map, report_key.to_owned()).unwrap();
+        runner::run_test(&test_file, &mut report_map, report_key.to_owned(), &opt)
+            .unwrap();
     }
     println!("@@@@@ END OF TESTING @@@@@\n");
 

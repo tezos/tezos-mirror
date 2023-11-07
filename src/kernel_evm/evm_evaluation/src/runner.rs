@@ -17,8 +17,9 @@ use std::path::Path;
 use thiserror::Error;
 
 use crate::fillers::process;
+use crate::helpers::construct_folder_path;
 use crate::models::{Env, FillerSource, SpecName, TestSuite};
-use crate::ReportValue;
+use crate::{Opt, ReportValue};
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
     (
@@ -73,6 +74,7 @@ pub fn run_test(
     path: &Path,
     report_map: &mut HashMap<String, ReportValue>,
     report_key: String,
+    opt: &Opt,
 ) -> Result<(), TestError> {
     let json_reader = std::fs::read(path).unwrap();
     let suit: TestSuite = serde_json::from_reader(&*json_reader)?;
@@ -81,10 +83,10 @@ pub fn run_test(
 
     for (name, unit) in suit.0.into_iter() {
         println!("Running unit test: {}", name);
-        let full_filler_path = "tests/".to_owned() + &unit._info.source;
-        println!("Filler source: {}", &full_filler_path);
-        let filler_path = Path::new(&full_filler_path);
-        let reader = std::fs::read(filler_path).unwrap();
+        let full_filler_path =
+            construct_folder_path(&unit._info.source, &opt.eth_tests, &None);
+        println!("Filler source: {}", &full_filler_path.to_str().unwrap());
+        let reader = std::fs::read(full_filler_path).unwrap();
         let filler_source = if unit._info.source.contains(".json") {
             let filler_source: FillerSource = serde_json::from_reader(&*reader)?;
             Some(filler_source)
