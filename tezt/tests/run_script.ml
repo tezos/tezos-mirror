@@ -111,7 +111,7 @@ let test_balance_and_self_address =
       client
   in
 
-  (* When --self-address is given, SELF_ADDRESS should match the given. *)
+  (* When --self-address is given, SELF_ADDRESS should match with it. *)
   let* _storage =
     Client.run_script
       ~self_address
@@ -132,7 +132,7 @@ let test_balance_and_self_address =
   in
 
   (* When both --self-address and --balance are given, the BALANCE should be
-     equal to the given value and SELF_ADDRESS should still match the given. *)
+     equal to the given value and SELF_ADDRESS should still match the given one. *)
   let* _storage =
     Client.run_script
       ~balance:(Tez.of_int 1)
