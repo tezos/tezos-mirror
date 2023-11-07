@@ -250,13 +250,21 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                 let {amount_to_burn; reward} = staked in
                 let* to_burn =
                   let+ {baker_part; stakers_part} =
-                    Shared_stake.share ctxt delegate amount_to_burn
+                    Shared_stake.share
+                      ~rounding:`Towards_stakers
+                      ctxt
+                      delegate
+                      amount_to_burn
                   in
                   [(giver_baker, baker_part); (giver_stakers, stakers_part)]
                 in
                 let* to_reward =
                   let+ {baker_part; stakers_part} =
-                    Shared_stake.share ctxt delegate reward
+                    Shared_stake.share
+                      ~rounding:`Towards_stakers
+                      ctxt
+                      delegate
+                      reward
                   in
                   [(giver_baker, baker_part); (giver_stakers, stakers_part)]
                 in
