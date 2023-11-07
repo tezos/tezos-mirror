@@ -5,6 +5,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
+
+let share ctxt delegate amount =
+  let open Lwt_result_syntax in
+  let* {own_frozen; staked_frozen; delegated = _} =
+    Stake_storage.get_full_staking_balance ctxt delegate
+  in
+  if Tez_repr.(staked_frozen = zero) then
+    return {baker_part = amount; stakers_part = Tez_repr.zero}
+  else
+    let*? total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
+    let*? baker_part =
+      Tez_repr.mul_ratio
+        ~rounding:`Down
+        amount
+        ~num:(Tez_repr.to_mutez own_frozen)
+        ~den:(Tez_repr.to_mutez total_frozen)
+    in
+    let*? stakers_part = Tez_repr.(amount -? baker_part) in
+    return {baker_part; stakers_part}
+
 type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 
 (** Compute the reward distribution between frozen and spendable according to:
