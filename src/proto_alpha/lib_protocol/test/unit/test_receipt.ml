@@ -75,7 +75,7 @@ let test_encodings () =
   let open Receipt in
   let pkh = Signature.Public_key_hash.zero in
   let pkh2, _pk, _sk = Signature.generate_key () in
-  let staker1 = Receipt.frozen_shared ~delegate:pkh in
+  let staker1 = Receipt.frozen_shared_between_stakers ~delegate:pkh in
   let staker2 = Receipt.frozen_baker pkh in
   let staker3 =
     Receipt.frozen_single_staker ~staker:(Contract.Implicit pkh2) ~delegate:pkh

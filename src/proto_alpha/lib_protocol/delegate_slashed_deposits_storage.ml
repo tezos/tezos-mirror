@@ -244,7 +244,8 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                   `Frozen_deposits (Frozen_staker_repr.baker delegate)
                 in
                 let giver_stakers =
-                  `Frozen_deposits (Frozen_staker_repr.shared ~delegate)
+                  `Frozen_deposits
+                    (Frozen_staker_repr.shared_between_stakers ~delegate)
                 in
                 let {amount_to_burn; reward} = staked in
                 let* to_burn =

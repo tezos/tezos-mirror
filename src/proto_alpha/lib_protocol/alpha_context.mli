@@ -2078,14 +2078,15 @@ module Receipt : sig
         staker : Contract.t;
         delegate : Signature.public_key_hash;
       }
-    | Shared of {delegate : Signature.public_key_hash}
+    | Shared_between_stakers of {delegate : Signature.public_key_hash}
 
   val frozen_baker : Signature.public_key_hash -> frozen_staker
 
   val frozen_single_staker :
     staker:Contract.t -> delegate:Signature.public_key_hash -> frozen_staker
 
-  val frozen_shared : delegate:Signature.public_key_hash -> frozen_staker
+  val frozen_shared_between_stakers :
+    delegate:Signature.public_key_hash -> frozen_staker
 
   type 'token balance =
     | Contract : Contract.t -> Tez.t balance

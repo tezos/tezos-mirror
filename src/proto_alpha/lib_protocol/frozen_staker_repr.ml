@@ -11,7 +11,7 @@ type t =
       staker : Contract_repr.t;
       delegate : Signature.public_key_hash;
     }
-  | Shared of {delegate : Signature.public_key_hash}
+  | Shared_between_stakers of {delegate : Signature.public_key_hash}
 
 let baker pkh = Baker pkh
 
@@ -20,7 +20,7 @@ let single_staker ~staker ~delegate =
   | Implicit pkh when Signature.Public_key_hash.(pkh = delegate) -> Baker pkh
   | _ -> Single_staker {staker; delegate}
 
-let shared ~delegate = Shared {delegate}
+let shared_between_stakers ~delegate = Shared_between_stakers {delegate}
 
 let encoding =
   let open Data_encoding in
@@ -48,7 +48,8 @@ let encoding =
          | Baker baker -> matched baker_tag baker_encoding baker
          | Single_staker {staker; delegate} ->
              matched single_tag single_encoding (staker, delegate)
-         | Shared {delegate} -> matched shared_tag shared_encoding delegate)
+         | Shared_between_stakers {delegate} ->
+             matched shared_tag shared_encoding delegate)
        [
          case
            ~title:"Single"
@@ -62,8 +63,9 @@ let encoding =
            ~title:"Shared"
            (Tag shared_tag)
            shared_encoding
-           (function Shared {delegate} -> Some delegate | _ -> None)
-           (fun delegate -> Shared {delegate});
+           (function
+             | Shared_between_stakers {delegate} -> Some delegate | _ -> None)
+           (fun delegate -> Shared_between_stakers {delegate});
          case
            ~title:"Baker"
            (Tag baker_tag)
@@ -81,7 +83,8 @@ let compare sa sb =
       Single_staker {staker = sb; delegate = db} ) ->
       Compare.or_else (Contract_repr.compare sa sb) (fun () ->
           Signature.Public_key_hash.compare da db)
-  | Shared {delegate = da}, Shared {delegate = db} ->
+  | ( Shared_between_stakers {delegate = da},
+      Shared_between_stakers {delegate = db} ) ->
       Signature.Public_key_hash.compare da db
-  | Single_staker _, Shared _ -> -1
-  | Shared _, Single_staker _ -> 1
+  | Single_staker _, Shared_between_stakers _ -> -1
+  | Shared_between_stakers _, Single_staker _ -> 1

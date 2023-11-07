@@ -15,7 +15,7 @@ type t = private
       staker : Contract_repr.t;
       delegate : Signature.public_key_hash;
     }  (** A single staker, cannot be the delegate. *)
-  | Shared of {delegate : Signature.public_key_hash}
+  | Shared_between_stakers of {delegate : Signature.public_key_hash}
       (** The delegate's stakers simultaneously (delegate excluded). *)
 
 val baker : Signature.public_key_hash -> t
@@ -23,7 +23,7 @@ val baker : Signature.public_key_hash -> t
 val single_staker :
   staker:Contract_repr.t -> delegate:Signature.public_key_hash -> t
 
-val shared : delegate:Signature.public_key_hash -> t
+val shared_between_stakers : delegate:Signature.public_key_hash -> t
 
 val encoding : t Data_encoding.t
 
