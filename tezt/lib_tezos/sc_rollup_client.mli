@@ -42,15 +42,6 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-type simulation_result = {
-  state_hash : string;
-  status : string;
-  output : JSON.t;
-  inbox_level : int;
-  num_ticks : int;
-  insights : string option list;
-}
-
 type gc_info = {last_gc_level : int; first_available_level : int}
 
 (** [create ~protocol ?runner ?name ?base_dir node] returns a fresh client
@@ -195,21 +186,6 @@ val get_dal_processed_slots :
   ?block:string ->
   t ->
   (int * string) list Runnable.process
-
-(** [simulate ?block client ?reveal_pages ?insight_request messages] simulates
-    the evaluation of input [messages] for the rollup PVM at [block] (default
-    ["head"]). [reveal_pages] can be used to provide data to be used for the
-    revelation ticks. [insight_request] can be used to look at a list of keys in
-    the PVM state after the simulation. *)
-val simulate :
-  ?hooks:Process_hooks.t ->
-  ?block:string ->
-  t ->
-  ?reveal_pages:string list ->
-  ?insight_requests:
-    [`Pvm_state_key of string list | `Durable_storage_key of string list] list ->
-  string list ->
-  simulation_result Runnable.process
 
 (** [inject client messages] injects the [messages] in the queue the rollup
     node's batcher and returns the list of message hashes injected. *)
