@@ -216,6 +216,13 @@ module P2P : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list
 
+    (** [get_topics_peers ~subscribed t] returns an association list between
+        the topics of connected peers and the connected peers subscribed to that
+        topic, when [subscribed = false]. When [subscribed = true], then the
+        returned value is restricted to the topics this node is subscribed to. *)
+    val get_topics_peers :
+      subscribed:bool -> t -> (Types.Topic.t * Types.Peer.t list) list
+
     (** [get_connections t] returns the list of connections. *)
     val get_connections : t -> (Types.Peer.t * Types.Gossipsub.connection) list
 

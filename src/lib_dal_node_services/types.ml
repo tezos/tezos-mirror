@@ -434,6 +434,15 @@ let connected_query =
   |+ flag "connected" (fun t -> t#connected)
   |> seal
 
+let subscribed_query =
+  let open Tezos_rpc.Query in
+  query (fun subscribed ->
+      object
+        method subscribed = subscribed
+      end)
+  |+ flag "subscribed" (fun t -> t#subscribed)
+  |> seal
+
 let slot_id_query =
   let open Tezos_rpc in
   let open Query in

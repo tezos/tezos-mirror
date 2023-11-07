@@ -297,5 +297,14 @@ module P2P : sig
       ; params : unit
       ; query : unit >
       service
+
+    val get_topics_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Topic.t * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < subscribed : bool > >
+      service
   end
 end
