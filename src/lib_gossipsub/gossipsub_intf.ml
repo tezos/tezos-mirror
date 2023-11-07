@@ -1112,8 +1112,9 @@ module type WORKER = sig
     | Join of GS.Topic.t
     | Leave of GS.Topic.t
 
-  (** A peer's origin is another peer (i.e. advertised via PX). *)
-  type peer_origin = PX of GS.Peer.t
+  (** A peer's origin is either another peer (i.e. advertised via PX), or none
+      if it is trusted. *)
+  type peer_origin = PX of GS.Peer.t | Trusted
 
   (** The different kinds of outputs that could be emitted by the worker for the
       P2P layer. *)

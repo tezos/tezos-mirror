@@ -195,7 +195,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Join of Topic.t
     | Leave of Topic.t
 
-  type peer_origin = PX of Peer.t
+  type peer_origin = PX of Peer.t | Trusted
 
   type p2p_output =
     | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
@@ -828,7 +828,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           "Connect{px=%a; origin=%a}"
           Peer.pp
           px
-          (fun fmt origin -> match origin with PX peer -> Peer.pp fmt peer)
+          (fun fmt origin ->
+            match origin with
+            | PX peer -> Peer.pp fmt peer
+            | Trusted -> Format.fprintf fmt "(trusted)")
           origin
     | Forget {px; origin} ->
         Format.fprintf fmt "Forget{px=%a; origin=%a}" Peer.pp px Peer.pp origin

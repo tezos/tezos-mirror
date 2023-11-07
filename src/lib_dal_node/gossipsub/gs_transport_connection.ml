@@ -120,10 +120,13 @@ end = struct
       &&
       match (origin, k2.origin) with
       | PX peer1, PX peer2 -> P2p_peer.Id.equal peer1 peer2
+      | Trusted, Trusted -> true
+      | PX _, _ | Trusted, _ -> false
 
     let hash {origin; px} =
-      P2p_peer.Id.hash px
-      + match origin with PX peer -> P2p_peer.Id.hash peer * 3
+      match origin with
+      | PX peer -> (P2p_peer.Id.hash px + P2p_peer.Id.hash peer) * 2
+      | Trusted -> P2p_peer.Id.hash px * 3
   end)
 
   type t = P2p_point.Id.t Table.t
