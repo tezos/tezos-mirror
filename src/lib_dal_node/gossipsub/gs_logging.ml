@@ -49,7 +49,7 @@ module Events = struct
       ~section
       ~name:(prefix "publish_message")
       ~msg:"Process Publish_message id {message_id} with topic {topic}"
-      ~level:Info
+      ~level:Debug
       ~pp1:GS.Topic.pp
       ~pp2:GS.Message_id.pp
       ("topic", Types.Topic.encoding)
@@ -103,7 +103,7 @@ module Events = struct
       ~msg:
         "Process Message_with_header from {peer} with id {message_id} and \
          topic {topic}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
       ~pp3:GS.Message_id.pp

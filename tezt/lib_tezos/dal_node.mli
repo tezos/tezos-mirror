@@ -82,13 +82,21 @@ val metrics_addr : t -> string
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
 
-(** [run ?wait_ready ?env node] launches the given dal
+(** [run ?wait_ready ?env ?event_level node] launches the given dal
     node where env is a map of environment variable.
 
     If [wait_ready] is [true], the promise waits for the dal node to be ready.
     [true] by default.
+
+    [event_level] allows to determine the printed levels. By default,
+    it is set to [`Debug] by default.
 *)
-val run : ?wait_ready:bool -> ?env:string String_map.t -> t -> unit Lwt.t
+val run :
+  ?wait_ready:bool ->
+  ?env:string String_map.t ->
+  ?event_level:Daemon.Level.default_level ->
+  t ->
+  unit Lwt.t
 
 (** Send SIGTERM and wait for the process to terminate.
 

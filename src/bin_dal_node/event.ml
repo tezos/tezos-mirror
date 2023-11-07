@@ -177,7 +177,7 @@ let stored_slot_shard =
     ~section
     ~name:"stored_slot_shard"
     ~msg:"stored shard {shard_index} for commitment {commitment}"
-    ~level:Info
+    ~level:Debug
     ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
     ("shard_index", Data_encoding.int31)
