@@ -12,8 +12,8 @@ types:
       if: (locked_round_tag == locked_round_tag::some)
 enums:
   locked_round_tag:
-    1: some
     0: none
+    1: some
 seq:
 - id: level
   type: s4

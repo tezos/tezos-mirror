@@ -22,13 +22,13 @@ types:
 enums:
   alpha__per_block_votes_tag:
     0: case__0
-    4: case__4
-    8: case__8
     1: case__1
-    5: case__5
-    9: case__9
     2: case__2
+    4: case__4
+    5: case__5
     6: case__6
+    8: case__8
+    9: case__9
     10: case__10
   bool:
     0: false

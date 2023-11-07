@@ -471,17 +471,17 @@ enums:
   id_011__pthangz2__operation__alpha__contents_tag:
     0: endorsement
     1: seed_nonce_revelation
-    10: endorsement_with_slot
     2: double_endorsement_evidence
     3: double_baking_evidence
     4: activate_account
     5: proposals
     6: ballot
+    10: endorsement_with_slot
+    17: failing_noop
     107: reveal
     108: transaction
     109: origination
     110: delegation
-    17: failing_noop
     111: register_global_constant
 seq:
 - id: id_011__pthangz2__operation__alpha__contents
