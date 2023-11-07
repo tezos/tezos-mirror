@@ -251,7 +251,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                 let* to_burn =
                   let+ {baker_part; stakers_part} =
                     Shared_stake.share
-                      ~rounding:`Towards_stakers
+                      ~rounding:`Towards_baker
                       ctxt
                       delegate
                       amount_to_burn
@@ -261,7 +261,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                 let* to_reward =
                   let+ {baker_part; stakers_part} =
                     Shared_stake.share
-                      ~rounding:`Towards_stakers
+                      ~rounding:`Towards_baker
                       ctxt
                       delegate
                       reward
