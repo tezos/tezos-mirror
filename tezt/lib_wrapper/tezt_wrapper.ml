@@ -11,7 +11,26 @@ open Base
 module Uses = struct
   type t = {tag : string; path : string}
 
-  let make ~tag ~path = {tag; path}
+  (* Filled by [make] and read by [lookup]. *)
+  let known_paths : t String_map.t ref = ref String_map.empty
+
+  let canonicalize_path path =
+    String.split_on_char '/' path
+    |> List.filter (function "" | "." -> false | _ -> true)
+    |> String.concat "/"
+
+  let add_to_known_paths path uses =
+    let path = canonicalize_path path in
+    known_paths :=
+      String_map.update
+        path
+        (function None -> Some uses | Some _ as x -> x)
+        !known_paths
+
+  let make ~tag ~path =
+    let uses = {tag; path} in
+    add_to_known_paths path uses ;
+    uses
 
   let path_handler : (t -> unit) ref = ref (fun _ -> ())
 
@@ -20,6 +39,8 @@ module Uses = struct
     uses.path
 
   let tag uses = uses.tag
+
+  let lookup path = String_map.find_opt (canonicalize_path path) !known_paths
 
   let octez_node = make ~tag:"node" ~path:"./octez-node"
 

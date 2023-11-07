@@ -65,6 +65,13 @@ let octez_injector_server =
 let smart_rollup_installer =
   Uses.make ~tag:"smart_rollup_installer" ~path:"smart-rollup-installer"
 
+(* The following is unused because even though the WASM debugger is released,
+   there are no tests for it yet, except [tezt/tests/binaries.ml].
+   However, this test requires the executables it tests to be declared with
+   [Uses.make] so that they are registered in the lookup table of [Uses]. *)
+let _octez_smart_rollup_wasm_debugger =
+  Uses.make ~tag:"wasm_debugger" ~path:"./octez-smart-rollup-wasm-debugger"
+
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)
