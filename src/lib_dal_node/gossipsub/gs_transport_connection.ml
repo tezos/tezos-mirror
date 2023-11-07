@@ -104,9 +104,12 @@ module PX_cache : sig
       overwritten.  *)
   val insert : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t -> unit
 
-  (** [drop t ~origin ~px] drops the entry [(origin, px)] from the cache and
-      returns the [point] being dropped, if any. *)
-  val drop : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t option
+  (** [find_opt t ~origin ~px] returns the content associated to the entry
+      [(origin, px)] in the cache, if any. *)
+  val find_opt : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t option
+
+  (** [drop t ~origin ~px] drops the entry [(origin, px)] from the cache. *)
+  val drop : t -> origin:origin -> px:P2p_peer.Id.t -> unit
 end = struct
   type origin = Worker.peer_origin
 
@@ -135,11 +138,9 @@ end = struct
 
   let insert table ~origin ~px point = Table.replace table {px; origin} point
 
-  let drop table ~origin ~px =
-    let key = {origin; px} in
-    let point_opt = Table.find_opt table key in
-    Table.remove table key ;
-    point_opt
+  let drop table ~origin ~px = Table.remove table {origin; px}
+
+  let find_opt table ~origin ~px = Table.find_opt table {origin; px}
 end
 
 (* [px_of_peer p2p_layer peer] returns the public IP address and port at which
@@ -261,7 +262,7 @@ let try_connect_to_peer p2p_layer px_cache ~px ~origin =
   let open Lwt_syntax in
   (* If there is some [point] associated to [px] and advertised by [origin]
      on the [px_cache], we will try to connect to it. *)
-  match PX_cache.drop px_cache ~px ~origin with
+  match PX_cache.find_opt px_cache ~px ~origin with
   | Some point ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5799
 
@@ -286,6 +287,9 @@ let try_connect_to_peer p2p_layer px_cache ~px ~origin =
       let* (_ : _ P2p.connection tzresult) =
         P2p.connect ~expected_peer_id:px p2p_layer point
       in
+      (match origin with
+      | Trusted -> () (* Don't drop trusted points. *)
+      | PX _ -> PX_cache.drop px_cache ~px ~origin) ;
       return_unit
   | _ -> return_unit
 
@@ -326,9 +330,7 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
       | Connect {px; origin} ->
           try_connect_to_peer p2p_layer px_cache ~px ~origin
       | Forget {px; origin} ->
-          let _p : P2p_point.Id.t option =
-            PX_cache.drop px_cache ~px ~origin:(PX origin)
-          in
+          PX_cache.drop px_cache ~px ~origin:(PX origin) ;
           return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer
