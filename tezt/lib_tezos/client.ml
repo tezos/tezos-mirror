@@ -49,6 +49,11 @@ type mockup_sync_mode = Asynchronous | Synchronous
 
 type normalize_mode = Readable | Optimized | Optimized_legacy
 
+let normalize_mode_to_string = function
+  | Readable -> "Readable"
+  | Optimized -> "Optimized"
+  | Optimized_legacy -> "Optimized_legacy"
+
 type t = {
   path : string;
   admin_path : string;
@@ -1780,6 +1785,23 @@ let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
     ~input
     client
 
+let spawn_run_code ?hooks ?protocol_hash ?no_base_dir_warnings ?amount ?balance
+    ?source ?payer ?self_address ?gas ?mode ?level ?now ?other_contracts
+    ?extra_big_maps ~src ~stack client =
+  spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
+  @@ ["run"; "michelson"; "code"; src; "on"; "stack"; stack]
+  @ optional_arg "amount" Tez.to_string amount
+  @ optional_arg "balance" Tez.to_string balance
+  @ optional_arg "source" Fun.id source
+  @ optional_arg "payer" Fun.id payer
+  @ optional_arg "self-address" Fun.id self_address
+  @ optional_arg "gas" string_of_int gas
+  @ optional_arg "unparsing-mode" normalize_mode_to_string mode
+  @ optional_arg "now" Fun.id now
+  @ optional_arg "level" string_of_int level
+  @ optional_arg "other-contracts" Fun.id other_contracts
+  @ optional_arg "extra-big-maps" Fun.id extra_big_maps
+
 let stresstest_estimate_gas ?endpoint client =
   let* output =
     spawn_command ?endpoint client ["stresstest"; "estimate"; "gas"]
@@ -1917,6 +1939,49 @@ let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
     ~prg
     client
 
+let run_code ?hooks ?protocol_hash ?no_base_dir_warnings ?amount ?balance
+    ?source ?payer ?self_address ?gas ?mode ?level ?now ?other_contracts
+    ?extra_big_maps ~src ~stack client =
+  let* client_output =
+    spawn_run_code
+      ?hooks
+      ?protocol_hash
+      ?no_base_dir_warnings
+      ?amount
+      ?balance
+      ?source
+      ?payer
+      ?self_address
+      ?gas
+      ?mode
+      ?level
+      ?now
+      ?other_contracts
+      ?extra_big_maps
+      ~src
+      ~stack
+      client
+    |> Process.check_and_read_stdout
+  in
+  (* Extract the final stack from [client_output].
+
+     The [client_ouput] has the following format:
+     Result
+       <stack>
+     Gas_remaining: <gas> units remaining *)
+  let client_output_lines = String.split_on_char '\n' client_output in
+  let stack, _tail =
+    span
+      (fun line -> not (String.starts_with ~prefix:"Gas remaining" line))
+      client_output_lines
+  in
+  match stack with
+  | "Result" :: stack -> return (String.trim (String.concat "\n" stack))
+  | _ ->
+      Test.fail
+        "Cannot extract resulting stack from client_output: %s,"
+        client_output
+
 let spawn_register_global_constant ?(wait = "none") ?burn_cap ~value ~src client
     =
   spawn_command
@@ -2036,11 +2101,6 @@ let hash_data ?hooks ~data ~typ client =
       raw_sha256_hash = get "Raw Sha256 hash";
       raw_sha512_hash = get "Raw Sha512 hash";
     }
-
-let normalize_mode_to_string = function
-  | Readable -> "Readable"
-  | Optimized -> "Optimized"
-  | Optimized_legacy -> "Optimized_legacy"
 
 let spawn_normalize_data ?hooks ?mode ?(legacy = false) ~data ~typ client =
   let mode_cmd =

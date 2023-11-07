@@ -1448,6 +1448,48 @@ val spawn_run_script_at :
   Protocol.t ->
   Process.t
 
+(** Run [octez-client run michelson code .. on stack ..]. *)
+val run_code :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  ?amount:Tez.t ->
+  ?balance:Tez.t ->
+  ?source:string ->
+  ?payer:string ->
+  ?self_address:string ->
+  ?gas:int ->
+  ?mode:normalize_mode ->
+  ?level:int ->
+  ?now:string ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
+  src:string ->
+  stack:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [run_code] but do not wait for the process to exit. *)
+val spawn_run_code :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  ?amount:Tez.t ->
+  ?balance:Tez.t ->
+  ?source:string ->
+  ?payer:string ->
+  ?self_address:string ->
+  ?gas:int ->
+  ?mode:normalize_mode ->
+  ?level:int ->
+  ?now:string ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
+  src:string ->
+  stack:string ->
+  t ->
+  Process.t
+
 (** Run [octez-client register global constant value from src].
     Returns the address hash of the new constant. *)
 val register_global_constant :
