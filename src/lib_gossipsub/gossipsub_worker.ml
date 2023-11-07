@@ -541,6 +541,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_heartheat = function
     | state, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
+        let gstate_view = View.view gstate in
         let iter pmap mk_msg =
           Peer.Map.iter
             (fun peer topicset ->
@@ -553,7 +554,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* Send Graft messages. *)
         iter to_graft (fun _peer topic -> Graft {topic}) ;
         (* Send Prune messages with adequate px. *)
-        let backoff = View.(view gstate |> limits).prune_backoff in
+        let backoff = View.(limits gstate_view).prune_backoff in
         iter to_prune (fun peer_to_prune topic ->
             let px =
               GS.select_px_peers gstate ~peer_to_prune topic ~noPX_peers
@@ -568,6 +569,15 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    state
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
+        Peer.Set.fold
+          (fun trusted_peer seq ->
+            if View.Connections.mem trusted_peer gstate_view.View.connections
+            then seq
+            else Seq.cons trusted_peer seq)
+          state.trusted_peers
+          Seq.empty
+        |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
+               Connect {px = trusted_peer; origin = Trusted}) ;
         state
 
   let update_gossip_state state (gossip_state, output) =
