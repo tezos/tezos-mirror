@@ -47,11 +47,11 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
-let dal_distribution () =
+let dal_parameters () =
   Test.register
     ~__FILE__
-    ~title:"Get the DAL distribution"
-    ~tags:["dal"; "distribution"]
+    ~title:"Check the validity of DAL parameters"
+    ~tags:["dal"; "parameters"]
   @@ fun () ->
   let open Dal.Cryptobox in
   let number_of_shards = Cli.get_int "number_of_shards" in
@@ -393,7 +393,7 @@ let baker_test ~network =
     ()
 
 let register () =
-  dal_distribution () ;
+  dal_parameters () ;
   List.iter
     (fun network ->
       slots_injector_test ~network ;

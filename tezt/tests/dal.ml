@@ -148,12 +148,15 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
 
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    ?attestation_lag ?attestation_threshold ?number_of_shards ?commitment_period
-    ?challenge_window ?dal_enable ?event_sections_levels ?node_arguments
-    ?activation_timestamp ?dal_bootstrap_peers f ~protocol =
+    ?attestation_lag ?slot_size ?page_size ?attestation_threshold
+    ?number_of_shards ?commitment_period ?challenge_window ?dal_enable
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?dal_bootstrap_peers f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
+    @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+    @ make_int_parameter ["dal_parametric"; "page_size"] page_size
     @ make_int_parameter
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
@@ -298,10 +301,11 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
       with_dal_node ?bootstrap_profile node @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
-let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
-    ?(tags = ["dal_node"]) ?(pvm_name = "arith") ?(dal_enable = true)
-    ?commitment_period ?challenge_window ?minimal_block_delay
-    ?delay_increment_per_round ?activation_timestamp variant scenario =
+let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
+    ?page_size ?number_of_shards ?attestation_lag ?(tags = ["dal_node"])
+    ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
+    ?challenge_window ?minimal_block_delay ?delay_increment_per_round
+    ?activation_timestamp variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -311,6 +315,9 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
       with_layer1
         ~custom_constants
         ?node_arguments
+        ?slot_size
+        ?page_size
+        ?number_of_shards
         ?attestation_lag
         ?commitment_period
         ?challenge_window
@@ -3857,6 +3864,81 @@ module Tx_kernel_e2e = struct
         ~__LOC__
         ~error_msg:"Expected %R, got %L") ;
     unit
+
+  let test_echo_kernel_e2e protocol parameters dal_node sc_rollup_node
+      _sc_rollup_address node client pvm_name =
+    Log.info "Originate the echo kernel." ;
+    let* boot_sector =
+      Sc_rollup_helpers.prepare_installer_kernel
+        ~base_installee:"./"
+        ~preimages_dir:
+          (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
+        "dal_echo_kernel"
+    in
+    let* sc_rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:Tez.(of_int 9999999)
+        ~alias:"dal_echo_kernel"
+        ~src:Constant.bootstrap1.public_key_hash
+        ~kind:pvm_name
+        ~boot_sector
+        ~parameters_ty:"unit"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* () =
+      Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+    in
+    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
+    let* current_level = Node.get_level node in
+    let target_level =
+      current_level + parameters.Dal.Parameters.attestation_lag + 1
+    in
+    let payload = "hello" in
+    let* () =
+      publish_store_and_attest_slot
+        client
+        dal_node
+        Constant.bootstrap1
+        ~index:0
+        ~content:
+          (Helpers.make_slot
+             ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
+             payload)
+        ~attestation_lag:parameters.attestation_lag
+        ~number_of_slots:parameters.number_of_slots
+    in
+    Log.info "Wait for the rollup node to catch up." ;
+    let* _level =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node target_level
+    in
+    let key = "/output/slot-0" in
+    let*! value_written =
+      Sc_rollup_client.inspect_durable_state_value
+        ~hooks
+        sc_rollup_client
+        ~pvm_kind:pvm_name
+        ~operation:Sc_rollup_client.Value
+        ~key
+    in
+    match value_written with
+    | None -> Test.fail "Expected a value to be found. But none was found."
+    | Some value ->
+        let value = `Hex value |> Hex.to_string in
+        Check.(
+          (String.length value = parameters.Dal.Parameters.cryptobox.slot_size)
+            int
+            ~error_msg:"Expected a value of size %R. Got $L") ;
+        if String.starts_with ~prefix:payload value then unit
+        else
+          let message =
+            Format.asprintf
+              "Expected the payload '%s' to be a prefix of the value written. \
+               Instead found: %s"
+              payload
+              (String.sub value 0 (String.length payload))
+          in
+          Test.fail "%s" message
 end
 
 let register ~protocols =
@@ -4010,9 +4092,15 @@ let register ~protocols =
   scenario_with_all_nodes
     "test tx_kernel"
     ~pvm_name:"wasm_2_0_0"
-    ~commitment_period:10
-    ~challenge_window:10
     Tx_kernel_e2e.test_tx_kernel_e2e
+    protocols ;
+  scenario_with_all_nodes
+    "test echo_kernel"
+    ~pvm_name:"wasm_2_0_0"
+    ~slot_size:2048
+    ~page_size:256
+    ~number_of_shards:64
+    Tx_kernel_e2e.test_echo_kernel_e2e
     protocols ;
 
   (* Register end-to-end tests *)
