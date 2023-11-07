@@ -41,40 +41,28 @@ type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 
 Preconditions:
  - 0 <= [edge_of_baking_over_staking_billionth]  <= 1_000_000_000
+
+Rounding favors:
+  - staking over delegation
+
+In case the delegate's stake is zero, everything goes to the spendable balance.
 *)
 let compute_reward_distrib ~full_staking_balance:_ ~stake
-    ~edge_of_baking_over_staking_billionth ~(rewards : Tez_repr.t) =
+    ~edge_of_baking_over_staking_billionth:_ ~(rewards : Tez_repr.t) =
+  let open Result_syntax in
   let ({frozen; weighted_delegated} : Stake_repr.t) = stake in
-  (* convert into Q *)
-  let weighted_delegated =
-    (* >= 0 *) Q.of_int64 @@ Tez_repr.to_mutez weighted_delegated
-  in
-  let frozen = (* >= 0 *) Q.of_int64 @@ Tez_repr.to_mutez frozen in
-  let baking_over_staking_edge (* 0 <= baking_over_staking_edge <= 1 *) =
-    Q.(of_int32 edge_of_baking_over_staking_billionth / of_int 1_000_000_000)
-  in
-  let rewards_q = Q.of_int64 @@ Tez_repr.to_mutez rewards in
-  (* compute in Q *)
-  let to_frozen =
-    let open Q in
-    let total_stake = weighted_delegated + frozen in
-    if total_stake <= zero then zero
-    else
-      let non_delegated_ratio = frozen / total_stake in
-      let non_delegated_rewards = rewards_q * non_delegated_ratio in
-      non_delegated_rewards * (one - baking_over_staking_edge)
-  in
-  (* finish computation into mutez *)
-  let rewards = Tez_repr.to_mutez rewards in
-  let to_frozen = Q.to_int64 to_frozen in
-  (* todo: is there any risk to overflow here ? *)
-  let to_spendable = Int64.(sub rewards to_frozen) in
-  (* convert back to tez *)
-  (* Preconditions prevents to_frozen to be negative or greater than
-     rewards. Thus we can use to_mutez_exn *)
-  let to_frozen = Tez_repr.of_mutez_exn to_frozen in
-  let to_spendable = Tez_repr.of_mutez_exn to_spendable in
-  Ok {to_frozen; to_spendable}
+  let* total_stake = Tez_repr.(frozen +? weighted_delegated) in
+  if Tez_repr.(total_stake <= zero) then
+    return {to_spendable = rewards; to_frozen = Tez_repr.zero}
+  else
+    let* to_spendable =
+      Tez_repr.mul_ratio
+        rewards
+        ~num:(Tez_repr.to_mutez weighted_delegated)
+        ~den:(Tez_repr.to_mutez total_stake)
+    in
+    let* to_frozen = Tez_repr.(rewards -? to_spendable) in
+    return {to_frozen; to_spendable}
 
 let share ~rounding ctxt delegate amount =
   let open Lwt_result_syntax in
