@@ -27,40 +27,88 @@ let mapping l =
 
 let mapping_flatten l = mapping (List.flatten l)
 
+let bool = function true -> scalar "true" | false -> scalar "false"
+
 let map_list_of_option f = function None -> [] | Some x -> [f x]
 
-let metaSpec (t : MetaSpec.t) =
+let metaSpec
+    ({
+       id;
+       endian;
+       bitEndian;
+       forceDebug;
+       opaqueTypes;
+       zeroCopySubstream;
+       imports;
+       encoding = _;
+       isOpaque = _;
+     } :
+      MetaSpec.t) =
   mapping_flatten
     [
-      map_list_of_option (fun id -> ("id", scalar id)) t.id;
+      map_list_of_option (fun id -> ("id", scalar id)) id;
       map_list_of_option
         (fun endian -> ("endian", scalar (Endianness.to_string endian)))
-        t.endian;
+        endian;
+      map_list_of_option
+        (fun bitendian ->
+          ("bit-endian", scalar (BitEndianness.to_string bitendian)))
+        bitEndian;
+      (match imports with
+      | [] -> []
+      | l -> [("imports", sequence (List.map scalar l))]);
+      map_list_of_option
+        (fun opaqueTypes -> ("ks-opaque-types", bool opaqueTypes))
+        opaqueTypes;
+      (if forceDebug then [("ks-debug", bool forceDebug)] else []);
+      map_list_of_option
+        (fun zeroCopySubstream ->
+          ("ks-zero-copy-substream", bool zeroCopySubstream))
+        zeroCopySubstream;
     ]
 
-let doc_spec DocSpec.{summary; refs = _} =
+let doc_spec DocSpec.{summary; refs} =
   map_list_of_option
     (fun summary ->
       let style = if String.length summary > 80 then `Folded else `Any in
-      ("doc", scalar ~style summary))
+      let doc = ("doc", scalar ~style summary) in
+      match refs with
+      | [] -> doc
+      | l ->
+          ( "doc-ref",
+            List.map
+              (function
+                | DocSpec.UrlRef {url; text} -> scalar (url ^ " " ^ text)
+                | DocSpec.TextRef x -> scalar x)
+              l
+            |> sequence ))
     summary
 
-let instanceSpec InstanceSpec.{doc = _; descr} =
-  (* TODO: pp doc spec as well. *)
+let instanceSpec InstanceSpec.{doc; descr} =
   match descr with
-  | ValueInstanceSpec instance ->
-      mapping [("value", scalar (Ast.to_string instance.value))]
-  | ParseInstanceSpec -> failwith "not supported"
+  | ValueInstanceSpec {value; ifExpr; id = _; dataTypeOpt = _} ->
+      let all = doc_spec doc in
+      let all = ("value", scalar (Ast.to_string value)) :: all in
+      let all =
+        match ifExpr with
+        | None -> all
+        | Some e -> ("if", scalar (Ast.to_string e)) :: all
+      in
+      mapping all
+  | ParseInstanceSpec -> failwith "not supported (ParseInstanceSpec)"
 
 let instances_spec instances =
   mapping (instances |> List.map (fun (k, v) -> (k, instanceSpec v)))
 
-let enumSpec enumspec =
-  (* TODO: pp doc spec as well. *)
+let enumSpec {EnumSpec.map} =
   mapping
     (List.map
-       (fun (v, EnumValueSpec.{name; _}) -> (string_of_int v, scalar name))
-       enumspec.EnumSpec.map)
+       (fun (v, EnumValueSpec.{name; doc}) ->
+         ( string_of_int v,
+           match doc_spec doc with
+           | [] -> scalar name
+           | l -> mapping (("id", scalar name) :: l) ))
+       map)
 
 let enums_spec enums =
   mapping (enums |> List.map (fun (k, v) -> (k, enumSpec v)))
@@ -69,7 +117,7 @@ let enums_spec enums =
 let type_spec attr =
   match attr.AttrSpec.dataType with
   | AnyType | BytesType _ -> []
-  | NumericType _ | BooleanType | StrType _ | ComplexDataType _ ->
+  | NumericType _ | BooleanType _ | StrType _ | ComplexDataType _ | Raw _ ->
       [("type", scalar (DataType.to_string attr.AttrSpec.dataType))]
 
 let repeat_spec =
@@ -142,10 +190,29 @@ let seq_spec seq = sequence (List.concat_map attr_spec seq)
 let spec_if_non_empty name args f =
   match args with [] -> [] | _ :: _ -> [(name, f args)]
 
-let rec to_yaml (t : ClassSpec.t) =
+let id_only_meta = function
+  | MetaSpec.
+      {
+        isOpaque = false;
+        id = Some _ | None;
+        (* [`Be] is the default value *)
+        endian = None | Some `BE;
+        bitEndian = None;
+        encoding = None;
+        forceDebug = false;
+        opaqueTypes = None;
+        zeroCopySubstream = None;
+        imports = [];
+      } ->
+      true
+  | _ -> false
+
+let rec to_yaml ~toplevel (t : ClassSpec.t) =
   mapping_flatten
     [
-      (if t.isTopLevel then [("meta", metaSpec t.meta)] else []);
+      (if toplevel then [("meta", metaSpec t.meta)]
+      else if id_only_meta t.meta then []
+      else [("meta", metaSpec t.meta)]);
       doc_spec t.doc;
       spec_if_non_empty "types" t.types types_spec;
       spec_if_non_empty "instances" t.instances instances_spec;
@@ -153,8 +220,11 @@ let rec to_yaml (t : ClassSpec.t) =
       spec_if_non_empty "seq" t.seq seq_spec;
     ]
 
-and types_spec types = mapping (types |> List.map (fun (k, v) -> (k, to_yaml v)))
+and types_spec types =
+  mapping (types |> List.map (fun (k, v) -> (k, to_yaml ~toplevel:false v)))
 
-let print t =
-  let y = to_yaml t in
+let to_string t =
+  let y = to_yaml ~toplevel:true t in
   match Yaml.yaml_to_string y with Ok x -> x | Error (`Msg m) -> failwith m
+
+let print t = to_string t

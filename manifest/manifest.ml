@@ -406,6 +406,8 @@ module Dune = struct
 
   let ocamllex name = [S "ocamllex"; S name]
 
+  let menhir name = [S "menhir"; [S "modules"; S name]]
+
   let ocamlyacc name = [S "ocamlyacc"; S name]
 
   let pps names = S "pps" :: of_atom_list names
@@ -3353,6 +3355,7 @@ let generate_dune_project_files () =
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
   Format.fprintf fmt "(using ctypes 0.3)@." ;
+  Format.fprintf fmt "(using menhir 2.1)@." ;
   ( Target.iter_internal_by_opam @@ fun package internals ->
     let has_public_target =
       List.exists

@@ -239,6 +239,8 @@ let ppx_deriving_show = external_sublib ppx_deriving "ppx_deriving.show"
 
 let ppx_repr = external_lib "ppx_repr" V.(at_least "0.6.0")
 
+let ppx_sexp_conv = external_lib "ppx_sexp_conv" V.True
+
 let ptime_clock_os = external_sublib ~js_compatible:true ptime "ptime.clock.os"
 
 let pure_splitmix =
@@ -300,6 +302,8 @@ let secp256k1_internal =
     version
 
 let seqes = external_lib ~js_compatible:true "seqes" V.(at_least "0.2")
+
+let sexplib = external_lib "sexplib" V.True
 
 let stdint = external_lib "stdint" V.True
 
@@ -8427,7 +8431,9 @@ let kaitai =
     "kaitai"
     ~path:"contrib/kaitai-ocaml/src"
     ~release_status:Unreleased
-    ~deps:[yaml]
+    ~preprocess:[pps ppx_sexp_conv]
+    ~deps:[yaml; sexplib]
+    ~dune:Dune.[ocamllex "lexer"; menhir "parser"]
     ~synopsis:"OCaml library for reading Kaitai spec files"
 
 (* We use a private-lib with inline-tests in order to run the tests normally,
