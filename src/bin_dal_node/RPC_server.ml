@@ -235,6 +235,10 @@ module P2P = struct
     let get_backoffs ctxt () () =
       let open Lwt_result_syntax in
       return @@ Node_context.P2P.Gossipsub.get_backoffs ctxt
+
+    let get_message_cache ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_message_cache ctxt
   end
 end
 
@@ -318,6 +322,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_backoffs
        (P2P.Gossipsub.get_backoffs ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_message_cache
+       (P2P.Gossipsub.get_message_cache ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.post_connect

@@ -376,7 +376,4 @@ module Worker_config = struct
 end
 
 module Worker = Tezos_gossipsub.Worker (Worker_config)
-module Message_cache =
-  Tezos_gossipsub.Internal_for_tests.Message_cache
-    (Automaton_config.Subconfig)
-    (Automaton_config.Time)
+module Message_cache = GS.Introspection.Message_cache

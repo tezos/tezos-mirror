@@ -62,6 +62,12 @@ module Sliding_message_id_map (C : Gossipsub_intf.AUTOMATON_SUBCONFIG) : sig
   (** Shifts the sliding window by one slot. *)
   val shift : 'a t -> 'a t
 
+  module Introspection : sig
+    module Map : Map.S with type key = Int64.t
+
+    val get_slot_entries : 'a t -> C.Message_id.t list C.Topic.Map.t Map.t
+  end
+
   module Internal_for_tests : sig
     val get_values : 'a t -> (C.Message_id.t * 'a) Seq.t
   end
@@ -204,6 +210,12 @@ end = struct
             window_size = t.window_size;
           }
 
+  module Introspection = struct
+    module Map = Map
+
+    let get_slot_entries t = t.slot_entries
+  end
+
   module Internal_for_tests = struct
     let get_values t =
       t.values_with_counter |> Message_id.Map.to_seq
@@ -319,6 +331,13 @@ module Make
       messages = Sliding_message_id_map.shift t.messages;
       first_seen_times = Sliding_message_id_map.shift t.first_seen_times;
     }
+
+  module Introspection = struct
+    module Map = Sliding_message_id_map.Introspection.Map
+
+    let get_message_ids t =
+      Sliding_message_id_map.Introspection.get_slot_entries t.messages
+  end
 
   module Internal_for_tests = struct
     let get_access_counters t =

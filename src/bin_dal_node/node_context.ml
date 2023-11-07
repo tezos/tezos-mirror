@@ -280,5 +280,21 @@ module P2P = struct
           (topic, Gossipsub.Worker.GS.Peer.Map.bindings peer_map) :: acc)
         state.backoff
         []
+
+    let get_message_cache {gs_worker; _} =
+      let module Cache = Gossipsub.Worker.GS.Introspection.Message_cache in
+      let state = Gossipsub.Worker.state gs_worker in
+      let map = Cache.Introspection.get_message_ids state.message_cache in
+      Cache.Introspection.Map.fold
+        (fun tick map acc ->
+          let list =
+            Cache.Topic.Map.fold
+              (fun topic ids acc -> (topic, List.length ids) :: acc)
+              map
+              []
+          in
+          (tick, list) :: acc)
+        map
+        []
   end
 end

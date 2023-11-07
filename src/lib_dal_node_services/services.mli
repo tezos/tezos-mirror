@@ -324,5 +324,14 @@ module P2P : sig
       ; params : unit
       ; query : unit >
       service
+
+    val get_message_cache :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (int64 * (Types.Topic.t * int) list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
   end
 end

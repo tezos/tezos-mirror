@@ -509,6 +509,12 @@ module type MESSAGE_CACHE = sig
       heartbeat tick). *)
   val shift : t -> t
 
+  module Introspection : sig
+    module Map : Map.S with type key = Int64.t
+
+    val get_message_ids : t -> Message_id.t list Topic.Map.t Map.t
+  end
+
   module Internal_for_tests : sig
     val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
   end
@@ -913,18 +919,14 @@ module type AUTOMATON = sig
       val peers_per_topic_map : t -> Peer.Set.t Topic.Map.t
     end
 
-    module Message_cache : sig
-      type t
-
-      val get_message_for_peer :
-        Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
-
-      val seen_message : Message_id.t -> t -> bool
-
-      module Internal_for_tests : sig
-        val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
-      end
-    end
+    module Message_cache :
+      MESSAGE_CACHE
+        with type Peer.t = Peer.t
+         and type 'a Peer.Map.t = 'a Peer.Map.t
+         and type Topic.t = Topic.t
+         and type Message_id.t = Message_id.t
+         and type Message.t = Message.t
+         and type Time.t = Time.t
 
     type view = {
       limits : limits;

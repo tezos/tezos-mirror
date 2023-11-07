@@ -235,5 +235,9 @@ module P2P : sig
     (** [get_backoffs t] returns the backoffs of peers with a backoff. *)
     val get_backoffs :
       t -> (Types.Topic.t * (Types.Peer.t * Types.Time.t) list) list
+
+    (** [get_message_cache t] returns the number of message ids in the message
+        cache, grouped by time slot and topic. *)
+    val get_message_cache : t -> (int64 * (Types.Topic.t * int) list) list
   end
 end

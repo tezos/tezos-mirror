@@ -529,5 +529,31 @@ module P2P = struct
                           (req "peer" Peer.encoding)
                           (req "backoff" Tezos_base.Time.System.encoding))))))
         (open_root / "backoffs")
+
+    let get_message_cache :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (int64 * (Types.Topic.t * int) list) list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Get the number of message ids in the message cache, grouped by \
+           heartbeat tick and topic."
+        ~query:Tezos_rpc.Query.empty
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "tick" int64)
+                 (req
+                    "per_topic_cache_size"
+                    (list
+                       (obj2
+                          (req "topic" Types.Topic.encoding)
+                          (req "num_ids" int31))))))
+        (open_root / "message_cache")
   end
 end
