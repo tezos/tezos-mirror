@@ -214,5 +214,8 @@ module P2P : sig
 
     (** [get_connections t] returns the list of connections. *)
     val get_connections : t -> (Types.Peer.t * Types.Gossipsub.connection) list
+
+    (** [get_scores t] returns the score of peers with a known score. *)
+    val get_scores : t -> (Types.Peer.t * Types.Score.t) list
   end
 end

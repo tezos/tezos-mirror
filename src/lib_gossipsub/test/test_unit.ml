@@ -120,8 +120,7 @@ let assert_topic_mesh ~__LOC__ ~topic ~expected_peers state =
 let assert_peer_score ~__LOC__ ~expected_score peer state =
   let view = GS.Introspection.view state in
   let actual_score =
-    GS.Introspection.get_peer_score peer view
-    |> GS.Score.Internal_for_tests.to_float
+    GS.Introspection.get_peer_score peer view |> GS.Score.Introspection.to_float
   in
   Check.(
     (actual_score = expected_score)

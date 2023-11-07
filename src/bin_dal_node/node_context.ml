@@ -230,5 +230,17 @@ module P2P = struct
           :: acc)
         state.connections
         []
+
+    let get_scores {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Peer.Map.fold
+        (fun peer score acc ->
+          let v =
+            Gossipsub.Worker.GS.Score.value score
+            |> Gossipsub.Worker.GS.Score.Introspection.to_float
+          in
+          (peer, v) :: acc)
+        state.scores
+        []
   end
 end

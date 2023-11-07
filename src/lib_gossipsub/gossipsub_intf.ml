@@ -416,12 +416,14 @@ module type SCORE = sig
 
   val pp_value : Format.formatter -> value -> unit
 
+  module Introspection : sig
+    (** Convert a score value into a float.  *)
+    val to_float : value -> float
+  end
+
   module Internal_for_tests : sig
     val get_topic_params :
       ('topic, 'span) score_limits -> 'topic -> 'span per_topic_score_limits
-
-    (** Convert a score value into a float.  *)
-    val to_float : value -> float
 
     (** [is_active topic t] returns [true] if the peer's score for [topic] is marked as active,
         and [false] otherwise. *)
