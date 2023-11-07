@@ -88,7 +88,7 @@ let redirect_if_many :
     state * AttrSpec.t =
  fun state attrs fattr id ->
   match attrs with
-  | [] -> failwith "Not supported"
+  | [] -> failwith "redirect_if_many: empty list not supported"
   | [attr] -> (state, {(fattr attr) with id})
   | _ :: _ :: _ as attrs -> redirect state attrs fattr id
 
@@ -260,7 +260,7 @@ let rec seq_field_of_data_encoding :
       let len_id = "len_" ^ id in
       let len_attr =
         match kind with
-        | `N -> failwith "Not implemented"
+        | `N -> failwith "Dynamic_size N not implemented"
         | `Uint30 -> Ground.Attr.uint30 ~id:len_id
         | `Uint16 -> Ground.Attr.uint16 ~id:len_id
         | `Uint8 -> Ground.Attr.uint8 ~id:len_id
@@ -281,7 +281,7 @@ let rec seq_field_of_data_encoding :
       let description = summary ~title ~description in
       let state, attrs = seq_field_of_data_encoding state encoding id in
       match attrs with
-      | [] -> failwith "Not supported"
+      | [] -> failwith "Describe: empty attributes not supported"
       | [attr] -> (state, [Helpers.merge_summaries attr description])
       | _ :: _ :: _ as attrs ->
           let described_class =
@@ -332,7 +332,8 @@ let rec seq_field_of_data_encoding :
             name
         in
         (state, [attr])
-  | _ -> failwith "Not implemented"
+  | String_enum _ -> failwith "String_enum not implemented"
+  | Padded _ -> failwith "Padded not implemented"
 
 and seq_field_of_tups :
     type a.
