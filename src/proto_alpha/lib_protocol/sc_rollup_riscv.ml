@@ -22,22 +22,27 @@ type minimal_state = {
   payload : string;
   level : Raw_level_repr.t option;
   message_counter : Z.t;
+  tick : Z.t;
 }
 
-let minimal_state =
+let minimal_state_encoding =
   let open Data_encoding in
   conv
-    (fun {payload; level; message_counter} -> (payload, level, message_counter))
-    (fun (payload, level, message_counter) -> {payload; level; message_counter})
-  @@ obj3
+    (fun {payload; level; message_counter; tick} ->
+      (payload, level, message_counter, tick))
+    (fun (payload, level, message_counter, tick) ->
+      {payload; level; message_counter; tick})
+  @@ obj4
        (req "payload" (string Hex))
        (req "level" (option Raw_level_repr.encoding))
        (req "message_counter" n)
+       (req "tick" n)
 
-let make_empty_state () = {payload = ""; level = None; message_counter = Z.zero}
+let make_empty_state () =
+  {payload = ""; level = None; message_counter = Z.zero; tick = Z.zero}
 
 let state_hash state =
-  [Data_encoding.Binary.to_bytes_exn minimal_state state]
+  [Data_encoding.Binary.to_bytes_exn minimal_state_encoding state]
   |> Context_hash.hash_bytes |> State_hash.context_hash_to_state_hash
 
 let reference_initial_state_hash = state_hash (make_empty_state ())
@@ -86,7 +91,7 @@ module Protocol_implementation :
     | None -> PS.Initial
     | Some level -> PS.First_after (level, state.message_counter)
 
-  let set_input input _state =
+  let set_input input state =
     Lwt.return
     @@
     match input with
@@ -95,10 +100,11 @@ module Protocol_implementation :
           payload = Sc_rollup_inbox_message_repr.unsafe_to_string payload;
           level = Some inbox_level;
           message_counter;
+          tick = Z.succ state.tick;
         }
     | PS.Reveal _s -> assert false
 
-  let eval state = Lwt.return state
+  let eval state = Lwt.return {state with tick = Z.succ state.tick}
 
   let verify_proof ~is_reveal_enabled:_ _input = function (_ : proof) -> .
 

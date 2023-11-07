@@ -1068,6 +1068,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
     match kind with
     | "arith" -> "Halted"
     | "wasm_2_0_0" -> "Waiting for input message"
+    | "riscv" -> "riscv_dummy_status"
     | _ -> raise (Invalid_argument kind)
   in
   Check.(status = expected_status)
@@ -5029,6 +5030,15 @@ let custom_mode_empty_operation_kinds ~kind =
     ~exit_code:1
     ~msg:(rex "Operation kinds for custom mode are empty.")
 
+let register_riscv () =
+  test_rollup_node_boots_into_initial_state [Protocol.Alpha] ~kind:"riscv" ;
+  test_commitment_scenario
+    ~extra_tags:["modes"; "operator"]
+    ~variant:"operator_publishes"
+    (mode_publish Operator true)
+    [Protocol.Alpha]
+    ~kind:"riscv"
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5192,7 +5202,7 @@ let register ~kind ~protocols =
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
      because the tezt will need to originate a rollup. However,
-     the tezt will not test for PVM kind specific featued. *)
+     the tezt will not test for PVM kind specific features. *)
   test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
   test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
@@ -5234,7 +5244,9 @@ let register ~protocols =
   test_accuser protocols ;
   test_bailout_refutation protocols ;
   test_injector_auto_discard protocols ;
-  (* Shared tezts - will be executed for both PVMs. *)
+  (* Specific riscv PVM tezt *)
+  register_riscv () ;
+  (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
   (* Both Arith and Wasm PVM tezts *)

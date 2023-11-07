@@ -201,7 +201,9 @@ let default_boot_sector_of ~kind =
   match kind with
   | "arith" -> ""
   | "wasm_2_0_0" -> Constant.wasm_echo_kernel_boot_sector
-  | kind -> raise (Invalid_argument kind)
+  | "riscv" -> ""
+  | kind ->
+      Format.kasprintf Stdlib.invalid_arg "default_boot_sector_of: %s" kind
 
 let make_parameter name = function
   | None -> []

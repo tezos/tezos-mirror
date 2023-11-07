@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Example_arith | Wasm_2_0_0
+type t = Example_arith | Wasm_2_0_0 | Riscv
 
 val encoding : t Data_encoding.t
 

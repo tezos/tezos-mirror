@@ -439,11 +439,12 @@ module Kind = struct
   let of_octez : Octez_smart_rollup.Kind.t -> t = function
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
+    | Riscv -> Riscv
 
   let to_octez : t -> Octez_smart_rollup.Kind.t = function
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
-    | Riscv -> assert false (* RISC-V PVM not yet enabled in node *)
+    | Riscv -> Riscv
 end
 
 module Constants = struct
