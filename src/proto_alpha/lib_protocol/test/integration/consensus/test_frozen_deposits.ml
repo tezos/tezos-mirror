@@ -112,7 +112,7 @@ let test_invariants () =
     Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
   in
   let* b1 = Block.bake ~operation:delegation b in
-  let* b2 = Block.bake_until_n_cycle_end constants.preserved_cycles b1 in
+  let* b2 = Block.bake_until_cycle_end b1 in
   let* new_staking_balance = Context.Delegate.staking_balance (B b2) account1 in
   let* new_full_balance = Context.Delegate.full_balance (B b2) account1 in
   let* new_spendable_balance = Context.Contract.balance (B b2) contract1 in
@@ -133,8 +133,14 @@ let test_invariants () =
       new_full_balance
       Test_tez.(new_spendable_balance +! new_frozen_deposits)
   in
-  (* Frozen deposits aren't changed by delegation. *)
-  Assert.equal_tez ~loc:__LOC__ new_frozen_deposits frozen_deposits
+  let expected_new_frozen_deposits =
+    Test_tez.(
+      (* in this particular example, if we follow the calculation of the active
+         stake, it is precisely the new_staking_balance *)
+      new_staking_balance
+      /! Int64.of_int (constants.limit_of_delegation_over_baking + 1))
+  in
+  Assert.equal_tez ~loc:__LOC__ new_frozen_deposits expected_new_frozen_deposits
 
 let test_cannot_bake_with_zero_deposits () =
   let open Lwt_result_syntax in
@@ -262,16 +268,7 @@ let test_limit_with_overdelegation () =
     Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
   in
   let* b = Block.bake ~operation:delegation b in
-  (* Overdelegation means that now there isn't enough staking, and the
-     baker who wants to have its stake close to its defined limit
-     should adjust it. *)
-  let* b =
-    adjust_staking_towards_limit
-      ~block:b
-      ~account:account1
-      ~contract:contract1
-      ~limit
-  in
+  let* b = Block.bake_until_cycle_end ~policy:(By_account account1) b in
   let expected_new_frozen_deposits = limit in
   let* frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) account1
@@ -373,11 +370,15 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   (* ...though we are immediately not allowed to bake with [slashed_account] *)
   let*! res = Block.bake ~policy:(By_account slashed_account) b in
   let* () = Assert.error ~loc:__LOC__ res (fun _ -> true) in
-  let* b = Block.bake_until_cycle_end ~policy:(By_account good_account) b in
+  let* b, metadata, _ =
+    Block.bake_until_cycle_end_with_metadata ~policy:(By_account good_account) b
+  in
   (* Assert that the [slashed_account]'s deposit is now zero without manual
      staking. *)
+  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
+  let autostaked = Block.autostaked slashed_account metadata in
   let* fd = Context.Delegate.current_frozen_deposits (B b) slashed_account in
-  let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
+  let* () = Assert.equal_tez ~loc:__LOC__ fd autostaked in
   (* Check that we are still not allowed to bake with [slashed_account] *)
   let*! res = Block.bake ~policy:(By_account slashed_account) b in
   let* () = Assert.error ~loc:__LOC__ res (fun _ -> true) in
@@ -415,7 +416,26 @@ let test_deposits_after_stake_removal () =
     Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
   in
   (* Bake a cycle. *)
+  let expected_new_frozen_deposits_2 =
+    Test_tez.(initial_frozen_deposits_2 *! 3L /! 2L)
+  in
   let* b = Block.bake_until_cycle_end b in
+  let* frozen_deposits_2 =
+    Context.Delegate.current_frozen_deposits (B b) account2
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      frozen_deposits_2
+      expected_new_frozen_deposits_2
+  in
+  (* Updating initial_frozen_deposits_x of accountx after autostaking  *)
+  let* initial_frozen_deposits_1 =
+    Context.Delegate.current_frozen_deposits (B b) account1
+  in
+  let* initial_frozen_deposits_2 =
+    Context.Delegate.current_frozen_deposits (B b) account2
+  in
   (* Frozen deposits aren't affected by balance change... *)
   let rec loop b n =
     if n = 0 then return b
@@ -438,7 +458,7 @@ let test_deposits_after_stake_removal () =
           frozen_deposits_2
           initial_frozen_deposits_2
       in
-      let* b = Block.bake_until_cycle_end b in
+      let* b, _, _ = Block.bake_until_cycle_end_with_metadata b in
       loop b (pred n)
   in
   (* the frozen deposits for account1 do not change until [preserved cycles +
@@ -557,8 +577,12 @@ let test_frozen_deposits_with_delegation () =
   in
   (* Bake one cycle. *)
   let* b = Block.bake_until_cycle_end b in
-  (* Frozen deposits aren't affected by balance changes. *)
-  let expected_new_frozen_deposits = initial_frozen_deposits in
+  let expected_new_frozen_deposits =
+    Test_tez.(
+      initial_frozen_deposits
+      +! delegated_amount
+         /! Int64.of_int (constants.limit_of_delegation_over_baking + 1))
+  in
   let* new_frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) account1
   in
