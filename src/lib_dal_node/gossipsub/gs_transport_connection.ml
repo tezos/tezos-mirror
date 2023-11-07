@@ -92,6 +92,8 @@ module PX_cache : sig
   (** The cache data structure for advertised alternative PXs. *)
   type t
 
+  type origin = Worker.peer_origin
+
   (** Create a new cache data structure. The [size] parameter is an indication
       on the size of internal table storing data. Its default value is
       [2048]. *)
@@ -100,23 +102,28 @@ module PX_cache : sig
   (** [insert t ~origin ~px point] associates the given [point] to [(origin,
       px)] pair of peers. If a point already exists for the pair, it is
       overwritten.  *)
-  val insert :
-    t -> origin:P2p_peer.Id.t -> px:P2p_peer.Id.t -> P2p_point.Id.t -> unit
+  val insert : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t -> unit
 
   (** [drop t ~origin ~px] drops the entry [(origin, px)] from the cache and
       returns the [point] being dropped, if any. *)
-  val drop :
-    t -> origin:P2p_peer.Id.t -> px:P2p_peer.Id.t -> P2p_point.Id.t option
+  val drop : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t option
 end = struct
-  type key = {origin : P2p_peer.Id.t; px : P2p_peer.Id.t}
+  type origin = Worker.peer_origin
+
+  type key = {origin : origin; px : P2p_peer.Id.t}
 
   module Table = Hashtbl.Make (struct
     type t = key
 
     let equal {origin; px} k2 =
-      P2p_peer.Id.equal origin k2.origin && P2p_peer.Id.equal px k2.px
+      P2p_peer.Id.equal px k2.px
+      &&
+      match (origin, k2.origin) with
+      | PX peer1, PX peer2 -> P2p_peer.Id.equal peer1 peer2
 
-    let hash {origin; px} = (P2p_peer.Id.hash origin * 3) + P2p_peer.Id.hash px
+    let hash {origin; px} =
+      P2p_peer.Id.hash px
+      + match origin with PX peer -> P2p_peer.Id.hash peer * 3
   end)
 
   type t = P2p_point.Id.t Table.t
@@ -235,7 +242,7 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
         Seq.map
           (fun I.{point; peer} ->
             if Option.is_none @@ P2p.find_connection_by_peer_id p2p_layer peer
-            then PX_cache.insert px_cache ~origin:from_peer ~px:peer point ;
+            then PX_cache.insert px_cache ~origin:(PX from_peer) ~px:peer point ;
             peer)
           px
       in
@@ -247,7 +254,7 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Message_with_header {message; topic; message_id} ->
       Message_with_header {message; topic; message_id}
 
-let try_connect_to_px p2p_layer px_cache ~px ~origin =
+let try_connect_to_peer p2p_layer px_cache ~px ~origin =
   let open Lwt_syntax in
   (* If there is some [point] associated to [px] and advertised by [origin]
      on the [px_cache], we will try to connect to it. *)
@@ -313,10 +320,12 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
           P2p.find_connection_by_peer_id p2p_layer peer
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
-      | Connect {px; origin = PX origin} ->
-          try_connect_to_px p2p_layer px_cache ~px ~origin
+      | Connect {px; origin} ->
+          try_connect_to_peer p2p_layer px_cache ~px ~origin
       | Forget {px; origin} ->
-          let _p : P2p_point.Id.t option = PX_cache.drop px_cache ~px ~origin in
+          let _p : P2p_point.Id.t option =
+            PX_cache.drop px_cache ~px ~origin:(PX origin)
+          in
           return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer
