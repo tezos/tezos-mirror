@@ -572,6 +572,7 @@ and seq_field_of_union :
           EnumValueSpec.
             {name = id; doc = DocSpec.{refs = []; summary = description}} ))
       tagged_cases
+    |> List.sort (fun (t1, _) (t2, _) -> compare t1 t2)
   in
   let tag_enum = EnumSpec.{map = tag_enum_map} in
   let state = add_enum state (tag_id, tag_enum) in
