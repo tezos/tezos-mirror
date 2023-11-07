@@ -368,7 +368,12 @@ module RPC = struct
                (Nth (un_qty temp_receipt.blockNumber)))
             decode_block_hash
         in
-        Some {temp_receipt with blockHash}
+        let logs =
+          List.map
+            (fun (log : transaction_log) -> {log with blockHash})
+            temp_receipt.logs
+        in
+        Some {temp_receipt with blockHash; logs}
     | None -> return_none
 
   let transaction_object base (Hash (Hex tx_hash)) =
