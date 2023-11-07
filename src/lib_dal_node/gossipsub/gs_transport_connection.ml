@@ -172,6 +172,14 @@ let px_of_peer p2p_layer peer =
   let* port = Option.either advertised_net_port conn_port_opt in
   return {point = (addr, port); peer}
 
+(* TODO: Use this function when trusting a peer via an RPC. *)
+(* This function inserts the point of a trusted peer into the [px_cache]
+   table. *)
+let cache_point_of_trusted_peer p2p_layer px_cache peer =
+  px_of_peer p2p_layer peer
+  |> Option.iter (fun Transport_layer_interface.{point; peer} ->
+         PX_cache.insert px_cache ~origin:Trusted ~px:peer point)
+
 (** This handler forwards information about connections established by the P2P
     layer to the Gossipsub worker.
 
@@ -185,7 +193,7 @@ let px_of_peer p2p_layer peer =
     outbound to avoid possible love bombing attacks. The Rust version also
     implements a way to mitigate this risk, but not the Go implementation.
 *)
-let new_connections_handler gs_worker p2p_layer peer conn =
+let new_connections_handler px_cache gs_worker p2p_layer peer conn =
   let P2p_connection.Info.{id_point = addr, port_opt; _} =
     P2p.connection_info p2p_layer conn
   in
@@ -209,6 +217,7 @@ let new_connections_handler gs_worker p2p_layer peer conn =
 
      Add the ability to have direct peers. *)
   let direct = false in
+  if trusted then cache_point_of_trusted_peer p2p_layer px_cache peer ;
   Worker.(
     New_connection {peer; direct; trusted; bootstrap} |> p2p_input gs_worker)
 
@@ -383,7 +392,7 @@ let activate gs_worker p2p_layer ~app_messages_callback =
   let px_cache = PX_cache.create () in
   (* Register a handler to notify new P2P connections to GS. *)
   let () =
-    new_connections_handler gs_worker p2p_layer
+    new_connections_handler px_cache gs_worker p2p_layer
     |> P2p.on_new_connection p2p_layer
   in
   (* Register a handler to notify P2P disconnections to GS. *)
