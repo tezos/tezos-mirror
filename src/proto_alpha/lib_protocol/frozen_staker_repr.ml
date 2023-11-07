@@ -7,15 +7,18 @@
 
 type t =
   | Baker of Signature.public_key_hash
-  | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
+  | Single_staker of {
+      staker : Contract_repr.t;
+      delegate : Signature.public_key_hash;
+    }
   | Shared of {delegate : Signature.public_key_hash}
 
 let baker pkh = Baker pkh
 
-let single ~staker ~delegate =
+let single_staker ~staker ~delegate =
   match (staker : Contract_repr.t) with
   | Implicit pkh when Signature.Public_key_hash.(pkh = delegate) -> Baker pkh
-  | _ -> Single {staker; delegate}
+  | _ -> Single_staker {staker; delegate}
 
 let shared ~delegate = Shared {delegate}
 
@@ -43,7 +46,7 @@ let encoding =
   @@ matching
        (function
          | Baker baker -> matched baker_tag baker_encoding baker
-         | Single {staker; delegate} ->
+         | Single_staker {staker; delegate} ->
              matched single_tag single_encoding (staker, delegate)
          | Shared {delegate} -> matched shared_tag shared_encoding delegate)
        [
@@ -52,8 +55,9 @@ let encoding =
            (Tag single_tag)
            single_encoding
            (function
-             | Single {staker; delegate} -> Some (staker, delegate) | _ -> None)
-           (fun (staker, delegate) -> single ~staker ~delegate);
+             | Single_staker {staker; delegate} -> Some (staker, delegate)
+             | _ -> None)
+           (fun (staker, delegate) -> single_staker ~staker ~delegate);
          case
            ~title:"Shared"
            (Tag shared_tag)
@@ -73,10 +77,11 @@ let compare sa sb =
   | Baker ba, Baker bb -> Signature.Public_key_hash.compare ba bb
   | Baker _, _ -> -1
   | _, Baker _ -> 1
-  | Single {staker = sa; delegate = da}, Single {staker = sb; delegate = db} ->
+  | ( Single_staker {staker = sa; delegate = da},
+      Single_staker {staker = sb; delegate = db} ) ->
       Compare.or_else (Contract_repr.compare sa sb) (fun () ->
           Signature.Public_key_hash.compare da db)
   | Shared {delegate = da}, Shared {delegate = db} ->
       Signature.Public_key_hash.compare da db
-  | Single _, Shared _ -> -1
-  | Shared _, Single _ -> 1
+  | Single_staker _, Shared _ -> -1
+  | Shared _, Single_staker _ -> 1

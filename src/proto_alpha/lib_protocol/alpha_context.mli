@@ -2074,12 +2074,15 @@ module Receipt : sig
 
   type frozen_staker = private
     | Baker of Signature.public_key_hash
-    | Single of {staker : Contract.t; delegate : Signature.public_key_hash}
+    | Single_staker of {
+        staker : Contract.t;
+        delegate : Signature.public_key_hash;
+      }
     | Shared of {delegate : Signature.public_key_hash}
 
   val frozen_baker : Signature.public_key_hash -> frozen_staker
 
-  val frozen_single :
+  val frozen_single_staker :
     staker:Contract.t -> delegate:Signature.public_key_hash -> frozen_staker
 
   val frozen_shared : delegate:Signature.public_key_hash -> frozen_staker

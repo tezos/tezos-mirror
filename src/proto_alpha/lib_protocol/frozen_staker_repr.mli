@@ -11,14 +11,17 @@
    over baking limit. *)
 type t = private
   | Baker of Signature.public_key_hash  (** The baker itself. *)
-  | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
-      (** A single staker, cannot be the delegate. *)
+  | Single_staker of {
+      staker : Contract_repr.t;
+      delegate : Signature.public_key_hash;
+    }  (** A single staker, cannot be the delegate. *)
   | Shared of {delegate : Signature.public_key_hash}
       (** The delegate's stakers simultaneously (delegate excluded). *)
 
 val baker : Signature.public_key_hash -> t
 
-val single : staker:Contract_repr.t -> delegate:Signature.public_key_hash -> t
+val single_staker :
+  staker:Contract_repr.t -> delegate:Signature.public_key_hash -> t
 
 val shared : delegate:Signature.public_key_hash -> t
 

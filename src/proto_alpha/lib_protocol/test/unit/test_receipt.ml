@@ -78,7 +78,7 @@ let test_encodings () =
   let staker1 = Receipt.frozen_shared ~delegate:pkh in
   let staker2 = Receipt.frozen_baker pkh in
   let staker3 =
-    Receipt.frozen_single ~staker:(Contract.Implicit pkh2) ~delegate:pkh
+    Receipt.frozen_single_staker ~staker:(Contract.Implicit pkh2) ~delegate:pkh
   in
   let* () = test_encodings (Contract (Contract.Implicit pkh)) in
   let* () = test_encodings Block_fees in
