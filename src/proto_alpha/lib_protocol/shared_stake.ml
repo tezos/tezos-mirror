@@ -7,16 +7,16 @@
 
 type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
 
-let share ~rounding ctxt delegate amount =
-  let open Lwt_result_syntax in
-  let* {own_frozen; staked_frozen; delegated = _} =
-    Stake_storage.get_full_staking_balance ctxt delegate
+let share ~rounding ~full_staking_balance amount =
+  let open Result_syntax in
+  let Full_staking_balance_repr.{own_frozen; staked_frozen; delegated = _} =
+    full_staking_balance
   in
   if Tez_repr.(staked_frozen = zero) then
     return {baker_part = amount; stakers_part = Tez_repr.zero}
   else
-    let*? total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
-    let*? baker_part =
+    let* total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
+    let* baker_part =
       let rounding =
         match rounding with `Towards_stakers -> `Down | `Towards_baker -> `Up
       in
@@ -26,7 +26,7 @@ let share ~rounding ctxt delegate amount =
         ~num:(Tez_repr.to_mutez own_frozen)
         ~den:(Tez_repr.to_mutez total_frozen)
     in
-    let*? stakers_part = Tez_repr.(amount -? baker_part) in
+    let* stakers_part = Tez_repr.(amount -? baker_part) in
     return {baker_part; stakers_part}
 
 type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
@@ -73,6 +73,13 @@ let compute_reward_distrib ~stake ~edge_of_baking_over_staking_billionth
   let to_frozen = Tez_repr.of_mutez_exn to_frozen in
   let to_spendable = Tez_repr.of_mutez_exn to_spendable in
   Ok {to_frozen; to_spendable}
+
+let share ~rounding ctxt delegate amount =
+  let open Lwt_result_syntax in
+  let* full_staking_balance =
+    Stake_storage.get_full_staking_balance ctxt delegate
+  in
+  Lwt.return (share ~rounding ~full_staking_balance amount)
 
 let compute_reward_distrib ctxt delegate stake rewards =
   let open Lwt_result_syntax in
