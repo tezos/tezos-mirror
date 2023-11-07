@@ -3637,7 +3637,10 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_administrator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
-  test_kernel_upgrade_version_change protocols ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6591
+     The MVP will be re-originated on ghostnet, instead of maintaining the tests,
+     we will reactivate them when we have the new version. *)
+  (* test_kernel_upgrade_version_change protocols ; *)
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
@@ -3660,6 +3663,9 @@ let register_evm_node ~protocols =
   test_originate_evm_kernel_and_dump_pvm_state protocols ;
   test_l2_call_inter_contract protocols
 
-let register ~protocols =
-  register_evm_node ~protocols ;
-  register_evm_migration ~protocols
+let register ~protocols = register_evm_node ~protocols
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6591
+   The MVP will be re-originated on ghostnet, instead of maintaining the tests,
+   we will reactivate them when we have the new version. *)
+(* register_evm_migration
+   ~protocols *)
