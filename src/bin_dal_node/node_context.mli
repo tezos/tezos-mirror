@@ -208,6 +208,10 @@ module P2P : sig
     t ->
     (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list tzresult Lwt.t
 
+  (** [get_peer_info t peer] returns the info of the corresponding peer if found. *)
+  val get_peer_info :
+    t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult Lwt.t
+
   module Gossipsub : sig
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list
