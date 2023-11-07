@@ -129,7 +129,8 @@ let stake ctxt ~sender ~delegate amount =
     Token.transfer
       ctxt
       (`Contract sender_contract)
-      (`Frozen_deposits (Staker_repr.Single (sender_contract, delegate)))
+      (`Frozen_deposits
+        (Frozen_staker_repr.single ~staker:sender_contract ~delegate))
       amount
   in
   ( ctxt,
@@ -155,7 +156,8 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
     let* ctxt, balance_updates =
       Token.transfer
         ctxt
-        (`Frozen_deposits (Staker_repr.Single (sender_contract, delegate)))
+        (`Frozen_deposits
+          (Frozen_staker_repr.single ~staker:sender_contract ~delegate))
         (`Unstaked_frozen_deposits
           (Staker_repr.Single (sender_contract, delegate), current_cycle))
         tez_to_unstake

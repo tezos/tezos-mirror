@@ -60,7 +60,7 @@ type container =
   | `Collected_commitments of Blinded_public_key_hash.t
     (** Pre-funded account waiting for the commited pkh and activation code to
         be revealed to unlock the funds *)
-  | `Frozen_deposits of Staker_repr.t
+  | `Frozen_deposits of Frozen_staker_repr.t
     (** Frozen tokens of a staker for consensus security deposits. *)
   | `Unstaked_frozen_deposits of Staker_repr.t * Cycle_repr.t
     (** Frozen tokens of a contract that have been unstaked at the

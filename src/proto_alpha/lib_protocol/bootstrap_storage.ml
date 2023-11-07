@@ -106,9 +106,7 @@ let init_account (ctxt, balance_updates)
               ~origin:Protocol_migration
               ctxt
               (`Contract contract)
-              (`Frozen_deposits
-                (Staker_repr.Single
-                   (Contract_repr.Implicit public_key_hash, public_key_hash)))
+              (`Frozen_deposits (Frozen_staker_repr.baker public_key_hash))
               amount_to_freeze)
     | None ->
         let* () =

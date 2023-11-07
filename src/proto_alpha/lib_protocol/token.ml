@@ -26,7 +26,7 @@
 type container =
   [ `Contract of Contract_repr.t
   | `Collected_commitments of Blinded_public_key_hash.t
-  | `Frozen_deposits of Staker_repr.t
+  | `Frozen_deposits of Frozen_staker_repr.t
   | `Unstaked_frozen_deposits of Staker_repr.t * Cycle_repr.t
   | `Block_fees
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
@@ -105,7 +105,6 @@ let credit ctxt receiver amount origin =
                 staker
                 amount
             in
-            let staker = Frozen_staker_repr.of_staker staker in
             (ctxt, Deposits staker)
         | `Unstaked_frozen_deposits (staker, cycle) ->
             let+ ctxt =
@@ -180,7 +179,6 @@ let spend ctxt giver amount origin =
                 staker
                 amount
             in
-            let staker = Frozen_staker_repr.of_staker staker in
             (ctxt, Deposits staker)
         | `Unstaked_frozen_deposits (staker, cycle) ->
             let+ ctxt =
