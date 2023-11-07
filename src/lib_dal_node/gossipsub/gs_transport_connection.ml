@@ -132,6 +132,35 @@ end = struct
     point_opt
 end
 
+(* [px_of_peer p2p_layer peer] returns the public IP address and port at which
+   [peer] could be reached. For that, it first inspects information transmitted
+   via connection metadata by the remote [peer]. If the address or port are
+   missing from the connection's metadata, the function inspects the Internet
+   connection link's information. It returns [None] if it does manage to get
+   those information with both methods. *)
+let px_of_peer p2p_layer peer =
+  let open Option_syntax in
+  let open Transport_layer_interface in
+  let* conn = P2p.find_connection_by_peer_id p2p_layer peer in
+  (* In general, people either provide an address and a port, or just a port.
+     In any case, we use `P2p.connection_remote_metadata` to get the address and
+     the port of the provided values, and we fall back to the values given by
+     `P2p.connection_info` if the former are not available
+     (respectively/independently for the address and the port).  The first case
+     is covered by {!P2p.connection_remote_metadata}. But if the IP address is
+     not explicitly given, we rely on the function {!P2p.connection_info
+     p2p_layer conn}. *)
+  let Types.P2P.Metadata.Connection.
+        {advertised_net_addr; advertised_net_port; is_bootstrap_peer = _} =
+    P2p.connection_remote_metadata p2p_layer conn
+  in
+  let {P2p_connection.Info.id_point = conn_addr, conn_port_opt; _} =
+    P2p.connection_info p2p_layer conn
+  in
+  let addr = Option.value advertised_net_addr ~default:conn_addr in
+  let* port = Option.either advertised_net_port conn_port_opt in
+  return {point = (addr, port); peer}
+
 (** This handler forwards information about connections established by the P2P
     layer to the Gossipsub worker.
 
@@ -176,35 +205,6 @@ let new_connections_handler gs_worker p2p_layer peer conn =
     worker. *)
 let disconnections_handler gs_worker peer =
   Worker.(Disconnection {peer} |> p2p_input gs_worker)
-
-(* [px_of_peer p2p_layer peer] returns the public IP address and port at which
-   [peer] could be reached. For that, it first inspects information transmitted
-   via connection metadata by the remote [peer]. If the address or port are
-   missing from the connection's metadata, the function inspects the Internet
-   connection link's information. It returns [None] if it does manage to get
-   those information with both methods. *)
-let px_of_peer p2p_layer peer =
-  let open Option_syntax in
-  let open Transport_layer_interface in
-  let* conn = P2p.find_connection_by_peer_id p2p_layer peer in
-  (* In general, people either provide an address and a port, or just a port.
-     In any case, we use `P2p.connection_remote_metadata` to get the address and
-     the port of the provided values, and we fall back to the values given by
-     `P2p.connection_info` if the former are not available
-     (respectively/independently for the address and the port).  The first case
-     is covered by {!P2p.connection_remote_metadata}. But if the IP address is
-     not explicitly given, we rely on the function {!P2p.connection_info
-     p2p_layer conn}. *)
-  let Types.P2P.Metadata.Connection.
-        {advertised_net_addr; advertised_net_port; is_bootstrap_peer = _} =
-    P2p.connection_remote_metadata p2p_layer conn
-  in
-  let {P2p_connection.Info.id_point = conn_addr, conn_port_opt; _} =
-    P2p.connection_info p2p_layer conn
-  in
-  let addr = Option.value advertised_net_addr ~default:conn_addr in
-  let* port = Option.either advertised_net_port conn_port_opt in
-  return {point = (addr, port); peer}
 
 (* This function translates a Worker p2p_message to the type of messages sent
    via the P2P layer. The two types don't coincide because of Prune. *)
