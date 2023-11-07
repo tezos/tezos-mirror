@@ -18,6 +18,7 @@ use thiserror::Error;
 
 use crate::fillers::process;
 use crate::models::{Env, FillerSource, SpecName, TestSuite};
+use crate::ReportValue;
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
     (
@@ -68,7 +69,11 @@ pub enum TestError {
     UnknownPrivateKey { private_key: H256 },
 }
 
-pub fn run_test(path: &Path) -> Result<(), TestError> {
+pub fn run_test(
+    path: &Path,
+    report_map: &mut HashMap<String, ReportValue>,
+    report_key: String,
+) -> Result<(), TestError> {
     let json_reader = std::fs::read(path).unwrap();
     let suit: TestSuite = serde_json::from_reader(&*json_reader)?;
 
@@ -244,10 +249,27 @@ pub fn run_test(path: &Path) -> Result<(), TestError> {
                 }
                 println!("\n=======> OK! <=======\n")
             }
+
             if successful_outcome {
-                println!("FINAL INTERPRETATION: SUCCESS\n")
+                println!("FINAL INTERPRETATION: SUCCESS\n");
+                report_map
+                    .entry(report_key.clone())
+                    .and_modify(|report_value| {
+                        *report_value = ReportValue {
+                            successes: report_value.successes + 1,
+                            failures: report_value.failures,
+                        };
+                    });
             } else {
-                println!("FINAL INTERPRETATION: FAILURE\n")
+                println!("FINAL INTERPRETATION: FAILURE\n");
+                report_map
+                    .entry(report_key.clone())
+                    .and_modify(|report_value| {
+                        *report_value = ReportValue {
+                            successes: report_value.successes,
+                            failures: report_value.failures + 1,
+                        };
+                    });
             }
         }
     }
