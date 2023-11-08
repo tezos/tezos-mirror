@@ -215,7 +215,17 @@ let adjust_staking_towards_limit ~limit ~block ~account ~contract =
 
 let test_limit_with_overdelegation () =
   let open Lwt_result_syntax in
-  let constants = {constants with limit_of_delegation_over_baking = 9} in
+  let constants =
+    {
+      constants with
+      adaptive_issuance =
+        {
+          Default_parameters.constants_test.adaptive_issuance with
+          autostaking_enable = false;
+        };
+      limit_of_delegation_over_baking = 9;
+    }
+  in
   let* genesis, contracts = Context.init_with_constants2 constants in
   let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts
@@ -266,7 +276,16 @@ let test_limit_with_overdelegation () =
     Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
   in
   let* b = Block.bake ~operation:delegation b in
-  let* b = Block.bake_until_cycle_end ~policy:(By_account account1) b in
+  (* Overdelegation means that now there isn't enough staking, and the
+     baker who wants to have its stake close to its defined limit
+     should adjust it. *)
+  let* b =
+    adjust_staking_towards_limit
+      ~block:b
+      ~account:account1
+      ~contract:contract1
+      ~limit
+  in
   let expected_new_frozen_deposits = limit in
   let* frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) account1
@@ -1020,16 +1039,14 @@ let tests =
         "frozen deposits with delegation"
         `Quick
         test_frozen_deposits_with_delegation;
-      (* Reactivate with set deposit limit in !10449. *)
-      (*tztest *)
-      (*   "test cannot bake with zero deposits" *)
-      (*   `Quick *)
-      (*   test_cannot_bake_with_zero_deposits; *)
-      (* Reactivated  in !10449.. *)
-      (* tztest *)
-      (*   "test simulation of limited staking with overdelegation" *)
-      (*   `Quick *)
-      (*   test_limit_with_overdelegation;*)
+      tztest
+        "test cannot bake with zero deposits"
+        `Quick
+        test_cannot_bake_with_zero_deposits;
+      tztest
+        "test simulation of limited staking with overdelegation"
+        `Quick
+        test_limit_with_overdelegation;
       tztest
         "test cannot bake again after full deposit slash"
         `Quick
