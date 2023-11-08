@@ -871,6 +871,7 @@ module Constants : sig
       launch_ema_threshold : int32;
       adaptive_rewards_params : adaptive_rewards_params;
       activation_vote_enable : bool;
+      autostaking_enable : bool;
     }
 
     type issuance_weights = {

@@ -131,6 +131,10 @@ type adaptive_issuance = {
        issuance activation vote triggers the activation of the adaptive
        inflation feature; otherwise the activation vote has no effect. *)
     bool;
+  autostaking_enable :
+    (* If set to true, a stake/unstake/finalize operation will be triggered for
+       all delegate at end of cycle. *)
+    bool;
 }
 
 type issuance_weights = {
