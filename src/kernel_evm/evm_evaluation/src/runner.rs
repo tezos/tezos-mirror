@@ -12,6 +12,8 @@ use tezos_ethereum::block::BlockConstants;
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use thiserror::Error;
 
@@ -75,6 +77,8 @@ pub fn run_test(
     report_map: &mut HashMap<String, ReportValue>,
     report_key: String,
     opt: &Opt,
+    output_file: &mut File,
+    file_name: &str,
 ) -> Result<(), TestError> {
     let json_reader = std::fs::read(path).unwrap();
     let suit: TestSuite = serde_json::from_reader(&*json_reader)?;
@@ -82,11 +86,17 @@ pub fn run_test(
     let map_caller_keys: HashMap<H256, H160> = MAP_CALLER_KEYS.into();
 
     for (name, unit) in suit.0.into_iter() {
-        println!("Running unit test: {}", name);
+        writeln!(output_file, "Running unit test: {}", name).unwrap();
         let full_filler_path =
             construct_folder_path(&unit._info.source, &opt.eth_tests, &None);
-        println!("Filler source: {}", &full_filler_path.to_str().unwrap());
-        let reader = std::fs::read(full_filler_path).unwrap();
+        writeln!(
+            output_file,
+            "Filler source: {}",
+            &full_filler_path.to_str().unwrap()
+        )
+        .unwrap();
+        let filler_path = Path::new(&full_filler_path);
+        let reader = std::fs::read(filler_path).unwrap();
         let filler_source = if unit._info.source.contains(".json") {
             let filler_source: FillerSource = serde_json::from_reader(&*reader)?;
             Some(filler_source)
@@ -103,25 +113,31 @@ pub fn run_test(
         let precompiles = precompile_set::<EvalHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
 
-        println!("\n[START] Accounts initialisation");
+        writeln!(output_file, "\n[START] Accounts initialisation").unwrap();
         for (address, info) in unit.pre.into_iter() {
             let h160_address: H160 = address.as_fixed_bytes().into();
-            println!("\nAccount is {}", h160_address);
+            writeln!(output_file, "\nAccount is {}", h160_address).unwrap();
             let mut account =
                 EthereumAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
             if info.nonce != 0 {
                 account.set_nonce(&mut host, info.nonce.into()).unwrap();
-                println!("Nonce is set for {} : {}", address, info.nonce);
+                writeln!(output_file, "Nonce is set for {} : {}", address, info.nonce)
+                    .unwrap();
             }
             account.balance_add(&mut host, info.balance).unwrap();
-            println!("Balance for {} was added : {}", address, info.balance);
+            writeln!(
+                output_file,
+                "Balance for {} was added : {}",
+                address, info.balance
+            )
+            .unwrap();
             account.set_code(&mut host, &info.code).unwrap();
-            println!("Code was set for {}", address);
+            writeln!(output_file, "Code was set for {}", address).unwrap();
             for (index, value) in info.storage.iter() {
                 account.set_storage(&mut host, index, value).unwrap();
             }
         }
-        println!("\n[END] Accounts initialisation\n");
+        writeln!(output_file, "\n[END] Accounts initialisation\n").unwrap();
 
         let mut env = Env::default();
 
@@ -219,28 +235,44 @@ pub fn run_test(
                             }
                             None => "[INVALID]",
                         };
-                        println!("\nOutcome status: {}", outcome_status);
+                        writeln!(output_file, "\nOutcome status: {}", outcome_status)
+                            .unwrap();
                     }
-                    Err(e) => println!("\nA test failed due to {:?}", e),
+                    Err(e) => {
+                        writeln!(output_file, "\nA test failed due to {:?}", e).unwrap()
+                    }
                 }
 
-                print!("\nFinal check: ");
+                write!(output_file, "\nFinal check: ").unwrap();
                 match (&test_execution.expect_exception, &exec_result) {
-                    (None, Ok(_)) => println!("No unexpected exception."),
-                    (Some(_), Err(_)) => println!("Exception was expected."),
+                    (None, Ok(_)) => {
+                        writeln!(output_file, "No unexpected exception.").unwrap()
+                    }
+                    (Some(_), Err(_)) => {
+                        writeln!(output_file, "Exception was expected.").unwrap()
+                    }
                     _ => {
-                        println!("\nSomething unexpected happened for test {}.", name);
-                        println!(
+                        writeln!(
+                            output_file,
+                            "\nSomething unexpected happened for test {}.",
+                            name
+                        )
+                        .unwrap();
+                        writeln!(
+                            output_file,
                             "Expected exception is the following: {:?}",
                             test_execution.expect_exception
-                        );
-                        println!(
+                        )
+                        .unwrap();
+                        writeln!(
+                            output_file,
                             "Furter details on the execution result: {:?}",
                             exec_result
                         )
+                        .unwrap();
                     }
                 }
-                println!("\n=======> OK! <=======\n")
+                writeln!(output_file, "\n=======> OK! <=======\n").unwrap();
             }
 
             // Check the state after the execution of the result.
@@ -251,10 +283,13 @@ pub fn run_test(
                     &spec_name,
                     report_map,
                     report_key.clone(),
+                    output_file,
                 ),
-                None => {
-                    println!("No filler file, the outcome of this test is uncertain.")
-                }
+                None => writeln!(
+                    output_file,
+                    "No filler file, the outcome of this test is uncertain."
+                )
+                .unwrap(),
             };
         }
     }

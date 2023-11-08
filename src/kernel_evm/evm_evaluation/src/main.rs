@@ -11,6 +11,8 @@ mod runner;
 use std::{
     collections::HashMap,
     ffi::OsStr,
+    fs::OpenOptions,
+    io::Write,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
@@ -57,16 +59,34 @@ pub struct Opt {
         about = "Specify the name of the test to execute."
     )]
     test: Option<String>,
+    #[structopt(
+        short = "o",
+        long = "output",
+        default_value = "evm_evaluation.regression",
+        about = "Specify the file where the logs will be outputed. By default it will be outputed to 'evm_evaluation.regression'."
+    )]
+    output: String,
 }
 
 pub fn main() {
     let opt = Opt::from_args();
+    let mut output_file = OpenOptions::new()
+        .append(true)
+        .truncate(false)
+        .create(true)
+        .open(&opt.output)
+        .unwrap();
     let folder_path =
         construct_folder_path("GeneralStateTests", &opt.eth_tests, &opt.sub_dir);
     let test_files = find_all_json_tests(&folder_path);
     let mut report_map: HashMap<String, ReportValue> = HashMap::new();
 
-    println!("Start running tests on: {}", folder_path.to_str().unwrap());
+    writeln!(
+        output_file,
+        "Start running tests on: {}",
+        folder_path.to_str().unwrap()
+    )
+    .unwrap();
     for test_file in test_files.into_iter() {
         let splitted_path: Vec<&str> = test_file.to_str().unwrap().split('/').collect();
         let report_key = splitted_path
@@ -86,19 +106,21 @@ pub fn main() {
                     &mut report_map,
                     report_key.to_owned(),
                     &opt,
+                    &mut output_file,
+                    &opt.output,
                 )
                 .unwrap();
             }
             continue;
         }
 
-        println!("---------- Test: {:?} ----------", test_file);
+        writeln!(output_file, "---------- Test: {:?} ----------", test_file).unwrap();
 
         if SKIP_ANY {
             // Funky test with `bigint 0x00` value in json not possible to happen on
             // Mainnet and require custom json parser.
             if test_file.file_name() == Some(OsStr::new("ValueOverflow.json")) {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -112,26 +134,26 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("gasCostBerlin.json"))
                 || test_file.file_name() == Some(OsStr::new("underflowTest.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
             // The following test(s) is/are failing they need in depth debugging
             // Reason: memory allocation of X bytes failed | 73289 IOT instruction (core dumped)
             if test_file.file_name() == Some(OsStr::new("sha3.json")) {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
             // Long tests ✔ (passing)
             if test_file.file_name() == Some(OsStr::new("loopMul.json")) {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
             // Oddly long checks on a test that do no relevant check (passing)
             if test_file.file_name() == Some(OsStr::new("intrinsic.json")) {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -141,14 +163,14 @@ pub fn main() {
                     == Some(OsStr::new("static_Call50000_ecrec.json"))
                 || test_file.file_name() == Some(OsStr::new("static_Call50000.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
             // Reason: panicked at 'attempt to add with overflow'
             if let Some(file_name) = test_file.to_str() {
                 if file_name.contains("DiffPlaces.json") {
-                    println!("\nSKIPPED\n");
+                    writeln!(output_file, "\nSKIPPED\n").unwrap();
                     continue;
                 }
             }
@@ -161,7 +183,7 @@ pub fn main() {
                 || test_file.file_name()
                     == Some(OsStr::new("static_Call1024PreCalls3.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -171,7 +193,7 @@ pub fn main() {
                     == Some(OsStr::new("static_Call1024PreCalls2.json"))
                 || test_file.file_name() == Some(OsStr::new("diffPlaces.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -192,7 +214,7 @@ pub fn main() {
                 || test_file.file_name()
                     == Some(OsStr::new("CreateAndGasInsideCreate.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -201,7 +223,7 @@ pub fn main() {
             if test_file.file_name()
                 == Some(OsStr::new("ZeroValue_SUICIDE_ToOneStorageKey.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -214,7 +236,7 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("OverflowGasRequire2.json"))
                 || test_file.file_name() == Some(OsStr::new("StackDepthLimitSEC.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -225,7 +247,7 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("clearReturnBuffer.json"))
                 || test_file.file_name() == Some(OsStr::new("gasCost.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
 
@@ -274,29 +296,40 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("callNonConst.json"))
                 || test_file.file_name() == Some(OsStr::new("twoOps.json"))
             {
-                println!("\nSKIPPED\n");
+                writeln!(output_file, "\nSKIPPED\n").unwrap();
                 continue;
             }
         }
 
-        runner::run_test(&test_file, &mut report_map, report_key.to_owned(), &opt)
-            .unwrap();
+        runner::run_test(
+            &test_file,
+            &mut report_map,
+            report_key.to_owned(),
+            &opt,
+            &mut output_file,
+            &opt.output,
+        )
+        .unwrap();
     }
-    println!("@@@@@ END OF TESTING @@@@@\n");
+    writeln!(output_file, "@@@@@ END OF TESTING @@@@@\n").unwrap();
 
-    println!("@@@@@@ FINAL REPORT @@@@@@");
+    writeln!(output_file, "@@@@@@ FINAL REPORT @@@@@@").unwrap();
     let mut successes_total = 0;
     let mut failure_total = 0;
     for (key, report_value) in report_map {
         successes_total += report_value.successes;
         failure_total += report_value.failures;
-        println!(
+        writeln!(
+            output_file,
             "For sub-dir {}, there was {} success(es) and {} failure(s).",
             key, report_value.successes, report_value.failures
         )
+        .unwrap();
     }
-    println!(
+    writeln!(
+        output_file,
         "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}",
         successes_total, failure_total
-    );
+    )
+    .unwrap();
 }
