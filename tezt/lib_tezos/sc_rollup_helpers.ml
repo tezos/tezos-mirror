@@ -342,14 +342,14 @@ let genesis_commitment ~sc_rollup tezos_client =
   let genesis_commitment_hash =
     JSON.(genesis_info |-> "commitment_hash" |> as_string)
   in
-  let* json =
+  let* commitment_opt =
     Client.RPC.call ~hooks tezos_client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
          ~sc_rollup
          ~hash:genesis_commitment_hash
          ()
   in
-  match Sc_rollup_client.commitment_from_json json with
+  match commitment_opt with
   | None -> failwith "genesis commitment have been removed"
   | Some commitment -> return commitment
 
@@ -534,13 +534,13 @@ let get_sc_rollup_constants client =
 
 let forged_commitment ?(compressed_state = Constant.sc_rollup_compressed_state)
     ?(number_of_ticks = 1) ~inbox_level ~predecessor () :
-    Sc_rollup_client.commitment =
+    Sc_rollup_rpc.commitment =
   {compressed_state; inbox_level; predecessor; number_of_ticks}
 
 let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
     client sc_rollup =
   let ({compressed_state; inbox_level; predecessor; number_of_ticks}
-        : Sc_rollup_client.commitment) =
+        : Sc_rollup_rpc.commitment) =
     commitment
   in
   Client.Sc_rollup.publish_commitment

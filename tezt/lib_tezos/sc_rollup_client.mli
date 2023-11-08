@@ -27,23 +27,6 @@
 (** Smart-Contract Rollup client state *)
 type t
 
-type commitment = {
-  compressed_state : string;
-  inbox_level : int;
-  predecessor : string;
-  number_of_ticks : int;
-}
-
-type commitment_and_hash = {commitment : commitment; hash : string}
-
-type commitment_info = {
-  commitment_and_hash : commitment_and_hash;
-  first_published_at_level : int option;
-  published_at_level : int option;
-}
-
-type gc_info = {last_gc_level : int; first_available_level : int}
-
 (** [create ~protocol ?runner ?name ?base_dir node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -149,31 +132,6 @@ val encode_batch :
   t ->
   transaction list ->
   string option Lwt.t
-
-(** [commitment_from_json] parses a commitment from its JSON representation. *)
-val commitment_from_json : JSON.t -> commitment option
-
-(** [commitment_info_from_json] parses a commitment, its hash and
-    the levels when the commitment was first published (if any) and included,
-    from the JSON representation. *)
-val commitment_info_from_json : JSON.t -> commitment_info option
-
-(** [last_stored_commitment client] gets the last commitment with its hash
-    stored by the rollup node. *)
-val last_stored_commitment :
-  ?hooks:Process.hooks -> t -> commitment_and_hash option Runnable.process
-
-(** [last_published_commitment client] gets the last commitment published by the
-    rollup node, with its hash and level when the commitment was first published
-    and the level it was included. *)
-val last_published_commitment :
-  ?hooks:Process.hooks -> t -> commitment_info option Runnable.process
-
-(** [commitment client hash] gets commitment by its [hash] from the rollup node,
-    with its hash and level when the commitment was first published and the
-    level it was included. *)
-val commitment :
-  ?hooks:Process.hooks -> t -> string -> commitment_info option Runnable.process
 
 (** [gc_info client] returns garbage collection information. *)
 val gc_info : ?hooks:Process.hooks -> t -> gc_info Runnable.process

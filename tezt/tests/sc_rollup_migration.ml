@@ -194,7 +194,7 @@ let test_migration_cement ~kind ~migrate_from ~migrate_to =
       ~src:Constant.bootstrap1.public_key_hash
       tezos_client
   and scenario_after tezos_client ~sc_rollup
-      ((commitment : Sc_rollup_client.commitment), hash) =
+      ((commitment : Sc_rollup_rpc.commitment), hash) =
     let* {commitment_period_in_blocks = commitment_period; _} =
       Sc_rollup_helpers.get_sc_rollup_constants tezos_client
     in
@@ -318,7 +318,7 @@ let test_migration_refute ~kind ~migrate_from ~migrate_to =
         ~player_commitment_hash
         ~opponent_commitment_hash
     in
-    let* Sc_rollup_client.{compressed_state = state_hash; _} =
+    let* Sc_rollup_rpc.{compressed_state = state_hash; _} =
       Sc_rollup_helpers.genesis_commitment ~sc_rollup tezos_client
     in
     let* () =
@@ -389,7 +389,7 @@ let test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to =
     let* {timeout_period_in_blocks = timeout_period; _} =
       Sc_rollup_helpers.get_sc_rollup_constants tezos_client
     in
-    let* Sc_rollup_client.{compressed_state = state_hash; _} =
+    let* Sc_rollup_rpc.{compressed_state = state_hash; _} =
       Sc_rollup_helpers.genesis_commitment ~sc_rollup tezos_client
     in
     let* () =

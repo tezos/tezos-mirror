@@ -1047,7 +1047,7 @@ let get_chain_block_context_smart_rollups_smart_rollup_commitment
       "commitment";
       hash;
     ]
-    Fun.id
+    (fun json -> Sc_rollup_rpc.commitment_from_json json)
 
 let get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup staker =
