@@ -400,3 +400,12 @@ val prepare_initial_context_params :
     tztrace )
   result
   Lwt.t
+
+(** [autostaked_opt delegate metadata] returns [Some amount] if [amount] tez
+    have been staked for the given [delegate]. [None] otherwise. *)
+val autostaked_opt : public_key_hash -> block_header_metadata -> Tez.t option
+
+(**  same as [autostaked_opt] but fails in case autostaking didn't provoke a
+     stake operation.  *)
+val autostaked :
+  ?loc:string -> public_key_hash -> block_header_metadata -> Tez.t
