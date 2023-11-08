@@ -97,10 +97,10 @@ let prod_directory ~verbose rollup_node_config =
   let open Evm_node_lib_prod in
   return @@ Services.directory ~verbose rollup_node_config
 
-let dev_directory ~verbose rollup_node_config =
+let dev_directory config rollup_node_config =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
-  return @@ Services.directory ~verbose rollup_node_config
+  return @@ Services.directory config rollup_node_config
 
 let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
     =
@@ -292,9 +292,7 @@ let proxy_command =
         else
           let* rollup_config = rollup_node_config_dev ~rollup_node_endpoint in
           let* () = Evm_node_lib_dev.Tx_pool.start rollup_config in
-          let* directory =
-            dev_directory ~verbose:config.verbose rollup_config
-          in
+          let* directory = dev_directory config rollup_config in
           let* server = start config ~directory in
           let (_ : Lwt_exit.clean_up_callback_id) =
             install_finalizer_dev server
