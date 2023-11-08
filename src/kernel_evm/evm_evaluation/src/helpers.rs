@@ -2,15 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use primitive_types::{H256, U256};
-use primitives::SpecId;
-
-pub fn u256_to_h256(value: &U256) -> H256 {
-    let mut ret = H256::zero();
-    value.to_big_endian(ret.as_bytes_mut());
-    ret
-}
-
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
     if data.contains('>') {
         u8::gt
@@ -31,17 +22,4 @@ pub fn purify_network(network: &str) -> String {
     let network = network.replace('<', "");
     let network = network.replace('>', "");
     network.replace('=', "")
-}
-
-pub fn network_to_specid(network: &str) -> SpecId {
-    let actual_network = if network == "EIP150" {
-        "Homestead"
-    } else if network == "EIP158" {
-        "Spurious"
-    } else if network.contains("Constantinople") {
-        "Petersburg"
-    } else {
-        network
-    };
-    SpecId::from(actual_network)
 }
