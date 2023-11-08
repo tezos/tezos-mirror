@@ -15,7 +15,8 @@
   octez-version.value
   octez-evm-node-libs.evm_node_lib_prod
   octez-evm-node-libs.evm_node_lib_dev
-  octez-evm-node-libs.evm_node_lib_dev_encoding)
+  octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-evm-node-libs.evm_node_config)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
@@ -23,4 +24,5 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_rpc_http
-  -open Evm_node_lib_dev_encoding))
+  -open Evm_node_lib_dev_encoding
+  -open Evm_node_config))
