@@ -468,20 +468,12 @@ let test_unset_limit () =
     | Some set_limit -> Assert.equal_tez ~loc:__LOC__ set_limit Tez.zero
     | None -> Alcotest.fail "unexpected absence of deposits limit"
   in
-  let expected_number_of_cycles_with_previous_deposit =
-    constants.preserved_cycles + Constants.max_slashing_period
-  in
-  let* b =
-    Block.bake_until_n_cycle_end
-      ~policy:(By_account account2)
-      expected_number_of_cycles_with_previous_deposit
-      b
-  in
+  let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
   let* frozen_deposits_at_b =
     Context.Delegate.current_frozen_deposits (B b) account1
   in
-  (* after [expected_number_of_cycles_with_previous_deposit] cycles
-     the 0 limit is reflected in the deposit which becomes 0 itself *)
+  (* after cycle end, the 0 limit is reflected in the deposit which becomes 0
+     itself *)
   let* () = Assert.equal_tez ~loc:__LOC__ frozen_deposits_at_b Tez.zero in
   (* unset the 0 limit *)
   let* operation = Op.set_deposits_limit (B b) contract1 None in
@@ -499,9 +491,11 @@ let test_unset_limit () =
   let* frozen_deposits_at_bfin =
     Context.Delegate.current_frozen_deposits (B bfin) account1
   in
-  (* without a limit and without manual staking, the new deposit is still zero;
-     note that account1 hasn't baked any block. *)
-  let* () = Assert.equal_tez ~loc:__LOC__ frozen_deposits_at_bfin Tez.zero in
+  (* without a limit and with autostaking staking, the new deposit is no more
+     zero; note that account1 hasn't baked any block. *)
+  let* () =
+    Assert.not_equal_tez ~loc:__LOC__ frozen_deposits_at_bfin Tez.zero
+  in
   return_unit
 
 let test_cannot_bake_with_zero_deposits_limit () =
@@ -518,13 +512,13 @@ let test_cannot_bake_with_zero_deposits_limit () =
     Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
   in
   let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
-  let expected_number_of_cycles_with_previous_deposit =
+  let expected_number_of_cycles_with_rights_from_previous_deposit =
     constants.preserved_cycles + Constants.max_slashing_period - 1
   in
   let* b =
     Block.bake_until_n_cycle_end
       ~policy:(By_account account2)
-      expected_number_of_cycles_with_previous_deposit
+      expected_number_of_cycles_with_rights_from_previous_deposit
       b
   in
   let*! b1 = Block.bake ~policy:(By_account account1) b in
@@ -891,8 +885,6 @@ let test_set_limit_with_overdelegation () =
        [new_account]
      - [new_account] will overdelegate to [account1] and [account1] will set
        its frozen deposits limit to 15% of its stake *)
-  Context.Delegate.current_frozen_deposits (B genesis) account1
-  >>=? fun initial_frozen_deposits ->
   Context.Delegate.staking_balance (B genesis) account1
   >>=? fun initial_staking_balance ->
   Context.Delegate.staking_balance (B genesis) account2
@@ -929,10 +921,10 @@ let test_set_limit_with_overdelegation () =
   Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
   >>=? fun delegation ->
   Block.bake ~operation:delegation b >>=? fun b ->
-  (* Finish the cycle. account1's frozen deposits aren't increased
+  (* Finish the cycle. account1's frozen deposits are increased
      automatically. *)
   Block.bake_until_cycle_end b >>=? fun b ->
-  let expected_new_frozen_deposits = initial_frozen_deposits in
+  let expected_new_frozen_deposits = limit in
   Context.Delegate.current_frozen_deposits (B b) account1
   >>=? fun frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
