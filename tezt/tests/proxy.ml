@@ -152,15 +152,17 @@ let test_cache_at_most_once ~protocols =
         ~query_string
         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
         protocols)
-    ((["helpers"; "endorsing_rights"], []) :: paths) ;
-  List.iter
-    (fun (sub_path, query_string) ->
-      test_cache_at_most_once
-        ~supports:Protocol.(From_protocol 019)
-        ~query_string
-        ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-        protocols)
-    paths
+    ((["helpers"; "endorsing_rights"], []) :: paths)
+(* Re-enable me once we start the protocol after Oxford. *)
+(* ;
+   List.iter
+     (fun (sub_path, query_string) ->
+       test_cache_at_most_once
+         ~supports:Protocol.(From_protocol 019)
+         ~query_string
+         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
+         protocols)
+     paths *)
 
 (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
 let starts_with ~(prefix : string) (s : string) : bool =
