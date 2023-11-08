@@ -154,11 +154,8 @@ let test_cannot_bake_with_zero_deposits () =
      (because the frozen deposits value impacts the active stake and the active
      stake is the one used to determine baking/attesting rights. *)
   (* To make account1 have zero deposits, we unstake all its deposits. *)
-  let* frozen_deposits =
-    Context.Delegate.current_frozen_deposits (B genesis) account1
-  in
   let* operation =
-    Adaptive_issuance_helpers.unstake (B genesis) contract1 frozen_deposits
+    Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
   in
   let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
   let expected_number_of_cycles_with_previous_deposit =
@@ -430,25 +427,7 @@ let test_set_limit balance_percentage () =
     | Some set_limit -> Assert.equal_tez ~loc:__LOC__ set_limit limit
     | None -> Alcotest.fail "unexpected absence of deposits limit"
   in
-  (* the frozen deposits limit affects the active stake for cycles starting with c +
-       preserved_cycles + 1; the new active stake is taken into account when
-       computing the frozen deposits for cycle c+1 already, however the user may see
-       an update to its frozen deposits at cycle c + preserved_cycles +
-       max_slashing_period at the latest (because up to that cycle the frozen
-       deposits also depend on the active stake at cycles before cycle c+1). *)
-  let expected_number_of_cycles_with_previous_deposit =
-    constants.preserved_cycles + Constants.max_slashing_period
-  in
-  let* b =
-    Block.bake_until_n_cycle_end
-      ~policy:(By_account account2)
-      (expected_number_of_cycles_with_previous_deposit - 1)
-      b
-  in
-  let* frozen_deposits =
-    Context.Delegate.current_frozen_deposits (B b) account1
-  in
-  let* () = Assert.not_equal_tez ~loc:__LOC__ frozen_deposits Tez.zero in
+  (* the frozen deposits limit affects the active stake at cycle end. *)
   let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
   let* frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) account1
