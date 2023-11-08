@@ -179,6 +179,15 @@ let commands () =
          ~from_text:(fun _cctx s -> Lwt_result_syntax.return s)
          ())
   in
+  let stack_param () =
+    param
+      ~name:"stack"
+      ~desc:
+        "a Michelson stack in the following format: {Stack_elt <ty_1> <val_1>; \
+         ...; Stack_elt <ty_n> <val_n>}, where each <val_i> is a Michelson \
+         value of type <ty_i>. The topmost element of the stack is <val_1>."
+      micheline_parameter
+  in
   let handle_parsing_error label (cctxt : Protocol_client_context.full)
       (emacs_mode, no_print_source) program body =
     let open Lwt_result_syntax in
@@ -347,6 +356,75 @@ let commands () =
               }
           in
           print_run_result cctxt ~show_source ~parsed:program res);
+    command
+      ~group
+      ~desc:
+        "Ask the node to run a Michelson instruction or a sequence of \
+         Michelson instructions on a stack."
+      (args12
+         amount_arg
+         balance_arg
+         source_arg
+         payer_arg
+         self_arg
+         run_gas_limit_arg
+         (unparsing_mode_arg ~default:"Readable")
+         now_arg
+         level_arg
+         other_contracts_arg
+         extra_big_maps_arg
+         legacy_switch)
+      (prefixes ["run"; "michelson"; "code"]
+      @@ Program.source_param
+      @@ prefixes ["on"; "stack"]
+      @@ stack_param () @@ stop)
+      (fun ( amount,
+             balance,
+             sender,
+             payer,
+             self,
+             gas,
+             unparsing_mode,
+             now,
+             level,
+             other_contracts,
+             extra_big_maps,
+             legacy )
+           program
+           (stack, stack_source)
+           cctxt ->
+        let open Lwt_result_syntax in
+        let*? program = Micheline_parser.no_parsing_error program in
+        let*? stack =
+          Michelson_v1_stack.parse_stack ~source:stack_source stack
+        in
+        let*! res =
+          run_instr
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            {
+              stack;
+              shared_params =
+                {
+                  input = program;
+                  unparsing_mode;
+                  now;
+                  level;
+                  sender;
+                  payer;
+                  gas;
+                  other_contracts;
+                  extra_big_maps;
+                };
+              amount;
+              balance;
+              self;
+              parameter = None;
+              legacy;
+            }
+        in
+        print_run_instr_result cctxt ~show_source:false ~parsed:program res);
     command
       ~group
       ~desc:"Ask the node to compute the size of a script."
@@ -776,16 +854,7 @@ let commands () =
          legacy_switch
          other_contracts_arg
          extra_big_maps_arg)
-      (prefixes ["normalize"; "stack"]
-      @@ param
-           ~name:"stack"
-           ~desc:
-             "the stack to normalize, in the following format: {Stack_elt \
-              <ty_1> <val_1>; ...; Stack_elt <ty_n> <val_n>}, where each \
-              <val_i> is a Michelson value of type <ty_i>. The topmost element \
-              of the stack is <val_1>."
-           micheline_parameter
-      @@ stop)
+      (prefixes ["normalize"; "stack"] @@ stack_param () @@ stop)
       (fun (unparsing_mode, legacy, other_contracts, extra_big_maps)
            (stack, source)
            cctxt ->

@@ -140,6 +140,22 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
       return_unit
   | Error errs -> print_errors cctxt errs ~show_source ~parsed
 
+let print_run_instr_result (cctxt : #Client_context.printer) ~show_source
+    ~parsed =
+  let open Lwt_result_syntax in
+  function
+  | Ok (stack, gas) ->
+      let*! () =
+        cctxt#message
+          "@[<v 0>@[<v 2>Result@,%a@]@,@[<v 2>Gas remaining: %a@]@]@."
+          Michelson_v1_printer.print_typed_stack
+          stack
+          Alpha_context.Gas.pp
+          gas
+      in
+      return_unit
+  | Error errs -> print_errors cctxt errs ~show_source ~parsed
+
 type simulation_params = {
   input : Michelson_v1_parser.parsed;
   unparsing_mode : Script_ir_unparser.unparsing_mode;
@@ -173,6 +189,16 @@ type run_params = {
   storage : Michelson_v1_parser.parsed;
   entrypoint : Entrypoint.t option;
   self : Contract_hash.t option;
+}
+
+type run_instr_params = {
+  shared_params : simulation_params;
+  amount : Tez.t;
+  balance : Tez.t option;
+  stack : (Script.expr * Script.expr) list;
+  self : Contract_hash.t option;
+  parameter : Script.expr option;
+  legacy : bool;
 }
 
 let run_view (cctxt : #Protocol_client_context.rpc_context)
@@ -348,6 +374,46 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~level
     ~other_contracts
     ~extra_big_maps
+
+let run_instr (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block (params : run_instr_params) =
+  let open Lwt_result_syntax in
+  let* chain_id = Chain_services.chain_id cctxt ~chain () in
+  let {shared_params; amount; balance; stack; self; parameter; legacy} =
+    params
+  in
+  let {
+    input;
+    unparsing_mode;
+    now;
+    level;
+    sender;
+    payer;
+    gas;
+    other_contracts;
+    extra_big_maps;
+  } =
+    shared_params
+  in
+  Plugin.RPC.Scripts.run_instr
+    ~gas
+    ~legacy
+    ~input:stack
+    ~code:input.expanded
+    ~chain_id
+    ~now
+    ~level
+    ~unparsing_mode:(Some unparsing_mode)
+    ~source:payer
+    ~sender
+    ~self
+    ~parameter
+    ~amount
+    ~balance
+    ~other_contracts
+    ~extra_big_maps
+    cctxt
+    (chain, block)
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ~gas ~legacy
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) () =
