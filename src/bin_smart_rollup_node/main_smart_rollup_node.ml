@@ -374,6 +374,19 @@ let dump_durable_storage =
           return_unit
       | Error errs -> cctxt#error "%a" pp_print_trace errs)
 
+let export_snapshot =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Export a snapshot of the rollup node state."
+    (args2 data_dir_arg Cli.snapshot_dir_arg)
+    (prefixes ["snapshot"; "export"] @@ stop)
+    (fun (data_dir, dest) cctxt ->
+      let open Lwt_result_syntax in
+      let* snapshot_file = Snapshots.export ~data_dir ~dest in
+      let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
+      return_unit)
+
 let sc_rollup_commands () =
   [
     config_init_command;
@@ -382,6 +395,7 @@ let sc_rollup_commands () =
     protocols_command;
     dump_metrics;
     dump_durable_storage;
+    export_snapshot;
   ]
 
 let select_commands _ctxt _ = Lwt_result_syntax.return (sc_rollup_commands ())
