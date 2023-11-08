@@ -7,9 +7,16 @@ edition = "2021"
 version = "*"
 optional = true
 
-[dependencies.libc]
-version = "0.2.149"
-optional = true
+[dependencies.tezos-smart-rollup-core]
+path = "../../kernel_sdk/core"
+version = "0.2.1"
+default-features = false
+features = ["proto-alpha"]
+
+[dependencies.tezos-smart-rollup-panic-hook]
+path = "../../kernel_sdk/panic-hook"
+version = "0.2.1"
+default-features = false
 
 [features]
 default = ["bare-metal"]
