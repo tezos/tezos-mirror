@@ -209,3 +209,13 @@ let get_local_gc_info () =
         last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
         first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
       })
+
+let get_global_block_state ?(block = "head") ~key () =
+  make
+    ~query_string:[("key", key)]
+    GET
+    ["global"; "block"; block; "state"]
+    (fun json ->
+      let out = JSON.as_string json in
+      let bytes = `Hex out |> Hex.to_bytes in
+      bytes)

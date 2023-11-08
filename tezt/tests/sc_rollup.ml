@@ -1109,7 +1109,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     ?boot_sector
     ~parameters_ty:"bytes"
     ~kind
-  @@ fun protocol sc_rollup_node sc_rollup_client sc_rollup _tezos_node client
+  @@ fun protocol sc_rollup_node _sc_rollup_client sc_rollup _tezos_node client
     ->
   let* genesis_info =
     Client.RPC.call ~hooks client
@@ -1168,11 +1168,11 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     let* () =
       match kind with
       | "arith" ->
-          let*! encoded_value =
-            Sc_rollup_client.state_value
-              ~hooks
-              sc_rollup_client
-              ~key:"vars/value"
+          let* encoded_value =
+            Sc_rollup_node.RPC.call
+              sc_rollup_node
+              ~rpc_hooks:Tezos_regression.rpc_hooks
+            @@ Sc_rollup_rpc.get_global_block_state ~key:"vars/value" ()
           in
           let value =
             match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with

@@ -1833,9 +1833,10 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   | None -> return ()
   | Some f -> f ~protocol client sc_rollup_address sc_rollup_node
 
-let check_saved_value_in_pvm ~name ~expected_value sc_client =
-  let*! encoded_value =
-    Sc_rollup_client.state_value ~hooks sc_client ~key:(sf "vars/%s" name)
+let check_saved_value_in_pvm ~rpc_hooks ~name ~expected_value sc_rollup_node =
+  let* encoded_value =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_state ~key:(sf "vars/%s" name) ()
   in
   match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
   | Error error ->
@@ -1852,14 +1853,14 @@ let check_saved_value_in_pvm ~name ~expected_value sc_client =
             "Invalid value in rollup state (current = %L, expected = %R)") ;
       return ()
 
-let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
+let rollup_node_interprets_dal_pages ~protocol:_ client sc_rollup sc_rollup_node
+    =
   let* genesis_info =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
@@ -1879,7 +1880,11 @@ let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   let* _lvl =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
   in
-  check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
+  check_saved_value_in_pvm
+    ~rpc_hooks:Tezos_regression.rpc_hooks
+    ~name:"value"
+    ~expected_value
+    sc_rollup_node
 
 (* Test that the rollup kernel can fetch and store a requested DAL page. Works as follows:
    - Originate a rollup with a kernel that:
@@ -2557,8 +2562,6 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   let* current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
-
   (* Generate new DAL and rollup nodes if requested. *)
   let* additional_nodes =
     create_additional_nodes
@@ -2648,16 +2651,24 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     "[e2e.final_check_1] check that the sum stored in the PVM is %d@."
     expected_value ;
   let* () =
-    check_saved_value_in_pvm ~name:"value" ~expected_value sc_rollup_client
+    check_saved_value_in_pvm
+      ~rpc_hooks:Tezos_regression.rpc_hooks
+      ~name:"value"
+      ~expected_value
+      sc_rollup_node
   in
 
   (* Check the statuses of the additional nodes/PVMs, if any. *)
   Log.info
     "[e2e.final_check_2] Check %d extra nodes@."
     (List.length additional_nodes) ;
-  Lwt_list.iter_p
-    (fun (_dal_node, _rollup_node, rollup_client) ->
-      check_saved_value_in_pvm ~name:"value" ~expected_value rollup_client)
+  Lwt_list.iter_s
+    (fun (_dal_node, rollup_node, _rollup_client) ->
+      check_saved_value_in_pvm
+        ~rpc_hooks:Tezos_regression.rpc_hooks
+        ~name:"value"
+        ~expected_value
+        rollup_node)
     additional_nodes
 
 (** Register end-to-end DAL Tests. *)
