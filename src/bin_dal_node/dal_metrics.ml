@@ -111,6 +111,40 @@ module GS = struct
         pkh
         slot_index
 
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
+
+       Be able to clean peers from metrics onces they are disconnected. *)
+    let collect_peers_per_topic_metrics gs_state =
+      let module W = Gossipsub.Worker in
+      W.GS.Topic.Map.fold
+        (fun topic peers accu ->
+          Prometheus.LabelSetMap.add
+            [topic_as_label topic]
+            [
+              W.GS.Peer.Set.cardinal peers
+              |> float |> Prometheus.Sample_set.sample;
+            ]
+            accu)
+        gs_state.W.GS.Introspection.mesh
+        Prometheus.LabelSetMap.empty
+
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
+
+       Be able to clean peers from metrics onces they are disconnected. *)
+    let collect_scores_of_peers_metrics gs_state =
+      let module W = Gossipsub.Worker in
+      W.GS.Peer.Map.fold
+        (fun peer score accu ->
+          Prometheus.LabelSetMap.add
+            [Format.asprintf "%a" W.GS.Peer.pp peer]
+            [
+              W.GS.Score.(value score |> Introspection.to_float)
+              |> Prometheus.Sample_set.sample;
+            ]
+            accu)
+        gs_state.W.GS.Introspection.scores
+        Prometheus.LabelSetMap.empty
+
     (* This function is called by Prometheus to collect Gossipsub data every X
        seconds, where X is the refresh frequency of the Prometeus server. *)
     let collectors_callback gs_worker =
@@ -126,30 +160,8 @@ module GS = struct
       (* For [count_peers_per_topic] and [scores_of_peers], we store directly the
          data in the format required by Prometheus to avoid re-folding on the
          data again. *)
-      count_peers_per_topic :=
-        W.GS.Topic.Map.fold
-          (fun topic peers accu ->
-            Prometheus.LabelSetMap.add
-              [topic_as_label topic]
-              [
-                W.GS.Peer.Set.cardinal peers
-                |> float |> Prometheus.Sample_set.sample;
-              ]
-              accu)
-          gs_state.mesh
-          Prometheus.LabelSetMap.empty ;
-      scores_of_peers :=
-        W.GS.Peer.Map.fold
-          (fun peer score accu ->
-            Prometheus.LabelSetMap.add
-              [Format.asprintf "%a" W.GS.Peer.pp peer]
-              [
-                W.GS.Score.(value score |> Internal_for_tests.to_float)
-                |> Prometheus.Sample_set.sample;
-              ]
-              accu)
-          gs_state.scores
-          Prometheus.LabelSetMap.empty
+      count_peers_per_topic := collect_peers_per_topic_metrics gs_state ;
+      scores_of_peers := collect_scores_of_peers_metrics gs_state
   end
 
   (* Metrics about the stats gathered by the worker *)
