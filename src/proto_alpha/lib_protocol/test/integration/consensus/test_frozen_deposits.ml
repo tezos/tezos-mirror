@@ -770,14 +770,16 @@ let tests =
         "frozen deposits with delegation"
         `Quick
         test_frozen_deposits_with_delegation;
-      tztest
-        "test cannot bake with zero deposits"
-        `Quick
-        test_cannot_bake_with_zero_deposits;
-      tztest
-        "test simulation of limited staking with overdelegation"
-        `Quick
-        test_limit_with_overdelegation;
+      (* Reactivate with set deposit limit in !10449. *)
+      (*tztest *)
+      (*   "test cannot bake with zero deposits" *)
+      (*   `Quick *)
+      (*   test_cannot_bake_with_zero_deposits; *)
+      (* Reactivated  in !10449.. *)
+      (* tztest *)
+      (*   "test simulation of limited staking with overdelegation" *)
+      (*   `Quick *)
+      (*   test_limit_with_overdelegation;*)
       tztest
         "test cannot bake again after full deposit slash"
         `Quick
