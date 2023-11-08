@@ -4,6 +4,7 @@
 
 ### SDK
 
+- Add michelson `or`.
 - Add a feature flag `proto-alpha` to enable host functions introduced in
   unreleased protocols.
 - Add `Runtime::reveal_dal_page` to let a kernel request pages from Tezos’ Data
