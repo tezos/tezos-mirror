@@ -29,6 +29,18 @@ module type WRITER = sig
   val close_out : out_channel -> unit
 end
 
+module type READER_INPUT = sig
+  include READER
+
+  val in_chan : in_channel
+end
+
+module type WRITER_OUTPUT = sig
+  include WRITER
+
+  val out_chan : out_channel
+end
+
 module Stdlib_reader : READER with type in_channel = Stdlib.in_channel = Stdlib
 
 module Stdlib_writer : WRITER with type out_channel = Stdlib.out_channel =
@@ -58,6 +70,63 @@ let gzip_reader : reader = (module Gzip_reader)
 
 let gzip_writer : writer = (module Gzip_writer)
 
+type snapshot_version = V0
+
+type snapshot_metadata = {
+  history_mode : Configuration.history_mode;
+  address : Address.t;
+  head_level : int32;
+  last_commitment : Commitment.Hash.t;
+}
+
+let snapshot_version_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (function V0 -> 0)
+    (function
+      | 0 -> Ok V0 | x -> Error ("Invalid snapshot version " ^ string_of_int x))
+    int8
+
+let snaphsot_metadata_encoding =
+  let open Data_encoding in
+  conv
+    (fun {history_mode; address; head_level; last_commitment} ->
+      (history_mode, address, head_level, last_commitment))
+    (fun (history_mode, address, head_level, last_commitment) ->
+      {history_mode; address; head_level; last_commitment})
+  @@ obj4
+       (req "history_mode" Configuration.history_mode_encoding)
+       (req "address" Address.encoding)
+       (req "head_level" int32)
+       (req "last_commitment" Commitment.Hash.encoding)
+
+let snapshot_metadata_size =
+  Data_encoding.Binary.fixed_length snaphsot_metadata_encoding
+  |> WithExceptions.Option.get ~loc:__LOC__
+
+let version = V0
+
+let write_snapshot_metadata (module Writer : WRITER_OUTPUT) metadata =
+  let version_bytes =
+    Data_encoding.Binary.to_bytes_exn snapshot_version_encoding version
+  in
+  let metadata_bytes =
+    Data_encoding.Binary.to_bytes_exn snaphsot_metadata_encoding metadata
+  in
+  Writer.output Writer.out_chan version_bytes 0 (Bytes.length version_bytes) ;
+  Writer.output Writer.out_chan metadata_bytes 0 (Bytes.length metadata_bytes)
+
+let read_snapshot_metadata (module Reader : READER_INPUT) =
+  let version_bytes = Bytes.create 1 in
+  let metadata_bytes = Bytes.create snapshot_metadata_size in
+  Reader.really_input Reader.in_chan version_bytes 0 1 ;
+  Reader.really_input Reader.in_chan metadata_bytes 0 snapshot_metadata_size ;
+  let snapshot_version =
+    Data_encoding.Binary.of_bytes_exn snapshot_version_encoding version_bytes
+  in
+  assert (snapshot_version = version) ;
+  Data_encoding.Binary.of_bytes_exn snaphsot_metadata_encoding metadata_bytes
+
 let list_files dir ~include_file f =
   let rec list_files_in_dir stream
       ((dir, relative_dir, dir_handle) as current_dir_info) =
@@ -82,8 +151,8 @@ let list_files dir ~include_file f =
   let dir_handle = Unix.opendir dir in
   list_files_in_dir Stream.sempty (dir, "", dir_handle)
 
-let create (module Reader : READER) (module Writer : WRITER) ~dir ~include_file
-    ~dest =
+let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
+    ~include_file ~dest =
   let module Archive_writer = Tar.Make (struct
     include Reader
     include Writer
@@ -120,6 +189,13 @@ let create (module Reader : READER) (module Writer : WRITER) ~dir ~include_file
   in
   let out_chan = Writer.open_out dest in
   try
+    write_snapshot_metadata
+      (module struct
+        include Writer
+
+        let out_chan = out_chan
+      end)
+      metadata ;
     Archive_writer.Archive.create_gen file_stream out_chan ;
     Writer.close_out out_chan
   with e ->
@@ -141,8 +217,8 @@ let rec create_dir ?(perm = 0o755) dir =
            time. *)
         ())
 
-let extract (module Reader : READER) (module Writer : WRITER) ~snapshot_file
-    ~dest =
+let extract (module Reader : READER) (module Writer : WRITER) metadata_check
+    ~snapshot_file ~dest =
   let module Archive_reader = Tar.Make (struct
     include Reader
     include Writer
@@ -154,6 +230,15 @@ let extract (module Reader : READER) (module Writer : WRITER) ~snapshot_file
   in
   let in_chan = Reader.open_in snapshot_file in
   try
+    let metadata =
+      read_snapshot_metadata
+        (module struct
+          include Reader
+
+          let in_chan = in_chan
+        end)
+    in
+    metadata_check metadata ;
     Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
     Reader.close_in in_chan
   with e ->
