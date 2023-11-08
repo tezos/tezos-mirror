@@ -45,13 +45,13 @@ pub enum Macro {
     DUUP(u16),
 }
 
-pub fn lex_diip<'a>(lex: &mut Lexer<'a, Macro>) -> Result<u16, LexerError> {
+fn lex_diip(lex: &mut Lexer<Macro>) -> Result<u16, LexerError> {
     (lex.slice().len() - 2)
         .try_into()
         .map_err(|_| LexerError::UnknownToken)
 }
 
-pub fn lex_duup<'a>(lex: &mut Lexer<'a, Macro>) -> Result<u16, LexerError> {
+fn lex_duup(lex: &mut Lexer<Macro>) -> Result<u16, LexerError> {
     (lex.slice().len() - 2)
         .try_into()
         .map_err(|_| LexerError::UnknownToken)
@@ -60,8 +60,8 @@ pub fn lex_duup<'a>(lex: &mut Lexer<'a, Macro>) -> Result<u16, LexerError> {
 impl std::fmt::Display for Macro {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Macro::DIIP(c) => write!(f, "D{}P", "I".repeat(usize::try_from(*c).unwrap())),
-            Macro::DUUP(c) => write!(f, "D{}P", "U".repeat(usize::try_from(*c).unwrap())),
+            Macro::DIIP(c) => write!(f, "D{}P", "I".repeat(usize::from(*c))),
+            Macro::DUUP(c) => write!(f, "D{}P", "U".repeat(usize::from(*c))),
             _ => write!(f, "{:?}", &self),
         }
     }

@@ -12,8 +12,9 @@
 use crate::ast::*;
 use crate::ast::annotations::*;
 use crate::parser::ParserError;
-use crate::lexer::{Annotation, LexerError, Prim, Noun, TztPrim as TzP, Tok};
-use crate::lexer::macros::Macro;
+use crate::parser::macros::expand_macro;
+use crate::lexer::{LexerError, Annotation, Prim, Noun, TztPrim as TzP, Tok};
+use crate::lexer::macros::{MacroArgs, Macro};
 use crate::typechecker as TC;
 use crate::tzt::*;
 use Noun::*;
@@ -68,11 +69,18 @@ MichelineAtomic: Micheline<'a> = {
   string => Micheline::String(<>),
   bytes => Micheline::Bytes(<>),
   Prim => Micheline::prim0(<>),
+  macro =>? expand_macro(arena, &<>, MacroArgs::NoArgs).map_err(Into::into),
+}
+
+MacroArgs: MacroArgs<'a> = {
+  <arg1:Micheline> => MacroArgs::OneArg(arg1),
+  <arg1:Micheline> <arg2:Micheline> => MacroArgs::TwoArgs(arg1, arg2)
 }
 
 MichelineComplex: Micheline<'a> = {
   <prim:Prim> <anns:ann+> => Micheline::App(prim, &[], anns.into()),
   <prim:Prim> <anns:ann*> <args:Micheline+> => Micheline::App(prim, arena.alloc_extend(args), anns.into()),
+  <m:macro> <anns:ann*> <args:MacroArgs> =>? expand_macro(arena, &m, args).map_err(Into::into),
 }
 
 pub MichelineNaked: Micheline<'a> = {

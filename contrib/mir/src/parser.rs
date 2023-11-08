@@ -5,12 +5,15 @@
 /*                                                                            */
 /******************************************************************************/
 
+pub mod macros;
+
 use crate::ast::*;
 use crate::lexer::{LexerError, Tok};
 use crate::syntax;
 use lalrpop_util::ParseError;
 use logos::Logos;
 use typed_arena::Arena;
+use macros::MacroError;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
@@ -18,6 +21,8 @@ pub enum ParserError {
     ExpectedU10(i128),
     #[error(transparent)]
     LexerError(#[from] LexerError),
+    #[error(transparent)]
+    MacroError(#[from] MacroError),
 }
 
 pub struct Parser<'a> {
