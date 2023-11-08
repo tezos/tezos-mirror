@@ -10,7 +10,7 @@
 //! [lib_micheline]: <https://gitlab.com/tezos/tezos/-/blob/9028b797894a5d9db38bc61a20abb793c3778316/src/lib_micheline/micheline_encoding.ml>
 use nom::bytes::complete::tag;
 use nom::combinator::map;
-use nom::sequence::{pair, preceded};
+use nom::sequence::{pair, preceded, tuple};
 use tezos_data_encoding::enc::{self, BinResult, BinSerializer, BinWriter};
 use tezos_data_encoding::encoding::{Encoding, HasEncoding};
 use tezos_data_encoding::has_encoding;
@@ -35,6 +35,8 @@ pub const MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG: u8 = 6;
 pub const MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG: u8 = 7;
 /// 2-argument primitive (with annotations) encoding case tag.
 pub const MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG: u8 = 8;
+/// any primitive (with or without annotations) encoding case tag.
+pub const MICHELINE_PRIM_GENERIC_TAG: u8 = 9;
 /// Bytes encoding case tag.
 pub const MICHELINE_BYTES_TAG: u8 = 10;
 
@@ -139,12 +141,133 @@ where
     pub(crate) annots: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Node {
+    Int(Zarith),
+    String(String),
+    Bytes(Vec<u8>),
+    Prim {
+        prim_tag: u8,
+        args: Vec<Node>,
+        annots: Option<String>,
+    },
+}
+
+impl From<MichelineInt> for Node {
+    fn from(i: MichelineInt) -> Self {
+        let MichelineInt(i) = i;
+        Node::Int(i)
+    }
+}
+
+impl From<MichelineString> for Node {
+    fn from(s: MichelineString) -> Self {
+        let MichelineString(s) = s;
+        Node::String(s)
+    }
+}
+
+impl From<MichelineBytes> for Node {
+    fn from(s: MichelineBytes) -> Self {
+        let MichelineBytes(s) = s;
+        Node::Bytes(s)
+    }
+}
+
+impl<const PRIM_TAG: u8> From<MichelinePrimNoArgsNoAnnots<PRIM_TAG>> for Node {
+    fn from(_: MichelinePrimNoArgsNoAnnots<PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![],
+            annots: None,
+        }
+    }
+}
+
+impl<const PRIM_TAG: u8> From<MichelinePrimNoArgsSomeAnnots<PRIM_TAG>> for Node {
+    fn from(a: MichelinePrimNoArgsSomeAnnots<PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![],
+            annots: Some(a.annots),
+        }
+    }
+}
+
+impl<Arg, const PRIM_TAG: u8> From<MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>> for Node
+where
+    Arg: Debug + PartialEq + Eq,
+    Node: From<Arg>,
+{
+    fn from(a: MichelinePrim1ArgNoAnnots<Arg, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg.into()],
+            annots: None,
+        }
+    }
+}
+
+impl<Arg, const PRIM_TAG: u8> From<MichelinePrim1ArgSomeAnnots<Arg, PRIM_TAG>> for Node
+where
+    Arg: Debug + PartialEq + Eq,
+    Node: From<Arg>,
+{
+    fn from(a: MichelinePrim1ArgSomeAnnots<Arg, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg.into()],
+            annots: Some(a.annots),
+        }
+    }
+}
+
+impl<Arg1, Arg2, const PRIM_TAG: u8>
+    From<MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>> for Node
+where
+    Arg1: Debug + PartialEq + Eq,
+    Arg2: Debug + PartialEq + Eq,
+    Node: From<Arg1>,
+    Node: From<Arg2>,
+{
+    fn from(a: MichelinePrim2ArgsNoAnnots<Arg1, Arg2, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg1.into(), a.arg2.into()],
+            annots: None,
+        }
+    }
+}
+
+impl<Arg1, Arg2, const PRIM_TAG: u8>
+    From<MichelinePrim2ArgsSomeAnnots<Arg1, Arg2, PRIM_TAG>> for Node
+where
+    Arg1: Debug + PartialEq + Eq,
+    Arg2: Debug + PartialEq + Eq,
+    Node: From<Arg1>,
+    Node: From<Arg2>,
+{
+    fn from(a: MichelinePrim2ArgsSomeAnnots<Arg1, Arg2, PRIM_TAG>) -> Self {
+        Node::Prim {
+            prim_tag: PRIM_TAG,
+            args: vec![a.arg1.into(), a.arg2.into()],
+            annots: Some(a.annots),
+        }
+    }
+}
+
 // ----------
 // CONVERSION
 // ----------
 impl From<i32> for MichelineInt {
     fn from(int: i32) -> Self {
         MichelineInt(Zarith(int.into()))
+    }
+}
+
+impl From<i32> for Node {
+    fn from(int: i32) -> Self {
+        Node::Int(Zarith(int.into()))
     }
 }
 
@@ -320,6 +443,110 @@ where
     }
 }
 
+// Auxilary function for deserializing a `Node` in the `Prim` case.
+// `micheline_prim_tag` should be one of the `MICHELINE_PRIM_*` tags
+// and is expected to be the first byte of the input.  The next byte
+// is interpreter as the tag for the primitive, and then the `next`
+// parser is used to parse the arguments and annotations of the
+// primitive application.
+fn nom_read_app_aux<'a, T>(
+    micheline_prim_tag: u8,
+    next: impl FnMut(NomInput<'a>) -> NomResult<T>,
+    into: impl Fn((u8, T)) -> Node,
+) -> impl FnMut(NomInput<'a>) -> NomResult<Node> {
+    use nom::number::complete::u8;
+
+    preceded(tag([micheline_prim_tag]), map(pair(u8, next), into))
+}
+
+impl Node {
+    fn nom_read_app(input: NomInput) -> NomResult<Node> {
+        use nom::branch::alt;
+        use nom::combinator::success;
+        use Node::Prim;
+
+        alt((
+            nom_read_app_aux(
+                MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG,
+                success(()),
+                |(prim_tag, ())| Prim {
+                    prim_tag,
+                    args: vec![],
+                    annots: None,
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG,
+                nom_read::string,
+                |(prim_tag, annots)| Prim {
+                    prim_tag,
+                    args: vec![],
+                    annots: Some(annots),
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG,
+                Self::nom_read,
+                |(prim_tag, arg)| Prim {
+                    prim_tag,
+                    args: vec![arg],
+                    annots: None,
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG,
+                pair(Self::nom_read, nom_read::string),
+                |(prim_tag, (arg, annots))| Prim {
+                    prim_tag,
+                    args: vec![arg],
+                    annots: Some(annots),
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG,
+                pair(Self::nom_read, Self::nom_read),
+                |(prim_tag, (arg1, arg2))| Prim {
+                    prim_tag,
+                    args: vec![arg1, arg2],
+                    annots: None,
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG,
+                tuple((Self::nom_read, Self::nom_read, nom_read::string)),
+                |(prim_tag, (arg1, arg2, annots))| Prim {
+                    prim_tag,
+                    args: vec![arg1, arg2],
+                    annots: Some(annots),
+                },
+            ),
+            nom_read_app_aux(
+                MICHELINE_PRIM_GENERIC_TAG,
+                pair(
+                    nom_read::dynamic(nom_read::list(Node::nom_read)),
+                    nom_read::string,
+                ),
+                |(prim_tag, (args, annots))| Prim {
+                    prim_tag,
+                    args,
+                    annots: Some(annots),
+                },
+            ),
+        ))(input)
+    }
+}
+
+impl NomReader for Node {
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        nom::branch::alt((
+            map(nom_read_micheline_int, Node::Int),
+            map(nom_read_micheline_string, Node::String),
+            map(nom_read_micheline_bytes(nom_read::bytes), Node::Bytes),
+            Self::nom_read_app,
+        ))(input)
+    }
+}
+
 // ----------
 // BIN_WRITER
 // ----------
@@ -345,13 +572,13 @@ impl BinWriter for MichelineBytes {
 
 impl<const PRIM_TAG: u8> BinWriter for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_no_args_no_annots::<{ PRIM_TAG }>(output)
+        bin_write_prim_no_args_no_annots(PRIM_TAG, output)
     }
 }
 
 impl<const PRIM_TAG: u8> BinWriter for MichelinePrimNoArgsSomeAnnots<PRIM_TAG> {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_no_args_some_annots::<{ PRIM_TAG }>(&self.annots, output)
+        bin_write_prim_no_args_some_annots(PRIM_TAG, &self.annots, output)
     }
 }
 
@@ -360,7 +587,7 @@ where
     Arg: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_1_arg_no_annots::<_, { PRIM_TAG }>(&self.arg, output)
+        bin_write_prim_1_arg_no_annots(PRIM_TAG, &self.arg, output)
     }
 }
 
@@ -369,11 +596,7 @@ where
     Arg: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_1_arg_some_annots::<_, { PRIM_TAG }>(
-            &self.arg,
-            &self.annots,
-            output,
-        )
+        bin_write_prim_1_arg_some_annots(PRIM_TAG, &self.arg, &self.annots, output)
     }
 }
 
@@ -384,9 +607,7 @@ where
     Arg2: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_2_args_no_annots::<_, _, { PRIM_TAG }>(
-            &self.arg1, &self.arg2, output,
-        )
+        bin_write_prim_2_args_no_annots(PRIM_TAG, &self.arg1, &self.arg2, output)
     }
 }
 
@@ -397,12 +618,49 @@ where
     Arg2: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_2_args_some_annots::<_, _, { PRIM_TAG }>(
+        bin_write_prim_2_args_some_annots(
+            PRIM_TAG,
             &self.arg1,
             &self.arg2,
             &self.annots,
             output,
         )
+    }
+}
+
+impl BinWriter for Node {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        match self {
+            Node::Int(i) => bin_write_micheline_int(i, output),
+            Node::String(s) => bin_write_micheline_string(&s, output),
+            Node::Bytes(s) => bin_write_micheline_bytes(enc::bytes)(s.as_slice(), output),
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } => match (args.as_slice(), annots.as_deref()) {
+                ([], None) => bin_write_prim_no_args_no_annots(*prim_tag, output),
+                ([], Some(annots)) => {
+                    bin_write_prim_no_args_some_annots(*prim_tag, annots, output)
+                }
+                ([arg], None) => bin_write_prim_1_arg_no_annots(*prim_tag, arg, output),
+                ([arg], Some(annots)) => {
+                    bin_write_prim_1_arg_some_annots(*prim_tag, arg, annots, output)
+                }
+                ([arg0, arg1], None) => {
+                    bin_write_prim_2_args_no_annots(*prim_tag, arg0, arg1, output)
+                }
+                ([arg0, arg1], Some(annots)) => bin_write_prim_2_args_some_annots(
+                    *prim_tag, arg0, arg1, annots, output,
+                ),
+                (_, annots) => bin_write_prim_generic(
+                    *prim_tag,
+                    args,
+                    annots.unwrap_or_default(),
+                    output,
+                ),
+            },
+        }
     }
 }
 
@@ -439,20 +697,22 @@ pub(crate) fn nom_read_micheline_int(input: NomInput) -> NomResult<Zarith> {
 // -------------------------
 /// Write `PRIM_TAG` into an `obj1` encoding, prefixed with the
 /// [MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_no_args_no_annots<const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_no_args_no_annots(
+    prim_tag: u8,
     output: &mut Vec<u8>,
 ) -> BinResult {
-    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, prim_tag], output);
     Ok(())
 }
 
 /// Write `PRIM_TAG` & `annots` into an `obj2` encoding, prefixed with the
 /// [MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_no_args_some_annots<const PRIM_TAG: u8>(
-    annots: &String,
+pub(crate) fn bin_write_prim_no_args_some_annots(
+    prim_tag: u8,
+    annots: &str,
     output: &mut Vec<u8>,
 ) -> BinResult {
-    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, prim_tag], output);
 
     enc::string(annots, output)?;
 
@@ -461,14 +721,15 @@ pub(crate) fn bin_write_prim_no_args_some_annots<const PRIM_TAG: u8>(
 
 /// Write `PRIM_TAG` & `arg` into an `obj2` encoding, prefixed with the
 /// [MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_1_arg_no_annots<Arg, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_1_arg_no_annots<Arg>(
+    prim_tag: u8,
     arg: &Arg,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
     Arg: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, prim_tag], output);
 
     arg.bin_write(output)?;
 
@@ -477,15 +738,16 @@ where
 
 /// Write `PRIM_TAG`, `arg` & `annots` into an `obj3` encoding, prefixed with the
 /// [MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_1_arg_some_annots<Arg, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_1_arg_some_annots<Arg>(
+    prim_tag: u8,
     arg: &Arg,
-    annots: &String,
+    annots: &str,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
     Arg: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, prim_tag], output);
 
     arg.bin_write(output)?;
     enc::string(annots, output)?;
@@ -495,7 +757,8 @@ where
 
 /// Write `PRIM_TAG`, `arg1` & `arg2` into an `obj3` encoding, prefixed with the
 /// [MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_2_args_no_annots<Arg1, Arg2, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_2_args_no_annots<Arg1, Arg2>(
+    prim_tag: u8,
     arg1: &Arg1,
     arg2: &Arg2,
     output: &mut Vec<u8>,
@@ -504,7 +767,7 @@ where
     Arg1: BinWriter,
     Arg2: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG, prim_tag], output);
 
     arg1.bin_write(output)?;
     arg2.bin_write(output)?;
@@ -514,20 +777,39 @@ where
 
 /// Write `PRIM_TAG`, `arg1`, `arg2` & `annots` into an `obj4` encoding, prefixed with the
 /// [MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG].
-pub(crate) fn bin_write_prim_2_args_some_annots<Arg1, Arg2, const PRIM_TAG: u8>(
+pub(crate) fn bin_write_prim_2_args_some_annots<Arg1, Arg2>(
+    prim_tag: u8,
     arg1: &Arg1,
     arg2: &Arg2,
-    annots: &String,
+    annots: &str,
     output: &mut Vec<u8>,
 ) -> BinResult
 where
     Arg1: BinWriter,
     Arg2: BinWriter,
 {
-    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG, PRIM_TAG], output);
+    enc::put_bytes(&[MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG, prim_tag], output);
 
     arg1.bin_write(output)?;
     arg2.bin_write(output)?;
+    enc::string(annots, output)?;
+
+    Ok(())
+}
+
+/// Write `PRIM_TAG`, `args` & `annots` into an `obj3` encoding, prefixed with the
+/// [MICHELINE_PRIM_GENERIC_TAG].
+pub(crate) fn bin_write_prim_generic<Arg>(
+    prim_tag: u8,
+    args: &Vec<Arg>,
+    annots: &str,
+    output: &mut Vec<u8>,
+) -> BinResult
+where
+    Arg: BinWriter,
+{
+    enc::put_bytes(&[MICHELINE_PRIM_GENERIC_TAG, prim_tag], output);
+    enc::dynamic(enc::list(Arg::bin_write))(args, output)?;
     enc::string(annots, output)?;
 
     Ok(())
@@ -936,6 +1218,65 @@ mod test {
             arg1: nat,
             arg2: int,
             annots: ":foo".into(),
+        };
+
+        let mut bin = Vec::new();
+        test.bin_write(&mut bin).unwrap();
+
+        assert_eq!(expected, bin);
+    }
+
+    #[test]
+    fn micheline_pair3_annot_decode() {
+        // Decode `Pair :foo Unit 0 0`
+        let test = vec![
+            9, // Prim_generic
+            7, // Prim tag: Pair
+            0, 0, 0, 6,  // length of args
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+            0,  // Int tag
+            0,  // 0
+            0,  // Int tag
+            0,  // 0
+            0, 0, 0, 4, // length of the annotation string
+            b':', b'f', b'o', b'o', // annotation
+        ];
+
+        let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let expected = Node::Prim {
+            prim_tag: 7,
+            args: vec![unit.into(), 0.into(), 0.into()],
+            annots: Some(":foo".into()),
+        };
+
+        let (remaining_input, optnatfoo) = NomReader::nom_read(test.as_slice()).unwrap();
+
+        assert!(remaining_input.is_empty());
+        assert_eq!(expected, optnatfoo);
+    }
+
+    #[test]
+    fn micheline_pair3_annot_encode() {
+        let expected = vec![
+            9, // Prim_generic
+            7, // Prim tag: Pair
+            0, 0, 0, 6,  // length of args
+            3,  // Prim_0 (no annots)
+            11, // Prim tag: Unit
+            0,  // Int tag
+            0,  // 0
+            0,  // Int tag
+            0,  // 0
+            0, 0, 0, 4, // length of the annotation string
+            b':', b'f', b'o', b'o', // annotation
+        ];
+
+        let unit = MichelinePrimNoArgsNoAnnots::<11> {};
+        let test = Node::Prim {
+            prim_tag: 7,
+            args: vec![unit.into(), 0.into(), 0.into()],
+            annots: Some(":foo".into()),
         };
 
         let mut bin = Vec::new();

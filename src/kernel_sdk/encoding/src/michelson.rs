@@ -214,7 +214,7 @@ impl BinWriter for MichelsonContract {
 
 impl BinWriter for MichelsonUnit {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_no_args_no_annots::<{ prim::UNIT_TAG }>(output)
+        bin_write_prim_no_args_no_annots(prim::UNIT_TAG, output)
     }
 }
 
@@ -224,9 +224,7 @@ where
     Arg1: BinWriter + Debug + PartialEq + Eq,
 {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_2_args_no_annots::<_, _, { prim::PAIR_TAG }>(
-            &self.0, &self.1, output,
-        )
+        bin_write_prim_2_args_no_annots(prim::PAIR_TAG, &self.0, &self.1, output)
     }
 }
 
