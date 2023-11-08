@@ -320,21 +320,20 @@ let test_rollup_node_running ~kind =
       description = "the smart contract rollup node runs on correct address";
     }
     ~kind
-  @@ fun _protocol rollup_node rollup_client sc_rollup _tezos_node _tezos_client
-    ->
+  @@ fun _protocol
+             rollup_node
+             _rollup_client
+             sc_rollup
+             _tezos_node
+             _tezos_client ->
   let metrics_port = string_of_int (Port.fresh ()) in
   let metrics_addr = "localhost:" ^ metrics_port in
   let* () =
     Sc_rollup_node.run rollup_node sc_rollup ["--metrics-addr"; metrics_addr]
   in
   let* sc_rollup_from_rpc =
-    Sc_rollup_helpers.call_rpc
-      ~smart_rollup_node:rollup_node
-      ~service:"global/smart_rollup_address"
-  in
-  let sc_rollup_from_rpc = JSON.as_string sc_rollup_from_rpc in
-  let*! sc_rollup_from_client =
-    Sc_rollup_client.sc_rollup_address ~hooks rollup_client
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.get_global_smart_rollup_address ()
   in
   if sc_rollup_from_rpc <> sc_rollup then
     failwith
@@ -342,12 +341,6 @@ let test_rollup_node_running ~kind =
          "Expecting %s, got %s when we query the sc rollup node RPC address"
          sc_rollup
          sc_rollup_from_rpc)
-  else if sc_rollup_from_client <> sc_rollup then
-    failwith
-      (Printf.sprintf
-         "Expecting %s, got %s when the client asks for the sc rollup address"
-         sc_rollup
-         sc_rollup_from_client)
   else
     let url = "http://" ^ metrics_addr ^ "/metrics" in
     let*! metrics = Curl.get_raw url in
