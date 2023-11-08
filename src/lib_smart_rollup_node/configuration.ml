@@ -580,14 +580,21 @@ let encoding : t Data_encoding.t =
 (** Maps a mode to their corresponding purposes. The Custom mode
     returns each purposes where it has at least one operation kind
     from (i.e. {!purposes_of_operation_kinds}). *)
-let purposes_of_mode mode : Purpose.t list =
+let purposes_of_mode mode : Purpose.ex_purpose list =
   match mode with
   | Observer -> []
-  | Batcher -> [Batching]
-  | Accuser -> [Operating]
-  | Bailout -> [Operating; Cementing; Recovering]
-  | Maintenance -> [Operating; Cementing; Executing_outbox]
-  | Operator -> [Operating; Cementing; Executing_outbox; Batching]
+  | Batcher -> [Purpose Batching]
+  | Accuser -> [Purpose Operating]
+  | Bailout -> [Purpose Operating; Purpose Cementing; Purpose Recovering]
+  | Maintenance ->
+      [Purpose Operating; Purpose Cementing; Purpose Executing_outbox]
+  | Operator ->
+      [
+        Purpose Operating;
+        Purpose Cementing;
+        Purpose Executing_outbox;
+        Purpose Batching;
+      ]
   | Custom op_kinds -> Purpose.of_operation_kind op_kinds
 
 let operation_kinds_of_mode mode =
@@ -604,8 +611,8 @@ let can_inject mode (op_kind : Operation_kind.t) =
   let allowed_operations = operation_kinds_of_mode mode in
   List.mem ~equal:Stdlib.( = ) op_kind allowed_operations
 
-let purpose_matches_mode mode purpose =
-  List.mem ~equal:Stdlib.( = ) purpose (purposes_of_mode mode)
+let purpose_matches_mode (type k) mode (purpose : k Purpose.t) =
+  List.mem ~equal:Stdlib.( = ) (Purpose.Purpose purpose) (purposes_of_mode mode)
 
 let refutation_player_buffer_levels = 5
 

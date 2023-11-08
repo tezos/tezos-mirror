@@ -57,7 +57,7 @@ let on_process Layer1.{level; _} state =
   | None ->
       (* Not injecting refutations, don't play refutation games *)
       return_unit
-  | Some self ->
+  | Some (Single self) ->
       let Node_context.{config; _} = node_ctxt in
       let* plugin = Protocol_plugins.last_proto_plugin node_ctxt in
       let module Plugin = (val plugin) in

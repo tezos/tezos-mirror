@@ -74,12 +74,10 @@ type rw = [`Read | `Write] t
 type ro = [`Read] t
 
 let get_operator node_ctxt purpose =
-  Purpose.Map.find purpose node_ctxt.config.operators
+  Purpose.find_operator purpose node_ctxt.config.operators
 
 let is_operator node_ctxt pkh =
-  Purpose.Map.exists
-    (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
-    node_ctxt.config.operators
+  Purpose.mem_operator pkh node_ctxt.config.operators
 
 let is_accuser node_ctxt = node_ctxt.config.mode = Accuser
 
@@ -91,9 +89,9 @@ let can_inject node_ctxt (op_kind : Operation_kind.t) =
   Configuration.can_inject node_ctxt.config.mode op_kind
 
 let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
-  let operator = get_operator node_ctxt Purpose.Operating in
+  let operator = get_operator node_ctxt Operating in
   match operator with
-  | Some operator ->
+  | Some (Single operator) ->
       error_unless
         (is_bailout node_ctxt
         || List.mem ~equal:Signature.Public_key_hash.equal operator whitelist)
@@ -1154,7 +1152,12 @@ module Internal_for_tests = struct
       kind =
     let open Lwt_result_syntax in
     let rollup_address = Address.zero in
-    let operators = Purpose.Map.empty in
+    let mode = Configuration.Observer in
+    let*? operators =
+      Purpose.make_operator
+        ~needed_purposes:(Configuration.purposes_of_mode mode)
+        []
+    in
     let loser_mode = Loser_mode.no_failures in
     let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
@@ -1171,7 +1174,7 @@ module Internal_for_tests = struct
           metrics_addr = None;
           reconnection_delay = 5.;
           fee_parameters = Configuration.default_fee_parameters;
-          mode = Observer;
+          mode;
           loser_mode;
           dal_node_endpoint = None;
           dac_observer_endpoint = None;

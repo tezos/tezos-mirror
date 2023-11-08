@@ -344,8 +344,8 @@ let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
     match operator with
     | None ->
         (* this case can't happen because the bailout mode needs a operator to start*)
-        tzfail (Purpose.Missing_operator Operating)
-    | Some operating_pkh -> (
+        tzfail (Purpose.Missing_operator (Purpose Operating))
+    | Some (Single operating_pkh) -> (
         let module Plugin = (val state.plugin) in
         let* last_published_commitment =
           Plugin.Layer1_helpers.get_last_published_commitment
@@ -368,16 +368,25 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let start () =
     let signers =
-      Purpose.Map.bindings node_ctxt.config.operators
+      Purpose.operators_bindings node_ctxt.config.operators
       |> List.fold_left
            (fun acc (purpose, operator) ->
              let operation_kinds = Purpose.operation_kind purpose in
-             let operation_kinds =
-               match Signature.Public_key_hash.Map.find operator acc with
-               | None -> operation_kinds
-               | Some kinds -> operation_kinds @ kinds
+             let operator_list =
+               match operator with
+               | Purpose.Operator (Single operator) -> [operator]
+               | Operator (Multiple operators) -> operators
              in
-             Signature.Public_key_hash.Map.add operator operation_kinds acc)
+             List.fold_left
+               (fun acc operator ->
+                 let operation_kinds =
+                   match Signature.Public_key_hash.Map.find operator acc with
+                   | None -> operation_kinds
+                   | Some kinds -> operation_kinds @ kinds
+                 in
+                 Signature.Public_key_hash.Map.add operator operation_kinds acc)
+               acc
+               operator_list)
            Signature.Public_key_hash.Map.empty
       |> Signature.Public_key_hash.Map.bindings
       |> List.map (fun (operator, operation_kinds) ->
@@ -573,11 +582,19 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
-    Purpose.Map.iter_es
-      (fun _purpose operator ->
-        let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
-        ())
-      configuration.operators
+    List.iter_ep
+      (fun (_purpose, operator) ->
+        let operator_list =
+          match operator with
+          | Purpose.Operator (Single operator) -> [operator]
+          | Operator (Multiple operators) -> operators
+        in
+        List.iter_es
+          (fun operator ->
+            let* _alias, _pk, _sk_uri = Client_keys.get_key cctxt operator in
+            return_unit)
+          operator_list)
+      (Purpose.operators_bindings configuration.operators)
   in
   let* l1_ctxt =
     Layer1.start
@@ -591,7 +608,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
   let* predecessor =
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
-  let publisher = Purpose.Map.find Operating configuration.operators in
+  let publisher = Purpose.find_operator Operating configuration.operators in
 
   let* protocol, plugin = plugin_of_first_block cctxt head in
   let module Plugin = (val plugin) in
@@ -607,9 +624,12 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       configuration.sc_rollup_address
   and* lpc =
     Option.filter_map_es
-      (Plugin.Layer1_helpers.get_last_published_commitment
-         cctxt
-         configuration.sc_rollup_address)
+      (function
+        | Purpose.Single operator ->
+            Plugin.Layer1_helpers.get_last_published_commitment
+              cctxt
+              configuration.sc_rollup_address
+              operator)
       publisher
   and* kind =
     Plugin.Layer1_helpers.get_kind cctxt configuration.sc_rollup_address
