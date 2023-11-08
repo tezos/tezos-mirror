@@ -31,6 +31,7 @@ let share ~rounding ~full_staking_balance amount =
 
 type reward_distrib = {
   to_baker_from_staking : Tez_repr.t;
+  to_baker_from_edge_over_stakers : Tez_repr.t;
   to_stakers : Tez_repr.t;
   to_spendable : Tez_repr.t;
 }
@@ -53,7 +54,7 @@ Rounding favors:
 In case the delegate's stake is zero, everything goes to the spendable balance.
 *)
 let compute_reward_distrib ~full_staking_balance ~stake
-    ~edge_of_baking_over_staking_billionth:_ ~(rewards : Tez_repr.t) =
+    ~edge_of_baking_over_staking_billionth ~(rewards : Tez_repr.t) =
   let open Result_syntax in
   let ({frozen; weighted_delegated} : Stake_repr.t) = stake in
   let* total_stake = Tez_repr.(frozen +? weighted_delegated) in
@@ -62,6 +63,7 @@ let compute_reward_distrib ~full_staking_balance ~stake
       {
         to_spendable = rewards;
         to_baker_from_staking = Tez_repr.zero;
+        to_baker_from_edge_over_stakers = Tez_repr.zero;
         to_stakers = Tez_repr.zero;
       }
   else
@@ -77,8 +79,23 @@ let compute_reward_distrib ~full_staking_balance ~stake
       share ~rounding:`Towards_baker ~full_staking_balance to_frozen
     in
     let to_baker_from_staking = baker_part in
-    let to_stakers = stakers_part in
-    return {to_baker_from_staking; to_stakers; to_spendable}
+    let* to_baker_from_edge_over_stakers =
+      Tez_repr.mul_ratio
+        ~rounding:`Up
+        stakers_part
+        ~num:(Int64.of_int32 edge_of_baking_over_staking_billionth)
+        ~den:1_000_000_000L
+    in
+    let* to_stakers =
+      Tez_repr.(stakers_part -? to_baker_from_edge_over_stakers)
+    in
+    return
+      {
+        to_baker_from_staking;
+        to_baker_from_edge_over_stakers;
+        to_stakers;
+        to_spendable;
+      }
 
 let share ~rounding ctxt delegate amount =
   let open Lwt_result_syntax in
@@ -119,7 +136,12 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
              (Signature.Public_key_hash.Map.find delegate stake_distrib)
              ~default:Stake_repr.zero)
   in
-  let* {to_baker_from_staking; to_stakers; to_spendable} =
+  let* {
+         to_baker_from_staking;
+         to_baker_from_edge_over_stakers;
+         to_stakers;
+         to_spendable;
+       } =
     compute_reward_distrib ctxt delegate active_stake rewards
   in
   let* ctxt, balance_updates_frozen_rewards_baker =
@@ -128,6 +150,13 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
       source
       (`Frozen_deposits (Frozen_staker_repr.baker delegate))
       to_baker_from_staking
+  in
+  let* ctxt, balance_updates_frozen_rewards_baker_edge =
+    Token.transfer
+      ctxt
+      source
+      (`Frozen_deposits (Frozen_staker_repr.baker delegate))
+      to_baker_from_edge_over_stakers
   in
   let* ctxt, balance_updates_frozen_rewards_stakers =
     Token.transfer
@@ -145,5 +174,6 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
   in
   ( ctxt,
     balance_updates_frozen_rewards_baker
+    @ balance_updates_frozen_rewards_baker_edge
     @ balance_updates_frozen_rewards_stakers @ balance_updates_spendable_rewards
   )
