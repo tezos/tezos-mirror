@@ -3084,6 +3084,8 @@ end
 module type IMPORTER = sig
   type t
 
+  val format : snapshot_format
+
   val init :
     snapshot_path:string ->
     dst_store_dir:[`Store_dir] Naming.directory ->
@@ -3141,6 +3143,8 @@ module Raw_importer : IMPORTER = struct
     dst_store_dir : [`Store_dir] Naming.directory;
     dst_chain_dir : [`Chain_dir] Naming.directory;
   }
+
+  let format = Raw
 
   let load_snapshot_header ~snapshot_path =
     let (module Loader) =
@@ -3485,6 +3489,8 @@ module Tar_importer : IMPORTER = struct
     (* Store the files of the archive to avoid re-reading them *)
     files : Onthefly.file list;
   }
+
+  let format = Tar
 
   let load_snapshot_header ~snapshot_path =
     let (module Loader) =
@@ -4277,6 +4283,11 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
              expected = List.map fst Version.supported_versions;
              got = snapshot_version;
            })
+    in
+    let*! () =
+      if snapshot_version <= 6 && Importer.format = Tar then
+        Event.(emit warn_tar_corruption snapshot_version)
+      else Lwt.return_unit
     in
     let* () =
       let metadata_chain_name =
