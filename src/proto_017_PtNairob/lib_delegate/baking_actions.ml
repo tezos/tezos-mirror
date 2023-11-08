@@ -370,7 +370,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     emit block_injected (bh, signed_block_header.shell.level, round, delegate))
   >>= fun () -> return updated_state
 
-let inject_preendorsements state ~preendorsements =
+let sign_preendorsements state ~preendorsements =
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   (* N.b. signing a lot of operations may take some time *)
@@ -433,7 +433,11 @@ let inject_preendorsements state ~preendorsements =
           let operation : Operation.packed = {shell; protocol_data} in
           return_some (delegate, operation, level, round))
     preendorsements
-  >>=? fun signed_operations ->
+
+let inject_preendorsements state ~preendorsements =
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  sign_preendorsements state ~preendorsements >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
     (fun (delegate, operation, level, round) ->
@@ -448,7 +452,7 @@ let inject_preendorsements state ~preendorsements =
           >>= fun () -> return_unit))
     signed_operations
 
-let sign_endorsements state endorsements =
+let sign_endorsements state ~endorsements =
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   (* N.b. signing a lot of operations may take some time *)
@@ -514,6 +518,24 @@ let sign_endorsements state endorsements =
           return_some (delegate, operation, level, round))
     endorsements
 
+let inject_endorsements state ~endorsements =
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  sign_endorsements state ~endorsements >>=? fun signed_operations ->
+  (* TODO: add a RPC to inject multiple operations *)
+  List.iter_ep
+    (fun (delegate, operation, level, round) ->
+      protect
+        ~on_error:(fun err ->
+          Events.(emit failed_to_inject_endorsement (delegate, err))
+          >>= fun () -> return_unit)
+        (fun () ->
+          Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
+          >>=? fun oph ->
+          Events.(emit endorsement_injected (oph, delegate, level, round))
+          >>= fun () -> return_unit))
+    signed_operations
+
 let sign_dal_attestations state attestations =
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -553,24 +575,6 @@ let sign_dal_attestations state attestations =
           return_some
             (delegate, operation, consensus_content.Dal.Attestation.attestation))
     attestations
-
-let inject_endorsements state ~endorsements =
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  sign_endorsements state endorsements >>=? fun signed_operations ->
-  (* TODO: add a RPC to inject multiple operations *)
-  List.iter_ep
-    (fun (delegate, operation, level, round) ->
-      protect
-        ~on_error:(fun err ->
-          Events.(emit failed_to_inject_endorsement (delegate, err))
-          >>= fun () -> return_unit)
-        (fun () ->
-          Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
-          >>=? fun oph ->
-          Events.(emit endorsement_injected (oph, delegate, level, round))
-          >>= fun () -> return_unit))
-    signed_operations
 
 let inject_dal_attestations state attestations =
   let cctxt = state.global_state.cctxt in

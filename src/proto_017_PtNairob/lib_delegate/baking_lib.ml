@@ -526,7 +526,7 @@ let rec baking_minimal_timestamp ~count state
     | Some first_potential_round -> return first_potential_round
   in
   let* signed_endorsements =
-    Baking_actions.sign_endorsements state own_endorsements
+    Baking_actions.sign_endorsements state ~endorsements:own_endorsements
   in
   let pool =
     Operation_pool.add_operations
