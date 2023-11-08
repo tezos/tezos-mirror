@@ -69,15 +69,11 @@ module Token = struct
     | Staking_pseudotoken -> Staking_pseudotoken_repr.pp
 end
 
-type staker = Staker_repr.staker =
-  | Single of Contract_repr.t * Signature.public_key_hash
-  | Shared of Signature.public_key_hash
-
 type 'token balance =
   | Contract : Contract_repr.t -> Tez_repr.t balance
   | Block_fees : Tez_repr.t balance
-  | Deposits : staker -> Tez_repr.t balance
-  | Unstaked_deposits : staker * Cycle_repr.t -> Tez_repr.t balance
+  | Deposits : Staker_repr.t -> Tez_repr.t balance
+  | Unstaked_deposits : Staker_repr.t * Cycle_repr.t -> Tez_repr.t balance
   | Nonce_revelation_rewards : Tez_repr.t balance
   | Attesting_rewards : Tez_repr.t balance
   | Baking_rewards : Tez_repr.t balance
@@ -138,9 +134,9 @@ let compare_balance :
  fun ba bb ->
   match (ba, bb) with
   | Contract ca, Contract cb -> Contract_repr.compare ca cb
-  | Deposits sa, Deposits sb -> Staker_repr.compare_staker sa sb
+  | Deposits sa, Deposits sb -> Staker_repr.compare sa sb
   | Unstaked_deposits (sa, ca), Unstaked_deposits (sb, cb) ->
-      Compare.or_else (Staker_repr.compare_staker sa sb) (fun () ->
+      Compare.or_else (Staker_repr.compare sa sb) (fun () ->
           Cycle_repr.compare ca cb)
   | Lost_attesting_rewards (pkha, pa, ra), Lost_attesting_rewards (pkhb, pb, rb)
     ->
@@ -280,7 +276,7 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
            (obj3
               (req "kind" (constant "freezer"))
               (req "category" (constant "deposits"))
-              (req "staker" Staker_repr.staker_encoding))
+              (req "staker" Staker_repr.encoding))
            (function Deposits staker -> Some ((), (), staker) | _ -> None)
            (fun ((), (), staker) -> Deposits staker);
          tez_case
@@ -450,7 +446,7 @@ let balance_and_update_encoding ~use_legacy_attestation_name =
            (obj4
               (req "kind" (constant "freezer"))
               (req "category" (constant "unstaked_deposits"))
-              (req "staker" Staker_repr.staker_encoding)
+              (req "staker" Staker_repr.encoding)
               (req "cycle" Cycle_repr.encoding))
            (function
              | Unstaked_deposits (staker, cycle) -> Some ((), (), staker, cycle)

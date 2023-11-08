@@ -241,7 +241,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
               in
               let init_to_burn_to_reward =
                 let {amount_to_burn; reward} = staked in
-                let giver = `Frozen_deposits (Receipt_repr.Shared delegate) in
+                let giver = `Frozen_deposits (Staker_repr.Shared delegate) in
                 ([(giver, amount_to_burn)], [(giver, reward)])
               in
               let* to_burn, to_reward =
@@ -264,7 +264,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                     in
                     let giver =
                       `Unstaked_frozen_deposits
-                        (Receipt_repr.Shared delegate, cycle)
+                        (Staker_repr.Shared delegate, cycle)
                     in
                     return
                       ( (giver, amount_to_burn) :: to_burn,

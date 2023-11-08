@@ -5,11 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type staker =
+type t =
   | Single of Contract_repr.t * Signature.public_key_hash
   | Shared of Signature.public_key_hash
 
-let staker_encoding =
+let encoding =
   let open Data_encoding in
   let single_tag = 0 in
   let single_encoding =
@@ -49,7 +49,7 @@ let staker_encoding =
            (fun delegate -> Shared delegate);
        ]
 
-let compare_staker sa sb =
+let compare sa sb =
   match (sa, sb) with
   | Single (ca, da), Single (cb, db) ->
       Compare.or_else (Contract_repr.compare ca cb) (fun () ->
@@ -58,6 +58,6 @@ let compare_staker sa sb =
   | Single _, Shared _ -> -1
   | Shared _, Single _ -> 1
 
-let staker_delegate = function
+let delegate = function
   | Single (_contract, delegate) -> delegate
   | Shared delegate -> delegate
