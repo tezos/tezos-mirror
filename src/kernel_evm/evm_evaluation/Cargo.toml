@@ -15,6 +15,7 @@ evm-execution.workspace = true
 tezos_ethereum.workspace = true
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-core.workspace = true
 
 hex.workspace = true
 hex-literal.workspace = true

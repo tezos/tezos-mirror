@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod evalhost;
 mod fillers;
 mod helpers;
 mod models;

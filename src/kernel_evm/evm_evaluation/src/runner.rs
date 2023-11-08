@@ -8,7 +8,6 @@ use evm_execution::precompiles::precompile_set;
 use evm_execution::{run_transaction, Config};
 
 use tezos_ethereum::block::BlockConstants;
-use tezos_smart_rollup_mock::MockHost;
 
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
@@ -16,6 +15,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use thiserror::Error;
 
+use crate::evalhost::EvalHost;
 use crate::fillers::process;
 use crate::helpers::construct_folder_path;
 use crate::models::{Env, FillerSource, SpecName, TestSuite};
@@ -99,8 +99,8 @@ pub fn run_test(
             None
         };
 
-        let mut host = MockHost::default();
-        let precompiles = precompile_set::<MockHost>();
+        let mut host = EvalHost::default_with_output_file(file_name.to_owned());
+        let precompiles = precompile_set::<EvalHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         println!("\n[START] Accounts initialisation");
