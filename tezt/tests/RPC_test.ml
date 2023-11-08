@@ -705,7 +705,16 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
     @@ RPC.get_chain_block_helper_current_level ()
   in
   let* () =
-    if Protocol.(number protocol <= number Oxford) then
+    if Protocol.(number protocol >= number Alpha) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_context_denunciations ()
+      in
+      unit
+    else unit
+  in
+  let* () =
+    if Protocol.(number protocol <= number Nairobi + 1) then
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
         @@ RPC.get_chain_block_helper_endorsing_rights ()
@@ -719,12 +728,7 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
              ()
       in
       unit
-    else
-      let* _ =
-        Client.RPC.call ?endpoint ~hooks client
-        @@ RPC.get_chain_block_context_denunciations ()
-      in
-      unit
+    else unit
   in
   let* () =
     let* _ =
