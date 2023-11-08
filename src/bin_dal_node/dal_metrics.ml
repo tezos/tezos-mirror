@@ -74,38 +74,58 @@ module GS = struct
   let add_metric (info, collector) =
     Prometheus.CollectorRegistry.(register default) info collector
 
-  let gs_stats = ref (Gossipsub.Worker.Introspection.empty_stats ())
+  module Stats = struct
+    let gs_stats = ref (Gossipsub.Worker.Introspection.empty_stats ())
+
+    let input_events_stream_length = ref 0
+
+    let p2p_output_streams_length = ref 0
+
+    let app_output_stream_length = ref 0
+
+    let set gs_worker =
+      let module W = Gossipsub.Worker in
+      gs_stats := W.stats gs_worker ;
+      input_events_stream_length :=
+        W.input_events_stream gs_worker |> W.Stream.length ;
+      p2p_output_streams_length :=
+        W.p2p_output_stream gs_worker |> W.Stream.length ;
+      app_output_stream_length :=
+        W.app_output_stream gs_worker |> W.Stream.length
+  end
+
+  (* Metrics about the stats gathered by the worker *)
 
   let count_topics =
     metric
       ~name:"count_topics"
       ~help:"The number of topics of the node"
-      (fun () -> Int64.to_float !gs_stats.count_topics)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_topics)
 
   let count_connections =
     metric
       ~name:"count_connections"
       ~help:"Count the number connections of the node"
-      (fun () -> Int64.to_float !gs_stats.count_connections)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_connections)
 
   let count_bootstrap_connections =
     metric
       ~name:"count_bootstrap_connections"
       ~help:"Count the number of bootstrap connections of the node"
-      (fun () -> Int64.to_float !gs_stats.count_bootstrap_connections)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_bootstrap_connections)
 
   let count_received_valid_messages =
     metric
       ~name:"count_received_valid_messages"
       ~help:
         "Count the number of received valid application messages by the node"
-      (fun () -> Int64.to_float !gs_stats.count_recv_valid_app_messages)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_valid_app_messages)
 
   let count_received_invalid_messages =
     metric
       ~name:"count_received_invalid_messages"
       ~help:"Count the number of receivedvalid application messages by the node"
-      (fun () -> Int64.to_float !gs_stats.count_recv_invalid_app_messages)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_invalid_app_messages)
 
   let count_received_unknown_validity_messages =
     metric
@@ -114,64 +134,91 @@ module GS = struct
         "Count the number of received application messages by the node with \
          unknown validity"
       (fun () ->
-        Int64.to_float !gs_stats.count_recv_unknown_validity_app_messages)
+        Int64.to_float !Stats.gs_stats.count_recv_unknown_validity_app_messages)
 
   let count_received_grafts =
     metric
       ~name:"count_received_grafts"
       ~help:"Count the number of received grafts by the node"
-      (fun () -> Int64.to_float !gs_stats.count_recv_grafts)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_grafts)
 
   let count_received_prunes =
     metric
       ~name:"count_received_prunes"
       ~help:"Count the number of received prunes by the node"
-      (fun () -> Int64.to_float !gs_stats.count_recv_prunes)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_prunes)
 
   let count_received_ihaves =
     metric
       ~name:"count_received_ihaves"
       ~help:"Count the number of received ihaves by the node"
-      (fun () -> Int64.to_float !gs_stats.count_recv_ihaves)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_ihaves)
 
   let count_received_iwants =
     metric
       ~name:"count_received_iwants"
       ~help:"Count the number of received iwants by the node"
-      (fun () -> Int64.to_float !gs_stats.count_recv_prunes)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_prunes)
 
   let count_sent_messages =
     metric
       ~name:"count_sent_messages"
       ~help:"Count the number of sent application messages by the node"
-      (fun () -> Int64.to_float !gs_stats.count_sent_app_messages)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_sent_app_messages)
 
   let count_sent_grafts =
     metric
       ~name:"count_sent_grafts"
       ~help:"Count the number of sent grafts by the node"
-      (fun () -> Int64.to_float !gs_stats.count_sent_grafts)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_sent_grafts)
 
   let count_sent_prunes =
     metric
       ~name:"count_sent_prunes"
       ~help:"Count the number of sent prunes by the node"
-      (fun () -> Int64.to_float !gs_stats.count_sent_prunes)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_sent_prunes)
 
   let count_sent_ihaves =
     metric
       ~name:"count_sent_ihaves"
       ~help:"Count the number of sent ihaves by the node"
-      (fun () -> Int64.to_float !gs_stats.count_sent_ihaves)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_sent_ihaves)
 
   let count_sent_iwants =
     metric
       ~name:"count_sent_iwants"
       ~help:"Count the number of sent iwants by the node"
-      (fun () -> Int64.to_float !gs_stats.count_sent_iwants)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_sent_iwants)
+
+  (* Metrics about the worker's streams *)
+
+  let input_events_stream_length =
+    metric
+      ~name:"input_events_stream_length"
+      ~help:
+        "The number of elements currently in the Gossipsub worker's input \
+         events stream"
+      (fun () -> float !Stats.input_events_stream_length)
+
+  let p2p_output_streams_length =
+    metric
+      ~name:"p2p_output_streams_length"
+      ~help:
+        "The number of elements currently in the Gossipsub worker's P2P output \
+         stream"
+      (fun () -> float !Stats.p2p_output_streams_length)
+
+  let app_output_stream_length =
+    metric
+      ~name:"app_output_stream_length"
+      ~help:
+        "The number of elements currently in the Gossipsub worker's \
+         application output stream"
+      (fun () -> float !Stats.app_output_stream_length)
 
   let metrics =
     [
+      (* Metrics about the stats gathered by the worker *)
       count_topics;
       count_connections;
       count_bootstrap_connections;
@@ -187,6 +234,10 @@ module GS = struct
       count_sent_prunes;
       count_sent_ihaves;
       count_sent_iwants;
+      (* Metrics about the worker's streams *)
+      input_events_stream_length;
+      p2p_output_streams_length;
+      app_output_stream_length;
     ]
 
   let () = List.iter add_metric metrics
@@ -220,4 +271,4 @@ let sample_time ~sampling_frequency ~to_sample ~metric_updater =
 
 let collect_gossipsub_metrics gs_worker =
   Prometheus.CollectorRegistry.(register_pre_collect default) (fun () ->
-      GS.gs_stats := Gossipsub.Worker.stats gs_worker)
+      GS.Stats.set gs_worker)

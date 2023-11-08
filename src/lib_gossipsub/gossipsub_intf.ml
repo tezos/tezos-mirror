@@ -1058,6 +1058,9 @@ module type WORKER_CONFIGURATION = sig
     (** Returns and removes all available elements of the stream l without
         blocking. *)
     val get_available : 'a t -> 'a list
+
+    (** Returns the number of elements in the stream. *)
+    val length : 'a t -> int
   end
 end
 
@@ -1166,6 +1169,10 @@ module type WORKER = sig
   (** [app_output_stream t] returns the output stream containing data for the
       application layer. *)
   val app_output_stream : t -> app_output Stream.t
+
+  (** [input_events_stream t] returns the input stream in which we push events
+      to be processed by the worker. *)
+  val input_events_stream : t -> event Stream.t
 
   (** [is_subscribed t topic] checks whether [topic] is in the mesh of [t]. *)
   val is_subscribed : t -> GS.Topic.t -> bool
