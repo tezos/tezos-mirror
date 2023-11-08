@@ -227,7 +227,7 @@ let test_other_contracts =
     ~__FILE__
     ~title:"Run script with other_contracts"
     ~tags:["client"; "michelson"]
-    ~supports:(Protocol.From_protocol 019)
+    ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let unused_address = {|"KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"|} in
@@ -246,7 +246,7 @@ let test_extra_big_maps =
     ~__FILE__
     ~title:"Run script with extra_big_maps"
     ~tags:["client"; "michelson"]
-    ~supports:(Protocol.From_protocol 019)
+    ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* {storage; _} =
