@@ -4242,7 +4242,7 @@ let test_rpcs ~kind
   let l2_block_hash' = JSON.(l2_block |-> "block_hash" |> as_string) in
   Check.((l2_block_hash' = l2_block_hash) string)
     ~error_msg:"L2 head is from full block is %L but should be %R" ;
-  if Protocol.number protocol >= 019 then (
+  if Protocol.number protocol >= 018 then (
     let whitelist = [Constant.bootstrap1.public_key_hash] in
     let* _, _, sc_rollup =
       setup_rollup ~protocol ~alias:"rollup2" ~kind ~whitelist node client
@@ -4537,7 +4537,7 @@ let test_bootstrap_smart_rollup_originated =
 
 let test_bootstrap_private_smart_rollup_originated =
   register_test
-    ~supports:(From_protocol 019)
+    ~supports:(From_protocol 018)
     ~__FILE__
     ~tags:["bootstrap"; "parameter"; "private"]
     ~title:"Bootstrap private smart rollups are private"
@@ -4612,7 +4612,7 @@ let test_private_rollup_whitelist ?check_error ~regression ~description
     ~commit_publisher ~whitelist =
   test_l1_scenario
     ~regression
-    ~supports:(From_protocol 019)
+    ~supports:(From_protocol 018)
     ~whitelist_enable:true
     ~whitelist
     ~src:Constant.bootstrap1.public_key_hash
@@ -4659,7 +4659,7 @@ let test_private_rollup_non_whitelisted_staker =
 let test_private_rollup_node_publish_in_whitelist =
   let commitment_period = 3 in
   test_full_scenario
-    ~supports:(From_protocol 019)
+    ~supports:(From_protocol 018)
     ~whitelist_enable:true
     ~whitelist:[Constant.bootstrap1.public_key_hash]
     ~operator:Constant.bootstrap1.alias
@@ -4684,7 +4684,7 @@ let test_private_rollup_node_publish_in_whitelist =
 let test_private_rollup_node_publish_not_in_whitelist =
   let operator = Constant.bootstrap1.alias in
   test_full_scenario
-    ~supports:(From_protocol 019)
+    ~supports:(From_protocol 018)
     ~whitelist_enable:true
     ~whitelist:[Constant.bootstrap2.public_key_hash]
     ~operator
@@ -4718,7 +4718,7 @@ let test_rollup_whitelist_update ~kind =
     ~kind
     ~whitelist_enable:true
     ~whitelist
-    ~supports:(From_protocol 019)
+    ~supports:(From_protocol 018)
     ~commitment_period
     ~challenge_window
     ~operator:Constant.bootstrap1.public_key_hash
@@ -4850,7 +4850,7 @@ let test_rollup_whitelist_outdated_update ~kind =
     ~kind
     ~whitelist_enable:true
     ~whitelist
-    ~supports:(From_protocol 019)
+    ~supports:(From_protocol 018)
     ~commitment_period
     ~challenge_window
   @@ fun _protocol rollup_node rollup_client rollup_addr _node client ->
@@ -5211,7 +5211,7 @@ let register ~kind ~protocols =
     test_consecutive_commitments
     protocols
     ~kind ;
-  test_cement_ignore_commitment ~kind [Nairobi; Alpha] ;
+  test_cement_ignore_commitment ~kind protocols ;
   bailout_mode_not_publish ~kind protocols ;
   bailout_mode_fail_to_start_without_operator ~kind protocols ;
   bailout_mode_fail_operator_no_stake ~kind protocols ;
