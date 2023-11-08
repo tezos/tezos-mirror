@@ -104,7 +104,7 @@ let network_activation_parameters_templates protocol_hash =
       (* Fetching the network parameters from the src/proto_alpha directory,
          to be sure that we are in synch with current protocl parameters. *)
       Some protocol_alpha_parameters_template
-  | _ -> None
+(* | _ -> None *)
 
 let genesis_prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
 
