@@ -13,6 +13,7 @@ use crate::ast::*;
 use crate::ast::annotations::*;
 use crate::parser::ParserError;
 use crate::lexer::{Annotation, LexerError, Prim, Noun, TztPrim as TzP, Tok};
+use crate::lexer::macros::Macro;
 use crate::typechecker as TC;
 use crate::tzt::*;
 use Noun::*;
@@ -41,6 +42,7 @@ extern {
         ann => Tok::Annotation(<Annotation<'a>>),
         // parameter, code and chain_id lexemes are special-cased because
         // they're also used in the tzt syntax
+        macro => Tok::Noun(Noun::MacroPrim(<Macro>)),
         "parameter" => Tok::Noun(PT::Prim(Prim::parameter)),
         "code" => Tok::Noun(PT::Prim(Prim::code)),
         "chain_id" => Tok::Noun(PT::Prim(Prim::chain_id)),

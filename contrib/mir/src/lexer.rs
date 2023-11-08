@@ -7,7 +7,10 @@
 
 use logos::Logos;
 pub mod errors;
+pub mod macros;
+
 pub use errors::*;
+use macros::*;
 
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
@@ -35,19 +38,20 @@ macro_rules! defprim {
                 match self {
                     $(
                         $ty::$prim => write!(f, "{}", coalesce!($($str)?, stringify!($prim))),
-                    )*
+                        )*
                 }
             }
         }
 
+
         impl std::str::FromStr for $ty {
-          type Err = PrimError;
-          fn from_str(s: &str) -> Result<Self, Self::Err> {
-              match s {
-                $(coalesce!($($str)?, stringify!($prim)) => Ok($ty::$prim),)*
-                _ => Err(PrimError(s.to_owned()))
-              }
-          }
+            type Err = PrimError;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $(coalesce!($($str)?, stringify!($prim)) => Ok($ty::$prim),)*
+                        _ => Err(PrimError(s.to_owned()))
+                }
+            }
         }
     };
 }
@@ -139,6 +143,7 @@ defprim! {
 pub enum Noun {
     Prim(Prim),
     TztPrim(TztPrim),
+    MacroPrim(Macro),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -191,11 +196,20 @@ pub enum Tok<'a> {
     Semi,
 }
 
+impl std::fmt::Display for Noun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Noun::Prim(p) => p.fmt(f),
+            Noun::TztPrim(p) => p.fmt(f),
+            Noun::MacroPrim(m) => m.fmt(f),
+        }
+    }
+}
+
 impl std::fmt::Display for Tok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Tok::Noun(Noun::Prim(p)) => p.fmt(f),
-            Tok::Noun(Noun::TztPrim(p)) => p.fmt(f),
+        match &self {
+            Tok::Noun(noun) => noun.fmt(f),
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
             Tok::Bytes(bs) => write!(f, "0x{}", hex::encode(bs)),
@@ -211,16 +225,24 @@ impl std::fmt::Display for Tok<'_> {
 
 type Lexer<'a> = logos::Lexer<'a, Tok<'a>>;
 
+fn lex_macro(lex: &mut Lexer) -> Result<Macro, PrimError> {
+    let slice = lex.slice();
+    let mut inner = Macro::lexer(slice);
+    let next = inner.next().ok_or_else(|| PrimError(slice.to_string()))?;
+    // check if lexed token is at EOF
+    if matches!(inner.next(), Some(_)) {
+        return Err(PrimError(slice.to_string()));
+    }
+    next.map_err(|_| PrimError(slice.to_string()))
+}
+
 fn lex_noun(lex: &mut Lexer) -> Result<Noun, LexerError> {
     lex.slice()
         .parse()
         .map(Noun::Prim)
         .or_else(|_| lex.slice().parse().map(Noun::TztPrim))
-        .or_else(|_| match lex.slice() {
-            "_" => Ok(Noun::TztPrim(TztPrim::Underscore)),
-            s => Err(PrimError(s.to_owned())),
-        })
-        .map_err(LexerError::from)
+        .or_else(|_| lex_macro(lex).map(Noun::MacroPrim))
+        .map_err(LexerError::PrimError)
 }
 
 fn lex_number(lex: &mut Lexer) -> Result<i128, LexerError> {
