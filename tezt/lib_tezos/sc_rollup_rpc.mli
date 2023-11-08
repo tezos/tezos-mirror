@@ -97,3 +97,9 @@ val post_global_block_simulate :
     [< `Durable_storage_key of string list | `Pvm_state_key of string list] list ->
   string list ->
   simulation_result RPC_core.t
+
+(** RPC: [GET global/block/<block>/dal/processed_slots] returns the slots indices
+    that have been marked by the rollup node as confirmed or unconfirmed for block
+    [block] (default ["head"]), with their statuses.  *)
+val get_global_block_dal_processed_slots :
+  ?block:string -> unit -> (int * string) list RPC_core.t

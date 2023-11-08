@@ -322,15 +322,6 @@ let gc_info ?hooks sc_client =
        first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
      }
 
-let get_dal_processed_slots ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "processed_slots"]
-  |> Runnable.map (fun json ->
-         JSON.as_list json
-         |> List.map (fun obj ->
-                let index = obj |> JSON.get "index" |> JSON.as_int in
-                let status = obj |> JSON.get "status" |> JSON.as_string in
-                (index, status)))
-
 let inject ?hooks sc_client messages =
   let messages_json =
     `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)

@@ -1646,7 +1646,6 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
 
   Check.(level = init_level)
@@ -1711,7 +1710,9 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     @@ Sc_rollup_rpc.get_global_block_dal_slot_headers ()
   in
   let commitments =
-    slots_headers |> List.map (fun Sc_rollup_rpc.{commitment; _} -> commitment)
+    slots_headers
+    |> List.map (fun Sc_rollup_rpc.{commitment; level = _; index = _} ->
+           commitment)
   in
   let expected_commitments = [commitment_0; commitment_1; commitment_2] in
   Check.(commitments = expected_commitments)
@@ -1738,8 +1739,12 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
        expected = %R)" ;
 
   Log.info "Step 7: check that the two slots have been attested" ;
-  let*! downloaded_slots =
-    Sc_rollup_client.get_dal_processed_slots ~hooks sc_rollup_client
+  (* TODO: add ~hooks
+     https://gitlab.com/tezos/tezos/-/issues/6612
+  *)
+  let* downloaded_slots =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_dal_processed_slots ()
   in
   let downloaded_confirmed_slots =
     List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
@@ -1775,10 +1780,14 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     "Step 9: verify that the rollup node has downloaded slot 2; slot 0 is \
      unconfirmed, and slot 1 has not been downloaded" ;
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
-  let*! downloaded_slots =
-    Sc_rollup_client.get_dal_processed_slots
-      ~block:confirmed_level_as_string
-      sc_rollup_client
+  (* TODO: add ~hooks
+     https://gitlab.com/tezos/tezos/-/issues/6612
+  *)
+  let* downloaded_slots =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_dal_processed_slots
+         ~block:confirmed_level_as_string
+         ()
   in
   let downloaded_confirmed_slots =
     List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots

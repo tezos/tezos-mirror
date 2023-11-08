@@ -178,15 +178,6 @@ val commitment :
 (** [gc_info client] returns garbage collection information. *)
 val gc_info : ?hooks:Process.hooks -> t -> gc_info Runnable.process
 
-(** [get_dal_processed_slots ?block client] returns the slots indices that have
-    been marked by the rollup node as confirmed or unconfirmed for block [block]
-    (default ["head"]), with their statuses. *)
-val get_dal_processed_slots :
-  ?hooks:Process.hooks ->
-  ?block:string ->
-  t ->
-  (int * string) list Runnable.process
-
 (** [inject client messages] injects the [messages] in the queue the rollup
     node's batcher and returns the list of message hashes injected. *)
 val inject :
