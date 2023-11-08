@@ -364,7 +364,7 @@ let register ~protocols =
   List.iter
     (fun (title, test_function) ->
       Protocol.register_test
-        ~supports:Protocol.(From_protocol (number Oxford))
+        ~supports:Protocol.(From_protocol (number Nairobi + 1))
         ~__FILE__
         ~title
         ~tags:["client"; "michelson"; "timelock"]
