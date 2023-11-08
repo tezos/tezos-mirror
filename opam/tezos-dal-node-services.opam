@@ -11,7 +11,6 @@ depends: [
   "dune" { >= "3.0" & < "3.11" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "prometheus" { >= "1.2" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

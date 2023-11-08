@@ -44,97 +44,99 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   module Introspection = struct
     type stats = {
-      mutable count_topics : int;
-      mutable count_connections : int;
-      mutable count_bootstrap_connections : int;
-      mutable count_sent_app_messages : int;
-      mutable count_sent_grafts : int;
-      mutable count_sent_prunes : int;
-      mutable count_sent_ihaves : int;
-      mutable count_sent_iwants : int;
-      mutable count_recv_valid_app_messages : int;
-      mutable count_recv_invalid_app_messages : int;
-      mutable count_recv_unknown_validity_app_messages : int;
-      mutable count_recv_grafts : int;
-      mutable count_recv_prunes : int;
-      mutable count_recv_ihaves : int;
-      mutable count_recv_iwants : int;
+      mutable count_topics : int64;
+      mutable count_connections : int64;
+      mutable count_bootstrap_connections : int64;
+      mutable count_sent_app_messages : int64;
+      mutable count_sent_grafts : int64;
+      mutable count_sent_prunes : int64;
+      mutable count_sent_ihaves : int64;
+      mutable count_sent_iwants : int64;
+      mutable count_recv_valid_app_messages : int64;
+      mutable count_recv_invalid_app_messages : int64;
+      mutable count_recv_unknown_validity_app_messages : int64;
+      mutable count_recv_grafts : int64;
+      mutable count_recv_prunes : int64;
+      mutable count_recv_ihaves : int64;
+      mutable count_recv_iwants : int64;
     }
 
-    let empty () =
+    let empty_stats () =
       {
-        count_topics = 0;
-        count_connections = 0;
-        count_bootstrap_connections = 0;
-        count_sent_app_messages = 0;
-        count_sent_grafts = 0;
-        count_sent_prunes = 0;
-        count_sent_ihaves = 0;
-        count_sent_iwants = 0;
-        count_recv_valid_app_messages = 0;
-        count_recv_invalid_app_messages = 0;
-        count_recv_unknown_validity_app_messages = 0;
-        count_recv_grafts = 0;
-        count_recv_prunes = 0;
-        count_recv_ihaves = 0;
-        count_recv_iwants = 0;
+        count_topics = 0L;
+        count_connections = 0L;
+        count_bootstrap_connections = 0L;
+        count_sent_app_messages = 0L;
+        count_sent_grafts = 0L;
+        count_sent_prunes = 0L;
+        count_sent_ihaves = 0L;
+        count_sent_iwants = 0L;
+        count_recv_valid_app_messages = 0L;
+        count_recv_invalid_app_messages = 0L;
+        count_recv_unknown_validity_app_messages = 0L;
+        count_recv_grafts = 0L;
+        count_recv_prunes = 0L;
+        count_recv_ihaves = 0L;
+        count_recv_iwants = 0L;
       }
 
     let counter_update = function
-      | `Incr -> 1
-      | `Decr -> -1
-      | `Plus n -> n
-      | `Minus n -> -n
+      | `Incr -> 1L
+      | `Decr -> -1L
+      | `Plus n -> Int64.of_int n
+      | `Minus n -> Int64.of_int (-n)
+
+    let ( ++ ) = Int64.add
 
     let update_count_topics t delta =
-      t.count_topics <- t.count_topics + counter_update delta
+      t.count_topics <- t.count_topics ++ counter_update delta
 
     let update_count_connections t delta =
-      t.count_connections <- t.count_connections + counter_update delta
+      t.count_connections <- t.count_connections ++ counter_update delta
 
     let update_count_bootstrap_connections t delta =
       t.count_bootstrap_connections <-
-        t.count_bootstrap_connections + counter_update delta
+        t.count_bootstrap_connections ++ counter_update delta
 
     let update_count_recv_grafts t delta =
-      t.count_recv_grafts <- t.count_recv_grafts + counter_update delta
+      t.count_recv_grafts <- t.count_recv_grafts ++ counter_update delta
 
     let update_count_recv_prunes t delta =
-      t.count_recv_prunes <- t.count_recv_prunes + counter_update delta
+      t.count_recv_prunes <- t.count_recv_prunes ++ counter_update delta
 
     let update_count_recv_ihaves t delta =
-      t.count_recv_ihaves <- t.count_recv_ihaves + counter_update delta
+      t.count_recv_ihaves <- t.count_recv_ihaves ++ counter_update delta
 
     let update_count_recv_iwants t delta =
-      t.count_recv_iwants <- t.count_recv_iwants + counter_update delta
+      t.count_recv_iwants <- t.count_recv_iwants ++ counter_update delta
 
     let update_count_recv_invalid_app_messages t delta =
       t.count_recv_invalid_app_messages <-
-        t.count_recv_invalid_app_messages + counter_update delta
+        t.count_recv_invalid_app_messages ++ counter_update delta
 
     let update_count_recv_unknown_validity_app_messages t delta =
       t.count_recv_unknown_validity_app_messages <-
-        t.count_recv_unknown_validity_app_messages + counter_update delta
+        t.count_recv_unknown_validity_app_messages ++ counter_update delta
 
     let update_count_recv_valid_app_messages t delta =
       t.count_recv_valid_app_messages <-
-        t.count_recv_valid_app_messages + counter_update delta
+        t.count_recv_valid_app_messages ++ counter_update delta
 
     let update_count_sent_grafts t delta =
-      t.count_sent_grafts <- t.count_sent_grafts + counter_update delta
+      t.count_sent_grafts <- t.count_sent_grafts ++ counter_update delta
 
     let update_count_sent_prunes t delta =
-      t.count_sent_prunes <- t.count_sent_prunes + counter_update delta
+      t.count_sent_prunes <- t.count_sent_prunes ++ counter_update delta
 
     let update_count_sent_ihaves t delta =
-      t.count_sent_ihaves <- t.count_sent_ihaves + counter_update delta
+      t.count_sent_ihaves <- t.count_sent_ihaves ++ counter_update delta
 
     let update_count_sent_iwants t delta =
-      t.count_sent_iwants <- t.count_sent_iwants + counter_update delta
+      t.count_sent_iwants <- t.count_sent_iwants ++ counter_update delta
 
     let update_count_sent_app_messages t delta =
       t.count_sent_app_messages <-
-        t.count_sent_app_messages + counter_update delta
+        t.count_sent_app_messages ++ counter_update delta
 
     (* *)
   end
@@ -740,7 +742,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       status = Starting;
       state =
         {
-          stats = Introspection.empty ();
+          stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
           connected_bootstrap_peers = Peer.Set.empty;
           events_stream = Stream.empty ();

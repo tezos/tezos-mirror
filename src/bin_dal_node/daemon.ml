@@ -640,6 +640,8 @@ let run ~data_dir configuration_override =
   let*! () = Event.(emit p2p_server_is_ready listen_addr) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
+  (* Start collecting stats related to the Gossipsub worker. *)
+  Dal_metrics.collect_gossipsub_metrics gs_worker ;
   (* Start daemon to resolve current protocol plugin *)
   let* () =
     daemonize
