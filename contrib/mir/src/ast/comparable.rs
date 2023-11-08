@@ -5,17 +5,40 @@ impl PartialOrd for TypedValue {
         use TypedValue::*;
         match (self, other) {
             (Int(a), Int(b)) => a.partial_cmp(b),
+            (Int(..), _) => None,
+
             (Nat(a), Nat(b)) => a.partial_cmp(b),
+            (Nat(..), _) => None,
+
             (Mutez(a), Mutez(b)) => a.partial_cmp(b),
+            (Mutez(..), _) => None,
+
             (Bool(a), Bool(b)) => a.partial_cmp(b),
+            (Bool(..), _) => None,
+
             (String(a), String(b)) => a.partial_cmp(b),
+            (String(..), _) => None,
+
             (Unit, Unit) => Some(std::cmp::Ordering::Equal),
+            (Unit, _) => None,
+
             (Pair(l), Pair(r)) => l.partial_cmp(r),
+            (Pair(..), _) => None,
+
             (Option(x), Option(y)) => x.as_deref().partial_cmp(&y.as_deref()),
+            (Option(..), _) => None,
+
             (Or(x), Or(y)) => x.as_ref().partial_cmp(y.as_ref()),
+            (Or(..), _) => None,
+
             (Address(l), Address(r)) => l.partial_cmp(r),
+            (Address(..), _) => None,
+
             (ChainId(l), ChainId(r)) => l.partial_cmp(r),
-            _ => None,
+            (ChainId(..), _) => None,
+
+            // non-comparable types
+            (List(..) | Map(..) | Contract(..), _) => None,
         }
     }
 }
