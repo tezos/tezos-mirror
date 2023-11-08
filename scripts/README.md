@@ -22,8 +22,10 @@ In particular, this includes scripts for:
 * setting user-activated upgrades (`user_activated_upgrade.sh`)
 * generating commitments (initial accounts) for test networks (`create_genesis/create_genesis_info.py`)
 
-This directory also includes an example docker-compose file to run a node
-with a baker and an accuser (`docker/docker-compose-generic.yml`).
+This directory also includes an example docker-compose file to run a
+node with a baker and an accuser (`docker/docker-compose-generic.yml`)
+and a minimalistic Michelson REPL built on top of `octez-client`
+(`michelson_repl.sh`).
 
 ## API
 <!-- For each script where this is possible, indicate how to obtain usage info

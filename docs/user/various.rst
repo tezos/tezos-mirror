@@ -8,6 +8,25 @@ Environment for writing Michelson contracts
 editing and debugging Michelson programs. `Install it <https://www.gnu.org/software/emacs/>`_ and follow the
 configuration instructions in the Michelson Emacs README `here <https://gitlab.com/tezos/tezos/-/tree/master/emacs>`__.
 
+Michelson interactive toplevel
+------------------------------
+
+An interactive Michelson toplevel (also known as a `REPL
+<https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop>`__)
+built on the :doc:`mockup` mode of Octez client is available in
+``scripts/michelson_repl.sh``, the typical usage is:
+
+::
+
+   $ octez-client --mode mockup --base-dir /tmp/mockup create mockup
+   $ rlwrap scripts/michelson_repl.sh
+   > UNIT
+     { Stack_elt unit Unit }
+   > UNIT
+     { Stack_elt unit Unit ; Stack_elt unit Unit }
+   > COMPARE
+     { Stack_elt int 0 }
+
 .. _octez-admin-client:
 
 Admin Client
