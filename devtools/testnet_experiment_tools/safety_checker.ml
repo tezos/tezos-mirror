@@ -29,6 +29,42 @@
 open Filename.Infix
 open Tezos_clic
 
+type block_kind = Safe | Potentially_unsafe | Unsafe
+
+type block_info = {
+  block_hash : Block_hash.t;
+  round : int;
+  level : int;
+  kind : block_kind;
+}
+
+module Block_kind_map = Map.Make (struct
+  type t = block_kind
+
+  let compare k1 k2 =
+    let score k =
+      match k with Safe -> 0 | Potentially_unsafe -> 1 | Unsafe -> 2
+    in
+    Int.compare (score k1) (score k2)
+end)
+
+let pp_block_kind fmt kind =
+  match kind with
+  | Safe -> Format.fprintf fmt "safe"
+  | Potentially_unsafe -> Format.fprintf fmt "potentially unsafe"
+  | Unsafe -> Format.fprintf fmt "unsafe"
+
+let pp_block_info fmt {block_hash; round; level; kind} =
+  Format.fprintf
+    fmt
+    "Block: %a Level: %d, Round: %d, Classified as: %a"
+    Block_hash.pp
+    block_hash
+    round
+    level
+    pp_block_kind
+    kind
+
 type error +=
   | Invalid_positive_int_parameter of string
   | Invalid_protocol_parameter of string
@@ -145,22 +181,42 @@ let min_block_level_arg =
     ~placeholder:"min-block-level"
     positive_int_parameter
 
+let classify_block ~min_unsafe_round ~min_maybe_unsafe_round block =
+  let level = Int32.to_int @@ Store.Block.level block in
+  let fitness = Store.Block.fitness block in
+  (* Fitness = [consensus_number, block_level, opt(locked_round), pred_round, round] *)
+  let round_idx = 4 in
+  let round =
+    match List.nth fitness round_idx with
+    | Some round ->
+        let (`Hex round) = Hex.of_bytes round in
+        int_of_string round
+    | None ->
+        raise
+          (Invalid_argument
+             ("No valid round was found for block at level: "
+            ^ string_of_int level))
+  in
+  let block_kind =
+    if round >= min_unsafe_round then Unsafe
+    else if round >= min_maybe_unsafe_round then Potentially_unsafe
+    else Safe
+  in
+  {block_hash = Store.Block.hash block; round; level; kind = block_kind}
+
 let run_safety_check_experiment chain_store current_head protocol_hash_opt
     min_unsafe_round max_maybe_unsafe_ratio min_maybe_unsafe_round
     min_block_level_opt =
   let open Lwt_result_syntax in
-  let unsafe_blocks = ref 0 in
-  let is_network_safe = ref true in
-  let current_head_level = Int32.to_int @@ Store.Block.level current_head in
-
   (* [check_safety] block maybe_unsafe_blocks - check whether [block] has safe
      round and aggregates in [maybe_unsafe_blocks] the "maybe safe" blocks *)
-  let rec check_safety block maybe_unsafe_blocks =
+  let rec check_safety block block_info_map =
     let*! current_protocol_hash =
       Store.Block.protocol_hash_exn chain_store block
     in
-    let level = Int32.to_int @@ Store.Block.level block in
-
+    let block_info =
+      classify_block ~min_unsafe_round ~min_maybe_unsafe_round block
+    in
     let protocol_should_check_block =
       match protocol_hash_opt with
       | None -> true
@@ -170,53 +226,33 @@ let run_safety_check_experiment chain_store current_head protocol_hash_opt
     let level_should_check_block =
       match min_block_level_opt with
       | None -> true
-      | Some min_block_level -> level >= min_block_level
+      | Some min_block_level -> block_info.level >= min_block_level
     in
     let should_check_block =
       protocol_should_check_block && level_should_check_block
     in
 
     if should_check_block then (
-      let fitness = Store.Block.fitness block in
-      (* Fitness = [consensus_number, block_level, opt(locked_round), pred_round, round] *)
-      let round_idx = 4 in
-      let round_int =
-        match List.nth fitness round_idx with
-        | Some round ->
-            let (`Hex round) = Hex.of_bytes round in
-            int_of_string round
-        | None ->
-            raise
-              (Invalid_argument
-                 ("No valid round was found for block at level: "
-                ^ string_of_int level))
-      in
-
-      if round_int >= min_unsafe_round then (
-        unsafe_blocks := !unsafe_blocks + 1 ;
-        is_network_safe := false ;
-        Format.printf
-          "Block %s at level %d has round %d, greater or equal to \
-           min_unsafe_round = %d.@."
-          (Block_hash.to_b58check (Store.Block.hash block))
-          level
-          round_int
-          min_unsafe_round) ;
-
-      let maybe_unsafe_blocks =
-        if round_int >= min_maybe_unsafe_round then maybe_unsafe_blocks + 1
-        else maybe_unsafe_blocks
+      let block_info_map =
+        Block_kind_map.update
+          block_info.kind
+          (function
+            | None -> Some [block_info]
+            | Some blocks_info -> Some (block_info :: blocks_info))
+          block_info_map
       in
 
       let*! predecessor_block =
         Store.Block.read_predecessor chain_store block
       in
       match predecessor_block with
-      | Ok predecessor_block ->
-          check_safety predecessor_block maybe_unsafe_blocks
+      | Ok predecessor_block -> check_safety predecessor_block block_info_map
       | Error _ ->
-          Format.printf "No predecessor for block at level: %d@." level ;
-          return (maybe_unsafe_blocks, level))
+          Format.printf
+            "Stopping block classification. No predecessor for block at level: \
+             %d@."
+            block_info.level ;
+          return block_info_map)
     else (
       if not protocol_should_check_block then
         Format.printf
@@ -225,52 +261,79 @@ let run_safety_check_experiment chain_store current_head protocol_hash_opt
           current_protocol_hash ;
 
       if not level_should_check_block then
-        Format.printf "Found block level: %d@." level ;
-      Format.printf "So we stopped.@." ;
+        Format.printf
+          "Stopping block classification.Found block level: %d@."
+          block_info.level ;
 
-      return (maybe_unsafe_blocks, level))
+      return block_info_map)
   in
 
   Format.printf "Start safety checking:@." ;
-  let* maybe_unsafe_blocks, last_block_level = check_safety current_head 0 in
-  let total_number_of_blocks = current_head_level - last_block_level + 1 in
+  let* blocks_info = check_safety current_head Block_kind_map.empty in
+  let total_number_of_blocks =
+    blocks_info |> Block_kind_map.to_seq |> List.of_seq |> List.map snd
+    |> List.flatten |> List.length
+  in
+  let maybe_unsafe_blocks =
+    Block_kind_map.find Potentially_unsafe blocks_info
+    |> Option.value ~default:[]
+  in
+  let unsafe_blocks =
+    Block_kind_map.find Unsafe blocks_info |> Option.value ~default:[]
+  in
+
+  Format.printf
+    "The following blocks have been found to be potentially unsafe (round >= \
+     %d): .@."
+    min_maybe_unsafe_round ;
+  List.iter
+    (fun block_info -> Format.printf "%a.@." pp_block_info block_info)
+    maybe_unsafe_blocks ;
+
+  Format.printf
+    "The following blocks have been found to be unsafe (round >= %d): .@."
+    min_unsafe_round ;
+  List.iter
+    (fun block_info -> Format.printf "%a.@." pp_block_info block_info)
+    unsafe_blocks ;
+
   Format.printf "Total number of blocks checked: %d.@." total_number_of_blocks ;
 
+  let unsafe_blocks_number = List.length unsafe_blocks in
+  let either_unsafe_or_potentially_unsafe_blocks_number =
+    unsafe_blocks_number + List.length maybe_unsafe_blocks
+  in
+  let unsafe_blocks_ratio =
+    Int.to_float unsafe_blocks_number
+    *. 100.
+    /. Int.to_float total_number_of_blocks
+  in
+  let either_unsafe_or_potentially_unsafe_blocks_ratio =
+    Int.to_float either_unsafe_or_potentially_unsafe_blocks_number
+    *. 100.
+    /. Int.to_float total_number_of_blocks
+  in
+  Format.printf
+    "Blocks classified as unsafe (round >= %d): %d (%f%%).@."
+    min_unsafe_round
+    unsafe_blocks_number
+    unsafe_blocks_ratio ;
+  Format.printf
+    "Blocks classified as either unsafe or potentially unsafe (round >= %d): \
+     %d (%f%%).@."
+    min_maybe_unsafe_round
+    either_unsafe_or_potentially_unsafe_blocks_number
+    either_unsafe_or_potentially_unsafe_blocks_ratio ;
   (* Check that there are no more than [max_maybe_unsafe_ratio]% of blocks where
      consensus was reached at round = [min_maybe_unsafe_round] *)
-  if maybe_unsafe_blocks * 100 > total_number_of_blocks * max_maybe_unsafe_ratio
-  then (
-    is_network_safe := false ;
-    Format.printf
-      "More than %d%% blocks have round = %d.@."
-      max_maybe_unsafe_ratio
-      min_maybe_unsafe_round ;
-    Format.printf
-      "Number of blocks with round %d : %d.@."
-      min_maybe_unsafe_round
-      maybe_unsafe_blocks ;
-    Format.printf
-      "Percentage of blocks with round %d : %f%% @."
-      min_maybe_unsafe_round
-      (Int.to_float maybe_unsafe_blocks
-      *. 100.
-      /. Int.to_float total_number_of_blocks)) ;
-
-  if !is_network_safe then
-    Format.printf "Experiment finished: Network safety result = TRUE.@."
-  else (
-    Format.printf
-      "Number of blocks with round at least %d : %d.@."
-      min_unsafe_round
-      !unsafe_blocks ;
-    Format.printf
-      "Percentage of blocks with round at least %d : %f%% @."
-      min_unsafe_round
-      (Int.to_float !unsafe_blocks
-      *. 100.
-      /. Int.to_float total_number_of_blocks) ;
-    Format.printf "Experiment finished: Network safety result = FALSE.@.") ;
-
+  let is_network_safe =
+    unsafe_blocks_number == 0
+    && either_unsafe_or_potentially_unsafe_blocks_number * 100
+       > total_number_of_blocks * max_maybe_unsafe_ratio
+  in
+  Format.printf
+    "Experiment finished: Network safety result = %b.@."
+    is_network_safe ;
   return_unit
 
 let commands =
