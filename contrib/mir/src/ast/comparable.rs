@@ -14,6 +14,7 @@ impl PartialOrd for TypedValue {
             (Option(x), Option(y)) => x.as_deref().partial_cmp(&y.as_deref()),
             (Or(x), Or(y)) => x.as_ref().partial_cmp(y.as_ref()),
             (Address(l), Address(r)) => l.partial_cmp(r),
+            (ChainId(l), ChainId(r)) => l.partial_cmp(r),
             _ => None,
         }
     }
@@ -28,6 +29,8 @@ impl Ord for TypedValue {
 
 #[cfg(test)]
 mod tests {
+    use tezos_crypto_rs::hash::HashTrait;
+
     use super::*;
 
     #[test]
@@ -126,6 +129,29 @@ mod tests {
 
         for (i, addr_i) in ordered_addrs.iter().enumerate() {
             for (j, addr_j) in ordered_addrs.iter().enumerate() {
+                assert_eq!(addr_i.partial_cmp(addr_j), i.partial_cmp(&j));
+                assert_eq!(addr_i.cmp(addr_j), i.cmp(&j));
+            }
+        }
+    }
+
+    #[test]
+    /// checks that an array of chain ids is sorted without a priori assuming
+    /// that the comparison operator on chain ids is transitive.
+    fn compare_chain_ids() {
+        // ordering was verified against octez-client
+        let ordered_chain_ids = [
+            "00000000", "00000001", "00000002", "00000100", "00000200", "01020304", "a0b0c0d0",
+            "a1b2c3d4", "ffffffff",
+        ]
+        .map(|x| {
+            TypedValue::ChainId(
+                tezos_crypto_rs::hash::ChainId::try_from_bytes(&hex::decode(x).unwrap()).unwrap(),
+            )
+        });
+
+        for (i, addr_i) in ordered_chain_ids.iter().enumerate() {
+            for (j, addr_j) in ordered_chain_ids.iter().enumerate() {
                 assert_eq!(addr_i.partial_cmp(addr_j), i.partial_cmp(&j));
                 assert_eq!(addr_i.cmp(addr_j), i.cmp(&j));
             }
