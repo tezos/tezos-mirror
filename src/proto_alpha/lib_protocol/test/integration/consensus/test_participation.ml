@@ -51,7 +51,10 @@ let bake_and_attest_once (_b_pred, b_cur) baker attester =
   | Some (delegate, _slots) ->
       let*?@ round = Block.get_round b_cur in
       Op.attestation ~round ~delegate b_cur >>=? fun attestation ->
-      Block.bake ~policy:(By_account baker) ~operation:attestation b_cur
+      Block.bake_with_metadata
+        ~policy:(By_account baker)
+        ~operation:attestation
+        b_cur
 
 (** We test that:
   - a delegate that participates enough, gets its attesting rewards at the end of the cycle,
@@ -87,9 +90,9 @@ let test_participation ~sufficient_participation () =
      consider baking rewards for [del2]. Delegate [del2] attests only
      if the target [minimal_nb_active_slots] is not reached; for the
      rest, it is [del1] that attests. *)
-  let* pred_b, b, _ =
+  let* pred_b, b, _, last_del2_autostaked =
     List.fold_left_es
-      (fun (b_pred, b_crt, attesting_power) level ->
+      (fun (b_pred, b_crt, attesting_power, _last_del2_autostaked) level ->
         let int_level = Int32.of_int level in
         let*?@ level = Raw_level.of_int32 int_level in
         let* attesting_power_for_level =
@@ -102,9 +105,12 @@ let test_participation ~sufficient_participation () =
           then (del2, attesting_power + attesting_power_for_level)
           else (del1, attesting_power)
         in
-        let* b = bake_and_attest_once (b_pred, b_crt) del1 attester in
-        return (b_crt, b, new_attesting_power))
-      (b0, b1, 0)
+        let* b, (metadata, _) =
+          bake_and_attest_once (b_pred, b_crt) del1 attester
+        in
+        let autostaked = Block.autostaked_opt del2 metadata in
+        return (b_crt, b, new_attesting_power, autostaked))
+      (b0, b1, 0, None)
       (2 -- (blocks_per_cycle - 1))
   in
   let* bal2_at_pred_b =
@@ -128,8 +134,13 @@ let test_participation ~sufficient_participation () =
     in
     Tez.to_mutez t
   in
+  let autostaked =
+    Tez.to_mutez @@ Option.value ~default:Tez.zero last_del2_autostaked
+  in
   let attesting_rewards = if sufficient_participation then er else 0L in
-  let expected_bal2_at_b = Int64.add bal2_at_pred_b attesting_rewards in
+  let expected_bal2_at_b =
+    Int64.(sub (add bal2_at_pred_b attesting_rewards) autostaked)
+  in
   Assert.equal_int64 ~loc:__LOC__ bal2_at_b expected_bal2_at_b
 
 (* We bake and attest with 1 out of 2 accounts; we monitor the result
@@ -204,7 +215,7 @@ let test_participation_rpc () =
             info.expected_attesting_rewards
             attesting_rewards
         in
-        let* b = bake_and_attest_once (b_pred, b_crt) del1 del1 in
+        let* b, _ = bake_and_attest_once (b_pred, b_crt) del1 del1 in
         (* [level_int] is the level of [b_crt] *)
         let*?@ level = level_int |> Int32.of_int |> Raw_level.of_int32 in
         let* attesting_power =
