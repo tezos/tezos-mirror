@@ -337,6 +337,7 @@ type 'accounts init :=
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
+  ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

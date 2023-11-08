@@ -144,6 +144,7 @@ val genesis :
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
+  ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
@@ -395,6 +396,7 @@ val prepare_initial_context_params :
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
+  ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )
