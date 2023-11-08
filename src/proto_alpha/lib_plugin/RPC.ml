@@ -3684,6 +3684,8 @@ module Attestation_rights = struct
 
     let attestation_path = RPC_path.(path / "attestation_rights")
 
+    let endorsing_path = RPC_path.(path / "endorsing_rights")
+
     type attestation_rights_query = {
       levels : Raw_level.t list;
       cycle : Cycle.t option;
@@ -3724,6 +3726,32 @@ module Attestation_rights = struct
         ~query:attestation_rights_query
         ~output:(list (encoding ~use_legacy_attestation_name:false))
         attestation_path
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5156
+       endorsing_rights RPC should be removed once the depreciation period
+       will be over *)
+    let endorsing_rights =
+      RPC_service.get_service
+        ~description:
+          "Deprecated: use `attestation_rights` instead.\n\
+           Retrieves the delegates allowed to endorse a block.\n\
+           By default, it gives the endorsing power for delegates that have at \
+           least one endorsing slot for the next block.\n\
+           Parameters `level` and `cycle` can be used to specify the (valid) \
+           level(s) in the past or future at which the endorsing rights have \
+           to be returned. Parameter `delegate` can be used to restrict the \
+           results to the given delegates.\n\
+           Parameter `consensus_key` can be used to restrict the results to \
+           the given consensus_keys. \n\
+           Returns the smallest endorsing slots and the endorsing power. Also \
+           returns the minimal timestamp that corresponds to endorsing at the \
+           given level. The timestamps are omitted for levels in the past, and \
+           are only estimates for levels higher that the next block's, based \
+           on the hypothesis that all predecessor blocks were baked at the \
+           first round."
+        ~query:attestation_rights_query
+        ~output:(list (encoding ~use_legacy_attestation_name:true))
+        endorsing_path
   end
 
   let attestation_rights_at_level ctxt level =
@@ -3794,6 +3822,8 @@ module Attestation_rights = struct
 
   let register () =
     Registration.register0 ~chunked:true S.attestation_rights (fun ctxt q () ->
+        get_attestation_rights ctxt q) ;
+    Registration.register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
         get_attestation_rights ctxt q)
 
   let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(consensus_keys = [])
