@@ -152,7 +152,7 @@ pub mod interpret_cost {
     use checked::Checked;
 
     use super::{AsGasCost, OutOfGas};
-    use crate::ast::TypedValue;
+    use crate::ast::{Or, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -246,6 +246,7 @@ pub mod interpret_cost {
         let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: usize = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
+        let cmp_or = Checked::from(10u32);
         Ok(match (v1, v2) {
             (V::Nat(l), V::Nat(r)) => {
                 // NB: eventually when using BigInts, use BigInt::bits() &c
@@ -269,6 +270,13 @@ pub mod interpret_cost {
             .as_gas_cost()?,
             (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
             (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
+            (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
+                (Or::Left(x), Or::Left(y)) => cmp_or + compare(x, y)?,
+                (Or::Right(x), Or::Right(y)) => cmp_or + compare(x, y)?,
+                (Or::Left(_), Or::Right(_)) => cmp_or,
+                (Or::Right(_), Or::Left(_)) => cmp_or,
+            }
+            .as_gas_cost()?,
             _ => unreachable!("Comparison of incomparable values"),
         })
     }
