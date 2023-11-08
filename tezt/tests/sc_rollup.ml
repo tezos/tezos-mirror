@@ -1054,12 +1054,18 @@ let test_rollup_node_boots_into_initial_state ~kind =
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+  let* ticks =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
   Check.(ticks = 0)
     Check.int
     ~error_msg:"Unexpected initial tick count (%L = %R)" ;
 
-  let* status = Sc_rollup_helpers.status sc_rollup_node in
+  let* status =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_status ()
+  in
   let expected_status =
     match kind with
     | "arith" -> "Halted"
@@ -1112,7 +1118,10 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       Sc_rollup_node.RPC.call sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
-    let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+    let* prev_ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+    in
     let message = sf "%d %d + value" i ((i + 2) * 2) in
     let* () =
       match forwarder with
@@ -1181,7 +1190,10 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     Check.(state_hash <> prev_state_hash)
       Check.string
       ~error_msg:"State hash has not changed (%L <> %R)" ;
-    let* ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+    let* ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+    in
     Check.(ticks >= prev_ticks)
       Check.int
       ~error_msg:"Tick counter did not advance (%L >= %R)" ;
@@ -3788,7 +3800,10 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     let parameters = "37" in
     let message_index = 0 in
     let check_expected_outbox () =
-      let* outbox = Sc_rollup_helpers.outbox ~outbox_level rollup_node in
+      let* outbox =
+        Sc_rollup_node.RPC.call rollup_node
+        @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level ()
+      in
       Log.info "Outbox is %s" (JSON.encode outbox) ;
 
       match expected_error with
@@ -4217,9 +4232,10 @@ let test_rpcs ~kind
       ["global"; "block"; "head"; "state_hash"]
   in
   let* _outbox =
-    Sc_rollup_helpers.outbox
-      ~outbox_level:l2_finalied_block_level
-      sc_rollup_node
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_outbox
+         ~outbox_level:l2_finalied_block_level
+         ()
   in
   let*! _head =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_head"]
@@ -4287,11 +4303,11 @@ let test_messages_processed_by_commitment ~kind =
   let* {commitment = {inbox_level; _}; hash = _} =
     get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-
   let* current_level =
-    Sc_rollup_helpers.state_current_level
-      ~block:(string_of_int inbox_level)
-      sc_rollup_node
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_current_level
+         ~block:(string_of_int inbox_level)
+         ()
   in
   Check.((current_level = inbox_level) int)
     ~error_msg:

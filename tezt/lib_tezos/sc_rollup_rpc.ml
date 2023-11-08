@@ -14,3 +14,18 @@ let get_global_block_ticks ?(block = "head") () =
 
 let get_global_block_state_hash ?(block = "head") () =
   make GET ["global"; "block"; block; "state_hash"] JSON.as_string
+
+let get_global_block_total_ticks ?(block = "head") () =
+  make GET ["global"; "block"; block; "total_ticks"] JSON.as_int
+
+let get_global_block_state_current_level ?(block = "head") () =
+  make GET ["global"; "block"; block; "state_current_level"] JSON.as_int
+
+let get_global_block_status ?(block = "head") () =
+  make GET ["global"; "block"; block; "status"] JSON.as_string
+
+let get_global_block_outbox ?(block = "cemented") ~outbox_level () =
+  make
+    GET
+    ["global"; "block"; block; "outbox"; string_of_int outbox_level; "messages"]
+    Fun.id

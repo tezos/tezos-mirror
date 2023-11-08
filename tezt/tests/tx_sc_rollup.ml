@@ -252,7 +252,10 @@ let assert_state_changed ?block sc_rollup_node prev_state_hash =
   Lwt.return_unit
 
 let assert_ticks_advanced ?block sc_rollup_node prev_ticks =
-  let* ticks = Sc_rollup_helpers.total_ticks ?block sc_rollup_node in
+  let* ticks =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ?block ()
+  in
   Check.(ticks > prev_ticks)
     Check.int
     ~error_msg:"Tick counter did not advance (%L > %R)" ;
@@ -465,7 +468,10 @@ let tx_kernel_e2e setup protocol =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_state_hash ()
   in
-  let* prev_ticks = Sc_rollup_helpers.total_ticks sc_rollup_node in
+  let* prev_ticks =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
   let* () = send_message client (sf "hex:[%S]" withdraw_message) in
   let level = level + 1 in
   let withdrawal_level = level in
@@ -501,7 +507,8 @@ let tx_kernel_e2e setup protocol =
 
   (* EXECUTE withdrawal *)
   let* outbox =
-    Sc_rollup_helpers.outbox ~outbox_level:withdrawal_level sc_rollup_node
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:withdrawal_level ()
   in
   Log.info "Outbox is %s" @@ JSON.encode outbox ;
   let execute_outbox_proof ~message_index =
