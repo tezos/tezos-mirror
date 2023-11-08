@@ -596,17 +596,21 @@ module Version = struct
    * - 5: snapshot exported with new protocol tables and "à la GC"
        context (storage 2.0)
    * - 6: new context representation introduced by irmin 3.7.2
+   * - 7: fix tar snapshots corrupted generation
    *)
 
   (* Used for old snapshot format versions *)
   let legacy_version = 4
 
-  let current_version = 6
+  let current_version = 7
 
   (* List of versions that are supported *)
   let supported_versions =
     [
-      (legacy_version, `Legacy_format); (5, `Legacy); (current_version, `Current);
+      (legacy_version, `Legacy_format);
+      (5, `Legacy);
+      (6, `Legacy);
+      (current_version, `Current);
     ]
 
   let is_supported version =
