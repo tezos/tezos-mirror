@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = Prod | Dev
-
 type log_filter_config = {
   max_nb_blocks : int;
   max_nb_logs : int;
@@ -18,7 +16,7 @@ type t = {
   rpc_port : int;
   debug : bool;
   rollup_node_endpoint : Uri.t;
-  version : version;
+  devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
   verbose : bool;
@@ -42,7 +40,7 @@ let default =
     rpc_port = default_rpc_port;
     debug = true;
     rollup_node_endpoint = Uri.empty;
-    version = Prod;
+    devmode = false;
     cors_origins = [];
     cors_headers = [];
     verbose = false;
@@ -61,24 +59,6 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
        (dft "max_nb_logs" int31 default_filter_config.max_nb_logs)
        (dft "chunk_size" int31 default_filter_config.chunk_size))
 
-let version_encoding : version Data_encoding.t =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"Prod"
-        (Tag 0)
-        unit
-        (function Prod -> Some () | _ -> None)
-        (fun () -> Prod);
-      case
-        ~title:"Dev"
-        (Tag 1)
-        unit
-        (function Dev -> Some () | _ -> None)
-        (fun () -> Dev);
-    ]
-
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -87,7 +67,7 @@ let encoding : t Data_encoding.t =
            rpc_port;
            debug;
            rollup_node_endpoint;
-           version;
+           devmode;
            cors_origins;
            cors_headers;
            verbose;
@@ -97,7 +77,7 @@ let encoding : t Data_encoding.t =
         rpc_port,
         debug,
         Uri.to_string rollup_node_endpoint,
-        version,
+        devmode,
         cors_origins,
         cors_headers,
         verbose,
@@ -106,7 +86,7 @@ let encoding : t Data_encoding.t =
            rpc_port,
            debug,
            rollup_node_endpoint,
-           version,
+           devmode,
            cors_origins,
            cors_headers,
            verbose,
@@ -116,7 +96,7 @@ let encoding : t Data_encoding.t =
         rpc_port;
         debug;
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
-        version;
+        devmode;
         cors_origins;
         cors_headers;
         verbose;
@@ -130,7 +110,7 @@ let encoding : t Data_encoding.t =
           "rollup_node_endpoint"
           string
           (Uri.to_string default.rollup_node_endpoint))
-       (dft "version" version_encoding default.version)
+       (dft "devmode" bool default.devmode)
        (dft "cors_origins" (list string) default.cors_origins)
        (dft "cors_headers" (list string) default.cors_headers)
        (dft "verbose" bool default.verbose)
@@ -156,21 +136,21 @@ let load ~data_dir =
   config
 
 module Cli = struct
-  let create ?version ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
+  let create ~devmode ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
       ?log_filter ~rollup_node_endpoint ~verbose () =
     {
       rpc_addr = Option.value ~default:default.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default.rpc_port rpc_port;
       debug = Option.value ~default:default.debug debug;
       rollup_node_endpoint;
-      version = Option.value ~default:default.version version;
+      devmode;
       cors_origins = Option.value ~default:default.cors_origins cors_origins;
       cors_headers = Option.value ~default:default.cors_headers cors_headers;
       verbose;
       log_filter = Option.value ~default:default_filter_config log_filter;
     }
 
-  let patch_configuration_from_args ?version ?rpc_addr ?rpc_port ?debug
+  let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?debug
       ?cors_origins ?cors_headers ?log_filter ~rollup_node_endpoint ~verbose
       configuration =
     {
@@ -178,7 +158,7 @@ module Cli = struct
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
       debug = Option.value ~default:configuration.debug debug;
       rollup_node_endpoint;
-      version = Option.value ~default:configuration.version version;
+      devmode;
       cors_origins =
         Option.value ~default:configuration.cors_origins cors_origins;
       cors_headers =
@@ -187,7 +167,7 @@ module Cli = struct
       log_filter = Option.value ~default:default_filter_config log_filter;
     }
 
-  let create_or_read_config ~data_dir ?version ?rpc_addr ?rpc_port ?debug
+  let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?debug
       ?cors_origins ?cors_headers ?log_filter ~rollup_node_endpoint ~verbose ()
       =
     let open Lwt_result_syntax in
@@ -212,7 +192,7 @@ module Cli = struct
       let* configuration = load ~data_dir in
       let configuration =
         patch_configuration_from_args
-          ?version
+          ~devmode
           ?rpc_addr
           ?rpc_port
           ?debug
@@ -227,7 +207,7 @@ module Cli = struct
     else
       let config =
         create
-          ?version
+          ~devmode
           ?rpc_addr
           ?rpc_port
           ?debug

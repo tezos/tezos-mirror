@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = Prod | Dev
-
 type log_filter_config = {
   max_nb_blocks : int;  (** Maximum block range for [get_logs]. *)
   max_nb_logs : int;  (** Maximum number of logs that [get_logs] can return. *)
@@ -21,7 +19,7 @@ type t = {
   rpc_port : int;
   debug : bool;
   rollup_node_endpoint : Uri.t;
-  version : version;
+  devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
   verbose : bool;
@@ -48,7 +46,7 @@ val load : data_dir:string -> t tzresult Lwt.t
 
 module Cli : sig
   val create :
-    ?version:version ->
+    devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?debug:bool ->
@@ -62,7 +60,7 @@ module Cli : sig
 
   val create_or_read_config :
     data_dir:string ->
-    ?version:version ->
+    devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?debug:bool ->
