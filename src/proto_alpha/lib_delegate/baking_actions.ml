@@ -430,68 +430,96 @@ let sign_preattestations state ~preattestations =
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
-  List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
-      let*! () = Events.(emit signing_preattestation delegate) in
-      let shell =
-        (* The branch is the latest finalized block. *)
-        {
-          Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.shell.predecessor;
-        }
-      in
-      let contents = Single (Preattestation consensus_content) in
+  (* Hypothesis: all preattestations have the same round and level *)
+  match preattestations with
+  | [] -> return_nil
+  | (_, (consensus_content : consensus_content)) :: _ ->
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
-      let sk_uri = consensus_key.secret_key_uri in
-      let* may_sign =
-        cctxt#with_lock (fun () ->
-            let* may_sign =
-              Baking_highwatermarks.may_sign_preattestation
-                cctxt
-                block_location
-                ~delegate:consensus_key.public_key_hash
-                ~level
-                ~round
-            in
-            match may_sign with
-            | true ->
-                let* () =
-                  Baking_highwatermarks.record_preattestation
-                    cctxt
-                    block_location
-                    ~delegate:consensus_key.public_key_hash
-                    ~level
-                    ~round
+      (* Filter all operations that don't satisfy the highwatermark *)
+      let* authorized_preattestations =
+        cctxt#with_lock @@ fun () ->
+        let* highwatermarks = Baking_highwatermarks.load cctxt block_location in
+        let*! authorized_preattestations =
+          List.filter_s
+            (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
+              let may_sign =
+                Baking_highwatermarks.may_sign_preattestation
+                  highwatermarks
+                  ~delegate:consensus_key.public_key_hash
+                  ~level
+                  ~round
+              in
+              if may_sign || state.global_state.config.force then
+                Lwt.return_true
+              else
+                let err =
+                  Baking_highwatermarks.Block_previously_preattested
+                    {round; level}
                 in
-                return_true
-            | false -> return state.global_state.config.force)
+                let*! () =
+                  Events.(emit skipping_preattestation (delegate, [err]))
+                in
+                Lwt.return_false)
+            preattestations
+        in
+        (* Record all preattestations new highwatermarks as one batch *)
+        let* () =
+          let delegates =
+            List.map
+              (fun ((ck, _), _) -> ck.public_key_hash)
+              authorized_preattestations
+          in
+          Baking_highwatermarks.record_all_preattestations
+            highwatermarks
+            cctxt
+            block_location
+            ~delegates
+            ~level
+            ~round
+        in
+        return authorized_preattestations
       in
-      let*! signature =
-        if may_sign then
-          let unsigned_operation = (shell, Contents_list contents) in
+      List.filter_map_es
+        (fun (((consensus_key, _delegate_pkh) as delegate), consensus_content) ->
+          let*! () = Events.(emit signing_preattestation delegate) in
+          let shell =
+            (* The branch is the latest finalized block. *)
+            {
+              Tezos_base.Operation.branch =
+                state.level_state.latest_proposal.predecessor.shell.predecessor;
+            }
+          in
+          let contents =
+            (* No preattestations are included *)
+            Single (Preattestation consensus_content)
+          in
+          let level = Raw_level.to_int32 consensus_content.level in
+          let round = consensus_content.round in
+          let sk_uri = consensus_key.secret_key_uri in
           let watermark = Operation.(to_watermark (Preattestation chain_id)) in
+          let unsigned_operation = (shell, Contents_list contents) in
           let unsigned_operation_bytes =
             Data_encoding.Binary.to_bytes_exn
-              Operation.unsigned_encoding_with_legacy_attestation_name
+              Operation.unsigned_encoding
               unsigned_operation
           in
-          Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-        else
-          tzfail
-            (Baking_highwatermarks.Block_previously_preattested {round; level})
-      in
-      match signature with
-      | Error err ->
-          let*! () = Events.(emit skipping_preattestation (delegate, err)) in
-          return_none
-      | Ok signature ->
-          let protocol_data =
-            Operation_data {contents; signature = Some signature}
+          let*! signature =
+            Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
           in
-          let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation, level, round))
-    preattestations
+          match signature with
+          | Error err ->
+              let*! () =
+                Events.(emit skipping_preattestation (delegate, err))
+              in
+              return_none
+          | Ok signature ->
+              let protocol_data =
+                Operation_data {contents; signature = Some signature}
+              in
+              let operation : Operation.packed = {shell; protocol_data} in
+              return_some (delegate, operation, level, round))
+        authorized_preattestations
 
 let inject_preattestations state ~preattestations =
   let open Lwt_result_syntax in
@@ -527,71 +555,93 @@ let sign_attestations state ~attestations =
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
-  List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
-      let*! () = Events.(emit signing_attestation delegate) in
-      let shell =
-        (* The branch is the latest finalized block. *)
-        {
-          Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.shell.predecessor;
-        }
-      in
-      let contents =
-        (* No preattestations are included *)
-        Single (Attestation consensus_content)
-      in
+  (* Hypothesis: all attestations have the same round and level *)
+  match attestations with
+  | [] -> return_nil
+  | (_, (consensus_content : consensus_content)) :: _ ->
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
-      let sk_uri = consensus_key.secret_key_uri in
-      let* may_sign =
-        cctxt#with_lock (fun () ->
-            let* may_sign =
-              Baking_highwatermarks.may_sign_attestation
-                cctxt
-                block_location
-                ~delegate:consensus_key.public_key_hash
-                ~level
-                ~round
-            in
-            match may_sign with
-            | true ->
-                let* () =
-                  Baking_highwatermarks.record_attestation
-                    cctxt
-                    block_location
-                    ~delegate:consensus_key.public_key_hash
-                    ~level
-                    ~round
+      (* Filter all operations that don't satisfy the highwatermark *)
+      let* authorized_attestations =
+        cctxt#with_lock @@ fun () ->
+        let* highwatermarks = Baking_highwatermarks.load cctxt block_location in
+        let*! authorized_attestations =
+          List.filter_s
+            (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
+              let may_sign =
+                Baking_highwatermarks.may_sign_attestation
+                  highwatermarks
+                  ~delegate:consensus_key.public_key_hash
+                  ~level
+                  ~round
+              in
+              if may_sign || state.global_state.config.force then
+                Lwt.return_true
+              else
+                let err =
+                  Baking_highwatermarks.Block_previously_attested {round; level}
                 in
-                return_true
-            | false -> return state.global_state.config.force)
+                let*! () =
+                  Events.(emit skipping_attestation (delegate, [err]))
+                in
+                Lwt.return_false)
+            attestations
+        in
+        (* Record all attestations new highwatermarks as one batch *)
+        let* () =
+          let delegates =
+            List.map
+              (fun ((ck, _), _) -> ck.public_key_hash)
+              authorized_attestations
+          in
+          Baking_highwatermarks.record_all_attestations
+            highwatermarks
+            cctxt
+            block_location
+            ~delegates
+            ~level
+            ~round
+        in
+        return authorized_attestations
       in
-      let*! signature =
-        if may_sign then
+      List.filter_map_es
+        (fun (((consensus_key, _delegate_pkh) as delegate), consensus_content) ->
+          let*! () = Events.(emit signing_attestation delegate) in
+          let shell =
+            (* The branch is the latest finalized block. *)
+            {
+              Tezos_base.Operation.branch =
+                state.level_state.latest_proposal.predecessor.shell.predecessor;
+            }
+          in
+          let contents =
+            (* No attestations are included *)
+            Single (Attestation consensus_content)
+          in
+          let level = Raw_level.to_int32 consensus_content.level in
+          let round = consensus_content.round in
+          let sk_uri = consensus_key.secret_key_uri in
           let watermark = Operation.(to_watermark (Attestation chain_id)) in
           let unsigned_operation = (shell, Contents_list contents) in
           let unsigned_operation_bytes =
             Data_encoding.Binary.to_bytes_exn
-              Operation.unsigned_encoding_with_legacy_attestation_name
+              Operation.unsigned_encoding
               unsigned_operation
           in
-          Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-        else
-          tzfail
-            (Baking_highwatermarks.Block_previously_attested {round; level})
-      in
-      match signature with
-      | Error err ->
-          let*! () = Events.(emit skipping_attestation (delegate, err)) in
-          return_none
-      | Ok signature ->
-          let protocol_data =
-            Operation_data {contents; signature = Some signature}
+          let*! signature =
+            Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
           in
-          let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation, level, round))
-    attestations
+          match signature with
+          | Error err ->
+              let*! () = Events.(emit skipping_attestation (delegate, err)) in
+              return_none
+          | Ok signature ->
+              let protocol_data =
+                Operation_data {contents; signature = Some signature}
+              in
+              let operation : Operation.packed = {shell; protocol_data} in
+              return_some (delegate, operation, level, round))
+        authorized_attestations
 
 let inject_attestations state ~attestations =
   let open Lwt_result_syntax in

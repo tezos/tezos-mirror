@@ -371,6 +371,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   >>= fun () -> return updated_state
 
 let sign_preendorsements state ~preendorsements =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   (* N.b. signing a lot of operations may take some time *)
@@ -379,60 +380,92 @@ let sign_preendorsements state ~preendorsements =
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
-  List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
-      Events.(emit signing_preendorsement delegate) >>= fun () ->
-      let shell =
-        (* The branch is the latest finalized block. *)
-        {
-          Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.shell.predecessor;
-        }
-      in
-      let contents = Single (Preendorsement consensus_content) in
+  (* Hypothesis: all preendorsements have the same round and level *)
+  match preendorsements with
+  | [] -> return_nil
+  | (_, (consensus_content : consensus_content)) :: _ ->
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
-      let sk_uri = consensus_key.secret_key_uri in
-      cctxt#with_lock (fun () ->
-          Baking_highwatermarks.may_sign_preendorsement
+      (* Filter all operations that don't satisfy the highwatermark *)
+      let* authorized_preendorsements =
+        cctxt#with_lock @@ fun () ->
+        let* highwatermarks = Baking_highwatermarks.load cctxt block_location in
+        let*! authorized_preendorsements =
+          List.filter_s
+            (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
+              let may_sign =
+                Baking_highwatermarks.may_sign_preendorsement
+                  highwatermarks
+                  ~delegate:consensus_key.public_key_hash
+                  ~level
+                  ~round
+              in
+              if may_sign || state.global_state.config.force then
+                Lwt.return_true
+              else
+                let err =
+                  Baking_highwatermarks.Block_previously_preendorsed
+                    {round; level}
+                in
+                let*! () =
+                  Events.(emit skipping_preendorsement (delegate, [err]))
+                in
+                Lwt.return_false)
+            preendorsements
+        in
+        (* Record all preendorsements new highwatermarks as one batch *)
+        let* () =
+          let delegates =
+            List.map
+              (fun ((ck, _), _) -> ck.public_key_hash)
+              authorized_preendorsements
+          in
+          Baking_highwatermarks.record_all_preendorsements
+            highwatermarks
             cctxt
             block_location
-            ~delegate:consensus_key.public_key_hash
+            ~delegates
             ~level
             ~round
-          >>=? function
-          | true ->
-              Baking_highwatermarks.record_preendorsement
-                cctxt
-                block_location
-                ~delegate:consensus_key.public_key_hash
-                ~level
-                ~round
-              >>=? fun () -> return_true
-          | false -> return state.global_state.config.force)
-      >>=? fun may_sign ->
-      (if may_sign then
-       let unsigned_operation = (shell, Contents_list contents) in
-       let watermark = Operation.(to_watermark (Preendorsement chain_id)) in
-       let unsigned_operation_bytes =
-         Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
-           unsigned_operation
-       in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-      else
-        fail (Baking_highwatermarks.Block_previously_preendorsed {round; level}))
-      >>= function
-      | Error err ->
-          Events.(emit skipping_preendorsement (delegate, err)) >>= fun () ->
-          return_none
-      | Ok signature ->
-          let protocol_data =
-            Operation_data {contents; signature = Some signature}
+        in
+        return authorized_preendorsements
+      in
+      List.filter_map_es
+        (fun (((consensus_key, _delegate_pkh) as delegate), consensus_content) ->
+          Events.(emit signing_preendorsement delegate) >>= fun () ->
+          let shell =
+            (* The branch is the latest finalized block. *)
+            {
+              Tezos_base.Operation.branch =
+                state.level_state.latest_proposal.predecessor.shell.predecessor;
+            }
           in
-          let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation, level, round))
-    preendorsements
+          let contents =
+            (* No preendorsements are included *)
+            Single (Preendorsement consensus_content)
+          in
+          let level = Raw_level.to_int32 consensus_content.level in
+          let round = consensus_content.round in
+          let sk_uri = consensus_key.secret_key_uri in
+          let watermark = Operation.(to_watermark (Preendorsement chain_id)) in
+          let unsigned_operation = (shell, Contents_list contents) in
+          let unsigned_operation_bytes =
+            Data_encoding.Binary.to_bytes_exn
+              Operation.unsigned_encoding
+              unsigned_operation
+          in
+          Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+          >>= function
+          | Error err ->
+              Events.(emit skipping_preendorsement (delegate, err))
+              >>= fun () -> return_none
+          | Ok signature ->
+              let protocol_data =
+                Operation_data {contents; signature = Some signature}
+              in
+              let operation : Operation.packed = {shell; protocol_data} in
+              return_some (delegate, operation, level, round))
+        authorized_preendorsements
 
 let inject_preendorsements state ~preendorsements =
   let cctxt = state.global_state.cctxt in
@@ -453,6 +486,7 @@ let inject_preendorsements state ~preendorsements =
     signed_operations
 
 let sign_endorsements state ~endorsements =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   (* N.b. signing a lot of operations may take some time *)
@@ -461,62 +495,91 @@ let sign_endorsements state ~endorsements =
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
-  List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
-      Events.(emit signing_endorsement delegate) >>= fun () ->
-      let shell =
-        (* The branch is the latest finalized block. *)
-        {
-          Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.shell.predecessor;
-        }
-      in
-      let contents =
-        (* No preendorsements are included *)
-        Single (Endorsement consensus_content)
-      in
+  (* Hypothesis: all endorsements have the same round and level *)
+  match endorsements with
+  | [] -> return_nil
+  | (_, (consensus_content : consensus_content)) :: _ ->
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
-      let sk_uri = consensus_key.secret_key_uri in
-      cctxt#with_lock (fun () ->
-          Baking_highwatermarks.may_sign_endorsement
+      (* Filter all operations that don't satisfy the highwatermark *)
+      let* authorized_endorsements =
+        cctxt#with_lock @@ fun () ->
+        let* highwatermarks = Baking_highwatermarks.load cctxt block_location in
+        let*! authorized_endorsements =
+          List.filter_s
+            (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
+              let may_sign =
+                Baking_highwatermarks.may_sign_endorsement
+                  highwatermarks
+                  ~delegate:consensus_key.public_key_hash
+                  ~level
+                  ~round
+              in
+              if may_sign || state.global_state.config.force then
+                Lwt.return_true
+              else
+                let err =
+                  Baking_highwatermarks.Block_previously_endorsed {round; level}
+                in
+                let*! () =
+                  Events.(emit skipping_endorsement (delegate, [err]))
+                in
+                Lwt.return_false)
+            endorsements
+        in
+        (* Record all endorsements new highwatermarks as one batch *)
+        let* () =
+          let delegates =
+            List.map
+              (fun ((ck, _), _) -> ck.public_key_hash)
+              authorized_endorsements
+          in
+          Baking_highwatermarks.record_all_endorsements
+            highwatermarks
             cctxt
             block_location
-            ~delegate:consensus_key.public_key_hash
+            ~delegates
             ~level
             ~round
-          >>=? function
-          | true ->
-              Baking_highwatermarks.record_endorsement
-                cctxt
-                block_location
-                ~delegate:consensus_key.public_key_hash
-                ~level
-                ~round
-              >>=? fun () -> return_true
-          | false -> return state.global_state.config.force)
-      >>=? fun may_sign ->
-      (if may_sign then
-       let watermark = Operation.(to_watermark (Endorsement chain_id)) in
-       let unsigned_operation = (shell, Contents_list contents) in
-       let unsigned_operation_bytes =
-         Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
-           unsigned_operation
-       in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-      else fail (Baking_highwatermarks.Block_previously_endorsed {round; level}))
-      >>= function
-      | Error err ->
-          Events.(emit skipping_endorsement (delegate, err)) >>= fun () ->
-          return_none
-      | Ok signature ->
-          let protocol_data =
-            Operation_data {contents; signature = Some signature}
+        in
+        return authorized_endorsements
+      in
+      List.filter_map_es
+        (fun (((consensus_key, _delegate_pkh) as delegate), consensus_content) ->
+          Events.(emit signing_endorsement delegate) >>= fun () ->
+          let shell =
+            (* The branch is the latest finalized block. *)
+            {
+              Tezos_base.Operation.branch =
+                state.level_state.latest_proposal.predecessor.shell.predecessor;
+            }
           in
-          let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation, level, round))
-    endorsements
+          let contents =
+            (* No endorsements are included *)
+            Single (Endorsement consensus_content)
+          in
+          let level = Raw_level.to_int32 consensus_content.level in
+          let round = consensus_content.round in
+          let sk_uri = consensus_key.secret_key_uri in
+          let watermark = Operation.(to_watermark (Endorsement chain_id)) in
+          let unsigned_operation = (shell, Contents_list contents) in
+          let unsigned_operation_bytes =
+            Data_encoding.Binary.to_bytes_exn
+              Operation.unsigned_encoding
+              unsigned_operation
+          in
+          Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+          >>= function
+          | Error err ->
+              Events.(emit skipping_endorsement (delegate, err)) >>= fun () ->
+              return_none
+          | Ok signature ->
+              let protocol_data =
+                Operation_data {contents; signature = Some signature}
+              in
+              let operation : Operation.packed = {shell; protocol_data} in
+              return_some (delegate, operation, level, round))
+        authorized_endorsements
 
 let inject_endorsements state ~endorsements =
   let cctxt = state.global_state.cctxt in

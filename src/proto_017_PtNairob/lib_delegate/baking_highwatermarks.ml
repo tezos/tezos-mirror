@@ -168,13 +168,11 @@ let may_sign_block cctxt (location : [`Highwatermarks] Baking_files.location)
   load cctxt location >>=? fun all_highwatermarks ->
   return @@ may_sign all_highwatermarks.blocks ~delegate ~level ~round
 
-let may_sign_preendorsement cctxt location ~delegate ~level ~round =
-  load cctxt location >>=? fun all_highwatermarks ->
-  return @@ may_sign all_highwatermarks.preendorsements ~delegate ~level ~round
+let may_sign_preendorsement all_highwatermarks ~delegate ~level ~round =
+  may_sign all_highwatermarks.preendorsements ~delegate ~level ~round
 
-let may_sign_endorsement cctxt location ~delegate ~level ~round =
-  load cctxt location >>=? fun all_highwatermarks ->
-  return @@ may_sign all_highwatermarks.endorsements ~delegate ~level ~round
+let may_sign_endorsement all_highwatermarks ~delegate ~level ~round =
+  may_sign all_highwatermarks.endorsements ~delegate ~level ~round
 
 let record map ~delegate ~new_level ~new_round =
   DelegateMap.update
@@ -231,3 +229,33 @@ let record_endorsement (cctxt : #Protocol_client_context.full) location
     cctxt
     filename
     {highwatermarks with endorsements = new_endorsements}
+
+let record_all_preendorsements all_highwatermarks cctxt location ~delegates
+    ~level ~round =
+  let new_preendorsements =
+    List.fold_left
+      (fun map delegate ->
+        record map ~delegate ~new_level:level ~new_round:round)
+      all_highwatermarks.preendorsements
+      delegates
+  in
+  let filename = Baking_files.filename location in
+  save_highwatermarks
+    cctxt
+    filename
+    {all_highwatermarks with preendorsements = new_preendorsements}
+
+let record_all_endorsements all_highwatermarks cctxt location ~delegates ~level
+    ~round =
+  let new_endorsements =
+    List.fold_left
+      (fun map delegate ->
+        record map ~delegate ~new_level:level ~new_round:round)
+      all_highwatermarks.endorsements
+      delegates
+  in
+  let filename = Baking_files.filename location in
+  save_highwatermarks
+    cctxt
+    filename
+    {all_highwatermarks with endorsements = new_endorsements}

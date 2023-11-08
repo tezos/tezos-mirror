@@ -130,8 +130,8 @@ let rec wait_next_event ~timeout loop_state =
     match loop_state.last_get_head_event with
     | None ->
         let t =
-          Lwt_stream.get loop_state.heads_stream >|= fun e ->
-          `New_head_proposal e
+          Lwt_stream.get loop_state.heads_stream >>= fun e ->
+          Lwt.return (`New_head_proposal e)
         in
         loop_state.last_get_head_event <- Some t ;
         t

@@ -71,8 +71,8 @@ let () =
     ~pp:(fun ppf highwatermark ->
       Format.fprintf
         ppf
-        "A preattestaion with a higher watermark than the current one (%a) was \
-         already produced."
+        "A preattestation with a higher watermark than the current one (%a) \
+         was already produced."
         pp_highwatermark
         highwatermark)
     highwatermark_encoding
@@ -195,15 +195,11 @@ let may_sign_block cctxt (location : [`Highwatermarks] Baking_files.location)
   let* all_highwatermarks = load cctxt location in
   return @@ may_sign all_highwatermarks.blocks ~delegate ~level ~round
 
-let may_sign_preattestation cctxt location ~delegate ~level ~round =
-  let open Lwt_result_syntax in
-  let* all_highwatermarks = load cctxt location in
-  return @@ may_sign all_highwatermarks.preattestations ~delegate ~level ~round
+let may_sign_preattestation all_highwatermarks ~delegate ~level ~round =
+  may_sign all_highwatermarks.preattestations ~delegate ~level ~round
 
-let may_sign_attestation cctxt location ~delegate ~level ~round =
-  let open Lwt_result_syntax in
-  let* all_highwatermarks = load cctxt location in
-  return @@ may_sign all_highwatermarks.attestations ~delegate ~level ~round
+let may_sign_attestation all_highwatermarks ~delegate ~level ~round =
+  may_sign all_highwatermarks.attestations ~delegate ~level ~round
 
 let record map ~delegate ~new_level ~new_round =
   DelegateMap.update
@@ -263,3 +259,33 @@ let record_attestation (cctxt : #Protocol_client_context.full) location
     cctxt
     filename
     {highwatermarks with attestations = new_attestations}
+
+let record_all_preattestations all_highwatermarks cctxt location ~delegates
+    ~level ~round =
+  let new_preattestations =
+    List.fold_left
+      (fun map delegate ->
+        record map ~delegate ~new_level:level ~new_round:round)
+      all_highwatermarks.preattestations
+      delegates
+  in
+  let filename = Baking_files.filename location in
+  save_highwatermarks
+    cctxt
+    filename
+    {all_highwatermarks with preattestations = new_preattestations}
+
+let record_all_attestations all_highwatermarks cctxt location ~delegates ~level
+    ~round =
+  let new_attestations =
+    List.fold_left
+      (fun map delegate ->
+        record map ~delegate ~new_level:level ~new_round:round)
+      all_highwatermarks.attestations
+      delegates
+  in
+  let filename = Baking_files.filename location in
+  save_highwatermarks
+    cctxt
+    filename
+    {all_highwatermarks with attestations = new_attestations}
