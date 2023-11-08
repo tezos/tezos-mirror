@@ -81,7 +81,6 @@ pub fn run_test(
 
     for (name, unit) in suit.0.into_iter() {
         println!("Running unit test: {}", name);
-        let mut successful_outcome = true;
         let full_filler_path = "tests/".to_owned() + &unit._info.source;
         println!("Filler source: {}", &full_filler_path);
         let filler_path = Path::new(&full_filler_path);
@@ -154,18 +153,25 @@ pub fn run_test(
                 _ => continue,
             };
 
-            for test in tests.into_iter() {
-                let gas_limit =
-                    *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
+            for test_execution in tests.into_iter() {
+                let gas_limit = *unit
+                    .transaction
+                    .gas_limit
+                    .get(test_execution.indexes.gas)
+                    .unwrap();
                 let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
                 env.tx.gas_limit = gas_limit;
                 env.tx.data = unit
                     .transaction
                     .data
-                    .get(test.indexes.data)
+                    .get(test_execution.indexes.data)
                     .unwrap()
                     .clone();
-                env.tx.value = *unit.transaction.value.get(test.indexes.value).unwrap();
+                env.tx.value = *unit
+                    .transaction
+                    .value
+                    .get(test_execution.indexes.value)
+                    .unwrap();
                 env.tx.transact_to = unit.transaction.to;
 
                 let block_constants = BlockConstants {
@@ -216,30 +222,15 @@ pub fn run_test(
                     Err(e) => println!("\nA test failed due to {:?}", e),
                 }
 
-                // check the state after the execution of the result
-                successful_outcome = match filler_source.clone() {
-                    Some(filler_source) => {
-                        let new_outcome = process(&mut host, filler_source, &spec_name);
-                        // if the outcome was a failure once it will stay a failure
-                        successful_outcome && new_outcome
-                    }
-                    None => {
-                        println!(
-                            "\nNo filler file, the outcome of this test is uncertain."
-                        );
-                        false
-                    }
-                };
-
                 print!("\nFinal check: ");
-                match (&test.expect_exception, &exec_result) {
+                match (&test_execution.expect_exception, &exec_result) {
                     (None, Ok(_)) => println!("No unexpected exception."),
                     (Some(_), Err(_)) => println!("Exception was expected."),
                     _ => {
                         println!("\nSomething unexpected happened for test {}.", name);
                         println!(
                             "Expected exception is the following: {:?}",
-                            test.expect_exception
+                            test_execution.expect_exception
                         );
                         println!(
                             "Furter details on the execution result: {:?}",
@@ -250,27 +241,19 @@ pub fn run_test(
                 println!("\n=======> OK! <=======\n")
             }
 
-            if successful_outcome {
-                println!("FINAL INTERPRETATION: SUCCESS\n");
-                report_map
-                    .entry(report_key.clone())
-                    .and_modify(|report_value| {
-                        *report_value = ReportValue {
-                            successes: report_value.successes + 1,
-                            failures: report_value.failures,
-                        };
-                    });
-            } else {
-                println!("FINAL INTERPRETATION: FAILURE\n");
-                report_map
-                    .entry(report_key.clone())
-                    .and_modify(|report_value| {
-                        *report_value = ReportValue {
-                            successes: report_value.successes,
-                            failures: report_value.failures + 1,
-                        };
-                    });
-            }
+            // Check the state after the execution of the result.
+            match filler_source.clone() {
+                Some(filler_source) => process(
+                    &mut host,
+                    filler_source,
+                    &spec_name,
+                    report_map,
+                    report_key.clone(),
+                ),
+                None => {
+                    println!("No filler file, the outcome of this test is uncertain.")
+                }
+            };
         }
     }
     Ok(())

@@ -5,6 +5,7 @@
 use crate::helpers::{parse_and_get_cmp, purify_network};
 use crate::models::spec::SpecId;
 use crate::models::{AccountInfoFiller, FillerSource, SpecName};
+use crate::ReportValue;
 
 use evm_execution::account_storage::EthereumAccount;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -203,11 +204,13 @@ pub fn process<Host: Runtime>(
     host: &mut Host,
     filler_source: FillerSource,
     spec_name: &SpecName,
-) -> bool {
+    report_map: &mut HashMap<String, ReportValue>,
+    report_key: String,
+) {
     let mut good_state = true;
 
     for (name, fillers) in filler_source.0.into_iter() {
-        println!("\nProcessing checks with filler: {}Filler\n", name);
+        println!("Processing checks with filler: {}Filler\n", name);
         for filler_expectation in fillers.expect {
             for filler_network in filler_expectation.network {
                 let cmp_spec_id = parse_and_get_cmp(&filler_network);
@@ -228,10 +231,20 @@ pub fn process<Host: Runtime>(
     }
 
     if good_state {
-        println!("TX INTERPRETATION: GOOD STATE")
+        println!("FINAL INTERPRETATION: SUCCESS\n");
+        report_map.entry(report_key).and_modify(|report_value| {
+            *report_value = ReportValue {
+                successes: report_value.successes + 1,
+                failures: report_value.failures,
+            };
+        });
     } else {
-        println!("TX INTERPRETATION: BAD STATE")
+        println!("FINAL INTERPRETATION: FAILURE\n");
+        report_map.entry(report_key).and_modify(|report_value| {
+            *report_value = ReportValue {
+                successes: report_value.successes,
+                failures: report_value.failures + 1,
+            };
+        });
     }
-
-    good_state
 }
