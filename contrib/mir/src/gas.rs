@@ -168,6 +168,8 @@ pub mod interpret_cost {
     pub const DROP: u32 = 10;
     pub const DUP: u32 = 10;
     pub const GT: u32 = 10;
+    pub const EQ: u32 = 10;
+    pub const LE: u32 = 10;
     pub const IF: u32 = 10;
     pub const IF_NONE: u32 = 10;
     pub const IF_CONS: u32 = 10;

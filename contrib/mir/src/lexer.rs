@@ -81,6 +81,8 @@ defprim! {
     PUSH,
     INT,
     GT,
+    EQ,
+    LE,
     LOOP,
     DIP,
     ADD,

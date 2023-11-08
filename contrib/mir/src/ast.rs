@@ -171,6 +171,8 @@ pub enum Instruction {
     Drop(Option<u16>),
     Dup(Option<u16>),
     Gt,
+    Eq,
+    Le,
     If(Vec<Self>, Vec<Self>),
     IfNone(Vec<Self>, Vec<Self>),
     Int,

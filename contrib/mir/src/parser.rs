@@ -85,6 +85,16 @@ mod tests {
     use crate::lexer::{Annotation, Prim};
 
     #[test]
+    fn instructions() {
+        assert_eq!(parse("LE").unwrap(), app!(LE));
+        assert_eq!(parse("EQ").unwrap(), app!(EQ));
+        assert_eq!(
+            parse("EQ @a").unwrap(),
+            Micheline::App(Prim::EQ, &[], [Annotation::Variable("a")].into())
+        );
+    }
+
+    #[test]
     fn pair_type() {
         assert_eq!(
             parse("PUSH (pair int nat) Unit").unwrap(),

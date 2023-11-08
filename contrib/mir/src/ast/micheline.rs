@@ -123,6 +123,8 @@ macro_rules! micheline_instructions {
             Prim::PUSH
                 | Prim::INT
                 | Prim::GT
+                | Prim::LE
+                | Prim::EQ
                 | Prim::LOOP
                 | Prim::DIP
                 | Prim::ADD

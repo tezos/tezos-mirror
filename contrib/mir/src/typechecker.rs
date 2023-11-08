@@ -637,6 +637,22 @@ pub(crate) fn typecheck_instruction(
         (App(GT, [], _), []) => no_overload!(GT, len 1),
         (App(GT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(EQ, [], _), [.., T::Int]) => {
+            stack[0] = T::Bool;
+            I::Eq
+        }
+        (App(EQ, [], _), [.., t]) => no_overload!(EQ, TypesNotEqual(T::Int, t.clone())),
+        (App(EQ, [], _), []) => no_overload!(EQ, len 1),
+        (App(EQ, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(LE, [], _), [.., T::Int]) => {
+            stack[0] = T::Bool;
+            I::Le
+        }
+        (App(LE, [], _), [.., t]) => no_overload!(LE, TypesNotEqual(T::Int, t.clone())),
+        (App(LE, [], _), []) => no_overload!(LE, len 1),
+        (App(LE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(IF, [Seq(nested_t), Seq(nested_f)], _), [.., T::Bool]) => {
             // pop the bool off the stack
             pop!();
@@ -2355,8 +2371,46 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_eq_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(EQ), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::EQ,
+                stack: stk![Type::String],
+                reason: Some(TypesNotEqual(Type::Int, Type::String).into())
+            })
+        );
+    }
+
+    #[test]
+    fn test_le_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(LE), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::LE,
+                stack: stk![Type::String],
+                reason: Some(TypesNotEqual(Type::Int, Type::String).into())
+            })
+        );
+    }
+
+    #[test]
     fn test_gt_short() {
         too_short_test(&app!(GT), Prim::GT, 1);
+    }
+
+    #[test]
+    fn test_eq_short() {
+        too_short_test(&app!(EQ), Prim::EQ, 1);
+    }
+
+    #[test]
+    fn test_le_short() {
+        too_short_test(&app!(LE), Prim::LE, 1);
     }
 
     #[test]
