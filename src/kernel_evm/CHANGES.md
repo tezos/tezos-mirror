@@ -1,6 +1,18 @@
 # Changelog
 
-## Version dev
+## Version Next
+
+### EVM Kernel
+
+### EVM Node
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version 7ff44c30366c3d2b860413905a2253522454fe5e
 
 ### EVM Kernel
 

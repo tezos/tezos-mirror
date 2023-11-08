@@ -111,9 +111,6 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
     | Kernel_version.Input _ ->
         let* kernel_version = Rollup_node_rpc.kernel_version () in
         return (Kernel_version.Output (Ok kernel_version))
-    | Upgrade_nonce.Input _ ->
-        let* upgrade_nonce = Rollup_node_rpc.upgrade_nonce () in
-        return (Upgrade_nonce.Output (Ok (Int32.of_int upgrade_nonce)))
     (* ETHEREUM JSON-RPC API *)
     | Accounts.Input _ -> return (Accounts.Output (Ok []))
     | Network_id.Input _ ->
@@ -126,6 +123,9 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
     | Get_balance.Input (Some (address, _block_param)) ->
         let* balance = Rollup_node_rpc.balance address in
         return (Get_balance.Output (Ok balance))
+    | Get_storage_at.Input (Some (address, position, _block_param)) ->
+        let* value = Rollup_node_rpc.storage_at address position in
+        return (Get_storage_at.Output (Ok value))
     | Block_number.Input _ ->
         let* block_number = Rollup_node_rpc.current_block_number () in
         return (Block_number.Output (Ok block_number))
@@ -137,25 +137,19 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
             (module Rollup_node_rpc)
         in
         return (Get_block_by_number.Output (Ok block))
-    | Get_block_by_number.Input None ->
-        return
-          (Get_block_by_number.Output
-             (Ok Mockup.(block (TxHash [transaction_hash]))))
     | Get_block_by_hash.Input (Some (block_hash, full_transaction_object)) ->
         let* block =
           Rollup_node_rpc.block_by_hash ~full_transaction_object block_hash
         in
         return (Get_block_by_hash.Output (Ok block))
-    | Get_block_by_hash.Input None ->
-        return
-          (Get_block_by_hash.Output
-             (Ok Mockup.(block (TxHash [transaction_hash]))))
     | Get_code.Input (Some (address, _)) ->
         let* code = Rollup_node_rpc.code address in
         return (Get_code.Output (Ok code))
-    | Gas_price.Input _ -> return (Gas_price.Output (Ok Mockup.gas_price))
+    | Gas_price.Input _ ->
+        let* base_fee = Rollup_node_rpc.base_fee_per_gas () in
+        return (Gas_price.Output (Ok base_fee))
     | Get_transaction_count.Input (Some (address, _)) ->
-        let* nonce = Rollup_node_rpc.nonce address in
+        let* nonce = Tx_pool.nonce address in
         return (Get_transaction_count.Output (Ok nonce))
     | Get_block_transaction_count_by_hash.Input (Some block_hash) ->
         let* block =
@@ -237,8 +231,6 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
               (Send_raw_transaction.Output
                  (Error {code = -32000; message = reason; data = None}))
         (* By default, the current dispatch handles the inputs *))
-    | Send_transaction.Input _ ->
-        return (Send_transaction.Output (Ok Mockup.transaction_hash))
     | Eth_call.Input (Some (call, _)) ->
         let* call_result = Rollup_node_rpc.simulate_call call in
         return (Eth_call.Output (Ok call_result))

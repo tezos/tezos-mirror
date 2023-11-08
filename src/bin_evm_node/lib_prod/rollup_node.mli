@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,7 +46,8 @@ module type S = sig
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
   (** [nonce address] returns the [address]'s nonce. *)
-  val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+  val nonce :
+    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t
 
   (** [code address] returns the [address]'s code. *)
   val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
@@ -110,12 +112,12 @@ module type S = sig
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 
+  (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)
+  val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
+
   (** [kernel_version ()] returns the internal kernel version (i.e the commit hash where
         the kernel was compiled). *)
   val kernel_version : unit -> string tzresult Lwt.t
-
-  (** [upgrade_nonce ()] returns the upgrade nonce. *)
-  val upgrade_nonce : unit -> int tzresult Lwt.t
 
   (** [simulate_call call_info] asks the rollup to simulate a call, and returns the
         result. *)
@@ -126,8 +128,17 @@ module type S = sig
   val estimate_gas :
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 
-  (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks if the nonce is correct. *)
-  val is_tx_valid : Ethereum_types.hex -> (unit, string) result tzresult Lwt.t
+  (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks if the nonce is correct
+      and returns the associated public key of transaction. *)
+  val is_tx_valid :
+    Ethereum_types.hex -> (Ethereum_types.address, string) result tzresult Lwt.t
+
+  (** [storage_at address pos] returns the value at index [pos] of the
+      account [address]'s storage. *)
+  val storage_at :
+    Ethereum_types.address ->
+    Ethereum_types.quantity ->
+    Ethereum_types.hex tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup
