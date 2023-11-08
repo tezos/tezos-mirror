@@ -128,6 +128,7 @@ let test_launch threshold expected_vote_duration () =
         default_constants.adaptive_issuance with
         launch_ema_threshold = threshold;
         activation_vote_enable = true;
+        autostaking_enable = false;
       }
     in
     let consensus_threshold = 0 in
