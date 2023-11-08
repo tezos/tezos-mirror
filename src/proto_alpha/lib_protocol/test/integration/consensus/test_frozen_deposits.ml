@@ -169,13 +169,9 @@ let test_cannot_bake_with_zero_deposits () =
   in
   let*! b1 = Block.bake ~policy:(By_account account1) b in
   (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
-     cannot be a proposer, thus it cannot bake. Precisely, bake fails because
-     get_next_baker_by_account fails with "No slots found" *)
-  let* () =
-    Assert.error ~loc:__LOC__ b1 (function
-        | Block.No_slots_found_for _ -> true
-        | _ -> false)
-  in
+     cannot be a proposer, thus it cannot bake. Precisely, bake fails with error
+     Validate_errors.Consensus.Zero_frozen_deposits*)
+  let* () = Assert.error ~loc:__LOC__ b1 (fun _ -> true) in
   let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
   (* after one cycle is passed, the frozen deposit window has passed
      and the frozen deposits should now be effectively 0. *)
