@@ -318,6 +318,10 @@ val change_node_mode : t -> mode -> t
 val dump_durable_storage :
   sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
 
+(** [export_snapshot rollup_node dir] creates a snapshot of the rollup node in
+    directory [dir]. *)
+val export_snapshot : t -> string -> string Runnable.process
+
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
 

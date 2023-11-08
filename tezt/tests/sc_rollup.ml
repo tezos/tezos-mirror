@@ -1010,6 +1010,42 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   | _ -> ()) ;
   unit
 
+(* Testing that snapshots can be exported correctly for a running node. *)
+let test_snapshots ~challenge_window ~commitment_period ~history_mode =
+  let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
+  test_full_scenario
+    {
+      tags = ["snapshot"; history_mode_str];
+      variant = None;
+      description =
+        sf "snapshot can be exported and checked (%s)" history_mode_str;
+    }
+    ~challenge_window
+    ~commitment_period
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup _node client ->
+  (* We want to produce snapshots for rollup node which have cemented
+     commitments *)
+  let level_snapshot = 2 * challenge_window in
+  (* We want to build an L2 chain that goes beyond the snapshots (and has
+     additional commitments). *)
+  let total_blocks = level_snapshot + (4 * commitment_period) in
+  let* () = Sc_rollup_node.run ~history_mode sc_rollup_node sc_rollup [] in
+  let rollup_node_processing =
+    let* () = bake_levels total_blocks client in
+    let* (_ : int) = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
+    unit
+  in
+  let* (_ : int) =
+    Sc_rollup_node.wait_for_level sc_rollup_node level_snapshot
+  in
+  let dir = Tezt.Temp.dir "snapshots" in
+  let*! snapshot_path = Sc_rollup_node.export_snapshot sc_rollup_node dir in
+  let* exists = Lwt_unix.file_exists snapshot_path in
+  if not exists then
+    Test.fail ~__LOC__ "Snapshot file %s does not exist" snapshot_path ;
+  let* () = rollup_node_processing in
+  unit
+
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
@@ -5517,6 +5553,18 @@ let register ~kind ~protocols =
     protocols ;
   test_gc
     "no_gc"
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:5
+    ~history_mode:Archive
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:5
+    ~commitment_period:2
+    ~history_mode:Full
+    protocols ;
+  test_snapshots
     ~kind
     ~challenge_window:10
     ~commitment_period:5
