@@ -6,6 +6,8 @@
 /******************************************************************************/
 
 use logos::Logos;
+pub mod errors;
+pub use errors::*;
 
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
@@ -49,10 +51,6 @@ macro_rules! defprim {
         }
     };
 }
-
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-#[error("unknown primitive: {0}")]
-pub struct PrimError(String);
 
 // NB: Primitives will be lexed as written, so capitalization matters.
 defprim! {
@@ -208,28 +206,6 @@ impl std::fmt::Display for Tok<'_> {
             Tok::RBrace => write!(f, "}}"),
             Tok::Semi => write!(f, ";"),
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, thiserror::Error)]
-pub enum LexerError {
-    #[error("unknown token")]
-    UnknownToken,
-    #[error("parsing of numeric literal {0} failed")]
-    NumericLiteral(String),
-    #[error("forbidden character found in string literal \"{0}\"")]
-    ForbiddenCharacterIn(String),
-    #[error("undefined escape sequence: \"\\{0}\"")]
-    UndefinedEscape(char),
-    #[error(transparent)]
-    PrimError(#[from] PrimError),
-    #[error("invalid hex sequence: {0}")]
-    InvalidHex(#[from] hex::FromHexError),
-}
-
-impl Default for LexerError {
-    fn default() -> Self {
-        LexerError::UnknownToken
     }
 }
 
