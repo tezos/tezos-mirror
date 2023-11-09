@@ -47,15 +47,12 @@ let sc_rollup_address_arg : (_, Client_context.full) Tezos_clic.arg =
 let operator_param next =
   let open Lwt_result_syntax in
   let desc =
-    let pp_purpose fmt purpose =
-      Format.pp_print_string fmt (Purpose.to_string purpose)
-    in
     Format.asprintf
       "Public key hash, or alias, of a smart rollup node operator. An operator \
        can be specialized to a particular purpose by prefixing its key or \
        alias by said purpose, e.g. operating:alias_of_my_operator. The \
        possible purposes are: @[<h>%a@]."
-      (Format.pp_print_list pp_purpose)
+      (Format.pp_print_list Purpose.pp_ex_purpose)
       Purpose.all
   in
   let parse_default cctxt s =
@@ -68,7 +65,8 @@ let operator_param next =
   in
   let all_purpose_case cctxt =
     List.map
-      (fun purpose -> (Purpose.to_string purpose, parse_purpose purpose cctxt))
+      (fun purpose ->
+        (Purpose.to_string_ex_purpose purpose, parse_purpose purpose cctxt))
       Purpose.all
   in
   Tezos_clic.param

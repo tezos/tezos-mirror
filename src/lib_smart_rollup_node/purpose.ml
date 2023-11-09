@@ -40,17 +40,22 @@ type ex_operator = Operator : 'a operator -> ex_operator
 
 type operators = ex_operator Map.t
 
-let to_string = function
-  | Purpose Operating -> "operating"
-  | Purpose Batching -> "batching"
-  | Purpose Cementing -> "cementing"
-  | Purpose Recovering -> "recovering"
-  | Purpose Executing_outbox -> "executing_outbox"
+let to_string (type kind) : kind t -> string = function
+  | Operating -> "operating"
+  | Batching -> "batching"
+  | Cementing -> "cementing"
+  | Recovering -> "recovering"
+  | Executing_outbox -> "executing_outbox"
+
+let to_string_ex_purpose (Purpose purpose) = to_string purpose
 
 let pp fmt purpose = Format.pp_print_string fmt (to_string purpose)
 
+let pp_ex_purpose fmt (Purpose purpose) = pp fmt purpose
+
 let encoding =
-  Data_encoding.string_enum @@ List.map (fun p -> (to_string p, p)) all
+  Data_encoding.string_enum
+  @@ List.map (fun p -> (to_string_ex_purpose p, p)) all
 
 type error +=
   | Missing_operator of ex_purpose
@@ -59,7 +64,7 @@ type error +=
       given_operators : operators;
     }
 
-let of_string = function
+let of_string_ex_purpose = function
   (* For backward compability:
      "publish", "refute", "timeout" -> Operating
      "add_messages" -> Batching
@@ -72,8 +77,8 @@ let of_string = function
   | "executing_outbox" -> Some (Purpose Executing_outbox)
   | _ -> None
 
-let of_string_exn s =
-  match of_string s with
+let of_string_exn_ex_purpose s =
+  match of_string_ex_purpose s with
   | Some p -> p
   | None -> invalid_arg ("purpose_of_string " ^ s)
 
@@ -106,8 +111,8 @@ let operators_encoding =
     (fun l -> List.to_seq l |> Map.of_seq)
     (Utils.dictionary_encoding
        ~keys:all
-       ~string_of_key:to_string
-       ~key_of_string:of_string_exn
+       ~string_of_key:to_string_ex_purpose
+       ~key_of_string:of_string_exn_ex_purpose
        ~value_encoding:(fun _ -> ex_operator_encoding))
 
 let pp_operators fmt operators =
@@ -121,7 +126,7 @@ let pp_operators fmt operators =
       Format.fprintf
         fmt
         "%a: %a"
-        pp
+        pp_ex_purpose
         purpose
         (Format.pp_print_list Signature.Public_key_hash.pp)
         keys)
@@ -137,7 +142,7 @@ let () =
       Format.fprintf
         ppf
         "@[<hov>Missing operator for the purpose of %a.@]"
-        pp
+        pp_ex_purpose
         missing_purpose)
     `Permanent
     Data_encoding.(obj1 (req "missing_purpose" encoding))
@@ -152,7 +157,7 @@ let () =
       Format.fprintf
         ppf
         "@[<hov>Too many operators, expecting operators for only %a, have %a.@]"
-        (Format.pp_print_list pp)
+        (Format.pp_print_list pp_ex_purpose)
         expected_purposes
         pp_operators
         given_operators)

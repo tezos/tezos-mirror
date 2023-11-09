@@ -46,14 +46,20 @@ type error +=
       given_operators : operators;
     }
 
-(** [to_string p] returns a string representation of purpose [p]. *)
-val to_string : ex_purpose -> string
+(** [to_string_ex_purpose p] returns a string representation of purpose [p]. *)
+val to_string_ex_purpose : ex_purpose -> string
 
-(** [of_string s] parses a purpose from the given string [s]. *)
-val of_string : string -> ex_purpose option
+val pp : Format.formatter -> 'a t -> unit
 
-(** [of_string s] parses a purpose from the given string [s]. *)
-val of_string_exn : string -> ex_purpose
+val pp_ex_purpose : Format.formatter -> ex_purpose -> unit
+
+(** [of_string_ex_purpose s] parses a purpose from the given string
+    [s]. *)
+val of_string_ex_purpose : string -> ex_purpose option
+
+(** [of_string_exn_ex_purpose s] parses a purpose from the given
+    string [s]. *)
+val of_string_exn_ex_purpose : string -> ex_purpose
 
 val operators_encoding : operators Data_encoding.t
 
