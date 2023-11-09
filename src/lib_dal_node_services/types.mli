@@ -141,6 +141,26 @@ module Span : sig
   val mul : t -> int -> t
 end
 
+module Time : sig
+  type t = Ptime.t
+
+  include COMPARABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include PRINTABLE with type t := t
+
+  type span = Span.t
+
+  val now : unit -> t
+
+  val add : t -> span -> t
+
+  val sub : t -> span -> t
+
+  val to_span : t -> span
+end
+
 module Score : sig
   type t = float
 

@@ -34,6 +34,7 @@ module Worker_config :
      and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = Types.Peer.t
      and type GS.Span.t = Types.Span.t
+     and type GS.Time.t = Types.Time.t
      and type 'a Monad.t = 'a Lwt.t
 
 module Worker_instance :
@@ -43,6 +44,7 @@ module Worker_instance :
      and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = Types.Peer.t
      and type GS.Span.t = Types.Span.t
+     and type GS.Time.t = Types.Time.t
      and type 'a Monad.t = 'a Lwt.t
 
 module Validate_message_hook : sig

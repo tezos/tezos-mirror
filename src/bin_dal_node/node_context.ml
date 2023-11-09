@@ -272,5 +272,13 @@ module P2P = struct
           (peer, v) :: acc)
         state.scores
         []
+
+    let get_backoffs {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Topic.Map.fold
+        (fun topic peer_map acc ->
+          (topic, Gossipsub.Worker.GS.Peer.Map.bindings peer_map) :: acc)
+        state.backoff
+        []
   end
 end

@@ -39,6 +39,7 @@ module Worker : sig
        and type GS.Message.t = Types.Message.t
        and type GS.Peer.t = Types.Peer.t
        and type GS.Span.t = Types.Span.t
+       and type GS.Time.t = Types.Time.t
        and type 'a Monad.t = 'a Lwt.t
 
   module Default_parameters : module type of Gs_default_parameters
@@ -50,6 +51,7 @@ module Worker : sig
        and type GS.Message.t = Types.Message.t
        and type GS.Peer.t = Types.Peer.t
        and type GS.Span.t = Types.Span.t
+       and type GS.Time.t = Types.Time.t
 
   module Logging : sig
     val event : event -> unit Monad.t

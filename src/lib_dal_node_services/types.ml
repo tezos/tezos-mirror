@@ -228,6 +228,26 @@ module Span = struct
          (obj1 (req "span" int16))
 end
 
+module Time = struct
+  type span = Span.t
+
+  type t = Ptime.t
+
+  include Compare.Make (Ptime)
+
+  let pp = Ptime.pp
+
+  let now = Ptime_clock.now
+
+  let add t span = Ptime.add_span t span |> get_value ~__LOC__ __FUNCTION__
+
+  let sub t span = Ptime.sub_span t span |> get_value ~__LOC__ __FUNCTION__
+
+  let to_span = Ptime.to_span
+
+  let encoding = Time.System.encoding
+end
+
 module Score = struct
   type t = float
 

@@ -27,8 +27,6 @@
 open Gossipsub_intf
 module Types = Tezos_dal_node_services.Types
 
-type peer = P2p_peer.Id.t
-
 module Validate_message_hook = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
 
@@ -45,40 +43,16 @@ end
 let message_valid ?message ~message_id () =
   !Validate_message_hook.check_message ?message ~message_id ()
 
-let get_value ~__LOC__ func =
-  Option.value_f ~default:(fun () ->
-      Stdlib.failwith
-        (Format.sprintf "%s: Unexpected overflow in %s" __LOC__ func))
-
-module Time = struct
-  type span = Types.Span.t
-
-  type t = Ptime.t
-
-  include Compare.Make (Ptime)
-
-  let pp = Ptime.pp
-
-  let now = Ptime_clock.now
-
-  let add t span = Ptime.add_span t span |> get_value ~__LOC__ __FUNCTION__
-
-  let sub t span = Ptime.sub_span t span |> get_value ~__LOC__ __FUNCTION__
-
-  let to_span = Ptime.to_span
-end
-
 module Automaton_config :
   AUTOMATON_CONFIG
-    with type Time.t = Ptime.t
+    with type Time.t = Types.Time.t
      and type Span.t = Types.Span.t
-     and type Time.span = Types.Span.t
-     and type Subconfig.Peer.t = peer
+     and type Subconfig.Peer.t = Types.Peer.t
      and type Subconfig.Topic.t = Types.Topic.t
      and type Subconfig.Message_id.t = Types.Message_id.t
      and type Subconfig.Message.t = Types.Message.t = struct
   module Span = Types.Span
-  module Time = Time
+  module Time = Types.Time
 
   module Subconfig = struct
     module Peer = Types.Peer
@@ -111,6 +85,7 @@ module Worker_config :
      and type GS.Message.t = Types.Message.t
      and type GS.Peer.t = Types.Peer.t
      and type GS.Span.t = Types.Span.t
+     and type GS.Time.t = Types.Time.t
      and type 'a Monad.t = 'a Lwt.t = struct
   module GS = Tezos_gossipsub.Make (Automaton_config)
   module Monad = Monad

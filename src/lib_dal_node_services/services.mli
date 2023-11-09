@@ -307,6 +307,15 @@ module P2P : sig
       ; query : unit >
       service
 
+    val get_backoffs :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Topic.t * (Types.Peer.t * Types.Time.t) list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
     val get_topics_peers :
       < meth : [`GET]
       ; input : unit
