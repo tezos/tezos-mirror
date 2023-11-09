@@ -28,7 +28,7 @@
 open Node_context
 
 let lock ~data_dir =
-  let lockfile_path = Filename.concat data_dir "lock" in
+  let lockfile_path = global_lockfile_path ~data_dir in
   let lock_aux ~data_dir =
     let open Lwt_result_syntax in
     let*! () = Event.acquiring_lock () in
