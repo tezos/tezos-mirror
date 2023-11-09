@@ -29,7 +29,6 @@ pub enum ContractInterpretError {
     InterpretError(#[from] crate::interpreter::InterpretError),
 }
 
-#[allow(dead_code)]
 impl ContractScript<TypecheckedStage> {
     /// Interpret a typechecked contract script using the provided parameter and
     /// storage. Parameter and storage are given as untyped `Value`s, as this

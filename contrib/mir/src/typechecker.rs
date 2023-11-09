@@ -81,7 +81,6 @@ pub enum StacksNotEqualReason {
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
 
-#[allow(dead_code)]
 impl ContractScript<ParsedStage> {
     pub fn typecheck(
         self,
@@ -1438,11 +1437,7 @@ mod typecheck_tests {
     fn compare_int_fail() {
         let mut stack = tc_stk![Type::Int, Type::Nat];
         assert_eq!(
-            typecheck_instruction(
-                parse("COMPARE").unwrap(),
-                &mut Ctx::default(),
-                &mut stack
-            ),
+            typecheck_instruction(parse("COMPARE").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::COMPARE,
                 stack: stk![Type::Int, Type::Nat],
@@ -1555,11 +1550,7 @@ mod typecheck_tests {
     fn failwith_operation() {
         let mut stack = tc_stk![Type::new_list(Type::Operation)];
         assert_eq!(
-            typecheck_instruction(
-                parse("FAILWITH").unwrap(),
-                &mut Ctx::default(),
-                &mut stack
-            ),
+            typecheck_instruction(parse("FAILWITH").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::TypeNotPackable(Type::new_list(Type::Operation)))
         );
     }
@@ -1725,11 +1716,7 @@ mod typecheck_tests {
             Type::Int
         ];
         assert_eq!(
-            typecheck_instruction(
-                parse("UPDATE").unwrap(),
-                &mut Ctx::default(),
-                &mut stack
-            ),
+            typecheck_instruction(parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TypesNotEqual(Type::String, Type::Nat).into())
         );
     }
@@ -1742,11 +1729,7 @@ mod typecheck_tests {
             Type::new_list(Type::Int)
         ];
         assert_eq!(
-            typecheck_instruction(
-                parse("UPDATE").unwrap(),
-                &mut Ctx::default(),
-                &mut stack
-            ),
+            typecheck_instruction(parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::TypeNotComparable(Type::new_list(Type::Int),))
         );
     }

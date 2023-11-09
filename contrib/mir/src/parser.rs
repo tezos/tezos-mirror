@@ -23,12 +23,10 @@ pub enum ParserError {
     DuplicateField(Prim),
 }
 
-#[allow(dead_code)]
 pub fn parse(src: &str) -> Result<ParsedInstruction, ParseError<usize, Tok, ParserError>> {
     syntax::InstructionParser::new().parse(spanned_lexer(src))
 }
 
-#[allow(dead_code)]
 pub fn parse_contract_script(
     src: &str,
 ) -> Result<ContractScript<ParsedStage>, ParseError<usize, Tok, ParserError>> {
