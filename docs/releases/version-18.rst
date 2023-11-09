@@ -4,7 +4,7 @@ Version 18.0
 Version 18.0 contains a new version (v10) of the protocol environment,
 which is the set of functions that a protocol can call.
 This new version is used by Oxford,
-which is a proposal for the successor of Nairobi.
+which is a proposal for the successor of Nairobi that has been rejected by vote on Oct 2, 2023.
 This release also contains Oxford itself as well as its associated protocol-specific executable binaries (baker, accuser, etc).
 
 Starting from Oxford, Endorsements have been renamed to Attestations.

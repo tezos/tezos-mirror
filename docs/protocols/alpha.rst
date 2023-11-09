@@ -2,7 +2,9 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to the Oxford protocol proposal (see :ref:`naming_convention`).
+to Oxford (see :ref:`naming_convention`).
+
+For changes brought by the rejected Oxford proposal with respect to Nairobi, see :doc:`../protocols/018_oxford`.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.

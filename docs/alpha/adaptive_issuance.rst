@@ -28,7 +28,7 @@
 Adaptive Issuance and Staking
 =============================
 
-This document describes Adaptive Issuance and Staking, two new features experimented in the Alpha protocol, which together constitute a major evolution of Tezos’ :doc:`Proof-of-Stake mechanism <proof_of_stake>`.
+This document describes Adaptive Issuance and Staking, two new features experimented in the Alpha protocol (referred hereafter as the Adaptive-Issuance/Staking proposal), which together constitute a major evolution of Tezos’ :doc:`Proof-of-Stake mechanism <proof_of_stake>`.
 
 .. note::
 
@@ -58,8 +58,8 @@ The values for participation rewards and
 the LB subsidy, if any, are currently defined by the Tezos protocol using fixed
 constants.
 
-The initial Oxford protocol proposal
-introduced the possibility to activate Adaptive Issuance: a mechanism where the amount of
+The Adaptive-Issuance/Staking proposal
+introduces the possibility to activate Adaptive Issuance: a mechanism where the amount of
 *regularly* issued tez (participation rewards and the LB subsidy, if
 active) depends on the global **staked funds ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
@@ -68,7 +68,7 @@ to encourage participants to stake and produce blocks, but *no more*.
 
 At the end of each blockchain :ref:`cycle <def_cycle_alpha>`, the
 regular issuance is adjusted, to nudge the staked funds ratio towards a
-protocol-defined target (set at 50% in Oxford). Participation rewards
+protocol-defined target (set at 50% in the Adaptive-Issuance/Staking proposal). Participation rewards
 and the LB subsidy are recomputed to match that budget. When the staked
 funds ratio decreases and diverges from the target, emission rates
 increase, incentivizing participants to stake funds to re-approach the
@@ -83,7 +83,7 @@ of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 5}`. The
 adaptive issuance rate is the sum of a :ref:`static rate <static_rate_alpha>`
 and a :ref:`dynamic rate <dynamic_rate_alpha>`. The final result is clipped to
 ensure nominal emissions remain within :math:`\IL{[\minR,\ \maxR]}` (set
-to [0.05%, 5%] in Oxford) of the total supply.
+to [0.05%, 5%] in the Adaptive-Issuance/Staking proposal) of the total supply.
 
 .. figure:: adaptive_rate.png
 
@@ -219,7 +219,7 @@ seconds.
 
 .. _reward_weights_alpha:
 
-\ **REWARD WEIGHTS**\     The Oxford proposal defines the weights for
+\ **REWARD WEIGHTS**\     The Adaptive-Issuance/Staking proposal defines the weights for
 participation rewards and the LB subsidy as:
 
 -  Attestation (formerly, endorsing) rewards : 10,240.
@@ -234,7 +234,7 @@ per block, :math:`\IL{\isb{c}}`, is distributed amongst the different
 rewards in proportion to their weight.
 
 **Consensus rewards.** Since the adoption of Tenderbake, Tezos protocols
-before Oxford have rewarded delegates :doc:`for their participation in
+before the Adaptive-Issuance/Staking proposal have rewarded delegates :doc:`for their participation in
 consensus <consensus>`
 with the following rewards per block:
 
@@ -291,7 +291,7 @@ weight is always counted in the computation of :math:`\IL{\tw}`. In
 other words, the budget for the LB subsidy is always allocated,
 regardless of whether it is issued or not.
 
-The Oxford protocol proposal implements a new `RPC
+The Adaptive-Issuance/Staking proposal implements a new `RPC
 endpoint <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
 ``/issuance/expected_issuance``, which reports the precomputed values of
 all participation rewards and the LB subsidy, for the cycle
@@ -347,7 +347,7 @@ the staked balance, and automatically shared between delegates and their
 stakers, delegates can use this parameter to collect an *edge* from the
 rewards attributable to their stakers.
 
-If and when Oxford activates, freezing and unfreezing of staked funds
+If and when the Adaptive-Issuance/Staking proposal activates, freezing and unfreezing of staked funds
 will be controlled directly by delegates and stakers, and will no longer
 be automatic. This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
@@ -385,7 +385,7 @@ parameters:
    maximum portion of external stake by stakers over the delegate’s own
    staked funds. It defaults to 0 – which entails that delegates do not
    accept external stakes by default. It is moreover capped by a global
-   constant, set to 5 in Oxford, which ensures the baker controls a
+   constant, set to 5 in the Adaptive-Issuance/Staking proposal, which ensures the baker controls a
    significant part of the stake.
 
 Delegates can modify these staking parameters at all times, using the
@@ -490,7 +490,7 @@ unfinalizable unstake request for token staked with the old delegate.
 Feature activation vs protocol activation
 =========================================
 
-Should the Oxford protocol proposal be accepted by the community, and
+Should the Adaptive-Issuance/Staking proposal be accepted by the community, and
 once the protocol becomes active on Tezos Mainnet, most of the features
 described in this document will **not** be enabled by default, only
 latent possibilities in the protocol, waiting for a separate activation.
@@ -506,7 +506,7 @@ from delegates via separate feature activation vote mechanism:
 -  The changes in weight for staked and delegated funds towards the
    computation of baking and voting rights.
 
-Other changes described earlier would be enabled from Oxford’s
+Other changes described earlier would be enabled from the Adaptive-Issuance/Staking proposal’s
 activation:
 
 -  The new interface for stake manipulation based on
@@ -529,7 +529,7 @@ Activation Vote
 We highlight the following principles behind the feature activation vote
 mechanism:
 
--  If and when Oxford activates, delegates can start voting for (**On**)
+-  If and when the Adaptive-Issuance/Staking proposal activates, delegates can start voting for (**On**)
    or against (**Off**) the feature activation of the changes listed
    above in each block they bake. They can also abstain with a **Pass**
    vote.
@@ -559,7 +559,7 @@ mechanism:
    in (and after) the Adoption phase – subsequent votes continue to be
    counted towards an updated EMA, but without any further effect.
 
-**NB** In the implementation in the Oxford protocol, the issuance rate
+**NB** In the implementation in the Adaptive-Issuance/Staking proposal, the issuance rate
 is computed 5 cycles in advance. Thus, in the first 5 cycles where is
 active, the protocol does not use the :ref:`adaptive reward
 formula <adaptive_rewards_alpha>` and keeps using the current reward
