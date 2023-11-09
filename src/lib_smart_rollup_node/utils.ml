@@ -76,7 +76,7 @@ let dictionary_encoding ~keys ~string_of_key ~key_of_string ~value_encoding =
       | _ -> assert false)
     Data_encoding.Json.encoding
 
-let lock lockfile_path =
+let lock ?(when_locked = `Block) lockfile_path =
   let open Lwt_result_syntax in
   let* lockfile =
     protect @@ fun () ->
@@ -92,7 +92,10 @@ let lock lockfile_path =
            let*! () = Lwt_unix.close lockfile in
            fail err)
     @@ fun () ->
-    let*! () = Lwt_unix.lockf lockfile Unix.F_LOCK 0 in
+    let command =
+      match when_locked with `Block -> Unix.F_LOCK | `Fail -> Unix.F_TLOCK
+    in
+    let*! () = Lwt_unix.lockf lockfile command 0 in
     return_unit
   in
   return lockfile
@@ -102,7 +105,7 @@ let unlock lockfile =
     (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
     (fun () -> Lwt_unix.close lockfile)
 
-let with_lockfile lockfile_path f =
+let with_lockfile ?when_locked lockfile_path f =
   let open Lwt_result_syntax in
-  let* lockfile = lock lockfile_path in
+  let* lockfile = lock ?when_locked lockfile_path in
   Lwt.finalize f (fun () -> unlock lockfile)

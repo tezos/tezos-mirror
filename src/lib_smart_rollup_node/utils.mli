@@ -43,16 +43,25 @@ val dictionary_encoding :
 
 (** {2 Lock files}  *)
 
-(** [lock path] acquires a lock on the file [path] and returns the opened file
-    descriptor (for unlocking). If there is already a lock on [path], this
-    function call is blocking until the previous lock is released.  *)
-val lock : string -> Lwt_unix.file_descr tzresult Lwt.t
+(** [lock ?when_lock path] acquires a lock on the file [path] and returns the
+    opened file descriptor (for unlocking). If there is already a lock on
+    [path], this function call is blocking until the previous lock is
+    released. If there is already a lock on [path], the call will block if
+    [when_lock] is [`Block] (the default), and will fail if [when_lock =
+    `Fail]. *)
+val lock :
+  ?when_locked:[`Fail | `Block] -> string -> Lwt_unix.file_descr tzresult Lwt.t
 
 (** [unlock fd] releases the lock on the opened file descriptor [fd]. If there
     is no lock or if it is already released, this function does nothing. *)
 val unlock : Lwt_unix.file_descr -> unit Lwt.t
 
-(** [with_lockfile path f] executes the function [f] by taking a lock on the
-    file [path]. If there is already a lock on [path], the execution of [f] is
-    blocking until the previous lock is released. *)
-val with_lockfile : string -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+(** [with_lockfile ?when_lock path f] executes the function [f] by taking a lock
+    on the file [path]. If there is already a lock on [path], the execution of
+    [f] is blocking until the previous lock is released. See {!lock} for a
+    description of the [when_lock] parameter. *)
+val with_lockfile :
+  ?when_locked:[`Fail | `Block] ->
+  string ->
+  (unit -> 'a tzresult Lwt.t) ->
+  'a tzresult Lwt.t
