@@ -38,6 +38,7 @@ let%expect_test "test basic mu" =
     meta:
       id: intlist
       endian: be
+    doc: ! 'Encoding id: intlist'
     types:
       cons:
         seq:
@@ -106,6 +107,7 @@ let%expect_test "test more mu" =
     meta:
       id: t
       endian: be
+    doc: ! 'Encoding id: t'
     types:
       branch:
         seq:

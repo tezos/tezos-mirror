@@ -18,6 +18,7 @@ let%expect_test "test padded" =
     meta:
       id: simple_tuple_with_padding
       endian: be
+    doc: ! 'Encoding id: simple_tuple_with_padding'
     types:
       simple_tuple_with_padding_field1:
         seq:

@@ -709,30 +709,35 @@ and seq_field_of_collection :
       in
       (state, [attr])
 
-let from_data_encoding :
-    type a. id:string -> ?description:string -> a DataEncoding.t -> ClassSpec.t
-    =
- fun ~id ?description encoding ->
+let add_original_id_to_description ?description id =
+  match description with
+  | None -> "Encoding id: " ^ id
+  | Some description -> "Encoding id: " ^ id ^ "\nDescription: " ^ description
+
+let from_data_encoding : type a. id:string -> a DataEncoding.t -> ClassSpec.t =
+ fun ~id encoding ->
   let encoding_name = escape_id id in
   let state = {types = []; enums = []; mus = MuSet.empty} in
   let sort l = List.sort (fun (t1, _) (t2, _) -> compare t1 t2) l in
   match encoding.encoding with
-  | Describe {encoding; description; id; _} ->
-      let state, attrs = seq_field_of_data_encoding state encoding id in
+  | Describe {encoding; description; id = descrid; _} ->
+      let description = add_original_id_to_description ?description id in
+      let state, attrs = seq_field_of_data_encoding state encoding descrid in
       Helpers.class_spec_of_attrs
         ~id:encoding_name
-        ?description
+        ~description
         ~enums:(sort state.enums)
         ~types:(sort state.types)
         ~instances:[]
         attrs
   | _ ->
+      let description = add_original_id_to_description id in
       let state, attrs =
         seq_field_of_data_encoding state encoding encoding_name
       in
       Helpers.class_spec_of_attrs
         ~id:encoding_name
-        ?description
+        ~description
         ~enums:(sort state.enums)
         ~types:(sort state.types)
         ~instances:[]

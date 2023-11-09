@@ -29,6 +29,7 @@ let%expect_test "test simple union" =
     meta:
       id: simple_union
       endian: be
+    doc: ! 'Encoding id: simple_union'
     enums:
       simple_union_tag:
         0: some
@@ -86,6 +87,7 @@ let%expect_test "test medium union" =
     meta:
       id: more_union
       endian: be
+    doc: ! 'Encoding id: more_union'
     enums:
       bool:
         0: false
@@ -153,6 +155,7 @@ let%expect_test "test union with structures inside" =
     meta:
       id: more_union
       endian: be
+    doc: ! 'Encoding id: more_union'
     types:
       b:
         seq:
