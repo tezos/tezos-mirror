@@ -23,8 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let risc_v_sandbox = Uses.make ~tag:"risc_v_sandbox" ~path:"risc-v-sandbox"
+
 let run_kernel ~kernel =
   let process =
-    Process.spawn (project_root // "risc-v-sandbox") ["-i"; kernel]
+    Process.spawn (project_root // Uses.path risc_v_sandbox) ["-i"; kernel]
   in
   Process.check process
