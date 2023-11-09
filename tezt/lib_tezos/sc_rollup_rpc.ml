@@ -32,3 +32,6 @@ let get_global_block_outbox ?(block = "cemented") ~outbox_level () =
 
 let get_global_smart_rollup_address () =
   make GET ["global"; "smart_rollup_address"] JSON.as_string
+
+let get_global_block ?(block = "head") () =
+  make GET ["global"; "block"; block] Fun.id

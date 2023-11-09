@@ -482,13 +482,7 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
   let* () = Node.run ~patch_config tezos_node nodes_args in
   let* () = Node.wait_for_ready tezos_node in
   let* () = Client.bake_for_and_wait tezos_client in
-  scenario_after
-    ~sc_rollup
-    ~rollup_node
-    ~rollup_client
-    tezos_node
-    tezos_client
-    prior_res
+  scenario_after ~sc_rollup ~rollup_node tezos_node tezos_client prior_res
 
 let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
   let tags = ["store"] in
@@ -501,20 +495,20 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     unit
   in
-  let scenario_after ~sc_rollup ~rollup_node ~rollup_client tezos_node
-      tezos_client () =
+  let scenario_after ~sc_rollup ~rollup_node tezos_node tezos_client () =
     let* migration_level = Node.get_level tezos_node in
     let* () =
       Sc_rollup_helpers.send_messages (commitment_period + 3) tezos_client
     in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
-    let*! _l2_block =
-      Sc_rollup_client.rpc_get
-        rollup_client
-        ["global"; "block"; string_of_int (migration_level - 1)]
+    let* _l2_block =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_global_block
+           ~block:(string_of_int (migration_level - 1))
+           ()
     in
-    let*! l2_head =
-      Sc_rollup_client.rpc_get rollup_client ["global"; "block"; "head"]
+    let* l2_head =
+      Sc_rollup_node.RPC.call rollup_node @@ Sc_rollup_rpc.get_global_block ()
     in
     let last_l2_commitment =
       JSON.(l2_head |-> "previous_commitment_hash" |> as_string)
@@ -556,8 +550,7 @@ let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
     Log.info "Sending more messages on L1." ;
     Sc_rollup_helpers.send_messages (commitment_period - 1) tezos_client
   in
-  let scenario_after ~sc_rollup ~rollup_node ~rollup_client tezos_node
-      tezos_client () =
+  let scenario_after ~sc_rollup ~rollup_node tezos_node tezos_client () =
     let* migration_level = Node.get_level tezos_node in
     let* () = Sc_rollup_helpers.send_messages 1 tezos_client in
     Log.info "Restarting rollup node after migration." ;
@@ -565,13 +558,14 @@ let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
     Log.info "Waiting for rollup node to catch up." ;
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:100. in
     Log.info "Rollup node has caught up!" ;
-    let*! _l2_block =
-      Sc_rollup_client.rpc_get
-        rollup_client
-        ["global"; "block"; string_of_int (migration_level - 1)]
+    let* _l2_block =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_global_block
+           ~block:(string_of_int (migration_level - 1))
+           ()
     in
-    let*! _l2_block =
-      Sc_rollup_client.rpc_get rollup_client ["global"; "block"; "head"]
+    let* _l2_block =
+      Sc_rollup_node.RPC.call rollup_node @@ Sc_rollup_rpc.get_global_block ()
     in
     unit
   in

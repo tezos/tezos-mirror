@@ -37,3 +37,6 @@ val get_global_block_outbox :
 (** RPC: [GET global/smart_rollup_address] returns the smart contract rollup
     address of the node. *)
 val get_global_smart_rollup_address : unit -> string RPC_core.t
+
+(** RPC: [GET global/block/<block>]. *)
+val get_global_block : ?block:string -> unit -> JSON.t RPC_core.t
