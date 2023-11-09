@@ -184,20 +184,23 @@ let%expect_test "test tuples descr inside" =
           type: b1be
         - id: payload
           type: b7be
+      unique_id_trap:
+        seq:
+        - id: unique_id_trap
+          type: u1
+          enum: bool
     enums:
       bool:
         0: false
         255: true
     seq:
     - id: tupdef_field0
-      type: u1
-      enum: bool
+      type: unique_id_trap
       doc: unique_id_trap
     - id: tupdef_field1
       type: n
     - id: tupdef_field2
-      type: u1
-      enum: bool
+      type: unique_id_trap
       doc: unique_id_trap
     - id: tupdef_field3
       type: u1
@@ -241,9 +244,8 @@ let%expect_test "test tuples descr inside" =
           type: u1
           enum: bool
         - id: foo
-          type: u1
+          type: unique_id_trap
           if: (foo_tag == bool::true)
-          enum: bool
       tupdef_field1:
         seq:
         - id: foo_tag
@@ -258,9 +260,8 @@ let%expect_test "test tuples descr inside" =
           type: u1
           enum: bool
         - id: foo
-          type: u1
+          type: unique_id_trap
           if: (foo_tag == bool::true)
-          enum: bool
       tupdef_field3:
         seq:
         - id: foo_tag
@@ -269,6 +270,11 @@ let%expect_test "test tuples descr inside" =
         - id: foo
           type: u1
           if: (foo_tag == bool::true)
+          enum: bool
+      unique_id_trap:
+        seq:
+        - id: unique_id_trap
+          type: u1
           enum: bool
     enums:
       bool:

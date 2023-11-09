@@ -32,22 +32,16 @@ val default_attr_spec : id:string -> AttrSpec.t
 
     The following meta section properties are set:
     - [endian] is set to [BE] (as per data-encoding default).
-    - [id] is set to [~id].
     - [imports] is set to [imports] if not empty.
     - Other fields are [[]] or [None]. *)
-val default_meta_spec : ?imports:string list -> id:string -> unit -> MetaSpec.t
+val default_meta_spec : ?imports:string list -> unit -> MetaSpec.t
 
-(** [default_class_spec ~id] builds an default (empty) [ClassSpec.t].
+(** [default_class_spec ?id] builds an default (empty) [ClassSpec.t].
 
-    @param [~id] is added to meta section as [id].
     @param [?description] is added into [doc] section as [summary].
     @param [?imports] is added to class specification if not empty. *)
 val default_class_spec :
-  id:string ->
-  ?description:string ->
-  ?imports:string list ->
-  unit ->
-  ClassSpec.t
+  ?description:string -> ?imports:string list -> unit -> ClassSpec.t
 
 (** [add_uniq_assoc kvs kv] returns an association list with associations from
     [kvs] as well as [kv].
@@ -61,7 +55,6 @@ val add_uniq_assoc : (string * 'a) list -> string * 'a -> (string * 'a) list
 (** [class_spec_of_attrs ~id ?description ?enums ?instances attrs]
     returns a [ClassSpec.t] for the seq [attrs].
 
-    @param [~id] is added to meta section as [id].
     @param [?description] is used as [doc] section [summary].
     @param [?enums] is added to class specification if present.
     @param [?types] is added to class specification if present.
@@ -69,7 +62,6 @@ val add_uniq_assoc : (string * 'a) list -> string * 'a -> (string * 'a) list
     @param [?imports] is added to class specification if not empty.
 *)
 val class_spec_of_attrs :
-  id:string ->
   ?description:string ->
   ?enums:(string * EnumSpec.t) list ->
   ?types:(string * ClassSpec.t) list ->
@@ -77,9 +69,6 @@ val class_spec_of_attrs :
   ?imports:string list ->
   AttrSpec.t list ->
   ClassSpec.t
-
-(** [usertype classspec] construct a [UserType] [DataType.t] from a classspec. *)
-val usertype : ClassSpec.t -> DataType.t
 
 (** [default_instance_spec ~id expr] returns a default instance specification for
     of a given [id] and [expr]. *)

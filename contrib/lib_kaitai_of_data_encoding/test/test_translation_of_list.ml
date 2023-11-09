@@ -69,6 +69,11 @@ let%expect_test "test dynamic size list translation" =
     endian: be
   doc: ! 'Encoding id: list_of_uint8'
   types:
+    list_of_uint8:
+      seq:
+      - id: list_of_uint8_entries
+        type: list_of_uint8_entries
+        repeat: eos
     list_of_uint8_entries:
       seq:
       - id: list_of_uint8_elt
@@ -77,9 +82,8 @@ let%expect_test "test dynamic size list translation" =
   - id: len_list_of_uint8
     type: s4
   - id: list_of_uint8
-    type: list_of_uint8_entries
+    type: list_of_uint8
     size: len_list_of_uint8
-    repeat: eos
   |}]
 
 let%expect_test "test dynamic size list with max length" =
@@ -96,6 +100,11 @@ let%expect_test "test dynamic size list with max length" =
     endian: be
   doc: ! 'Encoding id: list_with_length'
   types:
+    list_with_length:
+      seq:
+      - id: list_with_length_entries
+        type: list_with_length_entries
+        repeat: eos
     list_with_length_entries:
       seq:
       - id: list_with_length_elt
@@ -104,9 +113,8 @@ let%expect_test "test dynamic size list with max length" =
   - id: len_list_with_length
     type: s4
   - id: list_with_length
-    type: list_with_length_entries
+    type: list_with_length
     size: len_list_with_length
-    repeat: eos
   |}]
 
 let%expect_test "test variable size list with max length" =
