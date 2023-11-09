@@ -239,6 +239,12 @@ Node
   nodes. Also, improved the consistency of ``snapshot`` import errors
   messages (MR :gl:`!10138`)
 
+- **Breaking change** Bumped the Octez snapshot version from ``6`` to
+  ``7`` which fixes the corrupted generation of tar rolling and full
+  snapshots. It is still possible to import previous version snapshots
+  but snapshots in version 7 are not retro-compatible with previous
+  octez versions (MR :gl:`!10785`).
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
