@@ -2,6 +2,12 @@ meta:
   id: id_005__psbabym1__script__prim
   endian: be
 doc: ! 'Encoding id: 005-PsBabyM1.script.prim'
+types:
+  id_005__psbabym1__michelson__v1__primitives:
+    seq:
+    - id: id_005__psbabym1__michelson__v1__primitives
+      type: u1
+      enum: id_005__psbabym1__michelson__v1__primitives
 enums:
   id_005__psbabym1__michelson__v1__primitives:
     0: parameter
@@ -308,5 +314,4 @@ enums:
       doc: CHAIN_ID
 seq:
 - id: id_005__psbabym1__michelson__v1__primitives
-  type: u1
-  enum: id_005__psbabym1__michelson__v1__primitives
+  type: id_005__psbabym1__michelson__v1__primitives

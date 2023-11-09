@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 011-PtHangz2.tez'
 types:
+  id_011__pthangz2__mutez:
+    seq:
+    - id: id_011__pthangz2__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_011__pthangz2__mutez
-  type: n
+  type: id_011__pthangz2__mutez

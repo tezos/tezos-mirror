@@ -20,33 +20,41 @@ types:
       size: len_bound_data
   inputs:
     seq:
+    - id: inputs_entries
+      type: inputs_entries
+      repeat: eos
+  inputs_0:
+    seq:
     - id: len_inputs
       type: s4
     - id: inputs
-      type: inputs_entries
+      type: inputs
       size: len_inputs
-      repeat: eos
   inputs_entries:
     seq:
     - id: inputs_elt
       type: sapling__transaction__input
   outputs:
     seq:
+    - id: outputs_entries
+      type: outputs_entries
+      repeat: eos
+  outputs_0:
+    seq:
     - id: len_outputs
       type: s4
     - id: outputs
-      type: outputs_entries
+      type: outputs
       size: len_outputs
-      repeat: eos
   outputs_entries:
     seq:
     - id: outputs_elt
       type: sapling__transaction__output
 seq:
 - id: inputs
-  type: inputs
+  type: inputs_0
 - id: outputs
-  type: outputs
+  type: outputs_0
 - id: binding_sig
   type: sapling__transaction__binding_sig
 - id: balance

@@ -9,8 +9,12 @@ types:
       type: u1
       enum: delegate_selection_tag
     - id: round_robin_over_delegates
-      type: round_robin_over_delegates
+      type: round_robin_over_delegates_0
       if: (delegate_selection_tag == delegate_selection_tag::round_robin_over_delegates)
+  id_012__psithaca__mutez:
+    seq:
+    - id: id_012__psithaca__mutez
+      type: n
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -30,7 +34,6 @@ types:
     - id: payload
       type: b7be
   public_key:
-    doc: A Ed25519, Secp256k1, or P256 public key
     seq:
     - id: public_key_tag
       type: u1
@@ -52,24 +55,33 @@ types:
       type: u2
   round_robin_over_delegates:
     seq:
+    - id: round_robin_over_delegates_entries
+      type: round_robin_over_delegates_entries
+      repeat: eos
+  round_robin_over_delegates_0:
+    seq:
     - id: len_round_robin_over_delegates
       type: s4
     - id: round_robin_over_delegates
-      type: round_robin_over_delegates_entries
+      type: round_robin_over_delegates
       size: len_round_robin_over_delegates
+  round_robin_over_delegates_elt:
+    seq:
+    - id: round_robin_over_delegates_elt_entries
+      type: round_robin_over_delegates_elt_entries
       repeat: eos
   round_robin_over_delegates_elt_entries:
     seq:
     - id: signature__v0__public_key
       type: public_key
+      doc: A Ed25519, Secp256k1, or P256 public key
   round_robin_over_delegates_entries:
     seq:
     - id: len_round_robin_over_delegates_elt
       type: s4
     - id: round_robin_over_delegates_elt
-      type: round_robin_over_delegates_elt_entries
+      type: round_robin_over_delegates_elt
       size: len_round_robin_over_delegates_elt
-      repeat: eos
   z:
     seq:
     - id: has_tail
@@ -109,19 +121,19 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: tokens_per_roll
-  type: n
+  type: id_012__psithaca__mutez
 - id: seed_nonce_revelation_tip
-  type: n
+  type: id_012__psithaca__mutez
 - id: origination_size
   type: s4
 - id: baking_reward_fixed_portion
-  type: n
+  type: id_012__psithaca__mutez
 - id: baking_reward_bonus_per_slot
-  type: n
+  type: id_012__psithaca__mutez
 - id: endorsing_reward_per_slot
-  type: n
+  type: id_012__psithaca__mutez
 - id: cost_per_byte
-  type: n
+  type: id_012__psithaca__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
@@ -131,7 +143,7 @@ seq:
 - id: min_proposal_quorum
   type: s4
 - id: liquidity_baking_subsidy
-  type: n
+  type: id_012__psithaca__mutez
 - id: liquidity_baking_sunset_level
   type: s4
 - id: liquidity_baking_escape_ema_threshold
@@ -153,7 +165,7 @@ seq:
 - id: frozen_deposits_percentage
   type: s4
 - id: double_baking_punishment
-  type: n
+  type: id_012__psithaca__mutez
 - id: ratio_of_frozen_deposits_slashed_per_double_endorsement
   type: ratio_of_frozen_deposits_slashed_per_double_endorsement
 - id: delegate_selection

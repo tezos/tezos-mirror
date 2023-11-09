@@ -5,12 +5,16 @@ doc: ! 'Encoding id: 012-Psithaca.parameters'
 types:
   bootstrap_accounts:
     seq:
+    - id: bootstrap_accounts_entries
+      type: bootstrap_accounts_entries
+      repeat: eos
+  bootstrap_accounts_0:
+    seq:
     - id: len_bootstrap_accounts
       type: s4
     - id: bootstrap_accounts
-      type: bootstrap_accounts_entries
+      type: bootstrap_accounts
       size: len_bootstrap_accounts
-      repeat: eos
   bootstrap_accounts_entries:
     seq:
     - id: bootstrap_accounts_elt_tag
@@ -24,12 +28,16 @@ types:
       if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown)
   bootstrap_contracts:
     seq:
+    - id: bootstrap_contracts_entries
+      type: bootstrap_contracts_entries
+      repeat: eos
+  bootstrap_contracts_0:
+    seq:
     - id: len_bootstrap_contracts
       type: s4
     - id: bootstrap_contracts
-      type: bootstrap_contracts_entries
+      type: bootstrap_contracts
       size: len_bootstrap_contracts
-      repeat: eos
   bootstrap_contracts_entries:
     seq:
     - id: delegate_tag
@@ -38,8 +46,9 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: amount
-      type: n
+      type: id_012__psithaca__mutez
     - id: script
       type: id_012__psithaca__scripted__contracts
   code:
@@ -50,19 +59,23 @@ types:
       size: len_code
   commitments:
     seq:
+    - id: commitments_entries
+      type: commitments_entries
+      repeat: eos
+  commitments_0:
+    seq:
     - id: len_commitments
       type: s4
     - id: commitments
-      type: commitments_entries
+      type: commitments
       size: len_commitments
-      repeat: eos
   commitments_entries:
     seq:
     - id: commitments_elt_field0
       size: 20
       doc: blinded__public__key__hash
     - id: commitments_elt_field1
-      type: n
+      type: id_012__psithaca__mutez
       doc: id_012__psithaca__mutez
   delegate_selection:
     seq:
@@ -70,8 +83,12 @@ types:
       type: u1
       enum: delegate_selection_tag
     - id: round_robin_over_delegates
-      type: round_robin_over_delegates
+      type: round_robin_over_delegates_0
       if: (delegate_selection_tag == delegate_selection_tag::round_robin_over_delegates)
+  id_012__psithaca__mutez:
+    seq:
+    - id: id_012__psithaca__mutez
+      type: n
   id_012__psithaca__scripted__contracts:
     seq:
     - id: code
@@ -97,7 +114,6 @@ types:
     - id: payload
       type: b7be
   public_key:
-    doc: A Ed25519, Secp256k1, or P256 public key
     seq:
     - id: public_key_tag
       type: u1
@@ -112,7 +128,6 @@ types:
       size: 33
       if: (public_key_tag == public_key_tag::p256)
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -130,17 +145,23 @@ types:
     seq:
     - id: public_key_known_field0
       type: public_key
-      doc: signature__v0__public_key
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key
+
+
+        signature__v0__public_key'
     - id: public_key_known_field1
-      type: n
+      type: id_012__psithaca__mutez
       doc: id_012__psithaca__mutez
   public_key_unknown:
     seq:
     - id: public_key_unknown_field0
       type: public_key_hash
-      doc: signature__v0__public_key_hash
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key hash
+
+
+        signature__v0__public_key_hash'
     - id: public_key_unknown_field1
-      type: n
+      type: id_012__psithaca__mutez
       doc: id_012__psithaca__mutez
   ratio_of_frozen_deposits_slashed_per_double_endorsement:
     seq:
@@ -150,24 +171,33 @@ types:
       type: u2
   round_robin_over_delegates:
     seq:
+    - id: round_robin_over_delegates_entries
+      type: round_robin_over_delegates_entries
+      repeat: eos
+  round_robin_over_delegates_0:
+    seq:
     - id: len_round_robin_over_delegates
       type: s4
     - id: round_robin_over_delegates
-      type: round_robin_over_delegates_entries
+      type: round_robin_over_delegates
       size: len_round_robin_over_delegates
+  round_robin_over_delegates_elt:
+    seq:
+    - id: round_robin_over_delegates_elt_entries
+      type: round_robin_over_delegates_elt_entries
       repeat: eos
   round_robin_over_delegates_elt_entries:
     seq:
     - id: signature__v0__public_key
       type: public_key
+      doc: A Ed25519, Secp256k1, or P256 public key
   round_robin_over_delegates_entries:
     seq:
     - id: len_round_robin_over_delegates_elt
       type: s4
     - id: round_robin_over_delegates_elt
-      type: round_robin_over_delegates_elt_entries
+      type: round_robin_over_delegates_elt
       size: len_round_robin_over_delegates_elt
-      repeat: eos
   storage:
     seq:
     - id: len_storage
@@ -207,11 +237,11 @@ enums:
     2: p256
 seq:
 - id: bootstrap_accounts
-  type: bootstrap_accounts
+  type: bootstrap_accounts_0
 - id: bootstrap_contracts
-  type: bootstrap_contracts
+  type: bootstrap_contracts_0
 - id: commitments
-  type: commitments
+  type: commitments_0
 - id: security_deposit_ramp_up_cycles_tag
   type: u1
   enum: bool
@@ -241,19 +271,19 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: tokens_per_roll
-  type: n
+  type: id_012__psithaca__mutez
 - id: seed_nonce_revelation_tip
-  type: n
+  type: id_012__psithaca__mutez
 - id: origination_size
   type: s4
 - id: baking_reward_fixed_portion
-  type: n
+  type: id_012__psithaca__mutez
 - id: baking_reward_bonus_per_slot
-  type: n
+  type: id_012__psithaca__mutez
 - id: endorsing_reward_per_slot
-  type: n
+  type: id_012__psithaca__mutez
 - id: cost_per_byte
-  type: n
+  type: id_012__psithaca__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
@@ -263,7 +293,7 @@ seq:
 - id: min_proposal_quorum
   type: s4
 - id: liquidity_baking_subsidy
-  type: n
+  type: id_012__psithaca__mutez
 - id: liquidity_baking_sunset_level
   type: s4
 - id: liquidity_baking_escape_ema_threshold
@@ -285,7 +315,7 @@ seq:
 - id: frozen_deposits_percentage
   type: s4
 - id: double_baking_punishment
-  type: n
+  type: id_012__psithaca__mutez
 - id: ratio_of_frozen_deposits_slashed_per_double_endorsement
   type: ratio_of_frozen_deposits_slashed_per_double_endorsement
 - id: delegate_selection

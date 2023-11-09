@@ -32,6 +32,10 @@ types:
       size: 32
       if: (seed_nonce_hash_tag == bool::true)
     - id: per_block_votes
+      type: alpha__per_block_votes
+  alpha__per_block_votes:
+    seq:
+    - id: alpha__per_block_votes_tag
       type: u1
       enum: alpha__per_block_votes_tag
 enums:

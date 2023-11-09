@@ -3,14 +3,19 @@ meta:
   endian: be
 doc: ! 'Encoding id: 015-PtLimaPt.vote.listings'
 types:
+  id_015__ptlimapt__vote__listings:
+    seq:
+    - id: id_015__ptlimapt__vote__listings_entries
+      type: id_015__ptlimapt__vote__listings_entries
+      repeat: eos
   id_015__ptlimapt__vote__listings_entries:
     seq:
     - id: pkh
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: voting_power
       type: s8
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -33,6 +38,5 @@ seq:
 - id: len_id_015__ptlimapt__vote__listings
   type: s4
 - id: id_015__ptlimapt__vote__listings
-  type: id_015__ptlimapt__vote__listings_entries
+  type: id_015__ptlimapt__vote__listings
   size: len_id_015__ptlimapt__vote__listings
-  repeat: eos

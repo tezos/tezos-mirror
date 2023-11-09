@@ -2,6 +2,12 @@ meta:
   id: id_007__psdelph1__script__prim
   endian: be
 doc: ! 'Encoding id: 007-PsDELPH1.script.prim'
+types:
+  id_007__psdelph1__michelson__v1__primitives:
+    seq:
+    - id: id_007__psdelph1__michelson__v1__primitives
+      type: u1
+      enum: id_007__psdelph1__michelson__v1__primitives
 enums:
   id_007__psdelph1__michelson__v1__primitives:
     0: parameter
@@ -308,5 +314,4 @@ enums:
       doc: CHAIN_ID
 seq:
 - id: id_007__psdelph1__michelson__v1__primitives
-  type: u1
-  enum: id_007__psdelph1__michelson__v1__primitives
+  type: id_007__psdelph1__michelson__v1__primitives

@@ -2,6 +2,12 @@ meta:
   id: alpha__script__prim
   endian: be
 doc: ! 'Encoding id: alpha.script.prim'
+types:
+  alpha__michelson__v1__primitives:
+    seq:
+    - id: alpha__michelson__v1__primitives
+      type: u1
+      enum: alpha__michelson__v1__primitives
 enums:
   alpha__michelson__v1__primitives:
     0: parameter
@@ -399,5 +405,4 @@ enums:
       doc: NAT
 seq:
 - id: alpha__michelson__v1__primitives
-  type: u1
-  enum: alpha__michelson__v1__primitives
+  type: alpha__michelson__v1__primitives

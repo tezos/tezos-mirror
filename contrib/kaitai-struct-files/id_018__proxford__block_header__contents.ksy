@@ -18,6 +18,10 @@ types:
       size: 32
       if: (seed_nonce_hash_tag == bool::true)
     - id: per_block_votes
+      type: id_018__proxford__per_block_votes
+  id_018__proxford__per_block_votes:
+    seq:
+    - id: id_018__proxford__per_block_votes_tag
       type: u1
       enum: id_018__proxford__per_block_votes_tag
 enums:

@@ -2,6 +2,12 @@ meta:
   id: id_016__ptmumbai__script__prim
   endian: be
 doc: ! 'Encoding id: 016-PtMumbai.script.prim'
+types:
+  id_016__ptmumbai__michelson__v1__primitives:
+    seq:
+    - id: id_016__ptmumbai__michelson__v1__primitives
+      type: u1
+      enum: id_016__ptmumbai__michelson__v1__primitives
 enums:
   id_016__ptmumbai__michelson__v1__primitives:
     0: parameter
@@ -399,5 +405,4 @@ enums:
       doc: NAT
 seq:
 - id: id_016__ptmumbai__michelson__v1__primitives
-  type: u1
-  enum: id_016__ptmumbai__michelson__v1__primitives
+  type: id_016__ptmumbai__michelson__v1__primitives

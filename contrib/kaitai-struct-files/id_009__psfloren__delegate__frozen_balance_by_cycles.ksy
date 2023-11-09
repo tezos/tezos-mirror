@@ -3,15 +3,24 @@ meta:
   endian: be
 doc: ! 'Encoding id: 009-PsFLoren.delegate.frozen_balance_by_cycles'
 types:
+  id_009__psfloren__delegate__frozen_balance_by_cycles:
+    seq:
+    - id: id_009__psfloren__delegate__frozen_balance_by_cycles_entries
+      type: id_009__psfloren__delegate__frozen_balance_by_cycles_entries
+      repeat: eos
   id_009__psfloren__delegate__frozen_balance_by_cycles_entries:
     seq:
     - id: cycle
       type: s4
     - id: deposit
-      type: n
+      type: id_009__psfloren__mutez
     - id: fees
-      type: n
+      type: id_009__psfloren__mutez
     - id: rewards
+      type: id_009__psfloren__mutez
+  id_009__psfloren__mutez:
+    seq:
+    - id: id_009__psfloren__mutez
       type: n
   n:
     seq:
@@ -29,6 +38,5 @@ seq:
 - id: len_id_009__psfloren__delegate__frozen_balance_by_cycles
   type: s4
 - id: id_009__psfloren__delegate__frozen_balance_by_cycles
-  type: id_009__psfloren__delegate__frozen_balance_by_cycles_entries
+  type: id_009__psfloren__delegate__frozen_balance_by_cycles
   size: len_id_009__psfloren__delegate__frozen_balance_by_cycles
-  repeat: eos

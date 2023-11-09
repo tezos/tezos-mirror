@@ -2,6 +2,12 @@ meta:
   id: id_017__ptnairob__script__prim
   endian: be
 doc: ! 'Encoding id: 017-PtNairob.script.prim'
+types:
+  id_017__ptnairob__michelson__v1__primitives:
+    seq:
+    - id: id_017__ptnairob__michelson__v1__primitives
+      type: u1
+      enum: id_017__ptnairob__michelson__v1__primitives
 enums:
   id_017__ptnairob__michelson__v1__primitives:
     0: parameter
@@ -399,5 +405,4 @@ enums:
       doc: NAT
 seq:
 - id: id_017__ptnairob__michelson__v1__primitives
-  type: u1
-  enum: id_017__ptnairob__michelson__v1__primitives
+  type: id_017__ptnairob__michelson__v1__primitives

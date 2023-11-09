@@ -5,24 +5,32 @@ doc: ! 'Encoding id: 007-PsDELPH1.parameters'
 types:
   baking_reward_per_endorsement:
     seq:
+    - id: baking_reward_per_endorsement_entries
+      type: baking_reward_per_endorsement_entries
+      repeat: eos
+  baking_reward_per_endorsement_0:
+    seq:
     - id: len_baking_reward_per_endorsement
       type: s4
     - id: baking_reward_per_endorsement
-      type: baking_reward_per_endorsement_entries
+      type: baking_reward_per_endorsement
       size: len_baking_reward_per_endorsement
-      repeat: eos
   baking_reward_per_endorsement_entries:
     seq:
     - id: id_007__psdelph1__mutez
-      type: n
+      type: id_007__psdelph1__mutez
   bootstrap_accounts:
+    seq:
+    - id: bootstrap_accounts_entries
+      type: bootstrap_accounts_entries
+      repeat: eos
+  bootstrap_accounts_0:
     seq:
     - id: len_bootstrap_accounts
       type: s4
     - id: bootstrap_accounts
-      type: bootstrap_accounts_entries
+      type: bootstrap_accounts
       size: len_bootstrap_accounts
-      repeat: eos
   bootstrap_accounts_entries:
     seq:
     - id: bootstrap_accounts_elt_tag
@@ -36,18 +44,23 @@ types:
       if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown)
   bootstrap_contracts:
     seq:
+    - id: bootstrap_contracts_entries
+      type: bootstrap_contracts_entries
+      repeat: eos
+  bootstrap_contracts_0:
+    seq:
     - id: len_bootstrap_contracts
       type: s4
     - id: bootstrap_contracts
-      type: bootstrap_contracts_entries
+      type: bootstrap_contracts
       size: len_bootstrap_contracts
-      repeat: eos
   bootstrap_contracts_entries:
     seq:
     - id: delegate
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: amount
-      type: n
+      type: id_007__psdelph1__mutez
     - id: script
       type: id_007__psdelph1__scripted__contracts
   code:
@@ -58,29 +71,41 @@ types:
       size: len_code
   commitments:
     seq:
+    - id: commitments_entries
+      type: commitments_entries
+      repeat: eos
+  commitments_0:
+    seq:
     - id: len_commitments
       type: s4
     - id: commitments
-      type: commitments_entries
+      type: commitments
       size: len_commitments
-      repeat: eos
   commitments_entries:
     seq:
     - id: commitments_elt_field0
       size: 20
       doc: blinded__public__key__hash
     - id: commitments_elt_field1
-      type: n
+      type: id_007__psdelph1__mutez
       doc: id_007__psdelph1__mutez
   endorsement_reward:
+    seq:
+    - id: endorsement_reward_entries
+      type: endorsement_reward_entries
+      repeat: eos
+  endorsement_reward_0:
     seq:
     - id: len_endorsement_reward
       type: s4
     - id: endorsement_reward
-      type: endorsement_reward_entries
+      type: endorsement_reward
       size: len_endorsement_reward
-      repeat: eos
   endorsement_reward_entries:
+    seq:
+    - id: id_007__psdelph1__mutez
+      type: id_007__psdelph1__mutez
+  id_007__psdelph1__mutez:
     seq:
     - id: id_007__psdelph1__mutez
       type: n
@@ -103,7 +128,6 @@ types:
     - id: payload
       type: b7be
   public_key:
-    doc: A Ed25519, Secp256k1, or P256 public key
     seq:
     - id: public_key_tag
       type: u1
@@ -118,7 +142,6 @@ types:
       size: 33
       if: (public_key_tag == public_key_tag::p256)
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -136,17 +159,23 @@ types:
     seq:
     - id: public_key_known_field0
       type: public_key
-      doc: signature__v0__public_key
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key
+
+
+        signature__v0__public_key'
     - id: public_key_known_field1
-      type: n
+      type: id_007__psdelph1__mutez
       doc: id_007__psdelph1__mutez
   public_key_unknown:
     seq:
     - id: public_key_unknown_field0
       type: public_key_hash
-      doc: signature__v0__public_key_hash
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key hash
+
+
+        signature__v0__public_key_hash'
     - id: public_key_unknown_field1
-      type: n
+      type: id_007__psdelph1__mutez
       doc: id_007__psdelph1__mutez
   storage:
     seq:
@@ -156,12 +185,16 @@ types:
       size: len_storage
   time_between_blocks:
     seq:
+    - id: time_between_blocks_entries
+      type: time_between_blocks_entries
+      repeat: eos
+  time_between_blocks_0:
+    seq:
     - id: len_time_between_blocks
       type: s4
     - id: time_between_blocks
-      type: time_between_blocks_entries
+      type: time_between_blocks
       size: len_time_between_blocks
-      repeat: eos
   time_between_blocks_entries:
     seq:
     - id: time_between_blocks_elt
@@ -196,11 +229,11 @@ enums:
     2: p256
 seq:
 - id: bootstrap_accounts
-  type: bootstrap_accounts
+  type: bootstrap_accounts_0
 - id: bootstrap_contracts
-  type: bootstrap_contracts
+  type: bootstrap_contracts_0
 - id: commitments
-  type: commitments
+  type: commitments_0
 - id: security_deposit_ramp_up_cycles_tag
   type: u1
   enum: bool
@@ -224,7 +257,7 @@ seq:
 - id: blocks_per_voting_period
   type: s4
 - id: time_between_blocks
-  type: time_between_blocks
+  type: time_between_blocks_0
 - id: endorsers_per_block
   type: u2
 - id: hard_gas_limit_per_operation
@@ -234,23 +267,23 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: tokens_per_roll
-  type: n
+  type: id_007__psdelph1__mutez
 - id: michelson_maximum_type_size
   type: u2
 - id: seed_nonce_revelation_tip
-  type: n
+  type: id_007__psdelph1__mutez
 - id: origination_size
   type: s4
 - id: block_security_deposit
-  type: n
+  type: id_007__psdelph1__mutez
 - id: endorsement_security_deposit
-  type: n
+  type: id_007__psdelph1__mutez
 - id: baking_reward_per_endorsement
-  type: baking_reward_per_endorsement
+  type: baking_reward_per_endorsement_0
 - id: endorsement_reward
-  type: endorsement_reward
+  type: endorsement_reward_0
 - id: cost_per_byte
-  type: n
+  type: id_007__psdelph1__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: test_chain_duration

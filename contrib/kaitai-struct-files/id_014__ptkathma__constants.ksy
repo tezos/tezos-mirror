@@ -16,6 +16,10 @@ types:
       type: s2
     - id: availability_threshold
       type: s2
+  id_014__ptkathma__mutez:
+    seq:
+    - id: id_014__ptkathma__mutez
+      type: n
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -35,7 +39,6 @@ types:
     - id: payload
       type: b7be
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -118,21 +121,21 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: tokens_per_roll
-  type: n
+  type: id_014__ptkathma__mutez
 - id: vdf_difficulty
   type: s8
 - id: seed_nonce_revelation_tip
-  type: n
+  type: id_014__ptkathma__mutez
 - id: origination_size
   type: s4
 - id: baking_reward_fixed_portion
-  type: n
+  type: id_014__ptkathma__mutez
 - id: baking_reward_bonus_per_slot
-  type: n
+  type: id_014__ptkathma__mutez
 - id: endorsing_reward_per_slot
-  type: n
+  type: id_014__ptkathma__mutez
 - id: cost_per_byte
-  type: n
+  type: id_014__ptkathma__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
@@ -142,7 +145,7 @@ seq:
 - id: min_proposal_quorum
   type: s4
 - id: liquidity_baking_subsidy
-  type: n
+  type: id_014__ptkathma__mutez
 - id: liquidity_baking_sunset_level
   type: s4
 - id: liquidity_baking_toggle_ema_threshold
@@ -164,7 +167,7 @@ seq:
 - id: frozen_deposits_percentage
   type: s4
 - id: double_baking_punishment
-  type: n
+  type: id_014__ptkathma__mutez
 - id: ratio_of_frozen_deposits_slashed_per_double_endorsement
   type: ratio_of_frozen_deposits_slashed_per_double_endorsement
 - id: testnet_dictator_tag
@@ -173,6 +176,7 @@ seq:
 - id: testnet_dictator
   type: public_key_hash
   if: (testnet_dictator_tag == bool::true)
+  doc: A Ed25519, Secp256k1, or P256 public key hash
 - id: initial_seed_tag
   type: u1
   enum: bool
@@ -197,7 +201,7 @@ seq:
 - id: tx_rollup_max_withdrawals_per_batch
   type: s4
 - id: tx_rollup_commitment_bond
-  type: n
+  type: id_014__ptkathma__mutez
 - id: tx_rollup_finality_period
   type: s4
 - id: tx_rollup_withdraw_period
@@ -228,7 +232,7 @@ seq:
 - id: sc_rollup_max_available_messages
   type: s4
 - id: sc_rollup_stake_amount
-  type: n
+  type: id_014__ptkathma__mutez
 - id: sc_rollup_commitment_period_in_blocks
   type: s4
 - id: sc_rollup_max_lookahead_in_blocks

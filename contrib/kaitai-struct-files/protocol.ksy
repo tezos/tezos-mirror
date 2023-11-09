@@ -9,12 +9,16 @@ doc: ! >-
 types:
   components:
     seq:
+    - id: components_entries
+      type: components_entries
+      repeat: eos
+  components_0:
+    seq:
     - id: len_components
       type: s4
     - id: components
-      type: components_entries
+      type: components
       size: len_components
-      repeat: eos
   components_entries:
     seq:
     - id: name
@@ -45,12 +49,16 @@ types:
       type: s4
     - id: name
       size: len_name
+  protocol__environment_version:
+    seq:
+    - id: protocol__environment_version
+      type: u2
 enums:
   bool:
     0: false
     255: true
 seq:
 - id: expected_env_version
-  type: u2
+  type: protocol__environment_version
 - id: components
-  type: components
+  type: components_0

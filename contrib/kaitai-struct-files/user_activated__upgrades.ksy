@@ -6,6 +6,11 @@ doc: ! >-
 
   Description: User activated upgrades: at given level, switch to given protocol.
 types:
+  user_activated__upgrades:
+    seq:
+    - id: user_activated__upgrades_entries
+      type: user_activated__upgrades_entries
+      repeat: eos
   user_activated__upgrades_entries:
     seq:
     - id: level
@@ -16,6 +21,5 @@ seq:
 - id: len_user_activated__upgrades
   type: s4
 - id: user_activated__upgrades
-  type: user_activated__upgrades_entries
+  type: user_activated__upgrades
   size: len_user_activated__upgrades
-  repeat: eos

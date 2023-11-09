@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 008-PtEdo2Zk.tez'
 types:
+  id_008__ptedo2zk__mutez:
+    seq:
+    - id: id_008__ptedo2zk__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_008__ptedo2zk__mutez
-  type: n
+  type: id_008__ptedo2zk__mutez

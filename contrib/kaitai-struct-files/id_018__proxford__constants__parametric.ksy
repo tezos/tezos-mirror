@@ -44,6 +44,10 @@ types:
       type: s4
     - id: number_of_shards
       type: u2
+  id_018__proxford__mutez:
+    seq:
+    - id: id_018__proxford__mutez
+      type: n
   issuance_ratio_max:
     seq:
     - id: numerator
@@ -59,7 +63,7 @@ types:
   issuance_weights:
     seq:
     - id: base_total_issued_per_minute
-      type: n
+      type: id_018__proxford__mutez
     - id: baking_reward_fixed_portion_weight
       type: s4
     - id: baking_reward_bonus_weight
@@ -91,7 +95,6 @@ types:
     - id: payload
       type: b7be
   public_key_hash:
-    doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -164,9 +167,9 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: minimal_stake
-  type: n
+  type: id_018__proxford__mutez
 - id: minimal_frozen_stake
-  type: n
+  type: id_018__proxford__mutez
 - id: vdf_difficulty
   type: s8
 - id: origination_size
@@ -174,7 +177,7 @@ seq:
 - id: issuance_weights
   type: issuance_weights
 - id: cost_per_byte
-  type: n
+  type: id_018__proxford__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
@@ -211,6 +214,7 @@ seq:
 - id: testnet_dictator
   type: public_key_hash
   if: (testnet_dictator_tag == bool::true)
+  doc: A Ed25519, Secp256k1, P256, or BLS public key hash
 - id: initial_seed_tag
   type: u1
   enum: bool
@@ -236,7 +240,7 @@ seq:
 - id: smart_rollup_challenge_window_in_blocks
   type: s4
 - id: smart_rollup_stake_amount
-  type: n
+  type: id_018__proxford__mutez
 - id: smart_rollup_commitment_period_in_blocks
   type: s4
 - id: smart_rollup_max_lookahead_in_blocks

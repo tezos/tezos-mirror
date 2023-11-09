@@ -2,6 +2,12 @@ meta:
   id: id_012__psithaca__script__prim
   endian: be
 doc: ! 'Encoding id: 012-Psithaca.script.prim'
+types:
+  id_012__psithaca__michelson__v1__primitives:
+    seq:
+    - id: id_012__psithaca__michelson__v1__primitives
+      type: u1
+      enum: id_012__psithaca__michelson__v1__primitives
 enums:
   id_012__psithaca__michelson__v1__primitives:
     0: parameter
@@ -376,5 +382,4 @@ enums:
       doc: SUB_MUTEZ
 seq:
 - id: id_012__psithaca__michelson__v1__primitives
-  type: u1
-  enum: id_012__psithaca__michelson__v1__primitives
+  type: id_012__psithaca__michelson__v1__primitives

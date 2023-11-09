@@ -7,6 +7,9 @@ types:
     seq:
     - id: contract
       type: id_018__proxford__contract_id
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: bond_id
       type: id_018__proxford__bond_id
   id_018__proxford__bond_id:
@@ -18,9 +21,6 @@ types:
       size: 20
       if: (id_018__proxford__bond_id_tag == id_018__proxford__bond_id_tag::smart_rollup_bond_id)
   id_018__proxford__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
     seq:
     - id: id_018__proxford__contract_id_tag
       type: u1
@@ -28,6 +28,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (id_018__proxford__contract_id_tag == id_018__proxford__contract_id_tag::implicit)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: originated
       type: originated
       if: (id_018__proxford__contract_id_tag == id_018__proxford__contract_id_tag::originated)
@@ -39,9 +40,15 @@ types:
     - id: contract
       type: id_018__proxford__contract_id
       if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::contract)
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: deposits
       type: id_018__proxford__staker
       if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::deposits)
+      doc: ! >-
+        staker: Abstract notion of staker used in operation receipts, either a single
+        staker or all the stakers delegating to some delegate.
     - id: lost_attesting_rewards
       type: lost_attesting_rewards
       if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::lost_attesting_rewards)
@@ -54,27 +61,36 @@ types:
     - id: unstaked_deposits
       type: unstaked_deposits
       if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::unstaked_deposits)
+  id_018__proxford__operation_metadata__alpha__balance_update:
+    seq:
+    - id: change
+      type: s8
   id_018__proxford__operation_metadata__alpha__balance_updates:
+    seq:
+    - id: id_018__proxford__operation_metadata__alpha__balance_updates_entries
+      type: id_018__proxford__operation_metadata__alpha__balance_updates_entries
+      repeat: eos
+  id_018__proxford__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_id_018__proxford__operation_metadata__alpha__balance_updates
       type: s4
     - id: id_018__proxford__operation_metadata__alpha__balance_updates
-      type: id_018__proxford__operation_metadata__alpha__balance_updates_entries
+      type: id_018__proxford__operation_metadata__alpha__balance_updates
       size: len_id_018__proxford__operation_metadata__alpha__balance_updates
-      repeat: eos
   id_018__proxford__operation_metadata__alpha__balance_updates_entries:
     seq:
     - id: id_018__proxford__operation_metadata__alpha__balance
       type: id_018__proxford__operation_metadata__alpha__balance
-    - id: change
-      type: s8
+    - id: id_018__proxford__operation_metadata__alpha__balance_update
+      type: id_018__proxford__operation_metadata__alpha__balance_update
+    - id: id_018__proxford__operation_metadata__alpha__update_origin
+      type: id_018__proxford__operation_metadata__alpha__update_origin
+  id_018__proxford__operation_metadata__alpha__update_origin:
+    seq:
     - id: origin
       type: u1
       enum: origin_tag
   id_018__proxford__staker:
-    doc: ! >-
-      staker: Abstract notion of staker used in operation receipts, either a single
-      staker or all the stakers delegating to some delegate.
     seq:
     - id: id_018__proxford__staker_tag
       type: u1
@@ -85,10 +101,12 @@ types:
     - id: shared
       type: public_key_hash
       if: (id_018__proxford__staker_tag == id_018__proxford__staker_tag::shared)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   lost_attesting_rewards:
     seq:
     - id: delegate
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: participation
       type: u1
       enum: bool
@@ -103,7 +121,6 @@ types:
       size: 1
       doc: This field is for padding, ignore
   public_key_hash:
-    doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -124,12 +141,19 @@ types:
     seq:
     - id: contract
       type: id_018__proxford__contract_id
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: delegate
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   unstaked_deposits:
     seq:
     - id: staker
       type: id_018__proxford__staker
+      doc: ! >-
+        staker: Abstract notion of staker used in operation receipts, either a single
+        staker or all the stakers delegating to some delegate.
     - id: cycle
       type: s4
 enums:
@@ -178,4 +202,4 @@ enums:
     3: bls
 seq:
 - id: id_018__proxford__operation_metadata__alpha__balance_updates
-  type: id_018__proxford__operation_metadata__alpha__balance_updates
+  type: id_018__proxford__operation_metadata__alpha__balance_updates_0

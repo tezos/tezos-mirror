@@ -2,6 +2,12 @@ meta:
   id: id_013__ptjakart__script__prim
   endian: be
 doc: ! 'Encoding id: 013-PtJakart.script.prim'
+types:
+  id_013__ptjakart__michelson__v1__primitives:
+    seq:
+    - id: id_013__ptjakart__michelson__v1__primitives
+      type: u1
+      enum: id_013__ptjakart__michelson__v1__primitives
 enums:
   id_013__ptjakart__michelson__v1__primitives:
     0: parameter
@@ -381,5 +387,4 @@ enums:
     150: sapling_transaction
 seq:
 - id: id_013__ptjakart__michelson__v1__primitives
-  type: u1
-  enum: id_013__ptjakart__michelson__v1__primitives
+  type: id_013__ptjakart__michelson__v1__primitives

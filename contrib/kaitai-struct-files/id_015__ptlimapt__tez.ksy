@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 015-PtLimaPt.tez'
 types:
+  id_015__ptlimapt__mutez:
+    seq:
+    - id: id_015__ptlimapt__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_015__ptlimapt__mutez
-  type: n
+  type: id_015__ptlimapt__mutez

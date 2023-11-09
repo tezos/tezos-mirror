@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 014-PtKathma.tez'
 types:
+  id_014__ptkathma__mutez:
+    seq:
+    - id: id_014__ptkathma__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_014__ptkathma__mutez
-  type: n
+  type: id_014__ptkathma__mutez

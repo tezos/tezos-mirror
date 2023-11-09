@@ -13,6 +13,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: data
       type: data
     - id: signature_tag
@@ -25,6 +26,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: data
       type: data
     - id: signature_tag
@@ -34,7 +36,6 @@ types:
       size-eos: true
       if: (signature_tag == bool::true)
   public_key_hash:
-    doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -55,6 +56,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: data
       type: data
     - id: signature_tag
@@ -63,6 +65,16 @@ types:
     - id: signature
       size-eos: true
       if: (signature_tag == bool::true)
+  signer_messages__public_key__request:
+    seq:
+    - id: pkh
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+  signer_messages__supports_deterministic_nonces__request:
+    seq:
+    - id: pkh
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
 enums:
   bool:
     0: false
@@ -87,7 +99,7 @@ seq:
   type: sign
   if: (signer_messages__request_tag == signer_messages__request_tag::sign)
 - id: public_key
-  type: public_key_hash
+  type: signer_messages__public_key__request
   if: (signer_messages__request_tag == signer_messages__request_tag::public_key)
 - id: deterministic_nonce
   type: deterministic_nonce
@@ -96,5 +108,5 @@ seq:
   type: deterministic_nonce_hash
   if: (signer_messages__request_tag == signer_messages__request_tag::deterministic_nonce_hash)
 - id: supports_deterministic_nonces
-  type: public_key_hash
+  type: signer_messages__supports_deterministic_nonces__request
   if: (signer_messages__request_tag == signer_messages__request_tag::supports_deterministic_nonces)

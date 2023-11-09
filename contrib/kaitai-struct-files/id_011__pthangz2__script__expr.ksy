@@ -11,12 +11,16 @@ types:
       size: len_annots
   args:
     seq:
+    - id: args_entries
+      type: args_entries
+      repeat: eos
+  args_0:
+    seq:
     - id: len_args
       type: s4
     - id: args
-      type: args_entries
+      type: args
       size: len_args
-      repeat: eos
   args_entries:
     seq:
     - id: args_elt
@@ -27,6 +31,11 @@ types:
       type: s4
     - id: bytes
       size: len_bytes
+  id_011__pthangz2__michelson__v1__primitives:
+    seq:
+    - id: id_011__pthangz2__michelson__v1__primitives
+      type: u1
+      enum: id_011__pthangz2__michelson__v1__primitives
   micheline__011__pthangz2__michelson_v1__expression:
     seq:
     - id: micheline__011__pthangz2__michelson_v1__expression_tag
@@ -39,12 +48,11 @@ types:
       type: string
       if: (micheline__011__pthangz2__michelson_v1__expression_tag == micheline__011__pthangz2__michelson_v1__expression_tag::string)
     - id: sequence
-      type: sequence
+      type: sequence_0
       if: (micheline__011__pthangz2__michelson_v1__expression_tag == micheline__011__pthangz2__michelson_v1__expression_tag::sequence)
     - id: prim__no_args__no_annots
-      type: u1
+      type: id_011__pthangz2__michelson__v1__primitives
       if: (micheline__011__pthangz2__michelson_v1__expression_tag == micheline__011__pthangz2__michelson_v1__expression_tag::prim__no_args__no_annots)
-      enum: id_011__pthangz2__michelson__v1__primitives
     - id: prim__no_args__some_annots
       type: prim__no_args__some_annots
       if: (micheline__011__pthangz2__michelson_v1__expression_tag == micheline__011__pthangz2__michelson_v1__expression_tag::prim__no_args__some_annots)
@@ -75,15 +83,13 @@ types:
   prim__1_arg__no_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_011__pthangz2__michelson__v1__primitives
+      type: id_011__pthangz2__michelson__v1__primitives
     - id: arg
       type: micheline__011__pthangz2__michelson_v1__expression
   prim__1_arg__some_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_011__pthangz2__michelson__v1__primitives
+      type: id_011__pthangz2__michelson__v1__primitives
     - id: arg
       type: micheline__011__pthangz2__michelson_v1__expression
     - id: annots
@@ -91,8 +97,7 @@ types:
   prim__2_args__no_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_011__pthangz2__michelson__v1__primitives
+      type: id_011__pthangz2__michelson__v1__primitives
     - id: arg1
       type: micheline__011__pthangz2__michelson_v1__expression
     - id: arg2
@@ -100,8 +105,7 @@ types:
   prim__2_args__some_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_011__pthangz2__michelson__v1__primitives
+      type: id_011__pthangz2__michelson__v1__primitives
     - id: arg1
       type: micheline__011__pthangz2__michelson_v1__expression
     - id: arg2
@@ -111,27 +115,29 @@ types:
   prim__generic:
     seq:
     - id: prim
-      type: u1
-      enum: id_011__pthangz2__michelson__v1__primitives
+      type: id_011__pthangz2__michelson__v1__primitives
     - id: args
-      type: args
+      type: args_0
     - id: annots
       type: annots
   prim__no_args__some_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_011__pthangz2__michelson__v1__primitives
+      type: id_011__pthangz2__michelson__v1__primitives
     - id: annots
       type: annots
   sequence:
     seq:
+    - id: sequence_entries
+      type: sequence_entries
+      repeat: eos
+  sequence_0:
+    seq:
     - id: len_sequence
       type: s4
     - id: sequence
-      type: sequence_entries
+      type: sequence
       size: len_sequence
-      repeat: eos
   sequence_entries:
     seq:
     - id: sequence_elt

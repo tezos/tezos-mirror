@@ -17,10 +17,8 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
   id_005__psbabym1__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
     seq:
     - id: id_005__psbabym1__contract_id_tag
       type: u1
@@ -28,22 +26,29 @@ types:
     - id: implicit
       type: public_key_hash
       if: (id_005__psbabym1__contract_id_tag == id_005__psbabym1__contract_id_tag::implicit)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: originated
       type: originated
       if: (id_005__psbabym1__contract_id_tag == id_005__psbabym1__contract_id_tag::originated)
   id_005__psbabym1__entrypoint:
-    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     seq:
     - id: id_005__psbabym1__entrypoint_tag
       type: u1
       enum: id_005__psbabym1__entrypoint_tag
     - id: named
-      type: named
+      type: named_0
       if: (id_005__psbabym1__entrypoint_tag == id_005__psbabym1__entrypoint_tag::named)
+  id_005__psbabym1__mutez:
+    seq:
+    - id: id_005__psbabym1__mutez
+      type: n
   id_005__psbabym1__operation__alpha__internal_operation:
     seq:
     - id: source
       type: id_005__psbabym1__contract_id
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: nonce
       type: u2
     - id: id_005__psbabym1__operation__alpha__internal_operation_tag
@@ -52,6 +57,7 @@ types:
     - id: reveal
       type: public_key
       if: (id_005__psbabym1__operation__alpha__internal_operation_tag == id_005__psbabym1__operation__alpha__internal_operation_tag::reveal)
+      doc: A Ed25519, Secp256k1, or P256 public key
     - id: transaction
       type: transaction
       if: (id_005__psbabym1__operation__alpha__internal_operation_tag == id_005__psbabym1__operation__alpha__internal_operation_tag::transaction)
@@ -81,11 +87,15 @@ types:
       type: b7be
   named:
     seq:
+    - id: named
+      size-eos: true
+  named_0:
+    seq:
     - id: len_named
       type: u1
     - id: named
+      type: named
       size: len_named
-      size-eos: true
   originated:
     seq:
     - id: contract_hash
@@ -96,23 +106,24 @@ types:
   origination:
     seq:
     - id: balance
-      type: n
+      type: id_005__psbabym1__mutez
     - id: delegate_tag
       type: u1
       enum: bool
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: script
       type: id_005__psbabym1__scripted__contracts
   parameters:
     seq:
     - id: entrypoint
       type: id_005__psbabym1__entrypoint
+      doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
       type: value
   public_key:
-    doc: A Ed25519, Secp256k1, or P256 public key
     seq:
     - id: public_key_tag
       type: u1
@@ -127,7 +138,6 @@ types:
       size: 33
       if: (public_key_tag == public_key_tag::p256)
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -150,9 +160,12 @@ types:
   transaction:
     seq:
     - id: amount
-      type: n
+      type: id_005__psbabym1__mutez
     - id: destination
       type: id_005__psbabym1__contract_id
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: parameters_tag
       type: u1
       enum: bool

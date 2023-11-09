@@ -32,6 +32,10 @@ types:
       size: 32
       if: (seed_nonce_hash_tag == bool::true)
     - id: liquidity_baking_toggle_vote
+      type: id_016__ptmumbai__liquidity_baking_toggle_vote
+  id_016__ptmumbai__liquidity_baking_toggle_vote:
+    seq:
+    - id: id_016__ptmumbai__liquidity_baking_toggle_vote
       type: s1
 enums:
   bool:

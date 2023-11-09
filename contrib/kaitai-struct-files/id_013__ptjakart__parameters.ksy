@@ -5,12 +5,16 @@ doc: ! 'Encoding id: 013-PtJakart.parameters'
 types:
   bootstrap_accounts:
     seq:
+    - id: bootstrap_accounts_entries
+      type: bootstrap_accounts_entries
+      repeat: eos
+  bootstrap_accounts_0:
+    seq:
     - id: len_bootstrap_accounts
       type: s4
     - id: bootstrap_accounts
-      type: bootstrap_accounts_entries
+      type: bootstrap_accounts
       size: len_bootstrap_accounts
-      repeat: eos
   bootstrap_accounts_entries:
     seq:
     - id: bootstrap_accounts_elt_tag
@@ -24,12 +28,16 @@ types:
       if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown)
   bootstrap_contracts:
     seq:
+    - id: bootstrap_contracts_entries
+      type: bootstrap_contracts_entries
+      repeat: eos
+  bootstrap_contracts_0:
+    seq:
     - id: len_bootstrap_contracts
       type: s4
     - id: bootstrap_contracts
-      type: bootstrap_contracts_entries
+      type: bootstrap_contracts
       size: len_bootstrap_contracts
-      repeat: eos
   bootstrap_contracts_entries:
     seq:
     - id: delegate_tag
@@ -38,8 +46,9 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: amount
-      type: n
+      type: id_013__ptjakart__mutez
     - id: script
       type: id_013__ptjakart__scripted__contracts
   code:
@@ -50,20 +59,28 @@ types:
       size: len_code
   commitments:
     seq:
+    - id: commitments_entries
+      type: commitments_entries
+      repeat: eos
+  commitments_0:
+    seq:
     - id: len_commitments
       type: s4
     - id: commitments
-      type: commitments_entries
+      type: commitments
       size: len_commitments
-      repeat: eos
   commitments_entries:
     seq:
     - id: commitments_elt_field0
       size: 20
       doc: blinded__public__key__hash
     - id: commitments_elt_field1
-      type: n
+      type: id_013__ptjakart__mutez
       doc: id_013__ptjakart__mutez
+  id_013__ptjakart__mutez:
+    seq:
+    - id: id_013__ptjakart__mutez
+      type: n
   id_013__ptjakart__scripted__contracts:
     seq:
     - id: code
@@ -89,7 +106,6 @@ types:
     - id: payload
       type: b7be
   public_key:
-    doc: A Ed25519, Secp256k1, or P256 public key
     seq:
     - id: public_key_tag
       type: u1
@@ -104,7 +120,6 @@ types:
       size: 33
       if: (public_key_tag == public_key_tag::p256)
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -122,17 +137,23 @@ types:
     seq:
     - id: public_key_known_field0
       type: public_key
-      doc: signature__v0__public_key
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key
+
+
+        signature__v0__public_key'
     - id: public_key_known_field1
-      type: n
+      type: id_013__ptjakart__mutez
       doc: id_013__ptjakart__mutez
   public_key_unknown:
     seq:
     - id: public_key_unknown_field0
       type: public_key_hash
-      doc: signature__v0__public_key_hash
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key hash
+
+
+        signature__v0__public_key_hash'
     - id: public_key_unknown_field1
-      type: n
+      type: id_013__ptjakart__mutez
       doc: id_013__ptjakart__mutez
   ratio_of_frozen_deposits_slashed_per_double_endorsement:
     seq:
@@ -176,11 +197,11 @@ enums:
     2: p256
 seq:
 - id: bootstrap_accounts
-  type: bootstrap_accounts
+  type: bootstrap_accounts_0
 - id: bootstrap_contracts
-  type: bootstrap_contracts
+  type: bootstrap_contracts_0
 - id: commitments
-  type: commitments
+  type: commitments_0
 - id: security_deposit_ramp_up_cycles_tag
   type: u1
   enum: bool
@@ -210,19 +231,19 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: tokens_per_roll
-  type: n
+  type: id_013__ptjakart__mutez
 - id: seed_nonce_revelation_tip
-  type: n
+  type: id_013__ptjakart__mutez
 - id: origination_size
   type: s4
 - id: baking_reward_fixed_portion
-  type: n
+  type: id_013__ptjakart__mutez
 - id: baking_reward_bonus_per_slot
-  type: n
+  type: id_013__ptjakart__mutez
 - id: endorsing_reward_per_slot
-  type: n
+  type: id_013__ptjakart__mutez
 - id: cost_per_byte
-  type: n
+  type: id_013__ptjakart__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
@@ -232,7 +253,7 @@ seq:
 - id: min_proposal_quorum
   type: s4
 - id: liquidity_baking_subsidy
-  type: n
+  type: id_013__ptjakart__mutez
 - id: liquidity_baking_sunset_level
   type: s4
 - id: liquidity_baking_toggle_ema_threshold
@@ -254,7 +275,7 @@ seq:
 - id: frozen_deposits_percentage
   type: s4
 - id: double_baking_punishment
-  type: n
+  type: id_013__ptjakart__mutez
 - id: ratio_of_frozen_deposits_slashed_per_double_endorsement
   type: ratio_of_frozen_deposits_slashed_per_double_endorsement
 - id: initial_seed_tag
@@ -281,7 +302,7 @@ seq:
 - id: tx_rollup_max_withdrawals_per_batch
   type: s4
 - id: tx_rollup_commitment_bond
-  type: n
+  type: id_013__ptjakart__mutez
 - id: tx_rollup_finality_period
   type: s4
 - id: tx_rollup_withdraw_period

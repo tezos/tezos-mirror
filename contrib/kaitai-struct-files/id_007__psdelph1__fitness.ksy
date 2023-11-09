@@ -4,18 +4,17 @@ meta:
 doc: ! 'Encoding id: 007-PsDELPH1.fitness'
 types:
   fitness:
-    doc: ! >-
-      Block fitness: The fitness, or score, of a block, that allow the Tezos to decide
-      which chain is the best. A fitness value is a list of byte sequences. They are
-      compared as follows: shortest lists are smaller; lists of the same length are
-      compared according to the lexicographical order.
+    seq:
+    - id: fitness_entries
+      type: fitness_entries
+      repeat: eos
+  fitness_0:
     seq:
     - id: len_fitness
       type: s4
     - id: fitness
-      type: fitness_entries
+      type: fitness
       size: len_fitness
-      repeat: eos
   fitness__elem:
     seq:
     - id: len_fitness__elem
@@ -28,4 +27,9 @@ types:
       type: fitness__elem
 seq:
 - id: fitness
-  type: fitness
+  type: fitness_0
+  doc: ! >-
+    Block fitness: The fitness, or score, of a block, that allow the Tezos to decide
+    which chain is the best. A fitness value is a list of byte sequences. They are
+    compared as follows: shortest lists are smaller; lists of the same length are
+    compared according to the lexicographical order.

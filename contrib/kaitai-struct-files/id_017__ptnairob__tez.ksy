@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 017-PtNairob.tez'
 types:
+  id_017__ptnairob__mutez:
+    seq:
+    - id: id_017__ptnairob__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_017__ptnairob__mutez
-  type: n
+  type: id_017__ptnairob__mutez
