@@ -451,7 +451,10 @@ let test_info_command =
   in
   let expected_hash = JSON.(head |-> "hash" |> as_string) in
   let expected_level = head_level in
-  let expected_version = 6 in
+  (* This is expected to be updated as soon as a new snapshot version
+     is released (referring to the Snapshot.Version.current_version
+     from `lib_store/unix/snapshots`)*)
+  let expected_version = 7 in
   Log.info "Checks the human formatted output" ;
   (* Get the info line, which is the second line. *)
   let* () =
