@@ -358,8 +358,7 @@ mod tests {
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
-    use tezos_smart_rollup_encoding::michelson::ticket::UnitTicket;
-    use tezos_smart_rollup_encoding::michelson::{MichelsonPair, MichelsonUnit};
+    use tezos_smart_rollup_encoding::michelson::{MichelsonBytes, MichelsonOr};
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
@@ -528,15 +527,13 @@ mod tests {
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap();
         let contract =
             Contract::from_b58check("KT1HJphVV3LUxqZnc7YSH6Zdfd3up1DjLqZv").unwrap();
-        let sender = match contract.clone() {
+        let sender = match contract {
             Contract::Originated(kt1) => kt1,
             _ => panic!("The contract must be a KT1"),
         };
-        let ticket: UnitTicket = UnitTicket::new(contract, MichelsonUnit, 1).unwrap();
-        let payload: RollupType = MichelsonPair(
-            MichelsonPair(vec![].into(), ticket),
-            MichelsonPair(0.into(), kernel_upgrade_payload.into()),
-        );
+        let payload: RollupType =
+            MichelsonOr::Right(MichelsonBytes(kernel_upgrade_payload));
+
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         host.add_transfer(payload, &transfer_metadata);
 

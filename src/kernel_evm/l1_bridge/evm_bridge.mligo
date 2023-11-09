@@ -2,10 +2,7 @@
 (* SPDX-CopyrightText Nomadic Labs <contact@nomadic-labs.com> *)
 
 #include "./ticket_type.mligo"
-
-
-// EVM rollup expected type.
-type rollup_type = (bytes * unit ticket * nat * bytes)
+#include "./evm_type.mligo"
 
 type request_deposit = {
   l2_address: bytes; (* L2 address. *)
@@ -30,7 +27,7 @@ let deposit request ({exchanger; request_deposit}: storage) : return =
     | Some _ -> failwith "deposit locked"
   in
   let amount = Tezos.get_amount () in
-  let callback = Tezos.address (Tezos.self("%callback")) in
+  let callback = Tezos.address (Tezos.self("%callback") : tez_ticket contract) in
   match Tezos.get_entrypoint_opt "%mint" exchanger with
   | None -> failwith "Invalid tez ticket contract"
   | Some contract ->
@@ -45,12 +42,12 @@ let callback (ticket: tez_ticket) {exchanger; request_deposit} : return =
     | Some r -> r
   in
   let {l2_address; evm_address} = request_deposit in
-  let evm_address: rollup_type contract =
+  let evm_address: evm contract =
     Tezos.get_contract_with_error evm_address "Invalid rollup address"
   in
   let deposit =
     Tezos.transaction
-      (l2_address, ticket, 0n, ("" : bytes))
+      (DepositTicket (l2_address, ticket))
       0mutez
       evm_address
   in

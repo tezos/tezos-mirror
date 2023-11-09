@@ -37,6 +37,8 @@ open Sc_rollup_helpers
 
 let pvm_kind = "wasm_2_0_0"
 
+let evm_type = "or (or (pair bytes (ticket unit)) bytes) bytes"
+
 let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
 
 let exchanger_path () =
@@ -390,7 +392,7 @@ let setup_evm_kernel ?config ?kernel_installee
     originate_sc_rollup
       ~kind:pvm_kind
       ~boot_sector
-      ~parameters_ty:"pair (pair bytes (ticket unit)) (pair nat bytes)"
+      ~parameters_ty:evm_type
       ~src:originator_key
       client
   in
@@ -2742,7 +2744,7 @@ let test_deposit_dailynet =
     setup_bootstrap_smart_rollup
       ~name:"evm"
       ~address:rollup_address
-      ~parameters_ty:"pair (pair bytes (ticket unit)) (pair nat bytes)"
+      ~parameters_ty:evm_type
       ~base_installee:"./"
       ~installee:"evm_kernel"
       ~config:
