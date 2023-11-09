@@ -1,6 +1,8 @@
 meta:
   id: operation
   endian: be
+  imports:
+  - operation__shell_header
 doc: ! >-
   Encoding id: operation
 
@@ -8,8 +10,7 @@ doc: ! >-
   is meant to apply on top of. The proto part is protocol-specific and appears as
   a binary blob.
 seq:
-- id: branch
-  size: 32
-  doc: An operation's shell header.
+- id: operation
+  type: operation__shell_header
 - id: data
   size-eos: true

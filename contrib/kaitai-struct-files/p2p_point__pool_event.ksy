@@ -1,6 +1,8 @@
 meta:
   id: p2p_point__pool_event
   endian: be
+  imports:
+  - timestamp__system
 doc: ! >-
   Encoding id: p2p_point.pool_event
 
@@ -52,12 +54,6 @@ enums:
     6: external_disconnection
 seq:
 - id: p2p_point__pool_event_field0
-  type: s8
-  doc: ! >-
-    A timestamp as seen by the underlying, local computer: subsecond-level precision,
-    epoch or rfc3339 based.
-
-
-    timestamp__system
+  type: timestamp__system
 - id: p2p_point__pool_event_field1
   type: p2p_point__pool_event_field1

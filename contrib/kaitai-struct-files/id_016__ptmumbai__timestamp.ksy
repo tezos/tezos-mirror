@@ -1,8 +1,9 @@
 meta:
   id: id_016__ptmumbai__timestamp
   endian: be
+  imports:
+  - timestamp__protocol
 doc: ! 'Encoding id: 016-PtMumbai.timestamp'
 seq:
-- id: timestamp__protocol
-  type: s8
-  doc: ! 'A timestamp as seen by the protocol: second-level precision, epoch based.'
+- id: id_016__ptmumbai__timestamp
+  type: timestamp__protocol

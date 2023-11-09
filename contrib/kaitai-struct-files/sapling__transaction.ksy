@@ -1,6 +1,11 @@
 meta:
   id: sapling__transaction
   endian: be
+  imports:
+  - sapling__transaction__binding_sig
+  - sapling__transaction__commitment_hash
+  - sapling__transaction__input
+  - sapling__transaction__output
 doc: ! >-
   Encoding id: sapling.transaction
 
@@ -23,7 +28,7 @@ types:
       repeat: eos
   inputs_entries:
     seq:
-    - id: sapling__transaction__input
+    - id: inputs_elt
       type: sapling__transaction__input
   outputs:
     seq:
@@ -35,61 +40,18 @@ types:
       repeat: eos
   outputs_entries:
     seq:
-    - id: sapling__transaction__output
+    - id: outputs_elt
       type: sapling__transaction__output
-  payload_enc:
-    seq:
-    - id: len_payload_enc
-      type: s4
-    - id: payload_enc
-      size: len_payload_enc
-  sapling__transaction__ciphertext:
-    seq:
-    - id: cv
-      size: 32
-    - id: epk
-      size: 32
-    - id: payload_enc
-      type: payload_enc
-    - id: nonce_enc
-      size: 24
-    - id: payload_out
-      size: 80
-    - id: nonce_out
-      size: 24
-  sapling__transaction__input:
-    doc: Input of a transaction
-    seq:
-    - id: cv
-      size: 32
-    - id: nf
-      size: 32
-    - id: rk
-      size: 32
-    - id: proof_i
-      size: 192
-    - id: signature
-      size: 64
-  sapling__transaction__output:
-    doc: Output of a transaction
-    seq:
-    - id: cm
-      size: 32
-    - id: proof_o
-      size: 192
-    - id: ciphertext
-      type: sapling__transaction__ciphertext
 seq:
 - id: inputs
   type: inputs
 - id: outputs
   type: outputs
 - id: binding_sig
-  size: 64
-  doc: Binding signature of a transaction
+  type: sapling__transaction__binding_sig
 - id: balance
   type: s8
 - id: root
-  size: 32
+  type: sapling__transaction__commitment_hash
 - id: bound_data
   type: bound_data

@@ -1,6 +1,8 @@
 meta:
   id: block_header__shell
   endian: be
+  imports:
+  - timestamp__protocol
 doc: ! >-
   Encoding id: block_header.shell
 
@@ -38,8 +40,7 @@ seq:
 - id: predecessor
   size: 32
 - id: timestamp
-  type: s8
-  doc: ! 'A timestamp as seen by the protocol: second-level precision, epoch based.'
+  type: timestamp__protocol
 - id: validation_pass
   type: u1
 - id: operations_hash

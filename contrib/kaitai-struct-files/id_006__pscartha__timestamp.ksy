@@ -1,8 +1,9 @@
 meta:
   id: id_006__pscartha__timestamp
   endian: be
+  imports:
+  - timestamp__protocol
 doc: ! 'Encoding id: 006-PsCARTHA.timestamp'
 seq:
-- id: timestamp__protocol
-  type: s8
-  doc: ! 'A timestamp as seen by the protocol: second-level precision, epoch based.'
+- id: id_006__pscartha__timestamp
+  type: timestamp__protocol

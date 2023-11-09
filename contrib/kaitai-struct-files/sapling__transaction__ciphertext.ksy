@@ -1,6 +1,8 @@
 meta:
   id: sapling__transaction__ciphertext
   endian: be
+  imports:
+  - sapling__transaction__commitment_value
 doc: ! 'Encoding id: sapling.transaction.ciphertext'
 types:
   payload_enc:
@@ -11,7 +13,7 @@ types:
       size: len_payload_enc
 seq:
 - id: cv
-  size: 32
+  type: sapling__transaction__commitment_value
 - id: epk
   size: 32
 - id: payload_enc
