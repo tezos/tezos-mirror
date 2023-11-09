@@ -56,8 +56,20 @@ impl ContractScript<TypecheckedStage> {
     }
 }
 
-#[allow(dead_code)]
-pub fn interpret(
+impl TypecheckedInstruction {
+    /// Interpret the instruction with the given `Ctx` and input stack. Note the
+    /// interpreter assumes the instruction can execute on the provided stack,
+    /// otherwise this function will panic.
+    ///
+    /// # Panics
+    ///
+    /// When the instruction can't be executed on the provided stack.
+    pub fn interpret(&self, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
+        interpret_one(self, ctx, stack)
+    }
+}
+
+fn interpret(
     ast: &TypecheckedAST,
     ctx: &mut Ctx,
     stack: &mut IStack,
@@ -67,12 +79,6 @@ pub fn interpret(
     }
     ctx.gas.consume(interpret_cost::INTERPRET_RET)?;
     Ok(())
-}
-
-impl TypecheckedInstruction {
-    pub fn interpret(&self, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
-        interpret_one(self, ctx, stack)
-    }
 }
 
 #[track_caller]

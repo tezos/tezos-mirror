@@ -108,17 +108,6 @@ impl ContractScript<ParsedStage> {
     }
 }
 
-#[allow(dead_code)]
-pub fn typecheck(
-    ast: ParsedAST,
-    ctx: &mut Ctx,
-    opt_stack: &mut FailingTypeStack,
-) -> Result<TypecheckedAST, TcError> {
-    ast.into_iter()
-        .map(|i| i.typecheck(ctx, opt_stack))
-        .collect()
-}
-
 impl ParsedInstruction {
     pub fn typecheck(
         self,
@@ -127,6 +116,22 @@ impl ParsedInstruction {
     ) -> Result<TypecheckedInstruction, TcError> {
         typecheck_instruction(self, ctx, opt_stack)
     }
+}
+
+impl Value {
+    pub fn typecheck(self, ctx: &mut Ctx, t: &Type) -> Result<TypedValue, TcError> {
+        typecheck_value(ctx, t, self)
+    }
+}
+
+fn typecheck(
+    ast: ParsedAST,
+    ctx: &mut Ctx,
+    opt_stack: &mut FailingTypeStack,
+) -> Result<TypecheckedAST, TcError> {
+    ast.into_iter()
+        .map(|i| typecheck_instruction(i, ctx, opt_stack))
+        .collect()
 }
 
 macro_rules! nothing_to_none {
@@ -518,13 +523,7 @@ fn typecheck_instruction(
     })
 }
 
-impl Value {
-    pub fn typecheck(self, ctx: &mut Ctx, t: &Type) -> Result<TypedValue, TcError> {
-        typecheck_value(ctx, t, self)
-    }
-}
-
-pub fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcError> {
+fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcError> {
     use Type::*;
     use TypedValue as TV;
     use Value as V;
