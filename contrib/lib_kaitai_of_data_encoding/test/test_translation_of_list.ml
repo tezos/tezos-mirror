@@ -160,12 +160,12 @@ let%expect_test "test list with length" =
       - id: list_with_length_elt
         type: u1
   seq:
-  - id: number_of_elements_in_list_with_length
+  - id: num_list_with_length
     type: s4
   - id: list_with_length_entries
     type: list_with_length_entries
     repeat: expr
-    repeat-expr: number_of_elements_in_list_with_length
+    repeat-expr: num_list_with_length
   |}]
 
 let%expect_test "test list with length" =
@@ -187,12 +187,12 @@ let%expect_test "test list with length" =
       - id: list_with_length_elt
         type: u1
   seq:
-  - id: number_of_elements_in_list_with_length
+  - id: num_list_with_length
     type: u1
   - id: list_with_length_entries
     type: list_with_length_entries
     repeat: expr
-    repeat-expr: number_of_elements_in_list_with_length
+    repeat-expr: num_list_with_length
   |}]
 
 let%expect_test "test list with length" =
@@ -214,10 +214,10 @@ let%expect_test "test list with length" =
       - id: list_with_length_elt
         type: u1
   seq:
-  - id: number_of_elements_in_list_with_length
+  - id: num_list_with_length
     type: u2
   - id: list_with_length_entries
     type: list_with_length_entries
     repeat: expr
-    repeat-expr: number_of_elements_in_list_with_length
+    repeat-expr: num_list_with_length
   |}]

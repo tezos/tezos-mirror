@@ -156,6 +156,11 @@ let summary ~title ~description =
   | None, (Some _ as s) | (Some _ as s), None -> s
   | Some t, Some d -> Some (t ^ ": " ^ d)
 
+(* when an encoding has id [x],
+   then the attr for its size has id [len_id_of_id x].
+   Kaitai recomment to use the [len_] prefix in this case. *)
+let len_id_of_id id = "len_" ^ id
+
 (* in kaitai-struct, some fields can be added to single attributes but not to a
    group of them. When we want to attach a field to a group of attributes, we
    need to create an indirection to a named type. [redirect] is a function for
@@ -326,15 +331,15 @@ let rec seq_field_of_data_encoding0 :
   | Bytes (`Fixed n, _) -> (state, [Ground.Attr.bytes ~id (Fixed n)])
   | Bytes (`Variable, _) -> (state, [Ground.Attr.bytes ~id Variable])
   | Dynamic_size {kind; encoding = {encoding = Bytes (`Variable, _); _}} ->
-      let size_id = "len_" ^ id in
-      let size_attr = Ground.Attr.binary_length_kind ~id:size_id kind in
-      (state, [size_attr; Ground.Attr.bytes ~id (Dynamic size_id)])
+      let len_id = len_id_of_id id in
+      let len_attr = Ground.Attr.binary_length_kind ~id:len_id kind in
+      (state, [len_attr; Ground.Attr.bytes ~id (Dynamic len_id)])
   | String (`Fixed n, _) -> (state, [Ground.Attr.string ~id (Fixed n)])
   | String (`Variable, _) -> (state, [Ground.Attr.string ~id Variable])
   | Dynamic_size {kind; encoding = {encoding = String (`Variable, _); _}} ->
-      let size_id = "len_" ^ id in
-      let size_attr = Ground.Attr.binary_length_kind ~id:size_id kind in
-      (state, [size_attr; Ground.Attr.string ~id (Dynamic size_id)])
+      let len_id = len_id_of_id id in
+      let len_attr = Ground.Attr.binary_length_kind ~id:len_id kind in
+      (state, [len_attr; Ground.Attr.string ~id (Dynamic len_id)])
   | Padded (encoding, pad) ->
       let state, attrs = seq_field_of_data_encoding state encoding id in
       let pad_attr =
@@ -385,7 +390,7 @@ let rec seq_field_of_data_encoding0 :
   | Union {kind = _; tag_size; tagged_cases = _; match_case = _; cases} ->
       seq_field_of_union state tag_size cases id
   | Dynamic_size {kind; encoding} ->
-      let len_id = "len_" ^ id in
+      let len_id = len_id_of_id id in
       let len_attr =
         match kind with
         | `N -> failwith "Dynamic_size N not implemented"
@@ -734,7 +739,8 @@ and seq_field_of_collection :
  fun state length_limit length_encoding elts id ->
   match (length_limit, length_encoding, elts) with
   | At_most _max_length, Some le, elts ->
-      let length_id = "number_of_elements_in_" ^ id in
+      (* Kaitai recommend to use the [num_] prefix *)
+      let length_id = "num_" ^ id in
       let state, length_attrs = seq_field_of_data_encoding state le length_id in
       let length_attr =
         match length_attrs with
