@@ -616,7 +616,7 @@ and seq_field_of_union :
                                });
                       };
                   })
-                (id ^ "_" ^ case_id)
+                case_id
             in
             (state, attr :: payload_attrs))
       (state, [])

@@ -39,20 +39,20 @@ let%expect_test "test basic mu" =
       id: intlist
       endian: be
     types:
-      ilist:
-        seq:
-        - id: ilist_tag
-          type: u1
-          enum: ilist_tag
-        - id: ilist_cons
-          type: ilist_cons
-          if: (ilist_tag == ilist_tag::cons)
-      ilist_cons:
+      cons:
         seq:
         - id: hd
           type: u2
         - id: tl
           type: ilist
+      ilist:
+        seq:
+        - id: ilist_tag
+          type: u1
+          enum: ilist_tag
+        - id: cons
+          type: cons
+          if: (ilist_tag == ilist_tag::cons)
     enums:
       ilist_tag:
         0: nil
@@ -107,6 +107,13 @@ let%expect_test "test more mu" =
       id: t
       endian: be
     types:
+      branch:
+        seq:
+        - id: payload
+          type: u1
+          enum: bool
+        - id: branches
+          type: branches
       branches:
         seq:
         - id: len_branches
@@ -124,24 +131,17 @@ let%expect_test "test more mu" =
         - id: mt_tag
           type: u1
           enum: mt_tag
-        - id: mt_one
+        - id: one
           type: u1
           if: (mt_tag == mt_tag::one)
           enum: bool
-        - id: mt_seq
-          type: mt_seq
+        - id: seq
+          type: seq
           if: (mt_tag == mt_tag::seq)
-        - id: mt_branch
-          type: mt_branch
+        - id: branch
+          type: branch
           if: (mt_tag == mt_tag::branch)
-      mt_branch:
-        seq:
-        - id: payload
-          type: u1
-          enum: bool
-        - id: branches
-          type: branches
-      mt_seq:
+      seq:
         seq:
         - id: payload
           type: u1
