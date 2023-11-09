@@ -330,9 +330,9 @@ module Make_s
              Events.(emit ban_operation_encountered) (origin, oph))) ;
       true)
     else
-      Pending_ops.mem oph shell.pending
+      Classification.is_in_mempool oph shell.classification <> None
       || Operation_hash.Set.mem oph shell.live_operations
-      || Classification.is_in_mempool oph shell.classification <> None
+      || Pending_ops.mem oph shell.pending
       || Classification.is_known_unparsable oph shell.classification
 
   let advertise (shell : ('operation_data, _) types_state_shell) mempool =
