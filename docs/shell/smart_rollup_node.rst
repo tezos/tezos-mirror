@@ -768,7 +768,7 @@ invocation was trapped by verifying if some data are stored under the
 path ``/kernel/env/stuck``.
 
 Host Functions
-^^^^^^^^^^^^^^
+""""""""""""""
 
 At its core, the WASM machine defined in the WASM standard is just a
 very evolved arithmetic machine. It needs to be enriched with
@@ -876,7 +876,7 @@ conveying errors, as shown in the next table.
 ======= =======================================================================================================
 
 Implementing a WASM Kernel in Rust
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------------
 
 Though WASM is a good fit for efficiently executing computation-intensive, arbitrary
 programs, it is a low-level, stack-based, memory unsafe language.
