@@ -289,6 +289,15 @@ module P2P : sig
       ; query : unit >
       service
 
+    val get_topics_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Topic.t * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < subscribed : bool > >
+      service
+
     val get_connections :
       < meth : [`GET]
       ; input : unit
@@ -314,15 +323,6 @@ module P2P : sig
       ; prefix : unit
       ; params : unit
       ; query : unit >
-      service
-
-    val get_topics_peers :
-      < meth : [`GET]
-      ; input : unit
-      ; output : (Types.Topic.t * Types.Peer.t list) list
-      ; prefix : unit
-      ; params : unit
-      ; query : < subscribed : bool > >
       service
   end
 end
