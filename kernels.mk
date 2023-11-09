@@ -33,6 +33,10 @@ risc-v-sandbox:
 risc-v-interpreter:
 	@make -C $(RISC_V_INTERPRETER_DIR) build
 
+.PHONY: evm-execution
+evm-execution:
+	@make -C src/kernel_evm build-evm-execution
+
 evm_kernel_unstripped.wasm::
 	@make -C src/kernel_evm build
 	@cp src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
@@ -104,7 +108,7 @@ risc-v-dummy.elf:
 	@ln -f ${RISC_V_DUMMY_DIR}/target/riscv64gc-unknown-none-elf/release/risc-v-dummy $@
 
 .PHONY: build
-build: ${KERNELS} kernel_sdk risc-v-sandbox risc-v-interpreter
+build: ${KERNELS} evm-execution kernel_sdk risc-v-sandbox risc-v-interpreter
 
 .PHONY: build-dev-deps
 build-dev-deps: build-deps
