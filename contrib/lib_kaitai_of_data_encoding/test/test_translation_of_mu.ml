@@ -107,6 +107,18 @@ let%expect_test "test more mu" =
       id: t
       endian: be
     types:
+      branches:
+        seq:
+        - id: len_branches
+          type: s4
+        - id: branches
+          type: branches_entries
+          size: len_branches
+          repeat: eos
+      branches_entries:
+        seq:
+        - id: branches_elt
+          type: mt
       mt:
         seq:
         - id: mt_tag
@@ -129,18 +141,6 @@ let%expect_test "test more mu" =
           enum: bool
         - id: branches
           type: branches
-      branches:
-        seq:
-        - id: len_branches
-          type: s4
-        - id: branches
-          type: branches_entries
-          size: len_branches
-          repeat: eos
-      branches_entries:
-        seq:
-        - id: branches_elt
-          type: mt
       mt_seq:
         seq:
         - id: payload

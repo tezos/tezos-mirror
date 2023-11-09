@@ -154,6 +154,18 @@ let%expect_test "test union with structures inside" =
       id: more_union
       endian: be
     types:
+      b_field1:
+        seq:
+        - id: len_b_field1
+          type: s4
+        - id: b_field1
+          size: len_b_field1
+      more_union_b:
+        seq:
+        - id: b_field0
+          type: u2
+        - id: b_field1
+          type: b_field1
       more_union_c:
         seq:
         - id: l
@@ -162,18 +174,6 @@ let%expect_test "test union with structures inside" =
         - id: r
           type: u1
           enum: bool
-      more_union_b:
-        seq:
-        - id: b_field0
-          type: u2
-        - id: b_field1
-          type: b_field1
-      b_field1:
-        seq:
-        - id: len_b_field1
-          type: s4
-        - id: b_field1
-          size: len_b_field1
     enums:
       bool:
         0: false
