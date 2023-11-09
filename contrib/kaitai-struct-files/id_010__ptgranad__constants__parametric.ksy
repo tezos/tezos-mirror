@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__constants__parametric
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.constants.parametric'
 types:
   baking_reward_per_endorsement:
     seq:

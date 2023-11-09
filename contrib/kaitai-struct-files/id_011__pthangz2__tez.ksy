@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__tez
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.tez'
 types:
   n:
     seq:

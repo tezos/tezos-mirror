@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 018-Proxford.fa1.2.token_transfer'
 types:
   destination:
     seq:

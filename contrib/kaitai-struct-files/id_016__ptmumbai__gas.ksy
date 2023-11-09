@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__gas
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.gas'
 types:
   n_chunk:
     seq:

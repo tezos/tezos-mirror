@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__contract
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.contract'
 types:
   id_008__ptedo2zk__contract_id:
     doc: ! >-

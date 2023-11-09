@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__parameters
   endian: be
+doc: ! 'Encoding id: 018-Proxford.parameters'
 types:
   adaptive_rewards_params:
     seq:

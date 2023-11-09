@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__script
   endian: be
+doc: ! 'Encoding id: 018-Proxford.script'
 types:
   code:
     seq:

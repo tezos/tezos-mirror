@@ -1,6 +1,7 @@
 meta:
   id: alpha__constants__parametric
   endian: be
+doc: ! 'Encoding id: alpha.constants.parametric'
 types:
   adaptive_rewards_params:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__script__expr
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.script.expr'
 types:
   annots:
     seq:

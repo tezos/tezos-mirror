@@ -1,6 +1,7 @@
 meta:
   id: alpha__script__expr
   endian: be
+doc: ! 'Encoding id: alpha.script.expr'
 types:
   annots:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.contract.big_map_diff'
 types:
   alloc:
     seq:

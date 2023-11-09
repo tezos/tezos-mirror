@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__block_header__raw
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.block_header.raw'
 types:
   block_header:
     doc: ! 'Block header: Block header. It contains both shell and protocol specific

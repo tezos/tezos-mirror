@@ -2,7 +2,10 @@ meta:
   id: p2p_point__info
   endian: be
 doc: ! >-
-  Information about a peer point. Includes flags, state, and records about past events.
+  Encoding id: p2p_point.info
+
+  Description: Information about a peer point. Includes flags, state, and records
+  about past events.
 types:
   last_disconnection:
     seq:

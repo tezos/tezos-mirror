@@ -2,7 +2,10 @@ meta:
   id: p2p_identity
   endian: be
 doc: ! >-
-  The identity of a peer. This includes cryptographic keys as well as a proof-of-work.
+  Encoding id: p2p_identity
+
+  Description: The identity of a peer. This includes cryptographic keys as well as
+  a proof-of-work.
 enums:
   bool:
     0: false

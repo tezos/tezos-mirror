@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.receipt.balance_updates'
 types:
   frozen_bonds:
     seq:

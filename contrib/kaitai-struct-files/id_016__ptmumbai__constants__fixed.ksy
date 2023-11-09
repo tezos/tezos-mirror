@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__constants__fixed
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.constants.fixed'
 types:
   n:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__script__expr
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.script.expr'
 types:
   annots:
     seq:

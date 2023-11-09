@@ -1,6 +1,7 @@
 meta:
   id: alpha__contract
   endian: be
+doc: ! 'Encoding id: alpha.contract'
 types:
   alpha__contract_id:
     doc: ! >-

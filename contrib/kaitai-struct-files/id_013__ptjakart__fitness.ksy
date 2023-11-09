@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__fitness
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.fitness'
 types:
   locked_round:
     seq:

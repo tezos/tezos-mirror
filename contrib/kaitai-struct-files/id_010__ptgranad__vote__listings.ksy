@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__vote__listings
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.vote.listings'
 types:
   id_010__ptgranad__vote__listings_entries:
     seq:

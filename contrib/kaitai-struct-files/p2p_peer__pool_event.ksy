@@ -2,8 +2,10 @@ meta:
   id: p2p_peer__pool_event
   endian: be
 doc: ! >-
-  An event that may happen during maintenance of and other operations on the connection
-  to a specific peer.
+  Encoding id: p2p_peer.pool_event
+
+  Description: An event that may happen during maintenance of and other operations
+  on the connection to a specific peer.
 types:
   p2p_address:
     doc: An address for locating peers.

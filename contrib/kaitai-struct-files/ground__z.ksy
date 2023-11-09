@@ -1,7 +1,9 @@
 meta:
   id: ground__z
   endian: be
-doc: Arbitrary precision integers
+doc: ! 'Encoding id: ground.Z
+
+  Description: Arbitrary precision integers'
 types:
   n_chunk:
     seq:

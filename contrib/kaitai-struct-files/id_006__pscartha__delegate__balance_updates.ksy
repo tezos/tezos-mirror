@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__delegate__balance_updates
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.delegate.balance_updates'
 types:
   deposits:
     seq:

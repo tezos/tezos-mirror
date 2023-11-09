@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__script__prim
   endian: be
+doc: ! 'Encoding id: 018-Proxford.script.prim'
 enums:
   id_018__proxford__michelson__v1__primitives:
     0: parameter

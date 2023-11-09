@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__constants__fixed
   endian: be
+doc: ! 'Encoding id: 018-Proxford.constants.fixed'
 types:
   n:
     seq:

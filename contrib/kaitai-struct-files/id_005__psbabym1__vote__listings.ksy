@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__vote__listings
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.vote.listings'
 types:
   id_005__psbabym1__vote__listings_entries:
     seq:

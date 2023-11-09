@@ -1,6 +1,7 @@
 meta:
   id: alpha__fitness
   endian: be
+doc: ! 'Encoding id: alpha.fitness'
 types:
   locked_round:
     seq:

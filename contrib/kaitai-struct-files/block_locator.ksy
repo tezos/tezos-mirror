@@ -1,7 +1,7 @@
 meta:
   id: block_locator
   endian: be
-doc: ! "A sparse block locator \xE0 la Bitcoin"
+doc: ! "Encoding id: block_locator\nDescription: A sparse block locator \xE0 la Bitcoin"
 types:
   block_header:
     doc: ! 'Block header: Block header. It contains both shell and protocol specific

@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__script__prim
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.script.prim'
 enums:
   id_013__ptjakart__michelson__v1__primitives:
     0: parameter

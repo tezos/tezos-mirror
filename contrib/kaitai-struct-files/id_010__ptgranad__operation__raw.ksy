@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__operation__raw
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.operation.raw'
 types:
   operation:
     doc: ! >-

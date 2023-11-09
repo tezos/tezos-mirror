@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__constants__parametric
   endian: be
+doc: ! 'Encoding id: 018-Proxford.constants.parametric'
 types:
   adaptive_rewards_params:
     seq:

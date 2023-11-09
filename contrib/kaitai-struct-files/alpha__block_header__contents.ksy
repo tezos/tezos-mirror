@@ -1,6 +1,7 @@
 meta:
   id: alpha__block_header__contents
   endian: be
+doc: ! 'Encoding id: alpha.block_header.contents'
 types:
   alpha__block_header__alpha__unsigned_contents:
     seq:

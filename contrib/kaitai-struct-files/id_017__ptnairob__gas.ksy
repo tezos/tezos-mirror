@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__gas
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.gas'
 types:
   n_chunk:
     seq:

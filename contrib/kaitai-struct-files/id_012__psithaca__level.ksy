@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__level
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.level'
 enums:
   bool:
     0: false

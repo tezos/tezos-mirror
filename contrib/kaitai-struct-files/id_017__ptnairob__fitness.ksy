@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__fitness
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.fitness'
 types:
   locked_round:
     seq:

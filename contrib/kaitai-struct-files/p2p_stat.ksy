@@ -1,7 +1,9 @@
 meta:
   id: p2p_stat
   endian: be
-doc: Statistics about the p2p network.
+doc: ! 'Encoding id: p2p_stat
+
+  Description: Statistics about the p2p network.'
 seq:
 - id: total_sent
   type: s8

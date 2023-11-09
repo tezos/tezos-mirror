@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__block_header__shell_header
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.block_header.shell_header'
 types:
   block_header__shell:
     doc: ! >-

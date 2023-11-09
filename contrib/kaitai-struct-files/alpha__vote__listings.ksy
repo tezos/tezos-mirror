@@ -1,6 +1,7 @@
 meta:
   id: alpha__vote__listings
   endian: be
+doc: ! 'Encoding id: alpha.vote.listings'
 types:
   alpha__vote__listings_entries:
     seq:

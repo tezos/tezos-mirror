@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__script__expr
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.script.expr'
 types:
   annots:
     seq:

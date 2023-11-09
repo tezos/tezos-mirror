@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__constants
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.constants'
 types:
   dal_parametric:
     seq:

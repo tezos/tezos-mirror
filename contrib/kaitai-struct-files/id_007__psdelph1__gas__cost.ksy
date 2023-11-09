@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__gas__cost
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.gas.cost'
 types:
   n_chunk:
     seq:

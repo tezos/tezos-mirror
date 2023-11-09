@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__vote__listings
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.vote.listings'
 types:
   id_014__ptkathma__vote__listings_entries:
     seq:

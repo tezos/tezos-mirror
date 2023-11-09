@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__script__prim
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.script.prim'
 enums:
   id_009__psfloren__michelson__v1__primitives:
     0: parameter

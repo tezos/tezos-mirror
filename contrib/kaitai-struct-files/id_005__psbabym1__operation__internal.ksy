@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__operation__internal
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.operation.internal'
 types:
   code:
     seq:

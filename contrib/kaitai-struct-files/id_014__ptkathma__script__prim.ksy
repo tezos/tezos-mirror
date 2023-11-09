@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__script__prim
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.script.prim'
 enums:
   id_014__ptkathma__michelson__v1__primitives:
     0: parameter

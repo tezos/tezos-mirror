@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__constants
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.constants'
 types:
   dal_parametric:
     seq:

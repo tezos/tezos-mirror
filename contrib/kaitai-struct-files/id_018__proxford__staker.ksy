@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__staker
   endian: be
+doc: ! 'Encoding id: 018-Proxford.staker'
 types:
   id_018__proxford__contract_id:
     doc: ! >-

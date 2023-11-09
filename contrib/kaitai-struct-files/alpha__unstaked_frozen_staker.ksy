@@ -1,6 +1,7 @@
 meta:
   id: alpha__unstaked_frozen_staker
   endian: be
+doc: ! 'Encoding id: alpha.unstaked_frozen_staker'
 types:
   alpha__contract_id:
     doc: ! >-

@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__delegate__balance_updates
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.delegate.balance_updates'
 types:
   deposits:
     seq:

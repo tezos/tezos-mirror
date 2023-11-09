@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.receipt.balance_updates'
 types:
   id_012__psithaca__contract_id:
     doc: ! >-

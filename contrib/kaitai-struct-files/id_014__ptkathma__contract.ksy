@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__contract
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.contract'
 types:
   id_014__ptkathma__contract_id:
     doc: ! >-

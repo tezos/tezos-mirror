@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__vote__listings
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.vote.listings'
 types:
   id_015__ptlimapt__vote__listings_entries:
     seq:

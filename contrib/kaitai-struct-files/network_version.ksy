@@ -2,8 +2,10 @@ meta:
   id: network_version
   endian: be
 doc: ! >-
-  A version number for the network protocol (includes distributed DB version and p2p
-  version)
+  Encoding id: network_version
+
+  Description: A version number for the network protocol (includes distributed DB
+  version and p2p version)
 types:
   distributed_db_version__name:
     doc: A name for the distributed DB protocol

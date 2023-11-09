@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__parameters
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.parameters'
 types:
   bootstrap_accounts:
     seq:

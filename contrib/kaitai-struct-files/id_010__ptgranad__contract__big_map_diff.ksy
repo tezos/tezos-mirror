@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.contract.big_map_diff'
 types:
   alloc:
     seq:

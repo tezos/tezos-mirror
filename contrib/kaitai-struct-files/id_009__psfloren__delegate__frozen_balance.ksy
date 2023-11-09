@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__delegate__frozen_balance
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.delegate.frozen_balance'
 types:
   n:
     seq:

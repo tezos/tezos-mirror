@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__contract
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.contract'
 types:
   id_005__psbabym1__contract_id:
     doc: ! >-

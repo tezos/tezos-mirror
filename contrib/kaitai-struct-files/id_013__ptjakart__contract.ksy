@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__contract
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.contract'
 types:
   id_013__ptjakart__contract_id:
     doc: ! >-

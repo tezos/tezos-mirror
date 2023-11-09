@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__parameters
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.parameters'
 types:
   baking_reward_per_endorsement:
     seq:

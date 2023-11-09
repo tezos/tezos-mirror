@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__operation__internal
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.operation.internal'
 types:
   annots:
     seq:

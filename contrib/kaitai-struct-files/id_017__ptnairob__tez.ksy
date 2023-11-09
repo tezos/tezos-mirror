@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__tez
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.tez'
 types:
   n:
     seq:

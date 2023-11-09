@@ -2,7 +2,9 @@ meta:
   id: id_013__ptjakart__errors
   endian: be
 doc: ! >-
-  The full list of RPC errors would be too long to include.It is
+  Encoding id: 013-PtJakart.errors
+
+  Description: The full list of RPC errors would be too long to include.It is
 
   available through the RPC `/errors` (GET).
 seq:

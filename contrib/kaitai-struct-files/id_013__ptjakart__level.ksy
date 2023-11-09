@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__level
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.level'
 enums:
   bool:
     0: false

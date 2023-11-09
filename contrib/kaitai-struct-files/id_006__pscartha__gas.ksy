@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__gas
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.gas'
 types:
   n_chunk:
     seq:

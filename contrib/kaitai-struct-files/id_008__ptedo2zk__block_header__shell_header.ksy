@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__block_header__shell_header
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.block_header.shell_header'
 types:
   block_header__shell:
     doc: ! >-

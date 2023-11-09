@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__vote__listings
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.vote.listings'
 types:
   id_008__ptedo2zk__vote__listings_entries:
     seq:

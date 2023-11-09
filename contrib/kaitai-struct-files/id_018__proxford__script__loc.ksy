@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__script__loc
   endian: be
+doc: ! 'Encoding id: 018-Proxford.script.loc'
 seq:
 - id: micheline__location
   type: s4

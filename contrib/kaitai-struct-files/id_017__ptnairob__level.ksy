@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__level
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.level'
 enums:
   bool:
     0: false

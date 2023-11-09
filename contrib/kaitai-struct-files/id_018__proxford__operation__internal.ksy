@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__operation__internal
   endian: be
+doc: ! 'Encoding id: 018-Proxford.operation.internal'
 types:
   annots:
     seq:

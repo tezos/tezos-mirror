@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 018-Proxford.receipt.balance_updates'
 types:
   frozen_bonds:
     seq:

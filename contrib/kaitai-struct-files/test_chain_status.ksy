@@ -2,8 +2,11 @@ meta:
   id: test_chain_status
   endian: be
 doc: ! >-
-  The status of the test chain: not_running (there is no test chain at the moment),
-  forking (the test chain is being setup), running (the test chain is running).
+  Encoding id: test_chain_status
+
+  Description: The status of the test chain: not_running (there is no test chain at
+  the moment), forking (the test chain is being setup), running (the test chain is
+  running).
 types:
   forking:
     seq:

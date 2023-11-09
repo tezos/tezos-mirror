@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.fa1.2.token_transfer'
 types:
   destination:
     seq:

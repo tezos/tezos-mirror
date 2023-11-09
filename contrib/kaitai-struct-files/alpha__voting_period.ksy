@@ -1,6 +1,7 @@
 meta:
   id: alpha__voting_period
   endian: be
+doc: ! 'Encoding id: alpha.voting_period'
 enums:
   kind_tag:
     0: proposal

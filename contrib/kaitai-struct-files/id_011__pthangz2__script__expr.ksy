@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__script__expr
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.script.expr'
 types:
   annots:
     seq:

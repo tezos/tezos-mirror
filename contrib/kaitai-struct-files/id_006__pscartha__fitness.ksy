@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__fitness
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.fitness'
 types:
   fitness:
     doc: ! >-

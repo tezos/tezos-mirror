@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__contract
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.contract'
 types:
   id_006__pscartha__contract_id:
     doc: ! >-

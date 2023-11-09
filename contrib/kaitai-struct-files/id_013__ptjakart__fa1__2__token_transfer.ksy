@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.fa1.2.token_transfer'
 types:
   destination:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__gas__cost
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.gas.cost'
 types:
   n_chunk:
     seq:

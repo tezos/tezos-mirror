@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__script__prim
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.script.prim'
 enums:
   id_005__psbabym1__michelson__v1__primitives:
     0: parameter

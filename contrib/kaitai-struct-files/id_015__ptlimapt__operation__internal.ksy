@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__operation__internal
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.operation.internal'
 types:
   annots:
     seq:

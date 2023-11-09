@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__block_header__shell_header
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.block_header.shell_header'
 types:
   block_header__shell:
     doc: ! >-

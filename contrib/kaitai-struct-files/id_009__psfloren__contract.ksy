@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__contract
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.contract'
 types:
   id_009__psfloren__contract_id:
     doc: ! >-

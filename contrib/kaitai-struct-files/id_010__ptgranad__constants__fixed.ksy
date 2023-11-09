@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__constants__fixed
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.constants.fixed'
 seq:
 - id: proof_of_work_nonce_size
   type: u1

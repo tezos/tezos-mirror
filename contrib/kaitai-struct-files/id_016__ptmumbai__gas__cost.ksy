@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__gas__cost
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.gas.cost'
 types:
   n_chunk:
     seq:

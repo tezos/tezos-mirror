@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.receipt.balance_updates'
 types:
   frozen_bonds:
     seq:

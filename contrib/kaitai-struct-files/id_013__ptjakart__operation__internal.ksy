@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__operation__internal
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.operation.internal'
 types:
   code:
     seq:

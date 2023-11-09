@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__operation__internal
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.operation.internal'
 types:
   code:
     seq:

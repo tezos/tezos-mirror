@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__delegate__frozen_balance
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.delegate.frozen_balance'
 types:
   n:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__constants__parametric
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.constants.parametric'
 types:
   dal_parametric:
     seq:

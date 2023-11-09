@@ -1,6 +1,7 @@
 meta:
   id: signer_messages__public_key__response
   endian: be
+doc: ! 'Encoding id: signer_messages.public_key.response'
 types:
   public_key:
     doc: A Ed25519, Secp256k1, or P256 public key

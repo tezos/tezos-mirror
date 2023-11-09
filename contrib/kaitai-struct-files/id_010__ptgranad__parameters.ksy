@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__parameters
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.parameters'
 types:
   baking_reward_per_endorsement:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__vote__listings
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.vote.listings'
 types:
   id_011__pthangz2__vote__listings_entries:
     seq:

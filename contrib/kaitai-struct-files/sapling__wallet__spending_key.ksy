@@ -1,6 +1,7 @@
 meta:
   id: sapling__wallet__spending_key
   endian: be
+doc: ! 'Encoding id: sapling.wallet.spending_key'
 types:
   sapling__wallet__expanded_spending_key:
     seq:

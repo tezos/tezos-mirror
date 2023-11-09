@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__vote__listings
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.vote.listings'
 types:
   id_012__psithaca__vote__listings_entries:
     seq:

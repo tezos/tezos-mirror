@@ -1,6 +1,7 @@
 meta:
   id: alpha__operation__raw
   endian: be
+doc: ! 'Encoding id: alpha.operation.raw'
 types:
   operation:
     doc: ! >-

@@ -1,7 +1,9 @@
 meta:
   id: sapling__transaction__input
   endian: be
-doc: Input of a transaction
+doc: ! 'Encoding id: sapling.transaction.input
+
+  Description: Input of a transaction'
 seq:
 - id: cv
   size: 32

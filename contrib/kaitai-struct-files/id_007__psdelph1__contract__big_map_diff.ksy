@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.contract.big_map_diff'
 types:
   alloc:
     seq:

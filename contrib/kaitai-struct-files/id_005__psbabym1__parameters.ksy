@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__parameters
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.parameters'
 types:
   bootstrap_accounts:
     seq:

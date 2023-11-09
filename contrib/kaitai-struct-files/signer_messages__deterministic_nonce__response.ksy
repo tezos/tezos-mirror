@@ -1,6 +1,7 @@
 meta:
   id: signer_messages__deterministic_nonce__response
   endian: be
+doc: ! 'Encoding id: signer_messages.deterministic_nonce.response'
 types:
   deterministic_nonce:
     seq:

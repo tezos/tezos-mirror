@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__block_header__contents
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.block_header.contents'
 types:
   id_009__psfloren__block_header__alpha__unsigned_contents:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__block_header__unsigned
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.block_header.unsigned'
 types:
   block_header__shell:
     doc: ! >-

@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__script__prim
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.script.prim'
 enums:
   id_016__ptmumbai__michelson__v1__primitives:
     0: parameter

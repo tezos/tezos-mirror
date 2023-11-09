@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__gas__cost
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.gas.cost'
 types:
   n_chunk:
     seq:

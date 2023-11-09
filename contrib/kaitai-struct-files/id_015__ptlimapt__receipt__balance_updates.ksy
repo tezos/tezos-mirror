@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.receipt.balance_updates'
 types:
   frozen_bonds:
     seq:

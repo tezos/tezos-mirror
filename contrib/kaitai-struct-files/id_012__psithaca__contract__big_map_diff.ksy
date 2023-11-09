@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.contract.big_map_diff'
 types:
   alloc:
     seq:

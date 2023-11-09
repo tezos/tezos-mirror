@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__script__expr
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.script.expr'
 types:
   annots:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__script__loc
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.script.loc'
 seq:
 - id: micheline__location
   type: s4

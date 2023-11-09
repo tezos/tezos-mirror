@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__delegate__balance_updates
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.delegate.balance_updates'
 types:
   deposits:
     seq:

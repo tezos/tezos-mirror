@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.contract.big_map_diff'
 types:
   alloc:
     seq:

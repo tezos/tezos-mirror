@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__vote__listings
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.vote.listings'
 types:
   id_017__ptnairob__vote__listings_entries:
     seq:

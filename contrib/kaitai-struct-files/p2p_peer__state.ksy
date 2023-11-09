@@ -2,8 +2,11 @@ meta:
   id: p2p_peer__state
   endian: be
 doc: ! >-
-  The state a peer connection can be in: accepted (when the connection is being established),
-  running (when the connection is already established), disconnected (otherwise).
+  Encoding id: p2p_peer.state
+
+  Description: The state a peer connection can be in: accepted (when the connection
+  is being established), running (when the connection is already established), disconnected
+  (otherwise).
 enums:
   p2p_peer__state:
     0: accepted

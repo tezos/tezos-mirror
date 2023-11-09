@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__contract
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.contract'
 types:
   id_007__psdelph1__contract_id:
     doc: ! >-

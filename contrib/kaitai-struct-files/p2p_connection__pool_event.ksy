@@ -2,8 +2,11 @@ meta:
   id: p2p_connection__pool_event
   endian: be
 doc: ! >-
-  An event that may happen during maintenance of and other operations on the p2p connection
-  pool. Typically, it includes connection errors, peer swaps, etc.
+  Encoding id: p2p_connection.pool_event
+
+  Description: An event that may happen during maintenance of and other operations
+  on the p2p connection pool. Typically, it includes connection errors, peer swaps,
+  etc.
 types:
   accepting_request:
     seq:

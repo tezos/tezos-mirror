@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__parameters
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.parameters'
 types:
   bootstrap_accounts:
     seq:

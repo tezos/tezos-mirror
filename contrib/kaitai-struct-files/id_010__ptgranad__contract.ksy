@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__contract
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.contract'
 types:
   id_010__ptgranad__contract_id:
     doc: ! >-

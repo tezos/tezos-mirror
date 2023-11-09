@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__script__prim
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.script.prim'
 enums:
   id_010__ptgranad__michelson__v1__primitives:
     0: parameter

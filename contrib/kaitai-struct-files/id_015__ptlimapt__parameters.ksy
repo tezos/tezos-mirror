@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__parameters
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.parameters'
 types:
   bootstrap_accounts:
     seq:

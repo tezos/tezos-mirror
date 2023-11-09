@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__block_header__raw
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.block_header.raw'
 types:
   block_header:
     doc: ! 'Block header: Block header. It contains both shell and protocol specific

@@ -1,4 +1,6 @@
 meta:
   id: ground__null
   endian: be
-doc: A null value
+doc: ! 'Encoding id: ground.null
+
+  Description: A null value'

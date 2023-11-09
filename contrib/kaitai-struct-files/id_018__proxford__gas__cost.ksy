@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__gas__cost
   endian: be
+doc: ! 'Encoding id: 018-Proxford.gas.cost'
 types:
   n_chunk:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: signer_messages__request
   endian: be
+doc: ! 'Encoding id: signer_messages.request'
 types:
   data:
     seq:

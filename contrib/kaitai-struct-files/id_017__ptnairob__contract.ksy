@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__contract
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.contract'
 types:
   id_017__ptnairob__contract_id:
     doc: ! >-

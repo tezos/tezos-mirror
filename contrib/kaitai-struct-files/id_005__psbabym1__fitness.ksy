@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__fitness
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.fitness'
 types:
   fitness:
     doc: ! >-

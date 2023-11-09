@@ -2,8 +2,10 @@ meta:
   id: p2p_point__pool_event
   endian: be
 doc: ! >-
-  Events happening during maintenance of and operations on a peer point pool (such
-  as connections, disconnections, connection requests).
+  Encoding id: p2p_point.pool_event
+
+  Description: Events happening during maintenance of and operations on a peer point
+  pool (such as connections, disconnections, connection requests).
 types:
   p2p_point__pool_event_field1:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__contract
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.contract'
 types:
   id_016__ptmumbai__contract_id:
     doc: ! >-

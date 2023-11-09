@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.contract.big_map_diff'
 types:
   alloc:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__constants
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.constants'
 types:
   baking_reward_per_endorsement:
     seq:

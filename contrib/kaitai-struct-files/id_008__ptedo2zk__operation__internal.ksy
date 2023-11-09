@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__operation__internal
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.operation.internal'
 types:
   code:
     seq:

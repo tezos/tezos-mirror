@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.fa1.2.token_transfer'
 types:
   destination:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.fa1.2.token_transfer'
 types:
   destination:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__constants__parametric
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.constants.parametric'
 types:
   delegate_selection:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__operation__internal
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.operation.internal'
 types:
   code:
     seq:

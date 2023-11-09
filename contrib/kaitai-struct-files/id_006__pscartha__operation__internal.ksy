@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__operation__internal
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.operation.internal'
 types:
   code:
     seq:

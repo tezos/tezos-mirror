@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.receipt.balance_updates'
 types:
   deposits:
     seq:

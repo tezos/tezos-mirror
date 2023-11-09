@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__voting_period__kind
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.voting_period.kind'
 enums:
   id_006__pscartha__voting_period__kind_tag:
     0: proposal

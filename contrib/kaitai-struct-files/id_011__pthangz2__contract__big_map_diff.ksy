@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.contract.big_map_diff'
 types:
   alloc:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__gas
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.gas'
 types:
   n_chunk:
     seq:

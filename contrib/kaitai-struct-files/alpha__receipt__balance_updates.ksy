@@ -1,6 +1,7 @@
 meta:
   id: alpha__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: alpha.receipt.balance_updates'
 types:
   alpha__bond_id:
     seq:

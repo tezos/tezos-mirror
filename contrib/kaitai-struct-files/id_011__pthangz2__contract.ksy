@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__contract
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.contract'
 types:
   id_011__pthangz2__contract_id:
     doc: ! >-

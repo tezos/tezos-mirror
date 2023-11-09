@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__block_header
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.block_header'
 types:
   block_header__shell:
     doc: ! >-

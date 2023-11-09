@@ -2,8 +2,10 @@ meta:
   id: sapling__transaction
   endian: be
 doc: ! >-
-  A Sapling transaction with inputs, outputs, balance, root, bound_data and binding
-  sig.
+  Encoding id: sapling.transaction
+
+  Description: A Sapling transaction with inputs, outputs, balance, root, bound_data
+  and binding sig.
 types:
   bound_data:
     seq:

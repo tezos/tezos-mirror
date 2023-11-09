@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__delegate__balance_updates
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.delegate.balance_updates'
 types:
   deposits:
     seq:

@@ -2,9 +2,11 @@ meta:
   id: p2p_point__state
   endian: be
 doc: ! >-
-  The state a connection to a peer point can be in: requested (connection open from
-  here), accepted (handshake), running (connection already established), disconnected
-  (no connection).
+  Encoding id: p2p_point.state
+
+  Description: The state a connection to a peer point can be in: requested (connection
+  open from here), accepted (handshake), running (connection already established),
+  disconnected (no connection).
 enums:
   p2p_point__state_tag:
     0: requested

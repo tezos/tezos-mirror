@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__gas
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.gas'
 types:
   n_chunk:
     seq:

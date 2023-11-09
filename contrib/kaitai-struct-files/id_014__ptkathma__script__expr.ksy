@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__script__expr
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.script.expr'
 types:
   annots:
     seq:

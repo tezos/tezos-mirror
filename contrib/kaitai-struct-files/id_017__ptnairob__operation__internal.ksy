@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__operation__internal
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.operation.internal'
 types:
   annots:
     seq:

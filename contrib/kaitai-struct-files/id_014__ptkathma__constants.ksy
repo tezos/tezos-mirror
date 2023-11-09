@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__constants
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.constants'
 types:
   dal_parametric:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__fitness
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.fitness'
 types:
   locked_round:
     seq:

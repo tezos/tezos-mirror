@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__contract
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.contract'
 types:
   id_015__ptlimapt__contract_id:
     doc: ! >-

@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__vote__listings
   endian: be
+doc: ! 'Encoding id: 018-Proxford.vote.listings'
 types:
   id_018__proxford__vote__listings_entries:
     seq:

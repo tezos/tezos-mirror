@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__constants__fixed
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.constants.fixed'
 seq:
 - id: proof_of_work_nonce_size
   type: u1

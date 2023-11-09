@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.receipt.balance_updates'
 types:
   frozen_bonds:
     seq:

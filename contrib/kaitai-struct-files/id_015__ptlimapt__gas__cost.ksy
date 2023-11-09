@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__gas__cost
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.gas.cost'
 types:
   n_chunk:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: p2p_point__id
   endian: be
+doc: ! 'Encoding id: p2p_point.id'
 types:
   p2p_point__id:
     doc: Identifier for a peer point

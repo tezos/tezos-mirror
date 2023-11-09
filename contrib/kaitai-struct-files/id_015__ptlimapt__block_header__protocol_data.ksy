@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__block_header__protocol_data
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.block_header.protocol_data'
 types:
   id_015__ptlimapt__block_header__alpha__signed_contents:
     seq:

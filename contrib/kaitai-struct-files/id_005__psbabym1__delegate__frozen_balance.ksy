@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__delegate__frozen_balance
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.delegate.frozen_balance'
 types:
   n:
     seq:

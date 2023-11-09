@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.receipt.balance_updates'
 types:
   frozen_bonds:
     seq:

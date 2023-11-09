@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__gas__cost
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.gas.cost'
 types:
   n_chunk:
     seq:

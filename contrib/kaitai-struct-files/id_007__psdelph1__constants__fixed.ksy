@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__constants__fixed
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.constants.fixed'
 seq:
 - id: proof_of_work_nonce_size
   type: u1

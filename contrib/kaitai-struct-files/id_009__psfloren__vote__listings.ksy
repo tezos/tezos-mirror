@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__vote__listings
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.vote.listings'
 types:
   id_009__psfloren__vote__listings_entries:
     seq:

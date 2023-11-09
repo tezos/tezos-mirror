@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__block_header__protocol_data
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.block_header.protocol_data'
 types:
   id_008__ptedo2zk__block_header__alpha__signed_contents:
     seq:

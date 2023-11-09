@@ -1,6 +1,7 @@
 meta:
   id: alpha__operation__internal
   endian: be
+doc: ! 'Encoding id: alpha.operation.internal'
 types:
   alpha__apply_internal_results__alpha__operation_result:
     seq:

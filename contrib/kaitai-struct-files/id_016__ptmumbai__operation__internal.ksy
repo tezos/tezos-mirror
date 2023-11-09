@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__operation__internal
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.operation.internal'
 types:
   annots:
     seq:

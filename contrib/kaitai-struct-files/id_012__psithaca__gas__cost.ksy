@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__gas__cost
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.gas.cost'
 types:
   n_chunk:
     seq:

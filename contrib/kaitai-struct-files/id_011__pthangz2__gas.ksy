@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__gas
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.gas'
 types:
   n_chunk:
     seq:

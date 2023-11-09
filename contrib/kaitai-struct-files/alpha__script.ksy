@@ -1,6 +1,7 @@
 meta:
   id: alpha__script
   endian: be
+doc: ! 'Encoding id: alpha.script'
 types:
   alpha__scripted__contracts:
     seq:

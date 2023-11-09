@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.fa1.2.token_transfer'
 types:
   destination:
     seq:

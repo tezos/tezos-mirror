@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__vote__listings
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.vote.listings'
 types:
   id_013__ptjakart__vote__listings_entries:
     seq:

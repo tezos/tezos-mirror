@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__fitness
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.fitness'
 types:
   locked_round:
     seq:

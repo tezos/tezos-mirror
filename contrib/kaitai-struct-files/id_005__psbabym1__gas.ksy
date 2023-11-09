@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__gas
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.gas'
 types:
   n_chunk:
     seq:

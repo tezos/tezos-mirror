@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__fitness
   endian: be
+doc: ! 'Encoding id: 018-Proxford.fitness'
 types:
   locked_round:
     seq:

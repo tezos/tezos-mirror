@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__script
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.script'
 types:
   code:
     seq:

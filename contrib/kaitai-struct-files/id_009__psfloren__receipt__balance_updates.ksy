@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.receipt.balance_updates'
 types:
   deposits:
     seq:

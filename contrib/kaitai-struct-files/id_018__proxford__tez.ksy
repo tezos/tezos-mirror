@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__tez
   endian: be
+doc: ! 'Encoding id: 018-Proxford.tez'
 types:
   n:
     seq:

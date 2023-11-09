@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__parameters
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.parameters'
 types:
   bootstrap_accounts:
     seq:

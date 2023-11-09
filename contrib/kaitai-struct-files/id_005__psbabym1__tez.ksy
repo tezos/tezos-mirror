@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__tez
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.tez'
 types:
   n:
     seq:

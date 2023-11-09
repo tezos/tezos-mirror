@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__fitness
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.fitness'
 types:
   locked_round:
     seq:

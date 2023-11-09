@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__parameters
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.parameters'
 types:
   bootstrap_accounts:
     seq:

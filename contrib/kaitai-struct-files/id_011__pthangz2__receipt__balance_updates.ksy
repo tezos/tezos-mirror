@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.receipt.balance_updates'
 types:
   deposits:
     seq:

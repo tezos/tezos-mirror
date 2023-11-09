@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__voting_period__kind
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.voting_period.kind'
 enums:
   id_017__ptnairob__voting_period__kind_tag:
     0: proposal

@@ -2,8 +2,10 @@ meta:
   id: block_header__shell
   endian: be
 doc: ! >-
-  Block header's shell-related content. It contains information such as the block
-  level, its predecessor and timestamp.
+  Encoding id: block_header.shell
+
+  Description: Block header's shell-related content. It contains information such
+  as the block level, its predecessor and timestamp.
 types:
   fitness:
     doc: ! >-

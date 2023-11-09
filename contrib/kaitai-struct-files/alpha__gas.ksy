@@ -1,6 +1,7 @@
 meta:
   id: alpha__gas
   endian: be
+doc: ! 'Encoding id: alpha.gas'
 types:
   n_chunk:
     seq:

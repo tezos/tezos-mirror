@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__constants__fixed
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.constants.fixed'
 seq:
 - id: proof_of_work_nonce_size
   type: u1

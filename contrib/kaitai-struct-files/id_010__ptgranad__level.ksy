@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__level
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.level'
 enums:
   bool:
     0: false

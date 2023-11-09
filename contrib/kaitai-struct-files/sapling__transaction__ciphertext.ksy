@@ -1,6 +1,7 @@
 meta:
   id: sapling__transaction__ciphertext
   endian: be
+doc: ! 'Encoding id: sapling.transaction.ciphertext'
 types:
   payload_enc:
     seq:

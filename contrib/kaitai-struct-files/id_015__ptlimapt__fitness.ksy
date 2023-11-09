@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__fitness
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.fitness'
 types:
   locked_round:
     seq:

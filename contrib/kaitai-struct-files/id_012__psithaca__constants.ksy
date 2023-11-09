@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__constants
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.constants'
 types:
   cache_layout:
     seq:

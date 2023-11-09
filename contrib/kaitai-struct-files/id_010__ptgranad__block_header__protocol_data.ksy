@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__block_header__protocol_data
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.block_header.protocol_data'
 types:
   id_010__ptgranad__block_header__alpha__signed_contents:
     seq:

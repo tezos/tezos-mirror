@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__block_header__shell_header
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.block_header.shell_header'
 types:
   block_header__shell:
     doc: ! >-

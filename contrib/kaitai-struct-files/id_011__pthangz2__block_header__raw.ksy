@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__block_header__raw
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.block_header.raw'
 types:
   block_header:
     doc: ! 'Block header: Block header. It contains both shell and protocol specific

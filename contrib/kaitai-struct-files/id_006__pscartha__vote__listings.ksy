@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__vote__listings
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.vote.listings'
 types:
   id_006__pscartha__vote__listings_entries:
     seq:

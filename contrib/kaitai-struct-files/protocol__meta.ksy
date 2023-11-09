@@ -2,8 +2,10 @@ meta:
   id: protocol__meta
   endian: be
 doc: ! >-
-  Protocol metadata: the hash of the protocol, the expected environment version and
-  the list of modules comprising the protocol.
+  Encoding id: protocol.meta
+
+  Description: Protocol metadata: the hash of the protocol, the expected environment
+  version and the list of modules comprising the protocol.
 types:
   modules:
     seq:

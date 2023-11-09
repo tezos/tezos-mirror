@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__block_header__raw
   endian: be
+doc: ! 'Encoding id: 018-Proxford.block_header.raw'
 types:
   block_header:
     doc: ! 'Block header: Block header. It contains both shell and protocol specific

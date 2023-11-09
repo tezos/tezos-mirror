@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__delegate__frozen_balance_by_cycles
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.delegate.frozen_balance_by_cycles'
 types:
   id_010__ptgranad__delegate__frozen_balance_by_cycles_entries:
     seq:

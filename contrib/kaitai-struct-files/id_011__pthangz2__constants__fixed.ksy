@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__constants__fixed
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.constants.fixed'
 types:
   cache_layout:
     seq:

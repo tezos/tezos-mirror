@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.fa1.2.token_transfer'
 types:
   destination:
     seq:

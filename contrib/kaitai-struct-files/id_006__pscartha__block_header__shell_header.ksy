@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__block_header__shell_header
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.block_header.shell_header'
 types:
   block_header__shell:
     doc: ! >-

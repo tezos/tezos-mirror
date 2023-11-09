@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__contract
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.contract'
 types:
   id_012__psithaca__contract_id:
     doc: ! >-

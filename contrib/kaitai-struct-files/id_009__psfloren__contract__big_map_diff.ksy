@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.contract.big_map_diff'
 types:
   alloc:
     seq:
