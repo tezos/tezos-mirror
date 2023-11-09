@@ -96,6 +96,8 @@ module Dune = struct
     | Native -> "native"
     | JS -> "js"
 
+  type ppx_kind = Ppx_rewriter | Ppx_deriver
+
   type s_expr =
     | E
     | S of string
@@ -222,7 +224,7 @@ module Dune = struct
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
-      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false)
+      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false) ?ppx_kind
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
       ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
       ?modules ?modules_without_implementation ?modes
@@ -283,6 +285,10 @@ module Dune = struct
              | deps -> S "deps" :: of_list deps);
            ]
           else E);
+          (match ppx_kind with
+          | None -> E
+          | Some Ppx_rewriter -> [S "kind"; S "ppx_rewriter"]
+          | Some Ppx_deriver -> [S "kind"; S "ppx_deriver"]);
           (match preprocess with
           | [] -> E
           | _ :: _ -> S "preprocess" :: of_list preprocess);
@@ -1214,6 +1220,7 @@ module Target = struct
     optional : bool;
     opens : string list;
     path : string;
+    ppx_kind : Dune.ppx_kind option;
     preprocess : preprocessor list;
     preprocessor_deps : preprocessor_dep list;
     private_modules : string list;
@@ -1397,6 +1404,7 @@ module Target = struct
     ?opam_homepage:string ->
     ?opam_with_test:with_test ->
     ?optional:bool ->
+    ?ppx_kind:Dune.ppx_kind ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
@@ -1475,7 +1483,7 @@ module Target = struct
       ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
       ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
       ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
-      ?(optional = false) ?(preprocess = []) ?(preprocessor_deps = [])
+      ?(optional = false) ?ppx_kind ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?profile ?(opam_only_deps = [])
       ?(release_status = Auto_opam) ?static ?synopsis ?description
       ?(time_measurement_ppx = false) ?(available : available = Always)
@@ -1684,6 +1692,19 @@ module Target = struct
                 (String.concat ", " privates))
       | _ -> ()
     in
+    let () =
+      (* Sanity checks around [ppx_rewriter] and [ppx_deriver] libraries. *)
+      match ppx_kind with
+      | Some (Dune.Ppx_rewriter | Ppx_deriver) -> (
+          match kind with
+          | Public_library _ | Private_library _ -> ()
+          | Public_executable _ | Private_executable _ | Test_executable _ ->
+              error
+                "Argument ~ppx_kind is only allowed for libraries; target %s \
+                 is not a library"
+                (kind_name_for_errors kind))
+      | None -> ()
+    in
     let static =
       match (static, kind) with
       | Some static, _ -> static
@@ -1827,6 +1848,7 @@ module Target = struct
         optional;
         opens;
         path;
+        ppx_kind;
         preprocess;
         preprocessor_deps;
         private_modules;
@@ -2336,6 +2358,7 @@ module Sub_lib = struct
        ?opam_homepage
        ?opam_with_test
        ?optional
+       ?ppx_kind
        ?preprocess
        ?preprocessor_deps
        ?private_modules
@@ -2416,6 +2439,7 @@ module Sub_lib = struct
       ?opam_homepage
       ?opam_with_test
       ?optional
+      ?ppx_kind
       ?preprocess
       ?preprocessor_deps
       ?private_modules
@@ -2698,6 +2722,7 @@ let generate_dune (internal : Target.internal) =
       ~inline_tests:internal.inline_tests
       ?inline_tests_deps:internal.inline_tests_deps
       ~optional:internal.optional
+      ?ppx_kind:internal.ppx_kind
       ~preprocess
       ~preprocessor_deps
       ~virtual_modules:internal.virtual_modules

@@ -38,6 +38,11 @@ module Dune : sig
     - [JS]: compile to JavaScript. *)
   type mode = Byte | Native | JS
 
+  (** The content of the [(kind ...)] stanza of a [dune] file, when a
+      library is intended to be used as a PPX rewriter or a
+      [[@@deriving ...]]  plugin. *)
+  type ppx_kind = Ppx_rewriter | Ppx_deriver
+
   (** S-expressions.
 
       S-expressions are lists of atoms and/or s-expressions.
@@ -758,6 +763,10 @@ type bisect_ppx = No | Yes | With_sigterm
 
     - [path]: path of the directory in which to generate the [dune] file for this target.
 
+    - [ppx_kind]: specifies a [(kind ppx_rewriter)] or [(kind ppx_deriver)]
+      stanza for the [dune] target. Must be set when the library is intended
+      to be used as a PPX rewriter or a [@@deriving ...] plugin.
+
     - [preprocess]: preprocessor directives to add using the [(preprocess ...)] stanza.
       Those preprocessors are also added as dependencies in the [.opam] file.
 
@@ -850,6 +859,7 @@ type 'a maker =
   ?opam_homepage:string ->
   ?opam_with_test:with_test ->
   ?optional:bool ->
+  ?ppx_kind:Dune.ppx_kind ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
