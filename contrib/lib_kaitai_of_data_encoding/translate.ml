@@ -6,6 +6,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Kaitai.Types
+module MuSet = Set.Make (String)
+module StringSet = Set.Make (String)
+
+(* We need to access the definition of data-encoding's [descr] type. For this
+   reason we alias the private/internal module [Data_encoding__Encoding] (rather
+   than the public module [Data_encoding.Encoding]. *)
+module DataEncoding = Data_encoding__Encoding
+
+module AnyEncoding = struct
+  module T = struct
+    type t = AnyEncoding : _ DataEncoding.t -> t [@@unboxed]
+
+    let hash = Hashtbl.hash
+
+    (* We rely on [AnyEncoding] to be unboxed so that we can preserve
+       physical equality. We can't use structural equality because
+       encoding contain closures. *)
+    let equal a b = a == b
+
+    let pack x = AnyEncoding x
+  end
+
+  include T
+  module Tbl = Hashtbl.Make (T)
+end
+
+type state = {
+  enums : Ground.Enum.assoc;
+  types : Ground.Type.assoc;
+  mus : MuSet.t;
+  imports : StringSet.t;
+  extern : string AnyEncoding.Tbl.t;
+}
+
 (* Identifiers have a strict pattern to follow, this function removes the
    irregularities.
 
@@ -32,29 +67,11 @@ let escape_id id =
     id ;
   Buffer.contents b
 
-open Kaitai.Types
-module MuSet = Set.Make (String)
-
-type state = {
-  enums : Ground.Enum.assoc;
-  types : Ground.Type.assoc;
-  mus : MuSet.t;
-}
-
 let add_enum state enum =
   {state with enums = Helpers.add_uniq_assoc state.enums enum}
 
 let add_type state typ =
   {state with types = Helpers.add_uniq_assoc state.types typ}
-
-(* We need to access the definition of data-encoding's [descr] type. For this
-   reason we alias the private/internal module [Data_encoding__Encoding] (rather
-   than the public module [Data_encoding.Encoding]. *)
-module DataEncoding = Data_encoding__Encoding
-
-(* We need an existential type for encodings because the type of encodings in
-   cases is not related to the type of encodings in unions. *)
-type anyEncoding = AnyEncoding : _ DataEncoding.t -> anyEncoding
 
 let summary ~title ~description =
   match (title, description) with
@@ -115,7 +132,7 @@ let redirect_if_many :
   | [attr] -> (state, {(fattr attr) with id})
   | _ :: _ :: _ as attrs -> redirect state attrs fattr id
 
-let rec seq_field_of_data_encoding :
+let rec seq_field_of_data_encoding0 :
     type a. state -> a DataEncoding.t -> string -> state * AttrSpec.t list =
  fun state ({encoding; _} as whole_encoding) id ->
   let id = escape_id id in
@@ -439,6 +456,24 @@ let rec seq_field_of_data_encoding :
       in
       (state, [attr])
 
+and seq_field_of_data_encoding :
+    type a. state -> a DataEncoding.t -> string -> state * AttrSpec.t list =
+ fun state whole_encoding id ->
+  match
+    AnyEncoding.Tbl.find_opt state.extern (AnyEncoding.pack whole_encoding)
+  with
+  | Some name ->
+      let name = escape_id name in
+      let state = {state with imports = StringSet.add name state.imports} in
+      ( state,
+        [
+          {
+            (Helpers.default_attr_spec ~id:(escape_id id)) with
+            dataType = DataType.(ComplexDataType (UserType name));
+          };
+        ] )
+  | None -> seq_field_of_data_encoding0 state whole_encoding id
+
 and seq_field_of_tups :
     type a.
     state -> Helpers.tid_gen -> a DataEncoding.desc -> state * AttrSpec.t list =
@@ -545,7 +580,7 @@ and seq_field_of_union :
     string ->
     state * AttrSpec.t list =
  fun state tag_size cases id ->
-  let tagged_cases : (int * string * string option * anyEncoding) list =
+  let tagged_cases : (int * string * string option * AnyEncoding.t) list =
     (* Some cases are JSON-only, we filter those out and we also get rid of
        parts we don't care about like injection and projection functions. *)
     List.filter_map
@@ -554,7 +589,7 @@ and seq_field_of_union :
         Data_encoding__Uint_option.fold
           ~none:None
           ~some:(fun tag ->
-            Some (tag, escape_id title, description, AnyEncoding encoding))
+            Some (tag, escape_id title, description, AnyEncoding.pack encoding))
           tag)
       cases
   in
@@ -585,7 +620,8 @@ and seq_field_of_union :
   in
   let state, payload_attrs =
     List.fold_left
-      (fun (state, payload_attrs) (_, case_id, _, AnyEncoding encoding) ->
+      (fun (state, payload_attrs)
+           (_, case_id, _, AnyEncoding.AnyEncoding encoding) ->
         let state, attrs = seq_field_of_data_encoding state encoding case_id in
         match attrs with
         | [] -> (state, payload_attrs)
@@ -714,10 +750,25 @@ let add_original_id_to_description ?description id =
   | None -> "Encoding id: " ^ id
   | Some description -> "Encoding id: " ^ id ^ "\nDescription: " ^ description
 
-let from_data_encoding : type a. id:string -> a DataEncoding.t -> ClassSpec.t =
- fun ~id encoding ->
+let from_data_encoding :
+    type a.
+    id:string ->
+    ?extern:string AnyEncoding.Tbl.t ->
+    a DataEncoding.t ->
+    ClassSpec.t =
+ fun ~id ?(extern = AnyEncoding.Tbl.create 0) encoding ->
   let encoding_name = escape_id id in
-  let state = {types = []; enums = []; mus = MuSet.empty} in
+  let extern = AnyEncoding.Tbl.copy extern in
+  AnyEncoding.Tbl.remove extern (AnyEncoding.pack encoding) ;
+  let state =
+    {
+      enums = [];
+      types = [];
+      mus = MuSet.empty;
+      imports = StringSet.empty;
+      extern;
+    }
+  in
   let sort l = List.sort (fun (t1, _) (t2, _) -> compare t1 t2) l in
   match encoding.encoding with
   | Describe {encoding; description; id = descrid; _} ->
@@ -728,6 +779,7 @@ let from_data_encoding : type a. id:string -> a DataEncoding.t -> ClassSpec.t =
         ~description
         ~enums:(sort state.enums)
         ~types:(sort state.types)
+        ~imports:(StringSet.elements state.imports)
         ~instances:[]
         attrs
   | _ ->
@@ -740,5 +792,6 @@ let from_data_encoding : type a. id:string -> a DataEncoding.t -> ClassSpec.t =
         ~description
         ~enums:(sort state.enums)
         ~types:(sort state.types)
+        ~imports:(StringSet.elements state.imports)
         ~instances:[]
         attrs
