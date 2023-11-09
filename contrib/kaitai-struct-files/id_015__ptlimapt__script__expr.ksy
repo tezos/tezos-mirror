@@ -2,6 +2,30 @@ meta:
   id: id_015__ptlimapt__script__expr
   endian: be
 types:
+  annots:
+    seq:
+    - id: len_annots
+      type: s4
+    - id: annots
+      size: len_annots
+  args:
+    seq:
+    - id: len_args
+      type: s4
+    - id: args
+      type: args_entries
+      size: len_args
+      repeat: eos
+  args_entries:
+    seq:
+    - id: args_elt
+      type: micheline__015__ptlimapt__michelson_v1__expression
+  bytes:
+    seq:
+    - id: len_bytes
+      type: s4
+    - id: bytes
+      size: len_bytes
   micheline__015__ptlimapt__michelson_v1__expression:
     seq:
     - id: micheline__015__ptlimapt__michelson_v1__expression_tag
@@ -41,41 +65,19 @@ types:
     - id: micheline__015__ptlimapt__michelson_v1__expression_bytes
       type: bytes
       if: (micheline__015__ptlimapt__michelson_v1__expression_tag == micheline__015__ptlimapt__michelson_v1__expression_tag::bytes)
-  bytes:
-    seq:
-    - id: len_bytes
-      type: s4
-    - id: bytes
-      size: len_bytes
-  micheline__015__ptlimapt__michelson_v1__expression_prim__generic:
+  micheline__015__ptlimapt__michelson_v1__expression_prim__1_arg__no_annots:
     seq:
     - id: prim
       type: u1
       enum: id_015__ptlimapt__michelson__v1__primitives
-    - id: args
-      type: args
-    - id: annots
-      type: annots
-  args:
-    seq:
-    - id: len_args
-      type: s4
-    - id: args
-      type: args_entries
-      size: len_args
-      repeat: eos
-  args_entries:
-    seq:
-    - id: args_elt
+    - id: arg
       type: micheline__015__ptlimapt__michelson_v1__expression
-  micheline__015__ptlimapt__michelson_v1__expression_prim__2_args__some_annots:
+  micheline__015__ptlimapt__michelson_v1__expression_prim__1_arg__some_annots:
     seq:
     - id: prim
       type: u1
       enum: id_015__ptlimapt__michelson__v1__primitives
-    - id: arg1
-      type: micheline__015__ptlimapt__michelson_v1__expression
-    - id: arg2
+    - id: arg
       type: micheline__015__ptlimapt__michelson_v1__expression
     - id: annots
       type: annots
@@ -88,22 +90,26 @@ types:
       type: micheline__015__ptlimapt__michelson_v1__expression
     - id: arg2
       type: micheline__015__ptlimapt__michelson_v1__expression
-  micheline__015__ptlimapt__michelson_v1__expression_prim__1_arg__some_annots:
+  micheline__015__ptlimapt__michelson_v1__expression_prim__2_args__some_annots:
     seq:
     - id: prim
       type: u1
       enum: id_015__ptlimapt__michelson__v1__primitives
-    - id: arg
+    - id: arg1
+      type: micheline__015__ptlimapt__michelson_v1__expression
+    - id: arg2
       type: micheline__015__ptlimapt__michelson_v1__expression
     - id: annots
       type: annots
-  micheline__015__ptlimapt__michelson_v1__expression_prim__1_arg__no_annots:
+  micheline__015__ptlimapt__michelson_v1__expression_prim__generic:
     seq:
     - id: prim
       type: u1
       enum: id_015__ptlimapt__michelson__v1__primitives
-    - id: arg
-      type: micheline__015__ptlimapt__michelson_v1__expression
+    - id: args
+      type: args
+    - id: annots
+      type: annots
   micheline__015__ptlimapt__michelson_v1__expression_prim__no_args__some_annots:
     seq:
     - id: prim
@@ -111,12 +117,6 @@ types:
       enum: id_015__ptlimapt__michelson__v1__primitives
     - id: annots
       type: annots
-  annots:
-    seq:
-    - id: len_annots
-      type: s4
-    - id: annots
-      size: len_annots
   micheline__015__ptlimapt__michelson_v1__expression_sequence:
     seq:
     - id: len_sequence
@@ -125,6 +125,12 @@ types:
       type: sequence_entries
       size: len_sequence
       repeat: eos
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
   sequence_entries:
     seq:
     - id: sequence_elt
@@ -148,12 +154,6 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
 enums:
   id_015__ptlimapt__michelson__v1__primitives:
     0: parameter

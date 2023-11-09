@@ -2,12 +2,6 @@ meta:
   id: id_013__ptjakart__constants__parametric
   endian: be
 types:
-  ratio_of_frozen_deposits_slashed_per_double_endorsement:
-    seq:
-    - id: numerator
-      type: u2
-    - id: denominator
-      type: u2
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -20,6 +14,18 @@ types:
       type: n_chunk
       repeat: until
       repeat-until: not (_.has_more).as<bool>
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
+  ratio_of_frozen_deposits_slashed_per_double_endorsement:
+    seq:
+    - id: numerator
+      type: u2
+    - id: denominator
+      type: u2
   z:
     seq:
     - id: has_tail
@@ -33,12 +39,6 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
 enums:
   bool:
     0: false

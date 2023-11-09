@@ -2,23 +2,27 @@ meta:
   id: id_011__pthangz2__receipt__balance_updates
   endian: be
 types:
-  id_011__pthangz2__operation_metadata__alpha__balance_updates:
+  id_011__pthangz2__contract_id:
+    doc: ! >-
+      A contract handle: A contract notation as given to an RPC or inside scripts.
+      Can be a base58 implicit contract hash or a base58 originated contract hash.
     seq:
-    - id: len_id_011__pthangz2__operation_metadata__alpha__balance_updates
-      type: s4
-    - id: id_011__pthangz2__operation_metadata__alpha__balance_updates
-      type: id_011__pthangz2__operation_metadata__alpha__balance_updates_entries
-      size: len_id_011__pthangz2__operation_metadata__alpha__balance_updates
-      repeat: eos
-  id_011__pthangz2__operation_metadata__alpha__balance_updates_entries:
-    seq:
-    - id: id_011__pthangz2__operation_metadata__alpha__balance
-      type: id_011__pthangz2__operation_metadata__alpha__balance
-    - id: change
-      type: s8
-    - id: origin
+    - id: id_011__pthangz2__contract_id_tag
       type: u1
-      enum: origin_tag
+      enum: id_011__pthangz2__contract_id_tag
+    - id: id_011__pthangz2__contract_id_implicit
+      type: public_key_hash
+      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::implicit)
+    - id: id_011__pthangz2__contract_id_originated
+      type: id_011__pthangz2__contract_id_originated
+      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::originated)
+  id_011__pthangz2__contract_id_originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
   id_011__pthangz2__operation_metadata__alpha__balance:
     seq:
     - id: id_011__pthangz2__operation_metadata__alpha__balance_tag
@@ -54,27 +58,23 @@ types:
       type: public_key_hash
     - id: cycle
       type: s4
-  id_011__pthangz2__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
+  id_011__pthangz2__operation_metadata__alpha__balance_updates:
     seq:
-    - id: id_011__pthangz2__contract_id_tag
+    - id: len_id_011__pthangz2__operation_metadata__alpha__balance_updates
+      type: s4
+    - id: id_011__pthangz2__operation_metadata__alpha__balance_updates
+      type: id_011__pthangz2__operation_metadata__alpha__balance_updates_entries
+      size: len_id_011__pthangz2__operation_metadata__alpha__balance_updates
+      repeat: eos
+  id_011__pthangz2__operation_metadata__alpha__balance_updates_entries:
+    seq:
+    - id: id_011__pthangz2__operation_metadata__alpha__balance
+      type: id_011__pthangz2__operation_metadata__alpha__balance
+    - id: change
+      type: s8
+    - id: origin
       type: u1
-      enum: id_011__pthangz2__contract_id_tag
-    - id: id_011__pthangz2__contract_id_implicit
-      type: public_key_hash
-      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::implicit)
-    - id: id_011__pthangz2__contract_id_originated
-      type: id_011__pthangz2__contract_id_originated
-      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::originated)
-  id_011__pthangz2__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
+      enum: origin_tag
   public_key_hash:
     doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
@@ -91,14 +91,6 @@ types:
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
 enums:
-  origin_tag:
-    0: block_application
-    1: protocol_migration
-    2: subsidy
-  public_key_hash_tag:
-    0: ed25519
-    1: secp256k1
-    2: p256
   id_011__pthangz2__contract_id_tag:
     0: implicit
     1: originated
@@ -107,6 +99,14 @@ enums:
     1: rewards
     2: fees
     3: deposits
+  origin_tag:
+    0: block_application
+    1: protocol_migration
+    2: subsidy
+  public_key_hash_tag:
+    0: ed25519
+    1: secp256k1
+    2: p256
 seq:
 - id: id_011__pthangz2__operation_metadata__alpha__balance_updates
   type: id_011__pthangz2__operation_metadata__alpha__balance_updates

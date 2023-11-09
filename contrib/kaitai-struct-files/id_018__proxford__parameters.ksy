@@ -16,141 +16,83 @@ types:
       type: center_dz
     - id: radius_dz
       type: radius_dz
-  radius_dz:
+  bootstrap_accounts:
     seq:
-    - id: numerator
-      type: z
-    - id: denominator
-      type: z
-  center_dz:
-    seq:
-    - id: numerator
-      type: z
-    - id: denominator
-      type: z
-  issuance_ratio_max:
-    seq:
-    - id: numerator
-      type: z
-    - id: denominator
-      type: z
-  issuance_ratio_min:
-    seq:
-    - id: numerator
-      type: z
-    - id: denominator
-      type: z
-  smart_rollup_reveal_activation_level:
-    seq:
-    - id: raw_data
+    - id: len_bootstrap_accounts
       type: s4
-    - id: metadata
-      type: s4
-    - id: dal_page
-      type: s4
-  dal_parametric:
-    seq:
-    - id: feature_enable
-      type: u1
-      enum: bool
-    - id: number_of_slots
-      type: s2
-    - id: attestation_lag
-      type: s2
-    - id: attestation_threshold
-      type: s2
-    - id: blocks_per_epoch
-      type: s4
-    - id: redundancy_factor
-      type: u1
-    - id: page_size
-      type: u2
-    - id: slot_size
-      type: s4
-    - id: number_of_shards
-      type: u2
-  minimal_participation_ratio:
-    seq:
-    - id: numerator
-      type: u2
-    - id: denominator
-      type: u2
-  issuance_weights:
-    seq:
-    - id: base_total_issued_per_minute
-      type: n
-    - id: baking_reward_fixed_portion_weight
-      type: s4
-    - id: baking_reward_bonus_weight
-      type: s4
-    - id: attesting_reward_weight
-      type: s4
-    - id: liquidity_baking_subsidy_weight
-      type: s4
-    - id: seed_nonce_revelation_tip_weight
-      type: s4
-    - id: vdf_revelation_tip_weight
-      type: s4
-  z:
-    seq:
-    - id: has_tail
-      type: b1be
-    - id: sign
-      type: b1be
-    - id: payload
-      type: b6be
-    - id: tail
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
-      if: has_tail.as<bool>
-  commitments:
-    seq:
-    - id: len_commitments
-      type: s4
-    - id: commitments
-      type: commitments_entries
-      size: len_commitments
+    - id: bootstrap_accounts
+      type: bootstrap_accounts_entries
+      size: len_bootstrap_accounts
       repeat: eos
-  commitments_entries:
+  bootstrap_accounts_elt_public_key_known:
     seq:
-    - id: commitments_elt_field0
-      size: 20
-      doc: blinded__public__key__hash
-    - id: commitments_elt_field1
+    - id: public_key_known_field0
+      type: public_key
+      doc: signature__public_key
+    - id: public_key_known_field1
       type: n
       doc: id_018__proxford__mutez
-  bootstrap_smart_rollups:
+  bootstrap_accounts_elt_public_key_known_with_consensus_key:
     seq:
-    - id: len_bootstrap_smart_rollups
-      type: s4
-    - id: bootstrap_smart_rollups
-      type: bootstrap_smart_rollups_entries
-      size: len_bootstrap_smart_rollups
-      repeat: eos
-  bootstrap_smart_rollups_entries:
+    - id: public_key_known_with_consensus_key_field0
+      type: public_key
+      doc: signature__public_key
+    - id: public_key_known_with_consensus_key_field1
+      type: n
+      doc: id_018__proxford__mutez
+    - id: public_key_known_with_consensus_key_field2
+      type: public_key
+      doc: signature__public_key
+  bootstrap_accounts_elt_public_key_known_with_delegate:
     seq:
-    - id: address
-      size: 20
-    - id: pvm_kind
+    - id: public_key_known_with_delegate_field0
+      type: public_key
+      doc: signature__public_key
+    - id: public_key_known_with_delegate_field1
+      type: n
+      doc: id_018__proxford__mutez
+    - id: public_key_known_with_delegate_field2
+      type: public_key_hash
+      doc: signature__public_key_hash
+  bootstrap_accounts_elt_public_key_unknown:
+    seq:
+    - id: public_key_unknown_field0
+      type: public_key_hash
+      doc: signature__public_key_hash
+    - id: public_key_unknown_field1
+      type: n
+      doc: id_018__proxford__mutez
+  bootstrap_accounts_elt_public_key_unknown_with_delegate:
+    seq:
+    - id: public_key_unknown_with_delegate_field0
+      type: public_key_hash
+      doc: signature__public_key_hash
+    - id: public_key_unknown_with_delegate_field1
+      type: n
+      doc: id_018__proxford__mutez
+    - id: public_key_unknown_with_delegate_field2
+      type: public_key_hash
+      doc: signature__public_key_hash
+  bootstrap_accounts_entries:
+    seq:
+    - id: bootstrap_accounts_elt_tag
       type: u1
-      enum: pvm_kind
-    - id: kernel
-      type: kernel
-    - id: parameters_ty
-      type: parameters_ty
-  parameters_ty:
-    seq:
-    - id: len_parameters_ty
-      type: s4
-    - id: parameters_ty
-      size: len_parameters_ty
-  kernel:
-    seq:
-    - id: len_kernel
-      type: s4
-    - id: kernel
-      size: len_kernel
+      enum: bootstrap_accounts_elt_tag
+    - id: bootstrap_accounts_elt_public_key_known
+      type: bootstrap_accounts_elt_public_key_known
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known)
+    - id: bootstrap_accounts_elt_public_key_unknown
+      type: bootstrap_accounts_elt_public_key_unknown
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown)
+    - id: bootstrap_accounts_elt_public_key_known_with_delegate
+      type: bootstrap_accounts_elt_public_key_known_with_delegate
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known_with_delegate)
+    - id: bootstrap_accounts_elt_public_key_unknown_with_delegate
+      type: bootstrap_accounts_elt_public_key_unknown_with_delegate
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown_with_delegate)
+    - id: bootstrap_accounts_elt_public_key_known_with_consensus_key
+      type: bootstrap_accounts_elt_public_key_known_with_consensus_key
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known_with_consensus_key)
   bootstrap_contracts:
     seq:
     - id: len_bootstrap_contracts
@@ -177,119 +119,120 @@ types:
     - id: hash
       size: 20
       if: (hash_tag == bool::true)
-  id_018__proxford__scripted__contracts:
+  bootstrap_smart_rollups:
     seq:
-    - id: code
-      type: code
-    - id: storage
-      type: storage
-  storage:
-    seq:
-    - id: len_storage
+    - id: len_bootstrap_smart_rollups
       type: s4
-    - id: storage
-      size: len_storage
+    - id: bootstrap_smart_rollups
+      type: bootstrap_smart_rollups_entries
+      size: len_bootstrap_smart_rollups
+      repeat: eos
+  bootstrap_smart_rollups_entries:
+    seq:
+    - id: address
+      size: 20
+    - id: pvm_kind
+      type: u1
+      enum: pvm_kind
+    - id: kernel
+      type: kernel
+    - id: parameters_ty
+      type: parameters_ty
+  center_dz:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   code:
     seq:
     - id: len_code
       type: s4
     - id: code
       size: len_code
-  bootstrap_accounts:
+  commitments:
     seq:
-    - id: len_bootstrap_accounts
+    - id: len_commitments
       type: s4
-    - id: bootstrap_accounts
-      type: bootstrap_accounts_entries
-      size: len_bootstrap_accounts
+    - id: commitments
+      type: commitments_entries
+      size: len_commitments
       repeat: eos
-  bootstrap_accounts_entries:
+  commitments_entries:
     seq:
-    - id: bootstrap_accounts_elt_tag
+    - id: commitments_elt_field0
+      size: 20
+      doc: blinded__public__key__hash
+    - id: commitments_elt_field1
+      type: n
+      doc: id_018__proxford__mutez
+  dal_parametric:
+    seq:
+    - id: feature_enable
       type: u1
-      enum: bootstrap_accounts_elt_tag
-    - id: bootstrap_accounts_elt_public_key_known
-      type: bootstrap_accounts_elt_public_key_known
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known)
-    - id: bootstrap_accounts_elt_public_key_unknown
-      type: bootstrap_accounts_elt_public_key_unknown
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown)
-    - id: bootstrap_accounts_elt_public_key_known_with_delegate
-      type: bootstrap_accounts_elt_public_key_known_with_delegate
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known_with_delegate)
-    - id: bootstrap_accounts_elt_public_key_unknown_with_delegate
-      type: bootstrap_accounts_elt_public_key_unknown_with_delegate
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown_with_delegate)
-    - id: bootstrap_accounts_elt_public_key_known_with_consensus_key
-      type: bootstrap_accounts_elt_public_key_known_with_consensus_key
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known_with_consensus_key)
-  bootstrap_accounts_elt_public_key_known_with_consensus_key:
-    seq:
-    - id: public_key_known_with_consensus_key_field0
-      type: public_key
-      doc: signature__public_key
-    - id: public_key_known_with_consensus_key_field1
-      type: n
-      doc: id_018__proxford__mutez
-    - id: public_key_known_with_consensus_key_field2
-      type: public_key
-      doc: signature__public_key
-  bootstrap_accounts_elt_public_key_unknown_with_delegate:
-    seq:
-    - id: public_key_unknown_with_delegate_field0
-      type: public_key_hash
-      doc: signature__public_key_hash
-    - id: public_key_unknown_with_delegate_field1
-      type: n
-      doc: id_018__proxford__mutez
-    - id: public_key_unknown_with_delegate_field2
-      type: public_key_hash
-      doc: signature__public_key_hash
-  bootstrap_accounts_elt_public_key_known_with_delegate:
-    seq:
-    - id: public_key_known_with_delegate_field0
-      type: public_key
-      doc: signature__public_key
-    - id: public_key_known_with_delegate_field1
-      type: n
-      doc: id_018__proxford__mutez
-    - id: public_key_known_with_delegate_field2
-      type: public_key_hash
-      doc: signature__public_key_hash
-  bootstrap_accounts_elt_public_key_unknown:
-    seq:
-    - id: public_key_unknown_field0
-      type: public_key_hash
-      doc: signature__public_key_hash
-    - id: public_key_unknown_field1
-      type: n
-      doc: id_018__proxford__mutez
-  public_key_hash:
-    doc: A Ed25519, Secp256k1, P256, or BLS public key hash
-    seq:
-    - id: public_key_hash_tag
+      enum: bool
+    - id: number_of_slots
+      type: s2
+    - id: attestation_lag
+      type: s2
+    - id: attestation_threshold
+      type: s2
+    - id: blocks_per_epoch
+      type: s4
+    - id: redundancy_factor
       type: u1
-      enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
-      size: 20
-      if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
-      size: 20
-      if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
-      size: 20
-      if: (public_key_hash_tag == public_key_hash_tag::p256)
-    - id: public_key_hash_bls
-      size: 20
-      if: (public_key_hash_tag == public_key_hash_tag::bls)
-  bootstrap_accounts_elt_public_key_known:
+    - id: page_size
+      type: u2
+    - id: slot_size
+      type: s4
+    - id: number_of_shards
+      type: u2
+  id_018__proxford__scripted__contracts:
     seq:
-    - id: public_key_known_field0
-      type: public_key
-      doc: signature__public_key
-    - id: public_key_known_field1
+    - id: code
+      type: code
+    - id: storage
+      type: storage
+  issuance_ratio_max:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  issuance_ratio_min:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  issuance_weights:
+    seq:
+    - id: base_total_issued_per_minute
       type: n
-      doc: id_018__proxford__mutez
+    - id: baking_reward_fixed_portion_weight
+      type: s4
+    - id: baking_reward_bonus_weight
+      type: s4
+    - id: attesting_reward_weight
+      type: s4
+    - id: liquidity_baking_subsidy_weight
+      type: s4
+    - id: seed_nonce_revelation_tip_weight
+      type: s4
+    - id: vdf_revelation_tip_weight
+      type: s4
+  kernel:
+    seq:
+    - id: len_kernel
+      type: s4
+    - id: kernel
+      size: len_kernel
+  minimal_participation_ratio:
+    seq:
+    - id: numerator
+      type: u2
+    - id: denominator
+      type: u2
   n:
     seq:
     - id: n
@@ -302,6 +245,12 @@ types:
       type: b1be
     - id: payload
       type: b7be
+  parameters_ty:
+    seq:
+    - id: len_parameters_ty
+      type: s4
+    - id: parameters_ty
+      size: len_parameters_ty
   public_key:
     doc: A Ed25519, Secp256k1, or P256 public key
     seq:
@@ -320,13 +269,67 @@ types:
     - id: public_key_bls
       size: 48
       if: (public_key_tag == public_key_tag::bls)
+  public_key_hash:
+    doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    seq:
+    - id: public_key_hash_tag
+      type: u1
+      enum: public_key_hash_tag
+    - id: public_key_hash_ed25519
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::ed25519)
+    - id: public_key_hash_secp256k1
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
+    - id: public_key_hash_p256
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::p256)
+    - id: public_key_hash_bls
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::bls)
+  radius_dz:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  smart_rollup_reveal_activation_level:
+    seq:
+    - id: raw_data
+      type: s4
+    - id: metadata
+      type: s4
+    - id: dal_page
+      type: s4
+  storage:
+    seq:
+    - id: len_storage
+      type: s4
+    - id: storage
+      size: len_storage
+  z:
+    seq:
+    - id: has_tail
+      type: b1be
+    - id: sign
+      type: b1be
+    - id: payload
+      type: b6be
+    - id: tail
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+      if: has_tail.as<bool>
 enums:
-  pvm_kind:
-    0: arith
-    1: wasm_2_0_0
   bool:
     0: false
     255: true
+  bootstrap_accounts_elt_tag:
+    0: public_key_known
+    1: public_key_unknown
+    2: public_key_known_with_delegate
+    3: public_key_unknown_with_delegate
+    4: public_key_known_with_consensus_key
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
@@ -337,12 +340,9 @@ enums:
     1: secp256k1
     2: p256
     3: bls
-  bootstrap_accounts_elt_tag:
-    0: public_key_known
-    1: public_key_unknown
-    2: public_key_known_with_delegate
-    3: public_key_unknown_with_delegate
-    4: public_key_known_with_consensus_key
+  pvm_kind:
+    0: arith
+    1: wasm_2_0_0
 seq:
 - id: bootstrap_accounts
   type: bootstrap_accounts

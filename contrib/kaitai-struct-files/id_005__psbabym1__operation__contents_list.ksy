@@ -2,10 +2,153 @@ meta:
   id: id_005__psbabym1__operation__contents_list
   endian: be
 types:
-  id_005__psbabym1__operation__contents_list_entries:
+  bh1:
     seq:
-    - id: id_005__psbabym1__operation__alpha__contents
-      type: id_005__psbabym1__operation__alpha__contents
+    - id: len_bh1
+      type: s4
+    - id: bh1
+      type: id_005__psbabym1__block_header__alpha__full_header
+      size: len_bh1
+  bh2:
+    seq:
+    - id: len_bh2
+      type: s4
+    - id: bh2
+      type: id_005__psbabym1__block_header__alpha__full_header
+      size: len_bh2
+  block_header__shell:
+    doc: ! >-
+      Shell header: Block header's shell-related content. It contains information
+      such as the block level, its predecessor and timestamp.
+    seq:
+    - id: level
+      type: s4
+    - id: proto
+      type: u1
+    - id: predecessor
+      size: 32
+    - id: timestamp
+      type: s8
+      doc: ! 'A timestamp as seen by the protocol: second-level precision, epoch based.'
+    - id: validation_pass
+      type: u1
+    - id: operations_hash
+      size: 32
+    - id: fitness
+      type: fitness
+    - id: context
+      size: 32
+  code:
+    seq:
+    - id: len_code
+      type: s4
+    - id: code
+      size: len_code
+  fitness:
+    doc: ! >-
+      Block fitness: The fitness, or score, of a block, that allow the Tezos to decide
+      which chain is the best. A fitness value is a list of byte sequences. They are
+      compared as follows: shortest lists are smaller; lists of the same length are
+      compared according to the lexicographical order.
+    seq:
+    - id: len_fitness
+      type: s4
+    - id: fitness
+      type: fitness_entries
+      size: len_fitness
+      repeat: eos
+  fitness__elem:
+    seq:
+    - id: len_fitness__elem
+      type: s4
+    - id: fitness__elem
+      size: len_fitness__elem
+  fitness_entries:
+    seq:
+    - id: fitness__elem
+      type: fitness__elem
+  id_005__psbabym1__block_header__alpha__full_header:
+    seq:
+    - id: block_header__shell
+      type: block_header__shell
+    - id: id_005__psbabym1__block_header__alpha__signed_contents
+      type: id_005__psbabym1__block_header__alpha__signed_contents
+  id_005__psbabym1__block_header__alpha__signed_contents:
+    seq:
+    - id: id_005__psbabym1__block_header__alpha__unsigned_contents
+      type: id_005__psbabym1__block_header__alpha__unsigned_contents
+    - id: signature
+      size: 64
+  id_005__psbabym1__block_header__alpha__unsigned_contents:
+    seq:
+    - id: priority
+      type: u2
+    - id: proof_of_work_nonce
+      size: 8
+    - id: seed_nonce_hash_tag
+      type: u1
+      enum: bool
+    - id: seed_nonce_hash
+      size: 32
+      if: (seed_nonce_hash_tag == bool::true)
+  id_005__psbabym1__contract_id:
+    doc: ! >-
+      A contract handle: A contract notation as given to an RPC or inside scripts.
+      Can be a base58 implicit contract hash or a base58 originated contract hash.
+    seq:
+    - id: id_005__psbabym1__contract_id_tag
+      type: u1
+      enum: id_005__psbabym1__contract_id_tag
+    - id: id_005__psbabym1__contract_id_implicit
+      type: public_key_hash
+      if: (id_005__psbabym1__contract_id_tag == id_005__psbabym1__contract_id_tag::implicit)
+    - id: id_005__psbabym1__contract_id_originated
+      type: id_005__psbabym1__contract_id_originated
+      if: (id_005__psbabym1__contract_id_tag == id_005__psbabym1__contract_id_tag::originated)
+  id_005__psbabym1__contract_id_originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
+  id_005__psbabym1__entrypoint:
+    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
+    seq:
+    - id: id_005__psbabym1__entrypoint_tag
+      type: u1
+      enum: id_005__psbabym1__entrypoint_tag
+    - id: id_005__psbabym1__entrypoint_named
+      type: id_005__psbabym1__entrypoint_named
+      if: (id_005__psbabym1__entrypoint_tag == id_005__psbabym1__entrypoint_tag::named)
+  id_005__psbabym1__entrypoint_named:
+    seq:
+    - id: len_named
+      type: u1
+    - id: named
+      size: len_named
+      size-eos: true
+  id_005__psbabym1__inlined__endorsement:
+    seq:
+    - id: branch
+      size: 32
+      doc: An operation's shell header.
+    - id: operations
+      type: id_005__psbabym1__inlined__endorsement__contents
+    - id: signature_tag
+      type: u1
+      enum: bool
+    - id: signature
+      size: 64
+      if: (signature_tag == bool::true)
+  id_005__psbabym1__inlined__endorsement__contents:
+    seq:
+    - id: id_005__psbabym1__inlined__endorsement__contents_tag
+      type: u1
+      enum: id_005__psbabym1__inlined__endorsement__contents_tag
+    - id: id_005__psbabym1__inlined__endorsement__contents_endorsement
+      type: s4
+      if: (id_005__psbabym1__inlined__endorsement__contents_tag == id_005__psbabym1__inlined__endorsement__contents_tag::endorsement)
   id_005__psbabym1__operation__alpha__contents:
     seq:
     - id: id_005__psbabym1__operation__alpha__contents_tag
@@ -44,6 +187,22 @@ types:
     - id: id_005__psbabym1__operation__alpha__contents_delegation
       type: id_005__psbabym1__operation__alpha__contents_delegation
       if: (id_005__psbabym1__operation__alpha__contents_tag == id_005__psbabym1__operation__alpha__contents_tag::delegation)
+  id_005__psbabym1__operation__alpha__contents_activate_account:
+    seq:
+    - id: pkh
+      size: 20
+    - id: secret
+      size: 20
+  id_005__psbabym1__operation__alpha__contents_ballot:
+    seq:
+    - id: source
+      type: public_key_hash
+    - id: period
+      type: s4
+    - id: proposal
+      size: 32
+    - id: ballot
+      type: s1
   id_005__psbabym1__operation__alpha__contents_delegation:
     seq:
     - id: source
@@ -62,6 +221,18 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+  id_005__psbabym1__operation__alpha__contents_double_baking_evidence:
+    seq:
+    - id: bh1
+      type: bh1
+    - id: bh2
+      type: bh2
+  id_005__psbabym1__operation__alpha__contents_double_endorsement_evidence:
+    seq:
+    - id: op1
+      type: op1
+    - id: op2
+      type: op2
   id_005__psbabym1__operation__alpha__contents_origination:
     seq:
     - id: source
@@ -84,24 +255,34 @@ types:
       if: (delegate_tag == bool::true)
     - id: script
       type: id_005__psbabym1__scripted__contracts
-  id_005__psbabym1__scripted__contracts:
+  id_005__psbabym1__operation__alpha__contents_proposals:
     seq:
-    - id: code
-      type: code
-    - id: storage
-      type: storage
-  storage:
-    seq:
-    - id: len_storage
+    - id: source
+      type: public_key_hash
+    - id: period
       type: s4
-    - id: storage
-      size: len_storage
-  code:
+    - id: proposals
+      type: proposals
+  id_005__psbabym1__operation__alpha__contents_reveal:
     seq:
-    - id: len_code
+    - id: source
+      type: public_key_hash
+    - id: fee
+      type: n
+    - id: counter
+      type: n
+    - id: gas_limit
+      type: n
+    - id: storage_limit
+      type: n
+    - id: public_key
+      type: public_key
+  id_005__psbabym1__operation__alpha__contents_seed_nonce_revelation:
+    seq:
+    - id: level
       type: s4
-    - id: code
-      size: len_code
+    - id: nonce
+      size: 32
   id_005__psbabym1__operation__alpha__contents_transaction:
     seq:
     - id: source
@@ -124,69 +305,60 @@ types:
     - id: parameters
       type: parameters
       if: (parameters_tag == bool::true)
+  id_005__psbabym1__operation__contents_list_entries:
+    seq:
+    - id: id_005__psbabym1__operation__alpha__contents
+      type: id_005__psbabym1__operation__alpha__contents
+  id_005__psbabym1__scripted__contracts:
+    seq:
+    - id: code
+      type: code
+    - id: storage
+      type: storage
+  n:
+    seq:
+    - id: n
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
+  op1:
+    seq:
+    - id: len_op1
+      type: s4
+    - id: op1
+      type: id_005__psbabym1__inlined__endorsement
+      size: len_op1
+  op2:
+    seq:
+    - id: len_op2
+      type: s4
+    - id: op2
+      type: id_005__psbabym1__inlined__endorsement
+      size: len_op2
   parameters:
     seq:
     - id: entrypoint
       type: id_005__psbabym1__entrypoint
     - id: value
       type: value
-  value:
+  proposals:
     seq:
-    - id: len_value
+    - id: len_proposals
       type: s4
-    - id: value
-      size: len_value
-  id_005__psbabym1__entrypoint:
-    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
+    - id: proposals
+      type: proposals_entries
+      size: len_proposals
+      repeat: eos
+  proposals_entries:
     seq:
-    - id: id_005__psbabym1__entrypoint_tag
-      type: u1
-      enum: id_005__psbabym1__entrypoint_tag
-    - id: id_005__psbabym1__entrypoint_named
-      type: id_005__psbabym1__entrypoint_named
-      if: (id_005__psbabym1__entrypoint_tag == id_005__psbabym1__entrypoint_tag::named)
-  id_005__psbabym1__entrypoint_named:
-    seq:
-    - id: len_named
-      type: u1
-    - id: named
-      size: len_named
-      size-eos: true
-  id_005__psbabym1__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
-    seq:
-    - id: id_005__psbabym1__contract_id_tag
-      type: u1
-      enum: id_005__psbabym1__contract_id_tag
-    - id: id_005__psbabym1__contract_id_implicit
-      type: public_key_hash
-      if: (id_005__psbabym1__contract_id_tag == id_005__psbabym1__contract_id_tag::implicit)
-    - id: id_005__psbabym1__contract_id_originated
-      type: id_005__psbabym1__contract_id_originated
-      if: (id_005__psbabym1__contract_id_tag == id_005__psbabym1__contract_id_tag::originated)
-  id_005__psbabym1__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
-  id_005__psbabym1__operation__alpha__contents_reveal:
-    seq:
-    - id: source
-      type: public_key_hash
-    - id: fee
-      type: n
-    - id: counter
-      type: n
-    - id: gas_limit
-      type: n
-    - id: storage_limit
-      type: n
-    - id: public_key
-      type: public_key
+    - id: protocol_hash
+      size: 32
   public_key:
     doc: A Ed25519, Secp256k1, or P256 public key
     seq:
@@ -202,48 +374,6 @@ types:
     - id: public_key_p256
       size: 33
       if: (public_key_tag == public_key_tag::p256)
-  n:
-    seq:
-    - id: n
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
-  id_005__psbabym1__operation__alpha__contents_ballot:
-    seq:
-    - id: source
-      type: public_key_hash
-    - id: period
-      type: s4
-    - id: proposal
-      size: 32
-    - id: ballot
-      type: s1
-  id_005__psbabym1__operation__alpha__contents_proposals:
-    seq:
-    - id: source
-      type: public_key_hash
-    - id: period
-      type: s4
-    - id: proposals
-      type: proposals
-  proposals:
-    seq:
-    - id: len_proposals
-      type: s4
-    - id: proposals
-      type: proposals_entries
-      size: len_proposals
-      repeat: eos
-  proposals_entries:
-    seq:
-    - id: protocol_hash
-      size: 32
   public_key_hash:
     doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
@@ -259,149 +389,25 @@ types:
     - id: public_key_hash_p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
-  id_005__psbabym1__operation__alpha__contents_activate_account:
+  storage:
     seq:
-    - id: pkh
-      size: 20
-    - id: secret
-      size: 20
-  id_005__psbabym1__operation__alpha__contents_double_baking_evidence:
-    seq:
-    - id: bh1
-      type: bh1
-    - id: bh2
-      type: bh2
-  bh2:
-    seq:
-    - id: len_bh2
+    - id: len_storage
       type: s4
-    - id: bh2
-      type: id_005__psbabym1__block_header__alpha__full_header
-      size: len_bh2
-  bh1:
+    - id: storage
+      size: len_storage
+  value:
     seq:
-    - id: len_bh1
+    - id: len_value
       type: s4
-    - id: bh1
-      type: id_005__psbabym1__block_header__alpha__full_header
-      size: len_bh1
-  id_005__psbabym1__block_header__alpha__full_header:
-    seq:
-    - id: block_header__shell
-      type: block_header__shell
-    - id: id_005__psbabym1__block_header__alpha__signed_contents
-      type: id_005__psbabym1__block_header__alpha__signed_contents
-  id_005__psbabym1__block_header__alpha__signed_contents:
-    seq:
-    - id: id_005__psbabym1__block_header__alpha__unsigned_contents
-      type: id_005__psbabym1__block_header__alpha__unsigned_contents
-    - id: signature
-      size: 64
-  id_005__psbabym1__block_header__alpha__unsigned_contents:
-    seq:
-    - id: priority
-      type: u2
-    - id: proof_of_work_nonce
-      size: 8
-    - id: seed_nonce_hash_tag
-      type: u1
-      enum: bool
-    - id: seed_nonce_hash
-      size: 32
-      if: (seed_nonce_hash_tag == bool::true)
-  block_header__shell:
-    doc: ! >-
-      Shell header: Block header's shell-related content. It contains information
-      such as the block level, its predecessor and timestamp.
-    seq:
-    - id: level
-      type: s4
-    - id: proto
-      type: u1
-    - id: predecessor
-      size: 32
-    - id: timestamp
-      type: s8
-      doc: ! 'A timestamp as seen by the protocol: second-level precision, epoch based.'
-    - id: validation_pass
-      type: u1
-    - id: operations_hash
-      size: 32
-    - id: fitness
-      type: fitness
-    - id: context
-      size: 32
-  fitness:
-    doc: ! >-
-      Block fitness: The fitness, or score, of a block, that allow the Tezos to decide
-      which chain is the best. A fitness value is a list of byte sequences. They are
-      compared as follows: shortest lists are smaller; lists of the same length are
-      compared according to the lexicographical order.
-    seq:
-    - id: len_fitness
-      type: s4
-    - id: fitness
-      type: fitness_entries
-      size: len_fitness
-      repeat: eos
-  fitness_entries:
-    seq:
-    - id: fitness__elem
-      type: fitness__elem
-  fitness__elem:
-    seq:
-    - id: len_fitness__elem
-      type: s4
-    - id: fitness__elem
-      size: len_fitness__elem
-  id_005__psbabym1__operation__alpha__contents_double_endorsement_evidence:
-    seq:
-    - id: op1
-      type: op1
-    - id: op2
-      type: op2
-  op2:
-    seq:
-    - id: len_op2
-      type: s4
-    - id: op2
-      type: id_005__psbabym1__inlined__endorsement
-      size: len_op2
-  op1:
-    seq:
-    - id: len_op1
-      type: s4
-    - id: op1
-      type: id_005__psbabym1__inlined__endorsement
-      size: len_op1
-  id_005__psbabym1__inlined__endorsement:
-    seq:
-    - id: branch
-      size: 32
-      doc: An operation's shell header.
-    - id: operations
-      type: id_005__psbabym1__inlined__endorsement__contents
-    - id: signature_tag
-      type: u1
-      enum: bool
-    - id: signature
-      size: 64
-      if: (signature_tag == bool::true)
-  id_005__psbabym1__inlined__endorsement__contents:
-    seq:
-    - id: id_005__psbabym1__inlined__endorsement__contents_tag
-      type: u1
-      enum: id_005__psbabym1__inlined__endorsement__contents_tag
-    - id: id_005__psbabym1__inlined__endorsement__contents_endorsement
-      type: s4
-      if: (id_005__psbabym1__inlined__endorsement__contents_tag == id_005__psbabym1__inlined__endorsement__contents_tag::endorsement)
-  id_005__psbabym1__operation__alpha__contents_seed_nonce_revelation:
-    seq:
-    - id: level
-      type: s4
-    - id: nonce
-      size: 32
+    - id: value
+      size: len_value
 enums:
+  bool:
+    0: false
+    255: true
+  id_005__psbabym1__contract_id_tag:
+    0: implicit
+    1: originated
   id_005__psbabym1__entrypoint_tag:
     0: default
     1: root
@@ -409,20 +415,6 @@ enums:
     3: set_delegate
     4: remove_delegate
     255: named
-  id_005__psbabym1__contract_id_tag:
-    0: implicit
-    1: originated
-  public_key_tag:
-    0: ed25519
-    1: secp256k1
-    2: p256
-  public_key_hash_tag:
-    0: ed25519
-    1: secp256k1
-    2: p256
-  bool:
-    0: false
-    255: true
   id_005__psbabym1__inlined__endorsement__contents_tag:
     0: endorsement
   id_005__psbabym1__operation__alpha__contents_tag:
@@ -437,6 +429,14 @@ enums:
     108: transaction
     109: origination
     110: delegation
+  public_key_hash_tag:
+    0: ed25519
+    1: secp256k1
+    2: p256
+  public_key_tag:
+    0: ed25519
+    1: secp256k1
+    2: p256
 seq:
 - id: id_005__psbabym1__operation__contents_list_entries
   type: id_005__psbabym1__operation__contents_list_entries

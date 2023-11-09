@@ -2,42 +2,6 @@ meta:
   id: signer_messages__request
   endian: be
 types:
-  signer_messages__request_deterministic_nonce_hash:
-    seq:
-    - id: pkh
-      type: public_key_hash
-    - id: data
-      type: data
-    - id: signature_tag
-      type: u1
-      enum: bool
-    - id: signature
-      size-eos: true
-      if: (signature_tag == bool::true)
-  signer_messages__request_deterministic_nonce:
-    seq:
-    - id: pkh
-      type: public_key_hash
-    - id: data
-      type: data
-    - id: signature_tag
-      type: u1
-      enum: bool
-    - id: signature
-      size-eos: true
-      if: (signature_tag == bool::true)
-  signer_messages__request_sign:
-    seq:
-    - id: pkh
-      type: public_key_hash
-    - id: data
-      type: data
-    - id: signature_tag
-      type: u1
-      enum: bool
-    - id: signature
-      size-eos: true
-      if: (signature_tag == bool::true)
   data:
     seq:
     - id: len_data
@@ -62,6 +26,42 @@ types:
     - id: public_key_hash_bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+  signer_messages__request_deterministic_nonce:
+    seq:
+    - id: pkh
+      type: public_key_hash
+    - id: data
+      type: data
+    - id: signature_tag
+      type: u1
+      enum: bool
+    - id: signature
+      size-eos: true
+      if: (signature_tag == bool::true)
+  signer_messages__request_deterministic_nonce_hash:
+    seq:
+    - id: pkh
+      type: public_key_hash
+    - id: data
+      type: data
+    - id: signature_tag
+      type: u1
+      enum: bool
+    - id: signature
+      size-eos: true
+      if: (signature_tag == bool::true)
+  signer_messages__request_sign:
+    seq:
+    - id: pkh
+      type: public_key_hash
+    - id: data
+      type: data
+    - id: signature_tag
+      type: u1
+      enum: bool
+    - id: signature
+      size-eos: true
+      if: (signature_tag == bool::true)
 enums:
   bool:
     0: false

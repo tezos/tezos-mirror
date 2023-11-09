@@ -2,6 +2,49 @@ meta:
   id: id_011__pthangz2__operation__internal
   endian: be
 types:
+  code:
+    seq:
+    - id: len_code
+      type: s4
+    - id: code
+      size: len_code
+  id_011__pthangz2__contract_id:
+    doc: ! >-
+      A contract handle: A contract notation as given to an RPC or inside scripts.
+      Can be a base58 implicit contract hash or a base58 originated contract hash.
+    seq:
+    - id: id_011__pthangz2__contract_id_tag
+      type: u1
+      enum: id_011__pthangz2__contract_id_tag
+    - id: id_011__pthangz2__contract_id_implicit
+      type: public_key_hash
+      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::implicit)
+    - id: id_011__pthangz2__contract_id_originated
+      type: id_011__pthangz2__contract_id_originated
+      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::originated)
+  id_011__pthangz2__contract_id_originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
+  id_011__pthangz2__entrypoint:
+    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
+    seq:
+    - id: id_011__pthangz2__entrypoint_tag
+      type: u1
+      enum: id_011__pthangz2__entrypoint_tag
+    - id: id_011__pthangz2__entrypoint_named
+      type: id_011__pthangz2__entrypoint_named
+      if: (id_011__pthangz2__entrypoint_tag == id_011__pthangz2__entrypoint_tag::named)
+  id_011__pthangz2__entrypoint_named:
+    seq:
+    - id: len_named
+      type: u1
+    - id: named
+      size: len_named
+      size-eos: true
   id_011__pthangz2__operation__alpha__internal_operation:
     seq:
     - id: source
@@ -46,24 +89,6 @@ types:
       if: (delegate_tag == bool::true)
     - id: script
       type: id_011__pthangz2__scripted__contracts
-  id_011__pthangz2__scripted__contracts:
-    seq:
-    - id: code
-      type: code
-    - id: storage
-      type: storage
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
-  code:
-    seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
   id_011__pthangz2__operation__alpha__internal_operation_transaction:
     seq:
     - id: amount
@@ -76,34 +101,12 @@ types:
     - id: parameters
       type: parameters
       if: (parameters_tag == bool::true)
-  parameters:
+  id_011__pthangz2__scripted__contracts:
     seq:
-    - id: entrypoint
-      type: id_011__pthangz2__entrypoint
-    - id: value
-      type: value
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
-  id_011__pthangz2__entrypoint:
-    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
-    seq:
-    - id: id_011__pthangz2__entrypoint_tag
-      type: u1
-      enum: id_011__pthangz2__entrypoint_tag
-    - id: id_011__pthangz2__entrypoint_named
-      type: id_011__pthangz2__entrypoint_named
-      if: (id_011__pthangz2__entrypoint_tag == id_011__pthangz2__entrypoint_tag::named)
-  id_011__pthangz2__entrypoint_named:
-    seq:
-    - id: len_named
-      type: u1
-    - id: named
-      size: len_named
-      size-eos: true
+    - id: code
+      type: code
+    - id: storage
+      type: storage
   n:
     seq:
     - id: n
@@ -116,6 +119,12 @@ types:
       type: b1be
     - id: payload
       type: b7be
+  parameters:
+    seq:
+    - id: entrypoint
+      type: id_011__pthangz2__entrypoint
+    - id: value
+      type: value
   public_key:
     doc: A Ed25519, Secp256k1, or P256 public key
     seq:
@@ -131,27 +140,6 @@ types:
     - id: public_key_p256
       size: 33
       if: (public_key_tag == public_key_tag::p256)
-  id_011__pthangz2__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
-    seq:
-    - id: id_011__pthangz2__contract_id_tag
-      type: u1
-      enum: id_011__pthangz2__contract_id_tag
-    - id: id_011__pthangz2__contract_id_implicit
-      type: public_key_hash
-      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::implicit)
-    - id: id_011__pthangz2__contract_id_originated
-      type: id_011__pthangz2__contract_id_originated
-      if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::originated)
-  id_011__pthangz2__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
   public_key_hash:
     doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
@@ -167,7 +155,25 @@ types:
     - id: public_key_hash_p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
+  storage:
+    seq:
+    - id: len_storage
+      type: s4
+    - id: storage
+      size: len_storage
+  value:
+    seq:
+    - id: len_value
+      type: s4
+    - id: value
+      size: len_value
 enums:
+  bool:
+    0: false
+    255: true
+  id_011__pthangz2__contract_id_tag:
+    0: implicit
+    1: originated
   id_011__pthangz2__entrypoint_tag:
     0: default
     1: root
@@ -175,13 +181,6 @@ enums:
     3: set_delegate
     4: remove_delegate
     255: named
-  bool:
-    0: false
-    255: true
-  public_key_tag:
-    0: ed25519
-    1: secp256k1
-    2: p256
   id_011__pthangz2__operation__alpha__internal_operation_tag:
     0: reveal
     1: transaction
@@ -192,9 +191,10 @@ enums:
     0: ed25519
     1: secp256k1
     2: p256
-  id_011__pthangz2__contract_id_tag:
-    0: implicit
-    1: originated
+  public_key_tag:
+    0: ed25519
+    1: secp256k1
+    2: p256
 seq:
 - id: id_011__pthangz2__operation__alpha__internal_operation
   type: id_011__pthangz2__operation__alpha__internal_operation

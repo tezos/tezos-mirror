@@ -11,6 +11,18 @@ types:
       type: s4
     - id: bound_data
       size: len_bound_data
+  inputs:
+    seq:
+    - id: len_inputs
+      type: s4
+    - id: inputs
+      type: inputs_entries
+      size: len_inputs
+      repeat: eos
+  inputs_entries:
+    seq:
+    - id: sapling__transaction__input
+      type: sapling__transaction__input
   outputs:
     seq:
     - id: len_outputs
@@ -23,15 +35,12 @@ types:
     seq:
     - id: sapling__transaction__output
       type: sapling__transaction__output
-  sapling__transaction__output:
-    doc: Output of a transaction
+  payload_enc:
     seq:
-    - id: cm
-      size: 32
-    - id: proof_o
-      size: 192
-    - id: ciphertext
-      type: sapling__transaction__ciphertext
+    - id: len_payload_enc
+      type: s4
+    - id: payload_enc
+      size: len_payload_enc
   sapling__transaction__ciphertext:
     seq:
     - id: cv
@@ -46,24 +55,6 @@ types:
       size: 80
     - id: nonce_out
       size: 24
-  payload_enc:
-    seq:
-    - id: len_payload_enc
-      type: s4
-    - id: payload_enc
-      size: len_payload_enc
-  inputs:
-    seq:
-    - id: len_inputs
-      type: s4
-    - id: inputs
-      type: inputs_entries
-      size: len_inputs
-      repeat: eos
-  inputs_entries:
-    seq:
-    - id: sapling__transaction__input
-      type: sapling__transaction__input
   sapling__transaction__input:
     doc: Input of a transaction
     seq:
@@ -77,6 +68,15 @@ types:
       size: 192
     - id: signature
       size: 64
+  sapling__transaction__output:
+    doc: Output of a transaction
+    seq:
+    - id: cm
+      size: 32
+    - id: proof_o
+      size: 192
+    - id: ciphertext
+      type: sapling__transaction__ciphertext
 seq:
 - id: inputs
   type: inputs

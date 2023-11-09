@@ -26,6 +26,9 @@ types:
       type: u1
       enum: id_018__proxford__per_block_votes_tag
 enums:
+  bool:
+    0: false
+    255: true
   id_018__proxford__per_block_votes_tag:
     0: case__0
     1: case__1
@@ -36,9 +39,6 @@ enums:
     8: case__8
     9: case__9
     10: case__10
-  bool:
-    0: false
-    255: true
 seq:
 - id: id_018__proxford__block_header__alpha__signed_contents
   type: id_018__proxford__block_header__alpha__signed_contents

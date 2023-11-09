@@ -23,6 +23,14 @@ types:
     - id: alpha__apply_internal_results__alpha__operation_result_event
       type: alpha__apply_internal_results__alpha__operation_result_event
       if: (alpha__apply_internal_results__alpha__operation_result_tag == alpha__apply_internal_results__alpha__operation_result_tag::event)
+  alpha__apply_internal_results__alpha__operation_result_delegation:
+    seq:
+    - id: delegate_tag
+      type: u1
+      enum: bool
+    - id: delegate
+      type: public_key_hash
+      if: (delegate_tag == bool::true)
   alpha__apply_internal_results__alpha__operation_result_event:
     seq:
     - id: type
@@ -39,6 +47,125 @@ types:
     - id: payload
       type: micheline__alpha__michelson_v1__expression
       if: (payload_tag == bool::true)
+  alpha__apply_internal_results__alpha__operation_result_origination:
+    seq:
+    - id: balance
+      type: n
+    - id: delegate_tag
+      type: u1
+      enum: bool
+    - id: delegate
+      type: public_key_hash
+      if: (delegate_tag == bool::true)
+    - id: script
+      type: alpha__scripted__contracts
+  alpha__apply_internal_results__alpha__operation_result_transaction:
+    seq:
+    - id: amount
+      type: n
+    - id: destination
+      type: alpha__transaction_destination
+    - id: parameters_tag
+      type: u1
+      enum: bool
+    - id: parameters
+      type: parameters
+      if: (parameters_tag == bool::true)
+  alpha__entrypoint:
+    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
+    seq:
+    - id: alpha__entrypoint_tag
+      type: u1
+      enum: alpha__entrypoint_tag
+    - id: alpha__entrypoint_named
+      type: alpha__entrypoint_named
+      if: (alpha__entrypoint_tag == alpha__entrypoint_tag::named)
+  alpha__entrypoint_named:
+    seq:
+    - id: len_named
+      type: u1
+    - id: named
+      size: len_named
+      size-eos: true
+  alpha__scripted__contracts:
+    seq:
+    - id: code
+      type: code
+    - id: storage
+      type: storage
+  alpha__transaction_destination:
+    doc: ! >-
+      A destination of a transaction: A destination notation compatible with the contract
+      notation as given to an RPC or inside scripts. Can be a base58 implicit contract
+      hash, a base58 originated contract hash, a base58 originated transaction rollup,
+      or a base58 originated smart rollup.
+    seq:
+    - id: alpha__transaction_destination_tag
+      type: u1
+      enum: alpha__transaction_destination_tag
+    - id: alpha__transaction_destination_implicit
+      type: public_key_hash
+      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::implicit)
+    - id: alpha__transaction_destination_originated
+      type: alpha__transaction_destination_originated
+      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::originated)
+    - id: alpha__transaction_destination_smart_rollup
+      type: alpha__transaction_destination_smart_rollup
+      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::smart_rollup)
+    - id: alpha__transaction_destination_zk_rollup
+      type: alpha__transaction_destination_zk_rollup
+      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::zk_rollup)
+  alpha__transaction_destination_originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
+  alpha__transaction_destination_smart_rollup:
+    seq:
+    - id: smart_rollup_address
+      size: 20
+    - id: smart_rollup_padding
+      size: 1
+      doc: This field is for padding, ignore
+  alpha__transaction_destination_zk_rollup:
+    seq:
+    - id: zk_rollup_hash
+      size: 20
+    - id: zk_rollup_padding
+      size: 1
+      doc: This field is for padding, ignore
+  annots:
+    seq:
+    - id: len_annots
+      type: s4
+    - id: annots
+      size: len_annots
+  args:
+    seq:
+    - id: len_args
+      type: s4
+    - id: args
+      type: args_entries
+      size: len_args
+      repeat: eos
+  args_entries:
+    seq:
+    - id: args_elt
+      type: micheline__alpha__michelson_v1__expression
+  bytes:
+    seq:
+    - id: len_bytes
+      type: s4
+    - id: bytes
+      size: len_bytes
+  code:
+    seq:
+    - id: len_code
+      type: s4
+    - id: code
+      size: len_code
   micheline__alpha__michelson_v1__expression:
     seq:
     - id: micheline__alpha__michelson_v1__expression_tag
@@ -78,41 +205,19 @@ types:
     - id: micheline__alpha__michelson_v1__expression_bytes
       type: bytes
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::bytes)
-  bytes:
-    seq:
-    - id: len_bytes
-      type: s4
-    - id: bytes
-      size: len_bytes
-  micheline__alpha__michelson_v1__expression_prim__generic:
+  micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots:
     seq:
     - id: prim
       type: u1
       enum: alpha__michelson__v1__primitives
-    - id: args
-      type: args
-    - id: annots
-      type: annots
-  args:
-    seq:
-    - id: len_args
-      type: s4
-    - id: args
-      type: args_entries
-      size: len_args
-      repeat: eos
-  args_entries:
-    seq:
-    - id: args_elt
+    - id: arg
       type: micheline__alpha__michelson_v1__expression
-  micheline__alpha__michelson_v1__expression_prim__2_args__some_annots:
+  micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots:
     seq:
     - id: prim
       type: u1
       enum: alpha__michelson__v1__primitives
-    - id: arg1
-      type: micheline__alpha__michelson_v1__expression
-    - id: arg2
+    - id: arg
       type: micheline__alpha__michelson_v1__expression
     - id: annots
       type: annots
@@ -125,22 +230,26 @@ types:
       type: micheline__alpha__michelson_v1__expression
     - id: arg2
       type: micheline__alpha__michelson_v1__expression
-  micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots:
+  micheline__alpha__michelson_v1__expression_prim__2_args__some_annots:
     seq:
     - id: prim
       type: u1
       enum: alpha__michelson__v1__primitives
-    - id: arg
+    - id: arg1
+      type: micheline__alpha__michelson_v1__expression
+    - id: arg2
       type: micheline__alpha__michelson_v1__expression
     - id: annots
       type: annots
-  micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots:
+  micheline__alpha__michelson_v1__expression_prim__generic:
     seq:
     - id: prim
       type: u1
       enum: alpha__michelson__v1__primitives
-    - id: arg
-      type: micheline__alpha__michelson_v1__expression
+    - id: args
+      type: args
+    - id: annots
+      type: annots
   micheline__alpha__michelson_v1__expression_prim__no_args__some_annots:
     seq:
     - id: prim
@@ -148,12 +257,6 @@ types:
       enum: alpha__michelson__v1__primitives
     - id: annots
       type: annots
-  annots:
-    seq:
-    - id: len_annots
-      type: s4
-    - id: annots
-      size: len_annots
   micheline__alpha__michelson_v1__expression_sequence:
     seq:
     - id: len_sequence
@@ -162,107 +265,6 @@ types:
       type: sequence_entries
       size: len_sequence
       repeat: eos
-  sequence_entries:
-    seq:
-    - id: sequence_elt
-      type: micheline__alpha__michelson_v1__expression
-  string:
-    seq:
-    - id: len_string
-      type: s4
-    - id: string
-      size: len_string
-  z:
-    seq:
-    - id: has_tail
-      type: b1be
-    - id: sign
-      type: b1be
-    - id: payload
-      type: b6be
-    - id: tail
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
-      if: has_tail.as<bool>
-  alpha__apply_internal_results__alpha__operation_result_delegation:
-    seq:
-    - id: delegate_tag
-      type: u1
-      enum: bool
-    - id: delegate
-      type: public_key_hash
-      if: (delegate_tag == bool::true)
-  alpha__apply_internal_results__alpha__operation_result_origination:
-    seq:
-    - id: balance
-      type: n
-    - id: delegate_tag
-      type: u1
-      enum: bool
-    - id: delegate
-      type: public_key_hash
-      if: (delegate_tag == bool::true)
-    - id: script
-      type: alpha__scripted__contracts
-  alpha__scripted__contracts:
-    seq:
-    - id: code
-      type: code
-    - id: storage
-      type: storage
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
-  code:
-    seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
-  alpha__apply_internal_results__alpha__operation_result_transaction:
-    seq:
-    - id: amount
-      type: n
-    - id: destination
-      type: alpha__transaction_destination
-    - id: parameters_tag
-      type: u1
-      enum: bool
-    - id: parameters
-      type: parameters
-      if: (parameters_tag == bool::true)
-  parameters:
-    seq:
-    - id: entrypoint
-      type: alpha__entrypoint
-    - id: value
-      type: value
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
-  alpha__entrypoint:
-    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
-    seq:
-    - id: alpha__entrypoint_tag
-      type: u1
-      enum: alpha__entrypoint_tag
-    - id: alpha__entrypoint_named
-      type: alpha__entrypoint_named
-      if: (alpha__entrypoint_tag == alpha__entrypoint_tag::named)
-  alpha__entrypoint_named:
-    seq:
-    - id: len_named
-      type: u1
-    - id: named
-      size: len_named
-      size-eos: true
   n:
     seq:
     - id: n
@@ -275,49 +277,12 @@ types:
       type: b1be
     - id: payload
       type: b7be
-  alpha__transaction_destination:
-    doc: ! >-
-      A destination of a transaction: A destination notation compatible with the contract
-      notation as given to an RPC or inside scripts. Can be a base58 implicit contract
-      hash, a base58 originated contract hash, a base58 originated transaction rollup,
-      or a base58 originated smart rollup.
+  parameters:
     seq:
-    - id: alpha__transaction_destination_tag
-      type: u1
-      enum: alpha__transaction_destination_tag
-    - id: alpha__transaction_destination_implicit
-      type: public_key_hash
-      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::implicit)
-    - id: alpha__transaction_destination_originated
-      type: alpha__transaction_destination_originated
-      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::originated)
-    - id: alpha__transaction_destination_smart_rollup
-      type: alpha__transaction_destination_smart_rollup
-      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::smart_rollup)
-    - id: alpha__transaction_destination_zk_rollup
-      type: alpha__transaction_destination_zk_rollup
-      if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::zk_rollup)
-  alpha__transaction_destination_zk_rollup:
-    seq:
-    - id: zk_rollup_hash
-      size: 20
-    - id: zk_rollup_padding
-      size: 1
-      doc: This field is for padding, ignore
-  alpha__transaction_destination_smart_rollup:
-    seq:
-    - id: smart_rollup_address
-      size: 20
-    - id: smart_rollup_padding
-      size: 1
-      doc: This field is for padding, ignore
-  alpha__transaction_destination_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
+    - id: entrypoint
+      type: alpha__entrypoint
+    - id: value
+      type: value
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
@@ -336,7 +301,59 @@ types:
     - id: public_key_hash_bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+  sequence_entries:
+    seq:
+    - id: sequence_elt
+      type: micheline__alpha__michelson_v1__expression
+  storage:
+    seq:
+    - id: len_storage
+      type: s4
+    - id: storage
+      size: len_storage
+  string:
+    seq:
+    - id: len_string
+      type: s4
+    - id: string
+      size: len_string
+  value:
+    seq:
+    - id: len_value
+      type: s4
+    - id: value
+      size: len_value
+  z:
+    seq:
+    - id: has_tail
+      type: b1be
+    - id: sign
+      type: b1be
+    - id: payload
+      type: b6be
+    - id: tail
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+      if: has_tail.as<bool>
 enums:
+  alpha__apply_internal_results__alpha__operation_result_tag:
+    1: transaction
+    2: origination
+    3: delegation
+    4: event
+  alpha__entrypoint_tag:
+    0: default
+    1: root
+    2: do
+    3: set_delegate
+    4: remove_delegate
+    5: deposit
+    6: stake
+    7: unstake
+    8: finalize_unstake
+    9: set_delegate_parameters
+    255: named
   alpha__michelson__v1__primitives:
     0: parameter
     1: storage
@@ -731,6 +748,14 @@ enums:
     156:
       id: nat_0
       doc: NAT
+  alpha__transaction_destination_tag:
+    0: implicit
+    1: originated
+    3: smart_rollup
+    4: zk_rollup
+  bool:
+    0: false
+    255: true
   micheline__alpha__michelson_v1__expression_tag:
     0: int
     1: string
@@ -757,36 +782,11 @@ enums:
       id: prim__generic
       doc: Generic primitive (any number of args with or without annotations)
     10: bytes
-  alpha__entrypoint_tag:
-    0: default
-    1: root
-    2: do
-    3: set_delegate
-    4: remove_delegate
-    5: deposit
-    6: stake
-    7: unstake
-    8: finalize_unstake
-    9: set_delegate_parameters
-    255: named
-  bool:
-    0: false
-    255: true
-  alpha__apply_internal_results__alpha__operation_result_tag:
-    1: transaction
-    2: origination
-    3: delegation
-    4: event
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
-  alpha__transaction_destination_tag:
-    0: implicit
-    1: originated
-    3: smart_rollup
-    4: zk_rollup
 seq:
 - id: alpha__apply_internal_results__alpha__operation_result
   type: alpha__apply_internal_results__alpha__operation_result

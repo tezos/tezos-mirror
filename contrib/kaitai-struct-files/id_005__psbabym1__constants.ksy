@@ -8,19 +8,6 @@ types:
       type: n_chunk
       repeat: until
       repeat-until: not (_.has_more).as<bool>
-  z:
-    seq:
-    - id: has_tail
-      type: b1be
-    - id: sign
-      type: b1be
-    - id: payload
-      type: b6be
-    - id: tail
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
-      if: has_tail.as<bool>
   n_chunk:
     seq:
     - id: has_more
@@ -39,6 +26,19 @@ types:
     seq:
     - id: time_between_blocks_elt
       type: s8
+  z:
+    seq:
+    - id: has_tail
+      type: b1be
+    - id: sign
+      type: b1be
+    - id: payload
+      type: b6be
+    - id: tail
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+      if: has_tail.as<bool>
 seq:
 - id: proof_of_work_nonce_size
   type: u1

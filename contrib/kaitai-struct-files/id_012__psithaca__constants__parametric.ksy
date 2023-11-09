@@ -18,18 +18,24 @@ types:
       type: round_robin_over_delegates_entries
       size: len_round_robin_over_delegates
       repeat: eos
-  round_robin_over_delegates_entries:
+  minimal_participation_ratio:
     seq:
-    - id: len_round_robin_over_delegates_elt
-      type: s4
-    - id: round_robin_over_delegates_elt
-      type: round_robin_over_delegates_elt_entries
-      size: len_round_robin_over_delegates_elt
-      repeat: eos
-  round_robin_over_delegates_elt_entries:
+    - id: numerator
+      type: u2
+    - id: denominator
+      type: u2
+  n:
     seq:
-    - id: signature__v0__public_key
-      type: public_key
+    - id: n
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
   public_key:
     doc: A Ed25519, Secp256k1, or P256 public key
     seq:
@@ -51,18 +57,18 @@ types:
       type: u2
     - id: denominator
       type: u2
-  minimal_participation_ratio:
+  round_robin_over_delegates_elt_entries:
     seq:
-    - id: numerator
-      type: u2
-    - id: denominator
-      type: u2
-  n:
+    - id: signature__v0__public_key
+      type: public_key
+  round_robin_over_delegates_entries:
     seq:
-    - id: n
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
+    - id: len_round_robin_over_delegates_elt
+      type: s4
+    - id: round_robin_over_delegates_elt
+      type: round_robin_over_delegates_elt_entries
+      size: len_round_robin_over_delegates_elt
+      repeat: eos
   z:
     seq:
     - id: has_tail
@@ -76,20 +82,14 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
 enums:
+  delegate_selection_tag:
+    0: random_delegate_selection
+    1: round_robin_over_delegates
   public_key_tag:
     0: ed25519
     1: secp256k1
     2: p256
-  delegate_selection_tag:
-    0: random_delegate_selection
-    1: round_robin_over_delegates
 seq:
 - id: preserved_cycles
   type: u1
