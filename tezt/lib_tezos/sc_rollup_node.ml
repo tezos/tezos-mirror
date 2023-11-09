@@ -629,6 +629,20 @@ let export_snapshot sc_rollup_node dir =
   in
   Runnable.{value = process; run = parse}
 
+let import_snapshot sc_rollup_node ~snapshot_file =
+  let process =
+    spawn_command
+      sc_rollup_node
+      [
+        "snapshot";
+        "import";
+        snapshot_file;
+        "--data-dir";
+        data_dir sc_rollup_node;
+      ]
+  in
+  Runnable.{value = process; run = Process.check}
+
 let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in

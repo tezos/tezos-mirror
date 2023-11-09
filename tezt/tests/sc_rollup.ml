@@ -1016,7 +1016,13 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   | _ -> ()) ;
   unit
 
-(* Testing that snapshots can be exported correctly for a running node. *)
+(* Testing that snapshots can be exported correctly for a running node, and that
+   they can be used to bootstrap a blank or existing rollup node.
+   - we run two rollup nodes but stop the second one at some point
+   - after a while we create a snapshot from the first rollup node
+   - we import the snapshot in the second and a fresh rollup node
+   - we ensure they are all synchronized
+   - we also try to import invalid snapshots to make sure they are rejected. *)
 let test_snapshots ~challenge_window ~commitment_period ~history_mode =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
   test_full_scenario
@@ -1028,16 +1034,30 @@ let test_snapshots ~challenge_window ~commitment_period ~history_mode =
     }
     ~challenge_window
     ~commitment_period
-  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup _node client ->
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup node client ->
   (* We want to produce snapshots for rollup node which have cemented
      commitments *)
-  let level_snapshot = 2 * challenge_window in
+  let* level = Node.get_level node in
+  let level_snapshot = level + (2 * challenge_window) in
   (* We want to build an L2 chain that goes beyond the snapshots (and has
      additional commitments). *)
   let total_blocks = level_snapshot + (4 * commitment_period) in
+  let stop_rollup_node_2_levels = challenge_window + 2 in
   let* () = Sc_rollup_node.run ~history_mode sc_rollup_node sc_rollup [] in
+  (* We run the other nodes in mode observer because we only care if they can
+     catch up. *)
+  let rollup_node_2 =
+    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+  in
+  let rollup_node_3 =
+    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+  in
+  let* () = Sc_rollup_node.run ~history_mode rollup_node_2 sc_rollup [] in
   let rollup_node_processing =
-    let* () = bake_levels total_blocks client in
+    let* () = bake_levels stop_rollup_node_2_levels client in
+    Log.info "Stopping rollup node 2 before snapshot is made." ;
+    let* () = Sc_rollup_node.terminate rollup_node_2 in
+    let* () = bake_levels (total_blocks - stop_rollup_node_2_levels) client in
     let* (_ : int) = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
     unit
   in
@@ -1045,11 +1065,22 @@ let test_snapshots ~challenge_window ~commitment_period ~history_mode =
     Sc_rollup_node.wait_for_level sc_rollup_node level_snapshot
   in
   let dir = Tezt.Temp.dir "snapshots" in
-  let*! snapshot_path = Sc_rollup_node.export_snapshot sc_rollup_node dir in
-  let* exists = Lwt_unix.file_exists snapshot_path in
+  let*! snapshot_file = Sc_rollup_node.export_snapshot sc_rollup_node dir in
+  let* exists = Lwt_unix.file_exists snapshot_file in
   if not exists then
-    Test.fail ~__LOC__ "Snapshot file %s does not exist" snapshot_path ;
+    Test.fail ~__LOC__ "Snapshot file %s does not exist" snapshot_file ;
   let* () = rollup_node_processing in
+  Log.info "Importing snapshot in empty rollup node." ;
+  let*! () = Sc_rollup_node.import_snapshot rollup_node_3 ~snapshot_file in
+  (* rollup_node_2 was stopped before so it has data but is late with respect to
+     sc_rollup_node. *)
+  Log.info "Importing snapshot in late rollup node." ;
+  let*! () = Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file in
+  Log.info "Running rollup nodes with snapshots until they catch up." ;
+  let* () = Sc_rollup_node.run ~history_mode rollup_node_2 sc_rollup []
+  and* () = Sc_rollup_node.run ~history_mode rollup_node_3 sc_rollup [] in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_2
+  and* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_3 in
   unit
 
 (* One can retrieve the list of originated SCORUs.
