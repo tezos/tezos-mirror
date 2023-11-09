@@ -144,4 +144,17 @@ module Event = struct
          will not be fully checked. It is not recommended to use this option \
          with a snapshot downloaded from an untrusted source"
       ()
+
+  let warn_tar_corruption =
+    declare_1
+      ~section
+      ~level:Warning
+      ~name:"warn_tar_corruption"
+      ~msg:
+        "Warning: the snapshot being imported is in version {version} and \
+         using the tar format: some internal files might be corrupted. If the \
+         snapshot import fails, please import using a snapshot that is a least \
+         version 7."
+      ~pp1:Format.pp_print_int
+      ("version", Data_encoding.int31)
 end
