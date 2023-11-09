@@ -10,73 +10,38 @@ types:
     - id: id_012__psithaca__contract_id_tag
       type: u1
       enum: id_012__psithaca__contract_id_tag
-    - id: id_012__psithaca__contract_id_implicit
+    - id: implicit
       type: public_key_hash
       if: (id_012__psithaca__contract_id_tag == id_012__psithaca__contract_id_tag::implicit)
-    - id: id_012__psithaca__contract_id_originated
-      type: id_012__psithaca__contract_id_originated
+    - id: originated
+      type: originated
       if: (id_012__psithaca__contract_id_tag == id_012__psithaca__contract_id_tag::originated)
-  id_012__psithaca__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
   id_012__psithaca__operation_metadata__alpha__balance:
     seq:
     - id: id_012__psithaca__operation_metadata__alpha__balance_tag
       type: u1
       enum: id_012__psithaca__operation_metadata__alpha__balance_tag
-    - id: id_012__psithaca__operation_metadata__alpha__balance_contract
+    - id: contract
       type: id_012__psithaca__contract_id
       if: (id_012__psithaca__operation_metadata__alpha__balance_tag == id_012__psithaca__operation_metadata__alpha__balance_tag::contract)
-    - id: id_012__psithaca__operation_metadata__alpha__balance_legacy_rewards
-      type: id_012__psithaca__operation_metadata__alpha__balance_legacy_rewards
+    - id: legacy_rewards
+      type: legacy_rewards
       if: (id_012__psithaca__operation_metadata__alpha__balance_tag == id_012__psithaca__operation_metadata__alpha__balance_tag::legacy_rewards)
-    - id: id_012__psithaca__operation_metadata__alpha__balance_legacy_deposits
-      type: id_012__psithaca__operation_metadata__alpha__balance_legacy_deposits
+    - id: legacy_deposits
+      type: legacy_deposits
       if: (id_012__psithaca__operation_metadata__alpha__balance_tag == id_012__psithaca__operation_metadata__alpha__balance_tag::legacy_deposits)
-    - id: id_012__psithaca__operation_metadata__alpha__balance_deposits
+    - id: deposits
       type: public_key_hash
       if: (id_012__psithaca__operation_metadata__alpha__balance_tag == id_012__psithaca__operation_metadata__alpha__balance_tag::deposits)
-    - id: id_012__psithaca__operation_metadata__alpha__balance_legacy_fees
-      type: id_012__psithaca__operation_metadata__alpha__balance_legacy_fees
+    - id: legacy_fees
+      type: legacy_fees
       if: (id_012__psithaca__operation_metadata__alpha__balance_tag == id_012__psithaca__operation_metadata__alpha__balance_tag::legacy_fees)
-    - id: id_012__psithaca__operation_metadata__alpha__balance_lost_endorsing_rewards
-      type: id_012__psithaca__operation_metadata__alpha__balance_lost_endorsing_rewards
+    - id: lost_endorsing_rewards
+      type: lost_endorsing_rewards
       if: (id_012__psithaca__operation_metadata__alpha__balance_tag == id_012__psithaca__operation_metadata__alpha__balance_tag::lost_endorsing_rewards)
-    - id: id_012__psithaca__operation_metadata__alpha__balance_commitments
+    - id: commitments
       size: 20
       if: (id_012__psithaca__operation_metadata__alpha__balance_tag == id_012__psithaca__operation_metadata__alpha__balance_tag::commitments)
-  id_012__psithaca__operation_metadata__alpha__balance_legacy_deposits:
-    seq:
-    - id: delegate
-      type: public_key_hash
-    - id: cycle
-      type: s4
-  id_012__psithaca__operation_metadata__alpha__balance_legacy_fees:
-    seq:
-    - id: delegate
-      type: public_key_hash
-    - id: cycle
-      type: s4
-  id_012__psithaca__operation_metadata__alpha__balance_legacy_rewards:
-    seq:
-    - id: delegate
-      type: public_key_hash
-    - id: cycle
-      type: s4
-  id_012__psithaca__operation_metadata__alpha__balance_lost_endorsing_rewards:
-    seq:
-    - id: delegate
-      type: public_key_hash
-    - id: participation
-      type: u1
-      enum: bool
-    - id: revelation
-      type: u1
-      enum: bool
   id_012__psithaca__operation_metadata__alpha__balance_updates:
     seq:
     - id: len_id_012__psithaca__operation_metadata__alpha__balance_updates
@@ -94,19 +59,54 @@ types:
     - id: origin
       type: u1
       enum: origin_tag
+  legacy_deposits:
+    seq:
+    - id: delegate
+      type: public_key_hash
+    - id: cycle
+      type: s4
+  legacy_fees:
+    seq:
+    - id: delegate
+      type: public_key_hash
+    - id: cycle
+      type: s4
+  legacy_rewards:
+    seq:
+    - id: delegate
+      type: public_key_hash
+    - id: cycle
+      type: s4
+  lost_endorsing_rewards:
+    seq:
+    - id: delegate
+      type: public_key_hash
+    - id: participation
+      type: u1
+      enum: bool
+    - id: revelation
+      type: u1
+      enum: bool
+  originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
   public_key_hash:
     doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
 enums:

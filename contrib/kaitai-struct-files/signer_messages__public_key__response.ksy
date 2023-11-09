@@ -8,16 +8,16 @@ types:
     - id: public_key_tag
       type: u1
       enum: public_key_tag
-    - id: public_key_ed25519
+    - id: ed25519
       size: 32
       if: (public_key_tag == public_key_tag::ed25519)
-    - id: public_key_secp256k1
+    - id: secp256k1
       size: 33
       if: (public_key_tag == public_key_tag::secp256k1)
-    - id: public_key_p256
+    - id: p256
       size: 33
       if: (public_key_tag == public_key_tag::p256)
-    - id: public_key_bls
+    - id: bls
       size: 48
       if: (public_key_tag == public_key_tag::bls)
 enums:

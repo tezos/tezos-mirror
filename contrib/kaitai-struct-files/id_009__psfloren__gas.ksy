@@ -29,6 +29,6 @@ seq:
 - id: id_009__psfloren__gas_tag
   type: u1
   enum: id_009__psfloren__gas_tag
-- id: id_009__psfloren__gas_limited
+- id: limited
   type: z
   if: (id_009__psfloren__gas_tag == id_009__psfloren__gas_tag::limited)

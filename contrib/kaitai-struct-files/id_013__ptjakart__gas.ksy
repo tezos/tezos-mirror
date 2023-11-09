@@ -29,6 +29,6 @@ seq:
 - id: id_013__ptjakart__gas_tag
   type: u1
   enum: id_013__ptjakart__gas_tag
-- id: id_013__ptjakart__gas_limited
+- id: limited
   type: z
   if: (id_013__ptjakart__gas_tag == id_013__ptjakart__gas_tag::limited)

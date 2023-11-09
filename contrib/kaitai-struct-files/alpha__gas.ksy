@@ -29,6 +29,6 @@ seq:
 - id: alpha__gas_tag
   type: u1
   enum: alpha__gas_tag
-- id: alpha__gas_limited
+- id: limited
   type: z
   if: (alpha__gas_tag == alpha__gas_tag::limited)

@@ -8,6 +8,14 @@ types:
       type: s4
     - id: code
       size: len_code
+  delegation:
+    seq:
+    - id: delegate_tag
+      type: u1
+      enum: bool
+    - id: delegate
+      type: public_key_hash
+      if: (delegate_tag == bool::true)
   id_007__psdelph1__contract_id:
     doc: ! >-
       A contract handle: A contract notation as given to an RPC or inside scripts.
@@ -16,35 +24,21 @@ types:
     - id: id_007__psdelph1__contract_id_tag
       type: u1
       enum: id_007__psdelph1__contract_id_tag
-    - id: id_007__psdelph1__contract_id_implicit
+    - id: implicit
       type: public_key_hash
       if: (id_007__psdelph1__contract_id_tag == id_007__psdelph1__contract_id_tag::implicit)
-    - id: id_007__psdelph1__contract_id_originated
-      type: id_007__psdelph1__contract_id_originated
+    - id: originated
+      type: originated
       if: (id_007__psdelph1__contract_id_tag == id_007__psdelph1__contract_id_tag::originated)
-  id_007__psdelph1__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
   id_007__psdelph1__entrypoint:
     doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     seq:
     - id: id_007__psdelph1__entrypoint_tag
       type: u1
       enum: id_007__psdelph1__entrypoint_tag
-    - id: id_007__psdelph1__entrypoint_named
-      type: id_007__psdelph1__entrypoint_named
-      if: (id_007__psdelph1__entrypoint_tag == id_007__psdelph1__entrypoint_tag::named)
-  id_007__psdelph1__entrypoint_named:
-    seq:
-    - id: len_named
-      type: u1
     - id: named
-      size: len_named
-      size-eos: true
+      type: named
+      if: (id_007__psdelph1__entrypoint_tag == id_007__psdelph1__entrypoint_tag::named)
   id_007__psdelph1__operation__alpha__internal_operation:
     seq:
     - id: source
@@ -54,50 +48,18 @@ types:
     - id: id_007__psdelph1__operation__alpha__internal_operation_tag
       type: u1
       enum: id_007__psdelph1__operation__alpha__internal_operation_tag
-    - id: id_007__psdelph1__operation__alpha__internal_operation_reveal
+    - id: reveal
       type: public_key
       if: (id_007__psdelph1__operation__alpha__internal_operation_tag == id_007__psdelph1__operation__alpha__internal_operation_tag::reveal)
-    - id: id_007__psdelph1__operation__alpha__internal_operation_transaction
-      type: id_007__psdelph1__operation__alpha__internal_operation_transaction
+    - id: transaction
+      type: transaction
       if: (id_007__psdelph1__operation__alpha__internal_operation_tag == id_007__psdelph1__operation__alpha__internal_operation_tag::transaction)
-    - id: id_007__psdelph1__operation__alpha__internal_operation_origination
-      type: id_007__psdelph1__operation__alpha__internal_operation_origination
+    - id: origination
+      type: origination
       if: (id_007__psdelph1__operation__alpha__internal_operation_tag == id_007__psdelph1__operation__alpha__internal_operation_tag::origination)
-    - id: id_007__psdelph1__operation__alpha__internal_operation_delegation
-      type: id_007__psdelph1__operation__alpha__internal_operation_delegation
+    - id: delegation
+      type: delegation
       if: (id_007__psdelph1__operation__alpha__internal_operation_tag == id_007__psdelph1__operation__alpha__internal_operation_tag::delegation)
-  id_007__psdelph1__operation__alpha__internal_operation_delegation:
-    seq:
-    - id: delegate_tag
-      type: u1
-      enum: bool
-    - id: delegate
-      type: public_key_hash
-      if: (delegate_tag == bool::true)
-  id_007__psdelph1__operation__alpha__internal_operation_origination:
-    seq:
-    - id: balance
-      type: n
-    - id: delegate_tag
-      type: u1
-      enum: bool
-    - id: delegate
-      type: public_key_hash
-      if: (delegate_tag == bool::true)
-    - id: script
-      type: id_007__psdelph1__scripted__contracts
-  id_007__psdelph1__operation__alpha__internal_operation_transaction:
-    seq:
-    - id: amount
-      type: n
-    - id: destination
-      type: id_007__psdelph1__contract_id
-    - id: parameters_tag
-      type: u1
-      enum: bool
-    - id: parameters
-      type: parameters
-      if: (parameters_tag == bool::true)
   id_007__psdelph1__scripted__contracts:
     seq:
     - id: code
@@ -116,6 +78,32 @@ types:
       type: b1be
     - id: payload
       type: b7be
+  named:
+    seq:
+    - id: len_named
+      type: u1
+    - id: named
+      size: len_named
+      size-eos: true
+  originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
+  origination:
+    seq:
+    - id: balance
+      type: n
+    - id: delegate_tag
+      type: u1
+      enum: bool
+    - id: delegate
+      type: public_key_hash
+      if: (delegate_tag == bool::true)
+    - id: script
+      type: id_007__psdelph1__scripted__contracts
   parameters:
     seq:
     - id: entrypoint
@@ -128,13 +116,13 @@ types:
     - id: public_key_tag
       type: u1
       enum: public_key_tag
-    - id: public_key_ed25519
+    - id: ed25519
       size: 32
       if: (public_key_tag == public_key_tag::ed25519)
-    - id: public_key_secp256k1
+    - id: secp256k1
       size: 33
       if: (public_key_tag == public_key_tag::secp256k1)
-    - id: public_key_p256
+    - id: p256
       size: 33
       if: (public_key_tag == public_key_tag::p256)
   public_key_hash:
@@ -143,13 +131,13 @@ types:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
   storage:
@@ -158,6 +146,18 @@ types:
       type: s4
     - id: storage
       size: len_storage
+  transaction:
+    seq:
+    - id: amount
+      type: n
+    - id: destination
+      type: id_007__psdelph1__contract_id
+    - id: parameters_tag
+      type: u1
+      enum: bool
+    - id: parameters
+      type: parameters
+      if: (parameters_tag == bool::true)
   value:
     seq:
     - id: len_value

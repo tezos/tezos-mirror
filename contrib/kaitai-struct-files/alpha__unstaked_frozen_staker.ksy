@@ -10,19 +10,12 @@ types:
     - id: alpha__contract_id_tag
       type: u1
       enum: alpha__contract_id_tag
-    - id: alpha__contract_id_implicit
+    - id: implicit
       type: public_key_hash
       if: (alpha__contract_id_tag == alpha__contract_id_tag::implicit)
-    - id: alpha__contract_id_originated
-      type: alpha__contract_id_originated
+    - id: originated
+      type: originated
       if: (alpha__contract_id_tag == alpha__contract_id_tag::originated)
-  alpha__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
   alpha__staker:
     doc: ! >-
       unstaked_frozen_staker: Abstract notion of staker used in operation receipts
@@ -32,36 +25,43 @@ types:
     - id: alpha__staker_tag
       type: u1
       enum: alpha__staker_tag
-    - id: alpha__staker_single
-      type: alpha__staker_single
+    - id: single
+      type: single
       if: (alpha__staker_tag == alpha__staker_tag::single)
-    - id: alpha__staker_shared
+    - id: shared
       type: public_key_hash
       if: (alpha__staker_tag == alpha__staker_tag::shared)
-  alpha__staker_single:
+  originated:
     seq:
-    - id: contract
-      type: alpha__contract_id
-    - id: delegate
-      type: public_key_hash
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
-    - id: public_key_hash_bls
+    - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+  single:
+    seq:
+    - id: contract
+      type: alpha__contract_id
+    - id: delegate
+      type: public_key_hash
 enums:
   alpha__contract_id_tag:
     0: implicit

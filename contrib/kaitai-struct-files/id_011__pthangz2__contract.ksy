@@ -10,13 +10,13 @@ types:
     - id: id_011__pthangz2__contract_id_tag
       type: u1
       enum: id_011__pthangz2__contract_id_tag
-    - id: id_011__pthangz2__contract_id_implicit
+    - id: implicit
       type: public_key_hash
       if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::implicit)
-    - id: id_011__pthangz2__contract_id_originated
-      type: id_011__pthangz2__contract_id_originated
+    - id: originated
+      type: originated
       if: (id_011__pthangz2__contract_id_tag == id_011__pthangz2__contract_id_tag::originated)
-  id_011__pthangz2__contract_id_originated:
+  originated:
     seq:
     - id: contract_hash
       size: 20
@@ -29,13 +29,13 @@ types:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
 enums:

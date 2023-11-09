@@ -29,6 +29,6 @@ seq:
 - id: id_005__psbabym1__gas_tag
   type: u1
   enum: id_005__psbabym1__gas_tag
-- id: id_005__psbabym1__gas_limited
+- id: limited
   type: z
   if: (id_005__psbabym1__gas_tag == id_005__psbabym1__gas_tag::limited)

@@ -15,9 +15,9 @@ seq:
 - id: p2p_point__state_tag
   type: u1
   enum: p2p_point__state_tag
-- id: p2p_point__state_accepted
+- id: accepted
   size: 16
   if: (p2p_point__state_tag == p2p_point__state_tag::accepted)
-- id: p2p_point__state_running
+- id: running
   size: 16
   if: (p2p_point__state_tag == p2p_point__state_tag::running)

@@ -10,19 +10,12 @@ types:
     - id: id_018__proxford__contract_id_tag
       type: u1
       enum: id_018__proxford__contract_id_tag
-    - id: id_018__proxford__contract_id_implicit
+    - id: implicit
       type: public_key_hash
       if: (id_018__proxford__contract_id_tag == id_018__proxford__contract_id_tag::implicit)
-    - id: id_018__proxford__contract_id_originated
-      type: id_018__proxford__contract_id_originated
+    - id: originated
+      type: originated
       if: (id_018__proxford__contract_id_tag == id_018__proxford__contract_id_tag::originated)
-  id_018__proxford__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
   id_018__proxford__staker:
     doc: ! >-
       staker: Abstract notion of staker used in operation receipts, either a single
@@ -31,36 +24,43 @@ types:
     - id: id_018__proxford__staker_tag
       type: u1
       enum: id_018__proxford__staker_tag
-    - id: id_018__proxford__staker_single
-      type: id_018__proxford__staker_single
+    - id: single
+      type: single
       if: (id_018__proxford__staker_tag == id_018__proxford__staker_tag::single)
-    - id: id_018__proxford__staker_shared
+    - id: shared
       type: public_key_hash
       if: (id_018__proxford__staker_tag == id_018__proxford__staker_tag::shared)
-  id_018__proxford__staker_single:
+  originated:
     seq:
-    - id: contract
-      type: id_018__proxford__contract_id
-    - id: delegate
-      type: public_key_hash
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
-    - id: public_key_hash_bls
+    - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+  single:
+    seq:
+    - id: contract
+      type: id_018__proxford__contract_id
+    - id: delegate
+      type: public_key_hash
 enums:
   id_018__proxford__contract_id_tag:
     0: implicit

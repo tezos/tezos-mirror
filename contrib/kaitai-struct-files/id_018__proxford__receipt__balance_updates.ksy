@@ -2,12 +2,18 @@ meta:
   id: id_018__proxford__receipt__balance_updates
   endian: be
 types:
+  frozen_bonds:
+    seq:
+    - id: contract
+      type: id_018__proxford__contract_id
+    - id: bond_id
+      type: id_018__proxford__bond_id
   id_018__proxford__bond_id:
     seq:
     - id: id_018__proxford__bond_id_tag
       type: u1
       enum: id_018__proxford__bond_id_tag
-    - id: id_018__proxford__bond_id_smart_rollup_bond_id
+    - id: smart_rollup_bond_id
       size: 20
       if: (id_018__proxford__bond_id_tag == id_018__proxford__bond_id_tag::smart_rollup_bond_id)
   id_018__proxford__contract_id:
@@ -18,64 +24,35 @@ types:
     - id: id_018__proxford__contract_id_tag
       type: u1
       enum: id_018__proxford__contract_id_tag
-    - id: id_018__proxford__contract_id_implicit
+    - id: implicit
       type: public_key_hash
       if: (id_018__proxford__contract_id_tag == id_018__proxford__contract_id_tag::implicit)
-    - id: id_018__proxford__contract_id_originated
-      type: id_018__proxford__contract_id_originated
+    - id: originated
+      type: originated
       if: (id_018__proxford__contract_id_tag == id_018__proxford__contract_id_tag::originated)
-  id_018__proxford__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
   id_018__proxford__operation_metadata__alpha__balance:
     seq:
     - id: id_018__proxford__operation_metadata__alpha__balance_tag
       type: u1
       enum: id_018__proxford__operation_metadata__alpha__balance_tag
-    - id: id_018__proxford__operation_metadata__alpha__balance_contract
-      type: id_018__proxford__contract_id
-      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::contract)
-    - id: id_018__proxford__operation_metadata__alpha__balance_deposits
-      type: id_018__proxford__staker
-      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::deposits)
-    - id: id_018__proxford__operation_metadata__alpha__balance_lost_attesting_rewards
-      type: id_018__proxford__operation_metadata__alpha__balance_lost_attesting_rewards
-      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::lost_attesting_rewards)
-    - id: id_018__proxford__operation_metadata__alpha__balance_commitments
-      size: 20
-      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::commitments)
-    - id: id_018__proxford__operation_metadata__alpha__balance_frozen_bonds
-      type: id_018__proxford__operation_metadata__alpha__balance_frozen_bonds
-      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::frozen_bonds)
-    - id: id_018__proxford__operation_metadata__alpha__balance_unstaked_deposits
-      type: id_018__proxford__operation_metadata__alpha__balance_unstaked_deposits
-      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::unstaked_deposits)
-  id_018__proxford__operation_metadata__alpha__balance_frozen_bonds:
-    seq:
     - id: contract
       type: id_018__proxford__contract_id
-    - id: bond_id
-      type: id_018__proxford__bond_id
-  id_018__proxford__operation_metadata__alpha__balance_lost_attesting_rewards:
-    seq:
-    - id: delegate
-      type: public_key_hash
-    - id: participation
-      type: u1
-      enum: bool
-    - id: revelation
-      type: u1
-      enum: bool
-  id_018__proxford__operation_metadata__alpha__balance_unstaked_deposits:
-    seq:
-    - id: staker
+      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::contract)
+    - id: deposits
       type: id_018__proxford__staker
-    - id: cycle
-      type: s4
+      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::deposits)
+    - id: lost_attesting_rewards
+      type: lost_attesting_rewards
+      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::lost_attesting_rewards)
+    - id: commitments
+      size: 20
+      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::commitments)
+    - id: frozen_bonds
+      type: frozen_bonds
+      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::frozen_bonds)
+    - id: unstaked_deposits
+      type: unstaked_deposits
+      if: (id_018__proxford__operation_metadata__alpha__balance_tag == id_018__proxford__operation_metadata__alpha__balance_tag::unstaked_deposits)
   id_018__proxford__operation_metadata__alpha__balance_updates:
     seq:
     - id: len_id_018__proxford__operation_metadata__alpha__balance_updates
@@ -101,36 +78,59 @@ types:
     - id: id_018__proxford__staker_tag
       type: u1
       enum: id_018__proxford__staker_tag
-    - id: id_018__proxford__staker_single
-      type: id_018__proxford__staker_single
+    - id: single
+      type: single
       if: (id_018__proxford__staker_tag == id_018__proxford__staker_tag::single)
-    - id: id_018__proxford__staker_shared
+    - id: shared
       type: public_key_hash
       if: (id_018__proxford__staker_tag == id_018__proxford__staker_tag::shared)
-  id_018__proxford__staker_single:
+  lost_attesting_rewards:
     seq:
-    - id: contract
-      type: id_018__proxford__contract_id
     - id: delegate
       type: public_key_hash
+    - id: participation
+      type: u1
+      enum: bool
+    - id: revelation
+      type: u1
+      enum: bool
+  originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
-    - id: public_key_hash_bls
+    - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+  single:
+    seq:
+    - id: contract
+      type: id_018__proxford__contract_id
+    - id: delegate
+      type: public_key_hash
+  unstaked_deposits:
+    seq:
+    - id: staker
+      type: id_018__proxford__staker
+    - id: cycle
+      type: s4
 enums:
   bool:
     0: false
