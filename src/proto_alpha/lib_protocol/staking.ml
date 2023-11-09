@@ -112,6 +112,27 @@ let finalize_unstake ctxt contract =
 let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
     amount =
   let open Lwt_result_syntax in
+  let remove_from_unstaked_frozen_deposit ctxt cycle delegate sender_contract
+      amount =
+    let* ctxt, balance_updates =
+      Token.transfer
+        ctxt
+        (`Unstaked_frozen_deposits
+          (Unstaked_frozen_staker_repr.Single (sender_contract, delegate), cycle))
+        (`Frozen_deposits
+          (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
+        amount
+    in
+    let* ctxt =
+      Unstaked_frozen_deposits_storage
+      .decrease_initial_amount_only_for_stake_from_unstake
+        ctxt
+        delegate
+        cycle
+        amount
+    in
+    return (ctxt, balance_updates)
+  in
   match unfinalizable_requests_opt with
   | None -> return (ctxt, [], amount)
   | Some Unstake_requests_storage.{delegate = delegate_requests; requests} ->
@@ -167,21 +188,11 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
                   if Tez_repr.(remaining_amount_to_transfer >= requested_amount)
                   then
                     let* ctxt, cycle_balance_updates =
-                      Token.transfer
+                      remove_from_unstaked_frozen_deposit
                         ctxt
-                        (`Unstaked_frozen_deposits
-                          ( Receipt_repr.Single (sender_contract, delegate),
-                            cycle ))
-                        (`Frozen_deposits
-                          (Receipt_repr.Single (sender_contract, delegate)))
-                        requested_amount
-                    in
-                    let* ctxt =
-                      Unstaked_frozen_deposits_storage
-                      .decrease_initial_amount_only_for_stake_from_unstake
-                        ctxt
-                        (Receipt_repr.Single (sender_contract, delegate))
                         cycle
+                        delegate
+                        sender_contract
                         requested_amount
                     in
                     let*? remaining_amount =
@@ -196,21 +207,11 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
                       t
                   else
                     let* ctxt, cycle_balance_updates =
-                      Token.transfer
+                      remove_from_unstaked_frozen_deposit
                         ctxt
-                        (`Unstaked_frozen_deposits
-                          ( Receipt_repr.Single (sender_contract, delegate),
-                            cycle ))
-                        (`Frozen_deposits
-                          (Receipt_repr.Single (sender_contract, delegate)))
-                        remaining_amount_to_transfer
-                    in
-                    let* ctxt =
-                      Unstaked_frozen_deposits_storage
-                      .decrease_initial_amount_only_for_stake_from_unstake
-                        ctxt
-                        (Receipt_repr.Single (sender_contract, delegate))
                         cycle
+                        delegate
+                        sender_contract
                         remaining_amount_to_transfer
                     in
                     let*? new_requested_amount =
