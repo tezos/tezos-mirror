@@ -9,6 +9,7 @@ const fetch = require('./fetch')
 const block_finalization = require('./block_finalization')
 const tx_register = require('./tx_register')
 const tx_overhead = require('./tx_overhead')
+const queue = require('./queue')
 
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
@@ -32,7 +33,8 @@ function init_analysis() {
         fetch_data: [],
         block_finalization: [],
         tx_register: [],
-        tx_overhead: []
+        tx_overhead: [],
+        runs_infos: []
 
     };
     return empty
@@ -47,6 +49,10 @@ function print_analysis(infos) {
     console.info(`Block Finalization Analysis`)
     console.info(`----------------------------------`)
     let error_block_finalization = block_finalization.print_analysis(infos)
+    console.info(`-------------------------------------------------------`)
+    console.info(`Queue read and storage analysis`)
+    console.info(`----------------------------------`)
+    let error_queue = queue.print_analysis(infos)
     console.info(`-------------------------------------------------------`)
     console.info(`Transaction Registering Analysis`)
     console.info(`----------------------------------`)
@@ -75,7 +81,7 @@ function print_analysis(infos) {
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
-    return error_fetch + error_block_finalization + error_register
+    return error_fetch + error_block_finalization + error_register + error_queue
 
 }
 
@@ -85,6 +91,7 @@ function process_record(record, acc) {
 }
 
 function process_bench_record(record, acc) {
+    acc.runs_infos.push(record)
     if (!isNaN(record.interpreter_decode_ticks)) {
         acc.nb_kernel_run += 1
         acc.decode = Math.max(acc.decode, record.interpreter_decode_ticks)
