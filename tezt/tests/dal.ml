@@ -4218,13 +4218,15 @@ let register ~protocols =
     protocols ;
   scenario_with_all_nodes
     "test reveal_dal_page in fast exec wasm pvm"
-    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
+    ~uses:(fun protocol ->
+      [Protocol.sc_rollup_client protocol; Constant.smart_rollup_installer])
     ~pvm_name:"wasm_2_0_0"
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
   scenario_with_all_nodes
     "test tx_kernel"
-    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
+    ~uses:(fun protocol ->
+      [Protocol.sc_rollup_client protocol; Constant.smart_rollup_installer])
     ~pvm_name:"wasm_2_0_0"
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;

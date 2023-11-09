@@ -165,7 +165,7 @@ let prepare_installer_kernel ?runner
     Process.spawn
       ?runner
       ~name:installer
-      (project_root // "smart-rollup-installer")
+      (project_root // Uses.path Constant.smart_rollup_installer)
       ([
          "get-reveal-installer";
          "--upgrade-to";
