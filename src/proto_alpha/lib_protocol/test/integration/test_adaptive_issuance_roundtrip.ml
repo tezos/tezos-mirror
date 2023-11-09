@@ -2314,18 +2314,26 @@ end
 module Slashing = struct
   let test_simple_slash =
     let constants = init_constants () in
+    let any_slash =
+      Tag "double baking" --> double_bake "delegate"
+      |+ Tag "double attesting" --> double_attest "delegate"
+      |+ Tag "double preattesting" --> double_preattest "delegate"
+    in
     begin_test
       ~activate_ai:true
       constants
       ["delegate"; "bootstrap1"; "bootstrap2"]
     --> (Tag "No AI" --> next_cycle
         |+ Tag "Yes AI" --> next_block --> wait_ai_activation)
-    --> (Tag "double baking" --> double_bake "delegate"
-        |+ Tag "double attesting" --> double_attest "delegate"
-        |+ Tag "double preattesting" --> double_preattest "delegate")
+    --> any_slash
     --> snapshot_balances "before slash" ["delegate"]
     --> ((Tag "denounce same cycle" --> make_denunciations ()
          |+ Tag "denounce next cycle" --> next_cycle --> make_denunciations ())
+         --> (Empty
+             |+ Tag "another slash"
+                (* delegate can be forbidden in this case, so we set another baker *)
+                --> set_baker "bootstrap1"
+                --> any_slash --> make_denunciations ())
          --> check_snapshot_balances "before slash"
          --> exec_unit check_pending_slashings
          --> next_cycle
