@@ -114,9 +114,6 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
     (ctxt, [])
     delegates
 
-let maximal_available_for_staking ctxt ~delegate =
-  Contract_storage.get_balance ctxt (Implicit delegate)
-
 let adjust_frozen_stakes ctxt :
     (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -145,16 +142,12 @@ let adjust_frozen_stakes ctxt :
       let* ctxt, new_balance_updates =
         if Tez_repr.(optimal_frozen > own_frozen) then
           let*? optimal_to_stake = Tez_repr.(optimal_frozen -? own_frozen) in
-          let* available_to_stake =
-            maximal_available_for_staking ctxt ~delegate
-          in
-          let to_stake = Tez_repr.min optimal_to_stake available_to_stake in
           Staking.stake
             ctxt
-            ~amount_strictness:`Exact
+            ~amount_strictness:`Best_effort
             ~sender:delegate
             ~delegate
-            to_stake
+            optimal_to_stake
         else if Tez_repr.(optimal_frozen < own_frozen) then
           let*? to_unstake = Tez_repr.(own_frozen -? optimal_frozen) in
           Staking.request_unstake

@@ -2425,7 +2425,7 @@ module Staking : sig
     to [delegate]. *)
   val stake :
     context ->
-    amount_strictness:[`Exact] ->
+    amount_strictness:[`Best_effort | `Exact] ->
     sender:public_key_hash ->
     delegate:public_key_hash ->
     Tez.t ->
