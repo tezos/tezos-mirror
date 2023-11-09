@@ -239,6 +239,7 @@ let rec create_dir ?(perm = 0o755) dir =
 
 let extract (module Reader : READER) (module Writer : WRITER) metadata_check
     ~snapshot_file ~dest =
+  let open Lwt_result_syntax in
   let module Archive_reader = Tar.Make (struct
     include Reader
     include Writer
@@ -249,21 +250,21 @@ let extract (module Reader : READER) (module Writer : WRITER) metadata_check
     Writer.open_out path
   in
   let in_chan = Reader.open_in snapshot_file in
-  try
-    let metadata =
-      read_snapshot_metadata
-        (module struct
-          include Reader
+  Lwt.finalize
+    (fun () ->
+      let metadata =
+        read_snapshot_metadata
+          (module struct
+            include Reader
 
-          let in_chan = in_chan
-        end)
-    in
-    metadata_check metadata ;
-    Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
-    Reader.close_in in_chan
-  with e ->
-    Reader.close_in in_chan ;
-    raise e
+            let in_chan = in_chan
+          end)
+      in
+      let+ () = metadata_check metadata in
+      Archive_reader.Archive.extract_gen out_channel_of_header in_chan)
+    (fun () ->
+      Reader.close_in in_chan ;
+      Lwt.return_unit)
 
 let compress ~snapshot_file =
   let Unix.{st_size = total; _} = Unix.stat snapshot_file in

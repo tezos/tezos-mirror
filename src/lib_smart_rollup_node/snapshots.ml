@@ -181,8 +181,16 @@ let post_import_checks ~message ~dest =
   return_unit
 
 let post_export_checks ~snapshot_file =
+  let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
-  extract gzip_reader stdlib_writer (fun _ -> ()) ~snapshot_file ~dest ;
+  let* () =
+    extract
+      gzip_reader
+      stdlib_writer
+      (fun _ -> return_unit)
+      ~snapshot_file
+      ~dest
+  in
   post_import_checks ~message:"Checking snapshot   " ~dest
 
 let operator_local_file_regexp =
@@ -236,3 +244,80 @@ let export ~data_dir ~dest =
   let snapshot_file = compress ~snapshot_file:uncompressed_snapshot in
   let* () = post_export_checks ~snapshot_file in
   return snapshot_file
+
+let pre_import_checks ~data_dir snapshot_metadata =
+  let open Lwt_result_syntax in
+  let store_dir = Configuration.default_storage_dir data_dir in
+  (* Load stores in read-only to make simple checks. *)
+  let* store =
+    Store.load
+      Read_write
+      ~index_buffer_size:1000
+      ~l2_blocks_cache_size:100
+      store_dir
+  in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir
+  and* history_mode = Store.History_mode.read store.history_mode
+  and* head = Store.L2_head.read store.l2_head in
+  let* () = Store.close store in
+  let*? () =
+    let open Result_syntax in
+    match (metadata, history_mode) with
+    | None, _ | _, None ->
+        (* The rollup node data dir was never initialized, i.e. the rollup node
+           wasn't run yet. *)
+        return_unit
+    | Some {rollup_address; _}, Some history_mode ->
+        let* () =
+          error_unless Address.(rollup_address = snapshot_metadata.address)
+          @@ error_of_fmt
+               "The existing rollup node is for %a, but the snapshot is for \
+                rollup %a."
+               Address.pp
+               rollup_address
+               Address.pp
+               snapshot_metadata.address
+        in
+        let a_history_str = function
+          | Configuration.Archive -> "an archive"
+          | Configuration.Full -> "a full"
+        in
+        error_unless (history_mode = snapshot_metadata.history_mode)
+        @@ error_of_fmt
+             "Cannot import %s snapshot into %s rollup node."
+             (a_history_str snapshot_metadata.history_mode)
+             (a_history_str history_mode)
+  in
+  let*? () =
+    let open Result_syntax in
+    match head with
+    | None ->
+        (* The rollup node has no L2 chain. *)
+        return_unit
+    | Some head ->
+        error_when (snapshot_metadata.head_level <= head.header.level)
+        @@ error_of_fmt
+             "The rollup node is already at level %ld but the snapshot is only \
+              for level %ld."
+             head.header.level
+             snapshot_metadata.head_level
+  in
+  return_unit
+
+let import _cctxt ~data_dir ~snapshot_file =
+  let open Lwt_result_syntax in
+  let*! () = Lwt_utils_unix.create_dir data_dir in
+  let*! () = Event.acquiring_lock () in
+  Utils.with_lockfile
+    ~when_locked:`Fail
+    (Node_context.global_lockfile_path ~data_dir)
+  @@ fun () ->
+  let* () =
+    extract
+      gzip_reader
+      stdlib_writer
+      (pre_import_checks ~data_dir)
+      ~snapshot_file
+      ~dest:data_dir
+  in
+  post_import_checks ~message:"Checking snapshot import" ~dest:data_dir

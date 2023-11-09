@@ -54,14 +54,14 @@ val create :
     snapshot archive [snapshot_file] in the directory [dest]. Existing files in
     [dest] with the same names are overwritten. The metadata header read from
     the snapshot is checked with [check_metadata] before beginning
-    extraction. *)
+    extraction, and returned. *)
 val extract :
   reader ->
   writer ->
-  (snapshot_metadata -> unit) ->
+  (snapshot_metadata -> unit tzresult Lwt.t) ->
   snapshot_file:string ->
   dest:string ->
-  unit
+  unit tzresult Lwt.t
 
 (** [compress ~snapshot_file] compresses the snapshot archive [snapshot_file] of
     the form ["path/to/snapshot.uncompressed"] to a new file
