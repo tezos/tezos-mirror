@@ -24,6 +24,8 @@ let neg p = 100 - p
 
 let add_bounded p1 p2 = Compare.Int.min 100 (p1 + p2)
 
+let sub_bounded p1 p2 = Compare.Int.max 0 (p1 - p2)
+
 let p0 = 0
 
 let p7 = 7

@@ -17,6 +17,8 @@ val neg : t -> t
 
 val add_bounded : t -> t -> t
 
+val sub_bounded : t -> t -> t
+
 (** Constants *)
 
 (** 0 *)

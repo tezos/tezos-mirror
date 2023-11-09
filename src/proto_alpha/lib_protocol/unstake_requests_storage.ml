@@ -203,11 +203,7 @@ module For_RPC = struct
       List.map
         (fun (cycle, pct) ->
           if Cycle_repr.(succ cycle = current_level.cycle) then
-            ( cycle,
-              (* if 0 <= b <= a <= 1,
-                 then a - b = 1 - (b + (1 - a)) and 0 <= b+(1-a) <= 1 *)
-              Int_percentage.(neg (add_bounded not_yet_slashed_pct (neg pct)))
-            )
+            (cycle, Int_percentage.(sub_bounded pct not_yet_slashed_pct))
           else (cycle, pct))
         slashing_history
     in
