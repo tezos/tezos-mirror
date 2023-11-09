@@ -250,14 +250,6 @@ let inspect_durable_state_value :
       rpc_req ()
       |> Runnable.map (fun json -> List.map JSON.as_string (JSON.as_list json))
 
-let gc_info ?hooks sc_client =
-  rpc_get ?hooks sc_client ["local"; "gc_info"]
-  |> Runnable.map @@ fun obj ->
-     {
-       last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
-       first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
-     }
-
 let inject ?hooks sc_client messages =
   let messages_json =
     `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)

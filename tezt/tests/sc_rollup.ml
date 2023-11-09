@@ -854,7 +854,7 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
     }
     ~challenge_window
     ~commitment_period
-  @@ fun _protocol sc_rollup_node rollup_client sc_rollup node client ->
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup node client ->
   (* GC will be invoked at every available opportunity, i.e. after every new lcc *)
   let gc_frequency = 1 in
   (* We want to bake enough blocks for the LCC to be updated and the GC
@@ -908,7 +908,9 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   assert (!gc_finalisations <= !gc_starts) ;
   (* We expect the first available level to be the one corresponding
    * to the lcc for the full mode or the genesis for archive mode *)
-  let*! {first_available_level; _} = Sc_rollup_client.gc_info rollup_client in
+  let* {first_available_level; _} =
+    Sc_rollup_node.RPC.call sc_rollup_node @@ Sc_rollup_rpc.get_local_gc_info ()
+  in
   Log.info "First available level %d" first_available_level ;
   (* Check that RPC calls for blocks which were not GC'ed still return *)
   let* () =

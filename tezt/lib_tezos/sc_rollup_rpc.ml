@@ -200,3 +200,12 @@ let get_local_last_published_commitment () =
 
 let get_local_commitments ~commitment_hash () =
   make GET ["local"; "commitments"; commitment_hash] commitment_info_from_json
+
+type gc_info = {last_gc_level : int; first_available_level : int}
+
+let get_local_gc_info () =
+  make GET ["local"; "gc_info"] (fun obj ->
+      {
+        last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
+        first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
+      })

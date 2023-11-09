@@ -143,3 +143,8 @@ val get_local_last_published_commitment :
     level it was included. *)
 val get_local_commitments :
   commitment_hash:string -> unit -> commitment_info option RPC_core.t
+
+type gc_info = {last_gc_level : int; first_available_level : int}
+
+(** RPC: [GET local/gc_info] returns garbage collection information. *)
+val get_local_gc_info : unit -> gc_info RPC_core.t

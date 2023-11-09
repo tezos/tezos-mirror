@@ -133,9 +133,6 @@ val encode_batch :
   transaction list ->
   string option Lwt.t
 
-(** [gc_info client] returns garbage collection information. *)
-val gc_info : ?hooks:Process.hooks -> t -> gc_info Runnable.process
-
 (** [inject client messages] injects the [messages] in the queue the rollup
     node's batcher and returns the list of message hashes injected. *)
 val inject :
