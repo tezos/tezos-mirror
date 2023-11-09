@@ -210,11 +210,11 @@ In addition, a rollup node can run under different modes:
    staker) is detected will the "accuser node" publish a commitment and
    participate in the subsequent refutation game.
 
-#. ``bailout`` mode is designed to assist stakers in recovering their bonds. 
-   It functions as a slightly modified version of "Accuser", differing in that it does not post any new 
-   commitments but instead focuses on defending the ones that have been previously 
-   submitted. When operating in bailout mode, the expectation is to initiate a recover bond 
-   operation when the operator is no longer staked on any commitment. If the node detects that this 
+#. ``bailout`` mode is designed to assist stakers in recovering their bonds.
+   It functions as a slightly modified version of "Accuser", differing in that it does not post any new
+   commitments but instead focuses on defending the ones that have been previously
+   submitted. When operating in bailout mode, the expectation is to initiate a recover bond
+   operation when the operator is no longer staked on any commitment. If the node detects that this
    operation has been successful, it can gratefully exit.
 
 #. ``custom`` mode refers to a mode where the users individually selects which
@@ -362,7 +362,7 @@ representation of the message payload, one can do:
      send smart rollup message "hex:[ \"${EMESSAGE}\" ]" \
      from "${OPERATOR_ADDR}"
 
-to inject such an external message,  where ``${PROTO_HASH}`` is the hash of your 
+to inject such an external message,  where ``${PROTO_HASH}`` is the hash of your
 protocol (e.g. ``ProtoALphaAL`` for Alpha; see :ref:`how to obtain it <octez_client_protocol>`).
 So let us focus now on producing a viable content for ``${EMESSAGE}``.
 
@@ -393,7 +393,7 @@ outbox transaction using the Octez rollup client as follows:
 
     EMESSAGE=$(octez-smart-rollup-client-${PROTO} encode outbox message "${MESSAGE}")
 
-where ``${PROTO}`` is the suffix of the executables corresponding to your protocol 
+where ``${PROTO}`` is the suffix of the executables corresponding to your protocol
 (e.g., ``-alpha``).
 
 .. _triggering_execution_outbox_message:
@@ -565,7 +565,7 @@ When the environment variable is undefined, Cranelift is used by default.
 Developing WASM Kernels
 -----------------------
 
-This page provides a first overview on writing a Wasm kernel for a smart rollup. 
+This page provides a first overview on writing a Wasm kernel for a smart rollup.
 (See :doc:`smart optimistic rollup <../alpha/smart_rollups>`)
 
 A rollup is primarily characterized by the semantics it gives to the
@@ -1400,4 +1400,3 @@ preimage of a given hash, there are two possible solutions:
   ``preimage`` subdirectory.
 * ``reveal preimage of <hex encoded value>`` can be used to feed a custom
   preimage hash.
-
