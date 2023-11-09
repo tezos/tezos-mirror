@@ -5,6 +5,7 @@
 #[doc(hidden)]
 pub use tezos_smart_rollup_debug::debug_msg;
 
+#[derive(PartialEq)]
 pub enum Level {
     Info,
     Error,
@@ -28,7 +29,10 @@ impl std::fmt::Display for Level {
 macro_rules! log {
     ($host: expr, $level: expr, $($args: expr),*) => {
         {
-            $crate::debug_msg!($host, "[{}] {}\n", $level, { &alloc::format!($($args), *) });
+            // Display `Debug` level only if the feature flag is actived
+            if $level != $crate::Level::Debug || ($level == $crate::Level::Debug && cfg!(feature = "debug")) {
+                $crate::debug_msg!($host, "[{}] {}\n", $level, { &alloc::format!($($args), *) });
+            }
         }
     };
 }

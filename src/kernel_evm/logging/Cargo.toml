@@ -14,3 +14,4 @@ tezos-smart-rollup-debug.workspace = true
 [features]
 default = ["alloc"]
 alloc = []
+debug = []
