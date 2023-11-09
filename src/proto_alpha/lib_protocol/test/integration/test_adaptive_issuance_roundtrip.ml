@@ -1307,6 +1307,32 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
     && Stdlib.(m1 = m2)
     && Stdlib.(mc1 = mc2)
   in
+  let compare_denunciations
+      (pkh_1, {rewarded = r1; misbehaviour = m1; misbehaviour_cycle = mc1})
+      (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2}) =
+    let c1 = Signature.Public_key_hash.compare pkh_1 pkh_2 in
+    if c1 <> 0 then c1
+    else
+      let c2 = Signature.Public_key_hash.compare r1 r2 in
+      if c2 <> 0 then c2
+      else
+        let c3 =
+          match (m1, m2) with
+          | Double_baking, Double_attesting -> -1
+          | x, y when x = y -> 0
+          | _ -> 1
+        in
+        if c3 <> 0 then c3
+        else
+          match (mc1, mc2) with
+          | Current, Previous -> -1
+          | x, y when x = y -> 0
+          | _ -> 1
+  in
+  let denunciations_rpc = List.sort compare_denunciations denunciations_rpc in
+  let denunciations_state =
+    List.sort compare_denunciations state.State.pending_slashes
+  in
   let denunciations_equal = List.equal denunciations_obj_equal in
   let denunciations_obj_pp fmt
       (pkh, {rewarded; misbehaviour; misbehaviour_cycle}) =
@@ -1332,7 +1358,7 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
       "Denunciations are not equal"
       denunciations_pp
       denunciations_rpc
-      state.State.pending_slashes
+      denunciations_state
   in
   return_unit
 
@@ -1571,7 +1597,7 @@ let make_denunciations_ ?(filter = fun {denounced; _} -> not denounced)
     | [] -> return @@ (state, List.rev r_op, List.rev r_dss)
   in
   let* state, operations, double_signings =
-    make_op_list state.State.double_signings state [] []
+    make_op_list state.double_signings state [] []
   in
   let state = {state with double_signings} in
   return (state, operations)
