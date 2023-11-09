@@ -270,15 +270,6 @@ let rec seq_field_of_data_encoding0 :
         let state, represented_interval_attrs =
           seq_field_of_data_encoding state shifted_encoding shifted_id
         in
-        let instance_type : Kaitai.Types.DataType.int_type =
-          match size with
-          | `Uint8 -> Int1Type {signed = false}
-          | `Uint16 -> IntMultiType {signed = false; width = W2; endian = None}
-          | `Uint30 -> IntMultiType {signed = false; width = W4; endian = None}
-          | `Int8 -> Int1Type {signed = true}
-          | `Int16 -> IntMultiType {signed = true; width = W2; endian = None}
-          | `Int31 -> IntMultiType {signed = true; width = W4; endian = None}
-        in
         let represented_interval_class =
           Helpers.class_spec_of_attrs
             ~instances:
@@ -305,8 +296,6 @@ let rec seq_field_of_data_encoding0 :
                                 right = IntNum shift;
                               };
                           ifExpr = None;
-                          dataTypeOpt =
-                            Some (NumericType (Int_type instance_type));
                         };
                   } );
               ]

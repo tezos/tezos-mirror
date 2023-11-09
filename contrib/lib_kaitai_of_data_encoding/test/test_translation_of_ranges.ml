@@ -116,8 +116,7 @@ let%expect_test "test small shifted range" =
             max: 10
     seq:
     - id: shifted_small_range
-      type: shifted_small_range_shifted_to_zero
-  |}]
+      type: shifted_small_range_shifted_to_zero |}]
 
 let%expect_test "test bigger shifted range" =
   let s =
@@ -147,5 +146,4 @@ let%expect_test "test bigger shifted range" =
             max: 99899
     seq:
     - id: shifted_big_range
-      type: shifted_big_range_shifted_to_zero
-  |}]
+      type: shifted_big_range_shifted_to_zero |}]

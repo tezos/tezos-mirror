@@ -84,9 +84,7 @@ let default_instance_spec ~id value =
   InstanceSpec.
     {
       doc = default_doc_spec;
-      descr =
-        InstanceSpec.ValueInstanceSpec
-          {id; value; ifExpr = None; dataTypeOpt = None};
+      descr = InstanceSpec.ValueInstanceSpec {id; value; ifExpr = None};
     }
 
 let merge_summaries attr summary =

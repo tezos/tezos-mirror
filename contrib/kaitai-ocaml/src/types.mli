@@ -299,7 +299,6 @@ module InstanceSpec : sig
         id : InstanceIdentifier.t;
         value : Ast.expr;
         ifExpr : Ast.expr option;
-        dataTypeOpt : DataType.t option;
       }
     | ParseInstanceSpec (* TODO *)
 end
