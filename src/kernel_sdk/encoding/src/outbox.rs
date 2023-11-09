@@ -420,13 +420,11 @@ mod test {
             w3.expect("Expected Ok(message)"),
             (OutboxMessageWhitelistUpdate { whitelist: None })
         );
-        let l4 = Some(vec![addr.clone()]);
+        let l4 = Some(vec![addr]);
         let w4: Result<OutboxMessageWhitelistUpdate, _> = l4.clone().try_into();
         assert_eq!(
             w4.expect("Expected Ok(message)"),
-            (OutboxMessageWhitelistUpdate {
-                whitelist: l4.clone()
-            })
+            (OutboxMessageWhitelistUpdate { whitelist: l4 })
         );
     }
 }

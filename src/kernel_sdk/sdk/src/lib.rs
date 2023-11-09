@@ -55,9 +55,9 @@ pub mod prelude {
     //! # let mut host = MockHost::default();
     //! # host.run_level(kernel_run);
     //! ```
-    #[cfg(feature = "alloc")]
+    #[cfg(feature = "debug_alloc")]
     pub use tezos_smart_rollup_debug::debug_msg;
-    #[cfg(not(feature = "alloc"))]
+    #[cfg(not(feature = "debug_alloc"))]
     pub use tezos_smart_rollup_debug::debug_str;
     pub use tezos_smart_rollup_host::runtime::Runtime;
 }
