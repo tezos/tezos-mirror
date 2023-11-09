@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Definitions & tezos-encodings for *michelson* data.
+use nom::branch::alt;
 use nom::combinator::map;
 use std::fmt::Debug;
 use tezos_data_encoding::enc::{self, BinResult, BinWriter};
@@ -17,9 +18,10 @@ pub mod ticket;
 use super::contract::Contract;
 use micheline::{
     bin_write_micheline_bytes, bin_write_micheline_int, bin_write_micheline_string,
-    bin_write_prim_2_args_no_annots, bin_write_prim_no_args_no_annots,
-    nom_read_micheline_bytes, nom_read_micheline_int, nom_read_micheline_string,
-    MichelinePrim2ArgsNoAnnots, MichelinePrimNoArgsNoAnnots,
+    bin_write_prim_1_arg_no_annots, bin_write_prim_2_args_no_annots,
+    bin_write_prim_no_args_no_annots, nom_read_micheline_bytes, nom_read_micheline_int,
+    nom_read_micheline_string, MichelinePrim1ArgNoAnnots, MichelinePrim2ArgsNoAnnots,
+    MichelinePrimNoArgsNoAnnots,
 };
 use v1_primitives as prim;
 
@@ -28,8 +30,14 @@ pub mod v1_primitives {
     //!
     //! [michelson_v1_primitives]: <https://gitlab.com/tezos/tezos/-/blob/9028b797894a5d9db38bc61a20abb793c3778316/src/proto_alpha/lib_protocol/michelson_v1_primitives.ml>
 
+    /// `("Left", D_Left)` case tag.
+    pub const LEFT_TAG: u8 = 5;
+
     /// `("Pair", D_PAIR)` case tag.
     pub const PAIR_TAG: u8 = 7;
+
+    /// `("Right", D_Right)` case tag.
+    pub const RIGHT_TAG: u8 = 8;
 
     /// unit encoding case tag.
     pub const UNIT_TAG: u8 = 11;
@@ -52,6 +60,12 @@ where
     Arg1: Michelson,
 {
 }
+impl<Arg0, Arg1> Michelson for MichelsonOr<Arg0, Arg1>
+where
+    Arg0: Michelson,
+    Arg1: Michelson,
+{
+}
 
 /// Michelson *unit* encoding.
 #[derive(Debug, PartialEq, Eq)]
@@ -68,6 +82,19 @@ pub struct MichelsonPair<Arg0, Arg1>(pub Arg0, pub Arg1)
 where
     Arg0: Debug + PartialEq + Eq,
     Arg1: Debug + PartialEq + Eq;
+
+/// Michelson *or* encoding.
+#[derive(Debug, PartialEq, Eq)]
+pub enum MichelsonOr<Arg0, Arg1>
+where
+    Arg0: Debug + PartialEq + Eq,
+    Arg1: Debug + PartialEq + Eq,
+{
+    /// The *Left* case
+    Left(Arg0),
+    /// The *Right* case
+    Right(Arg1),
+}
 
 /// Michelson String encoding.
 #[derive(Debug, PartialEq, Eq)]
@@ -133,6 +160,16 @@ where
     }
 }
 
+impl<Arg0, Arg1> HasEncoding for MichelsonOr<Arg0, Arg1>
+where
+    Arg0: Debug + PartialEq + Eq,
+    Arg1: Debug + PartialEq + Eq,
+{
+    fn encoding() -> Encoding {
+        Encoding::Custom
+    }
+}
+
 impl HasEncoding for MichelsonString {
     fn encoding() -> Encoding {
         Encoding::Custom
@@ -182,6 +219,25 @@ where
             MichelinePrim2ArgsNoAnnots::<_, _, { prim::PAIR_TAG }>::nom_read,
             Into::into,
         )(input)
+    }
+}
+
+impl<Arg0, Arg1> NomReader for MichelsonOr<Arg0, Arg1>
+where
+    Arg0: NomReader + Debug + PartialEq + Eq,
+    Arg1: NomReader + Debug + PartialEq + Eq,
+{
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        alt((
+            map(
+                MichelinePrim1ArgNoAnnots::<_, { prim::LEFT_TAG }>::nom_read,
+                |MichelinePrim1ArgNoAnnots { arg }| Self::Left(arg),
+            ),
+            map(
+                MichelinePrim1ArgNoAnnots::<_, { prim::RIGHT_TAG }>::nom_read,
+                |MichelinePrim1ArgNoAnnots { arg }| Self::Right(arg),
+            ),
+        ))(input)
     }
 }
 
@@ -252,6 +308,45 @@ where
             arg1: michelson.0,
             arg2: michelson.1,
         }
+    }
+}
+
+impl<Arg0, Arg1> BinWriter for MichelsonOr<Arg0, Arg1>
+where
+    Arg0: BinWriter + Debug + PartialEq + Eq,
+    Arg1: BinWriter + Debug + PartialEq + Eq,
+{
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        match self {
+            MichelsonOr::Left(left) => {
+                bin_write_prim_1_arg_no_annots(prim::LEFT_TAG, left, output)
+            }
+            MichelsonOr::Right(right) => {
+                bin_write_prim_1_arg_no_annots(prim::RIGHT_TAG, right, output)
+            }
+        }
+    }
+}
+
+impl<Arg0, Arg1> From<MichelinePrim1ArgNoAnnots<Arg0, { prim::LEFT_TAG }>>
+    for MichelsonOr<Arg0, Arg1>
+where
+    Arg0: Debug + PartialEq + Eq,
+    Arg1: Debug + PartialEq + Eq,
+{
+    fn from(micheline: MichelinePrim1ArgNoAnnots<Arg0, { prim::LEFT_TAG }>) -> Self {
+        Self::Left(micheline.arg)
+    }
+}
+
+impl<Arg0, Arg1> From<MichelinePrim1ArgNoAnnots<Arg1, { prim::RIGHT_TAG }>>
+    for MichelsonOr<Arg0, Arg1>
+where
+    Arg0: Debug + PartialEq + Eq,
+    Arg1: Debug + PartialEq + Eq,
+{
+    fn from(micheline: MichelinePrim1ArgNoAnnots<Arg1, { prim::RIGHT_TAG }>) -> Self {
+        Self::Right(micheline.arg)
     }
 }
 
