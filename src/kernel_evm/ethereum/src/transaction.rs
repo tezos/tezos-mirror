@@ -81,6 +81,36 @@ impl From<TransactionType> for u8 {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct IndexedLog {
+    pub log: Log,
+    /// Position of the log within a block.
+    pub index: u64,
+}
+
+impl Encodable for IndexedLog {
+    fn rlp_append(&self, stream: &mut RlpStream) {
+        stream.begin_list(2);
+        stream.append(&self.log);
+        append_u64_le(stream, &self.index);
+    }
+}
+
+impl Decodable for IndexedLog {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if Ok(2) != decoder.item_count() {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let log: Log = decode_field(&next(&mut it)?, "log")?;
+        let index: u64 = decode_field_u64_le(&next(&mut it)?, "index")?;
+        Ok(Self { log, index })
+    }
+}
+
 /// Transaction receipt, see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionreceipt
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransactionReceipt {
@@ -103,7 +133,7 @@ pub struct TransactionReceipt {
     /// The contract address created, if the transaction was a contract creation, otherwise null.
     pub contract_address: Option<H160>,
     /// The logs emitted during contract execution
-    pub logs: Vec<Log>,
+    pub logs: Vec<IndexedLog>,
     /// The bloom filter corresponding to the logs.
     /// It basically contains all addresses and topics from log objects.
     pub logs_bloom: Bloom,
@@ -113,13 +143,13 @@ pub struct TransactionReceipt {
 }
 
 impl TransactionReceipt {
-    pub fn logs_to_bloom(logs: &[Log]) -> Bloom {
+    pub fn logs_to_bloom(logs: &[IndexedLog]) -> Bloom {
         let mut bloom = Bloom::default();
         // According to
         // https://github.com/ethereum/go-ethereum/blob/41ee96fdfee5924004e8fbf9bbc8aef783893917/core/types/bloom9.go#L119
         for log in logs {
-            bloom.accrue(Input::Raw(log.address.as_bytes()));
-            for topic in log.topics.iter() {
+            bloom.accrue(Input::Raw(log.log.address.as_bytes()));
+            for topic in log.log.topics.iter() {
                 bloom.accrue(Input::Raw(topic.as_bytes()));
             }
         }
@@ -312,7 +342,7 @@ mod test {
         assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
     }
 
-    fn tx_receipt(logs: Vec<Log>) -> TransactionReceipt {
+    fn tx_receipt(logs: Vec<IndexedLog>) -> TransactionReceipt {
         TransactionReceipt {
             hash: [0; TRANSACTION_HASH_SIZE],
             index: 15u32,
@@ -341,10 +371,13 @@ mod test {
             )
             .expect("Valid hex"),
         );
-        let logs = vec![Log {
-            address,
-            topics: vec![topic],
-            data: vec![0, 1, 2, 3],
+        let logs = vec![IndexedLog {
+            log: Log {
+                address,
+                topics: vec![topic],
+                data: vec![0, 1, 2, 3],
+            },
+            index: 0,
         }];
 
         let v = tx_receipt(logs);

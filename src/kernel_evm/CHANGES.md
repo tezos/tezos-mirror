@@ -10,6 +10,8 @@
 
 ### Bug fixes
 
+- Transaction's log indices correspond to the position in the block. (!10615)
+
 ### Breaking changes
 
 ### Internal

@@ -906,6 +906,15 @@ let caller =
     bin = kernel_inputs_path ^ "/caller.bin";
   }
 
+(** The info for the "events.sol" contract.
+    See [src/kernel_evm/solidity_examples] *)
+let events =
+  {
+    label = "events";
+    abi = kernel_inputs_path ^ "/events.abi";
+    bin = kernel_inputs_path ^ "/events.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -1130,6 +1139,64 @@ let test_deploy_contract_for_shanghai =
          expected_code =
            "0x608060405234801561000f575f80fd5b5060043610610034575f3560e01c80632e64cec1146100385780636057361d14610056575b5f80fd5b610040610072565b60405161004d919061009b565b60405180910390f35b610070600480360381019061006b91906100e2565b61007a565b005b5f8054905090565b805f8190555050565b5f819050919050565b61009581610083565b82525050565b5f6020820190506100ae5f83018461008c565b92915050565b5f80fd5b6100c181610083565b81146100cb575f80fd5b50565b5f813590506100dc816100b8565b92915050565b5f602082840312156100f7576100f66100b4565b5b5f610104848285016100ce565b9150509291505056fea2646970667358221220c1aa96a14de9ab1c36fb97f3051eac7ba11ec6ac604ddeab90e5b6ac8bd4efc064736f6c63430008140033";
        }
+
+let check_log_indices ~endpoint ~status ~tx indices =
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
+  match receipt with
+  | None ->
+      failwith "no transaction receipt, probably it hasn't been mined yet."
+  | Some r ->
+      Check.(
+        (r.status = status)
+          bool
+          ~__LOC__
+          ~error_msg:"Unexpected transaction status, expected: %R but got: %L") ;
+      let received_indices =
+        List.map (fun tx -> tx.Transaction.logIndex) r.logs
+      in
+      Check.(
+        (received_indices = indices)
+          (list int32)
+          ~__LOC__
+          ~error_msg:
+            "Unexpected transaction logs indices, expected:\n%R but got:\n%L") ;
+      unit
+
+let test_log_index =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "log_index"]
+    ~title:"Check that log index is correctly computed"
+  @@ fun protocol ->
+  (* setup *)
+  let* ({evm_node; node; client; sc_rollup_node; _} as evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let _player = Eth_account.bootstrap_accounts.(1) in
+  (* deploy the events contract *)
+  let* _address, _tx = deploy ~contract:events ~sender evm_setup in
+  (* Emits two events: EventA and EventB *)
+  let raw_emitBoth =
+    "0xf88901843b9aca00826bf694d77420f73b4612a7a99dba8c2afd30a1886b034480a4cc79cf9d0000000000000000000000000000000000000000000000000000000000000064820a96a01350f66edc1a5bfa7dc8651d5735dbb343c491939a9e49b3f1a041b6a234df72a0028c5523a2bcc1077e090360a0e96ffaff7a2f26fd161b87107252e4bb83c47b"
+  in
+  (* Emits one event: EventA *)
+  let raw_emitA =
+    "0xf88980843b9aca0082644094d77420f73b4612a7a99dba8c2afd30a1886b034480a413c49adf000000000000000000000000000000000000000000000000000000000000000a820a95a0a46df17e7392d9777a94248e2dd6d9a0a097143cf915152d531c07fa604d2219a053c59f5e070adef0e2c443e5f7afb6435dfed20e04ddcfcfccb150972535cd2d"
+  in
+  let* _requests, _receipt, hashes =
+    send_n_transactions
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~evm_node
+      [raw_emitBoth; raw_emitA]
+  in
+  let* () =
+    check_log_indices ~endpoint ~status:true ~tx:(List.hd hashes) [0l; 1l]
+  in
+  check_log_indices ~endpoint ~status:true ~tx:(List.nth hashes 1) [2l]
 
 (* TODO: add internal parameters here (e.g the kernel version) *)
 type config_result = {chain_id : int64}
@@ -3828,7 +3895,8 @@ let register_evm_node ~protocols =
   test_rpc_sendRawTransaction_not_included protocols ;
   test_originate_evm_kernel_and_dump_pvm_state protocols ;
   test_l2_call_inter_contract protocols ;
-  test_rpc_getLogs protocols
+  test_rpc_getLogs protocols ;
+  test_log_index protocols
 
 let register ~protocols = register_evm_node ~protocols
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6591
