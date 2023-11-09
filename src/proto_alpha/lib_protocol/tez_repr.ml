@@ -171,14 +171,20 @@ let div_exn t d =
   | Ok v -> v
   | Error _ -> invalid_arg "div_exn"
 
-let mul_ratio tez ~num ~den =
+let mul_ratio ~rounding tez ~num ~den =
   let open Result_syntax in
   let (Tez_tag t) = tez in
   if num < 0L then tzfail (Negative_multiplicator (tez, num))
   else if den <= 0L then tzfail (Invalid_divisor (tez, den))
   else if num = 0L then return zero
   else
-    let z = Z.(div (mul (of_int64 t) (of_int64 num)) (of_int64 den)) in
+    let numerator = Z.(mul (of_int64 t) (of_int64 num)) in
+    let denominator = Z.of_int64 den in
+    let z =
+      match rounding with
+      | `Down -> Z.div numerator denominator
+      | `Up -> Z.cdiv numerator denominator
+    in
     if Z.fits_int64 z then return (Tez_tag (Z.to_int64 z))
     else tzfail (Multiplication_overflow (tez, num))
 
