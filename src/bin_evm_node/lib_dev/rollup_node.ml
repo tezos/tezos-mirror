@@ -370,7 +370,8 @@ module RPC = struct
         in
         let logs =
           List.map
-            (fun (log : transaction_log) -> {log with blockHash})
+            (fun (log : transaction_log) ->
+              {log with blockHash = Some blockHash})
             temp_receipt.logs
         in
         Some {temp_receipt with blockHash; logs}

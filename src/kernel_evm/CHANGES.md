@@ -6,6 +6,8 @@
 
 ### EVM Node
 
+- Add support for `eth_getLogs`. (!10624)
+
 ### Bug fixes
 
 ### Breaking changes

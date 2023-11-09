@@ -249,6 +249,9 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
         let hash_bytes = Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes in
         let hash = Hex.of_bytes hash_bytes |> Hex.show in
         return (Web3_sha3.Output (Ok (Hash (Hex hash))))
+    | Get_logs.Input (Some filter) ->
+        let+ logs = Filter_helpers.get_logs (module Rollup_node_rpc) filter in
+        Get_logs.Output (Ok logs)
     | _ -> Error_monad.failwith "Unsupported method\n%!"
   in
   let* output = dispatch_input_aux input in
