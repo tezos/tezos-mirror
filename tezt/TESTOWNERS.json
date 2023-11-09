@@ -9,6 +9,7 @@
   },
   "layer1": {
     "tags": [
+      "mempool",
       "protocol",
       "protocol_cache",
       "protocol_table",
