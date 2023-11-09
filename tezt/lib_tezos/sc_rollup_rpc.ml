@@ -33,5 +33,19 @@ let get_global_block_outbox ?(block = "cemented") ~outbox_level () =
 let get_global_smart_rollup_address () =
   make GET ["global"; "smart_rollup_address"] JSON.as_string
 
-let get_global_block ?(block = "head") () =
-  make GET ["global"; "block"; block] Fun.id
+let get_global_block_aux ?(block = "head") ?(path = []) () =
+  make GET (["global"; "block"; block] @ path) Fun.id
+
+let get_global_block = get_global_block_aux ~path:[]
+
+let get_global_block_inbox = get_global_block_aux ~path:["inbox"]
+
+let get_global_block_hash = get_global_block_aux ~path:["hash"]
+
+let get_global_block_level = get_global_block_aux ~path:["level"]
+
+let get_global_block_num_messages = get_global_block_aux ~path:["num_messages"]
+
+let get_global_tezos_head () = make GET ["global"; "tezos_head"] Fun.id
+
+let get_global_tezos_level () = make GET ["global"; "tezos_level"] Fun.id
