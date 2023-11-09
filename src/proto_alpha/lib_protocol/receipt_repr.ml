@@ -504,31 +504,30 @@ let compare_update_origin oa ob =
 let update_origin_encoding =
   let open Data_encoding in
   def "operation_metadata.alpha.update_origin"
-  @@ obj1 @@ req "origin"
   @@ union
        [
          case
            (Tag 0)
            ~title:"Block_application"
-           (constant "block")
+           (obj1 (req "origin" (constant "block")))
            (function Block_application -> Some () | _ -> None)
            (fun () -> Block_application);
          case
            (Tag 1)
            ~title:"Protocol_migration"
-           (constant "migration")
+           (obj1 (req "origin" (constant "migration")))
            (function Protocol_migration -> Some () | _ -> None)
            (fun () -> Protocol_migration);
          case
            (Tag 2)
            ~title:"Subsidy"
-           (constant "subsidy")
+           (obj1 (req "origin" (constant "subsidy")))
            (function Subsidy -> Some () | _ -> None)
            (fun () -> Subsidy);
          case
            (Tag 3)
            ~title:"Simulation"
-           (constant "simulation")
+           (obj1 (req "origin" (constant "simulation")))
            (function Simulation -> Some () | _ -> None)
            (fun () -> Simulation);
        ]
