@@ -90,28 +90,18 @@ val inject_block :
   updated_state:state ->
   state tzresult Lwt.t
 
-val sign_preattestations :
+val sign_consensus_votes :
   state ->
-  preattestations:(consensus_key_and_delegate * consensus_content) list ->
-  (consensus_key_and_delegate * packed_operation * int32 * Round.t) list
+  (consensus_key_and_delegate * consensus_content) list ->
+  [`Preattestation | `Attestation] ->
+  ((consensus_key * public_key_hash) * packed_operation * int32 * Round.t) list
   tzresult
   Lwt.t
 
-val inject_preattestations :
+val inject_consensus_vote :
   state ->
-  preattestations:(consensus_key_and_delegate * consensus_content) list ->
-  unit tzresult Lwt.t
-
-val sign_attestations :
-  state ->
-  attestations:(consensus_key_and_delegate * consensus_content) list ->
-  (consensus_key_and_delegate * packed_operation * int32 * Round.t) list
-  tzresult
-  Lwt.t
-
-val inject_attestations :
-  state ->
-  attestations:(consensus_key_and_delegate * consensus_content) list ->
+  (consensus_key_and_delegate * consensus_content) list ->
+  [`Preattestation | `Attestation] ->
   unit tzresult Lwt.t
 
 val sign_dal_attestations :
