@@ -551,9 +551,6 @@ fn typecheck_instruction(
             let kty_ = pop!();
             let (kty, vty) = *pop!(T::Map);
             ensure_ty_eq(ctx, &kty, &kty_)?;
-            // can only fail if the typechecker is invoked on invalid types,
-            // i.e. where `map` key is non-comparable
-            ensure_comparable(ctx, &kty)?;
             stack.push(T::new_option(vty));
             I::Get(overloads::Get::Map)
         }
@@ -564,9 +561,6 @@ fn typecheck_instruction(
             let (kty, vty) = m.as_ref();
             ensure_ty_eq(ctx, kty, kty_)?;
             ensure_ty_eq(ctx, vty, vty_new)?;
-            // can only fail if the typechecker is invoked on invalid types,
-            // i.e. where `map` key is non-comparable
-            ensure_comparable(ctx, kty)?;
             pop!();
             pop!();
             I::Update(overloads::Update::Map)
@@ -621,9 +615,6 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
         ),
         (Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            // can only fail if the typechecker is invoked on invalid
-            // types, i.e. where `map` key is non-comparable
-            ensure_comparable(ctx, tk)?;
             let tc_elt = |v: Value| -> Result<(TypedValue, TypedValue), TcError> {
                 match v {
                     Value::Elt(e) => {
@@ -693,14 +684,6 @@ fn ensure_pushable(ctx: &mut Ctx, ty: &Type) -> Result<(), TcError> {
         Ok(())
     } else {
         Err(TcError::TypeNotPushable(ty.clone()))
-    }
-}
-
-fn ensure_comparable(ctx: &mut Ctx, ty: &Type) -> Result<(), TcError> {
-    if ty.is_comparable(&mut ctx.gas)? {
-        Ok(())
-    } else {
-        Err(TcError::TypeNotComparable(ty.clone()))
     }
 }
 
@@ -1740,7 +1723,9 @@ mod typecheck_tests {
             Type::new_list(Type::Int)
         ];
         assert_eq!(
-            typecheck_instruction(parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
+            parse("GET")
+                .unwrap()
+                .typecheck(&mut Ctx::default(), &mut stack),
             Err(TcError::TypeNotComparable(Type::new_list(Type::Int))),
         );
     }
@@ -1789,7 +1774,9 @@ mod typecheck_tests {
             Type::new_list(Type::Int)
         ];
         assert_eq!(
-            typecheck_instruction(parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            parse("UPDATE")
+                .unwrap()
+                .typecheck(&mut Ctx::default(), &mut stack),
             Err(TcError::TypeNotComparable(Type::new_list(Type::Int),))
         );
     }
