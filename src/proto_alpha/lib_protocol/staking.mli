@@ -27,6 +27,7 @@
     to [delegate]. *)
 val stake :
   Raw_context.t ->
+  amount_strictness:[`Exact] ->
   sender:Signature.Public_key_hash.t ->
   delegate:Signature.public_key_hash ->
   Tez_repr.t ->

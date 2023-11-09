@@ -242,7 +242,7 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 
-let stake ctxt ~sender ~delegate amount =
+let stake ctxt ~amount_strictness ~sender ~delegate amount =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
       Unstake_requests_storage.{delegate = unstake_delegate; requests} =
@@ -258,6 +258,7 @@ let stake ctxt ~sender ~delegate amount =
   let* ctxt, finalize_balance_updates, unfinalizable_requests_opt =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
+  let amount = match amount_strictness with `Exact -> amount in
   let* ctxt, stake_balance_updates1, amount_from_liquid =
     if Signature.Public_key_hash.(sender <> delegate) then
       let* ctxt, stake_balance_updates_pseudotoken =
