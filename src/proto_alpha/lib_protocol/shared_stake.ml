@@ -7,7 +7,7 @@
 
 type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
 
-let share ctxt delegate amount =
+let share ~rounding ctxt delegate amount =
   let open Lwt_result_syntax in
   let* {own_frozen; staked_frozen; delegated = _} =
     Stake_storage.get_full_staking_balance ctxt delegate
@@ -17,8 +17,11 @@ let share ctxt delegate amount =
   else
     let*? total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
     let*? baker_part =
+      let rounding =
+        match rounding with `Towards_stakers -> `Down | `Towards_baker -> `Up
+      in
       Tez_repr.mul_ratio
-        ~rounding:`Down
+        ~rounding
         amount
         ~num:(Tez_repr.to_mutez own_frozen)
         ~den:(Tez_repr.to_mutez total_frozen)
@@ -102,7 +105,9 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
   let* {to_frozen; to_spendable} =
     compute_reward_distrib ctxt delegate active_stake rewards
   in
-  let* {baker_part; stakers_part} = share ctxt delegate to_frozen in
+  let* {baker_part; stakers_part} =
+    share ~rounding:`Towards_stakers ctxt delegate to_frozen
+  in
   let* ctxt, balance_updates_frozen_rewards_baker =
     Token.transfer
       ctxt
