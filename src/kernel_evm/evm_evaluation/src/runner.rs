@@ -11,6 +11,7 @@ use tezos_ethereum::block::BlockConstants;
 
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -78,19 +79,24 @@ pub fn run_test(
     report_key: String,
     opt: &Opt,
     output_file: &mut File,
-    file_name: &str,
 ) -> Result<(), TestError> {
     let json_reader = std::fs::read(path).unwrap();
     let suit: TestSuite = serde_json::from_reader(&*json_reader)?;
+    let execution_buffer = Vec::new();
+    let buffer = RefCell::new(execution_buffer);
+    let mut host = EvalHost::default_with_buffer(buffer);
 
     let map_caller_keys: HashMap<H256, H160> = MAP_CALLER_KEYS.into();
 
     for (name, unit) in suit.0.into_iter() {
+        let precompiles = precompile_set::<EvalHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+
         writeln!(output_file, "Running unit test: {}", name).unwrap();
         let full_filler_path =
             construct_folder_path(&unit._info.source, &opt.eth_tests, &None);
         writeln!(
-            output_file,
+            host.buffer.borrow_mut(),
             "Filler source: {}",
             &full_filler_path.to_str().unwrap()
         )
@@ -109,35 +115,45 @@ pub fn run_test(
             None
         };
 
-        let mut host = EvalHost::default_with_output_file(file_name.to_owned());
-        let precompiles = precompile_set::<EvalHost>();
-        let mut evm_account_storage = init_account_storage().unwrap();
-
-        writeln!(output_file, "\n[START] Accounts initialisation").unwrap();
+        writeln!(
+            host.buffer.borrow_mut(),
+            "\n[START] Accounts initialisation"
+        )
+        .unwrap();
         for (address, info) in unit.pre.into_iter() {
             let h160_address: H160 = address.as_fixed_bytes().into();
-            writeln!(output_file, "\nAccount is {}", h160_address).unwrap();
+            writeln!(host.buffer.borrow_mut(), "\nAccount is {}", h160_address).unwrap();
             let mut account =
                 EthereumAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
             if info.nonce != 0 {
                 account.set_nonce(&mut host, info.nonce.into()).unwrap();
-                writeln!(output_file, "Nonce is set for {} : {}", address, info.nonce)
-                    .unwrap();
+                writeln!(
+                    host.buffer.borrow_mut(),
+                    "Nonce is set for {} : {}",
+                    address,
+                    info.nonce
+                )
+                .unwrap();
             }
             account.balance_add(&mut host, info.balance).unwrap();
             writeln!(
-                output_file,
+                host.buffer.borrow_mut(),
                 "Balance for {} was added : {}",
-                address, info.balance
+                address,
+                info.balance
             )
             .unwrap();
             account.set_code(&mut host, &info.code).unwrap();
-            writeln!(output_file, "Code was set for {}", address).unwrap();
+            writeln!(host.buffer.borrow_mut(), "Code was set for {}", address).unwrap();
             for (index, value) in info.storage.iter() {
                 account.set_storage(&mut host, index, value).unwrap();
             }
         }
-        writeln!(output_file, "\n[END] Accounts initialisation\n").unwrap();
+        writeln!(
+            host.buffer.borrow_mut(),
+            "\n[END] Accounts initialisation\n"
+        )
+        .unwrap();
 
         let mut env = Env::default();
 
@@ -235,44 +251,53 @@ pub fn run_test(
                             }
                             None => "[INVALID]",
                         };
-                        writeln!(output_file, "\nOutcome status: {}", outcome_status)
-                            .unwrap();
+                        writeln!(
+                            host.buffer.borrow_mut(),
+                            "\nOutcome status: {}",
+                            outcome_status
+                        )
+                        .unwrap();
                     }
-                    Err(e) => {
-                        writeln!(output_file, "\nA test failed due to {:?}", e).unwrap()
-                    }
+                    Err(e) => writeln!(
+                        host.buffer.borrow_mut(),
+                        "\nA test failed due to {:?}",
+                        e
+                    )
+                    .unwrap(),
                 }
 
-                write!(output_file, "\nFinal check: ").unwrap();
+                write!(host.buffer.borrow_mut(), "\nFinal check: ").unwrap();
                 match (&test_execution.expect_exception, &exec_result) {
                     (None, Ok(_)) => {
-                        writeln!(output_file, "No unexpected exception.").unwrap()
+                        writeln!(host.buffer.borrow_mut(), "No unexpected exception.")
+                            .unwrap()
                     }
                     (Some(_), Err(_)) => {
-                        writeln!(output_file, "Exception was expected.").unwrap()
+                        writeln!(host.buffer.borrow_mut(), "Exception was expected.")
+                            .unwrap()
                     }
                     _ => {
                         writeln!(
-                            output_file,
+                            host.buffer.borrow_mut(),
                             "\nSomething unexpected happened for test {}.",
                             name
                         )
                         .unwrap();
                         writeln!(
-                            output_file,
+                            host.buffer.borrow_mut(),
                             "Expected exception is the following: {:?}",
                             test_execution.expect_exception
                         )
                         .unwrap();
                         writeln!(
-                            output_file,
+                            host.buffer.borrow_mut(),
                             "Furter details on the execution result: {:?}",
                             exec_result
                         )
                         .unwrap();
                     }
                 }
-                writeln!(output_file, "\n=======> OK! <=======\n").unwrap();
+                writeln!(host.buffer.borrow_mut(), "\n=======> OK! <=======\n").unwrap();
             }
 
             // Check the state after the execution of the result.
@@ -286,7 +311,7 @@ pub fn run_test(
                     output_file,
                 ),
                 None => writeln!(
-                    output_file,
+                    host.buffer.borrow_mut(),
                     "No filler file, the outcome of this test is uncertain."
                 )
                 .unwrap(),

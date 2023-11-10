@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::evalhost::EvalHost;
 use crate::helpers::{parse_and_get_cmp, purify_network};
 use crate::models::spec::SpecId;
 use crate::models::{AccountInfoFiller, FillerSource, SpecName};
 use crate::ReportValue;
 
 use evm_execution::account_storage::EthereumAccount;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 use bytes::Bytes;
 use primitive_types::{H160, H256, U256};
@@ -17,21 +17,25 @@ use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
 
-fn check_should_not_exist<Host: Runtime>(
-    host: &mut Host,
+fn check_should_not_exist(
+    host: &mut EvalHost,
     account: &EthereumAccount,
     invalid_state: &mut bool,
     shouldnotexist: &Option<String>,
     hex_address: &str,
-    output_file: &mut File,
 ) {
     if let Some(_shouldnotexist) = shouldnotexist {
         if account.balance(host).is_ok() {
-            writeln!(output_file, "Account {} should not exist.", hex_address).unwrap();
+            writeln!(
+                host.buffer.borrow_mut(),
+                "Account {} should not exist.",
+                hex_address
+            )
+            .unwrap();
             *invalid_state = true;
         } else {
             writeln!(
-                output_file,
+                host.buffer.borrow_mut(),
                 "Account {} rightfully do not exist.",
                 hex_address
             )
@@ -40,29 +44,32 @@ fn check_should_not_exist<Host: Runtime>(
     }
 }
 
-fn check_balance<Host: Runtime>(
-    host: &mut Host,
+fn check_balance(
+    host: &mut EvalHost,
     account: &EthereumAccount,
     invalid_state: &mut bool,
     balance: &Option<U256>,
     hex_address: &str,
-    output_file: &mut File,
 ) {
     if let Some(balance) = balance {
         match account.balance(host) {
             Ok(current_balance) => {
                 if current_balance != *balance {
                     *invalid_state = true;
-                    writeln!(output_file, "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance).unwrap();
+                    writeln!( host.buffer.borrow_mut(), "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance).unwrap();
                 } else {
-                    writeln!(output_file, "Account {}: balance matched.", hex_address)
-                        .unwrap();
+                    writeln!(
+                        host.buffer.borrow_mut(),
+                        "Account {}: balance matched.",
+                        hex_address
+                    )
+                    .unwrap();
                 }
             }
             Err(_) => {
                 *invalid_state = true;
                 writeln!(
-                    output_file,
+                    host.buffer.borrow_mut(),
                     "Account {} should have a balance.",
                     hex_address
                 )
@@ -72,13 +79,12 @@ fn check_balance<Host: Runtime>(
     }
 }
 
-fn check_code<Host: Runtime>(
-    host: &mut Host,
+fn check_code(
+    host: &mut EvalHost,
     account: &EthereumAccount,
     invalid_state: &mut bool,
     code: &Option<Bytes>,
     hex_address: &str,
-    output_file: &mut File,
 ) {
     if let Some(code) = &code {
         match account.code(host) {
@@ -86,61 +92,75 @@ fn check_code<Host: Runtime>(
                 let current_code: Bytes = current_code.into();
                 if current_code != code {
                     *invalid_state = true;
-                    writeln!(output_file, "Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code).unwrap();
+                    writeln!( host.buffer.borrow_mut(), "Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code).unwrap();
                 } else {
-                    writeln!(output_file, "Account {}: code matched.", hex_address)
-                        .unwrap();
+                    writeln!(
+                        host.buffer.borrow_mut(),
+                        "Account {}: code matched.",
+                        hex_address
+                    )
+                    .unwrap();
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                writeln!(output_file, "Account {} should have a code.", hex_address)
-                    .unwrap();
+                writeln!(
+                    host.buffer.borrow_mut(),
+                    "Account {} should have a code.",
+                    hex_address
+                )
+                .unwrap();
             }
         }
     }
 }
 
-fn check_nonce<Host: Runtime>(
-    host: &mut Host,
+fn check_nonce(
+    host: &mut EvalHost,
     account: &EthereumAccount,
     invalid_state: &mut bool,
     nonce: &Option<u64>,
     hex_address: &str,
-    output_file: &mut File,
 ) {
     if let Some(nonce) = nonce {
         match account.nonce(host) {
             Ok(current_nonce) => {
                 if current_nonce != (*nonce).into() {
                     *invalid_state = true;
-                    writeln!(output_file, "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce).unwrap();
+                    writeln!( host.buffer.borrow_mut(), "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce).unwrap();
                 } else {
-                    writeln!(output_file, "Account {}: nonce matched.", hex_address)
-                        .unwrap();
+                    writeln!(
+                        host.buffer.borrow_mut(),
+                        "Account {}: nonce matched.",
+                        hex_address
+                    )
+                    .unwrap();
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                writeln!(output_file, "Account {} should have a nonce.", hex_address)
-                    .unwrap();
+                writeln!(
+                    host.buffer.borrow_mut(),
+                    "Account {} should have a nonce.",
+                    hex_address
+                )
+                .unwrap();
             }
         }
     }
 }
 
-fn check_storage<Host: Runtime>(
-    host: &mut Host,
+fn check_storage(
+    host: &mut EvalHost,
     account: &EthereumAccount,
     invalid_state: &mut bool,
     storage: &Option<HashMap<H256, H256>>,
     hex_address: &str,
-    output_file: &mut File,
 ) {
     if let Some(storage) = &storage {
         if storage.is_empty() {
             writeln!(
-                output_file,
+                host.buffer.borrow_mut(),
                 "Account {}: storage matched (both empty).",
                 hex_address
             )
@@ -152,10 +172,10 @@ fn check_storage<Host: Runtime>(
                     let storage_value = value;
                     if current_storage_value != *storage_value {
                         *invalid_state = true;
-                        writeln!(output_file, "Account {}: storage don't match current one, {} was expected, but got {}.", hex_address, storage_value, current_storage_value).unwrap();
+                        writeln!( host.buffer.borrow_mut(), "Account {}: storage don't match current one, {} was expected, but got {}.", hex_address, storage_value, current_storage_value).unwrap();
                     } else {
                         writeln!(
-                            output_file,
+                            host.buffer.borrow_mut(),
                             "Account {}: storage matched.",
                             hex_address
                         )
@@ -165,7 +185,7 @@ fn check_storage<Host: Runtime>(
                 Err(_) => {
                     *invalid_state = true;
                     writeln!(
-                        output_file,
+                        host.buffer.borrow_mut(),
                         "Account {} should have a storage.",
                         hex_address
                     )
@@ -176,11 +196,10 @@ fn check_storage<Host: Runtime>(
     }
 }
 
-fn check_durable_storage<Host: Runtime>(
-    host: &mut Host,
+fn check_durable_storage(
+    host: &mut EvalHost,
     filler_expectation_result: &HashMap<String, AccountInfoFiller>,
     good_state: &mut bool,
-    output_file: &mut File,
 ) {
     for (account, info) in filler_expectation_result.iter() {
         let hex_address = if account.contains("0x") {
@@ -200,7 +219,6 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.shouldnotexist,
             &hex_address,
-            output_file,
         );
 
         check_balance(
@@ -209,17 +227,9 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.balance,
             &hex_address,
-            output_file,
         );
 
-        check_code(
-            host,
-            &account,
-            &mut invalid_state,
-            &info.code,
-            &hex_address,
-            output_file,
-        );
+        check_code(host, &account, &mut invalid_state, &info.code, &hex_address);
 
         check_nonce(
             host,
@@ -227,7 +237,6 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.nonce,
             &hex_address,
-            output_file,
         );
 
         check_storage(
@@ -236,21 +245,20 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.storage,
             &hex_address,
-            output_file,
         );
 
         if invalid_state {
             // One invalid state will cause the entire test to be a failure.
             *good_state = false;
-            writeln!(output_file, "==> [INVALID STATE]\n").unwrap();
+            writeln!(host.buffer.borrow_mut(), "==> [INVALID STATE]\n").unwrap();
         } else {
-            writeln!(output_file, "==> [CORRECT STATE]\n").unwrap();
+            writeln!(host.buffer.borrow_mut(), "==> [CORRECT STATE]\n").unwrap();
         }
     }
 }
 
-pub fn process<Host: Runtime>(
-    host: &mut Host,
+pub fn process(
+    host: &mut EvalHost,
     filler_source: FillerSource,
     spec_name: &SpecName,
     report_map: &mut HashMap<String, ReportValue>,
@@ -261,7 +269,7 @@ pub fn process<Host: Runtime>(
 
     for (name, fillers) in filler_source.0.into_iter() {
         writeln!(
-            output_file,
+            host.buffer.borrow_mut(),
             "Processing checks with filler: {}Filler\n",
             name
         )
@@ -277,23 +285,26 @@ pub fn process<Host: Runtime>(
                     continue;
                 }
 
-                writeln!(output_file, "CONFIG NETWORK ---- {}", spec_name.to_str())
-                    .unwrap();
-                writeln!(output_file, "CHECK  NETWORK ---- {}\n", filler_network)
-                    .unwrap();
+                writeln!(
+                    host.buffer.borrow_mut(),
+                    "CONFIG NETWORK ---- {}",
+                    spec_name.to_str()
+                )
+                .unwrap();
+                writeln!(
+                    host.buffer.borrow_mut(),
+                    "CHECK  NETWORK ---- {}\n",
+                    filler_network
+                )
+                .unwrap();
 
-                check_durable_storage(
-                    host,
-                    &filler_expectation.result,
-                    &mut good_state,
-                    output_file,
-                );
+                check_durable_storage(host, &filler_expectation.result, &mut good_state);
             }
         }
     }
 
     if good_state {
-        writeln!(output_file, "FINAL INTERPRETATION: SUCCESS\n").unwrap();
+        writeln!(output_file, "\nFINAL RESULT: SUCCESS\n").unwrap();
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
                 successes: report_value.successes + 1,
@@ -301,7 +312,13 @@ pub fn process<Host: Runtime>(
             };
         });
     } else {
-        writeln!(output_file, "FINAL INTERPRETATION: FAILURE\n").unwrap();
+        write!(
+            output_file,
+            "{}",
+            String::from_utf8(host.buffer.borrow_mut().to_vec()).unwrap()
+        )
+        .unwrap();
+        writeln!(output_file, "FINAL RESULT: FAILURE\n").unwrap();
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
                 successes: report_value.successes,

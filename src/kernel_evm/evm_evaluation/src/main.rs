@@ -107,7 +107,6 @@ pub fn main() {
                     report_key.to_owned(),
                     &opt,
                     &mut output_file,
-                    &opt.output,
                 )
                 .unwrap();
             }
@@ -307,7 +306,6 @@ pub fn main() {
             report_key.to_owned(),
             &opt,
             &mut output_file,
-            &opt.output,
         )
         .unwrap();
     }
