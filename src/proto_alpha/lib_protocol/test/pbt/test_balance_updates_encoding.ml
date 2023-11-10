@@ -60,9 +60,9 @@ let frozen_staker =
   let open Gen in
   oneofl
     [
-      Frozen_staker_repr.shared ~delegate:default_delegate;
+      Frozen_staker_repr.shared_between_stakers ~delegate:default_delegate;
       Frozen_staker_repr.baker default_delegate;
-      Frozen_staker_repr.single
+      Frozen_staker_repr.single_staker
         ~staker:default_contract
         ~delegate:default_delegate;
     ]

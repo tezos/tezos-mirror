@@ -373,7 +373,7 @@ let pp_balance_updates ppf balance_updates =
   let pp_frozen_staker ppf (staker : Receipt.frozen_staker) =
     match staker with
     | Baker baker -> pp_baker ppf baker
-    | Single {staker; delegate} ->
+    | Single_staker {staker; delegate} ->
         Format.fprintf
           ppf
           "%a delegated to %a"
@@ -381,7 +381,7 @@ let pp_balance_updates ppf balance_updates =
           staker
           pp_baker
           delegate
-    | Shared {delegate} ->
+    | Shared_between_stakers {delegate} ->
         Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
   in
   let pp_update token ppf = function

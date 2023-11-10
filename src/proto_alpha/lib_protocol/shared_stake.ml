@@ -5,6 +5,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
+
+let share ctxt delegate amount =
+  let open Lwt_result_syntax in
+  let* {own_frozen; staked_frozen; delegated = _} =
+    Stake_storage.get_full_staking_balance ctxt delegate
+  in
+  if Tez_repr.(staked_frozen = zero) then
+    return {baker_part = amount; stakers_part = Tez_repr.zero}
+  else
+    let*? total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
+    let*? baker_part =
+      Tez_repr.mul_ratio
+        ~rounding:`Down
+        amount
+        ~num:(Tez_repr.to_mutez own_frozen)
+        ~den:(Tez_repr.to_mutez total_frozen)
+    in
+    let*? stakers_part = Tez_repr.(amount -? baker_part) in
+    return {baker_part; stakers_part}
+
 type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 
 (** Compute the reward distribution between frozen and spendable according to:
@@ -81,12 +102,20 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
   let* {to_frozen; to_spendable} =
     compute_reward_distrib ctxt delegate active_stake rewards
   in
-  let* ctxt, balance_updates_frozen_rewards =
+  let* {baker_part; stakers_part} = share ctxt delegate to_frozen in
+  let* ctxt, balance_updates_frozen_rewards_baker =
     Token.transfer
       ctxt
       source
-      (`Frozen_deposits (Frozen_staker_repr.shared ~delegate))
-      to_frozen
+      (`Frozen_deposits (Frozen_staker_repr.baker delegate))
+      baker_part
+  in
+  let* ctxt, balance_updates_frozen_rewards_stakers =
+    Token.transfer
+      ctxt
+      source
+      (`Frozen_deposits (Frozen_staker_repr.shared_between_stakers ~delegate))
+      stakers_part
   in
   let+ ctxt, balance_updates_spendable_rewards =
     Token.transfer
@@ -95,4 +124,7 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
       (`Contract (Contract_repr.Implicit delegate))
       to_spendable
   in
-  (ctxt, balance_updates_frozen_rewards @ balance_updates_spendable_rewards)
+  ( ctxt,
+    balance_updates_frozen_rewards_baker
+    @ balance_updates_frozen_rewards_stakers @ balance_updates_spendable_rewards
+  )

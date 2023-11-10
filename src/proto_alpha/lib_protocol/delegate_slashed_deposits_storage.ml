@@ -239,12 +239,28 @@ let apply_and_clear_current_cycle_denunciations ctxt =
               let*? staked =
                 compute_reward_and_burn slashing_percentage frozen_deposits
               in
-              let init_to_burn_to_reward =
-                let {amount_to_burn; reward} = staked in
-                let giver =
-                  `Frozen_deposits (Frozen_staker_repr.shared ~delegate)
+              let* init_to_burn_to_reward =
+                let giver_baker =
+                  `Frozen_deposits (Frozen_staker_repr.baker delegate)
                 in
-                ([(giver, amount_to_burn)], [(giver, reward)])
+                let giver_stakers =
+                  `Frozen_deposits
+                    (Frozen_staker_repr.shared_between_stakers ~delegate)
+                in
+                let {amount_to_burn; reward} = staked in
+                let* to_burn =
+                  let+ {baker_part; stakers_part} =
+                    Shared_stake.share ctxt delegate amount_to_burn
+                  in
+                  [(giver_baker, baker_part); (giver_stakers, stakers_part)]
+                in
+                let* to_reward =
+                  let+ {baker_part; stakers_part} =
+                    Shared_stake.share ctxt delegate reward
+                  in
+                  [(giver_baker, baker_part); (giver_stakers, stakers_part)]
+                in
+                return (to_burn, to_reward)
               in
               let* to_burn, to_reward =
                 let oldest_slashable_cycle =

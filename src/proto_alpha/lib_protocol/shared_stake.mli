@@ -5,6 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
+
+(** [share ctxt delegate amount] shares [amount] between a [baker_part] and a
+    [stakers_part] proportionally to their shares in [delegate]'s frozen
+    deposits. *)
+val share :
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  Tez_repr.t ->
+  shared tzresult Lwt.t
+
 (** [pay_rewards ctxt ?active_stake source delegate] transfers the rewards to the
     [delegate] spendable balance and frozen balance.
 
