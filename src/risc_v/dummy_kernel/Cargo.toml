@@ -3,6 +3,10 @@ name = "risc-v-dummy"
 version = "0.0.0"
 edition = "2021"
 
+[target.'cfg(target_os = "hermit")'.dependencies.hermit]
+version = "0.7.2"
+default-features = false
+
 [dependencies.riscv-rt]
 version = "*"
 optional = true

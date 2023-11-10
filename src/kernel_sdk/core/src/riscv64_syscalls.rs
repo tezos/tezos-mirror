@@ -49,8 +49,42 @@ mod bare_metal {
     }
 }
 
+#[cfg(not(target_os = "none"))]
+mod hermit {
+    extern crate std;
+
+    /// Write data to a file descriptor.
+    pub fn write(fd: i64, buf: *const u8, count: usize) -> i64 {
+        use std::{
+            io::{self, Write},
+            slice::from_raw_parts,
+        };
+        let buffer = unsafe { from_raw_parts(buf, count) };
+        match fd {
+            1 => {
+                let _ = io::stdout().write_all(buffer);
+            }
+            2 => {
+                let _ = io::stderr().write_all(buffer);
+            }
+            _ => {
+                unreachable!()
+            }
+        };
+        0
+    }
+
+    /// Exit the kernel with a status code.
+    pub fn exit(code: i32) -> ! {
+        std::process::exit(code)
+    }
+}
+
 #[cfg(target_os = "none")]
 pub use bare_metal::*;
+
+#[cfg(not(target_os = "none"))]
+pub use hermit::*;
 
 /// Available file descriptor for output
 #[repr(i64)]
