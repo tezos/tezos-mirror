@@ -33,3 +33,7 @@ val get_global_block_status : ?block:string -> unit -> string RPC_core.t
    is the block corresponding to the last cemented level). *)
 val get_global_block_outbox :
   ?block:string -> outbox_level:int -> unit -> JSON.t RPC_core.t
+
+(** RPC: [GET global/smart_rollup_address] returns the smart contract rollup
+    address of the node. *)
+val get_global_smart_rollup_address : unit -> string RPC_core.t
