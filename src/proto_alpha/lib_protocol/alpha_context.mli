@@ -2072,10 +2072,21 @@ module Receipt : sig
     | Single of Contract.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
 
+  type frozen_staker = private
+    | Single of {staker : Contract.t; delegate : Signature.public_key_hash}
+    | Shared of {delegate : Signature.public_key_hash}
+
+  val frozen_baker : Signature.public_key_hash -> frozen_staker
+
+  val frozen_single :
+    staker:Contract.t -> delegate:Signature.public_key_hash -> frozen_staker
+
+  val frozen_shared : delegate:Signature.public_key_hash -> frozen_staker
+
   type 'token balance =
     | Contract : Contract.t -> Tez.t balance
     | Block_fees : Tez.t balance
-    | Deposits : staker -> Tez.t balance
+    | Deposits : frozen_staker -> Tez.t balance
     | Unstaked_deposits : staker * Cycle.t -> Tez.t balance
     | Nonce_revelation_rewards : Tez.t balance
     | Attesting_rewards : Tez.t balance

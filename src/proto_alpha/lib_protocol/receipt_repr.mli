@@ -45,7 +45,7 @@ end
 type 'token balance =
   | Contract : Contract_repr.t -> Tez_repr.t balance
   | Block_fees : Tez_repr.t balance
-  | Deposits : Staker_repr.t -> Tez_repr.t balance
+  | Deposits : Frozen_staker_repr.t -> Tez_repr.t balance
   | Unstaked_deposits : Staker_repr.t * Cycle_repr.t -> Tez_repr.t balance
   | Nonce_revelation_rewards : Tez_repr.t balance
   | Attesting_rewards : Tez_repr.t balance

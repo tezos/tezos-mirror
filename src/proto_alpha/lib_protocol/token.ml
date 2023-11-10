@@ -105,6 +105,7 @@ let credit ctxt receiver amount origin =
                 staker
                 amount
             in
+            let staker = Frozen_staker_repr.of_staker staker in
             (ctxt, Deposits staker)
         | `Unstaked_frozen_deposits (staker, cycle) ->
             let+ ctxt =
@@ -179,6 +180,7 @@ let spend ctxt giver amount origin =
                 staker
                 amount
             in
+            let staker = Frozen_staker_repr.of_staker staker in
             (ctxt, Deposits staker)
         | `Unstaked_frozen_deposits (staker, cycle) ->
             let+ ctxt =

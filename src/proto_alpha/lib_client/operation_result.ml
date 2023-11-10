@@ -357,8 +357,9 @@ let pp_balance_updates ppf balance_updates =
       Format.fprintf ppf "the baker who will include this operation"
     else Signature.Public_key_hash.pp ppf baker
   in
-  let pp_staker ppf = function
-    | Receipt.Single (contract, delegate) ->
+  let pp_staker ppf (staker : Receipt.staker) =
+    match staker with
+    | Single (contract, delegate) ->
         Format.fprintf
           ppf
           "%a delegated to %a"
@@ -366,7 +367,20 @@ let pp_balance_updates ppf balance_updates =
           contract
           pp_baker
           delegate
-    | Receipt.Shared delegate ->
+    | Shared delegate ->
+        Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
+  in
+  let pp_frozen_staker ppf (staker : Receipt.frozen_staker) =
+    match staker with
+    | Single {staker; delegate} ->
+        Format.fprintf
+          ppf
+          "%a delegated to %a"
+          Contract.pp
+          staker
+          pp_baker
+          delegate
+    | Shared {delegate} ->
         Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
   in
   let pp_update token ppf = function
@@ -381,7 +395,8 @@ let pp_balance_updates ppf balance_updates =
           match balance with
           | Contract c -> Format.asprintf "%a" Contract.pp c
           | Block_fees -> "payload fees(the block proposer)"
-          | Deposits staker -> Format.asprintf "deposits(%a)" pp_staker staker
+          | Deposits staker ->
+              Format.asprintf "deposits(%a)" pp_frozen_staker staker
           | Unstaked_deposits (staker, cycle) ->
               Format.asprintf
                 "unstaked_deposits(%a,%a)"

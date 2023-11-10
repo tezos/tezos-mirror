@@ -501,6 +501,16 @@ module Receipt = struct
     | Single of Contract_repr.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
 
+  type frozen_staker = Frozen_staker_repr.t = private
+    | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
+    | Shared of {delegate : Signature.public_key_hash}
+
+  let frozen_baker = Frozen_staker_repr.baker
+
+  let frozen_single = Frozen_staker_repr.single
+
+  let frozen_shared = Frozen_staker_repr.shared
+
   include Receipt_repr
 end
 
