@@ -176,6 +176,14 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
                           (Receipt_repr.Single (sender_contract, delegate)))
                         requested_amount
                     in
+                    let* ctxt =
+                      Unstaked_frozen_deposits_storage
+                      .decrease_initial_amount_only_for_stake_from_unstake
+                        ctxt
+                        (Receipt_repr.Single (sender_contract, delegate))
+                        cycle
+                        requested_amount
+                    in
                     let*? remaining_amount =
                       Tez_repr.(
                         remaining_amount_to_transfer -? requested_amount)
@@ -184,7 +192,7 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
                       ctxt
                       (balance_updates @ cycle_balance_updates)
                       remaining_amount
-                      ((cycle, Tez_repr.zero) :: updated_requests_rev)
+                      updated_requests_rev
                       t
                   else
                     let* ctxt, cycle_balance_updates =
@@ -195,6 +203,14 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
                             cycle ))
                         (`Frozen_deposits
                           (Receipt_repr.Single (sender_contract, delegate)))
+                        remaining_amount_to_transfer
+                    in
+                    let* ctxt =
+                      Unstaked_frozen_deposits_storage
+                      .decrease_initial_amount_only_for_stake_from_unstake
+                        ctxt
+                        (Receipt_repr.Single (sender_contract, delegate))
+                        cycle
                         remaining_amount_to_transfer
                     in
                     let*? new_requested_amount =
