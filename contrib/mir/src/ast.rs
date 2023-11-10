@@ -6,12 +6,14 @@
 /******************************************************************************/
 
 pub mod comparable;
+pub mod micheline;
 pub mod michelson_address;
 pub mod michelson_list;
 pub mod or;
 pub mod parsed;
 pub mod typechecked;
 
+pub use micheline::Micheline;
 use std::collections::BTreeMap;
 pub use tezos_crypto_rs::hash::ChainId;
 
