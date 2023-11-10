@@ -270,6 +270,8 @@ let previous_protocol = function
   | Oxford -> Some Nairobi
   | Nairobi -> None
 
+let has_predecessor p = previous_protocol p <> None
+
 let all = [Nairobi; Oxford; Alpha]
 
 type supported_protocols =
@@ -277,8 +279,9 @@ type supported_protocols =
   | From_protocol of int
   | Until_protocol of int
   | Between_protocols of int * int
+  | With_predecessor of supported_protocols
 
-let is_supported supported_protocols protocol =
+let rec is_supported supported_protocols protocol =
   match supported_protocols with
   | Any_protocol -> true
   | From_protocol n -> number protocol >= n
@@ -286,12 +289,15 @@ let is_supported supported_protocols protocol =
   | Between_protocols (a, b) ->
       let n = number protocol in
       a <= n && n <= b
+  | With_predecessor sp -> has_predecessor protocol && is_supported sp protocol
 
-let show_supported_protocols = function
+let rec show_supported_protocols = function
   | Any_protocol -> "Any_protocol"
   | From_protocol n -> sf "From_protocol %d" n
   | Until_protocol n -> sf "Until_protocol %d" n
   | Between_protocols (a, b) -> sf "Between_protocol (%d, %d)" a b
+  | With_predecessor sp ->
+      sf "With_predecessor (%s)" (show_supported_protocols sp)
 
 let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
   match List.filter (is_supported supports) protocols with

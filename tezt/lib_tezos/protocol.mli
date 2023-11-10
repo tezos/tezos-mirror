@@ -196,6 +196,8 @@ val all : t list
     - [Until_protocol n]: the test can run on protocols [p] such that [number p <= n].
     - [Between_protocols (a, b)]: the test can run on protocols [p]
       such that [a <= number p <= b].
+    - [With_predecessor sp]: the test can run on protocols [p] that both have a predecessor
+      and satisfy [sp].
 
     Always write the number itself, do not compute it.
     For instance, writing [Until_protocol (number Alpha)] would make your test
@@ -209,6 +211,7 @@ type supported_protocols =
   | From_protocol of int
   | Until_protocol of int
   | Between_protocols of int * int
+  | With_predecessor of supported_protocols
 
 (** Register a test that uses the protocol.
 
