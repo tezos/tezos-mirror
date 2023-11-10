@@ -97,11 +97,15 @@ let optimal_frozen_wrt_delegated_without_ai ctxt
      With AI the optimum is to freeze as much as possible, this computation
      would make no sense. *)
   let* power = Tez_repr.(delegated +? own_frozen) in
-  Tez_repr.mul_ratio
-    ~rounding:`Up
-    power
-    ~num:1L
-    ~den:(Int64.add limit_of_delegation_over_baking 1L)
+  let* opti_frozen =
+    Tez_repr.mul_ratio
+      ~rounding:`Up
+      power
+      ~num:1L
+      ~den:(Int64.add limit_of_delegation_over_baking 1L)
+  in
+  let min_frozen = Constants_storage.minimal_frozen_stake ctxt in
+  return (Tez_repr.max opti_frozen min_frozen)
 
 let baking_weight ctxt staking_parameters f =
   let open Result_syntax in
