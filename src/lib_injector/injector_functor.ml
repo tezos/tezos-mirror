@@ -47,8 +47,6 @@ module Int_cache =
    Centralize this and maybe make it configurable. *)
 let confirmations = 2
 
-type injection_strategy = [`Each_block | `Delay_block of float]
-
 (** Builds a client context from another client context but uses logging instead
     of printing on stdout directly. This client context cannot make the injector
     exit. *)
