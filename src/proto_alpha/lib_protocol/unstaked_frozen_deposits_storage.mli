@@ -52,7 +52,7 @@ val get :
     unslashable cycle. *)
 val credit_only_call_from_token :
   Raw_context.t ->
-  Staker_repr.t ->
+  Unstaked_frozen_staker_repr.t ->
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
@@ -65,7 +65,7 @@ val credit_only_call_from_token :
     too low. *)
 val spend_only_call_from_token :
   Raw_context.t ->
-  Staker_repr.t ->
+  Unstaked_frozen_staker_repr.t ->
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t

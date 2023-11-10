@@ -27,7 +27,7 @@ type container =
   [ `Contract of Contract_repr.t
   | `Collected_commitments of Blinded_public_key_hash.t
   | `Frozen_deposits of Frozen_staker_repr.t
-  | `Unstaked_frozen_deposits of Staker_repr.t * Cycle_repr.t
+  | `Unstaked_frozen_deposits of Unstaked_frozen_staker_repr.t * Cycle_repr.t
   | `Block_fees
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
 

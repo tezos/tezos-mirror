@@ -22,10 +22,11 @@ let encoding =
     obj1 (req "delegate" Signature.Public_key_hash.encoding)
   in
   def
-    ~title:"staker"
+    ~title:"unstaked_frozen_staker"
     ~description:
-      "Abstract notion of staker used in operation receipts, either a single \
-       staker or all the stakers delegating to some delegate."
+      "Abstract notion of staker used in operation receipts for unstaked \
+       frozen deposits, either a single staker or all the stakers delegating \
+       to some delegate."
     "staker"
   @@ matching
        (function

@@ -357,7 +357,7 @@ let pp_balance_updates ppf balance_updates =
       Format.fprintf ppf "the baker who will include this operation"
     else Signature.Public_key_hash.pp ppf baker
   in
-  let pp_staker ppf (staker : Receipt.staker) =
+  let pp_unstaked_frozen_staker ppf (staker : Receipt.unstaked_frozen_staker) =
     match staker with
     | Single (contract, delegate) ->
         Format.fprintf
@@ -401,7 +401,7 @@ let pp_balance_updates ppf balance_updates =
           | Unstaked_deposits (staker, cycle) ->
               Format.asprintf
                 "unstaked_deposits(%a,%a)"
-                pp_staker
+                pp_unstaked_frozen_staker
                 staker
                 Cycle.pp
                 cycle

@@ -497,7 +497,7 @@ module Bond_id = struct
 end
 
 module Receipt = struct
-  type staker = Staker_repr.t =
+  type unstaked_frozen_staker = Unstaked_frozen_staker_repr.t =
     | Single of Contract_repr.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
 

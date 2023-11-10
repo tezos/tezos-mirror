@@ -46,14 +46,14 @@ let default_contract =
 
 let contract = Receipt_repr.Contract default_contract
 
-let staker =
+let unstaked_frozen_staker =
   let open Gen in
   oneofl
     [
-      Staker_repr.Shared default_delegate;
-      Staker_repr.Single
+      Unstaked_frozen_staker_repr.Shared default_delegate;
+      Unstaked_frozen_staker_repr.Single
         (Contract_repr.Implicit default_delegate, default_delegate);
-      Staker_repr.Single (default_contract, default_delegate);
+      Unstaked_frozen_staker_repr.Single (default_contract, default_delegate);
     ]
 
 let frozen_staker =
@@ -78,7 +78,7 @@ let lost_attesting_rewards =
 
 let unstaked_deposits =
   let open Gen in
-  let+ staker in
+  let+ staker = unstaked_frozen_staker in
   Receipt_repr.Unstaked_deposits (staker, Cycle_repr.root)
 
 let commitments = Receipt_repr.Commitments Blinded_public_key_hash.zero
