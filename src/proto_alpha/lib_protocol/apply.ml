@@ -2357,7 +2357,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       let tip = Delegate.Rewards.seed_nonce_revelation_tip ctxt in
       let delegate = payload_producer.Consensus_key.delegate in
       let+ ctxt, balance_updates =
-        Delegate.Staking_parameters.pay_rewards
+        Delegate.Shared_stake.pay_rewards
           ctxt
           ~source:`Revelation_rewards
           ~delegate
@@ -2369,7 +2369,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       let tip = Delegate.Rewards.vdf_revelation_tip ctxt in
       let delegate = payload_producer.Consensus_key.delegate in
       let+ ctxt, balance_updates =
-        Delegate.Staking_parameters.pay_rewards
+        Delegate.Shared_stake.pay_rewards
           ctxt
           ~source:`Revelation_rewards
           ~delegate

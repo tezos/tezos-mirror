@@ -121,7 +121,7 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
       Token.transfer ctxt `Block_fees (`Contract contract) block_fees
     in
     let+ ctxt, balance_updates_baking_rewards =
-      Delegate_staking_parameters.pay_rewards
+      Shared_stake.pay_rewards
         ctxt
         ~source:`Baking_rewards
         ~delegate
@@ -130,11 +130,7 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     (ctxt, balance_updates_block_fees @ balance_updates_baking_rewards)
   in
   let pay_block_producer ctxt delegate bonus =
-    Delegate_staking_parameters.pay_rewards
-      ctxt
-      ~source:`Baking_bonuses
-      ~delegate
-      bonus
+    Shared_stake.pay_rewards ctxt ~source:`Baking_bonuses ~delegate bonus
   in
   let* ctxt, balance_updates_payload_producer =
     pay_payload_producer ctxt payload_producer
