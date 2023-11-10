@@ -150,7 +150,6 @@ module Make (Parameters : PARAMETERS) = struct
     l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
     signers : signer list;  (** The signers for this worker. *)
     number_of_signers : int;
-    mutable signer_index : int;  (** Next index to use for the signer list. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
           purposes. *)
@@ -291,7 +290,6 @@ module Make (Parameters : PARAMETERS) = struct
     let proto_client =
       Inj_proto.proto_client_for_protocol head_protocols.next_protocol
     in
-    let signer_index = 0 in
     let number_of_signers = List.length signers in
     return
       {
@@ -299,7 +297,6 @@ module Make (Parameters : PARAMETERS) = struct
         l1_ctxt;
         signers;
         number_of_signers;
-        signer_index;
         tags;
         strategy;
         save_dir = data_dir;
@@ -468,16 +465,6 @@ module Make (Parameters : PARAMETERS) = struct
   let keep_half ops =
     let total = List.length ops in
     if total <= 1 then None else Some (List.take_n (total / 2) ops)
-
-  let next_signer ({signers; number_of_signers; signer_index; _} as state) =
-    let signer =
-      match List.nth signers signer_index with
-      | Some signer -> signer
-      | None -> assert false
-      (* can't happens because index is bounded by the list length *)
-    in
-    state.signer_index <- (signer_index + 1) mod number_of_signers ;
-    signer
 
   (** [simulate_operations ~must_succeed state operations] simulates the
       injection of [operations] and returns a triple [(op, ops, results)] where
@@ -649,33 +636,46 @@ module Make (Parameters : PARAMETERS) = struct
       in
       (oph, operations)
 
-  (** Retrieve as many operations from the queue while remaining below the size
-    limit. *)
-  let get_operations_from_queue ~size_limit state =
-    let exception Reached_limit of int * Inj_operation.t list in
-    let module Proto_client = (val state.proto_client) in
-    let min_size =
-      (* Size of branch field and signature *)
-      Block_hash.size + Signature.size Signature.zero
+  (** Retrieve as many batch of operations from the queue while batch
+      size remains below the size limit. *)
+  let get_n_ops_batch_from_queue ~size_limit state n =
+    let exception
+      Reached_limit of
+        (int * Inj_operation.t list * int * Inj_operation.t list list)
     in
+    let module Proto_client = (val state.proto_client) in
+    let min_size = Block_hash.size + Signature.size Signature.zero in
     let op_size op =
       Proto_client.operation_size op.Inj_operation.operation
       + Proto_client.operation_size_overhead
     in
-    let _size, rev_ops =
+    let _current_size, rev_current_ops, nb_batch, rev_ops_batch =
       try
         Op_queue.fold
-          (fun _oph op (current_size, ops) ->
-            let new_ops = op :: ops in
+          (fun _oph
+               op
+               ((current_size, rev_current_ops, nb_batch, rev_ops_batch) as acc) ->
+            if nb_batch = n then raise (Reached_limit acc) ;
             let new_size = current_size + op_size op in
             if new_size > size_limit then
-              raise (Reached_limit (current_size, ops)) ;
-            (new_size, new_ops))
+              let current_ops = List.rev rev_current_ops in
+              ( min_size + op_size op,
+                [op],
+                nb_batch + 1,
+                current_ops :: rev_ops_batch )
+            else (new_size, op :: rev_current_ops, nb_batch, rev_ops_batch))
           state.queue
-          (min_size, [])
-      with Reached_limit (size, ops) -> (size, ops)
+          (min_size, [], 0, [])
+      with Reached_limit acc -> acc
     in
-    List.rev rev_ops
+    let rev_ops_batch =
+      if nb_batch < n then
+        (* Add the last batch, even if it's not of full size, to ensure a larger number of batches. *)
+        let current_ops = List.rev rev_current_ops in
+        current_ops :: rev_ops_batch
+      else rev_ops_batch
+    in
+    List.rev rev_ops_batch
 
   (* Ignore operations that are allowed to fail. *)
   let ignore_ignorable_failing_operations state operations =
@@ -800,22 +800,28 @@ module Make (Parameters : PARAMETERS) = struct
         let module Proto_client = (val state.proto_client) in
         Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
-    let ({pkh = stop_key; _} as signer) = next_signer state in
-    let rec aux total_nb_op signer state =
-      let operations_to_inject = get_operations_from_queue ~size_limit state in
-      let* continue_or_stop =
-        inject_pending_operations_round state signer operations_to_inject
-      in
-      match continue_or_stop with
-      | `Stop -> return total_nb_op
-      | `Continue nb_op ->
-          let total_nb_op = total_nb_op + nb_op in
-          let ({pkh = next_key; _} as next) = next_signer state in
-          if Signature.Public_key_hash.(stop_key = next_key) then
-            return total_nb_op
-          else aux total_nb_op next state
+    let ops_batch =
+      get_n_ops_batch_from_queue ~size_limit state state.number_of_signers
     in
-    aux 0 signer state
+    let signers_and_ops = List.combine_drop state.signers ops_batch in
+    let*! res_list =
+      List.map_p
+        (fun (signer, operations_to_inject) ->
+          inject_pending_operations_round state signer operations_to_inject)
+        signers_and_ops
+    in
+    let*? total_np_op =
+      List.fold_left
+        (fun res injected_res ->
+          match (res, injected_res) with
+          | Ok n, Ok (`Continue n') -> Ok (n + n')
+          | Ok n, Ok `Stop -> Ok n
+          | Error err, _ | Ok _, Error err ->
+              (* only keep the first found error *) Error err)
+        (Ok 0)
+        res_list
+    in
+    return total_np_op
 
   (** Retrieve protocols of a block with a small cache. *)
   let protocols_of_block =

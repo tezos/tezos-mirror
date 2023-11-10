@@ -24,6 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Defines the strategy for a worker. *)
 type injection_strategy =
   [ `Each_block  (** Inject pending operations after each new L1 block *)
   | `Delay_block of float
