@@ -194,26 +194,26 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     in
     match errs with
     | [] -> ()
-    | Michelson_v1_stack.Wrong_stack_item (loc, expr) :: rest ->
+    | Michelson_v1_stack.Wrong_stack_item loc_node :: rest ->
         Format.fprintf
           ppf
-          "@[<v 0>%s,@ wrong syntax for a stack element, expecting something \
+          "@[<v 0>%a,@ wrong syntax for a stack element, expecting something \
            of the following shape: Stack_elt <ty> <val>; got %a.@]"
-          (String.capitalize_ascii
-             (Format.asprintf "%a" Micheline_parser.print_location loc))
-          Micheline_printer.print_expr_unwrapped
-          expr ;
+          Michelson_v1_stack.print_localized_node_location
+          loc_node
+          Michelson_v1_stack.print_localized_node
+          loc_node ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Michelson_v1_stack.Wrong_stack (loc, expr) :: rest ->
+    | Michelson_v1_stack.Wrong_stack loc_node :: rest ->
         Format.fprintf
           ppf
-          "@[<v 0>%s,@ wrong syntax for stack, expecting a sequence of \
+          "@[<v 0>%a,@ wrong syntax for stack, expecting a sequence of \
            elements of the following shape: Stack_elt <ty> <val>; got %a.@]"
-          (String.capitalize_ascii
-             (Format.asprintf "%a" Micheline_parser.print_location loc))
-          Micheline_printer.print_expr_unwrapped
-          expr ;
+          Michelson_v1_stack.print_localized_node_location
+          loc_node
+          Michelson_v1_stack.print_localized_node
+          loc_node ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error
