@@ -786,41 +786,31 @@ module Make (Parameters : PARAMETERS) = struct
       in
       (oph, operations)
 
-  (** Returns the (upper bound on) the size of an L1 batch of operations composed
-    of the manager operations [ops]. *)
-  let size_l1_batch state ops =
-    let module Proto_client = (val state.proto_client) in
-    let size_shell_header =
-      (* Size of branch field *)
-      Block_hash.size
-    in
-    let signature_size = Signature.size Signature.zero in
-    let contents_size =
-      List.fold_left
-        (fun acc o ->
-          acc
-          + Proto_client.operation_size o.Inj_operation.operation
-          + Proto_client.operation_size_overhead)
-        0
-        ops
-    in
-    size_shell_header + contents_size + signature_size
-
   (** Retrieve as many operations from the queue while remaining below the size
     limit. *)
   let get_operations_from_queue ~size_limit state =
-    let exception Reached_limit of Inj_operation.t list in
-    let rev_ops =
+    let exception Reached_limit of int * Inj_operation.t list in
+    let module Proto_client = (val state.proto_client) in
+    let min_size =
+      (* Size of branch field and signature *)
+      Block_hash.size + Signature.size Signature.zero
+    in
+    let op_size op =
+      Proto_client.operation_size op.Inj_operation.operation
+      + Proto_client.operation_size_overhead
+    in
+    let _size, rev_ops =
       try
         Op_queue.fold
-          (fun _oph op ops ->
+          (fun _oph op (current_size, ops) ->
             let new_ops = op :: ops in
-            let new_size = size_l1_batch state new_ops in
-            if new_size > size_limit then raise (Reached_limit ops) ;
-            new_ops)
+            let new_size = current_size + op_size op in
+            if new_size > size_limit then
+              raise (Reached_limit (current_size, ops)) ;
+            (new_size, new_ops))
           state.queue
-          []
-      with Reached_limit ops -> ops
+          (min_size, [])
+      with Reached_limit (size, ops) -> (size, ops)
     in
     List.rev rev_ops
 
