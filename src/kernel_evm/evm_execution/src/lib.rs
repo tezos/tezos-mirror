@@ -1083,7 +1083,7 @@ mod test {
             logs: vec![],
             result: Some(vec![1u8; 32]),
             withdrawals: vec![],
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 42_000 + 35 * 32,
         }));
 
         assert_eq!(expected_result, result);
