@@ -423,6 +423,32 @@ pub mod interpret_cost {
         })
     }
 
+    /// Cost charged for computing total entries size (needed for the subsequent
+    /// gas calculation, so this is meta-gas).
+    pub fn concat_list_precheck(list_size: usize) -> Result<u32, OutOfGas> {
+        (10 * Checked::from(list_size)).as_gas_cost()
+    }
+
+    pub fn concat_string_list(total_len: Checked<usize>) -> Result<u32, OutOfGas> {
+        // Copied from the Tezos protocol
+        (total_len / 2 + 100).as_gas_cost()
+    }
+
+    pub fn concat_bytes_list(total_len: Checked<usize>) -> Result<u32, OutOfGas> {
+        // Copied from the Tezos protocol
+        (total_len / 2 + 100).as_gas_cost()
+    }
+
+    pub fn concat_string_pair(len1: usize, len2: usize) -> Result<u32, OutOfGas> {
+        // Copied from the Tezos protocol
+        ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
+    }
+
+    pub fn concat_bytes_pair(len1: usize, len2: usize) -> Result<u32, OutOfGas> {
+        // Copied from the Tezos protocol
+        ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
+    }
+
     pub fn map_mem(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         map_get(k, map_size)
     }

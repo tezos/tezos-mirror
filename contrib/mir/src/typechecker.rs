@@ -108,7 +108,7 @@ impl From<FromBytesError> for ChainIdError {
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum NoMatchingOverloadReason {
-    #[error("stack too short, expected {expected}")]
+    #[error("stack too short, expected at least {expected}")]
     StackTooShort { expected: usize },
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
@@ -1004,6 +1004,28 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CONS, [], _), [.., ty, _]) => no_overload!(CONS, NMOR::ExpectedList(ty.clone())),
         (App(CONS, [], _), [] | [_]) => no_overload!(CONS, len 2),
         (App(CONS, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(CONCAT, [], _), [.., T::String, T::String]) => {
+            pop!();
+            I::Concat(overloads::Concat::TwoStrings)
+        }
+        (App(CONCAT, [], _), [.., T::Bytes, T::Bytes]) => {
+            pop!();
+            I::Concat(overloads::Concat::TwoBytes)
+        }
+        (App(CONCAT, [], _), [.., T::List(ty)]) => {
+            let ty = ty.as_ref();
+            let overload = match ty {
+                T::String => overloads::Concat::ListOfStrings,
+                T::Bytes => overloads::Concat::ListOfBytes,
+                _ => no_overload!(CONCAT),
+            };
+            stack[0] = ty.clone(); // cheap clone, `ty` is either `String` or `Bytes`
+            I::Concat(overload)
+        }
+        (App(CONCAT, [], _), [.., _]) => no_overload!(CONCAT),
+        (App(CONCAT, [], _), []) => no_overload!(CONCAT, len 1),
+        (App(CONCAT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(EMPTY_SET, [ty], _), _) => {
             let ty = parse_ty(ctx, ty)?;
@@ -2576,6 +2598,26 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn concat_two_strings() {
+        let mut stack = tc_stk![Type::String, Type::String];
+        assert_eq!(
+            typecheck_instruction(&parse("CONCAT").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Concat(overloads::Concat::TwoStrings))
+        );
+        assert_eq!(stack, tc_stk![Type::String]);
+    }
+
+    #[test]
+    fn concat_list_of_strings() {
+        let mut stack = tc_stk![Type::new_list(Type::String)];
+        assert_eq!(
+            typecheck_instruction(&parse("CONCAT").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Concat(overloads::Concat::ListOfStrings))
+        );
+        assert_eq!(stack, tc_stk![Type::String]);
+    }
+
+    #[test]
     fn push_set() {
         let mut stack = tc_stk![];
         assert_eq!(
@@ -3196,6 +3238,11 @@ mod typecheck_tests {
     #[test]
     fn test_pair_short() {
         too_short_test(&app!(PAIR), Prim::PAIR, 2);
+    }
+
+    #[test]
+    fn test_concat_short() {
+        too_short_test(&app!(CONCAT), Prim::CONCAT, 1);
     }
 
     #[test]
