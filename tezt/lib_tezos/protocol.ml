@@ -279,7 +279,10 @@ type supported_protocols =
   | From_protocol of int
   | Until_protocol of int
   | Between_protocols of int * int
-  | With_predecessor of supported_protocols
+  | Has_predecessor
+  | And of supported_protocols list
+  | Or of supported_protocols list
+  | Not of supported_protocols
 
 let rec is_supported supported_protocols protocol =
   match supported_protocols with
@@ -289,15 +292,22 @@ let rec is_supported supported_protocols protocol =
   | Between_protocols (a, b) ->
       let n = number protocol in
       a <= n && n <= b
-  | With_predecessor sp -> has_predecessor protocol && is_supported sp protocol
+  | Has_predecessor -> has_predecessor protocol
+  | And l -> List.for_all (fun sp -> is_supported sp protocol) l
+  | Or l -> List.exists (fun sp -> is_supported sp protocol) l
+  | Not sp -> not (is_supported sp protocol)
 
 let rec show_supported_protocols = function
   | Any_protocol -> "Any_protocol"
   | From_protocol n -> sf "From_protocol %d" n
   | Until_protocol n -> sf "Until_protocol %d" n
   | Between_protocols (a, b) -> sf "Between_protocol (%d, %d)" a b
-  | With_predecessor sp ->
-      sf "With_predecessor (%s)" (show_supported_protocols sp)
+  | Has_predecessor -> "Has_predecessor"
+  | And l ->
+      sf "And [%s]" (String.concat "; " (List.map show_supported_protocols l))
+  | Or l ->
+      sf "Or [%s]" (String.concat "; " (List.map show_supported_protocols l))
+  | Not sp -> sf "Not (%s)" (show_supported_protocols sp)
 
 let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
   match List.filter (is_supported supports) protocols with

@@ -256,7 +256,7 @@ let test_multi_protocols =
     ~__FILE__
     ~title:"proxy_server multi protocols"
     ~tags:["multi_protocols"]
-    ~supports:(With_predecessor Any_protocol)
+    ~supports:Has_predecessor
   @@ fun to_protocol ->
   match Protocol.previous_protocol to_protocol with
   | None ->
