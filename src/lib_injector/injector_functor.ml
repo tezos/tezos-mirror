@@ -706,13 +706,9 @@ module Make (Parameters : PARAMETERS) = struct
       total size does not exceed [size_limit] using [signer]. Upon
       successful injection, the operations are removed from the queue
       and marked as injected. *)
-  let inject_pending_operations_round state
-      ?(size_limit =
-        let module Proto_client = (val state.proto_client) in
-        Proto_client.max_operation_data_length) signer =
+  let inject_pending_operations_round state signer operations_to_inject =
     let open Lwt_result_syntax in
     (* Retrieve and remove operations from pending *)
-    let operations_to_inject = get_operations_from_queue ~size_limit state in
     let*! () =
       Event.(emit1 ~signers:[signer] considered_operations_info)
         state
@@ -799,12 +795,16 @@ module Make (Parameters : PARAMETERS) = struct
             in
             return (`Continue 0))
 
-  let inject_pending_operation_with_all_keys_or_no_op_left ?size_limit state =
+  let inject_pending_operation_with_all_keys_or_no_op_left state
+      ?(size_limit =
+        let module Proto_client = (val state.proto_client) in
+        Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
     let ({pkh = stop_key; _} as signer) = next_signer state in
     let rec aux total_nb_op signer state =
+      let operations_to_inject = get_operations_from_queue ~size_limit state in
       let* continue_or_stop =
-        inject_pending_operations_round ?size_limit state signer
+        inject_pending_operations_round state signer operations_to_inject
       in
       match continue_or_stop with
       | `Stop -> return total_nb_op
@@ -1081,7 +1081,7 @@ module Make (Parameters : PARAMETERS) = struct
   let on_inject state =
     let open Lwt_result_syntax in
     let* total_nb_injected_op =
-      inject_pending_operation_with_all_keys_or_no_op_left state
+      inject_pending_operation_with_all_keys_or_no_op_left state ()
     in
     let*! () = Event.(emit1 total_injected_ops) state total_nb_injected_op in
     let*! () =
