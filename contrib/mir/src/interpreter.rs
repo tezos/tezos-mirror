@@ -9,7 +9,9 @@ use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
+use crate::lexer::Prim;
 use crate::stack::*;
+use crate::typechecker::typecheck_value;
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum InterpretError {
@@ -31,17 +33,18 @@ pub enum ContractInterpretError {
 
 impl ContractScript<TypecheckedStage> {
     /// Interpret a typechecked contract script using the provided parameter and
-    /// storage. Parameter and storage are given as untyped `Value`s, as this
+    /// storage. Parameter and storage are given as `Micheline`, as this
     /// allows ensuring they satisfy the types expected by the script.
     pub fn interpret(
         &self,
         ctx: &mut crate::context::Ctx,
-        parameter: Value,
-        storage: Value,
+        parameter: Micheline,
+        storage: Micheline,
     ) -> Result<(Vec<TypedValue>, TypedValue), ContractInterpretError> {
         let in_ty = Type::new_pair(self.parameter.clone(), self.storage.clone());
-        let in_val = Value::new_pair(parameter, storage);
-        let tc_val = in_val.typecheck(ctx, &in_ty)?;
+        let in_val = &[parameter, storage];
+        let in_val = Micheline::App(Prim::Pair, in_val, vec![]);
+        let tc_val = typecheck_value(ctx, &in_ty, &in_val)?;
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, &mut stack)?;
         use TypedValue as V;

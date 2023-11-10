@@ -74,8 +74,8 @@ pub struct TztTest<'a> {
 fn typecheck_stack(stk: Vec<(Micheline, Micheline)>) -> Result<Vec<(Type, TypedValue)>, TcError> {
     stk.into_iter()
         .map(|(t, v)| {
-            let t = t.typecheck_ty(&mut Ctx::default())?;
-            let tc_val = v.typecheck_value(&mut Default::default(), &t)?;
+            let t = parse_ty(&mut Ctx::default(), &t)?;
+            let tc_val = typecheck_value(&mut Default::default(), &t, &v)?;
             Ok((t, tc_val))
         })
         .collect()
@@ -143,19 +143,19 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             chain_id: m_chain_id
                 .map(|v| {
                     Ok::<_, TcError>(irrefutable_match!(
-                        v.typecheck_value(&mut Ctx::default(), &Type::ChainId)?;
+                        typecheck_value(&mut Ctx::default(), &Type::ChainId, &v)?;
                         TypedValue::ChainId
                     ))
                 })
                 .transpose()?,
             parameter: m_parameter
-                .map(|v| v.typecheck_ty(&mut Ctx::default()))
+                .map(|v| parse_ty(&mut Ctx::default(), &v))
                 .transpose()?,
             self_addr: m_self
                 .map(|v| {
                     Ok::<_, TcError>(
                         irrefutable_match!(
-                            v.typecheck_value(&mut Ctx::default(), &Type::Address)?;
+                            typecheck_value(&mut Ctx::default(), &Type::Address, &v)?;
                             TypedValue::Address
                         )
                         .hash,
@@ -255,7 +255,7 @@ fn execute_tzt_test_code(
     // This value along with the test expectation
     // from the test file will be used to decide if
     // the test was a success or a fail.
-    let typechecked_code = code.typecheck(ctx, Some(parameter), &mut t_stack)?;
+    let typechecked_code = typecheck_instruction(&code, ctx, Some(parameter), &mut t_stack)?;
     let mut i_stack: IStack = TopIsFirst::from(vals).0;
     typechecked_code.interpret(ctx, &mut i_stack)?;
     Ok((t_stack, i_stack))

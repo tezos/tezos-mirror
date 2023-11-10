@@ -43,7 +43,7 @@ fn unify_interpreter_error(
         (FailedWith(value), InterpretError::FailedWith(typ, failed_typed_value)) => {
             // Here we typecheck the untyped value from the expectation using the
             // typed of the failed value we get from the interpreter.
-            match value.clone().typecheck_value(ctx, typ) {
+            match typecheck_value(ctx, typ, value) {
                 Ok(exp_typed_val) => {
                     // Then both `Typedvalue`s are untyped and compared to get the result. Here
                     // untyping is done before comparing so that we are not using the Eq trait of
