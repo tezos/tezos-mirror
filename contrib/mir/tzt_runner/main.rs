@@ -8,11 +8,15 @@
 use std::env;
 use std::fs::read_to_string;
 
+use mir::parser::Parser;
 use mir::tzt::*;
 
 fn run_test(file: &str) -> Result<(), String> {
     let contents = read_to_string(file).map_err(|e| e.to_string())?;
-    let tzt_test = parse_tzt_test(&contents).map_err(|e| e.to_string())?;
+    let parser = Parser::new();
+    let tzt_test = parser
+        .parse_tzt_test(&contents)
+        .map_err(|e| e.to_string())?;
 
     run_tzt_test(tzt_test).map_err(|e| format!("{}", e))
 }
@@ -41,8 +45,15 @@ fn main() {
 
 #[cfg(test)]
 mod tztrunner_tests {
-    use mir::tzt::*;
+    use std::error::Error;
+
+    use mir::{parser::Parser, tzt::*};
     use TztTestError::*;
+
+    fn parse_tzt_test(s: &str) -> Result<TztTest, Box<dyn Error>> {
+        let parser = Box::leak(Box::new(Parser::new()));
+        parser.parse_tzt_test(s)
+    }
 
     #[test]
     fn test_runner_success() {

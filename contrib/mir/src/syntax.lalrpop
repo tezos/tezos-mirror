@@ -10,14 +10,15 @@
 #![cfg(not(tarpaulin_include))]
 
 use crate::ast::*;
-use crate::parser::{ParserError, ContractScriptEntity, validate_u10};
+use crate::parser::ParserError;
 use crate::lexer::{LexerError, Prim, PrimWithTzt, TztPrim as TzP, Tok};
 use crate::typechecker as TC;
 use crate::tzt::*;
 use PrimWithTzt::*;
 use PrimWithTzt as PT;
+use typed_arena::Arena;
 
-grammar;
+grammar<'a>(arena: &'a Arena<Micheline<'a>>);
 
 extern {
     type Error = ParserError;
@@ -37,62 +38,12 @@ extern {
         string => Tok::String(<String>),
         bytes => Tok::Bytes(<Vec<u8>>),
         ann => Tok::Annotation,
+        // parameter, code and chain_id lexemes are special-cased because
+        // they're also used in the tzt syntax
         "parameter" => Tok::Prim(PT::Prim(Prim::parameter)),
-        "storage" => Tok::Prim(PT::Prim(Prim::storage)),
         "code" => Tok::Prim(PT::Prim(Prim::code)),
-        "int" => Tok::Prim(PT::Prim(Prim::int)),
-        "nat" => Tok::Prim(PT::Prim(Prim::nat)),
-        "bool" => Tok::Prim(PT::Prim(Prim::bool)),
-        "mutez" => Tok::Prim(PT::Prim(Prim::mutez)),
-        "string" => Tok::Prim(PT::Prim(Prim::string)),
-        "unit" => Tok::Prim(PT::Prim(Prim::unit)),
-        "operation" => Tok::Prim(PT::Prim(Prim::operation)),
-        "pair" => Tok::Prim(PT::Prim(Prim::pair)),
-        "option" => Tok::Prim(PT::Prim(Prim::option)),
-        "list" => Tok::Prim(PT::Prim(Prim::list)),
-        "map" => Tok::Prim(PT::Prim(Prim::map)),
-        "or" => Tok::Prim(PT::Prim(Prim::or)),
-        "contract" => Tok::Prim(PT::Prim(Prim::contract)),
-        "address" => Tok::Prim(PT::Prim(Prim::address)),
         "chain_id" => Tok::Prim(PT::Prim(Prim::chain_id)),
-        "True" => Tok::Prim(PT::Prim(Prim::True)),
-        "False" => Tok::Prim(PT::Prim(Prim::False)),
-        "Unit" => Tok::Prim(PT::Prim(Prim::Unit)),
-        "None" => Tok::Prim(PT::Prim(Prim::None)),
-        "Pair" => Tok::Prim(PT::Prim(Prim::Pair)),
-        "Some" => Tok::Prim(PT::Prim(Prim::Some)),
-        "Elt" => Tok::Prim(PT::Prim(Prim::Elt)),
-        "Left" => Tok::Prim(PT::Prim(Prim::Left)),
-        "Right" => Tok::Prim(PT::Prim(Prim::Right)),
-        "PUSH" => Tok::Prim(PT::Prim(Prim::PUSH)),
-        "INT" => Tok::Prim(PT::Prim(Prim::INT)),
-        "GT" => Tok::Prim(PT::Prim(Prim::GT)),
-        "LOOP" => Tok::Prim(PT::Prim(Prim::LOOP)),
-        "DIP" => Tok::Prim(PT::Prim(Prim::DIP)),
-        "ADD" => Tok::Prim(PT::Prim(Prim::ADD)),
-        "DROP" => Tok::Prim(PT::Prim(Prim::DROP)),
-        "SWAP" => Tok::Prim(PT::Prim(Prim::SWAP)),
-        "IF" => Tok::Prim(PT::Prim(Prim::IF)),
-        "DUP" => Tok::Prim(PT::Prim(Prim::DUP)),
-        "FAILWITH" => Tok::Prim(PT::Prim(Prim::FAILWITH)),
-        "UNIT" => Tok::Prim(PT::Prim(Prim::UNIT)),
-        "CAR" => Tok::Prim(PT::Prim(Prim::CAR)),
-        "CDR" => Tok::Prim(PT::Prim(Prim::CDR)),
-        "PAIR" => Tok::Prim(PT::Prim(Prim::PAIR)),
-        "IF_NONE" => Tok::Prim(PT::Prim(Prim::IF_NONE)),
-        "SOME" => Tok::Prim(PT::Prim(Prim::SOME)),
-        "COMPARE" => Tok::Prim(PT::Prim(Prim::COMPARE)),
-        "AMOUNT" => Tok::Prim(PT::Prim(Prim::AMOUNT)),
-        "NIL" => Tok::Prim(PT::Prim(Prim::NIL)),
-        "GET" => Tok::Prim(PT::Prim(Prim::GET)),
-        "UPDATE" => Tok::Prim(PT::Prim(Prim::UPDATE)),
-        "UNPAIR" => Tok::Prim(PT::Prim(Prim::UNPAIR)),
-        "CONS" => Tok::Prim(PT::Prim(Prim::CONS)),
-        "IF_CONS" => Tok::Prim(PT::Prim(Prim::IF_CONS)),
-        "ITER" => Tok::Prim(PT::Prim(Prim::ITER)),
-        "IF_LEFT" => Tok::Prim(PT::Prim(Prim::IF_LEFT)),
-        "CHAIN_ID" => Tok::Prim(PT::Prim(Prim::CHAIN_ID)),
-        "SELF" => Tok::Prim(PT::Prim(Prim::SELF)),
+        prim => Tok::Prim(PT::Prim(<Prim>)),
         "(" => Tok::LParen,
         ")" => Tok::RParen,
         "{" => Tok::LBrace,
@@ -102,126 +53,42 @@ extern {
     }
 }
 
-u10: u16 = number =>? validate_u10(<>).map_err(Into::into);
-
-anns: () = ann* => ();
-
-atomic_type: Type = {
-  "int"  => Type::Int,
-  "nat"  => Type::Nat,
-  "bool" => Type::Bool,
-  "mutez" => Type::Mutez,
-  "string" => Type::String,
-  "unit" => Type::Unit,
-  "operation" => Type::Operation,
-  "address" => Type::Address,
-  "chain_id" => Type::ChainId,
+Prim: Prim = {
+  "parameter" => Prim::parameter,
+  "code" => Prim::code,
+  "chain_id" => Prim::chain_id,
+  prim => <>,
 }
 
-pair_args: Type = {
-    type_expr => <>,
-    type_expr pair_args => Type::new_pair(<>)
+MichelineAtomic: Micheline<'a> = {
+  number => Micheline::Int(<>),
+  string => Micheline::String(<>),
+  bytes => Micheline::Bytes(<>),
+  Prim => Micheline::prim0(<>),
 }
 
-composite_type: Type = {
-    "pair"   anns <type_expr> <pair_args> => Type::new_pair(<>),
-    "option" anns <type_expr> => Type::new_option(<>),
-    "list"   anns <type_expr> => Type::new_list(<>),
-    "map"    anns <type_expr> <type_expr> => Type::new_map(<>),
-    "or"     anns <type_expr> <type_expr> => Type::new_or(<>),
-    "contract" anns <type_expr> => Type::new_contract(<>),
+MichelineComplex: Micheline<'a> = {
+  <prim:Prim> ann+ => Micheline::App(prim, &[], vec![]),
+  <prim:Prim> ann* <args:Micheline+> => Micheline::App(prim, arena.alloc_extend(args), vec![]),
 }
 
-type_expr: Type = {
-    <atomic_type> => <>,
-    "(" <atomic_type> ann anns ")" => <>,
-    "(" <composite_type> ")" => <>,
-    "(" <type_expr> ")" => <>,
+pub MichelineNaked: Micheline<'a> = {
+  MichelineComplex,
+  Micheline,
 }
 
-boolean: bool = {
-  "True" => true,
-  "False" => false,
+pub Micheline: Micheline<'a> = {
+  MichelineAtomic,
+  "(" <MichelineNaked> ")",
+  "{" <MichelineNakedSeq> "}",
 }
 
-atomic_value: Value = {
-  <n:number> => Value::Number(n),
-  <b:boolean> => Value::Boolean(b),
-  string => Value::String(<>),
-  bytes => Value::Bytes(<>),
-  "Unit" => Value::Unit,
-  "None" => Value::Option(None),
+MichelineNakedSeq: Micheline<'a> =
+  semicolonSepSeq<MichelineNaked> => Micheline::Seq(arena.alloc_extend(<>));
+
+pub MichelineTopLevel: Micheline<'a> = {
+  MichelineNakedSeq,
 }
-
-pair_val_args: Value = {
-  value_expr => <>,
-  value_expr pair_val_args => Value::new_pair(<>)
-}
-
-composite_value: Value = {
-  "Pair" <value_expr> <pair_val_args> => Value::new_pair(<>),
-  "Some" <value_expr> => Value::new_option(Some(<>)),
-  "Elt" <value_expr> <value_expr> => Value::new_elt(<>),
-  "Left" <value_expr> => Value::new_or(Or::Left(<>)),
-  "Right" <value_expr> => Value::new_or(Or::Right(<>)),
-}
-
-value_expr: Value = {
-  atomic_value => <>,
-  "(" <value_expr_naked> ")" => <>,
-  "{" <value_seq> "}" => Value::Seq(<>),
-}
-
-value_expr_naked: Value = {
-  composite_value => <>,
-  value_expr => <>,
-}
-
-value_seq: Vec<Value> = semicolonSepSeq<value_expr_naked>;
-
-use Instruction::*;
-
-#[inline]
-atomic_instruction: ParsedInstruction = {
-  "ADD" => Add(()),
-  "INT" => Int,
-  "GT" => Gt,
-  "SWAP" => Swap,
-  "FAILWITH" => Failwith(()),
-  "UNIT" => Unit,
-  "CAR" => Car,
-  "CDR" => Cdr,
-  "PAIR" => Pair,
-  "SOME" => ISome,
-  "COMPARE" => Compare,
-  "AMOUNT" => Instruction::Amount,
-  "GET" => Get(()),
-  "UPDATE" => Update(()),
-  "DROP" => Drop(None),
-  "DUP" => Dup(None),
-  "UNPAIR" => Unpair,
-  "CONS" => Cons,
-  "CHAIN_ID" => Instruction::ChainId,
-  "SELF" => ISelf,
-}
-
-instruction: ParsedInstruction = {
-  <atomic_instruction> anns => <>,
-  "PUSH" anns <type_expr> <value_expr> => Push((<>)),
-  "LOOP" anns <ib: instructionBlock> => Loop(ib),
-  "DIP" anns <n:u10?> <ib: instructionBlock> => Dip(n, ib),
-  "DROP" anns <u10> => Drop(Some(<>)),
-  "IF" anns <t: instructionBlock> <f: instructionBlock> => If(t, f),
-  "DUP" anns <u10> => Dup(Some(<>)),
-  "IF_NONE" anns <instructionBlock> <instructionBlock> => IfNone(<>),
-  "NIL" anns <type_expr> => Nil(<>),
-  "IF_CONS" anns <instructionBlock> <instructionBlock> => IfCons(<>),
-  "ITER" anns <instructionBlock> => Iter((), <>),
-  "IF_LEFT" anns <instructionBlock> <instructionBlock> => IfLeft(<>),
-  instructionBlock => Instruction::Seq(<>),
-}
-
-instructionSeq = semicolonSepSeq<instruction>;
 
 semicolonSepSeq<T>: Vec<T> = {
   <mut tseq:(<T>";")*><i:T?> => {
@@ -240,47 +107,18 @@ semicolonSepSeq<T>: Vec<T> = {
   }
 }
 
-instructionBlock: ParsedInstructionBlock = {
-  "{" <is:instructionSeq> "}" => is,
-}
-
-// synonym for consistent type naming
-pub Instruction = instruction;
-
-// synonym for consistent type naming
-pub Type: Type = type_expr;
-
-code_content: ParsedInstruction = {
-  atomic_instruction => <>,
-  "(" <instruction> ")" => <>,
-  instructionBlock => Instruction::Seq(<>),
-}
-
-ContractScriptEntity: ContractScriptEntity = {
-  "parameter" <type_expr> => ContractScriptEntity::Parameter(<>),
-  "storage" <type_expr> => ContractScriptEntity::Storage(<>),
-  "code" <code_content> => ContractScriptEntity::Code(<>),
-}
-
-ContractScriptEntitySeq = semicolonSepSeq<ContractScriptEntity>;
-
-pub ContractScript: ContractScript<ParsedStage> = {
-  ContractScriptEntitySeq =>? <>.try_into().map_err(Into::into),
-  "{" <ContractScript> "}" => <>,
-}
-
 // For parsing TZT Tests
 
 use TztEntity::*;
 use TztOutput::*;
 
-tztStackElt : (Type, Value) = {
-  "stack_elt" <t:type_expr> <v:value_expr> => (t, v)
+tztStackElt : (Micheline<'a>, Micheline<'a>) = {
+  "stack_elt" <t:Micheline> <v:Micheline> => (t, v)
 }
 
 tztStackEltSeq = semicolonSepSeq<tztStackElt>;
 
-tztStack : Vec<(Type, Value)> = {
+tztStack : Vec<(Micheline<'a>, Micheline<'a>)> = {
   "{" <s:tztStackEltSeq> "}" => s
 }
 
@@ -290,19 +128,19 @@ mutezAmount : i64 =
 
 use ErrorExpectation::*;
 use InterpreterErrorExpectation::*;
-tztEntity : TztEntity = {
-  "code" <code_content> => Code(<>),
+tztEntity : TztEntity<'a> = {
+  "code" <Micheline> => Code(<>),
   "input" <s:tztStack> => Input(s),
   "output" <s:tztStack> => Output(TztSuccess(s)),
-  "output" "(" "failed" <v:value_expr> ")" => Output(TztError(InterpreterError(FailedWith(v)))),
+  "output" "(" "failed" <v:Micheline> ")" => Output(TztError(InterpreterError(FailedWith(v)))),
   "output" "(" "mutezOverflow" <a1:mutezAmount> <a2:mutezAmount> ")" => Output(TztError(InterpreterError(MutezOverflow(a1, a2)))),
   "output" "(" "generalOverflow" <a1:number> <a2:number> ")" => Output(TztError(InterpreterError(GeneralOverflow(a1, a2)))),
   "output" "(" "StaticError" <s:string> ")" => Output(TztError(TypecheckerError(Some(s)))),
   "output" "(" "StaticError" "_"  ")" => Output(TztError(TypecheckerError(None))),
   "amount" <m:mutezAmount> => TztEntity::Amount(m),
-  "chain_id" <value_expr> => TztEntity::ChainId(<>),
-  "parameter" <type_expr> => TztEntity::Parameter(<>),
-  "self" <value_expr> => TztEntity::SelfAddr(<>),
+  "chain_id" <Micheline> => TztEntity::ChainId(<>),
+  "parameter" <Micheline> => TztEntity::Parameter(<>),
+  "self" <Micheline> => TztEntity::SelfAddr(<>),
 }
 
-pub tztTestEntities : Vec<TztEntity> = semicolonSepSeq<tztEntity>;
+pub tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;

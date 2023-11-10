@@ -7,11 +7,11 @@
 
 use super::*;
 
-fn check_error_expectation(
+fn check_error_expectation<'a>(
     ctx: &mut Ctx,
-    err_exp: ErrorExpectation,
+    err_exp: ErrorExpectation<'a>,
     err: TestError,
-) -> Result<(), TztTestError> {
+) -> Result<(), TztTestError<'a>> {
     use ErrorExpectation as Ex;
     use TestError as Er;
     use TztTestError::*;
@@ -43,7 +43,7 @@ fn unify_interpreter_error(
         (FailedWith(value), InterpretError::FailedWith(typ, failed_typed_value)) => {
             // Here we typecheck the untyped value from the expectation using the
             // typed of the failed value we get from the interpreter.
-            match value.clone().typecheck(ctx, typ) {
+            match value.clone().typecheck_value(ctx, typ) {
                 Ok(exp_typed_val) => {
                     // Then both `Typedvalue`s are untyped and compared to get the result. Here
                     // untyping is done before comparing so that we are not using the Eq trait of
@@ -64,11 +64,11 @@ fn unify_interpreter_error(
     }
 }
 
-pub fn check_expectation(
+pub fn check_expectation<'a>(
     ctx: &mut Ctx,
-    expected: TestExpectation,
+    expected: TestExpectation<'a>,
     real: Result<(FailingTypeStack, IStack), TestError>,
-) -> Result<(), TztTestError> {
+) -> Result<(), TztTestError<'a>> {
     use TestExpectation::*;
     use TztTestError::*;
     match (expected, real) {

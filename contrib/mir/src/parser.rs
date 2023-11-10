@@ -6,10 +6,11 @@
 /******************************************************************************/
 
 use crate::ast::*;
-use crate::lexer::{LexerError, Prim, Tok};
+use crate::lexer::{LexerError, Tok};
 use crate::syntax;
 use lalrpop_util::ParseError;
 use logos::Logos;
+use typed_arena::Arena;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
@@ -17,58 +18,34 @@ pub enum ParserError {
     ExpectedU10(i128),
     #[error(transparent)]
     LexerError(#[from] LexerError),
-    #[error("no {0} field")]
-    NoField(Prim),
-    #[error("duplicate {0} field")]
-    DuplicateField(Prim),
 }
 
-pub fn parse(src: &str) -> Result<ParsedInstruction, ParseError<usize, Tok, ParserError>> {
-    syntax::InstructionParser::new().parse(spanned_lexer(src))
+pub struct Parser<'a> {
+    pub arena: Arena<Micheline<'a>>,
 }
 
-pub fn parse_contract_script(
-    src: &str,
-) -> Result<ContractScript<ParsedStage>, ParseError<usize, Tok, ParserError>> {
-    syntax::ContractScriptParser::new().parse(spanned_lexer(src))
+impl Default for Parser<'_> {
+    fn default() -> Self {
+        Parser::new()
+    }
 }
 
-/// Helper type to parse contract fields
-pub enum ContractScriptEntity {
-    Parameter(Type),
-    Storage(Type),
-    Code(ParsedInstruction),
-}
-
-impl TryFrom<Vec<ContractScriptEntity>> for ContractScript<ParsedStage> {
-    type Error = crate::parser::ParserError;
-    fn try_from(value: Vec<ContractScriptEntity>) -> Result<Self, Self::Error> {
-        use crate::lexer::Prim as P;
-        use crate::parser::ParserError as Err;
-        use ContractScriptEntity as CE;
-        let mut param: Option<Type> = None;
-        let mut storage: Option<Type> = None;
-        let mut code: Option<ParsedInstruction> = None;
-        fn set_if_none<T>(x: &mut Option<T>, y: T, e: P) -> Result<(), Err> {
-            if x.is_none() {
-                *x = Some(y);
-                Ok(())
-            } else {
-                Err(Err::DuplicateField(e))
-            }
+impl<'a> Parser<'a> {
+    pub fn new() -> Self {
+        Parser {
+            arena: Arena::new(),
         }
-        for i in value {
-            match i {
-                CE::Parameter(p) => set_if_none(&mut param, p, P::parameter),
-                CE::Storage(p) => set_if_none(&mut storage, p, P::storage),
-                CE::Code(p) => set_if_none(&mut code, p, P::code),
-            }?;
-        }
-        Ok(ContractScript {
-            parameter: param.ok_or(Err::NoField(P::parameter))?,
-            storage: storage.ok_or(Err::NoField(P::storage))?,
-            code: code.ok_or(Err::NoField(P::code))?,
-        })
+    }
+
+    pub fn parse(&'a self, src: &str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+        syntax::MichelineNakedParser::new().parse(&self.arena, spanned_lexer(src))
+    }
+
+    pub fn parse_top_level(
+        &'a self,
+        src: &str,
+    ) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+        syntax::MichelineTopLevelParser::new().parse(&self.arena, spanned_lexer(src))
     }
 }
 
@@ -83,38 +60,43 @@ pub fn spanned_lexer(
         })
 }
 
-/// Validate a number is a 10-bit unsigned integer.
-pub fn validate_u10(n: i128) -> Result<u16, ParserError> {
-    let res = u16::try_from(n).map_err(|_| ParserError::ExpectedU10(n))?;
-    if res >= 1024 {
-        return Err(ParserError::ExpectedU10(n));
+#[cfg(test)]
+pub mod test_helpers {
+    use super::*;
+
+    pub fn parse(s: &str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+        let parser = Box::leak(Box::new(Parser::new()));
+        parser.parse(s)
     }
-    Ok(res)
+
+    pub fn parse_contract_script(
+        s: &str,
+    ) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+        let parser = Box::leak(Box::new(Parser::new()));
+        parser.parse_top_level(s)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::test_helpers::*;
+    use crate::ast::micheline::test_helpers::{app, seq};
 
     #[test]
     fn pair_type() {
         assert_eq!(
             parse("PUSH (pair int nat) Unit").unwrap(),
-            Instruction::Push((Type::new_pair(Type::Int, Type::Nat), Value::Unit))
+            app!(PUSH[app!(pair[app!(int), app!(nat)]), app!(Unit)])
         );
         assert_eq!(
             parse("PUSH (pair int nat unit) Unit").unwrap(),
-            Instruction::Push((
-                Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Unit)),
-                Value::Unit
-            ))
+            app!(PUSH[app!(pair[app!(int), app!(nat), app!(unit)]), app!(Unit)])
         );
         assert_eq!(
             parse("PUSH (pair (pair int nat) unit) Unit").unwrap(),
-            Instruction::Push((
-                Type::new_pair(Type::new_pair(Type::Int, Type::Nat), Type::Unit),
-                Value::Unit
-            ))
+            app!(PUSH[
+              app!(pair[app!(pair[app!(int), app!(nat)]), app!(unit)]), app!(Unit)
+            ])
         );
     }
 
@@ -122,14 +104,7 @@ mod tests {
     fn or_type() {
         assert_eq!(
             parse("PUSH (or int nat) Unit").unwrap(),
-            Instruction::Push((Type::new_or(Type::Int, Type::Nat), Value::Unit))
-        );
-        // unlike for pairs, there's no linearized syntax for `or`
-        assert_eq!(
-            parse("{ PUSH (or int nat unit) Unit }")
-                .unwrap_err()
-                .to_string(),
-            "Unrecognized token `unit` found at 19:23\nExpected one of \")\""
+            app!(PUSH[app!(or[app!(int), app!(nat)]), app!(Unit)])
         );
     }
 
@@ -137,49 +112,35 @@ mod tests {
     fn pair_value() {
         assert_eq!(
             parse("PUSH unit (Pair 3 4)").unwrap(),
-            Instruction::Push((
-                Type::Unit,
-                Value::new_pair(Value::Number(3), Value::Number(4)),
-            ))
+            app!(PUSH[app!(unit), app!(Pair[3, 4])])
         );
         assert_eq!(
             parse("PUSH unit (Pair 3 4 5)").unwrap(),
-            Instruction::Push((
-                Type::Unit,
-                Value::new_pair(
-                    Value::Number(3),
-                    Value::new_pair(Value::Number(4), Value::Number(5)),
-                ),
-            ))
+            app!(PUSH[app!(unit), app!(Pair[3, 4, 5])])
         );
         assert_eq!(
             parse("PUSH unit (Pair (Pair 3 4) 5)").unwrap(),
-            Instruction::Push((
-                Type::Unit,
-                Value::new_pair(
-                    Value::new_pair(Value::Number(3), Value::Number(4)),
-                    Value::Number(5),
-                ),
+            app!(PUSH[app!(unit), app!(Pair[app!(Pair[3, 4]), 5])])
+        );
+        assert_eq!(
+            parse("PUSH pair unit unit Pair Unit Unit"),
+            Ok(app!(
+                PUSH[app!(pair), app!(unit), app!(unit), app!(Pair), app!(Unit), app!(Unit)]
             ))
         );
-        assert!(parse("{ PUSH pair unit unit Pair Unit Unit }")
-            .unwrap_err()
-            .to_string()
-            .starts_with("Unrecognized token `pair` found at 7:11"));
-        assert!(parse("{ PUSH (pair unit unit) Pair Unit Unit }")
-            .unwrap_err()
-            .to_string()
-            .starts_with("Unrecognized token `Pair` found at 24:28\n"));
+        assert_eq!(
+            parse("PUSH (pair unit unit) Pair Unit Unit"),
+            Ok(app!(
+                PUSH[app!(pair[app!(unit), app!(unit)]), app!(Pair), app!(Unit), app!(Unit)]
+            ))
+        );
     }
 
     #[test]
     fn or_value() {
         assert_eq!(
             parse("PUSH (or int unit) (Left 3)").unwrap(),
-            Instruction::Push((
-                Type::new_or(Type::Int, Type::Unit),
-                Value::new_or(Or::Left(Value::Number(3))),
-            ))
+            app!(PUSH[app!(or[app!(int), app!(unit)]), app!(Left[3])]),
         );
     }
 
@@ -187,56 +148,49 @@ mod tests {
     fn value_parens() {
         assert_eq!(
             parse("PUSH unit (Unit)").unwrap(),
-            Instruction::Push((Type::Unit, Value::Unit))
+            app!(PUSH[app!(unit), app!(Unit)])
         );
     }
 
     #[test]
     fn type_anns() {
-        use Type as T;
-        use Type::*;
-        macro_rules! parse_type {
-            ($s:expr) => {
-                crate::syntax::TypeParser::new().parse(spanned_lexer($s))
-            };
-        }
-        assert_eq!(parse_type!("(int :p)"), Ok(Int));
+        assert_eq!(parse("(int :p)"), Ok(app!(int)));
         assert_eq!(
-            parse_type!("(pair :point (int :x_pos) (int :y_pos))"),
-            Ok(T::new_pair(Int, Int))
+            parse("(pair :point (int :x_pos) (int :y_pos))"),
+            Ok(app!(pair[app!(int), app!(int)]))
         );
-        assert_eq!(parse_type!("(string %foo)"), Ok(String));
-        assert_eq!(parse_type!("(string %foo :bar @baz)"), Ok(String));
-        assert_eq!(parse_type!("(string @foo)"), Ok(String));
+        assert_eq!(parse("(string %foo)"), Ok(app!(string)));
+        assert_eq!(parse("(string %foo :bar @baz)"), Ok(app!(string)));
+        assert_eq!(parse("(string @foo)"), Ok(app!(string)));
         assert_eq!(
-            parse_type!("(pair %a (int %b) (int %c))"),
-            Ok(T::new_pair(Int, Int))
+            parse("(pair %a (int %b) (int %c))"),
+            Ok(app!(pair[app!(int), app!(int)]))
         );
         assert_eq!(
-            parse_type!("(or %a (int %b) (int %c))"),
-            Ok(T::new_or(Int, Int))
+            parse("(or %a (int %b) (int %c))"),
+            Ok(app!(or[app!(int), app!(int)]))
         );
         assert_eq!(
-            parse_type!("(option %a int %b)")
+            parse("(option %a int %b)")
                 .unwrap_err()
                 .to_string()
-                .as_str(),
-            "Unrecognized token `<ann>` found at 15:17\nExpected one of \")\""
+                .as_str()
+                .lines()
+                .next()
+                .unwrap(),
+            "Unrecognized token `<ann>` found at 15:17"
         );
     }
 
     #[test]
     fn instr_anns() {
-        use Instruction::*;
-        use Type as T;
-        use Value as V;
         assert_eq!(
             parse("PUSH @var :ty %field int 1").unwrap(),
-            Push((T::Int, V::Number(1))),
+            app!(PUSH[app!(int), 1]),
         );
         assert_eq!(
             parse("CAR @var :ty %field :ty.2 @var.2 %field.2").unwrap(),
-            Car,
+            app!(CAR),
         );
     }
 
@@ -250,63 +204,32 @@ mod tests {
 
     #[test]
     fn parse_contract_script_test() {
-        use crate::lexer::Prim::{code, parameter, storage};
-        use Instruction::*;
-        use ParserError as Err;
-        use Type as T;
-
         assert_eq!(
             parse_contract_script("parameter unit; storage unit; code FAILWITH"),
-            Ok(ContractScript {
-                parameter: T::Unit,
-                storage: T::Unit,
-                code: Failwith(())
+            Ok(seq! {
+              app!(parameter[app!(unit)]);
+              app!(storage[app!(unit)]);
+              app!(code[app!(FAILWITH)]);
             })
         );
 
         // non-atomic arguments to code must be wrapped in braces
         assert_eq!(
-            parse_contract_script("parameter unit; storage unit; code NIL unit")
-                .unwrap_err()
-                .to_string()
-                .lines()
-                .next(),
-            Some("Unrecognized token `NIL` found at 35:38")
+            parse_contract_script("parameter unit; storage unit; code NIL unit"),
+            Ok(seq! {
+                app!(parameter[app!(unit)]);
+                app!(storage[app!(unit)]);
+                app!(code[app!(NIL), app!(unit)]);
+            })
         );
         // or parentheses
         assert_eq!(
             parse_contract_script("parameter unit; storage unit; code (NIL unit)"),
-            Ok(ContractScript {
-                parameter: T::Unit,
-                storage: T::Unit,
-                code: Nil(T::Unit),
+            Ok(seq! {
+                app!(parameter[app!(unit)]);
+                app!(storage[app!(unit)]);
+                app!(code[app!(NIL[app!(unit)])]);
             })
-        );
-        // duplicate
-        assert_eq!(
-            parse_contract_script("parameter unit; parameter int; storage unit; code FAILWITH"),
-            Err(Err::DuplicateField(parameter).into())
-        );
-        assert_eq!(
-            parse_contract_script("parameter unit; storage unit; storage int; code FAILWITH"),
-            Err(Err::DuplicateField(storage).into())
-        );
-        assert_eq!(
-            parse_contract_script("code INT; parameter unit; storage unit; code FAILWITH"),
-            Err(Err::DuplicateField(code).into())
-        );
-        // missing
-        assert_eq!(
-            parse_contract_script("storage unit; code FAILWITH"),
-            Err(Err::NoField(parameter).into())
-        );
-        assert_eq!(
-            parse_contract_script("parameter unit; code FAILWITH"),
-            Err(Err::NoField(storage).into())
-        );
-        assert_eq!(
-            parse_contract_script("parameter unit; storage unit"),
-            Err(Err::NoField(code).into())
         );
     }
 
@@ -317,7 +240,7 @@ mod tests {
     fn contract_ty_push() {
         assert_eq!(
             parse("PUSH (contract :ct %foo unit) Unit").unwrap(),
-            Instruction::Push((Type::new_contract(Type::Unit), Value::Unit))
+            app!(PUSH[app!(contract[app!(unit)]), app!(Unit)])
         );
     }
 
@@ -325,7 +248,7 @@ mod tests {
     fn bytes_push() {
         assert_eq!(
             parse("PUSH unit 0xdeadf00d").unwrap(),
-            Instruction::Push((Type::Unit, Value::Bytes(vec![0xde, 0xad, 0xf0, 0x0d])))
+            app!(PUSH[app!(unit), vec![0xde, 0xad, 0xf0, 0x0d]])
         );
     }
 
@@ -333,10 +256,7 @@ mod tests {
     fn address_ty_push() {
         assert_eq!(
             parse("PUSH address \"tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw\"").unwrap(),
-            Instruction::Push((
-                Type::Address,
-                Value::String("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".to_owned())
-            ))
+            app!(PUSH[app!(address), "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw"])
         );
     }
 }

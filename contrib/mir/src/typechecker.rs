@@ -115,6 +115,32 @@ pub enum StacksNotEqualReason {
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
 
+impl Micheline<'_> {
+    pub fn typecheck_value(&self, ctx: &mut Ctx, ty: &Type) -> Result<TypedValue, TcError> {
+        todo!();
+    }
+
+    pub fn typecheck(
+        &self,
+        ctx: &mut Ctx,
+        self_type: Option<&Type>,
+        stack: &mut FailingTypeStack,
+    ) -> Result<TypecheckedInstruction, TcError> {
+        todo!();
+    }
+
+    pub fn typecheck_ty(&self, ctx: &mut Ctx) -> Result<Type, TcError> {
+        todo!();
+    }
+
+    pub fn typecheck_script(
+        &self,
+        ctx: &mut Ctx,
+    ) -> Result<ContractScript<TypecheckedStage>, TcError> {
+        todo!();
+    }
+}
+
 impl ContractScript<ParsedStage> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
@@ -821,9 +847,12 @@ fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
 #[cfg(test)]
 mod typecheck_tests {
     use crate::gas::Gas;
-    use crate::parser::*;
     use crate::typechecker::*;
     use Instruction::*;
+
+    fn parse(s: &str) -> Result<ParsedInstruction, TcError> {
+        todo!()
+    }
 
     /// hack to simplify syntax in tests
     fn typecheck_instruction(
