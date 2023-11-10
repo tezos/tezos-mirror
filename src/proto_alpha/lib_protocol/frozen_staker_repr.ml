@@ -6,12 +6,16 @@
 (*****************************************************************************)
 
 type t =
+  | Baker of Signature.public_key_hash
   | Single of {staker : Contract_repr.t; delegate : Signature.public_key_hash}
   | Shared of {delegate : Signature.public_key_hash}
 
-let baker pkh = Single {staker = Contract_repr.Implicit pkh; delegate = pkh}
+let baker pkh = Baker pkh
 
-let single ~staker ~delegate = Single {staker; delegate}
+let single ~staker ~delegate =
+  match (staker : Contract_repr.t) with
+  | Implicit pkh when Signature.Public_key_hash.(pkh = delegate) -> Baker pkh
+  | _ -> Single {staker; delegate}
 
 let shared ~delegate = Shared {delegate}
 
@@ -32,6 +36,8 @@ let encoding =
   let shared_encoding =
     obj1 (req "delegate" Signature.Public_key_hash.encoding)
   in
+  let baker_tag = 2 in
+  let baker_encoding = obj1 (req "baker" Signature.Public_key_hash.encoding) in
   def
     ~title:"frozen_staker"
     ~description:
@@ -41,6 +47,7 @@ let encoding =
     "frozen_staker"
   @@ matching
        (function
+         | Baker baker -> matched baker_tag baker_encoding baker
          | Single {staker; delegate} ->
              matched single_tag single_encoding (staker, delegate)
          | Shared {delegate} -> matched shared_tag shared_encoding delegate)
@@ -51,17 +58,26 @@ let encoding =
            single_encoding
            (function
              | Single {staker; delegate} -> Some (staker, delegate) | _ -> None)
-           (fun (staker, delegate) -> Single {staker; delegate});
+           (fun (staker, delegate) -> single ~staker ~delegate);
          case
            ~title:"Shared"
            (Tag shared_tag)
            shared_encoding
            (function Shared {delegate} -> Some delegate | _ -> None)
            (fun delegate -> Shared {delegate});
+         case
+           ~title:"Baker"
+           (Tag baker_tag)
+           baker_encoding
+           (function Baker baker -> Some baker | _ -> None)
+           (fun baker -> Baker baker);
        ]
 
 let compare sa sb =
   match (sa, sb) with
+  | Baker ba, Baker bb -> Signature.Public_key_hash.compare ba bb
+  | Baker _, _ -> -1
+  | _, Baker _ -> 1
   | Single {staker = sa; delegate = da}, Single {staker = sb; delegate = db} ->
       Compare.or_else (Contract_repr.compare sa sb) (fun () ->
           Signature.Public_key_hash.compare da db)
