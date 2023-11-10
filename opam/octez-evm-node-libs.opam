@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.0" & < "3.11" }
   "ocaml" { >= "4.14" }
   "octez-libs"
+  "octez-smart-rollup-wasm-debugger-plugin"
   "octez-version"
-  "octez-node-lib-prod-encoding"
   "lwt-exit"
 ]
 build: [
@@ -20,4 +20,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup [prod version]"
+synopsis: "Octez EVM node libraries"

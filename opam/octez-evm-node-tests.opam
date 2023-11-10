@@ -14,8 +14,7 @@ depends: [
   "octez-libs" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}
-  "octez-node-lib-prod" {with-test}
-  "octez-node-lib-dev" {with-test}
+  "octez-evm-node-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
