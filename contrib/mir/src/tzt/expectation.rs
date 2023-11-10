@@ -51,7 +51,9 @@ fn unify_interpreter_error(
                     // context of the interpreter, though here we have full type information for
                     // both values being compared, so it is probably safe to compare typed
                     // representation as well.
-                    Value::from(exp_typed_val) == Value::from(failed_typed_value.clone())
+                    let arena = typed_arena::Arena::new();
+                    typed_value_to_value_optimized(&arena, exp_typed_val)
+                        == typed_value_to_value_optimized(&arena, failed_typed_value.clone())
                 }
                 Err(_) => false,
             }

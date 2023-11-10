@@ -16,6 +16,9 @@ pub mod typechecked;
 pub use micheline::Micheline;
 use std::collections::BTreeMap;
 pub use tezos_crypto_rs::hash::ChainId;
+use typed_arena::Arena;
+
+use crate::lexer::Prim;
 
 pub use michelson_address::*;
 pub use michelson_list::MichelsonList;
@@ -167,53 +170,41 @@ pub enum TypedValue {
     Contract(Address),
 }
 
-pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
+pub fn typed_value_to_value_optimized<'a>(
+    arena: &'a Arena<Micheline<'a>>,
+    tv: TypedValue,
+) -> Micheline<'a> {
+    use Micheline as V;
     use TypedValue as TV;
-    use Value as V;
+    let go = |x| typed_value_to_value_optimized(arena, x);
     match tv {
-        TV::Int(i) => V::Number(i),
-        TV::Nat(u) => V::Number(u.try_into().unwrap()),
-        TV::Mutez(u) => V::Number(u.try_into().unwrap()),
-        TV::Bool(b) => V::Boolean(b),
+        TV::Int(i) => V::Int(i),
+        TV::Nat(u) => V::Int(u.try_into().unwrap()),
+        TV::Mutez(u) => V::Int(u.try_into().unwrap()),
+        TV::Bool(true) => V::prim0(Prim::True),
+        TV::Bool(false) => V::prim0(Prim::False),
         TV::String(s) => V::String(s),
-        TV::Unit => V::Unit,
+        TV::Unit => V::prim0(Prim::Unit),
         // This transformation for pairs deviates from the optimized representation of the
         // reference implementation, because reference implementation optimizes the size of combs
         // and uses an untyped representation that is the shortest.
-        TV::Pair(b) => V::new_pair(
-            typed_value_to_value_optimized(b.0),
-            typed_value_to_value_optimized(b.1),
-        ),
-        TV::List(l) => V::Seq(l.into_iter().map(typed_value_to_value_optimized).collect()),
+        TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
+        TV::List(l) => V::Seq(arena.alloc_extend(l.into_iter().map(go))),
         TV::Map(m) => V::Seq(
-            m.into_iter()
-                .map(|(key, val)| {
-                    V::new_elt(
-                        typed_value_to_value_optimized(key),
-                        typed_value_to_value_optimized(val),
-                    )
-                })
-                .collect(),
+            arena.alloc_extend(
+                m.into_iter()
+                    .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+            ),
         ),
-        TV::Option(None) => V::Option(None),
-        TV::Option(Some(r)) => V::new_option(Some(typed_value_to_value_optimized(*r))),
-        TV::Or(x) => V::new_or(x.map(typed_value_to_value_optimized)),
+        TV::Option(None) => V::prim0(Prim::None),
+        TV::Option(Some(x)) => V::prim1(arena, Prim::Some, go(*x)),
+        TV::Or(or) => match *or {
+            Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
+            Or::Right(x) => V::prim1(arena, Prim::Right, go(x)),
+        },
         TV::Address(x) => V::Bytes(x.to_bytes_vec()),
         TV::ChainId(x) => V::Bytes(x.into()),
-        TV::Contract(x) => typed_value_to_value_optimized(TV::Address(x)),
-    }
-}
-
-// Note that there are more than one way to do this conversion. Here we use the optimized untyped
-// representation as the target, since that is what the typed to untyped conversion during a
-// FAILWITH call does in the reference implementation, and this logic is primarily used in the
-// corresponding section of MIR now.
-//
-// TODO: This implementation will be moved to interpreter in the context of issue,
-// https://gitlab.com/tezos/tezos/-/issues/6504
-impl From<TypedValue> for Value {
-    fn from(tv: TypedValue) -> Self {
-        typed_value_to_value_optimized(tv)
+        TV::Contract(x) => go(TV::Address(x)),
     }
 }
 
