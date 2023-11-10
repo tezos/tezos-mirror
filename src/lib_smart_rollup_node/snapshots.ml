@@ -411,7 +411,7 @@ let snapshotable_files_regexp =
   Re.Str.regexp
     "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|context/.*\\|metadata$\\)"
 
-let export ~data_dir ~dest =
+let export ~no_checks ~data_dir ~dest =
   let open Lwt_result_syntax in
   let* uncompressed_snapshot =
     Format.eprintf "Acquiring GC lock@." ;
@@ -453,7 +453,7 @@ let export ~data_dir ~dest =
     return dest_file
   in
   let snapshot_file = compress ~snapshot_file:uncompressed_snapshot in
-  let* () = post_export_checks ~snapshot_file in
+  let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
 
 let pre_import_checks cctxt ~data_dir snapshot_metadata =
@@ -516,7 +516,7 @@ let pre_import_checks cctxt ~data_dir snapshot_metadata =
   let* () = check_last_commitment_published cctxt snapshot_metadata in
   return_unit
 
-let import cctxt ~data_dir ~snapshot_file =
+let import ~no_checks cctxt ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let*! () = Lwt_utils_unix.create_dir data_dir in
   let*! () = Event.acquiring_lock () in
@@ -532,6 +532,7 @@ let import cctxt ~data_dir ~snapshot_file =
       ~snapshot_file
       ~dest:data_dir
   in
+  unless no_checks @@ fun () ->
   post_checks
     ~action:(`Import cctxt)
     ~message:"Checking imported data"
