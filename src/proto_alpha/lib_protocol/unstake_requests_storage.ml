@@ -68,11 +68,9 @@ let prepared_finalize_unstake_encoding :
        (req "finalizable" finalizable_encoding)
        (req "unfinalizable" stored_requests_encoding))
 
-let apply_slashes ~preserved_plus_slashing slashing_history ~from_cycle amount =
+let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
   let first_cycle_to_apply_slash = from_cycle in
-  let last_cycle_to_apply_slash =
-    Cycle_repr.add from_cycle (preserved_plus_slashing - 1)
-  in
+  let last_cycle_to_apply_slash = Cycle_repr.add from_cycle preserved_cycles in
   (* [slashing_history] is sorted so slashings always happen in the same order. *)
   List.fold_left
     (fun amount (slashing_cycle, slashing_percentage) ->
@@ -115,7 +113,7 @@ let prepare_finalize_unstake ctxt contract =
                 if Cycle_repr.(request_cycle <= greatest_finalizable_cycle) then
                   let new_amount =
                     apply_slashes
-                      ~preserved_plus_slashing
+                      ~preserved_cycles
                       slashing_history
                       ~from_cycle:request_cycle
                       request_amount
@@ -153,8 +151,6 @@ module For_RPC = struct
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
     let open Lwt_result_syntax in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-    let max_slashing_period = Constants_repr.max_slashing_period in
-    let preserved_plus_slashing = preserved_cycles + max_slashing_period in
     let* slashing_history_opt =
       Storage.Contract.Slashed_deposits.find
         ctxt
@@ -165,7 +161,7 @@ module For_RPC = struct
       (fun (request_cycle, request_amount) ->
         let new_amount =
           apply_slashes
-            ~preserved_plus_slashing
+            ~preserved_cycles
             slashing_history
             ~from_cycle:request_cycle
             request_amount
