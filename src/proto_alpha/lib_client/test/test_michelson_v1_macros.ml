@@ -49,7 +49,7 @@ let assert_expands
     (expanded : (Micheline_parser.location, string) Micheline.node) =
   let {Michelson_v1_parser.expanded = expansion; _}, errors =
     let source = to_string (Micheline.strip_locations original) in
-    Michelson_v1_parser.expand_all ~source ~original
+    Michelson_v1_parser.expand_all_and_recognize_prims ~source ~original
   in
   match errors with
   | [] ->
@@ -713,7 +713,7 @@ let test_map_cdadr () =
 let assert_unexpansion original ex =
   let {Michelson_v1_parser.expanded; _}, errors =
     let source = to_string (Micheline.strip_locations original) in
-    Michelson_v1_parser.expand_all ~source ~original
+    Michelson_v1_parser.expand_all_and_recognize_prims ~source ~original
   in
   let unparse = Michelson_v1_printer.unparse_expression expanded in
   match errors with

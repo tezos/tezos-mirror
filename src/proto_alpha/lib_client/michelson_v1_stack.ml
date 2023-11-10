@@ -195,7 +195,9 @@ let () =
 let parse_expression ~source (node : Micheline_parser.node) :
     Script.expr tzresult =
   let open Result_syntax in
-  let parsing_result = Michelson_v1_parser.expand_all ~source ~original:node in
+  let parsing_result =
+    Michelson_v1_parser.expand_all_and_recognize_prims ~source ~original:node
+  in
   let* parsed = Micheline_parser.no_parsing_error parsing_result in
   return parsed.expanded
 
