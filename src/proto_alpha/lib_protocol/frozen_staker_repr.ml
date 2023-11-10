@@ -19,11 +19,6 @@ let single ~staker ~delegate =
 
 let shared ~delegate = Shared {delegate}
 
-let of_staker (staker : Staker_repr.t) =
-  match staker with
-  | Single (staker, delegate) -> single ~staker ~delegate
-  | Shared delegate -> shared ~delegate
-
 let encoding =
   let open Data_encoding in
   let single_tag = 0 in

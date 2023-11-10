@@ -5096,7 +5096,7 @@ module Token : sig
   type container =
     [ `Contract of Contract.t
     | `Collected_commitments of Blinded_public_key_hash.t
-    | `Frozen_deposits of Receipt.staker
+    | `Frozen_deposits of Receipt.frozen_staker
     | `Unstaked_frozen_deposits of Receipt.staker * Cycle.t
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]

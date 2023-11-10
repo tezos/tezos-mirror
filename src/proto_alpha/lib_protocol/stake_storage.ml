@@ -189,12 +189,11 @@ let remove_shared_frozen_stake ctxt delegate amount =
 
 let remove_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
-  | Staker_repr.Single (contract, delegate)
-    when Contract_repr.(contract = Implicit delegate) ->
+  | Frozen_staker_repr.Baker delegate ->
       remove_own_frozen_stake ctxt delegate amount
-  | Single (_staker, delegate) ->
+  | Single {staker = _; delegate} ->
       remove_staked_frozen_stake ctxt delegate amount
-  | Shared delegate -> remove_shared_frozen_stake ctxt delegate amount
+  | Shared {delegate} -> remove_shared_frozen_stake ctxt delegate amount
 
 let add_delegated_stake ctxt delegate amount =
   let open Result_syntax in
@@ -236,11 +235,11 @@ let add_shared_frozen_stake ctxt delegate amount =
 
 let add_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
-  | Staker_repr.Single (contract, delegate)
-    when Contract_repr.(contract = Implicit delegate) ->
+  | Frozen_staker_repr.Baker delegate ->
       add_own_frozen_stake ctxt delegate amount
-  | Single (_staker, delegate) -> add_staked_frozen_stake ctxt delegate amount
-  | Shared delegate -> add_shared_frozen_stake ctxt delegate amount
+  | Single {staker = _; delegate} ->
+      add_staked_frozen_stake ctxt delegate amount
+  | Shared {delegate} -> add_shared_frozen_stake ctxt delegate amount
 
 let set_inactive ctxt delegate =
   let open Lwt_syntax in
