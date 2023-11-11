@@ -98,16 +98,21 @@ defprim! {
     amount,
     MutezOverflow,
     GeneralOverflow,
+    StaticError,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimWithTzt {
     Prim(Prim),
     TztPrim(TztPrim),
+    Underscore,
+    // Including underscore spearately from TztPrim because the `defprim` macro won't work if we
+    // used a literal underscore there. parsing for this variant is handled specially in the
+    // `lex_prim` function as well.
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
-#[logos(error = LexerError, skip r"[ \t\r\n\v\f]+")]
+#[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok {
     #[regex(r"[A-Za-z_]+", lex_prim)]
     Prim(PrimWithTzt),
@@ -139,6 +144,7 @@ impl std::fmt::Display for Tok {
         match &self {
             Tok::Prim(PrimWithTzt::Prim(p)) => p.fmt(f),
             Tok::Prim(PrimWithTzt::TztPrim(p)) => p.fmt(f),
+            Tok::Prim(PrimWithTzt::Underscore) => write!(f, "_"),
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
             Tok::Annotation => write!(f, "<ann>"),
@@ -178,6 +184,10 @@ fn lex_prim(lex: &mut Lexer) -> Result<PrimWithTzt, LexerError> {
         .parse()
         .map(PrimWithTzt::Prim)
         .or_else(|_| lex.slice().parse().map(PrimWithTzt::TztPrim))
+        .or_else(|_| match lex.slice() {
+            "_" => Ok(PrimWithTzt::Underscore),
+            s => Err(PrimError(s.to_owned())),
+        })
         .map_err(LexerError::from)
 }
 

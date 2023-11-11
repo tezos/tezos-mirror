@@ -14,7 +14,7 @@ fn run_test(file: &str) -> Result<(), String> {
     let contents = read_to_string(file).map_err(|e| e.to_string())?;
     let tzt_test = parse_tzt_test(&contents).map_err(|e| e.to_string())?;
 
-    run_tzt_test(tzt_test).map_err(|e| format!("{:?}", e))
+    run_tzt_test(tzt_test).map_err(|e| format!("{}", e))
 }
 
 fn main() {
@@ -74,6 +74,18 @@ mod tztrunner_tests {
         assert!(matches!(run_tzt_test(tzt_test), Ok(())));
     }
 
+    #[test]
+    fn test_runner_tc_expectation() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_TC_FAIL).unwrap();
+        assert!(matches!(run_tzt_test(tzt_test), Ok(())));
+    }
+
+    #[test]
+    fn test_runner_tc_specific_expectation() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_TC_FAIL_SPECIFIC).unwrap();
+        assert!(matches!(run_tzt_test(tzt_test), Ok(())));
+    }
+
     #[should_panic(expected = "Duplicate field 'input' in test")]
     #[test]
     fn test_duplicate_field() {
@@ -100,9 +112,19 @@ mod tztrunner_tests {
     }
 
     #[test]
+    fn test_runner_interpreter_error_diff() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_INTERPRETER_DIFF_ERROR).unwrap();
+        let result = run_tzt_test(tzt_test);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_runner_interpreter_unexpected_success() {
         let tzt_test = parse_tzt_test(TZT_SAMPLE_EXP_FAIL_BUT_SUCCEED).unwrap();
-        assert!(matches!(run_tzt_test(tzt_test), Err(UnexpectedSuccess(_))));
+        assert!(matches!(
+            run_tzt_test(tzt_test),
+            Err(UnexpectedSuccess(_, _))
+        ));
     }
 
     #[test]
@@ -157,7 +179,19 @@ mod tztrunner_tests {
         input { Stack_elt mutez 10 ; Stack_elt mutez 1 } ;
         output (MutezOverflow 9223372036854775807 1)"#;
 
+    const TZT_SAMPLE_INTERPRETER_DIFF_ERROR: &str = r#"code { ADD } ;
+        input { Stack_elt mutez 9223372036854775807 ; Stack_elt mutez 1 } ;
+        output (StaticError _)"#;
+
     const TZT_SAMPLE_FAIL_WITH_UNEXPECTED: &str = r#"code { FAILWITH } ;
         input { Stack_elt int 10 ;  } ;
         output (Failed 11)"#;
+
+    const TZT_SAMPLE_TC_FAIL: &str = "code { ADD } ;
+        input { Stack_elt mutez 5 ; Stack_elt int 5 } ;
+        output(StaticError _)";
+
+    const TZT_SAMPLE_TC_FAIL_SPECIFIC: &str = r#"code { ADD } ;
+        input { Stack_elt mutez 5 ; Stack_elt int 5 } ;
+        output(StaticError "no matching overload for ADD on stack Stack([Int, Mutez])")"#;
 }

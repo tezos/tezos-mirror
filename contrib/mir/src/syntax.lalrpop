@@ -12,6 +12,7 @@
 use crate::ast::*;
 use crate::parser::{ParserError, ContractScriptEntity, validate_u10};
 use crate::lexer::{LexerError, Prim, PrimWithTzt, TztPrim as TzP, Tok};
+use crate::typechecker as TC;
 use crate::tzt::*;
 use PrimWithTzt::*;
 use PrimWithTzt as PT;
@@ -29,6 +30,7 @@ extern {
         "failed" => Tok::Prim(TztPrim(TzP::Failed)),
         "mutezOverflow" => Tok::Prim(TztPrim(TzP::MutezOverflow)),
         "generalOverflow" => Tok::Prim(TztPrim(TzP::GeneralOverflow)),
+        "StaticError" => Tok::Prim(TztPrim(TzP::StaticError)),
         "amount" => Tok::Prim(TztPrim(TzP::amount)),
         number => Tok::Number(<i128>),
         string => Tok::String(<String>),
@@ -82,6 +84,7 @@ extern {
         "{" => Tok::LBrace,
         "}" => Tok::RBrace,
         ";" => Tok::Semi,
+        "_" => Tok::Prim(PT::Underscore)
     }
 }
 
@@ -258,13 +261,17 @@ mutezAmount : i64 =
   <n:number> =>? i64::try_from(n)
     .map_err(|_| ParserError::LexerError(LexerError::NumericLiteral(n.to_string())).into() );
 
+use ErrorExpectation::*;
+use InterpreterErrorExpectation::*;
 tztEntity : TztEntity = {
   "code" <ib:instructionBlock> => Code(ib),
   "input" <s:tztStack> => Input(s),
-  "output" <s:tztStack> => Output(Success(s)),
-  "output" "(" "failed" <v:value_expr> ")" => Output(Fail(v)),
-  "output" "(" "mutezOverflow" <a1:mutezAmount> <a2:mutezAmount> ")" => Output(MutezOverflow(a1, a2)),
-  "output" "(" "generalOverflow" <a1:number> <a2:number> ")" => Output(GeneralOverflow(a1, a2)),
+  "output" <s:tztStack> => Output(TztSuccess(s)),
+  "output" "(" "failed" <v:value_expr> ")" => Output(TztError(InterpreterError(FailedWith(v)))),
+  "output" "(" "mutezOverflow" <a1:mutezAmount> <a2:mutezAmount> ")" => Output(TztError(InterpreterError(MutezOverflow(a1, a2)))),
+  "output" "(" "generalOverflow" <a1:number> <a2:number> ")" => Output(TztError(InterpreterError(GeneralOverflow(a1, a2)))),
+  "output" "(" "StaticError" <s:string> ")" => Output(TztError(TypecheckerError(Some(s)))),
+  "output" "(" "StaticError" "_"  ")" => Output(TztError(TypecheckerError(None))),
   "amount" <m:mutezAmount> => TztEntity::Amount(m)
 }
 

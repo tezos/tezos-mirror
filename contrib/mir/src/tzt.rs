@@ -8,6 +8,8 @@
 mod context;
 mod expectation;
 
+use std::fmt;
+
 use crate::ast::*;
 use crate::context::*;
 use crate::interpreter::*;
@@ -20,19 +22,46 @@ use crate::tzt::expectation::*;
 
 pub type TestStack = Vec<(Type, TypedValue)>;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum TztTestError {
     StackMismatch(
         (FailingTypeStack, Stack<Value>),
         (FailingTypeStack, Stack<Value>),
     ),
     UnexpectedError(TestError),
-    UnexpectedSuccess(IStack),
+    UnexpectedSuccess(ErrorExpectation, IStack),
     ExpectedDifferentError(ErrorExpectation, TestError),
 }
 
-/// Represent one Tzt test. The output attribute is a Result to include
-/// expectation of failure.
+impl fmt::Display for TztTestError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use TztTestError::*;
+        match self {
+            StackMismatch(e, r) => {
+                write!(f, "Stack mismatch: Expected {:?}, Real {:?}", e, r)
+            }
+            UnexpectedError(e) => {
+                write!(f, "Unexpected error during test code execution: {}", e)
+            }
+            UnexpectedSuccess(e, stk) => {
+                write!(
+                    f,
+                    "Expected an error but none occured. Expected {} but ended with stack {:?}.",
+                    e, stk
+                )
+            }
+            ExpectedDifferentError(e, r) => {
+                write!(
+                    f,
+                    "Expected an error but got a different one.\n expected: {}\n got: {}.",
+                    e, r
+                )
+            }
+        }
+    }
+}
+
+/// Represent one Tzt test.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TztTest {
     pub code: ParsedInstructionBlock,
@@ -73,7 +102,6 @@ use std::error::Error;
 impl TryFrom<Vec<TztEntity>> for TztTest {
     type Error = Box<dyn Error>;
     fn try_from(tzt: Vec<TztEntity>) -> Result<Self, Self::Error> {
-        use ErrorExpectation::*;
         use TestExpectation::*;
         use TztEntity::*;
         use TztOutput::*;
@@ -90,19 +118,11 @@ impl TryFrom<Vec<TztEntity>> for TztTest {
                     "output",
                     &mut m_output,
                     match tzt_output {
-                        Success(stk) => {
+                        TztSuccess(stk) => {
                             typecheck_stack(stk.clone())?;
                             ExpectSuccess(stk)
                         }
-                        Fail(v) => ExpectError(InterpreterError(
-                            InterpreterErrorExpectation::FailedWith(v),
-                        )),
-                        TztOutput::MutezOverflow(v1, v2) => ExpectError(InterpreterError(
-                            InterpreterErrorExpectation::MutezOverflow(v1, v2),
-                        )),
-                        TztOutput::GeneralOverflow(_, _) => {
-                            todo!("General overflow is not implemented!")
-                        }
+                        TztError(error_exp) => ExpectError(error_exp),
                     },
                 )?,
                 Amount(m) => set_tzt_field("amount", &mut m_amount, m)?,
@@ -136,11 +156,21 @@ pub enum TestExpectation {
     ExpectError(ErrorExpectation),
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ErrorExpectation {
-    TypecheckerError(TcError),
+    TypecheckerError(Option<String>),
     InterpreterError(InterpreterErrorExpectation),
+}
+
+impl fmt::Display for ErrorExpectation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use ErrorExpectation::*;
+        match self {
+            TypecheckerError(None) => write!(f, "some typechecker error"),
+            TypecheckerError(Some(err)) => write!(f, "typechecker error: {}", err),
+            InterpreterError(err) => write!(f, "interpreter error: {}", err),
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -149,6 +179,17 @@ pub enum InterpreterErrorExpectation {
     GeneralOverflow(i128, i128),
     MutezOverflow(i64, i64),
     FailedWith(Value),
+}
+
+impl fmt::Display for InterpreterErrorExpectation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use InterpreterErrorExpectation::*;
+        match self {
+            GeneralOverflow(a1, a2) => write!(f, "General Overflow {} {}", a1, a2),
+            MutezOverflow(a1, a2) => write!(f, "MutezOverflow {} {}", a1, a2),
+            FailedWith(v) => write!(f, "FailedWith {:?}", v),
+        }
+    }
 }
 
 /// Helper type for use during parsing, represent a single
@@ -160,12 +201,10 @@ pub enum TztEntity {
     Amount(i64),
 }
 
-/// Possible values for the "output" field in a Tzt test
+/// Possible values for the "output" expectation field in a Tzt test
 pub enum TztOutput {
-    Success(Vec<(Type, Value)>),
-    Fail(Value),
-    MutezOverflow(i64, i64),
-    GeneralOverflow(i128, i128),
+    TztSuccess(Vec<(Type, Value)>),
+    TztError(ErrorExpectation),
 }
 
 fn execute_tzt_test_code(

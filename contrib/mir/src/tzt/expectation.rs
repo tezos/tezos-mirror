@@ -16,8 +16,11 @@ fn check_error_expectation(
     use TestError as Er;
     use TztTestError::*;
     match (err_exp, err) {
-        (Ex::TypecheckerError(tc_error), Er::TypecheckerError(res_tc_error))
-            if tc_error == res_tc_error =>
+        // Typecheck error expectation with exact error unspecified.
+        (Ex::TypecheckerError(None), Er::TypecheckerError(_)) => Ok(()),
+
+        (Ex::TypecheckerError(Some(tc_exp)), Er::TypecheckerError(tc_real))
+            if tc_real.to_string() == tc_exp =>
         {
             Ok(())
         }
@@ -95,10 +98,10 @@ pub fn check_expectation(
             // a success, fail the test with appropriate error..
             Err(UnexpectedError(e))
         }
-        (ExpectError(_), Ok((_, i_stack))) => {
+        (ExpectError(e), Ok((_, i_stack))) => {
             // If the run was success, but the expectation expected
             // a failure, fail the test.
-            Err(UnexpectedSuccess(i_stack))
+            Err(UnexpectedSuccess(e, i_stack))
         }
         (ExpectError(err_exp), Err(t_error)) => check_error_expectation(ctx, err_exp, t_error),
     }
