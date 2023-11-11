@@ -40,3 +40,19 @@ val dictionary_encoding :
   key_of_string:(string -> 'k) ->
   value_encoding:('k -> 'v Data_encoding.t) ->
   ('k * 'v) list Data_encoding.t
+
+(** {2 Lock files}  *)
+
+(** [lock path] acquires a lock on the file [path] and returns the opened file
+    descriptor (for unlocking). If there is already a lock on [path], this
+    function call is blocking until the previous lock is released.  *)
+val lock : string -> Lwt_unix.file_descr tzresult Lwt.t
+
+(** [unlock fd] releases the lock on the opened file descriptor [fd]. If there
+    is no lock or if it is already released, this function does nothing. *)
+val unlock : Lwt_unix.file_descr -> unit Lwt.t
+
+(** [with_lockfile path f] executes the function [f] by taking a lock on the
+    file [path]. If there is already a lock on [path], the execution of [f] is
+    blocking until the previous lock is released. *)
+val with_lockfile : string -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t

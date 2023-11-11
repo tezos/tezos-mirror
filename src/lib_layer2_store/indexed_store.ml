@@ -544,7 +544,10 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
   let wait_gc_completion store =
     match store.gc_status with
     | No_gc -> Lwt.return_unit
-    | Ongoing {promise; _} -> promise
+    | Ongoing {promise; _} ->
+        Lwt.catch
+          (fun () -> promise)
+          (function Lwt.Canceled -> Lwt.return_unit | e -> raise e)
 
   let is_gc_finished store =
     match store.gc_status with No_gc -> true | Ongoing _ -> false
@@ -1157,7 +1160,10 @@ struct
   let wait_gc_completion store =
     match store.gc_status with
     | No_gc -> Lwt.return_unit
-    | Ongoing {promise; _} -> promise
+    | Ongoing {promise; _} ->
+        Lwt.catch
+          (fun () -> promise)
+          (function Lwt.Canceled -> Lwt.return_unit | e -> raise e)
 
   let is_gc_finished store =
     match store.gc_status with No_gc -> true | Ongoing _ -> false
