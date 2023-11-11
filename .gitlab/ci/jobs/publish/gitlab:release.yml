@@ -9,6 +9,8 @@ gitlab:release:
   dependencies:
     - build:static-x86_64-linux-binaries
     - build:static-arm64-linux-binaries
+    - build:dpkg:amd64
+    - build:rpm:amd64
     - docker:merge_manifests
   script:
     - ./scripts/ci/gitlab-release.sh

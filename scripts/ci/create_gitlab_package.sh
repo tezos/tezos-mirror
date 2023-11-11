@@ -14,10 +14,13 @@ set -eu
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_package_name}/${gitlab_package_version}"
+gitlab_deb_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_deb_package_name}/${gitlab_package_version}"
+gitlab_rpm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_rpm_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
   remote_file="${2}"
+  url="${3-${gitlab_package_url}}"
   echo "Upload to ${gitlab_package_url}/${remote_file}"
 
   i=0
@@ -30,7 +33,7 @@ gitlab_upload() {
     http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
                      -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
                      -T "${local_path}" \
-                     "${gitlab_package_url}/${remote_file}")
+                     "${url}/${remote_file}")
 
     # Success
     [ "${http_code}" = '201' ] && return
@@ -56,6 +59,22 @@ do
   for binary in ${binaries}
   do
     gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
+  done
+
+  echo "Upload debian packages (${architecture})"
+
+  # Loop over debian packages
+  for package in ${deb_packages}
+  do
+    gitlab_upload "${package}" "${package}" "${gitlab_deb_package_url}"
+  done
+
+  echo "Upload rpm packages (${architecture})"
+
+  # Loop over rpm packages
+  for package in ${rpm_packages}
+  do
+    gitlab_upload "./${package}" "${package}" "${gitlab_rpm_package_url}"
   done
 
   echo "Upload tarball with all binaries (${architecture})"
