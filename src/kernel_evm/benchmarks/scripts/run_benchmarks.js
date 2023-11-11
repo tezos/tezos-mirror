@@ -81,6 +81,7 @@ function run_profiler(path) {
         var bip_store = [];
         var bip_read = [];
         var receipt_size = [];
+        let bloom_size = [];
 
         var profiler_output_path = "";
 
@@ -117,6 +118,7 @@ function run_profiler(path) {
             push_match(output, bip_store, /\bStoring Block in Progress of size\s*(\d+)/g)
             push_match(output, bip_read, /\bReading Block in Progress of size\s*(\d+)/g)
             push_match(output, receipt_size, /\bStoring receipt of size \s*(\d+)/g)
+            push_match(output, bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
             push_profiler_sections(output, opcodes);
         });
         childProcess.on('close', _ => {
@@ -138,6 +140,9 @@ function run_profiler(path) {
             if (tx_status.length != receipt_size.length) {
                 console.log(new Error("Missing receipt size value (expected: " + tx_status.length + ", actual: " + receipt_size.length + ")"));
             }
+            if (tx_status.length != bloom_size.length) {
+                console.log(new Error("Missing bloom size value (expected: " + tx_status.length + ", actual: " + bloom_size.length + ")"));
+            }
             resolve({
                 profiler_output_path,
                 gas_costs: gas_used,
@@ -149,6 +154,7 @@ function run_profiler(path) {
                 bip_read,
                 receipt_size,
                 opcodes,
+                bloom_size
             });
         });
     })
@@ -200,6 +206,7 @@ async function analyze_profiler_output(path) {
     interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
     fetch_blueprint_ticks = await get_ticks(path, "blueprint5fetch");
     block_finalize = await get_ticks(path, "store_current_block");
+    logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     return {
         kernel_run_ticks: kernel_run_ticks,
         run_transaction_ticks: run_transaction_ticks,
@@ -210,7 +217,8 @@ async function analyze_profiler_output(path) {
         fetch_blueprint_ticks: fetch_blueprint_ticks,
         sputnik_runtime_ticks: sputnik_runtime_ticks,
         store_receipt_ticks,
-        block_finalize
+        block_finalize,
+        logs_to_bloom
     };
 }
 
@@ -289,6 +297,8 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
                     store_receipt_ticks: run_benchmark_result.store_receipt_ticks[j],
                     receipt_size: run_benchmark_result.receipt_size[j],
                     tx_size: tx_size[j],
+                    logs_to_bloom: run_benchmark_result.logs_to_bloom[j],
+                    bloom_size: run_benchmark_result.bloom_size[j],
                     ...basic_info_row
                 });
             gas_cost_index += 1;
@@ -388,6 +398,8 @@ async function run_all_benchmarks(benchmark_scripts) {
         "store_transaction_object_ticks",
         "receipt_size",
         "store_receipt_ticks",
+        "logs_to_bloom",
+        "bloom_size",
         "estimated_ticks",
         "interpreter_decode_ticks",
         "interpreter_init_ticks",
