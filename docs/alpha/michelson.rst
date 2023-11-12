@@ -1489,8 +1489,40 @@ Micheline expressions are encoded in JSON like this:
 As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
+Development tools
+-----------------
+
+To ease the development of Michelson scripts, some tools are provided
+to Michelson developers.
+
+Emacs mode
+~~~~~~~~~~
+
+`Emacs <https://www.gnu.org/software/emacs/>`_ can be used as a practical environment for writing,
+editing and debugging Michelson programs. `Install it <https://www.gnu.org/software/emacs/>`_ and follow the
+configuration instructions in the Michelson Emacs README `here <https://gitlab.com/tezos/tezos/-/tree/master/emacs>`__.
+
+Interactive toplevel
+~~~~~~~~~~~~~~~~~~~~
+
+An interactive Michelson toplevel (also known as a `REPL
+<https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop>`__)
+built on the :doc:`../user/mockup` mode of Octez client is available in
+``scripts/michelson_repl.sh``, the typical usage is:
+
+::
+
+   $ octez-client --mode mockup --base-dir /tmp/mockup create mockup
+   $ rlwrap scripts/michelson_repl.sh
+   > UNIT
+     { Stack_elt unit Unit }
+   > UNIT
+     { Stack_elt unit Unit ; Stack_elt unit Unit }
+   > COMPARE
+     { Stack_elt int 0 }
+
 Examples
----------
+--------
 
 Contracts in the system are stored as a piece of code and a global data
 storage. The type of the global data of the storage is fixed for each
