@@ -74,7 +74,7 @@ This sequence of operations was run:
 { "balance": "0", "counter": "4" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "999999999385", "current_frozen_deposits": "0",
+{ "full_balance": "999999999385", "current_frozen_deposits": "49999999970",
   "frozen_deposits": "0", "staking_balance": "999999999385",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "total_delegated_stake": "0",

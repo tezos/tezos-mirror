@@ -277,6 +277,7 @@ let constants_mainnet =
             radius_dz = Q.(1 // 50);
           };
         activation_vote_enable = false;
+        autostaking_enable = true;
       };
   }
 

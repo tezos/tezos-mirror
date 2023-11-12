@@ -134,6 +134,45 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
     (ctxt, [])
     delegates
 
+let maximal_available_for_staking ctxt ~delegate =
+  Contract_storage.get_balance ctxt (Implicit delegate)
+
+let adjust_frozen_stakes ctxt :
+    (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  Stake_storage.fold_on_active_delegates_with_minimal_stake_es
+    ctxt
+    ~order:`Undefined
+    ~init:(ctxt, [])
+    ~f:(fun delegate (ctxt, balance_updates) ->
+      let* ({own_frozen; _} as full_staking_balance :
+             Full_staking_balance_repr.t) =
+        Stake_storage.get_full_staking_balance ctxt delegate
+      in
+      let*? optimal_frozen =
+        Stake_context.optimal_frozen_wrt_delegated_without_ai
+          ctxt
+          full_staking_balance
+      in
+      let* ctxt, new_balance_updates =
+        if Tez_repr.(optimal_frozen > own_frozen) then
+          let*? optimal_to_stake = Tez_repr.(optimal_frozen -? own_frozen) in
+          let* available_to_stake =
+            maximal_available_for_staking ctxt ~delegate
+          in
+          let to_stake = Tez_repr.min optimal_to_stake available_to_stake in
+          Staking.stake ctxt ~sender:delegate ~delegate to_stake
+        else if Tez_repr.(optimal_frozen < own_frozen) then
+          let*? to_unstake = Tez_repr.(own_frozen -? optimal_frozen) in
+          Staking.request_unstake
+            ctxt
+            ~sender_contract:Contract_repr.(Implicit delegate)
+            ~delegate
+            to_unstake
+        else Staking.finalize_unstake ctxt Contract_repr.(Implicit delegate)
+      in
+      return (ctxt, new_balance_updates @ balance_updates))
+
 let cycle_end ctxt last_cycle =
   let open Lwt_result_syntax in
   let* ctxt, unrevealed_nonces = Seed_storage.cycle_end ctxt last_cycle in
@@ -158,6 +197,13 @@ let cycle_end ctxt last_cycle =
       ctxt
       ~new_cycle
   in
+  let* ctxt, autostake_balance_updates =
+    if
+      Raw_context.adaptive_issuance_enable ctxt
+      || not (Constants_storage.adaptive_issuance_autostaking_enable ctxt)
+    then return (ctxt, [])
+    else adjust_frozen_stakes ctxt
+  in
   let* ctxt = update_forbidden_delegates ctxt ~new_cycle in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
@@ -166,7 +212,10 @@ let cycle_end ctxt last_cycle =
   let* ctxt =
     Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   in
-  let balance_updates = slashing_balance_updates @ attesting_balance_updates in
+  let balance_updates =
+    slashing_balance_updates @ attesting_balance_updates
+    @ autostake_balance_updates
+  in
   return (ctxt, balance_updates, deactivated_delegates)
 
 let init_first_cycles ctxt =

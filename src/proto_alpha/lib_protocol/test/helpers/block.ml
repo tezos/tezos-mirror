@@ -560,7 +560,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    () =
+    ?adaptive_issuance () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -622,6 +622,9 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       nonce_revelation_threshold
   in
   let dal = Option.value ~default:constants.dal dal in
+  let adaptive_issuance =
+    Option.value ~default:constants.adaptive_issuance adaptive_issuance
+  in
 
   let constants =
     {
@@ -643,7 +646,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
         };
       dal = {dal with feature_enable = dal_enable};
       zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
-      adaptive_issuance = constants.adaptive_issuance;
+      adaptive_issuance;
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
     }
@@ -679,7 +682,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?sc_rollup_enable ?sc_rollup_arith_pvm_enable ?sc_rollup_private_enable
     ?sc_rollup_riscv_pvm_enable ?dal_enable ?zk_rollup_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    (bootstrap_accounts : Parameters.bootstrap_account list) =
+    ?adaptive_issuance (bootstrap_accounts : Parameters.bootstrap_account list)
+    =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
     prepare_initial_context_params
@@ -700,6 +704,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
       ?hard_gas_limit_per_block
       ?nonce_revelation_threshold
       ?dal
+      ?adaptive_issuance
       ()
   in
   let* () =
@@ -998,7 +1003,7 @@ let bake_n ?baking_mode ?policy ?liquidity_baking_toggle_vote
 
 let rec bake_while_with_metadata ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote
-    ?(invariant = fun _ -> return_unit) predicate b =
+    ?(invariant = fun _ -> return_unit) ?previous_metadata predicate b =
   let open Lwt_result_syntax in
   let* () = invariant b in
   let* new_block, (metadata, _) =
@@ -1015,21 +1020,28 @@ let rec bake_while_with_metadata ?baking_mode ?policy
       ?policy
       ?liquidity_baking_toggle_vote
       ?adaptive_issuance_vote
+      ~previous_metadata:metadata
       ~invariant
       predicate
       new_block
-  else return b
+  else return (b, (previous_metadata, metadata))
+
+let bake_while_with_metadata = bake_while_with_metadata ?previous_metadata:None
 
 let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
     ?adaptive_issuance_vote ?invariant predicate b =
-  bake_while_with_metadata
-    ?baking_mode
-    ?policy
-    ?liquidity_baking_toggle_vote
-    ?adaptive_issuance_vote
-    ?invariant
-    (fun block _metadata -> predicate block)
-    b
+  let open Lwt_result_syntax in
+  let* b, _ =
+    bake_while_with_metadata
+      ?baking_mode
+      ?policy
+      ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote
+      ?invariant
+      (fun block _metadata -> predicate block)
+      b
+  in
+  return b
 
 let bake_until_level ?baking_mode ?policy ?liquidity_baking_toggle_vote
     ?adaptive_issuance_vote level b =
@@ -1230,6 +1242,12 @@ let current_cycle b =
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
   current_cycle
 
+let last_block_of_cycle b =
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
+  let current_level = b.header.shell.level in
+  let mod_plus_one = Int32.(rem (succ current_level) blocks_per_cycle) in
+  Int32.(equal mod_plus_one zero)
+
 let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   let open Lwt_result_syntax in
   let* final_block_of_previous_cycle =
@@ -1241,10 +1259,61 @@ let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   in
   bake ?baking_mode ?policy final_block_of_previous_cycle
 
+let bake_until_cycle_with_metadata ?baking_mode ?policy cycle (b : t) =
+  bake_while_with_metadata
+    ?baking_mode
+    ?policy
+    (fun block _ -> Cycle.(current_cycle block < cycle))
+    b
+
 let bake_until_cycle_end ?baking_mode ?policy b =
   let cycle = current_cycle b in
   bake_until_cycle ?baking_mode ?policy (Cycle.succ cycle) b
 
+let bake_until_cycle_end_with_metadata ?baking_mode ?policy b =
+  let open Lwt_result_syntax in
+  let cycle = current_cycle b in
+  let* blk, (eoc_metadata, nxt_metadata) =
+    bake_until_cycle_with_metadata ?baking_mode ?policy (Cycle.succ cycle) b
+  in
+  return (blk, eoc_metadata, nxt_metadata)
+
 let bake_until_n_cycle_end ?policy n b =
   let cycle = current_cycle b in
   bake_until_cycle ?policy (Cycle.add cycle n) b
+
+let debited_of_balance_update_item (it : Receipt.balance_update_item) :
+    Tez.t option =
+  let open Receipt in
+  match it with
+  | Balance_update_item (Contract _, Debited tez, _) -> Some tez
+  | _ -> None
+
+let autostaked_opt baker (metadata : block_header_metadata) =
+  let autostaked_bal_up_opt =
+    List.find
+      (function
+        | Receipt.Balance_update_item
+            (Contract tzbaker, Receipt.Debited debited_tez, _origin)
+          when tzbaker = Implicit baker ->
+            List.exists
+              (function
+                | Receipt.Balance_update_item
+                    (Deposits _staker, Receipt.Credited tez, _origin) ->
+                    Tez.(tez = debited_tez)
+                | _ -> false)
+              metadata.balance_updates
+        | _ -> false)
+      metadata.balance_updates
+  in
+  Option.map
+    (fun receipt ->
+      match debited_of_balance_update_item receipt with
+      | None -> assert false
+      | Some tez -> tez)
+    autostaked_bal_up_opt
+
+let autostaked ?(loc = __LOC__) baker metadata =
+  match autostaked_opt baker metadata with
+  | None -> raise (Failure (loc ^ ":No autostake found"))
+  | Some tez -> tez

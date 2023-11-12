@@ -314,3 +314,6 @@ seq:
 - id: adaptive_issuance_activation_vote_enable
   type: u1
   enum: bool
+- id: autostaking_enable
+  type: u1
+  enum: bool

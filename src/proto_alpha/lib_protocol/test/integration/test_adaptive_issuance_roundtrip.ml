@@ -216,6 +216,17 @@ module State = struct
     | None -> raise Not_found
     | Some (name, acc) -> (name, acc)
 
+  let liquid_delegated ~name state =
+    let open Result_syntax in
+    String.Map.fold_e
+      (fun _delegator account acc ->
+        match account.delegate with
+        | Some delegate when not @@ String.equal delegate name -> return acc
+        | None -> return acc
+        | _ -> Tez.(acc +? account.liquid))
+      state.account_map
+      Tez.zero
+
   (** Returns true iff account is a delegate *)
   let is_self_delegate (account_name : string) (state : t) : bool =
     let acc = find_account account_name state in
@@ -401,15 +412,115 @@ module State = struct
   let pop_pending_operations state =
     ({state with pending_operations = []}, state.pending_operations)
 
-  (** When reaching a new cycle: apply unstakes and parameters changes.
-    We expect these changes after applying the last block of a cycle *)
-  let apply_end_cycle new_cycle state : t =
-    let unstake_wait = unstake_wait state in
-    (* Prepare finalizable unstakes *)
-    let state =
-      match Cycle.sub new_cycle unstake_wait with
-      | None -> state
-      | Some cycle -> apply_unslashable cycle state
+  let log_model_autostake name pkh old_cycle op ~optimal amount =
+    Log.debug
+      "Model Autostaking: at end of cycle %a, %s(%a) to reach optimal stake %a \
+       %s %a"
+      Cycle.pp
+      old_cycle
+      name
+      Signature.Public_key_hash.pp
+      pkh
+      Tez.pp
+      optimal
+      op
+      Tez.pp
+      (Tez.of_mutez_exn amount)
+
+  let apply_autostake ~name ~old_cycle
+      ({
+         pkh;
+         contract = _;
+         delegate;
+         parameters = _;
+         liquid = _;
+         bonds = _;
+         frozen_deposits;
+         unstaked_frozen;
+         unstaked_finalizable;
+         staking_delegator_numerator = _;
+         staking_delegate_denominator = _;
+       } :
+        account_state) state =
+    let open Result_syntax in
+    if Some name <> delegate then (
+      Log.debug
+        "Model Autostaking: %s <> %s, noop@."
+        name
+        (Option.value ~default:"None" delegate) ;
+      return state)
+    else
+      let* current_liquid_delegated = liquid_delegated ~name state in
+      let current_frozen = Frozen_tez.total_current frozen_deposits in
+      let current_unstaked_frozen_delegated =
+        Unstaked_frozen.sum_current unstaked_frozen
+      in
+      let current_unstaked_final_delegated =
+        Unstaked_finalizable.total unstaked_finalizable
+      in
+      let power =
+        Tez.(
+          current_liquid_delegated +! current_frozen
+          +! current_unstaked_frozen_delegated
+          +! current_unstaked_final_delegated
+          |> to_mutez |> Z.of_int64)
+      in
+      let optimal =
+        Tez.of_z
+          (Z.cdiv
+             power
+             (Z.of_int (state.constants.limit_of_delegation_over_baking + 1)))
+      in
+      let autostaked =
+        Int64.(sub (Tez.to_mutez optimal) (Tez.to_mutez current_frozen))
+      in
+      (* stake or unstake *)
+      let new_state =
+        if autostaked > 0L then (
+          log_model_autostake ~optimal name pkh old_cycle "stake" autostaked ;
+          apply_stake (Test_tez.of_mutez_exn autostaked) name state)
+        else if autostaked < 0L then (
+          log_model_autostake
+            ~optimal
+            name
+            pkh
+            old_cycle
+            "unstake"
+            (Int64.neg autostaked) ;
+          apply_unstake
+            old_cycle
+            (Test_tez.of_mutez_exn Int64.(neg autostaked))
+            name
+            state)
+        else (
+          log_model_autostake
+            ~optimal
+            name
+            pkh
+            old_cycle
+            "only finalize"
+            autostaked ;
+          state)
+      in
+      return @@ apply_finalize name new_state
+
+  (** Applies when baking the last block of a cycle *)
+  let apply_end_cycle current_cycle block state : t tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
+    let* launch_cycle_opt =
+      Context.get_adaptive_issuance_launch_cycle (B block)
+    in
+    let*? state =
+      match launch_cycle_opt with
+      | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) -> ok state
+      | None | Some _ ->
+          Environment.wrap_tzresult
+          @@ String.Map.fold_e
+               (fun name account state ->
+                 apply_autostake ~name ~old_cycle:current_cycle account state)
+               state.account_map
+               state
     in
     (* Apply parameter changes *)
     let state, param_requests =
@@ -438,7 +549,20 @@ module State = struct
                }))
         state
     in
-    {state with param_requests}
+    return {state with param_requests}
+
+  (** Applies when baking the first block of a cycle.
+      Technically nothing special happens, but we need to update the unslashable unstakes
+      since it's done lazily *)
+  let apply_new_cycle new_cycle state : t =
+    let unstake_wait = unstake_wait state in
+    (* Prepare finalizable unstakes *)
+    let state =
+      match Cycle.sub new_cycle unstake_wait with
+      | None -> state
+      | Some cycle -> apply_unslashable cycle state
+    in
+    state
 
   (* end module State *)
 end
@@ -598,13 +722,6 @@ let check_all_balances block state : unit tzresult Lwt.t =
   let* actual_total_supply = Context.get_total_supply (B block) in
   Assert.equal_tez ~loc:__LOC__ actual_total_supply total_supply
 
-(** Apply rewards in state + check *)
-let apply_rewards ~(baker : string) block state : State.t tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let* state = State.apply_rewards ~baker block state in
-  let* () = check_all_balances block state in
-  return state
-
 let check_issuance_rpc block : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* We assume one block per minute *)
@@ -715,7 +832,8 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return (block, state)
     else return (block', state)
   in
-  (* TODO: mistake ? The baking parameters apply before we reach the new cycle... *)
+  let* state = State.apply_rewards ~baker:baker_name block state in
+  (* First block of a new cycle *)
   let new_current_cycle = Block.current_cycle block in
   let* state =
     if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
@@ -725,9 +843,14 @@ let bake ?baker : t -> t tzresult Lwt.t =
         ~color:time_color
         "Cycle %d"
         (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
-      return @@ State.apply_end_cycle new_current_cycle state)
+      return @@ State.apply_new_cycle new_current_cycle state)
   in
-  let* state = apply_rewards ~baker:baker_name block state in
+  (* Dawn of a new cycle *)
+  let* state =
+    if not (Block.last_block_of_cycle block) then return state
+    else State.apply_end_cycle current_cycle block state
+  in
+  let* () = check_all_balances block state in
   return (block, state)
 
 (** Bake until a cycle is reached, using [bake] instead of [Block.bake]
@@ -780,12 +903,16 @@ let snapshot_balances snap_name names_list : (t, t) scenarios =
       return {state with snapshot_balances})
 
 (** Check balances against a previously defined snapshot *)
-let check_snapshot_balances snap_name : (t, t) scenarios =
+let check_snapshot_balances
+    ?(f =
+      fun ~name:_ ~old_balance ~new_balance ->
+        assert_balance_equal ~loc:__LOC__ old_balance new_balance) snap_name :
+    (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_unit (fun (_block, state) ->
       Log.debug
         ~color:low_debug_color
-        "Checking equality of balances between \"%s\" and now"
+        "Checking evolution of balances between \"%s\" and now"
         snap_name ;
       let snapshot_balances =
         String.Map.find snap_name state.State.snapshot_balances
@@ -804,7 +931,7 @@ let check_snapshot_balances snap_name : (t, t) scenarios =
                 let new_balance =
                   balance_of_account name state.State.account_map
                 in
-                assert_balance_equal ~loc:__LOC__ old_balance new_balance)
+                f ~name ~old_balance ~new_balance)
               snapshot_balances
           in
           return_unit)
@@ -826,7 +953,14 @@ let check_rate_evolution (f : Q.t -> Q.t -> bool) : (t, t) scenarios =
       | None -> failwith "check_rate_evolution: no rate previously saved"
       | Some previous_rate ->
           if f previous_rate new_rate then return_unit
-          else failwith "check_rate_evolution: assertion failed")
+          else
+            failwith
+              "check_rate_evolution: assertion failed@.previous rate: %a@.new \
+               rate: %a"
+              Q.pp_print
+              previous_rate
+              Q.pp_print
+              new_rate)
 
 (* ======== Operations ======== *)
 
@@ -1277,7 +1411,7 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false) () =
      - AI not activated (and staker = delegate)
     Any scenario that begins with this will be triplicated.
  *)
-let init_scenario ?reward_per_block () =
+let init_scenario ?(force_ai = true) ?reward_per_block () =
   let constants = init_constants ?reward_per_block () in
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
@@ -1286,21 +1420,26 @@ let init_scenario ?reward_per_block () =
     let name = if self_stake then "staker" else "delegate" in
     begin_test ~activate_ai constants [name]
     --> set_delegate_params name init_params
-    --> stake name (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> set_baker "__bootstrap__"
   in
-  (Tag "AI activated"
-   --> (Tag "self stake" --> begin_test ~activate_ai:true ~self_stake:true
-       |+ Tag "external stake"
-          --> begin_test ~activate_ai:true ~self_stake:false
-          --> add_account_with_funds
-                "staker"
-                "delegate"
-                (Amount (Tez.of_mutez 2_000_000_000_000L))
-          --> set_delegate "staker" (Some "delegate"))
-   --> wait_ai_activation
-  |+ Tag "AI deactivated, self stake"
-     --> begin_test ~activate_ai:false ~self_stake:true)
+  let ai_activated =
+    Tag "AI activated"
+    --> (Tag "self stake" --> begin_test ~activate_ai:true ~self_stake:true
+        |+ Tag "external stake"
+           --> begin_test ~activate_ai:true ~self_stake:false
+           --> add_account_with_funds
+                 "staker"
+                 "delegate"
+                 (Amount (Tez.of_mutez 2_000_000_000_000L))
+           --> set_delegate "staker" (Some "delegate"))
+    --> wait_ai_activation
+  in
+
+  let ai_deactivated =
+    Tag "AI deactivated, self stake"
+    --> begin_test ~activate_ai:false ~self_stake:true
+  in
+  (if force_ai then ai_activated else ai_activated |+ ai_deactivated)
   --> next_block
 
 module Roundtrip = struct
@@ -1599,9 +1738,10 @@ module Rewards = struct
     in
     begin_test ~activate_ai:true ~burn_rewards:true constants ["delegate"]
     --> set_delegate_params "delegate" init_params
+    --> save_current_rate --> wait_ai_activation
+    (* We stake about 50% of the total supply *)
     --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
-    --> save_current_rate --> wait_ai_activation
     --> (Tag "increase stake, decrease rate" --> next_cycle
          --> loop rate_var_lag (stake "delegate" delta --> next_cycle)
          --> loop 10 cycle_stake
@@ -1631,13 +1771,140 @@ module Rewards = struct
        ]
 end
 
+module Autostaking = struct
+  let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
+      ~new_balance compare =
+    let old_b, new_b =
+      match part with
+      | `staked -> (old_balance.staked_b, new_balance.staked_b)
+      | `unstaked_frozen ->
+          (old_balance.unstaked_frozen_b, new_balance.unstaked_frozen_b)
+      | `unstaked_finalizable ->
+          ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_finalizable_b,
+            Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_finalizable_b )
+    in
+    if List.mem ~equal:String.equal name for_accounts then
+      if compare new_b old_b then return_unit
+      else (
+        Log.debug ~color:Log_module.warning_color "Balances changes failed:@." ;
+        Log.debug "@[<v 2>Old Balance@ %a@]@." balance_pp old_balance ;
+        Log.debug "@[<v 2>New Balance@ %a@]@." balance_pp new_balance ;
+        failwith "%s Unexpected stake evolution for %s" loc name)
+    else raise Not_found
+
+  let delegate = "delegate"
+
+  and delegator1 = "delegator1"
+
+  and delegator2 = "delegator2"
+
+  let setup ~activate_ai =
+    let constants = init_constants () in
+    begin_test ~activate_ai constants [delegate]
+    --> add_account_with_funds
+          delegator1
+          "__bootstrap__"
+          (Amount (Tez.of_mutez 2_000_000_000L))
+    --> add_account_with_funds
+          delegator2
+          "__bootstrap__"
+          (Amount (Tez.of_mutez 2_000_000_000L))
+    --> next_cycle
+    --> (if activate_ai then wait_ai_activation else next_cycle)
+    --> snapshot_balances "before delegation" [delegate]
+    --> set_delegate delegator1 (Some delegate)
+    --> check_snapshot_balances "before delegation"
+    --> next_cycle
+
+  let test_autostaking =
+    Tag "No Ai" --> setup ~activate_ai:false
+    --> check_snapshot_balances
+          ~f:
+            (assert_balance_evolution
+               ~loc:__LOC__
+               ~for_accounts:[delegate]
+               ~part:`staked
+               Q.gt)
+          "before delegation"
+    --> snapshot_balances "before second delegation" [delegate]
+    --> (Tag "increase delegation"
+         --> set_delegate delegator2 (Some delegate)
+         --> next_cycle
+         --> check_snapshot_balances
+               ~f:
+                 (assert_balance_evolution
+                    ~loc:__LOC__
+                    ~for_accounts:[delegate]
+                    ~part:`staked
+                    Q.gt)
+               "before second delegation"
+        |+ Tag "constant delegation"
+           --> snapshot_balances "after stake change" [delegate]
+           --> wait_n_cycles 8
+           --> check_snapshot_balances "after stake change"
+        |+ Tag "decrease delegation"
+           --> set_delegate delegator1 None
+           --> next_cycle
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`staked
+                      Q.lt)
+                 "before second delegation"
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_frozen
+                      Q.gt)
+                 "before second delegation"
+           --> snapshot_balances "after unstake" [delegate]
+           --> next_cycle
+           --> check_snapshot_balances "after unstake"
+           --> wait_n_cycles 3
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_frozen
+                      Q.lt)
+                 "after unstake"
+           (* finalizable are auto-finalize with one cycle shift *)
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_finalizable
+                      Q.gt)
+                 "after unstake"
+           --> snapshot_balances "before finalisation" [delegate]
+           --> next_cycle
+           --> check_snapshot_balances
+                 ~f:
+                   (assert_balance_evolution
+                      ~loc:__LOC__
+                      ~for_accounts:[delegate]
+                      ~part:`unstaked_finalizable
+                      Q.lt)
+                 "before finalisation")
+    |+ Tag "Yes AI" --> setup ~activate_ai:true
+       --> check_snapshot_balances "before delegation"
+
+  let tests = tests_of_scenarios [("Test auto-staking", test_autostaking)]
+end
+
 let tests =
   (tests_of_scenarios
   @@ [
        ("Test expected error in assert failure", test_expected_error);
        ("Test init", init_scenario () --> Action (fun _ -> return_unit));
      ])
-  @ Roundtrip.tests @ Rewards.tests
+  @ Roundtrip.tests @ Rewards.tests @ Autostaking.tests
 
 let () =
   Alcotest_lwt.run

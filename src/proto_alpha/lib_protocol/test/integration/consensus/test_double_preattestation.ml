@@ -201,6 +201,12 @@ end = struct
     else if c < 0 then (op2, op1)
     else (op1, op2)
 
+  let adaptive_issuance =
+    {
+      Default_parameters.constants_test.adaptive_issuance with
+      autostaking_enable = false;
+    }
+
   (** Helper function for denunciations inclusion *)
   let generic_double_preattestation_denunciation ~nb_blocks_before_double
       ~nb_blocks_before_denunciation
@@ -212,7 +218,9 @@ end = struct
           let* a, _b = pick_attesters ctxt in
           return (a, a)) ~loc () =
     let open Lwt_result_syntax in
-    let* genesis, contracts = Context.init_n ~consensus_threshold:0 10 () in
+    let* genesis, contracts =
+      Context.init_n ~adaptive_issuance ~consensus_threshold:0 10 ()
+    in
     let addr =
       match List.hd contracts with None -> assert false | Some e -> e
     in
@@ -341,7 +349,9 @@ end = struct
   let test_two_double_preattestation_evidences_leads_to_duplicate_denunciation
       () =
     let open Lwt_result_syntax in
-    let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+    let* genesis, _contracts =
+      Context.init2 ~adaptive_issuance ~consensus_threshold:0 ()
+    in
     let* blk_1, blk_2 = block_fork genesis in
     let* blk_a = Block.bake blk_1 in
     let* blk_b = Block.bake blk_2 in

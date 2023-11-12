@@ -149,12 +149,17 @@ let test_valid_double_attestation_evidence () =
       frozen_deposits_right_after
       frozen_deposits_before
   in
-  let* blk_eoc =
-    Block.bake_until_cycle_end ~policy:(By_account baker) blk_final
+  let* blk_eoc, metadata, _ =
+    Block.bake_until_cycle_end_with_metadata
+      ~policy:(By_account baker)
+      blk_final
   in
+  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
+  let autostaked = Block.autostaked delegate metadata in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B blk_eoc) delegate
   in
+  let frozen_deposits_after = Test_tez.(frozen_deposits_after -! autostaked) in
   let p =
     constants.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
@@ -298,12 +303,17 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
   in
   (* Check that all frozen deposits have been slashed at the end of the cycle. *)
-  let* b =
-    Block.bake_until_cycle_end ~policy:(By_account baker) blk_with_evidence2
+  let* b, metadata, _ =
+    Block.bake_until_cycle_end_with_metadata
+      ~policy:(By_account baker)
+      blk_with_evidence2
   in
+  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
+  let autostaked = Block.autostaked delegate metadata in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b) delegate
   in
+  let frozen_deposits_after = Test_tez.(frozen_deposits_after -! autostaked) in
   Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after
 
 (** Say a delegate double-attests twice in a cycle,
@@ -346,8 +356,10 @@ let test_two_double_attestation_evidences_staggered () =
   let* blk_with_stake =
     Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
   in
-  let* blk_new_cycle =
-    Block.bake_until_cycle_end ~policy:(By_account baker) blk_with_stake
+  let* blk_new_cycle, metadata, _ =
+    Block.bake_until_cycle_end_with_metadata
+      ~policy:(By_account baker)
+      blk_with_stake
   in
   let* blk_with_evidence2 =
     Block.bake
@@ -359,6 +371,9 @@ let test_two_double_attestation_evidences_staggered () =
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
   in
+  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
+  let autostaked = Block.autostaked delegate metadata in
+  let frozen_deposits_after = Test_tez.(frozen_deposits_after -! autostaked) in
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_new_cycle) delegate
   in
@@ -643,6 +658,11 @@ let test_freeze_more_with_low_balance =
         percentage_of_frozen_deposits_slashed_per_double_attestation =
           (* enforce that percentage is 50% in the test's params. *)
           Int_percentage.p50;
+        adaptive_issuance =
+          {
+            Default_parameters.constants_test.adaptive_issuance with
+            autostaking_enable = false;
+          };
       }
     in
     let* genesis, (c1, c2) = Context.init_with_constants2 constants in

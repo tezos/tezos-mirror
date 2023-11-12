@@ -1087,6 +1087,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                 else (* 5% for testnets *) 100_000_000l);
               adaptive_rewards_params;
               activation_vote_enable = false;
+              autostaking_enable = true;
             }
         in
         let issuance_weights =

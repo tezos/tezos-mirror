@@ -83,6 +83,30 @@ let apply_limits ctxt staking_parameters
   let+ frozen = Tez_repr.(own_frozen +? allowed_staked_frozen) in
   Stake_repr.make ~frozen ~weighted_delegated
 
+let optimal_frozen_wrt_delegated_without_ai ctxt
+    {Full_staking_balance_repr.delegated; own_frozen; _} =
+  let open Result_syntax in
+  let limit_of_delegation_over_baking =
+    Int64.of_int (Constants_storage.limit_of_delegation_over_baking ctxt)
+  in
+  (* Without AI, frozen deposit is optimal when `delegated =
+     limit_of_delegation_over_baking * frozen`. Freezing more would
+     unnecessarily freeze tokens, freezing less would under exploit delegated
+     rights due to over-delegation limit.
+
+     With AI the optimum is to freeze as much as possible, this computation
+     would make no sense. *)
+  let* power = Tez_repr.(delegated +? own_frozen) in
+  let* opti_frozen =
+    Tez_repr.mul_ratio
+      ~rounding:`Up
+      power
+      ~num:1L
+      ~den:(Int64.add limit_of_delegation_over_baking 1L)
+  in
+  let min_frozen = Constants_storage.minimal_frozen_stake ctxt in
+  return (Tez_repr.max opti_frozen min_frozen)
+
 let baking_weight ctxt staking_parameters f =
   let open Result_syntax in
   let+ s = apply_limits ctxt staking_parameters f in

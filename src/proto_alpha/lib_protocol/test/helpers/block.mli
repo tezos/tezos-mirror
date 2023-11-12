@@ -144,6 +144,7 @@ val genesis :
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
+  ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
@@ -235,10 +236,7 @@ val bake_with_metadata :
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
   ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   t ->
-  ( t * (block_header_metadata * operation_receipt list),
-    Error_monad.tztrace )
-  result
-  Lwt.t
+  (t * (block_header_metadata * operation_receipt list)) tzresult Lwt.t
 
 (** Bakes [n] blocks. *)
 val bake_n :
@@ -310,10 +308,7 @@ val bake_n_with_metadata :
   ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   int ->
   block ->
-  ( block * (block_header_metadata * operation_receipt list),
-    Error_monad.tztrace )
-  result
-  Lwt.t
+  (block * (block_header_metadata * operation_receipt list)) tzresult Lwt.t
 
 val get_balance_updates_from_metadata :
   block_header_metadata * operation_receipt list ->
@@ -337,7 +332,11 @@ val bake_while :
   block tzresult Lwt.t
 
 (* Same as [bake_while] but the predicate also has access to the
-   metadata resulting from the application of the block. *)
+   metadata resulting from the application of the block.
+
+   optionnal metadata of the last block stisfying the condition and metadata of
+   the last block (which don't) are returned together with the block.
+*)
 val bake_while_with_metadata :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
@@ -346,14 +345,25 @@ val bake_while_with_metadata :
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> block_header_metadata -> bool) ->
   block ->
-  block tzresult Lwt.t
+  (block * (block_header_metadata option * block_header_metadata)) tzresult
+  Lwt.t
 
 val current_cycle : block -> Cycle.t
+
+val last_block_of_cycle : block -> bool
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
     that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
 val bake_until_cycle_end :
   ?baking_mode:baking_mode -> ?policy:baker_policy -> t -> t tzresult Lwt.t
+
+(** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
+    that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
+val bake_until_cycle_end_with_metadata :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  block ->
+  (block * block_header_metadata option * block_header_metadata) tzresult Lwt.t
 
 (** Bakes enough blocks to end [n] cycles. *)
 val bake_until_n_cycle_end :
@@ -386,8 +396,18 @@ val prepare_initial_context_params :
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
+  ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )
   result
   Lwt.t
+
+(** [autostaked_opt delegate metadata] returns [Some amount] if [amount] tez
+    have been staked for the given [delegate]. [None] otherwise. *)
+val autostaked_opt : public_key_hash -> block_header_metadata -> Tez.t option
+
+(**  same as [autostaked_opt] but fails in case autostaking didn't provoke a
+     stake operation.  *)
+val autostaked :
+  ?loc:string -> public_key_hash -> block_header_metadata -> Tez.t

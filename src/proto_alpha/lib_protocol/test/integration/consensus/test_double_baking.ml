@@ -77,8 +77,11 @@ let test_valid_double_baking_evidence () =
     c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
   let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
+  let* blk_fst_cycle, _, _ =
+    Block.bake_until_cycle_end_with_metadata ~policy:(By_account baker2) genesis
+  in
   let* blk_a, blk_b =
-    block_fork ~policy:(By_account baker1) contracts genesis
+    block_fork ~policy:(By_account baker1) contracts blk_fst_cycle
   in
   let operation = double_baking (B blk_a) blk_a.header blk_b.header in
   let* blk_final = Block.bake ~policy:(By_account baker2) ~operation blk_a in
@@ -103,14 +106,22 @@ let test_valid_double_baking_evidence () =
     Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
   in
   (* Check that the frozen deposits have been slashed at the end of the cycle. *)
-  let* blk_eoc =
-    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_final
+  let* blk_eoc, end_cycle_metadata, _next_cycle =
+    Block.bake_until_cycle_end_with_metadata
+      ~policy:(By_account baker2)
+      blk_final
+  in
+  let end_cycle_metadata =
+    Option.value_f ~default:(fun () -> assert false) end_cycle_metadata
   in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
+  let autostaked = Block.autostaked baker1 end_cycle_metadata in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+    Test_tez.(
+      (frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+      +! autostaked)
   in
   Assert.equal_tez
     ~loc:__LOC__
@@ -166,9 +177,13 @@ let test_valid_double_baking_followed_by_double_attesting () =
       frozen_deposits_before
       frozen_deposits_right_after
   in
-  let* blk_eoc =
-    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_final
+  let* blk_eoc, metadata, _ =
+    Block.bake_until_cycle_end_with_metadata
+      ~policy:(By_account baker2)
+      blk_final
   in
+  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
+  let autostaked = Block.autostaked baker1 metadata in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
@@ -184,7 +199,8 @@ let test_valid_double_baking_followed_by_double_attesting () =
     (* assuming the sum doesn't exceed 100% *)
   in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+    Test_tez.(
+      (frozen_deposits_before *! Int64.of_int (100 - p) /! 100L) +! autostaked)
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
      the percentages are additive, not multiplicative. *)
@@ -236,9 +252,15 @@ let test_valid_double_attesting_followed_by_double_baking () =
       frozen_deposits_before
       frozen_deposits_right_after
   in
-  let* blk_eoc =
-    Block.bake_until_cycle_end ~policy:(By_account baker2) blk_with_db_evidence
+  let* blk_eoc, end_cycle_metadata, _ =
+    Block.bake_until_cycle_end_with_metadata
+      ~policy:(By_account baker2)
+      blk_with_db_evidence
   in
+  let end_cycle_metadata =
+    Option.value_f ~default:(fun () -> assert false) end_cycle_metadata
+  in
+  let autostaked = Block.autostaked baker1 end_cycle_metadata in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
@@ -254,7 +276,8 @@ let test_valid_double_attesting_followed_by_double_baking () =
     (* assuming the sum doesn't exceed 100% *)
   in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
+    Test_tez.(
+      (frozen_deposits_before *! Int64.of_int (100 - p) /! 100L) +! autostaked)
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
      the percentages are additive, not multiplicative. *)
@@ -334,12 +357,21 @@ let test_payload_producer_gets_evidence_rewards () =
       real_reward_right_after
   in
   (* Slashing and rewarding happen at the end of the cycle. *)
-  let* b' = Block.bake_until_cycle_end ~policy:(By_account baker2) b' in
+  let* b', end_cycle_metadata, _ =
+    Block.bake_until_cycle_end_with_metadata ~policy:(By_account baker2) b'
+  in
+  let end_cycle_metadata =
+    Option.value_f ~default:(fun () -> assert false) end_cycle_metadata
+  in
+  let autostaked = Block.autostaked baker1 end_cycle_metadata in
+
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+    Test_tez.(
+      (frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+      +! autostaked)
   in
   (* the frozen deposits of the double-signer [baker1] are slashed *)
   let* () =
@@ -349,7 +381,7 @@ let test_payload_producer_gets_evidence_rewards () =
       expected_frozen_deposits_after
   in
   let slashed_amount =
-    Test_tez.(frozen_deposits_before -! frozen_deposits_after)
+    Test_tez.(frozen_deposits_before -! (frozen_deposits_after -! autostaked))
   in
   (* [baker2] included the double baking evidence in [b_with_evidence]
      and so it receives the reward for the evidence included in [b']
