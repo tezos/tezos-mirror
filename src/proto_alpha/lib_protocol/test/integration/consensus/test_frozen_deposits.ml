@@ -379,9 +379,9 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   let autostaked = Block.autostaked slashed_account metadata in
   let* fd = Context.Delegate.current_frozen_deposits (B b) slashed_account in
   let* () = Assert.equal_tez ~loc:__LOC__ fd autostaked in
-  (* Check that we are still not allowed to bake with [slashed_account] *)
-  let*! res = Block.bake ~policy:(By_account slashed_account) b in
-  let* () = Assert.error ~loc:__LOC__ res (fun _ -> true) in
+  (* Check that [slashed_account] can bake since it's a new cycle and
+     autostake increased the frozen deposits enough to bake *)
+  let* _ = Block.bake ~policy:(By_account slashed_account) b in
   return_unit
 
 let test_deposits_after_stake_removal () =
