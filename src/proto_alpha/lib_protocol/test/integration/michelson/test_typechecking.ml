@@ -195,28 +195,31 @@ let location = function
 
 let test_parse_ty (type exp expc) ctxt node
     (expected : (exp, expc) Script_typed_ir.ty) =
+  let open Result_wrap_syntax in
   let legacy = false in
   let allow_lazy_storage = true in
   let allow_operation = true in
   let allow_contract = true in
   let allow_ticket = true in
-  Environment.wrap_tzresult
-    ( Script_ir_translator.parse_ty
-        ctxt
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        node
+  let@ result =
+    Script_ir_translator.parse_ty
+      ctxt
+      ~legacy
+      ~allow_lazy_storage
+      ~allow_operation
+      ~allow_contract
+      ~allow_ticket
+      node
     >>? fun (Script_typed_ir.Ex_ty actual, ctxt) ->
-      Gas_monad.run ctxt
-      @@ Script_ir_translator.ty_eq
-           ~error_details:(Informative (location node))
-           actual
-           expected
-      >>? fun (eq, ctxt) ->
-      eq >|? fun Eq -> ctxt )
+    Gas_monad.run ctxt
+    @@ Script_ir_translator.ty_eq
+         ~error_details:(Informative (location node))
+         actual
+         expected
+    >>? fun (eq, ctxt) ->
+    eq >|? fun Eq -> ctxt
+  in
+  result
 
 let test_parse_comb_type () =
   let open Lwt_result_wrap_syntax in
@@ -300,10 +303,9 @@ let test_parse_comb_type () =
 
 let test_unparse_ty loc ctxt expected ty =
   let open Result_syntax in
-  Environment.wrap_tzresult
-    (let* actual, ctxt = Script_ir_unparser.unparse_ty ctxt ~loc:() ty in
-     if actual = expected then Ok ctxt
-     else Alcotest.failf "Unexpected error: %s" loc)
+  let* actual, ctxt = Script_ir_unparser.unparse_ty ctxt ~loc:() ty in
+  if actual = expected then Ok ctxt
+  else Alcotest.failf "Unexpected error: %s" loc
 
 let test_unparse_comb_type () =
   let open Lwt_result_wrap_syntax in
@@ -318,10 +320,12 @@ let test_unparse_comb_type () =
   let*?@ (Ty_ex_c pair_nat_nat_ty) = pair_ty nat_ty nat_ty in
   let* ctxt = test_context () in
   (* pair nat nat *)
-  let*? ctxt = test_unparse_ty __LOC__ ctxt pair_nat_nat_prim pair_nat_nat_ty in
+  let*?@ ctxt =
+    test_unparse_ty __LOC__ ctxt pair_nat_nat_prim pair_nat_nat_ty
+  in
   (* pair (pair nat nat) nat *)
   let*?@ (Ty_ex_c pair_pair_nat_nat_nat_ty) = pair_ty pair_nat_nat_ty nat_ty in
-  let*? ctxt =
+  let*?@ ctxt =
     test_unparse_ty
       __LOC__
       ctxt
@@ -330,7 +334,7 @@ let test_unparse_comb_type () =
   in
   (* pair nat nat nat *)
   let*?@ (Ty_ex_c pair_nat_nat_nat_ty) = pair_ty nat_ty pair_nat_nat_ty in
-  let*? (_ : context) =
+  let*?@ (_ : context) =
     test_unparse_ty
       __LOC__
       ctxt
@@ -344,11 +348,10 @@ let test_unparse_comparable_ty loc ctxt expected ty =
      call parse_ty on a set type *)
   let open Result_syntax in
   let open Script_typed_ir in
-  Environment.wrap_tzresult
-    (let* set_ty_ty = set_t (-1) ty in
-     let* actual, ctxt = Script_ir_unparser.unparse_ty ctxt ~loc:() set_ty_ty in
-     if actual = Prim ((), T_set, [expected], []) then return ctxt
-     else Alcotest.failf "Unexpected error: %s" loc)
+  let* set_ty_ty = set_t (-1) ty in
+  let* actual, ctxt = Script_ir_unparser.unparse_ty ctxt ~loc:() set_ty_ty in
+  if actual = Prim ((), T_set, [expected], []) then return ctxt
+  else Alcotest.failf "Unexpected error: %s" loc
 
 let test_unparse_comb_comparable_type () =
   let open Lwt_result_wrap_syntax in
@@ -363,12 +366,12 @@ let test_unparse_comb_comparable_type () =
   let*?@ pair_nat_nat_ty = pair_ty nat_ty nat_ty in
   let* ctxt = test_context () in
   (* pair nat nat *)
-  let*? ctxt =
+  let*?@ ctxt =
     test_unparse_comparable_ty __LOC__ ctxt pair_nat_nat_prim pair_nat_nat_ty
   in
   (* pair (pair nat nat) nat *)
   let*?@ pair_pair_nat_nat_nat_ty = pair_ty pair_nat_nat_ty nat_ty in
-  let*? ctxt =
+  let*?@ ctxt =
     test_unparse_comparable_ty
       __LOC__
       ctxt
@@ -377,7 +380,7 @@ let test_unparse_comb_comparable_type () =
   in
   (* pair nat nat nat *)
   let*?@ pair_nat_nat_nat_ty = pair_ty nat_ty pair_nat_nat_ty in
-  let*? (_ : context) =
+  let*?@ (_ : context) =
     test_unparse_comparable_ty
       __LOC__
       ctxt
@@ -891,14 +894,13 @@ let test_parse_contract_data_for_rollup_with_invalid_type () =
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
   let entrypoint = Entrypoint.of_string_strict_exn "add" in
-  let*! res =
-    wrap
-    @@ Script_ir_translator.parse_contract_data
-         ctxt
-         (-1)
-         Script_typed_ir.unit_t
-         (Destination.Sc_rollup rollup)
-         ~entrypoint
+  let*!@ res =
+    Script_ir_translator.parse_contract_data
+      ctxt
+      (-1)
+      Script_typed_ir.unit_t
+      (Destination.Sc_rollup rollup)
+      ~entrypoint
   in
   Assert.proto_error
     ~loc:__LOC__

@@ -200,7 +200,7 @@ let test_negative_balance () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = make_context () in
   let*?@ alice_red, ctxt = make_key ctxt "alice_red" in
-  let*! res = wrap @@ adjust_balance ctxt alice_red (-1) in
+  let*!@ res = adjust_balance ctxt alice_red (-1) in
   Assert.proto_error ~loc:__LOC__ res (fun _err -> true)
 
 (** Test that positive storage spaces are returned for operations

@@ -162,19 +162,18 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     return_unit
 
   let typecheck_patched_script code () =
-    let open Lwt_result_syntax in
+    let open Lwt_result_wrap_syntax in
     (* Number 3 below controls how many accounts should be
        created. This number shouldn't be too small or the context
        won't have enough at least [minimal_stake] tokens. *)
     let* block, _contracts = Context.init3 () in
     let* inc = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt inc in
-    let* _code, _ctxt =
-      Lwt.map Environment.wrap_tzresult
-      @@ Script_ir_translator.parse_code
-           ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-           ~code:(Script_repr.lazy_expr code)
-           ctxt
+    let*@ _code, _ctxt =
+      Script_ir_translator.parse_code
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+        ~code:(Script_repr.lazy_expr code)
+        ctxt
     in
     return_unit
 

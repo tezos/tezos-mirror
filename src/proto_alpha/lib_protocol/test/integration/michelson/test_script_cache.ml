@@ -74,7 +74,6 @@ let equal_scripts (s1 : Script.t) (s2 : Script.t) =
     let* storage1 = force_bytes s1.storage in
     let* storage2 = force_bytes s2.storage in
     return (Bytes.equal code1 code2 && Bytes.equal storage1 storage2))
-  |> Environment.wrap_tzresult
 
 let find ctxt addr =
   let open Lwt_result_wrap_syntax in
@@ -199,7 +198,7 @@ let test_find_correctly_looks_up () =
     *)
     let*@ _, _, result = Script_cache.find ctxt addr in
     let*@ ctxt, script = Contract.get_script ctxt addr in
-    let*? cond =
+    let*?@ cond =
       match (result, script) with
       | None, _ -> Result_syntax.return_false
       | Some _, None ->
@@ -390,9 +389,10 @@ let test_entries_shows_lru () =
       List.fold_left_es
         (fun ctxt (_, addr) ->
           let* ctxt, id, script, cached_contract = find ctxt addr in
-          Lwt.return
-          @@ (Script_cache.update ctxt id (script, cached_contract) new_size
-             |> Environment.wrap_tzresult))
+          let*?@ result =
+            Script_cache.update ctxt id (script, cached_contract) new_size
+          in
+          return result)
         ctxt
         contracts
     in
