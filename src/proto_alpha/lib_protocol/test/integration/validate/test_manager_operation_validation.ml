@@ -292,8 +292,8 @@ let high_fee_diagnostic (infos : infos) op =
   validate_ko_diagnostic infos op expect_failure
 
 let test_high_fee infos kind =
-  let open Lwt_result_syntax in
-  let*? fee = Tez.(one +? default_fund) |> Environment.wrap_tzresult in
+  let open Lwt_result_wrap_syntax in
+  let*?@ fee = Tez.(one +? default_fund) in
   let* op =
     select_op
       {
