@@ -247,8 +247,9 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 
-let stake ctxt ~(amount_strictness : [`Best_effort | `Exact]) ~sender ~delegate
-    amount =
+let stake ctxt
+    ~(amount_strictness : [`Best_effort of Tez_repr.t | `Exact of Tez_repr.t])
+    ~sender ~delegate =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
       Unstake_requests_storage.{delegate = unstake_delegate; requests} =
@@ -272,8 +273,8 @@ let stake ctxt ~(amount_strictness : [`Best_effort | `Exact]) ~sender ~delegate
         unfinalizable_requests_opt
     in
     match amount_strictness with
-    | `Exact -> return amount
-    | `Best_effort ->
+    | `Exact amount -> return amount
+    | `Best_effort max_amount ->
         let*? unstake_frozen_balance =
           List.fold_left_e
             (fun acc (_, t) -> Tez_repr.(acc +? t))
@@ -289,7 +290,7 @@ let stake ctxt ~(amount_strictness : [`Best_effort | `Exact]) ~sender ~delegate
             Tez_repr.(spendable +? unstake_frozen_balance)
           else ok spendable
         in
-        return Tez_repr.(min amount max_spendable)
+        return Tez_repr.(min max_amount max_spendable)
   in
   let* ctxt, stake_balance_updates1, amount_from_liquid =
     if Signature.Public_key_hash.(sender <> delegate) then

@@ -2425,10 +2425,9 @@ module Staking : sig
     to [delegate]. *)
   val stake :
     context ->
-    amount_strictness:[`Best_effort | `Exact] ->
+    amount_strictness:[`Best_effort of Tez.t | `Exact of Tez.t] ->
     sender:public_key_hash ->
     delegate:public_key_hash ->
-    Tez.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
   (** [request_unstake ctxt ~sender_contract ~delegate amount] records a request
