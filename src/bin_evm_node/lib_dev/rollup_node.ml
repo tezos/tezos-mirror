@@ -27,6 +27,7 @@
 (*****************************************************************************)
 
 open Ethereum_types
+open Rollup_node_services
 
 (* The hard limit is 4096 but it needs to add the external message tag. *)
 let max_input_size = 4095
@@ -185,408 +186,344 @@ module Durable_storage_path = struct
   end
 end
 
-module RPC = struct
-  open Tezos_rpc
-  open Path
+let inspect_durable_and_decode_opt base key decode =
+  let open Lwt_result_syntax in
+  let* bytes = call_service ~base durable_state_value () {key} () in
+  match bytes with
+  | Some bytes -> return_some (decode bytes)
+  | None -> return_none
 
-  let smart_rollup_address =
-    Service.get_service
-      ~description:"Smart rollup address"
-      ~query:Query.empty
-      ~output:(Data_encoding.Fixed.bytes 20)
-      (open_root / "global" / "smart_rollup_address")
+let inspect_durable_and_decode base key decode =
+  let open Lwt_result_syntax in
+  let* res_opt = inspect_durable_and_decode_opt base key decode in
+  match res_opt with Some res -> return res | None -> failwith "null"
 
-  type state_value_query = {key : string}
+let smart_rollup_address base =
+  let open Lwt_result_syntax in
+  let*! answer =
+    call_service
+      ~base
+      ~media_types:[Media_type.octet_stream]
+      smart_rollup_address
+      ()
+      ()
+      ()
+  in
+  match answer with
+  | Ok address -> return (Bytes.to_string address)
+  | Error tztrace ->
+      failwith
+        "Failed to communicate with %a, because %a"
+        Uri.pp
+        base
+        pp_print_trace
+        tztrace
 
-  let state_value_query : state_value_query Tezos_rpc.Query.t =
-    let open Tezos_rpc.Query in
-    query (fun key -> {key})
-    |+ field "key" Tezos_rpc.Arg.string "" (fun t -> t.key)
-    |> seal
+let balance base address =
+  let open Lwt_result_syntax in
+  let key = Durable_storage_path.Accounts.balance address in
+  let+ answer = call_service ~base durable_state_value () {key} () in
+  match answer with
+  | Some bytes ->
+      Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
+  | None -> Ethereum_types.Qty Z.zero
 
-  let durable_state_value =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "Retrieve value by key from PVM durable storage. PVM state is taken \
-         with respect to the specified block level. Value returned in hex \
-         format."
-      ~query:state_value_query
-      ~output:Data_encoding.(option bytes)
-      (open_root / "global" / "block" / "head" / "durable" / "wasm_2_0_0"
-     / "value")
+let nonce base address =
+  let open Lwt_result_syntax in
+  let key = Durable_storage_path.Accounts.nonce address in
+  let+ answer = call_service ~base durable_state_value () {key} () in
+  answer
+  |> Option.map (fun bytes ->
+         bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)
 
-  let batcher_injection =
-    Tezos_rpc.Service.post_service
-      ~description:"Inject messages in the batcher's queue"
-      ~query:Tezos_rpc.Query.empty
-      ~input:
-        Data_encoding.(
-          def "messages" ~description:"Messages to inject" (list string))
-      ~output:
-        Data_encoding.(
-          def
-            "message_hashes"
-            ~description:"Hashes of injected L2 messages"
-            (list string))
-      (open_root / "local" / "batcher" / "injection")
+let code base address =
+  let open Lwt_result_syntax in
+  let key = Durable_storage_path.Accounts.code address in
+  let+ answer = call_service ~base durable_state_value () {key} () in
+  match answer with
+  | Some bytes ->
+      bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
+  | None -> Ethereum_types.Hex ""
 
-  let simulation =
-    Tezos_rpc.Service.post_service
-      ~description:
-        "Simulate messages evaluation by the PVM, and find result in durable \
-         storage"
-      ~query:Tezos_rpc.Query.empty
-      ~input:Simulation.Encodings.simulate_input
-      ~output:Data_encoding.Json.encoding
-      (open_root / "global" / "block" / "head" / "simulate")
+let inject_raw_transaction base tx =
+  let open Lwt_result_syntax in
+  (* The injection's service returns a notion of L2 message hash (defined
+     by the rollup node) used to track the message's injection in the batcher.
+     We do not wish to follow the message's inclusion, and thus, ignore
+     the resulted hash. *)
+  let* _answer = call_service ~base batcher_injection () () [tx] in
+  return_unit
 
-  let call_service ~base ?(media_types = Media_type.all_media_types) =
-    Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
+let inject_raw_transaction base ~smart_rollup_address tx_raw =
+  let open Lwt_result_syntax in
+  let*? tx_hash, messages =
+    make_encoded_messages ~smart_rollup_address tx_raw
+  in
+  let* () = List.iter_es (inject_raw_transaction base) messages in
+  return (Ethereum_types.Hash Hex.(of_string tx_hash |> show |> hex_of_string))
 
-  let inspect_durable_and_decode_opt base key decode =
-    let open Lwt_result_syntax in
-    let* bytes = call_service ~base durable_state_value () {key} () in
-    match bytes with
-    | Some bytes -> return_some (decode bytes)
-    | None -> return_none
+exception Invalid_block_structure of string
 
-  let inspect_durable_and_decode base key decode =
-    let open Lwt_result_syntax in
-    let* res_opt = inspect_durable_and_decode_opt base key decode in
-    match res_opt with Some res -> return res | None -> failwith "null"
+exception Invalid_block_index of Z.t
 
-  let smart_rollup_address base =
-    let open Lwt_result_syntax in
-    let*! answer =
-      call_service
-        ~base
-        ~media_types:[Media_type.octet_stream]
-        smart_rollup_address
-        ()
-        ()
-        ()
-    in
-    match answer with
-    | Ok address -> return (Bytes.to_string address)
-    | Error tztrace ->
-        failwith
-          "Failed to communicate with %a, because %a"
-          Uri.pp
+let block_number base n =
+  let open Lwt_result_syntax in
+  match n with
+  (* This avoids an unecessary service call in case we ask a block's number
+     with an already expected/known block number [n]. *)
+  | Durable_storage_path.Block.Nth i -> return @@ Ethereum_types.Block_height i
+  | Durable_storage_path.Block.Current -> (
+      let key = Durable_storage_path.Block.current_number in
+      let+ answer = call_service ~base durable_state_value () {key} () in
+      match answer with
+      | Some bytes ->
+          Ethereum_types.Block_height (Bytes.to_string bytes |> Z.of_bits)
+      | None ->
+          raise
+          @@ Invalid_block_structure
+               "Unexpected [None] value for [current_number]'s [answer]")
+
+let current_block_number base () =
+  block_number base Durable_storage_path.Block.Current
+
+let un_qty (Qty z) = z
+
+let transaction_receipt base (Hash (Hex tx_hash)) =
+  let open Lwt_result_syntax in
+  (* We use a mock block hash to decode the rest of the receipt,
+     so that we can get the number to query for the actual block
+     hash. *)
+  let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+  let* opt_receipt =
+    inspect_durable_and_decode_opt
+      base
+      (Durable_storage_path.Transaction_receipt.receipt tx_hash)
+      (Ethereum_types.transaction_receipt_from_rlp mock_block_hash)
+  in
+  match opt_receipt with
+  | Some temp_receipt ->
+      let+ blockHash =
+        inspect_durable_and_decode
           base
-          pp_print_trace
-          tztrace
+          (Durable_storage_path.Indexes.blocks_by_number
+             (Nth (un_qty temp_receipt.blockNumber)))
+          decode_block_hash
+      in
+      let logs =
+        List.map
+          (fun (log : transaction_log) -> {log with blockHash = Some blockHash})
+          temp_receipt.logs
+      in
+      Some {temp_receipt with blockHash; logs}
+  | None -> return_none
 
-  let balance base address =
-    let open Lwt_result_syntax in
-    let key = Durable_storage_path.Accounts.balance address in
-    let+ answer = call_service ~base durable_state_value () {key} () in
-    match answer with
-    | Some bytes ->
-        Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
-    | None -> Ethereum_types.Qty Z.zero
-
-  let nonce base address =
-    let open Lwt_result_syntax in
-    let key = Durable_storage_path.Accounts.nonce address in
-    let+ answer = call_service ~base durable_state_value () {key} () in
-    answer
-    |> Option.map (fun bytes ->
-           bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)
-
-  let code base address =
-    let open Lwt_result_syntax in
-    let key = Durable_storage_path.Accounts.code address in
-    let+ answer = call_service ~base durable_state_value () {key} () in
-    match answer with
-    | Some bytes ->
-        bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
-    | None -> Ethereum_types.Hex ""
-
-  let inject_raw_transaction base tx =
-    let open Lwt_result_syntax in
-    (* The injection's service returns a notion of L2 message hash (defined
-       by the rollup node) used to track the message's injection in the batcher.
-       We do not wish to follow the message's inclusion, and thus, ignore
-       the resulted hash. *)
-    let* _answer = call_service ~base batcher_injection () () [tx] in
-    return_unit
-
-  let inject_raw_transaction base ~smart_rollup_address tx_raw =
-    let open Lwt_result_syntax in
-    let*? tx_hash, messages =
-      make_encoded_messages ~smart_rollup_address tx_raw
-    in
-    let* () = List.iter_es (inject_raw_transaction base) messages in
-    return
-      (Ethereum_types.Hash Hex.(of_string tx_hash |> show |> hex_of_string))
-
-  exception Invalid_block_structure of string
-
-  exception Invalid_block_index of Z.t
-
-  let block_number base n =
-    let open Lwt_result_syntax in
-    match n with
-    (* This avoids an unecessary service call in case we ask a block's number
-       with an already expected/known block number [n]. *)
-    | Durable_storage_path.Block.Nth i ->
-        return @@ Ethereum_types.Block_height i
-    | Durable_storage_path.Block.Current -> (
-        let key = Durable_storage_path.Block.current_number in
-        let+ answer = call_service ~base durable_state_value () {key} () in
-        match answer with
-        | Some bytes ->
-            Ethereum_types.Block_height (Bytes.to_string bytes |> Z.of_bits)
-        | None ->
-            raise
-            @@ Invalid_block_structure
-                 "Unexpected [None] value for [current_number]'s [answer]")
-
-  let current_block_number base () =
-    block_number base Durable_storage_path.Block.Current
-
-  let un_qty (Qty z) = z
-
-  let transaction_receipt base (Hash (Hex tx_hash)) =
-    let open Lwt_result_syntax in
-    (* We use a mock block hash to decode the rest of the receipt,
-       so that we can get the number to query for the actual block
-       hash. *)
-    let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
-    let* opt_receipt =
-      inspect_durable_and_decode_opt
-        base
-        (Durable_storage_path.Transaction_receipt.receipt tx_hash)
-        (Ethereum_types.transaction_receipt_from_rlp mock_block_hash)
-    in
-    match opt_receipt with
-    | Some temp_receipt ->
-        let+ blockHash =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Indexes.blocks_by_number
-               (Nth (un_qty temp_receipt.blockNumber)))
-            decode_block_hash
-        in
-        let logs =
-          List.map
-            (fun (log : transaction_log) ->
-              {log with blockHash = Some blockHash})
-            temp_receipt.logs
-        in
-        Some {temp_receipt with blockHash; logs}
-    | None -> return_none
-
-  let transaction_object base (Hash (Hex tx_hash)) =
-    let open Lwt_result_syntax in
-    (* We use a mock block hash to decode the rest of the receipt,
-       so that we can get the number to query for the actual block
-       hash. *)
-    let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
-    let* opt_object =
-      inspect_durable_and_decode_opt
-        base
-        (Durable_storage_path.Transaction_object.object_ tx_hash)
-        (Ethereum_types.transaction_object_from_rlp mock_block_hash)
-    in
-    match opt_object with
-    | Some temp_object ->
-        let+ blockHash =
-          inspect_durable_and_decode
-            base
-            (Durable_storage_path.Indexes.blocks_by_number
-               (Nth (un_qty temp_object.blockNumber)))
-            decode_block_hash
-        in
-        Some {temp_object with blockHash}
-    | None -> return_none
-
-  let transaction_object_with_block_hash base block_hash (Hash (Hex tx_hash)) =
+let transaction_object base (Hash (Hex tx_hash)) =
+  let open Lwt_result_syntax in
+  (* We use a mock block hash to decode the rest of the receipt,
+     so that we can get the number to query for the actual block
+     hash. *)
+  let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+  let* opt_object =
     inspect_durable_and_decode_opt
       base
       (Durable_storage_path.Transaction_object.object_ tx_hash)
-      (Ethereum_types.transaction_object_from_rlp block_hash)
-
-  let full_transactions block_hash transactions base =
-    let open Lwt_result_syntax in
-    match transactions with
-    | TxHash hashes ->
-        let+ objects =
-          List.filter_map_es
-            (transaction_object_with_block_hash base block_hash)
-            hashes
-        in
-        TxFull objects
-    | TxFull _ -> return transactions
-
-  let populate_tx_objects ~full_transaction_object base block =
-    let open Lwt_result_syntax in
-    if full_transaction_object then
-      let* transactions =
-        full_transactions block.hash block.transactions base
+      (Ethereum_types.transaction_object_from_rlp mock_block_hash)
+  in
+  match opt_object with
+  | Some temp_object ->
+      let+ blockHash =
+        inspect_durable_and_decode
+          base
+          (Durable_storage_path.Indexes.blocks_by_number
+             (Nth (un_qty temp_object.blockNumber)))
+          decode_block_hash
       in
-      return {block with transactions}
-    else return block
+      Some {temp_object with blockHash}
+  | None -> return_none
 
-  let blocks_by_number ~full_transaction_object ~number base =
-    let open Lwt_result_syntax in
-    let* (Ethereum_types.Block_height level) = block_number base number in
-    let* block_hash_opt =
-      inspect_durable_and_decode_opt
-        base
-        (Durable_storage_path.Indexes.blocks_by_number (Nth level))
-        decode_block_hash
-    in
-    match block_hash_opt with
-    | None -> raise @@ Invalid_block_index level
-    | Some block_hash -> (
-        let* block_opt =
-          inspect_durable_and_decode_opt
-            base
-            (Durable_storage_path.Block.by_hash block_hash)
-            Ethereum_types.block_from_rlp
-        in
-        match block_opt with
-        | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
-        | Some block -> populate_tx_objects ~full_transaction_object base block)
+let transaction_object_with_block_hash base block_hash (Hash (Hex tx_hash)) =
+  inspect_durable_and_decode_opt
+    base
+    (Durable_storage_path.Transaction_object.object_ tx_hash)
+    (Ethereum_types.transaction_object_from_rlp block_hash)
 
-  let current_block base ~full_transaction_object =
-    blocks_by_number
-      ~full_transaction_object
-      ~number:Durable_storage_path.Block.Current
+let full_transactions block_hash transactions base =
+  let open Lwt_result_syntax in
+  match transactions with
+  | TxHash hashes ->
+      let+ objects =
+        List.filter_map_es
+          (transaction_object_with_block_hash base block_hash)
+          hashes
+      in
+      TxFull objects
+  | TxFull _ -> return transactions
+
+let populate_tx_objects ~full_transaction_object base block =
+  let open Lwt_result_syntax in
+  if full_transaction_object then
+    let* transactions = full_transactions block.hash block.transactions base in
+    return {block with transactions}
+  else return block
+
+let blocks_by_number ~full_transaction_object ~number base =
+  let open Lwt_result_syntax in
+  let* (Ethereum_types.Block_height level) = block_number base number in
+  let* block_hash_opt =
+    inspect_durable_and_decode_opt
       base
+      (Durable_storage_path.Indexes.blocks_by_number (Nth level))
+      decode_block_hash
+  in
+  match block_hash_opt with
+  | None -> raise @@ Invalid_block_index level
+  | Some block_hash -> (
+      let* block_opt =
+        inspect_durable_and_decode_opt
+          base
+          (Durable_storage_path.Block.by_hash block_hash)
+          Ethereum_types.block_from_rlp
+      in
+      match block_opt with
+      | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+      | Some block -> populate_tx_objects ~full_transaction_object base block)
 
-  let nth_block base ~full_transaction_object n =
-    blocks_by_number
-      ~full_transaction_object
-      ~number:Durable_storage_path.Block.(Nth n)
+let current_block base ~full_transaction_object =
+  blocks_by_number
+    ~full_transaction_object
+    ~number:Durable_storage_path.Block.Current
+    base
+
+let nth_block base ~full_transaction_object n =
+  blocks_by_number
+    ~full_transaction_object
+    ~number:Durable_storage_path.Block.(Nth n)
+    base
+
+let block_by_hash base ~full_transaction_object block_hash =
+  let open Lwt_result_syntax in
+  let* block_opt =
+    inspect_durable_and_decode_opt
       base
+      (Durable_storage_path.Block.by_hash block_hash)
+      Ethereum_types.block_from_rlp
+  in
+  match block_opt with
+  | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+  | Some block -> populate_tx_objects ~full_transaction_object base block
 
-  let block_by_hash base ~full_transaction_object block_hash =
-    let open Lwt_result_syntax in
-    let* block_opt =
-      inspect_durable_and_decode_opt
-        base
-        (Durable_storage_path.Block.by_hash block_hash)
-        Ethereum_types.block_from_rlp
-    in
-    match block_opt with
-    | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
-    | Some block -> populate_tx_objects ~full_transaction_object base block
+let txpool _ () =
+  Lwt.return_ok {pending = AddressMap.empty; queued = AddressMap.empty}
 
-  let txpool _ () =
-    Lwt.return_ok {pending = AddressMap.empty; queued = AddressMap.empty}
+let chain_id base () =
+  inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
 
-  let chain_id base () =
-    inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
+let base_fee_per_gas base () =
+  inspect_durable_and_decode
+    base
+    Durable_storage_path.base_fee_per_gas
+    decode_number
 
-  let base_fee_per_gas base () =
-    inspect_durable_and_decode
-      base
-      Durable_storage_path.base_fee_per_gas
-      decode_number
+let kernel_version base () =
+  inspect_durable_and_decode
+    base
+    Durable_storage_path.kernel_version
+    Bytes.to_string
 
-  let kernel_version base () =
-    inspect_durable_and_decode
-      base
-      Durable_storage_path.kernel_version
-      Bytes.to_string
+let simulate_call base call =
+  let open Lwt_result_syntax in
+  let*? messages = Simulation.encode call in
+  let insight_requests =
+    [
+      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
+         for now the status is not used but it should be for error handling *)
+      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
+    ]
+  in
+  let* r =
+    call_service
+      ~base
+      simulation
+      ()
+      ()
+      {
+        messages;
+        reveal_pages = None;
+        insight_requests;
+        log_kernel_debug_file = Some "simulate_call";
+      }
+  in
+  Simulation.call_result r
 
-  let simulate_call base call =
-    let open Lwt_result_syntax in
-    let*? messages = Simulation.encode call in
-    let insight_requests =
-      [
-        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
-           for now the status is not used but it should be for error handling *)
-        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
-      ]
-    in
-    let* r =
-      call_service
-        ~base
-        simulation
-        ()
-        ()
-        {
-          messages;
-          reveal_pages = None;
-          insight_requests;
-          log_kernel_debug_file = Some "simulate_call";
-        }
-    in
-    Simulation.call_result r
+let estimate_gas base call =
+  let open Lwt_result_syntax in
+  let*? messages = Simulation.encode call in
+  let insight_requests =
+    [
+      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_gas"];
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
+         for now the status is not used but it should be for error handling *)
+      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
+    ]
+  in
+  let* r =
+    call_service
+      ~base
+      simulation
+      ()
+      ()
+      {
+        messages;
+        reveal_pages = None;
+        insight_requests;
+        log_kernel_debug_file = Some "estimate_gas";
+      }
+  in
+  Simulation.gas_estimation r
 
-  let estimate_gas base call =
-    let open Lwt_result_syntax in
-    let*? messages = Simulation.encode call in
-    let insight_requests =
-      [
-        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_gas"];
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
-           for now the status is not used but it should be for error handling *)
-        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
-      ]
-    in
-    let* r =
-      call_service
-        ~base
-        simulation
-        ()
-        ()
-        {
-          messages;
-          reveal_pages = None;
-          insight_requests;
-          log_kernel_debug_file = Some "estimate_gas";
-        }
-    in
-    Simulation.gas_estimation r
+let is_tx_valid base (Hex tx_raw) =
+  let open Lwt_result_syntax in
+  let*? messages = Simulation.encode_tx tx_raw in
+  let insight_requests =
+    [
+      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
+      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
+    ]
+  in
+  let* r =
+    call_service
+      ~base
+      simulation
+      ()
+      ()
+      {
+        messages;
+        reveal_pages = None;
+        insight_requests;
+        log_kernel_debug_file = Some "tx_validity";
+      }
+  in
+  Simulation.is_tx_valid r
 
-  let is_tx_valid base (Hex tx_raw) =
-    let open Lwt_result_syntax in
-    let*? messages = Simulation.encode_tx tx_raw in
-    let insight_requests =
-      [
-        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
-        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
-      ]
-    in
-    let* r =
-      call_service
-        ~base
-        simulation
-        ()
-        ()
-        {
-          messages;
-          reveal_pages = None;
-          insight_requests;
-          log_kernel_debug_file = Some "tx_validity";
-        }
-    in
-    Simulation.is_tx_valid r
-
-  let storage_at base address (Qty pos) =
-    let open Lwt_result_syntax in
-    let pad32left0 s =
-      let open Ethereum_types in
-      (* Strip 0x *)
-      let (Hex s) = hex_of_string s in
-      let len = String.length s in
-      (* This is a Hex string of 32 bytes, therefore the length is 64 *)
-      String.make (64 - len) '0' ^ s
-    in
-    let index = Z.format "#x" pos |> pad32left0 in
-    let key = Durable_storage_path.Accounts.storage address index in
-    let+ answer = call_service ~base durable_state_value () {key} () in
-    match answer with
-    | Some bytes ->
-        Bytes.to_string bytes |> Hex.of_string |> Hex.show
-        |> Ethereum_types.hex_of_string
-    | None -> Ethereum_types.Hex (pad32left0 "0")
-end
+let storage_at base address (Qty pos) =
+  let open Lwt_result_syntax in
+  let pad32left0 s =
+    let open Ethereum_types in
+    (* Strip 0x *)
+    let (Hex s) = hex_of_string s in
+    let len = String.length s in
+    (* This is a Hex string of 32 bytes, therefore the length is 64 *)
+    String.make (64 - len) '0' ^ s
+  in
+  let index = Z.format "#x" pos |> pad32left0 in
+  let key = Durable_storage_path.Accounts.storage address index in
+  let+ answer = call_service ~base durable_state_value () {key} () in
+  match answer with
+  | Some bytes ->
+      Bytes.to_string bytes |> Hex.of_string |> Hex.show
+      |> Ethereum_types.hex_of_string
+  | None -> Ethereum_types.Hex (pad32left0 "0")
 
 module type S = sig
   val smart_rollup_address : string tzresult Lwt.t
@@ -647,41 +584,41 @@ end
 module Make (Base : sig
   val base : Uri.t
 end) : S = struct
-  let smart_rollup_address = RPC.smart_rollup_address Base.base
+  let smart_rollup_address = smart_rollup_address Base.base
 
-  let balance = RPC.balance Base.base
+  let balance = balance Base.base
 
-  let nonce = RPC.nonce Base.base
+  let nonce = nonce Base.base
 
-  let code = RPC.code Base.base
+  let code = code Base.base
 
-  let inject_raw_transaction = RPC.inject_raw_transaction Base.base
+  let inject_raw_transaction = inject_raw_transaction Base.base
 
-  let current_block = RPC.current_block Base.base
+  let current_block = current_block Base.base
 
-  let current_block_number = RPC.current_block_number Base.base
+  let current_block_number = current_block_number Base.base
 
-  let nth_block = RPC.nth_block Base.base
+  let nth_block = nth_block Base.base
 
-  let block_by_hash = RPC.block_by_hash Base.base
+  let block_by_hash = block_by_hash Base.base
 
-  let transaction_receipt = RPC.transaction_receipt Base.base
+  let transaction_receipt = transaction_receipt Base.base
 
-  let transaction_object = RPC.transaction_object Base.base
+  let transaction_object = transaction_object Base.base
 
-  let txpool = RPC.txpool Base.base
+  let txpool = txpool Base.base
 
-  let chain_id = RPC.chain_id Base.base
+  let chain_id = chain_id Base.base
 
-  let base_fee_per_gas = RPC.base_fee_per_gas Base.base
+  let base_fee_per_gas = base_fee_per_gas Base.base
 
-  let kernel_version = RPC.kernel_version Base.base
+  let kernel_version = kernel_version Base.base
 
-  let simulate_call = RPC.simulate_call Base.base
+  let simulate_call = simulate_call Base.base
 
-  let estimate_gas = RPC.estimate_gas Base.base
+  let estimate_gas = estimate_gas Base.base
 
-  let is_tx_valid = RPC.is_tx_valid Base.base
+  let is_tx_valid = is_tx_valid Base.base
 
-  let storage_at = RPC.storage_at Base.base
+  let storage_at = storage_at Base.base
 end
