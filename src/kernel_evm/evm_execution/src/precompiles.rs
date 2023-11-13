@@ -10,15 +10,19 @@
 //! provided by SputnikVM, as we require the Host type and object
 //! for writing to the log.
 
+use std::{cmp::min, vec};
+
 use crate::abi;
 use crate::handler::EvmHandler;
 use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
+use libsecp256k1::{curve::Scalar, recover, Message, RecoveryId, Signature};
 use primitive_types::{H160, U256};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
+use sha3::Keccak256;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 
@@ -114,6 +118,114 @@ macro_rules! fail_if_too_much {
             $estimated_ticks
         }
     };
+}
+
+fn erec_output_for_wrong_input() -> PrecompileOutcome {
+    PrecompileOutcome {
+        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+        output: vec![],
+        withdrawals: vec![],
+        estimated_ticks: 0,
+    }
+}
+
+macro_rules! unwrap {
+    ($expr : expr) => {
+        match $expr {
+            Ok(x) => x,
+            Err(_) => return Ok(erec_output_for_wrong_input()),
+        }
+    };
+}
+
+fn erec_parse_inputs(input: &[u8]) -> ([u8; 32], u8, [u8; 32], [u8; 32]) {
+    // input is padded with 0 on the right
+    let mut clean_input: [u8; 128] = [0; 128];
+    // and truncated if too large
+    let input_size = min(128, input.len());
+    clean_input[..input_size].copy_from_slice(&input[..input_size]);
+
+    // extract values
+    let mut hash = [0; 32];
+    let mut v_array = [0; 32];
+    let mut r_array = [0; 32];
+    let mut s_array = [0; 32];
+    hash.copy_from_slice(&clean_input[0..32]);
+    v_array.copy_from_slice(&clean_input[32..64]);
+    r_array.copy_from_slice(&clean_input[64..96]);
+    s_array.copy_from_slice(&clean_input[96..128]);
+    // v is encoding of 1 byte nb over 32 bytes
+    (hash, v_array[31], r_array, s_array)
+}
+
+// implementation of 0x01 ECDSA recover
+fn ecrecover_precompile<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+    _context: &Context,
+    _is_static: bool,
+    _transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    log!(handler.borrow_host(), Info, "Calling ecrecover precompile");
+
+    // check that enough ressources to execute (gas / ticks) are available
+    let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_ecrecover(), handler);
+    let cost = 3000;
+    if let Err(err) = handler.record_cost(cost) {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Couldn't record the cost of ecrecover {:?}",
+            err
+        );
+        return Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks,
+        });
+    }
+    log!(
+        handler.borrow_host(),
+        Debug,
+        "Input is {:?}",
+        hex::encode(input)
+    );
+
+    // parse inputs
+    let (hash, v_raw, r_array, s_array) = erec_parse_inputs(input);
+    let v = match v_raw.checked_sub(27) {
+        Some(v) => v,
+        None => return Ok(erec_output_for_wrong_input()),
+    };
+    // wrappers needed by ecdsa crate
+    let mut r = Scalar::default();
+    let _ = r.set_b32(&r_array);
+    let mut s = Scalar::default();
+    let _ = s.set_b32(&s_array);
+    let ri = unwrap!(RecoveryId::parse(v));
+
+    // check signature
+    let pubk = unwrap!(recover(&Message::parse(&hash), &Signature { r, s }, &ri));
+    let kec = Keccak256::digest(&pubk.serialize()[1..]);
+    let address: Result<[u8; 20], _> = kec.as_slice()[12..].try_into();
+    let add = unwrap!(address);
+
+    // format output
+    let mut output = vec![0; 32];
+    output[12..].copy_from_slice(&add);
+    log!(
+        handler.borrow_host(),
+        Debug,
+        "Output is {:?}",
+        hex::encode(&output)
+    );
+    Ok(PrecompileOutcome {
+        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+        output,
+        withdrawals: vec![],
+        estimated_ticks,
+    })
 }
 
 // implmenetation of 0x02 precompiled (identity)
@@ -311,6 +423,10 @@ fn withdrawal_precompile<Host: Runtime>(
 pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
     BTreeMap::from([
         (
+            H160::from_low_u64_be(1u64),
+            ecrecover_precompile as PrecompileFn<Host>,
+        ),
+        (
             H160::from_low_u64_be(2u64),
             sha256_precompile as PrecompileFn<Host>,
         ),
@@ -346,6 +462,11 @@ mod tick_model {
     }
     pub fn ticks_of_withdraw() -> u64 {
         1_000_000
+    }
+
+    pub fn ticks_of_ecrecover() -> u64 {
+        // TODO: find out safe value
+        0
     }
 }
 
