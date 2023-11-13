@@ -555,15 +555,18 @@ module State = struct
     let state = apply_all_slashes_at_cycle_end current_cycle state in
     (* Apply autostaking *)
     let*? state =
-      match launch_cycle_opt with
-      | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) -> ok state
-      | None | Some _ ->
-          Environment.wrap_tzresult
-          @@ String.Map.fold_e
-               (fun name account state ->
-                 apply_autostake ~name ~old_cycle:current_cycle account state)
-               state.account_map
-               state
+      if not state.constants.adaptive_issuance.autostaking_enable then ok state
+      else
+        match launch_cycle_opt with
+        | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) ->
+            ok state
+        | None | Some _ ->
+            Environment.wrap_tzresult
+            @@ String.Map.fold_e
+                 (fun name account state ->
+                   apply_autostake ~name ~old_cycle:current_cycle account state)
+                 state.account_map
+                 state
     in
     (* Apply parameter changes *)
     let state, param_requests =
@@ -1752,13 +1755,18 @@ let test_expected_error =
            (exec (fun _ -> failwith "")))
 
 let init_constants ?reward_per_block ?(deactivate_dynamic = false)
-    ?blocks_per_cycle ?(force_snapshot_at_end = false) () =
+    ?blocks_per_cycle ?(force_snapshot_at_end = false) ?autostaking_enable () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
   (* default for tests: 12 *)
   let blocks_per_cycle =
     Option.value ~default:default_constants.blocks_per_cycle blocks_per_cycle
+  in
+  let autostaking_enable =
+    Option.value
+      ~default:default_constants.adaptive_issuance.autostaking_enable
+      autostaking_enable
   in
   let blocks_per_stake_snapshot =
     if force_snapshot_at_end then blocks_per_cycle
@@ -1789,7 +1797,9 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
       }
     else adaptive_issuance.adaptive_rewards_params
   in
-  let adaptive_issuance = {adaptive_issuance with adaptive_rewards_params} in
+  let adaptive_issuance =
+    {adaptive_issuance with adaptive_rewards_params; autostaking_enable}
+  in
   {
     default_constants with
     consensus_threshold;
@@ -2314,7 +2324,7 @@ end
 
 module Slashing = struct
   let test_simple_slash =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     let any_slash =
       Tag "double baking" --> double_bake "delegate"
       |+ Tag "double attesting" --> double_attest "delegate"
@@ -2466,7 +2476,11 @@ module Slashing = struct
   let test_slash_monotonous_stake =
     let scenario ~op ~early_d =
       let constants =
-        init_constants ~force_snapshot_at_end:true ~blocks_per_cycle:8l ()
+        init_constants
+          ~force_snapshot_at_end:true
+          ~blocks_per_cycle:8l
+          ~autostaking_enable:false
+          ()
       in
       begin_test ~activate_ai:false constants ["delegate"]
       --> next_cycle
