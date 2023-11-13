@@ -3,7 +3,7 @@
 
 (library
  (name evm_node_lib_dev_encoding)
- (package octez-node-lib-dev-encoding)
+ (public_name octez-evm-node-libs.evm_node_lib_dev_encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base

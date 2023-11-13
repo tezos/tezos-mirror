@@ -12,8 +12,8 @@
   octez-libs.test-helpers
   qcheck-alcotest
   octez-alcotezt
-  evm_node_lib_prod
-  evm_node_lib_dev)
+  octez-evm-node-libs.evm_node_lib_prod
+  octez-evm-node-libs.evm_node_lib_dev)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

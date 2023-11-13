@@ -3,7 +3,7 @@
 
 (library
  (name evm_node_lib_prod)
- (package octez-node-lib-prod)
+ (public_name octez-evm-node-libs.evm_node_lib_prod)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
@@ -12,7 +12,7 @@
   octez-libs.rpc-http-client-unix
   octez-version.value
   octez-libs.stdlib-unix
-  evm_node_lib_prod_encoding
+  octez-evm-node-libs.evm_node_lib_prod_encoding
   lwt-exit)
  (flags
   (:standard)

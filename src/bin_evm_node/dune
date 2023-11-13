@@ -13,9 +13,9 @@
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   octez-version.value
-  evm_node_lib_prod
-  evm_node_lib_dev
-  evm_node_lib_dev_encoding)
+  octez-evm-node-libs.evm_node_lib_prod
+  octez-evm-node-libs.evm_node_lib_dev
+  octez-evm-node-libs.evm_node_lib_dev_encoding)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))

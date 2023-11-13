@@ -8272,11 +8272,21 @@ let _octez_scoru_wasm_debugger =
         lambda_term;
       ]
 
+(* Container of the registered sublibraries of [octez-evm-node] *)
+let registered_octez_evm_node_libs : Sub_lib.container =
+  Sub_lib.make_container ()
+
+(* Registers a sub-library in the [octez-evm-node] package. *)
+let octez_evm_node_lib : Sub_lib.maker =
+  Sub_lib.sub_lib
+    ~package_synopsis:"Octez EVM node libraries"
+    ~container:registered_octez_evm_node_libs
+    ~package:"octez-evm-node-libs"
+
 let evm_node_lib_prod_encoding =
-  private_lib
+  octez_evm_node_lib
     "evm_node_lib_prod_encoding"
     ~path:"src/bin_evm_node/lib_prod/encodings"
-    ~opam:"octez-node-lib-prod-encoding"
     ~synopsis:
       "EVM encodings for the EVM node and plugin for the WASM Debugger [prod \
        version]"
@@ -8284,10 +8294,9 @@ let evm_node_lib_prod_encoding =
       [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
 
 let evm_node_lib_prod =
-  private_lib
+  octez_evm_node_lib
     "evm_node_lib_prod"
     ~path:"src/bin_evm_node/lib_prod"
-    ~opam:"octez-node-lib-prod"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [prod version]"
@@ -8304,10 +8313,9 @@ let evm_node_lib_prod =
       ]
 
 let evm_node_lib_dev_encoding =
-  private_lib
+  octez_evm_node_lib
     "evm_node_lib_dev_encoding"
     ~path:"src/bin_evm_node/lib_dev/encodings"
-    ~opam:"octez-node-lib-dev-encoding"
     ~synopsis:
       "EVM encodings for the EVM node and plugin for the WASM Debugger [dev \
        version]"
@@ -8315,10 +8323,9 @@ let evm_node_lib_dev_encoding =
       [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
 
 let evm_node_lib_dev =
-  private_lib
+  octez_evm_node_lib
     "evm_node_lib_dev"
     ~path:"src/bin_evm_node/lib_dev"
-    ~opam:"octez-node-lib-dev"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [dev version]"
@@ -8768,5 +8775,19 @@ let () =
      It contains the following libraries:\n\n"
   in
   Sub_lib.pp_documentation_of_container ~header fmt registered_octez_l2_libs
+
+(* Generate documentation index for [octez-evm-node-libs] *)
+let () =
+  write "src/bin_evm_node/index.mld" @@ fun fmt ->
+  let header =
+    "{0 Octez-evm-node-libs: octez EVM Node libraries}\n\n\
+     This is a package containing some libraries used by the EVM Node of \
+     Octez.\n\n\
+     It contains the following libraries:\n\n"
+  in
+  Sub_lib.pp_documentation_of_container
+    ~header
+    fmt
+    registered_octez_evm_node_libs
 
 let () = postcheck ~exclude ()
