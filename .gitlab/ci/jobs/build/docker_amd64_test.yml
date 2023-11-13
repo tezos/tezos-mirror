@@ -4,6 +4,7 @@ docker:amd64:
   extends:
     - .tags_template__build
     - .build_docker_release_template
+    - .tags_template__no_gcp
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "false"

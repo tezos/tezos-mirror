@@ -3,6 +3,7 @@ include: .gitlab/ci/jobs/publish/common.yml
 docker:promote_to_latest:
   extends:
     - .image_template__docker
+    - .tags_template__no_gcp
   stage: publish_release
   variables:
     CI_DOCKER_HUB: "true"

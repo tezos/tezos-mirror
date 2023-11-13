@@ -1,4 +1,6 @@
 dpkg:amd64:
+  extends:
+    - .tags_template__build
   image: debian:bookworm
   stage: manual
   when: manual
@@ -18,8 +20,6 @@ dpkg:amd64:
   variables:
     OCTEZ_PKGMAINTAINER: "dev@nomadic-labs.com"
     BLST_PORTABLE: "yes"
-  tags:
-    - amd64
   artifacts:
     name: "dpkg-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
@@ -28,6 +28,8 @@ dpkg:amd64:
     when: on_success
 
 rpm:amd64:
+  extends:
+    - .tags_template__build
   image: fedora
   stage: manual
   when: manual
@@ -47,8 +49,6 @@ rpm:amd64:
   variables:
     OCTEZ_PKGMAINTAINER: "dev@nomadic-labs.com"
     BLST_PORTABLE: "yes"
-  tags:
-    - amd64
   artifacts:
     name: "rpm-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:

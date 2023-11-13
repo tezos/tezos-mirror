@@ -2,7 +2,6 @@ ocaml-check:
   extends:
     - .tags_template__build
     - .build
-    - .tags_template__gcp
   needs: [trigger]
   script:
     - dune build @check

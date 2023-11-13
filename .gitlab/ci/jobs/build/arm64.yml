@@ -2,9 +2,8 @@ include: .gitlab/ci/jobs/build/common.yml
 
 .build_arm64:
   extends:
-    - .tags_template__build_arm64
     - .build
-    - .tags_template__gcp_arm64
+    - .tags_template__build_arm64
   variables:
     ARCH: "arm64"
     # Disable coverage for arm64

@@ -3,6 +3,7 @@ include: .gitlab/ci/jobs/test/common.yml
 ometrics-code-quality-default:
   stage: test
   extends:
+    - .default_settings_template
     - .template__code_quality
     - .image_template__alpine
     # See https://gitlab.com/gitlab-org/gitlab/-/issues/215279
