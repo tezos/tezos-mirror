@@ -90,9 +90,9 @@ let gen_inbox level =
   let* tail = small_list gen_msg in
   let payloads = hd :: tail in
   let witness_and_inbox =
-    let open Result_syntax in
+    let open Result_wrap_syntax in
     let inbox = Sc_rollup_helpers.dumb_init_repr level in
-    Environment.wrap_tzresult
+    wrap
     @@
     let witness = Sc_rollup_inbox_repr.init_witness_no_history in
     let witness =

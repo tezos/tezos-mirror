@@ -72,7 +72,7 @@ struct
       - every element in the list of levels represents the slots of a single level.
       - each slot of a given level is not confirmed iff the boolean is true. *)
   let populate_slots_history (levels_data : levels) =
-    let open Result_syntax in
+    let open Result_wrap_syntax in
     (* Make and insert a slot. *)
     let slot_data =
       Bytes.init
@@ -93,11 +93,9 @@ struct
       let slot =
         Dal_slot_repr.Header.{id = {published_level = level; index}; commitment}
       in
-      let* cell, cache =
+      let*@ cell, cache =
         if skip_slot then return (cell, cache)
-        else
-          Dal_slot_repr.History.add_confirmed_slot_headers cell cache [slot]
-          |> Environment.wrap_tzresult
+        else Dal_slot_repr.History.add_confirmed_slot_headers cell cache [slot]
       in
       return (cell, cache, (polynomial, slot, skip_slot) :: slots_info)
     in
