@@ -7,6 +7,8 @@
 ### EVM Node
 
 - Add support for `eth_getLogs`. (!10624)
+- Replaced the argument `--version <mode>` to a flag `--devmode` for dev, and
+  mode production by default. (!10821)
 
 ### Bug fixes
 

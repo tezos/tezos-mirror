@@ -28,21 +28,21 @@
 (** EVM node server state. *)
 type t
 
-(** [create ?runner ?version ?rpc_addr ?rpc_port rollup_node] creates an EVM node server.
+(** [create ?runner ?devmode ?rpc_addr ?rpc_port rollup_node] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to ["127.0.0.1"] and a fresh port is
     chosen if [rpc_port] is not set.
 
-    To use the node on development set [version] to [`Development]. Otherwise to
-    set it to the one on production set [version] to [`Production].
+    To use the node on development set [devmode] to [true]. Otherwise to
+    set it to the one on production set [devmode] to [false] (or omit the parameter).
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node].
 *)
 val create :
   ?runner:Runner.t ->
-  ?version:[< `Production | `Development] ->
+  ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   Sc_rollup_node.t ->
@@ -52,11 +52,11 @@ val create :
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
-(** [init ?runner ?version ?rpc_addr ?rpc_port rollup_node] creates an EVM node server
+(** [init ?runner ?devmode ?rpc_addr ?rpc_port rollup_node] creates an EVM node server
     with {!create} and runs it with {!run}. *)
 val init :
   ?runner:Runner.t ->
-  ?version:[< `Production | `Development] ->
+  ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   Sc_rollup_node.t ->
