@@ -254,8 +254,14 @@ module State = struct
     let f = apply_transfer amount src_name dst_name in
     update_map ~log_updates:[src_name; dst_name] ~f state
 
-  let apply_stake amount staker_name (state : t) : t =
-    let f = apply_stake amount staker_name in
+  let apply_stake amount current_cycle staker_name (state : t) : t =
+    let f =
+      apply_stake
+        amount
+        current_cycle
+        state.constants.preserved_cycles
+        staker_name
+    in
     update_map ~log_updates:[staker_name] ~f state
 
   let apply_unstake cycle amount staker_name (state : t) : t =
@@ -471,6 +477,7 @@ module State = struct
          staking_delegator_numerator = _;
          staking_delegate_denominator = _;
          frozen_rights = _;
+         slashed_cycles = _;
        } :
         account_state) state =
     let open Result_syntax in
@@ -509,7 +516,7 @@ module State = struct
       let new_state =
         if autostaked > 0L then (
           log_model_autostake ~optimal name pkh old_cycle "stake" autostaked ;
-          apply_stake (Test_tez.of_mutez_exn autostaked) name state)
+          apply_stake (Test_tez.of_mutez_exn autostaked) old_cycle name state)
         else if autostaked < 0L then (
           log_model_autostake
             ~optimal
@@ -1256,8 +1263,9 @@ let stake src_name stake_value : (t, t) scenarios =
       (* Stake applies finalize *before* the stake *)
       let state = State.apply_finalize src_name state in
       let amount = quantity_to_tez src.liquid stake_value in
+      let current_cycle = Block.current_cycle block in
       let* operation = stake (B block) src.contract amount in
-      let state = State.apply_stake amount src_name state in
+      let state = State.apply_stake amount current_cycle src_name state in
       return (state, [operation]))
 
 (** unstake operation *)
@@ -1556,6 +1564,18 @@ let update_state_denunciation (block, state)
            We also assume that the current state baking policy will be used for the next block *)
         let* rewarded, _, _, _ =
           Block.get_next_baker ?policy:state.baking_policy block
+        in
+        let culprit_name, culprit_account =
+          State.find_account_from_pkh culprit state
+        in
+        let state =
+          State.update_account
+            culprit_name
+            {
+              culprit_account with
+              slashed_cycles = inclusion_cycle :: culprit_account.slashed_cycles;
+            }
+            state
         in
         let new_pending_slash =
           ( culprit,
@@ -2581,6 +2601,28 @@ module Slashing = struct
                  ["delegate"; "staker1"; "staker2"; "staker3"]
               --> slash "delegate" --> next_cycle)) *)
 
+  let test_no_shortcut_for_cheaters =
+    let constants = init_constants () in
+    let amount = Amount (Tez.of_mutez 333_000_000_000L) in
+    let preserved_cycles = constants.preserved_cycles in
+    begin_test ~activate_ai:true constants ["delegate"]
+    --> next_block --> wait_ai_activation
+    --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> next_cycle --> double_bake "delegate" --> make_denunciations ()
+    --> next_cycle
+    --> snapshot_balances "init" ["delegate"]
+    --> unstake "delegate" amount
+    --> (List.fold_left
+           (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
+           (Tag "wait 0 cycles" --> Empty)
+           (Stdlib.List.init (preserved_cycles - 1) (fun i -> i + 1))
+         --> stake "delegate" amount
+         --> assert_failure (check_snapshot_balances "init")
+        |+ Tag "wait enough cycles (preserved cycles + 1)"
+           --> wait_n_cycles (preserved_cycles + 1)
+           --> stake "delegate" amount
+           --> check_snapshot_balances "init")
+
   let tests =
     tests_of_scenarios
     @@ [
@@ -2591,6 +2633,8 @@ module Slashing = struct
          ( "Test multiple slashes with multiple stakes/unstakes",
            test_many_slashes );
          ("Test slash timing", test_slash_timing);
+         ( "Test stake from unstake deactivated when slashed",
+           test_no_shortcut_for_cheaters );
        ]
 end
 

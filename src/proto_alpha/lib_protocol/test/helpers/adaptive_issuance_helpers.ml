@@ -376,6 +376,7 @@ type account_state = {
   staking_delegator_numerator : Z.t;
   staking_delegate_denominator : Z.t;
   frozen_rights : Tez.t CycleMap.t;
+  slashed_cycles : Cycle.t list;
 }
 
 let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
@@ -384,7 +385,7 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
     ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
-    () =
+    ?(slashed_cycles = []) () =
   {
     pkh;
     contract;
@@ -398,6 +399,7 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     staking_delegator_numerator;
     staking_delegate_denominator;
     frozen_rights;
+    slashed_cycles;
   }
 
 type account_map = account_state String.Map.t
@@ -441,6 +443,7 @@ let balance_of_account account_name (account_map : account_map) =
         staking_delegator_numerator;
         staking_delegate_denominator;
         frozen_rights = _;
+        slashed_cycles = _;
       } ->
       let balance =
         {
@@ -713,42 +716,53 @@ let apply_transfer amount src_name dst_name account_map =
         update_account ~f:f_dst dst_name account_map
   | _ -> raise Not_found
 
-let stake_from_unstake amount delegate_name account_map =
+let stake_from_unstake amount current_cycle preserved_cycles delegate_name
+    account_map =
   match String.Map.find delegate_name account_map with
   | None -> raise Not_found
-  | Some ({unstaked_frozen; frozen_deposits; _} as account) ->
-      let unstaked_frozen =
-        List.sort
-          (fun (cycle1, _) (cycle2, _) -> Cycle.compare cycle2 cycle1)
-          unstaked_frozen
+  | Some ({unstaked_frozen; frozen_deposits; slashed_cycles; _} as account) ->
+      let oldest_slashable_cycle =
+        Cycle.(sub current_cycle (preserved_cycles + 1))
+        |> Option.value ~default:Cycle.root
       in
-      let rec aux acc_unstakes rem_amount rem_unstakes =
-        match rem_unstakes with
-        | [] -> (acc_unstakes, rem_amount)
-        | (cycle, frozen_map) :: t ->
-            if Tez.(rem_amount = zero) then
-              (acc_unstakes @ rem_unstakes, Tez.zero)
-            else
-              let frozen_map, removed =
-                Frozen_tez.sub_current rem_amount delegate_name frozen_map
-              in
-              let rem_amount = Tez.(rem_amount -! removed) in
-              aux (acc_unstakes @ [(cycle, frozen_map)]) rem_amount t
-      in
-      let unstaked_frozen, rem_amount = aux [] amount unstaked_frozen in
-      let frozen_deposits =
-        Frozen_tez.add_current
-          Tez.(amount -! rem_amount)
-          delegate_name
-          frozen_deposits
-      in
-      let account = {account with unstaked_frozen; frozen_deposits} in
-      let account_map =
-        update_account ~f:(fun _ -> account) delegate_name account_map
-      in
-      (account_map, rem_amount)
+      if
+        List.exists
+          (fun x -> Cycle.(x >= oldest_slashable_cycle))
+          slashed_cycles
+      then (account_map, amount)
+      else
+        let unstaked_frozen =
+          List.sort
+            (fun (cycle1, _) (cycle2, _) -> Cycle.compare cycle2 cycle1)
+            unstaked_frozen
+        in
+        let rec aux acc_unstakes rem_amount rem_unstakes =
+          match rem_unstakes with
+          | [] -> (acc_unstakes, rem_amount)
+          | (cycle, frozen_map) :: t ->
+              if Tez.(rem_amount = zero) then
+                (acc_unstakes @ rem_unstakes, Tez.zero)
+              else
+                let frozen_map, removed =
+                  Frozen_tez.sub_current rem_amount delegate_name frozen_map
+                in
+                let rem_amount = Tez.(rem_amount -! removed) in
+                aux (acc_unstakes @ [(cycle, frozen_map)]) rem_amount t
+        in
+        let unstaked_frozen, rem_amount = aux [] amount unstaked_frozen in
+        let frozen_deposits =
+          Frozen_tez.add_current
+            Tez.(amount -! rem_amount)
+            delegate_name
+            frozen_deposits
+        in
+        let account = {account with unstaked_frozen; frozen_deposits} in
+        let account_map =
+          update_account ~f:(fun _ -> account) delegate_name account_map
+        in
+        (account_map, rem_amount)
 
-let apply_stake amount staker_name account_map =
+let apply_stake amount current_cycle preserved_cycles staker_name account_map =
   match String.Map.find staker_name account_map with
   | None -> raise Not_found
   | Some staker -> (
@@ -760,7 +774,12 @@ let apply_stake amount staker_name account_map =
           let old_account_map = account_map in
           let account_map, amount =
             if delegate_name = staker_name then
-              stake_from_unstake amount staker_name account_map
+              stake_from_unstake
+                amount
+                current_cycle
+                preserved_cycles
+                staker_name
+                account_map
             else (account_map, amount)
           in
           if Tez.(staker.liquid < amount) then
