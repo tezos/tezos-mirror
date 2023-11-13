@@ -10,8 +10,7 @@ pub mod micheline;
 pub mod michelson_address;
 pub mod michelson_list;
 pub mod or;
-pub mod parsed;
-pub mod typechecked;
+pub mod overloads;
 
 pub use micheline::Micheline;
 use std::collections::BTreeMap;
@@ -23,8 +22,6 @@ use crate::lexer::Prim;
 pub use michelson_address::*;
 pub use michelson_list::MichelsonList;
 pub use or::Or;
-pub use parsed::{ParsedInstruction, ParsedStage};
-pub use typechecked::{overloads, TypecheckedInstruction, TypecheckedStage};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
@@ -222,40 +219,20 @@ impl TypedValue {
     }
 }
 
-pub type ParsedInstructionBlock = Vec<ParsedInstruction>;
-
-macro_rules! meta_types {
-    ($($i:ident),* $(,)*) => {
-        $(type $i: std::fmt::Debug + PartialEq + Clone;)*
-    };
-}
-
-pub trait Stage {
-    meta_types! {
-      AddMeta,
-      PushValue,
-      NilType,
-      GetOverload,
-      UpdateOverload,
-      FailwithType,
-      IterOverload,
-    }
-}
-
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Instruction<T: Stage> {
-    Add(T::AddMeta),
-    Dip(Option<u16>, Vec<Instruction<T>>),
+pub enum Instruction {
+    Add(overloads::Add),
+    Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
     Dup(Option<u16>),
     Gt,
-    If(Vec<Instruction<T>>, Vec<Instruction<T>>),
-    IfNone(Vec<Instruction<T>>, Vec<Instruction<T>>),
+    If(Vec<Self>, Vec<Self>),
+    IfNone(Vec<Self>, Vec<Self>),
     Int,
-    Loop(Vec<Instruction<T>>),
-    Push(T::PushValue),
+    Loop(Vec<Self>),
+    Push(TypedValue),
     Swap,
-    Failwith(T::FailwithType),
+    Failwith(Type),
     Unit,
     Car,
     Cdr,
@@ -264,27 +241,23 @@ pub enum Instruction<T: Stage> {
     ISome,
     Compare,
     Amount,
-    Nil(T::NilType),
-    Get(T::GetOverload),
-    Update(T::UpdateOverload),
-    Seq(Vec<Instruction<T>>),
+    Nil,
+    Get(overloads::Get),
+    Update(overloads::Update),
+    Seq(Vec<Self>),
     Unpair,
     Cons,
-    IfCons(Vec<Instruction<T>>, Vec<Instruction<T>>),
-    Iter(T::IterOverload, Vec<Instruction<T>>),
-    IfLeft(Vec<Instruction<T>>, Vec<Instruction<T>>),
+    IfCons(Vec<Self>, Vec<Self>),
+    Iter(overloads::Iter, Vec<Self>),
+    IfLeft(Vec<Self>, Vec<Self>),
     ChainId,
     /// `ISelf` because `Self` is a reserved keyword
     ISelf,
 }
 
-pub type ParsedAST = Vec<ParsedInstruction>;
-
-pub type TypecheckedAST = Vec<TypecheckedInstruction>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ContractScript<T: Stage> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContractScript {
     pub parameter: Type,
     pub storage: Type,
-    pub code: Instruction<T>,
+    pub code: Instruction,
 }

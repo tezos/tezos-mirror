@@ -150,7 +150,7 @@ impl Micheline<'_> {
         ctx: &mut Ctx,
         self_type: Option<&Micheline>,
         stack: &[Micheline],
-    ) -> Result<TypecheckedInstruction, TcError> {
+    ) -> Result<Instruction, TcError> {
         let self_type = self_type
             .map(|ty| {
                 let ty = parse_ty(ctx, ty)?;
@@ -174,10 +174,7 @@ impl Micheline<'_> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
-    pub fn typecheck_script(
-        &self,
-        ctx: &mut Ctx,
-    ) -> Result<ContractScript<TypecheckedStage>, TcError> {
+    pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
             Micheline::Seq([Micheline::Seq(seq)]) => seq,
@@ -345,7 +342,7 @@ fn typecheck(
     ctx: &mut Ctx,
     self_type: Option<&Type>,
     opt_stack: &mut FailingTypeStack,
-) -> Result<TypecheckedAST, TcError> {
+) -> Result<Vec<Instruction>, TcError> {
     ast.iter()
         .map(|i| typecheck_instruction(i, ctx, self_type, opt_stack))
         .collect()
@@ -373,7 +370,7 @@ pub(crate) fn typecheck_instruction(
     ctx: &mut Ctx,
     self_type: Option<&Type>,
     opt_stack: &mut FailingTypeStack,
-) -> Result<TypecheckedInstruction, TcError> {
+) -> Result<Instruction, TcError> {
     use Instruction as I;
     use NoMatchingOverloadReason as NMOR;
     use Type as T;
@@ -809,7 +806,7 @@ pub(crate) fn typecheck_instruction(
         (App(NIL, [ty], _), ..) => {
             let ty = parse_ty(ctx, ty)?;
             stack.push(T::new_list(ty));
-            I::Nil(())
+            I::Nil
         }
         (App(NIL, ..), _) => unexpected_micheline!(),
 
@@ -1081,7 +1078,7 @@ mod typecheck_tests {
         i: &Micheline,
         ctx: &mut Ctx,
         opt_stack: &mut FailingTypeStack,
-    ) -> Result<TypecheckedInstruction, TcError> {
+    ) -> Result<Instruction, TcError> {
         super::typecheck_instruction(i, ctx, None, opt_stack)
     }
 
@@ -1887,7 +1884,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![];
         assert_eq!(
             typecheck_instruction(&parse("NIL int").unwrap(), &mut Ctx::default(), &mut stack),
-            Ok(Nil(()))
+            Ok(Nil)
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
     }
@@ -1938,7 +1935,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Nil(()))
+            Ok(Nil)
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Operation)]);
     }
