@@ -22,7 +22,7 @@ use tezos_smart_rollup_encoding::{
         ExternalMessageFrame, InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer,
     },
     michelson::{
-        ticket::UnitTicket, MichelsonBytes, MichelsonInt, MichelsonOr, MichelsonPair,
+        ticket::FA2_1Ticket, MichelsonBytes, MichelsonInt, MichelsonOr, MichelsonPair,
     },
 };
 use tezos_smart_rollup_host::input::Message;
@@ -101,7 +101,7 @@ pub enum InputResult {
 }
 
 pub type RollupType = MichelsonOr<
-    MichelsonOr<MichelsonPair<MichelsonBytes, UnitTicket>, MichelsonBytes>,
+    MichelsonOr<MichelsonPair<MichelsonBytes, FA2_1Ticket>, MichelsonBytes>,
     MichelsonBytes,
 >;
 
@@ -228,7 +228,7 @@ impl InputResult {
 
     fn parse_deposit<Host: Runtime>(
         host: &mut Host,
-        ticket: UnitTicket,
+        ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
         gas_price: MichelsonInt,
         ticketer: &Option<ContractKt1Hash>,

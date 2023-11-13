@@ -18,8 +18,8 @@ let mint address : return =
   in
   let amount: nat = Tezos.get_amount () / 1mutez in
   let tickets : tez_ticket =
-    match Tezos.create_ticket () amount with
-    | Some t -> t
+    match Tezos.create_ticket (0n, None) amount with
+    | Some (t : tez_ticket) -> t
     | None -> failwith "Could not mint ticket."
   in
   ([Tezos.transaction tickets 0mutez contract], ())

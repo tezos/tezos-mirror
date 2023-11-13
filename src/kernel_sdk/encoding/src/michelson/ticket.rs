@@ -9,8 +9,8 @@
 use crate::{
     contract::Contract,
     michelson::{
-        Michelson, MichelsonBytes, MichelsonContract, MichelsonInt, MichelsonPair,
-        MichelsonString, MichelsonUnit,
+        Michelson, MichelsonBytes, MichelsonContract, MichelsonInt, MichelsonOption,
+        MichelsonPair, MichelsonString, MichelsonUnit,
     },
 };
 use core::{
@@ -218,6 +218,10 @@ pub type BytesTicket = Ticket<MichelsonBytes>;
 
 /// Specialized version of ticket where the content must be unit
 pub type UnitTicket = Ticket<MichelsonUnit>;
+
+/// Specialized version of ticket for FA2.1 tokens
+pub type FA2_1Ticket =
+    Ticket<MichelsonPair<MichelsonInt, MichelsonOption<MichelsonBytes>>>;
 
 #[cfg(test)]
 mod test {
