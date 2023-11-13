@@ -103,6 +103,7 @@ impl L2Block {
         transactions_root: OwnedHash,
         state_root: OwnedHash,
         receipts_root: OwnedHash,
+        gas_used: U256,
     ) -> Self {
         let hash = Self::hash(
             parent_hash,
@@ -113,7 +114,7 @@ impl L2Block {
             &None,
             number,
             None,
-            U256::zero(),
+            gas_used,
             timestamp,
             &None,
         );
@@ -127,6 +128,7 @@ impl L2Block {
             transactions_root,
             state_root,
             receipts_root,
+            gas_used,
             ..Self::default()
         }
     }

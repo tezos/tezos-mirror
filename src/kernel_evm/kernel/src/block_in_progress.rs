@@ -301,20 +301,17 @@ impl BlockInProgress {
             Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_RECEIPTS))?;
         let transactions_root =
             Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_OBJECTS))?;
-        let new_block = L2Block {
+        let new_block = L2Block::new(
+            self.number,
+            self.valid_txs,
             timestamp,
-            gas_used: self.cumulative_gas,
-            ..L2Block::new(
-                self.number,
-                self.valid_txs,
-                timestamp,
-                self.parent_hash,
-                self.logs_bloom,
-                transactions_root,
-                state_root,
-                receipts_root,
-            )
-        };
+            self.parent_hash,
+            self.logs_bloom,
+            transactions_root,
+            state_root,
+            receipts_root,
+            self.cumulative_gas,
+        );
         storage::store_current_block(host, &new_block)
             .context("Failed to store the current block")?;
         Ok(new_block)
