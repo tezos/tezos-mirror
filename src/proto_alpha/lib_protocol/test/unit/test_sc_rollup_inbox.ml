@@ -248,14 +248,14 @@ let fill_merkelized_payload history payloads =
   let*?@ history, merkelized_payload =
     Merkelized_payload_hashes.genesis history first
   in
-  let@ result =
+  let*?@ result =
     List.fold_left_e
       (fun (history, payloads) payload ->
         Merkelized_payload_hashes.add_payload history payloads payload)
       (history, merkelized_payload)
       payloads
   in
-  Lwt.return result
+  return result
 
 let construct_merkelized_payload_hashes payloads =
   let history = Merkelized_payload_hashes.History.empty ~capacity:1000L in
