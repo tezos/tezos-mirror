@@ -168,20 +168,16 @@ struct
       [check_verify_result], respectively. *)
   let produce_and_verify_proof ~check_produce ?check_verify ~get_history
       skip_list ~page_info ~page_id =
-    let open Lwt_result_syntax in
-    let*! res =
+    let open Lwt_result_wrap_syntax in
+    let*!@ res =
       Hist.produce_proof params ~page_info page_id ~get_history skip_list
-      |> Lwt.map Environment.wrap_tzresult
     in
     let* () = check_produce res page_info in
     match check_verify with
     | None -> return_unit
     | Some check_verify ->
         let*? proof, _input_opt = res in
-        let res =
-          Hist.verify_proof params page_id skip_list proof
-          |> Environment.wrap_tzresult
-        in
+        let@ res = Hist.verify_proof params page_id skip_list proof in
         check_verify res page_info
 
   (* Some check functions. *)

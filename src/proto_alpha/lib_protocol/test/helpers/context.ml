@@ -46,7 +46,9 @@ let pred_branch = function
 let level = function B b -> b.header.shell.level | I i -> Incremental.level i
 
 let get_level ctxt =
-  level ctxt |> Raw_level.of_int32 |> Environment.wrap_tzresult
+  let open Result_wrap_syntax in
+  let+@ res = level ctxt |> Raw_level.of_int32 in
+  res
 
 let rpc_ctxt =
   object
@@ -266,9 +268,10 @@ let get_attesting_reward ctxt ~expected_attesting_power =
       csts
       ~reward_kind:Attesting_reward_per_slot
   in
-  Lwt.return
-    (Environment.wrap_tzresult
-       Tez.(attesting_reward_per_slot *? Int64.of_int expected_attesting_power))
+  let*?@ t =
+    Tez.(attesting_reward_per_slot *? Int64.of_int expected_attesting_power)
+  in
+  return t
 
 let get_liquidity_baking_subsidy ctxt =
   let open Lwt_result_syntax in

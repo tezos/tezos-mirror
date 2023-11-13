@@ -34,8 +34,6 @@ module Common = struct
   let int_of_memo_size ms =
     Alpha_context.Sapling.Memo_size.unparse_to_z ms |> Z.to_int
 
-  let wrap e = Lwt.return (Environment.wrap_tzresult e)
-
   let assert_true res =
     let open Lwt_result_syntax in
     let+ res in
@@ -219,7 +217,7 @@ module Alpha_context_helpers = struct
           return (vs, ctx)
       | Some id ->
           (* let*! result = Storage.Sapling.Roots.get (Obj.magic ctx, id) 0l in *)
-          (* let* _, root = wrap result in *)
+          (* let*?@ _, root = result in *)
           (* print ~prefix:"verify: " Environment.Sapling.Hash.encoding root ; *)
           let*@ result = Alpha_context.Sapling.state_from_id ctx id in
           return result
@@ -280,7 +278,7 @@ module Alpha_context_helpers = struct
           return (vs, ctx)
       | Some id ->
           (* let*! result = Storage.Sapling.Roots.get (Obj.magic ctx, id) 0l in *)
-          (* let* _, root = wrap result in *)
+          (* let*?@ _, root = result in *)
           (* print ~prefix:"verify: " Environment.Sapling.Hash.encoding root ; *)
           let*@ result = Alpha_context.Sapling.state_from_id ctx id in
           return result

@@ -174,7 +174,7 @@ let sign ?watermark sk ctxt (Contents_list contents) =
 
 let batch_operations ?(recompute_counters = false) ~source ctxt
     (operations : packed_operation list) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let operations =
     List.map
       (function
@@ -201,9 +201,7 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
     else return operations
   in
   let* account = Context.Contract.manager ctxt source in
-  let*? operations =
-    Environment.wrap_tzresult @@ Operation.of_list operations
-  in
+  let*?@ operations = Operation.of_list operations in
   return @@ sign account.sk (Context.branch ctxt) operations
 
 type gas_limit = Max | High | Low | Zero | Custom_gas of Gas.Arith.integral
@@ -261,7 +259,7 @@ let pp_gas_limit fmt = function
 
 let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   assert (match packed_operations with [] -> false | _ :: _ -> true) ;
   (* Hypothesis : each operation must have the same branch (is this really true?) *)
   let {Tezos_base.Operation.branch} =
@@ -345,9 +343,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
         (* Insert at the end *)
         operations @ [op]
   in
-  let*? operations =
-    Environment.wrap_tzresult @@ Operation.of_list operations
-  in
+  let*?@ operations = Operation.of_list operations in
   return @@ sign account.sk (Context.branch ctxt) operations
 
 let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
