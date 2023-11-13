@@ -242,3 +242,14 @@ let find_whitelist _cctxt _rollup_address :
   return None
 
 let find_last_whitelist_update _cctxt _rollup_address = return_none
+
+let get_commitment cctxt rollup_address commitment_hash =
+  let open Lwt_result_syntax in
+  let+ commitment =
+    Plugin.RPC.Sc_rollup.commitment
+      (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
+      (cctxt#chain, `Head 0)
+      (Sc_rollup_proto_types.Address.of_octez rollup_address)
+      (Sc_rollup_proto_types.Commitment_hash.of_octez commitment_hash)
+  in
+  Sc_rollup_proto_types.Commitment.to_octez commitment
