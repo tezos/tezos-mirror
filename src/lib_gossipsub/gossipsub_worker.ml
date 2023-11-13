@@ -201,8 +201,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
-    | Connect of {px : Peer.t; origin : peer_origin}
-    | Forget of {px : Peer.t; origin : Peer.t}
+    | Connect of {peer : Peer.t; origin : peer_origin}
+    | Forget of {peer : Peer.t; origin : Peer.t}
 
   type app_output = message_with_header
 
@@ -507,7 +507,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let forget_all state =
       emit_p2p_output
         state
-        ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
+        ~mk_output:(fun to_peer -> Forget {peer = to_peer; origin = from_peer})
         input_px
     in
     function
@@ -523,12 +523,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         emit_p2p_output
           state
           ~mk_output:(fun to_peer ->
-            Connect {px = to_peer; origin = PX from_peer})
+            Connect {peer = to_peer; origin = PX from_peer})
           (Peer.Set.to_seq peers) ;
         (* Forget peers that were filtered out by the automaton. *)
         emit_p2p_output
           state
-          ~mk_output:(fun to_peer -> Forget {px = to_peer; origin = from_peer})
+          ~mk_output:(fun to_peer ->
+            Forget {peer = to_peer; origin = from_peer})
           (Peer.Set.to_seq @@ Peer.Set.(diff (of_seq input_px) peers)) ;
         state
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5426
@@ -583,7 +584,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             state.trusted_peers
             Seq.empty
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
-                 Connect {px = trusted_peer; origin = Trusted}) ;
+                 Connect {peer = trusted_peer; origin = Trusted}) ;
         state
 
   let update_gossip_state state (gossip_state, output) =
@@ -838,19 +839,25 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let pp_p2p_output fmt = function
     | Disconnect {peer} -> Format.fprintf fmt "Disconnect{peer=%a}" Peer.pp peer
     | Kick {peer} -> Format.fprintf fmt "Kick{peer=%a}" Peer.pp peer
-    | Connect {px; origin} ->
+    | Connect {peer; origin} ->
         Format.fprintf
           fmt
-          "Connect{px=%a; origin=%a}"
+          "Connect{peer=%a; origin=%a}"
           Peer.pp
-          px
+          peer
           (fun fmt origin ->
             match origin with
             | PX peer -> Peer.pp fmt peer
             | Trusted -> Format.fprintf fmt "(trusted)")
           origin
-    | Forget {px; origin} ->
-        Format.fprintf fmt "Forget{px=%a; origin=%a}" Peer.pp px Peer.pp origin
+    | Forget {peer; origin} ->
+        Format.fprintf
+          fmt
+          "Forget{peer=%a; origin=%a}"
+          Peer.pp
+          peer
+          Peer.pp
+          origin
     | Out_message {to_peer; p2p_message} ->
         Format.fprintf
           fmt
