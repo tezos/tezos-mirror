@@ -712,6 +712,9 @@ module Cache = Cache_repr
 module Unstake_requests = struct
   include Unstake_requests_storage
 
+  let prepare_finalize_unstake =
+    prepare_finalize_unstake ~for_next_cycle_use_only_after_slashing:false
+
   module For_RPC = struct
     let apply_slash_to_unstaked_unfinalizable ctxt ~delegate ~requests =
       Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
