@@ -36,6 +36,12 @@ pub struct PrecompileOutcome {
     /// Any withdrawals produced by the precompiled contract. This encodes
     /// withdrawals to Tezos Layer 1.
     pub withdrawals: Vec<Withdrawal>,
+    /// Number of ticks estimated by the tick model of the precompiled contract.
+    /// Note that the implementation of the contract is responsible for failing
+    /// with EthereumError::OutOfTicks if the number of tricks would make the
+    /// total number of ticks of the Handler go over the allocated number of
+    /// ticks.
+    pub estimated_ticks: u64,
 }
 
 /// Type for a single precompiled contract
@@ -99,6 +105,17 @@ impl<Host: Runtime> PrecompileSet<Host> for PrecompileBTreeMap<Host> {
     }
 }
 
+#[macro_export]
+macro_rules! fail_if_too_much {
+    ($estimated_ticks : expr, $handler: expr) => {
+        if $estimated_ticks + $handler.estimated_ticks_used > $handler.ticks_allocated {
+            return Err(EthereumError::OutOfTicks);
+        } else {
+            $estimated_ticks
+        }
+    };
+}
+
 // implmenetation of 0x02 precompiled (identity)
 fn identity_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
@@ -108,6 +125,8 @@ fn identity_precompile<Host: Runtime>(
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling identity precompile");
+    let estimated_ticks =
+        fail_if_too_much!(tick_model::ticks_of_identity(input.len())?, handler);
 
     let size = input.len() as u64;
     let data_word_size = (size + 31) / 32;
@@ -120,6 +139,7 @@ fn identity_precompile<Host: Runtime>(
             exit_status: ExitReason::Error(err),
             output: vec![],
             withdrawals: vec![],
+            estimated_ticks,
         });
     }
 
@@ -127,6 +147,7 @@ fn identity_precompile<Host: Runtime>(
         exit_status: ExitReason::Succeed(ExitSucceed::Returned),
         output: input.to_vec(),
         withdrawals: vec![],
+        estimated_ticks,
     })
 }
 
@@ -139,6 +160,8 @@ fn sha256_precompile<Host: Runtime>(
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling sha2-256 precompile");
+    let estimated_ticks =
+        fail_if_too_much!(tick_model::ticks_of_sha256(input.len())?, handler);
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;
@@ -149,6 +172,7 @@ fn sha256_precompile<Host: Runtime>(
             exit_status: ExitReason::Error(err),
             output: vec![],
             withdrawals: vec![],
+            estimated_ticks,
         });
     }
 
@@ -158,6 +182,7 @@ fn sha256_precompile<Host: Runtime>(
         exit_status: ExitReason::Succeed(ExitSucceed::Returned),
         output: output.to_vec(),
         withdrawals: vec![],
+        estimated_ticks,
     })
 }
 
@@ -170,6 +195,8 @@ fn ripemd160_precompile<Host: Runtime>(
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling ripemd-160 precompile");
+    let estimated_ticks =
+        fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len())?, handler);
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;
@@ -180,6 +207,7 @@ fn ripemd160_precompile<Host: Runtime>(
             exit_status: ExitReason::Error(err),
             output: vec![],
             withdrawals: vec![],
+            estimated_ticks,
         });
     }
 
@@ -192,22 +220,26 @@ fn ripemd160_precompile<Host: Runtime>(
         exit_status: ExitReason::Succeed(ExitSucceed::Returned),
         output: output.to_vec(),
         withdrawals: vec![],
+        estimated_ticks,
     })
 }
 
 /// Implementation of Etherelink specific withdrawals precompiled contract.
 fn withdrawal_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
+
     input: &[u8],
     _context: &Context,
     _is_static: bool,
     transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
+    let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_withdraw(), handler);
     fn revert_withdrawal() -> PrecompileOutcome {
         PrecompileOutcome {
             exit_status: ExitReason::Revert(ExitRevert::Reverted),
             output: vec![],
             withdrawals: vec![],
+            estimated_ticks: tick_model::ticks_of_withdraw(),
         }
     }
 
@@ -260,6 +292,7 @@ fn withdrawal_precompile<Host: Runtime>(
                 exit_status: ExitReason::Succeed(ExitSucceed::Returned),
                 output: vec![],
                 withdrawals,
+                estimated_ticks,
             })
         }
         // TODO A contract "function" to do withdrawal to byte encoded address
@@ -294,6 +327,26 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
             withdrawal_precompile as PrecompileFn<Host>,
         ),
     ])
+}
+mod tick_model {
+    use super::*;
+    pub fn ticks_of_sha256(data_size: usize) -> Result<u64, EthereumError> {
+        let size = data_size as u64;
+        Ok(75_000 + 30_000 * (size.div_euclid(64)))
+    }
+    pub fn ticks_of_ripemd160(data_size: usize) -> Result<u64, EthereumError> {
+        let size = data_size as u64;
+
+        Ok(70_000 + 20_000 * (size.div_euclid(64)))
+    }
+    pub fn ticks_of_identity(data_size: usize) -> Result<u64, EthereumError> {
+        let size = data_size as u64;
+
+        Ok(42_000 + 35 * size)
+    }
+    pub fn ticks_of_withdraw() -> u64 {
+        1_000_000
+    }
 }
 
 #[cfg(test)]
@@ -398,8 +451,7 @@ mod tests {
             logs: vec![],
             result: Some(expected_hash),
             withdrawals: vec![],
-            // TODO (#6426): estimate the ticks consumption of precompiled contracts
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 75_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -425,8 +477,7 @@ mod tests {
             logs: vec![],
             result: Some(expected_hash),
             withdrawals: vec![],
-            // TODO (#6426): estimate the ticks consumption of precompiled contracts
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 70_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -476,8 +527,7 @@ mod tests {
                 target: expected_target,
                 amount: 100.into(),
             }],
-            // TODO (#6426): estimate the ticks consumption of precompiled contracts
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 1_000_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -529,7 +579,7 @@ mod tests {
                 amount: 100.into(),
             }],
             // TODO (#6426): estimate the ticks consumption of precompiled contracts
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 1_000_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -561,8 +611,7 @@ mod tests {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            // TODO (#6426): estimate the ticks consumption of precompiled contracts
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 1_000_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -585,8 +634,7 @@ mod tests {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            // TODO (#6426): estimate the ticks consumption of precompiled contracts
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 1_000_000,
         };
 
         let result = execute_precompiled(target, input, transfer, Some(21000));

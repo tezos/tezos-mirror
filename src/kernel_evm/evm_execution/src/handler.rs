@@ -230,10 +230,10 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// progress
     transaction_data: Vec<TransactionLayerData<'a>>,
     /// Estimated number of ticks remaining for the current run
-    ticks_allocated: u64,
+    pub ticks_allocated: u64,
     /// Estimated ticks spent for the execution of the current transaction,
     /// according to the ticks per gas per opcode model
-    estimated_ticks_used: u64,
+    pub estimated_ticks_used: u64,
 }
 
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
@@ -721,7 +721,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             match precompile_result {
                 Ok(mut outcome) => {
                     self.add_withdrawals(&mut outcome.withdrawals)?;
-
+                    self.estimated_ticks_used += outcome.estimated_ticks;
                     Ok((outcome.exit_status, None, outcome.output))
                 }
                 Err(err) => Err(err),
