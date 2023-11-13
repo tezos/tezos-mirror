@@ -79,6 +79,8 @@ let test_preattest_on_valid () =
 
     let pqc_noticed = ref false
 
+    let qc_noticed = ref false
+
     let stop_on_event = function
       | Baking_state.Prequorum_reached (candidate, _) ->
           (* Register the PQC notice. *)
@@ -89,11 +91,13 @@ let test_preattest_on_valid () =
           | _ -> ()) ;
           false
       | Baking_state.Quorum_reached (candidate, _) ->
-          (* Ensure that we never see a QC on the seen candidate. *)
+          (* Because attestations are sent regardless of whether
+             a head has been applied, we can expect a quorum to
+             be received regardless of a head not being produced. *)
           (match !seen_candidate with
           | Some seen_candidate
             when Block_hash.(candidate.hash = seen_candidate) ->
-              Stdlib.failwith "Quorum occured on the seen candidate"
+              qc_noticed := true
           | _ -> ()) ;
           false
       | New_head_proposal {block; _} ->
@@ -116,6 +120,7 @@ let test_preattest_on_valid () =
     let check_chain_on_success ~chain:_ =
       assert (!seen_candidate <> None) ;
       assert !pqc_noticed ;
+      assert !qc_noticed ;
       return_unit
   end in
   let config = {default_config with timeout = 10} in
@@ -493,6 +498,110 @@ let test_scenario_t3 () =
       (1, (module Node_c_hooks));
       (1, (module Node_d_hooks));
     ]
+
+(* Scenario T4
+
+   1. There are two nodes A B:
+      A can propose at level 1, round 0 and level 2, round 1
+      B can propose at level 1, round 1 and level 2, round 0
+   4. Node A proposes at level 1, round 0,
+   5. Both nodes preattest the proposal at level 1, round 0,
+   6. Both nodes attest the proposal at level 1, round 0,
+   7. Only A receives the block application at level 1, round 0,
+   8. B does not propose at level 2, round 0,
+   9. A proposes at level 2, round 1.
+      Predecessor hash is block at level 1, round 0.
+*)
+
+let test_scenario_t4 () =
+  let open Lwt_result_syntax in
+  let level_to_reach = 4l in
+  let a_proposal_level_1 = ref None in
+  let a_proposal_level_2_predecessor = ref None in
+  let b_attested_level_1 = ref false in
+  let b_proposed_level_2 = ref false in
+
+  let stop_on_event0 = function
+    | Baking_state.New_head_proposal {block; _} ->
+        block.shell.level >= level_to_reach
+    | _ -> false
+  in
+  let module Node_a_hooks : Hooks = struct
+    include Default_hooks
+
+    let on_inject_block ~level ~round ~block_hash ~block_header ~operations
+        ~protocol_data:_ =
+      let () =
+        match (level, round) with
+        | 1l, 0l -> a_proposal_level_1 := Some block_hash
+        | 2l, 1l ->
+            a_proposal_level_2_predecessor :=
+              Some block_header.Block_header.shell.predecessor
+        | _ -> ()
+      in
+      return (block_hash, block_header, operations, [Pass; Pass])
+
+    let stop_on_event = stop_on_event0
+  end in
+  let module Node_b_hooks : Hooks = struct
+    include Default_hooks
+
+    let on_new_head ~block_hash ~block_header =
+      (* Stop notifying heads to node B for block proposed at level 1, round 0. *)
+      match !a_proposal_level_1 with
+      | Some a_proposal_level_1_block_hash
+        when Block_hash.(a_proposal_level_1_block_hash = block_hash) ->
+          Lwt.return_none
+      | _ -> Lwt.return_some (block_hash, block_header)
+
+    let on_inject_block ~level ~round ~block_hash ~block_header ~operations
+        ~protocol_data:_ =
+      let () =
+        match (level, round) with
+        | 2l, 0l -> b_proposed_level_2 := true
+        | _ -> ()
+      in
+      return (block_hash, block_header, operations, [Pass; Pass])
+
+    let on_inject_operation ~op_hash ~op =
+      let* is_attestation = op_is_attestation ~level:1l ~round:0l op_hash op in
+      if is_attestation then b_attested_level_1 := true ;
+
+      return (op_hash, op, [Pass; Pass; Pass; Pass])
+
+    let check_chain_on_success ~chain:_ =
+      if not !b_attested_level_1 then
+        failwith "Node B did not attest proposal at level 1, round 0"
+      else if
+        not
+        @@ Option.equal
+             Block_hash.equal
+             !a_proposal_level_2_predecessor
+             !a_proposal_level_1
+      then
+        failwith
+          "Invalid predecessor block for A's proposal at level 2: proposal had \
+           predecessor %a, expected %a\n"
+          (Format.pp_print_option Block_hash.pp_short)
+          !a_proposal_level_1
+          (Format.pp_print_option Block_hash.pp_short)
+          !a_proposal_level_2_predecessor
+      else return_unit
+
+    let stop_on_event = stop_on_event0
+  end in
+  let config =
+    {
+      default_config with
+      initial_seed = None;
+      delegate_selection =
+        [
+          (1l, [(0l, bootstrap1); (1l, bootstrap2)]);
+          (2l, [(0l, bootstrap2); (1l, bootstrap1)]);
+        ];
+    }
+  in
+  run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
 
 (*
 
@@ -1602,6 +1711,7 @@ let () =
          (Protocol.name ^ ": scenario t1", test_scenario_t1);
          (Protocol.name ^ ": scenario t2", test_scenario_t2);
          (Protocol.name ^ ": scenario t3", test_scenario_t3);
+         (Protocol.name ^ ": scenario t4", test_scenario_t4);
          (Protocol.name ^ ": scenario f1", test_scenario_f1);
          (Protocol.name ^ ": scenario f2", test_scenario_f2);
          (Protocol.name ^ ": scenario m1", test_scenario_m1);
