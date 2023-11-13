@@ -2524,7 +2524,11 @@ module Slashing = struct
 
   let test_slash_timing =
     let constants =
-      init_constants ~force_snapshot_at_end:true ~blocks_per_cycle:8l ()
+      init_constants
+        ~force_snapshot_at_end:true
+        ~blocks_per_cycle:8l
+        ~autostaking_enable:false
+        ()
     in
     begin_test ~activate_ai:false constants ["delegate"]
     --> next_cycle
