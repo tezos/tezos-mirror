@@ -207,6 +207,12 @@ end = struct
       autostaking_enable = false;
     }
 
+  let issuance_weights =
+    {
+      Default_parameters.constants_test.issuance_weights with
+      base_total_issued_per_minute = Tez.zero;
+    }
+
   (** Helper function for denunciations inclusion *)
   let generic_double_preattestation_denunciation ~nb_blocks_before_double
       ~nb_blocks_before_denunciation
@@ -219,7 +225,12 @@ end = struct
           return (a, a)) ~loc () =
     let open Lwt_result_syntax in
     let* genesis, contracts =
-      Context.init_n ~adaptive_issuance ~consensus_threshold:0 10 ()
+      Context.init_n
+        ~issuance_weights
+        ~adaptive_issuance
+        ~consensus_threshold:0
+        10
+        ()
     in
     let addr =
       match List.hd contracts with None -> assert false | Some e -> e
