@@ -246,6 +246,10 @@ module Frozen_tez = struct
             in
             ({a with co_current}, amount)
 
+  let sub_current_and_init amount account a =
+    let a, amount = sub_current amount account a in
+    ({a with initial = Tez.(a.initial -! amount)}, amount)
+
   let slash base_amount (pct : Protocol.Int_percentage.t) a =
     let pct_times_100 = (pct :> int) in
     let slashed_amount =
@@ -744,7 +748,10 @@ let stake_from_unstake amount current_cycle preserved_cycles delegate_name
                 (acc_unstakes @ rem_unstakes, Tez.zero)
               else
                 let frozen_map, removed =
-                  Frozen_tez.sub_current rem_amount delegate_name frozen_map
+                  Frozen_tez.sub_current_and_init
+                    rem_amount
+                    delegate_name
+                    frozen_map
                 in
                 let rem_amount = Tez.(rem_amount -! removed) in
                 aux (acc_unstakes @ [(cycle, frozen_map)]) rem_amount t

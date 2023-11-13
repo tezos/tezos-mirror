@@ -2623,6 +2623,28 @@ module Slashing = struct
            --> stake "delegate" amount
            --> check_snapshot_balances "init")
 
+  let test_slash_correct_amount_after_stake_from_unstake =
+    let constants = init_constants () in
+    let amount_to_unstake = Amount (Tez.of_mutez 200_000_000_000L) in
+    let amount_to_restake = Amount (Tez.of_mutez 100_000_000_000L) in
+    let amount_expected_in_unstake_after_slash = Tez.of_mutez 50_000_000_000L in
+    let preserved_cycles = constants.preserved_cycles in
+    begin_test ~activate_ai:true constants ["delegate"]
+    --> next_block --> wait_ai_activation
+    --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> next_cycle
+    --> unstake "delegate" amount_to_unstake
+    --> stake "delegate" amount_to_restake
+    --> List.fold_left
+          (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
+          (Tag "wait 0 cycles" --> Empty)
+          (Stdlib.List.init (preserved_cycles - 2) (fun i -> i + 1))
+    --> double_attest "delegate" --> make_denunciations () --> next_cycle
+    --> check_balance_field
+          "delegate"
+          `Unstaked_frozen_total
+          amount_expected_in_unstake_after_slash
+
   let tests =
     tests_of_scenarios
     @@ [
@@ -2635,6 +2657,8 @@ module Slashing = struct
          ("Test slash timing", test_slash_timing);
          ( "Test stake from unstake deactivated when slashed",
            test_no_shortcut_for_cheaters );
+         ( "Test stake from unstake reduce initial amount",
+           test_slash_correct_amount_after_stake_from_unstake );
        ]
 end
 
