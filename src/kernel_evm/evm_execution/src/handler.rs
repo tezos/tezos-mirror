@@ -12,10 +12,10 @@ use crate::account_storage::{
     account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
     CODE_HASH_DEFAULT,
 };
-use crate::storage;
 use crate::transaction::TransactionContext;
 use crate::EthereumError;
 use crate::PrecompileSet;
+use crate::{storage, tick_model_opcodes};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
 use core::cmp::min;
@@ -203,13 +203,6 @@ mod benchmarks {
             host.write_debug(core::str::from_utf8_unchecked(&END_SECTION_MSG));
         }
     }
-}
-
-/// This function is a placeholder that will be replaced by the real tick model
-/// function.
-fn ticks_per_gas(_opcode: &Opcode, gas: u64) -> u64 {
-    // This value is a placeholder.
-    gas * 2000
 }
 
 /// The implementation of the SputnikVM [Handler] trait
@@ -426,7 +419,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         opcode: &Opcode,
         gas: u64,
     ) -> Result<(), EthereumError> {
-        self.estimated_ticks_used += ticks_per_gas(opcode, gas);
+        self.estimated_ticks_used += tick_model_opcodes::ticks(opcode, gas);
         if self.estimated_ticks_used > self.ticks_allocated {
             Err(EthereumError::OutOfTicks)
         } else {
