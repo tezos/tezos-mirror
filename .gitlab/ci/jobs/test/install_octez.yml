@@ -1,8 +1,6 @@
 .base-test-install-scripts-template:
   stage: test
   needs: [trigger]
-  extends:
-    - .tags_template__gcp
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always

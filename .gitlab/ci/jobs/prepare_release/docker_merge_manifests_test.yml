@@ -6,7 +6,9 @@ include: .gitlab/ci/jobs/publish/common.yml
 # here we handle all architectures so there is no such variable.
 docker:merge_manifests:
   extends:
+    - .default_settings_template
     - .image_template__docker
+    - .tags_template__no_gcp
   stage: prepare_release
   variables:
     CI_DOCKER_HUB: "false"

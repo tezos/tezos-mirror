@@ -89,11 +89,11 @@ include: .gitlab/ci/jobs/test/common.yml
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 60
-  # Disable GCP at this time.
-  tags: []
 
 tezt:
-  extends: [.tezt_tests]
+  extends:
+    - .tezt_tests
+    - .tags_template__no_gcp
   variables:
     # Exclude tests with tags 'ci_disabled', 'flaky' and `memory_{3,4}k`.
     # See tezt/lib_tezos/tag.mli for more information.
