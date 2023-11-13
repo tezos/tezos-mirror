@@ -459,6 +459,7 @@ let drain_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
 let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee contract ~src_pk ~manager_sk
     ~fee_parameter limit_opt =
+  let open Lwt_result_syntax in
   let operation = Set_deposits_limit limit_opt in
   let operation =
     Injection.prepare_manager_operation
@@ -468,23 +469,24 @@ let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
       operation
   in
   let operation = Annotated_manager_operation.Single_manager operation in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?simulation
-    ~source:contract
-    ~fee:(Limit.of_option fee)
-    ~gas_limit:Limit.unknown
-    ~storage_limit:Limit.unknown
-    ~src_pk
-    ~src_sk:manager_sk
-    ~fee_parameter
-    operation
-  >>=? fun (oph, _, op, result) ->
+  let* oph, _, op, result =
+    Injection.inject_manager_operation
+      cctxt
+      ~chain
+      ~block
+      ?confirmations
+      ?dry_run
+      ?verbose_signing
+      ?simulation
+      ~source:contract
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      ~src_pk
+      ~src_sk:manager_sk
+      ~fee_parameter
+      operation
+  in
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)

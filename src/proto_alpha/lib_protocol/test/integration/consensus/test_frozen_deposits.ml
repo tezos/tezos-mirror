@@ -171,7 +171,9 @@ let test_cannot_bake_with_zero_deposits () =
   (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
      cannot be a proposer, thus it cannot bake. Precisely, bake fails with error
      Validate_errors.Consensus.Zero_frozen_deposits*)
-  let* () = Assert.error ~loc:__LOC__ b1 (fun _ -> true) in
+  let* () =
+    Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits"
+  in
   let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
   (* after one cycle is passed, the frozen deposit window has passed
      and the frozen deposits should now be effectively 0. *)
