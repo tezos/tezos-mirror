@@ -106,9 +106,6 @@ module type S = sig
     Ethereum_types.hash ->
     Ethereum_types.transaction_object option tzresult Lwt.t
 
-  (** [txpool ()] returns the pending and queued transactions. *)
-  val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
-
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 

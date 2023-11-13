@@ -146,9 +146,6 @@ let inject_raw_transaction base ~smart_rollup_address tx_raw =
   let* () = List.iter_es (inject_raw_transaction base) messages in
   return (Ethereum_types.Hash Hex.(of_string tx_hash |> show |> hex_of_string))
 
-let txpool _ () =
-  Lwt.return_ok {pending = AddressMap.empty; queued = AddressMap.empty}
-
 let simulate_call base call =
   let open Lwt_result_syntax in
   let*? messages = Simulation.encode call in
@@ -259,8 +256,6 @@ module type S = sig
     Ethereum_types.hash ->
     Ethereum_types.transaction_object option tzresult Lwt.t
 
-  val txpool : unit -> Ethereum_types.txpool tzresult Lwt.t
-
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 
   val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
@@ -292,8 +287,6 @@ end) : S = struct
   let smart_rollup_address = smart_rollup_address Base.base
 
   let inject_raw_transaction = inject_raw_transaction Base.base
-
-  let txpool = txpool Base.base
 
   let simulate_call = simulate_call Base.base
 

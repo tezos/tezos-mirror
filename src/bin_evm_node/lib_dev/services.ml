@@ -238,8 +238,11 @@ let dispatch_input (config : Configuration.t)
         let* gas = Rollup_node_rpc.estimate_gas call in
         return (Get_estimate_gas.Output (Ok gas))
     | Txpool_content.Input _ ->
-        let* txpool = Rollup_node_rpc.txpool () in
-        return (Txpool_content.Output (Ok txpool))
+        return
+          (Txpool_content.Output
+             (Ok
+                Ethereum_types.
+                  {pending = AddressMap.empty; queued = AddressMap.empty}))
     | Web3_clientVersion.Input _ ->
         return (Web3_clientVersion.Output (Ok client_version))
     | Web3_sha3.Input (Some data) ->
