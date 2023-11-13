@@ -268,6 +268,11 @@ module Unstaked_frozen = struct
       Frozen_tez.zero
       unstaked
 
+  let remove_zeros a =
+    List.filter
+      (fun (_, frozen) -> Tez.(Frozen_tez.total_current frozen > zero))
+      a
+
   let get account unstaked =
     List.map (fun (c, frozen) -> (c, Frozen_tez.get account frozen)) unstaked
 
@@ -298,16 +303,16 @@ module Unstaked_frozen = struct
           (amount, (c, a) :: rest)
 
   let slash ~preserved_cycles slashed_cycle pct_times_100 a =
-    List.map
-      (fun (c, frozen) ->
-        if Cycle.(c > slashed_cycle || add c preserved_cycles < slashed_cycle)
-        then ((c, frozen), Tez.zero)
-        else
-          let ufd, slashed =
-            Frozen_tez.slash frozen.Frozen_tez.initial pct_times_100 frozen
-          in
-          ((c, ufd), slashed))
-      a
+    remove_zeros a
+    |> List.map (fun (c, frozen) ->
+           if
+             Cycle.(c > slashed_cycle || add c preserved_cycles < slashed_cycle)
+           then ((c, frozen), Tez.zero)
+           else
+             let ufd, slashed =
+               Frozen_tez.slash frozen.Frozen_tez.initial pct_times_100 frozen
+             in
+             ((c, ufd), slashed))
     |> List.split
 end
 
