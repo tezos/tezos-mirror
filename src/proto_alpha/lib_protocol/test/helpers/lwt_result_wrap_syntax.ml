@@ -30,6 +30,10 @@ let wrap m =
   let+ result = m in
   Environment.wrap_tzresult result
 
+let ( let@ ) m f =
+  let x = Environment.wrap_tzresult m in
+  f x
+
 let ( let*@ ) m f =
   let* x = wrap m in
   f x
