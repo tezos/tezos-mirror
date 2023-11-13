@@ -3,8 +3,8 @@ Version 18.0
 
 Version 18.0 contains a new version (v10) of the protocol environment,
 which is the set of functions that a protocol can call.
-This new version is used by protocol :doc:`Oxford <../protocols/018_oxford>`,
-which is a proposal for the successor of Nairobi.
+This new version is used by Oxford,
+which is a proposal for the successor of Nairobi that has been rejected by vote on Oct 2, 2023.
 This release also contains Oxford itself as well as its associated protocol-specific executable binaries (baker, accuser, etc).
 
 Starting from Oxford, Endorsements have been renamed to Attestations.
@@ -28,13 +28,13 @@ Octez version 18 improves performance, notably to the block validation process: 
 
 v18 also fixes a concurrency issue in the logging infrastructure which can cause the node to become temporarily unresponsive.
 
-As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_oxford>` for more details.
+As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_alpha>` for more details.
 
 
 Oxford's feature activation vote
 --------------------------------
 
-The Oxford protocol includes 3 features (all part of Adaptive Issuance and the new Staking mechanism), which would not be immediately available upon the protocol's eventual activation:
+The Oxford protocol proposal includes 3 features (all part of Adaptive Issuance and the new Staking mechanism), which would not be immediately available upon the protocol's eventual activation:
 
 - Adaptive issuance;
 - the ability for *delegators* to become *stakers*; and,
@@ -45,7 +45,7 @@ Instead, these are guarded behind a *single* per-block vote mechanism, where bak
 Specifically, the Octez v18.0 Oxford baker executable introduces a dedicated option ``--adaptive-issuance-vote``, to allow bakers to manifest their choice.
 The use of this flag is *optional*, and defaults to **Pass** if not present.
 
-See :ref:`here <feature_activation_oxford>` for further details on this additional activation vote mechanism.
+See :ref:`here <feature_activation_alpha>` for further details on this additional activation vote mechanism.
 
 
 Update Instructions
@@ -85,7 +85,7 @@ You can also install Octez using Opam by running ``opam install octez``.
 
    Finally, be aware that the old packages, that are now sub-libraries of the packages mentioned above, have been renamed by removing the ``tezos-`` and ``octez-`` prefixes.
    For protocol dependent sub-libraries, the redundant protocol name suffixes have also been removed.
-   For instance, ``Tezos-client-018-PtNairob`` is now the sub-library ``Client`` of the package ``Octez-018-PtNairob-libs``.
+   For instance, ``Tezos-client-017-PtNairob`` is now the sub-library ``Client`` of the package ``Octez-017-PtNairob-libs``.
 
    For more details, see :doc:`the OCaml API <../api/api-inline>`.
 

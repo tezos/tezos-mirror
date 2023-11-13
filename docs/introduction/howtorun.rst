@@ -90,7 +90,7 @@ is required for participating in consensus and in governance.
 
 .. warning::
 
-  Starting with :doc:`Protocol Oxford <../protocols/018_oxford>`, the staking mechanism changes, see :doc:`../alpha/adaptive_issuance`. The rest of this page assumes the current staking mechanism in the active protocol.
+  Starting with the Adaptive-Issuance/Staking proposal, the staking mechanism changes, see :doc:`../alpha/adaptive_issuance`. The rest of this page assumes the current staking mechanism in the active protocol.
 
 Delegates are required to freeze around 10% of their active stake into
 a security deposit (more precisely, it's 10% of the maximum active

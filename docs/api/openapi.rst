@@ -52,19 +52,6 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Oxford RPCs
------------
-
-The OpenAPI specification for RPCs which are specific to the Oxford (``Proxford``)
-protocol can be found at:
-
-- `oxford-openapi.json (version 18.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
-
-The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Oxford protocol can be found at:
-
-- `oxford-mempool-openapi.json (version 18.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
-
 Nairobi RPCs
 ------------
 

@@ -188,16 +188,6 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Oxford Protocol doc
-   :hidden:
-
-   oxford/protocol
-   oxford/glossary
-   oxford/cli-commands
-   oxford/rpc
-
-.. toctree::
-   :maxdepth: 2
    :caption: Alpha Dev Protocol doc
    :hidden:
 
@@ -239,7 +229,6 @@ Platform developers are also provided reference materials for internal APIs of O
 
    protocols/naming
    protocols/017_nairobi
-   protocols/018_oxford
    protocols/alpha
    protocols/history
 

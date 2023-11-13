@@ -15,7 +15,7 @@ that may be breaking.
 Attestations
 ------------
 
-Starting from the protocol :doc:`Oxford <../protocols/018_oxford>` and the Octez
+Starting with the Oxford protocol proposal and the Octez
 ``v18`` the legacy attestation name ``endorsement`` is now deprecated and
 ``attestation`` should be used everywhere. Then, ``preendorsement`` is renamed
 to ``preattestation``, ``double_preendorsement_evidence`` to
@@ -69,7 +69,7 @@ version ``2`` to output ``attestation``.
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
-Starting with protocol :doc:`Oxford <../protocols/018_oxford>`, the protocol
+Starting with protocol Oxford, the protocol
 parameters, storage fields and errors that were using the legacy attestation
 name now use ``attestation``. The baker and accuser will no longer use the
 legacy attestation name in their event messages and errors and will use

@@ -4,6 +4,8 @@ Protocol Alpha
 This page documents the changes brought by protocol Alpha with respect
 to Oxford (see :ref:`naming_convention`).
 
+For changes brought by the rejected Oxford proposal with respect to Nairobi, see :doc:`../protocols/018_oxford`.
+
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
 
@@ -80,4 +82,3 @@ Internal
 
 - Register an error's encoding: ``WASM_proof_verification_failed``. It was
   previously not registered, making the error message a bit obscure. (MR :gl:`!9603`)
-
