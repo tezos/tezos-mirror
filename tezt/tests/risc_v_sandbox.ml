@@ -74,6 +74,12 @@ let test_user_level_risc_v_unit_tests riscv_test_unit () =
       else Lwt.return_unit)
     kernels
 
+let test_inline_asm () =
+  let kernel =
+    project_root // "src/risc_v/tests/inline_asm/rv64-inline-asm-tests"
+  in
+  Tezt_risc_v_sandbox.run_kernel ~kernel
+
 let register () =
   Test.register
     ~__FILE__
@@ -87,4 +93,9 @@ let register () =
         ~title:(sf "Run risc-v unit tests (%s)" test_unit)
         ~tags:["riscv"; "sandbox"; "unit"; test_unit]
         (test_user_level_risc_v_unit_tests test_unit))
-    riscv_test_units
+    riscv_test_units ;
+  Test.register
+    ~__FILE__
+    ~title:"Run inline asm tests"
+    ~tags:["riscv"; "sandbox"; "inline_asm"]
+    test_inline_asm
