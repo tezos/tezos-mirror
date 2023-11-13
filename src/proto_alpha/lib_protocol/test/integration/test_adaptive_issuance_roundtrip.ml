@@ -470,6 +470,7 @@ module State = struct
          unstaked_finalizable;
          staking_delegator_numerator = _;
          staking_delegate_denominator = _;
+         frozen_rights = _;
        } :
         account_state) state =
     let open Result_syntax in
@@ -579,7 +580,7 @@ module State = struct
         (state, [])
         state.param_requests
     in
-    {state with param_requests}
+    return {state with param_requests}
 
   (** Applies when baking the first block of a cycle.
       Technically nothing special happens, but we need to update the unslashable unstakes
@@ -959,9 +960,9 @@ let snapshot_balances snap_name names_list : (t, t) scenarios =
 (** Check balances against a previously defined snapshot *)
 let check_snapshot_balances
     ?(f =
-      fun ~name:_ ~old_balance ~new_balance ->
-        assert_balance_equal ~loc:__LOC__ old_balance new_balance) snap_name :
-    (t, t) scenarios =
+      fun ~name ~old_balance ~new_balance ->
+        assert_balance_equal ~loc:__LOC__ name old_balance new_balance)
+    snap_name : (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_unit (fun (_block, state) ->
       Log.debug
