@@ -224,21 +224,18 @@ let assert_true _ctxt = return_unit
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~loc k expected_err =
-  let open Lwt_result_syntax in
-  let*! res = k in
-  let res = Environment.wrap_tzresult res in
+  let open Lwt_result_wrap_syntax in
+  let*!@ res = k in
   Assert.proto_error ~loc res (( = ) expected_err)
 
 let assert_fails_with_f ~loc k pred =
-  let open Lwt_result_syntax in
-  let*! res = k in
-  let res = Environment.wrap_tzresult res in
+  let open Lwt_result_wrap_syntax in
+  let*!@ res = k in
   Assert.proto_error ~loc res pred
 
 let assert_fails ~loc k =
-  let open Lwt_result_syntax in
-  let*! res = k in
-  let res = Environment.wrap_tzresult res in
+  let open Lwt_result_wrap_syntax in
+  let*!@ res = k in
   Assert.error ~loc res (fun _ -> true)
 
 (** Assert operation fails because of missing rollup *)

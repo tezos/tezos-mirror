@@ -70,19 +70,18 @@ let payloads_from_messages =
       | Reveal _ -> assert false)
 
 let populate_inboxes level history inbox inboxes list_of_messages =
-  let open Result_syntax in
+  let open Result_wrap_syntax in
   let rec aux level history payloads_histories inbox inboxes witness = function
     | [] -> return (payloads_histories, witness, history, inbox, inboxes)
     | messages :: ps ->
-        let* payloads_history, history, inbox, witness, _messages =
-          Environment.wrap_tzresult
-          @@ add_all_messages
-               ~protocol_migration_message:None
-               ~predecessor_timestamp:Time.Protocol.epoch
-               ~predecessor:Block_hash.zero
-               history
-               inbox
-               messages
+        let*@ payloads_history, history, inbox, witness, _messages =
+          add_all_messages
+            ~protocol_migration_message:None
+            ~predecessor_timestamp:Time.Protocol.epoch
+            ~predecessor:Block_hash.zero
+            history
+            inbox
+            messages
         in
         let witness_hash =
           Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness
@@ -143,22 +142,21 @@ let check_payload messages external_message =
 (** This is basically identical to {!setup_inbox_with_messages}, except
     that it uses the {!Node} instance instead of the protocol instance. *)
 let setup_node_inbox_with_messages list_of_messages f =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let inbox = inbox first_level in
   let history = History.empty ~capacity:10000L in
   let payloads_histories = Payloads_histories.empty in
   let rec aux level history payloads_histories inbox inboxes witness = function
     | [] -> return (payloads_histories, witness, history, inbox, inboxes)
     | messages :: ps ->
-        let*? payloads_history, history, inbox, witness, _messages =
-          Environment.wrap_tzresult
-          @@ add_all_messages
-               ~protocol_migration_message:None
-               ~predecessor_timestamp:Time.Protocol.epoch
-               ~predecessor:Block_hash.zero
-               history
-               inbox
-               messages
+        let*?@ payloads_history, history, inbox, witness, _messages =
+          add_all_messages
+            ~protocol_migration_message:None
+            ~predecessor_timestamp:Time.Protocol.epoch
+            ~predecessor:Block_hash.zero
+            history
+            inbox
+            messages
         in
         let witness_hash =
           Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness
@@ -389,7 +387,7 @@ let test_history_prefix params =
     inclusion proofs depending on histories' capacity. *)
 let test_inclusion_proofs_depending_on_history_capacity
     ((_nb_levels, _default_capacity, _small_capacity, _next_index) as params) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let module I = Sc_rollup_inbox_repr in
   let* no_history, small_history, big_history =
     init_inboxes_histories_with_different_capacities params
@@ -419,9 +417,8 @@ let test_inclusion_proofs_depending_on_history_capacity
           history.")
   in
   let proof s v =
-    let open Lwt_result_syntax in
-    let*! v in
-    match Environment.wrap_tzresult v with
+    let*!@ v in
+    match v with
     | Ok v -> return v
     | Error _ -> tzfail (err (s ^ ": Expecting some inclusion proof."))
   in
@@ -456,14 +453,8 @@ let test_inclusion_proofs_depending_on_history_capacity
          "Should not be able to get inbox inclusion proofs without a history \
           (i.e., a history with no capacity). ")
   in
-  let*? hp1'' =
-    I.Internal_for_tests.verify_inclusion_proof ip1 hp1
-    |> Environment.wrap_tzresult
-  in
-  let*? hp2'' =
-    I.Internal_for_tests.verify_inclusion_proof ip2 hp2
-    |> Environment.wrap_tzresult
-  in
+  let*?@ hp1'' = I.Internal_for_tests.verify_inclusion_proof ip1 hp1 in
+  let*?@ hp2'' = I.Internal_for_tests.verify_inclusion_proof ip2 hp2 in
   fail_unless
     (hp1' = hp1'' && hp2' = hp2'' && hp1' = hp2')
     (err "Inclusion proofs are expected to be valid.")
