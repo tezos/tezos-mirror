@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
-use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::inbox::Transaction;
@@ -295,7 +294,6 @@ impl BlockInProgress {
         self,
         host: &mut Host,
     ) -> Result<L2Block, anyhow::Error> {
-        let timestamp = current_timestamp(host);
         let state_root = Self::safe_store_get_hash(host, Some(EVM_ACCOUNTS_PATH))?;
         let receipts_root =
             Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_RECEIPTS))?;
@@ -304,7 +302,7 @@ impl BlockInProgress {
         let new_block = L2Block::new(
             self.number,
             self.valid_txs,
-            timestamp,
+            self.timestamp,
             self.parent_hash,
             self.logs_bloom,
             transactions_root,
