@@ -25,11 +25,10 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Nairobi | Oxford | Alpha
+type t = Nairobi | Alpha
 
 let encoding =
-  Data_encoding.string_enum
-    [("nairobi", Nairobi); ("oxford", Oxford); ("alpha", Alpha)]
+  Data_encoding.string_enum [("nairobi", Nairobi); ("alpha", Alpha)]
 
 type constants =
   | Constants_sandbox
@@ -43,17 +42,13 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function
-  | Alpha -> "Alpha"
-  | Nairobi -> "Nairobi"
-  | Oxford -> "Oxford"
+let name = function Alpha -> "Alpha" | Nairobi -> "Nairobi"
 
-let number = function Nairobi -> 017 | Oxford -> 018 | Alpha -> 019
+let number = function Nairobi -> 017 | Alpha -> 018
 
 let directory = function
   | Alpha -> "proto_alpha"
   | Nairobi -> "proto_017_PtNairob"
-  | Oxford -> "proto_018_Proxford"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -61,7 +56,6 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Nairobi -> "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
-  | Oxford -> "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -260,19 +254,13 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let next_protocol = function
-  | Nairobi -> Some Alpha
-  | Oxford -> None
-  | Alpha -> None
+let next_protocol = function Nairobi -> Some Alpha | Alpha -> None
 
-let previous_protocol = function
-  | Alpha -> Some Nairobi
-  | Oxford -> Some Nairobi
-  | Nairobi -> None
+let previous_protocol = function Alpha -> Some Nairobi | Nairobi -> None
 
 let has_predecessor p = previous_protocol p <> None
 
-let all = [Nairobi; Oxford; Alpha]
+let all = [Nairobi; Alpha]
 
 type supported_protocols =
   | Any_protocol

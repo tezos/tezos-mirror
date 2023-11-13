@@ -97,8 +97,7 @@ let max_op_ttl = 120
 
 (** Constant gas cost required for every manager operation. Should
     match [Michelson_v1_gas.Cost_of.manager_operation]. *)
-let manager_operation_gas_cost ~protocol =
-  match protocol with Protocol.Nairobi | Oxford | Alpha -> 100
+let manager_operation_gas_cost ~protocol:_ = 100
 
 (** A valid base58 encoded compressed state hash. *)
 let sc_rollup_compressed_state =

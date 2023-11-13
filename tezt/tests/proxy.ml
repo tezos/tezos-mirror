@@ -148,19 +148,21 @@ let test_cache_at_most_once ~protocols =
   List.iter
     (fun (sub_path, query_string) ->
       test_cache_at_most_once
-        ~supports:Protocol.(Until_protocol (number Oxford))
+        ~supports:Protocol.(Until_protocol (number Nairobi + 1))
         ~query_string
         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
         protocols)
-    ((["helpers"; "endorsing_rights"], []) :: paths) ;
-  List.iter
-    (fun (sub_path, query_string) ->
-      test_cache_at_most_once
-        ~supports:Protocol.(From_protocol 019)
-        ~query_string
-        ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-        protocols)
-    paths
+    ((["helpers"; "endorsing_rights"], []) :: paths)
+(* Re-enable me once we start the protocol after Oxford. *)
+(* ;
+   List.iter
+     (fun (sub_path, query_string) ->
+       test_cache_at_most_once
+         ~supports:Protocol.(From_protocol 019)
+         ~query_string
+         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
+         protocols)
+     paths *)
 
 (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
 let starts_with ~(prefix : string) (s : string) : bool =
@@ -272,7 +274,7 @@ let test_context_suffix_no_rpc ~protocols =
   let iter l f = List.iter f l in
   iter protocols @@ fun protocol ->
   let paths =
-    if Protocol.(number protocol <= number Oxford) then
+    if Protocol.(number protocol <= number Nairobi + 1) then
       (["helpers"; "endorsing_rights"], []) :: paths
     else paths
   in
@@ -540,7 +542,7 @@ module Location = struct
           (add_rpc_path_prefix ["votes"; "proposals"], []);
         ]
       in
-      if Protocol.(number protocol <= number Oxford) then
+      if Protocol.(number protocol <= number Nairobi + 1) then
         (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []) :: compared
       else compared
     in
