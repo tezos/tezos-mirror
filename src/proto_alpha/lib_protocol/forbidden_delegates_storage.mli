@@ -15,6 +15,9 @@ val is_forbidden : Raw_context.t -> Signature.Public_key_hash.t -> bool
     baking or attesting. *)
 val forbid : Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 
+val should_forbid :
+  current_cycle:Cycle_repr.t -> Storage.Slashed_deposits_history.t -> bool
+
 (** [load ctxt] reads from the storage the saved set of
     forbidden delegates and sets the raw context's in-memory cached value. *)
 val load : Raw_context.t -> Raw_context.t tzresult Lwt.t

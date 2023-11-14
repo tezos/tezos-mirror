@@ -16,6 +16,21 @@ let forbid ctxt delegate =
   in
   Storage.Tenderbake.Forbidden_delegates.add ctxt new_forbidden_delegates
 
+let should_forbid ~current_cycle slash_history =
+  let slashed_this_cycle =
+    Storage.Slashed_deposits_history.get current_cycle slash_history
+  in
+  let slashed_previous_cycle =
+    match Cycle_repr.pred current_cycle with
+    | Some previous_cycle ->
+        Storage.Slashed_deposits_history.get previous_cycle slash_history
+    | None -> Int_percentage.p0
+  in
+  let slashed_both_cycles =
+    Int_percentage.add_bounded slashed_this_cycle slashed_previous_cycle
+  in
+  Compare.Int.((slashed_both_cycles :> int) >= 100)
+
 let load ctxt =
   let open Lwt_result_syntax in
   let* forbidden_delegates_opt =
