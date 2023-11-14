@@ -144,3 +144,4 @@ Miscellaneous
 -------------
 
 - Beta scripts to build Debian and RedHat packages have been added to the tree.
+- New Recommended Rust version 1.65.0 instead of 1.64.0.
