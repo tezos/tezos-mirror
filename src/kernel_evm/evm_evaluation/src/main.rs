@@ -8,6 +8,7 @@ mod models;
 mod runner;
 
 use std::{
+    collections::HashMap,
     ffi::OsStr,
     path::{Path, PathBuf},
 };
@@ -24,35 +25,28 @@ pub fn find_all_json_tests(path: &Path) -> Vec<PathBuf> {
         .collect::<Vec<PathBuf>>()
 }
 
-/* REPORT - 30/10/2023 - 17:18 (UTC+2)
-
-# Number of tests:
-    - Runned: 2474
-    - Skipped: 194
-
-# Ethereum transactions:
-    - 17404 in total with Shanghai config
-
-# EVM execution outcomes: (just for stats, not relevant)
-    - 7565 SUCCESS
-    - 5666 FAILURE
-    - 168 INVALID
-
-# EVM evaluation interpretation:
-
-## Per test interpreted:
-    - 746 SUCCESS (30.65%)
-    - 1688 FAILURE (69.35%)
-
-EVM confidence : 0.31 (target: 1.00) */
+#[derive(Default)]
+pub struct ReportValue {
+    pub successes: u16,
+    pub failures: u16,
+}
 
 pub fn main() {
     // Preliminary step:
     // Clone https://github.com/ethereum/tests repo inside [engine_evaluation]
     let folder_path = "tests/GeneralStateTests";
     let test_files = find_all_json_tests(&PathBuf::from(folder_path));
+    let mut report_map: HashMap<String, ReportValue> = HashMap::new();
     println!("Start running tests on: {:?}", folder_path);
     for test_file in test_files.into_iter() {
+        let splitted_path: Vec<&str> = test_file.to_str().unwrap().split('/').collect();
+        let report_key = splitted_path
+            .get(splitted_path.len() - 2)
+            .unwrap()
+            .to_owned();
+        if !report_map.contains_key(report_key) {
+            report_map.insert(report_key.to_owned(), ReportValue::default());
+        }
         println!("---------- Test: {:?} ----------", test_file);
 
         if SKIP_ANY {
@@ -240,7 +234,23 @@ pub fn main() {
             }
         }
 
-        runner::run_test(&test_file).unwrap();
+        runner::run_test(&test_file, &mut report_map, report_key.to_owned()).unwrap();
     }
-    println!("@@@@@ END OF TESTING @@@@@");
+    println!("@@@@@ END OF TESTING @@@@@\n");
+
+    println!("@@@@@@ FINAL REPORT @@@@@@");
+    let mut successes_total = 0;
+    let mut failure_total = 0;
+    for (key, report_value) in report_map {
+        successes_total += report_value.successes;
+        failure_total += report_value.failures;
+        println!(
+            "For sub-dir {}, there was {} success(es) and {} failure(s).",
+            key, report_value.successes, report_value.failures
+        )
+    }
+    println!(
+        "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}",
+        successes_total, failure_total
+    );
 }
