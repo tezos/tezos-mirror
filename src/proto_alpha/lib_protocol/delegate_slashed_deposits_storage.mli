@@ -68,6 +68,7 @@ type punishing_amounts = {
     already been slashed for the same misbehaviour for the given level.  *)
 val punish_double_signing :
   Raw_context.t ->
+  operation_hash:Operation_hash.t ->
   Misbehaviour.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->

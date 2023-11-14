@@ -91,6 +91,9 @@ type update_origin =
   | Protocol_migration  (** Update from a protocol migration *)
   | Subsidy  (** Update from an inflationary subsidy  *)
   | Simulation  (** Simulation of an operation **)
+  | Delayed_operation of {operation_hash : Operation_hash.t}
+      (** Delayed application of an operation, whose hash is given. E.g. for
+          operations that take effect only at the end of the cycle. *)
 
 (** Compares two origins. *)
 val compare_update_origin : update_origin -> update_origin -> int

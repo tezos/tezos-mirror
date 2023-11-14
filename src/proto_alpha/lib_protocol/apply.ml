@@ -2259,16 +2259,22 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   in
   return (ctxt, contents_result_list)
 
-let punish_delegate ctxt delegate level misbehaviour mk_result ~payload_producer
-    =
+let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
+    ~payload_producer =
   let open Lwt_result_syntax in
   let rewarded = payload_producer.Consensus_key.delegate in
   let+ ctxt =
-    Delegate.punish_double_signing ctxt misbehaviour delegate level ~rewarded
+    Delegate.punish_double_signing
+      ctxt
+      ~operation_hash
+      misbehaviour
+      delegate
+      level
+      ~rewarded
   in
   (ctxt, Single_result (mk_result []))
 
-let punish_double_attestation_or_preattestation (type kind) ctxt
+let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
     (context
     * kind Kind.double_consensus_operation_evidence contents_result_list)
@@ -2291,13 +2297,15 @@ let punish_double_attestation_or_preattestation (type kind) ctxt
       in
       punish_delegate
         ctxt
+        ~operation_hash
         consensus_pk1.delegate
         level
         Double_attesting
         mk_result
         ~payload_producer
 
-let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
+let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
+    ~payload_producer =
   let open Lwt_result_syntax in
   let*? bh1_fitness = Fitness.from_raw bh1.shell.fitness in
   let round1 = Fitness.round bh1_fitness in
@@ -2308,6 +2316,7 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
   let* ctxt, consensus_pk1 = Stake_distribution.slot_owner ctxt level slot1 in
   punish_delegate
     ctxt
+    ~operation_hash
     consensus_pk1.delegate
     level
     Double_baking
@@ -2315,7 +2324,8 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
     (fun balance_updates -> Double_baking_evidence_result balance_updates)
 
 let apply_contents_list (type kind) ctxt chain_id (mode : mode)
-    ~payload_producer ~operation (contents_list : kind contents_list) :
+    ~payload_producer ~operation ~operation_hash
+    (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let mempool_mode =
@@ -2377,11 +2387,19 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       in
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preattestation_evidence {op1; op2 = _}) ->
-      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
+      punish_double_attestation_or_preattestation
+        ctxt
+        ~operation_hash
+        ~op1
+        ~payload_producer
   | Single (Double_attestation_evidence {op1; op2 = _}) ->
-      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
+      punish_double_attestation_or_preattestation
+        ctxt
+        ~operation_hash
+        ~op1
+        ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
-      punish_double_baking ctxt bh1 ~payload_producer
+      punish_double_baking ctxt ~operation_hash bh1 ~payload_producer
   | Single (Activate_account {id = pkh; activation_code}) ->
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
@@ -2455,6 +2473,7 @@ let apply_operation application_state operation_hash operation =
         application_state.mode
         ~payload_producer
         ~operation
+        ~operation_hash
         operation.protocol_data.contents
     in
     let ctxt = Gas.set_unlimited ctxt in

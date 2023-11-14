@@ -18,6 +18,7 @@ let misbehaviour_cycle_encoding =
     int8
 
 type item = {
+  operation_hash : Operation_hash.t;
   rewarded : Signature.public_key_hash;
   misbehaviour : Misbehaviour.t;
   misbehaviour_cycle : misbehaviour_cycle;
@@ -26,11 +27,12 @@ type item = {
 let item_encoding =
   let open Data_encoding in
   conv
-    (fun {rewarded; misbehaviour; misbehaviour_cycle} ->
-      (rewarded, misbehaviour, misbehaviour_cycle))
-    (fun (rewarded, misbehaviour, misbehaviour_cycle) ->
-      {rewarded; misbehaviour; misbehaviour_cycle})
-    (obj3
+    (fun {operation_hash; rewarded; misbehaviour; misbehaviour_cycle} ->
+      (operation_hash, rewarded, misbehaviour, misbehaviour_cycle))
+    (fun (operation_hash, rewarded, misbehaviour, misbehaviour_cycle) ->
+      {operation_hash; rewarded; misbehaviour; misbehaviour_cycle})
+    (obj4
+       (req "operation_hash" Operation_hash.encoding)
        (req "rewarded" Signature.Public_key_hash.encoding)
        (req "misbehaviour" Misbehaviour.encoding)
        (req "misbehaviour_cycle" misbehaviour_cycle_encoding))
@@ -39,5 +41,5 @@ type t = item list
 
 let encoding = Data_encoding.list item_encoding
 
-let add rewarded misbehaviour misbehaviour_cycle list =
-  list @ [{rewarded; misbehaviour; misbehaviour_cycle}]
+let add operation_hash rewarded misbehaviour misbehaviour_cycle list =
+  list @ [{operation_hash; rewarded; misbehaviour; misbehaviour_cycle}]

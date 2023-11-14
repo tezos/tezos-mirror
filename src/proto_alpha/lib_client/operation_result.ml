@@ -455,6 +455,12 @@ let pp_balance_updates ppf balance_updates =
           | Protocol_migration -> Format.asprintf "migration %s" balance
           | Subsidy -> Format.asprintf "subsidy %s" balance
           | Simulation -> Format.asprintf "simulation %s" balance
+          | Delayed_operation {operation_hash} ->
+              Format.asprintf
+                "delayed operation(%a) %s"
+                Operation_hash.pp
+                operation_hash
+                balance
         in
         let update = Format.asprintf "%a" (pp_update token) update in
         (balance, update))

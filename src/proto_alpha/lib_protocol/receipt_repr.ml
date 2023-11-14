@@ -490,47 +490,64 @@ type update_origin =
   | Protocol_migration
   | Subsidy
   | Simulation
+  | Delayed_operation of {operation_hash : Operation_hash.t}
 
 let compare_update_origin oa ob =
-  let index o =
-    match o with
-    | Block_application -> 0
-    | Protocol_migration -> 1
-    | Subsidy -> 2
-    | Simulation -> 3
-  in
-  Compare.Int.compare (index oa) (index ob)
+  match (oa, ob) with
+  | ( Delayed_operation {operation_hash = oha},
+      Delayed_operation {operation_hash = ohb} ) ->
+      Operation_hash.compare oha ohb
+  | _, _ ->
+      let index o =
+        match o with
+        | Block_application -> 0
+        | Protocol_migration -> 1
+        | Subsidy -> 2
+        | Simulation -> 3
+        | Delayed_operation _ -> 4
+        (* don't forget to add parameterized cases in the first part of the function *)
+      in
+      Compare.Int.compare (index oa) (index ob)
 
 let update_origin_encoding =
   let open Data_encoding in
   def "operation_metadata.alpha.update_origin"
-  @@ obj1 @@ req "origin"
   @@ union
        [
          case
            (Tag 0)
            ~title:"Block_application"
-           (constant "block")
+           (obj1 (req "origin" (constant "block")))
            (function Block_application -> Some () | _ -> None)
            (fun () -> Block_application);
          case
            (Tag 1)
            ~title:"Protocol_migration"
-           (constant "migration")
+           (obj1 (req "origin" (constant "migration")))
            (function Protocol_migration -> Some () | _ -> None)
            (fun () -> Protocol_migration);
          case
            (Tag 2)
            ~title:"Subsidy"
-           (constant "subsidy")
+           (obj1 (req "origin" (constant "subsidy")))
            (function Subsidy -> Some () | _ -> None)
            (fun () -> Subsidy);
          case
            (Tag 3)
            ~title:"Simulation"
-           (constant "simulation")
+           (obj1 (req "origin" (constant "simulation")))
            (function Simulation -> Some () | _ -> None)
            (fun () -> Simulation);
+         case
+           (Tag 4)
+           ~title:"Delayed_operation"
+           (obj2
+              (req "origin" (constant "delayed_operation"))
+              (req "delayed_operation_hash" Operation_hash.encoding))
+           (function
+             | Delayed_operation {operation_hash} -> Some ((), operation_hash)
+             | _ -> None)
+           (fun ((), operation_hash) -> Delayed_operation {operation_hash});
        ]
 
 type balance_update_item =

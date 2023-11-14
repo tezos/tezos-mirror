@@ -57,8 +57,8 @@ type punishing_amounts = {
 
     The double signing event corresponds to a field in {!Storage.slashed_level}.
 *)
-let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
-    (level : Level_repr.t) ~rewarded =
+let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
+    delegate (level : Level_repr.t) ~rewarded =
   let open Lwt_result_syntax in
   let* slashed_opt =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
@@ -146,7 +146,12 @@ let punish_double_signing ctxt (misbehaviour : Misbehaviour.t) delegate
           assert false
       in
       let denunciations =
-        Denunciations_repr.add rewarded misbehaviour cycle denunciations
+        Denunciations_repr.add
+          operation_hash
+          rewarded
+          misbehaviour
+          cycle
+          denunciations
       in
       let*! ctxt =
         Storage.Current_cycle_denunciations.add ctxt delegate denunciations
@@ -203,7 +208,8 @@ let apply_and_clear_current_cycle_denunciations ctxt =
         let+ ctxt, percentage, balance_updates =
           List.fold_left_es
             (fun (ctxt, percentage, balance_updates)
-                 Denunciations_repr.{rewarded; misbehaviour; misbehaviour_cycle} ->
+                 Denunciations_repr.
+                   {operation_hash; rewarded; misbehaviour; misbehaviour_cycle} ->
               let slashing_percentage =
                 match misbehaviour with
                 | Double_baking ->
@@ -298,12 +304,18 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                   init_to_burn_to_reward
                   slashable_cycles
               in
+              let origin = Receipt_repr.Delayed_operation {operation_hash} in
               let* ctxt, punish_balance_updates =
-                Token.transfer_n ctxt to_burn `Double_signing_punishments
+                Token.transfer_n
+                  ctxt
+                  ~origin
+                  to_burn
+                  `Double_signing_punishments
               in
               let+ ctxt, reward_balance_updates =
                 Token.transfer_n
                   ctxt
+                  ~origin
                   to_reward
                   (`Contract (Contract_repr.Implicit rewarded))
               in
