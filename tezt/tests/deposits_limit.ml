@@ -33,8 +33,6 @@ let test_set_deposits_limit =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"set deposits limit"
-      (* TODO: Remove the constraint when oxford1 is removed *)
-    ~supports:(Protocol.From_protocol 019)
     ~tags:["deposits_limit"]
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
@@ -47,8 +45,6 @@ let test_unset_deposits_limit =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"unset deposits limit"
-      (* TODO: Remove the constraint when oxford1 is removed *)
-    ~supports:(Protocol.From_protocol 019)
     ~tags:["deposits_limit"]
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
