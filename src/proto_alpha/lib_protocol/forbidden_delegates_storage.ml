@@ -31,6 +31,11 @@ let should_forbid ~current_cycle slash_history =
   in
   Compare.Int.((slashed_both_cycles :> int) >= 100)
 
+let may_forbid ctxt delegate ~current_cycle slash_history =
+  let open Lwt_syntax in
+  if should_forbid ~current_cycle slash_history then forbid ctxt delegate
+  else return ctxt
+
 let load ctxt =
   let open Lwt_result_syntax in
   let* forbidden_delegates_opt =

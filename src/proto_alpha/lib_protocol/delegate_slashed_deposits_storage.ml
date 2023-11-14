@@ -107,13 +107,12 @@ let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
-  let should_forbid_from_history =
-    Forbidden_delegates_storage.should_forbid ~current_cycle slash_history
-  in
   let*! ctxt =
-    if should_forbid_from_history then
-      Forbidden_delegates_storage.forbid ctxt delegate
-    else Lwt.return ctxt
+    Forbidden_delegates_storage.may_forbid
+      ctxt
+      delegate
+      ~current_cycle
+      slash_history
   in
   let* ctxt =
     if Compare.Int.((previously_slashed_this_cycle :> int) >= 100) then

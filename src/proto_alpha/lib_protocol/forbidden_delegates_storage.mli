@@ -15,8 +15,16 @@ val is_forbidden : Raw_context.t -> Signature.Public_key_hash.t -> bool
     baking or attesting. *)
 val forbid : Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 
-val should_forbid :
-  current_cycle:Cycle_repr.t -> Storage.Slashed_deposits_history.t -> bool
+(** [may_forbid ctxt delegate ~current_cycle slash_history] checks the
+    forbidding criteria based on [current_cycle] and [slash_history] and, if
+    required, adds [delegate] to the set of forbidden delegates and stores the
+    updated set, which prevents this delegate from baking or attesting. *)
+val may_forbid :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  current_cycle:Cycle_repr.t ->
+  Storage.Slashed_deposits_history.t ->
+  Raw_context.t Lwt.t
 
 (** [load ctxt] reads from the storage the saved set of
     forbidden delegates and sets the raw context's in-memory cached value. *)
