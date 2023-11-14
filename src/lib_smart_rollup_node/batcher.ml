@@ -42,7 +42,6 @@ type state = {
   node_ctxt : Node_context.ro;
   messages : Message_queue.t;
   batched : Batched_messages.t;
-  mutable simulation_ctxt : Simulation.t option;
   mutable plugin : (module Protocol_plugin_sig.S);
 }
 
@@ -155,19 +154,6 @@ let produce_batches state ~only_full =
         to_remove ;
       return_unit
 
-let simulate state simulation_ctxt (messages : L2_message.t list) =
-  let open Lwt_result_syntax in
-  let module Plugin = (val state.plugin) in
-  let*? ext_messages =
-    List.map_e
-      (fun m -> Plugin.Inbox.serialize_external_message (L2_message.content m))
-      messages
-  in
-  let+ simulation_ctxt, _ticks =
-    Simulation.simulate_messages simulation_ctxt ext_messages
-  in
-  simulation_ctxt
-
 let on_register state (messages : string list) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
@@ -185,15 +171,6 @@ let on_register state (messages : string list) =
         else Ok (L2_message.make message))
       messages
   in
-  let* () =
-    if not state.node_ctxt.config.batcher.simulate then return_unit
-    else
-      match state.simulation_ctxt with
-      | None -> failwith "Simulation context of batcher not initialized"
-      | Some simulation_ctxt ->
-          let+ simulation_ctxt = simulate state simulation_ctxt messages in
-          state.simulation_ctxt <- Some simulation_ctxt
-  in
   let*! () = Batcher_events.(emit queue) (List.length messages) in
   let hashes =
     List.map
@@ -206,39 +183,13 @@ let on_register state (messages : string list) =
   let+ () = produce_batches state ~only_full:true in
   hashes
 
-let on_new_head state head =
-  let open Lwt_result_syntax in
-  (* Produce batches first *)
-  let* () = produce_batches state ~only_full:false in
-  let* simulation_ctxt =
-    Simulation.start_simulation ~reveal_map:None state.node_ctxt head
-  in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4224
-     Replay with simulation may be too expensive *)
-  let+ simulation_ctxt, failing =
-    if not state.node_ctxt.config.batcher.simulate then
-      return (simulation_ctxt, [])
-    else
-      (* Re-simulate one by one *)
-      Message_queue.fold_es
-        (fun msg_hash msg (simulation_ctxt, failing) ->
-          let*! result = simulate state simulation_ctxt [msg] in
-          match result with
-          | Ok simulation_ctxt -> return (simulation_ctxt, failing)
-          | Error _ -> return (simulation_ctxt, msg_hash :: failing))
-        state.messages
-        (simulation_ctxt, [])
-  in
-  state.simulation_ctxt <- Some simulation_ctxt ;
-  (* Forget failing messages *)
-  List.iter (Message_queue.remove state.messages) failing
+let on_new_head state = produce_batches state ~only_full:false
 
 let init_batcher_state plugin node_ctxt =
   {
     node_ctxt;
     messages = Message_queue.create 100_000 (* ~ 400MB *);
     batched = Batched_messages.create 100_000 (* ~ 400MB *);
-    simulation_ctxt = None;
     plugin;
   }
 
@@ -280,7 +231,7 @@ module Handlers = struct
     match request with
     | Request.Register messages ->
         protect @@ fun () -> on_register state messages
-    | Request.New_head head -> protect @@ fun () -> on_new_head state head
+    | Request.Produce_batches -> protect @@ fun () -> on_new_head state
 
   type launch_error = error trace
 
@@ -301,11 +252,11 @@ module Handlers = struct
     in
     match r with
     | Request.Register _ -> emit_and_return_errors errs
-    | Request.New_head _ -> emit_and_return_errors errs
+    | Request.Produce_batches -> emit_and_return_errors errs
 
   let on_completion _w r _ st =
     match Request.view r with
-    | Request.View (Register _ | New_head _) ->
+    | Request.View (Register _ | Produce_batches) ->
         Batcher_events.(emit Worker.request_completed_debug) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
@@ -397,7 +348,7 @@ let register_messages messages =
   Worker.Queue.push_request_and_wait w (Request.Register messages)
   |> handle_request_error
 
-let new_head b =
+let produce_batches () =
   let open Lwt_result_syntax in
   match Lazy.force worker with
   | Error Rollup_node_errors.No_batcher ->
@@ -405,7 +356,7 @@ let new_head b =
       return_unit
   | Error e -> tzfail e
   | Ok w ->
-      Worker.Queue.push_request_and_wait w (Request.New_head b)
+      Worker.Queue.push_request_and_wait w Request.Produce_batches
       |> handle_request_error
 
 let shutdown () =

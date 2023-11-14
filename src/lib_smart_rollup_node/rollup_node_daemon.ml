@@ -299,7 +299,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Refutation_coordinator.process stripped_head in
-  let* () = Batcher.new_head stripped_head in
+  let* () = Batcher.produce_batches () in
   let*! () = Injector.inject ~header:head.header () in
   return_unit
 

@@ -31,8 +31,9 @@ module Request : sig
   type ('a, 'b) t =
     | Register : string list -> (L2_message.hash list, error trace) t
         (** Request to register new L2 messages in the queue. *)
-    | New_head : Layer1.head -> (unit, error trace) t
-        (** Request to handle a new L1 head. *)
+    | Produce_batches : (unit, error trace) t
+        (** Request to produce new messages batches and submit them to
+            the injector. *)
 
   type view = View : _ t -> view
 

@@ -35,7 +35,6 @@ type mode =
   | Custom of Operation_kind.t list
 
 type batcher = {
-  simulate : bool;
   min_batch_elements : int;
   min_batch_size : int;
   max_batch_elements : int;
@@ -185,8 +184,6 @@ let default_fee_parameters =
     Operation_kind.Map.empty
     Operation_kind.all
 
-let default_batcher_simulate = true
-
 let default_batcher_min_batch_elements = 10
 
 let default_batcher_min_batch_size = 10
@@ -195,7 +192,6 @@ let default_batcher_max_batch_elements = max_int
 
 let default_batcher =
   {
-    simulate = default_batcher_simulate;
     min_batch_elements = default_batcher_min_batch_elements;
     min_batch_size = default_batcher_min_batch_size;
     max_batch_elements = default_batcher_max_batch_elements;
@@ -322,22 +318,14 @@ let batcher_encoding =
   let open Data_encoding in
   conv_with_guard
     (fun {
-           simulate;
            min_batch_elements;
            min_batch_size;
            max_batch_elements;
            max_batch_size;
          } ->
-      ( simulate,
-        min_batch_elements,
-        min_batch_size,
-        max_batch_elements,
-        max_batch_size ))
-    (fun ( simulate,
-           min_batch_elements,
-           min_batch_size,
-           max_batch_elements,
-           max_batch_size ) ->
+      (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size))
+    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size)
+         ->
       let open Result_syntax in
       let error_when c s = if c then Error s else return_unit in
       let* () =
@@ -357,15 +345,8 @@ let batcher_encoding =
           (max_batch_elements < min_batch_elements)
           "max_batch_elements must be greater than min_batch_elements"
       in
-      {
-        simulate;
-        min_batch_elements;
-        min_batch_size;
-        max_batch_elements;
-        max_batch_size;
-      })
-  @@ obj5
-       (dft "simulate" bool default_batcher_simulate)
+      {min_batch_elements; min_batch_size; max_batch_elements; max_batch_size})
+  @@ obj4
        (dft "min_batch_elements" int31 default_batcher_min_batch_elements)
        (dft "min_batch_size" int31 default_batcher_min_batch_size)
        (dft "max_batch_elements" int31 default_batcher_max_batch_elements)
