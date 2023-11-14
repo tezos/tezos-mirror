@@ -156,7 +156,11 @@ let adjust_frozen_stakes ctxt :
             ~sender_contract:Contract_repr.(Implicit delegate)
             ~delegate
             to_unstake
-        else Staking.finalize_unstake ctxt Contract_repr.(Implicit delegate)
+        else
+          Staking.finalize_unstake
+            ctxt
+            ~for_next_cycle_use_only_after_slashing:true
+            Contract_repr.(Implicit delegate)
       in
       return (ctxt, new_balance_updates @ balance_updates))
 

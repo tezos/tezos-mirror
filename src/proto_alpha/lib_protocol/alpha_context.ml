@@ -594,6 +594,9 @@ module Staking = struct
 
   let request_unstake =
     request_unstake ~for_next_cycle_use_only_after_slashing:false
+
+  let finalize_unstake =
+    finalize_unstake ~for_next_cycle_use_only_after_slashing:false
 end
 
 module Nonce = Nonce_storage

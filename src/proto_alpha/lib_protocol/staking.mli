@@ -53,16 +53,22 @@ val request_unstake :
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-(** [finalize_unstake ctxt contract] performs the finalization of all unstake
-    requests from [contract] that can be finalized.
+(** [finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing contract]
+    performs the finalization of all unstake requests from [contract] that can
+    be finalized.
     An unstake request can be finalized if it is old enough, specifically the
     requested amount must not be at stake anymore and must not be slashable
     anymore, i.e. after [preserved_cycles + max_slashing_period] after the
     request.
     Amounts are transferred from the [contract]'s delegate (at request time)
     unstaked frozen deposits to [contract]'s spendable balance, minus slashing
-    the requested stake undergone in between. *)
+    the requested stake undergone in between.
+
+    If [for_next_cycle_use_only_after_slashing] is true, the finalization is
+    done for the next cycle. It is meant to be used only at cycle end after the
+    application of the slashing.*)
 val finalize_unstake :
   Raw_context.t ->
+  for_next_cycle_use_only_after_slashing:bool ->
   Contract_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t

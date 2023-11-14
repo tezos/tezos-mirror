@@ -101,7 +101,7 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
           in
           return (ctxt, balance_updates, Some unfinalizable))
 
-let finalize_unstake ctxt contract =
+let finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing:_ contract =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt _unfinalizable = return ctxt in
   let* ctxt, balance_updates, _ =
@@ -313,7 +313,7 @@ let stake ctxt ~for_next_cycle_use_only_after_slashing:_
     stake_balance_updates1 @ stake_balance_updates2 @ stake_balance_updates3
     @ finalize_balance_updates )
 
-let request_unstake ctxt ~for_next_cycle_use_only_after_slashing:_
+let request_unstake ctxt ~for_next_cycle_use_only_after_slashing
     ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* ctxt, tez_to_unstake, request_unstake_balance_updates =
@@ -341,7 +341,10 @@ let request_unstake ctxt ~for_next_cycle_use_only_after_slashing:_
         tez_to_unstake
     in
     let* ctxt, finalize_balance_updates =
-      finalize_unstake ctxt sender_contract
+      finalize_unstake
+        ctxt
+        ~for_next_cycle_use_only_after_slashing
+        sender_contract
     in
     let+ ctxt =
       Unstake_requests_storage.add
