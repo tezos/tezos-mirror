@@ -225,6 +225,13 @@ module Make
           ("operations", Data_encoding.list Operation.encoding)
           ~pp2:(pp_operations_list ~numbered:true)
 
+      let total_injected_ops =
+        declare_1
+          ~name:"total_injected_ops"
+          ~msg:"Total {nb} operations injected in the last round"
+          ~level:Debug
+          ("nb", Data_encoding.int31)
+
       let add_pending =
         declare_1
           ~name:"add_pending"
