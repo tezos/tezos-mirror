@@ -126,6 +126,14 @@ Smart Rollup node
 - Fix header in messages store to use predecessor hash to avoid missing pointer
   in case of reorganization and GC. (MR :gl:`!10847`)
 
+- Added a garbage collection mechanism that cleans historical data before the LCC.
+  (MRs :gl:`!10050`, :gl:`!10135`, :gl:`!10236`, :gl:`!10237`, :gl:`!10452`)
+
+- Added a ``history-mode`` option, which can be either ``archive`` or
+  ``full``. In ``archive``, the default, the rollup node has the whole L2 chain
+  history, no GC happens. In ``full`` the rollup node retains data for possible
+  refutations. (MRs :gl:`!10475`, :gl:`!10695`)
+
 Smart Rollup client
 -------------------
 
