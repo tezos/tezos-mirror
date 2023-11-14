@@ -268,6 +268,7 @@ pub enum Instruction<T: Stage> {
     Seq(Vec<Instruction<T>>),
     Unpair,
     Cons,
+    IfCons(Vec<Instruction<T>>, Vec<Instruction<T>>),
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

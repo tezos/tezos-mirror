@@ -139,6 +139,7 @@ pub mod interpret_cost {
     pub const GT: u32 = 10;
     pub const IF: u32 = 10;
     pub const IF_NONE: u32 = 10;
+    pub const IF_CONS: u32 = 10;
     pub const LOOP: u32 = 10;
     pub const SWAP: u32 = 10;
     pub const INT_NAT: u32 = 10;
