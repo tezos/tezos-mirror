@@ -537,7 +537,7 @@ module Delegate = struct
 
   let deactivated = Delegate_activation_storage.is_inactive
 
-  let is_forbidden_delegate = Forbidden_delegates_storage.is_forbidden_delegate
+  let is_forbidden_delegate = Forbidden_delegates_storage.is_forbidden
 
   module Consensus_key = Delegate_consensus_key
 

@@ -5,16 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [is_forbidden_delegate ctxt delegate] returns [true] if the given [delegate]
+(** [is_forbidden ctxt delegate] returns [true] if the given [delegate]
     is forbidden to bake or attest. This means that its current frozen deposit
     is equal to zero. Returns [false] otherwise. *)
-val is_forbidden_delegate : Raw_context.t -> Signature.Public_key_hash.t -> bool
+val is_forbidden : Raw_context.t -> Signature.Public_key_hash.t -> bool
 
-(** [forbid_delegate ctxt delegate] adds [delegate] to the set of forbidden
+(** [forbid ctxt delegate] adds [delegate] to the set of forbidden
     delegates and stores the updated set, which prevents this delegate from
     baking or attesting. *)
-val forbid_delegate :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
+val forbid : Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 
 (** [load ctxt] reads from the storage the saved set of
     forbidden delegates and sets the raw context's in-memory cached value. *)

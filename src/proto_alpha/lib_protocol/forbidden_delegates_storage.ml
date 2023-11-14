@@ -5,11 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let is_forbidden_delegate ctxt delegate =
+let is_forbidden ctxt delegate =
   let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
   Signature.Public_key_hash.Set.mem delegate forbidden_delegates
 
-let forbid_delegate ctxt delegate =
+let forbid ctxt delegate =
   let ctxt = Raw_context.Consensus.forbid_delegate ctxt delegate in
   let new_forbidden_delegates =
     Raw_context.Consensus.forbidden_delegates ctxt

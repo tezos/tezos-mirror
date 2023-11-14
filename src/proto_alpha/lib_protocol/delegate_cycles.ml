@@ -61,9 +61,7 @@ let update_forbidden_delegates ctxt ~new_cycle =
       if Tez_repr.(current_deposits = zero) then
         (* If the delegate's current deposit remains at zero then we add it to
            the forbidden set. *)
-        let*! ctxt =
-          Forbidden_delegates_storage.forbid_delegate ctxt delegate
-        in
+        let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
         return ctxt
       else return ctxt)
     ctxt
