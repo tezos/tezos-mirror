@@ -246,7 +246,7 @@ module Make (Parameters : PARAMETERS) = struct
     cctxt : Client_context.full;
         (** The client context which is used to perform the injections. *)
     l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
-    signer : signer;  (** The signer for this worker. *)
+    signers : signer list;  (** The signers for this worker. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
           purposes. *)
@@ -287,11 +287,13 @@ module Make (Parameters : PARAMETERS) = struct
       Injector_events.Make (Parameters) (Tags) (POperation) (Inj_operation)
         (Request)
 
-    let emit1 e state x = emit e (state.signer.alias, state.tags, x)
+    let signers_alias state = List.map (fun s -> s.alias) state.signers
 
-    let emit2 e state x y = emit e (state.signer.alias, state.tags, x, y)
+    let emit1 e state x = emit e (signers_alias state, state.tags, x)
 
-    let emit3 e state x y z = emit e (state.signer.alias, state.tags, x, y, z)
+    let emit2 e state x y = emit e (signers_alias state, state.tags, x, y)
+
+    let emit3 e state x y z = emit e (signers_alias state, state.tags, x, y, z)
   end
 
   let last_head_encoding =
@@ -318,9 +320,10 @@ module Make (Parameters : PARAMETERS) = struct
     state.last_seen_head <- Some head
 
   let init_injector cctxt l1_ctxt ~head_protocols ~data_dir state
-      ~retention_period ~allowed_attempts ~injection_ttl ~signer strategy tags =
+      ~retention_period ~allowed_attempts ~injection_ttl ~signers strategy tags
+      =
     let open Lwt_result_syntax in
-    let* signer = get_signer cctxt signer in
+    let* signers = List.map_ep (get_signer cctxt) signers in
     let data_dir = Filename.concat data_dir "injector" in
     let*! () = Lwt_utils_unix.create_dir data_dir in
     let filter op_proj op =
@@ -328,11 +331,13 @@ module Make (Parameters : PARAMETERS) = struct
     in
     (* Warn of corrupted files but don't fail *)
     let warn file error =
-      Event.(emit corrupted_operation_on_disk) (signer.alias, tags, file, error)
+      Event.(emit corrupted_operation_on_disk)
+        (List.map (fun s -> s.alias) signers, tags, file, error)
     in
     let warn_unreadable = Some warn in
     let emit_event_loaded kind nb =
-      Event.(emit loaded_from_disk) (signer.alias, tags, nb, kind)
+      Event.(emit loaded_from_disk)
+        (List.map (fun s -> s.alias) signers, tags, nb, kind)
     in
     let* queue =
       Op_queue.load_from_disk
@@ -400,7 +405,7 @@ module Make (Parameters : PARAMETERS) = struct
       {
         cctxt = injector_context (cctxt :> #Client_context.full);
         l1_ctxt;
-        signer;
+        signers;
         tags;
         strategy;
         save_dir = data_dir;
@@ -606,6 +611,14 @@ module Make (Parameters : PARAMETERS) = struct
   let rec simulate_operations ~must_succeed state
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
+    let signer =
+      match state.signers with
+      | signer :: _ -> signer
+      | [] ->
+          (* TODO: there is always at least a signer per
+             worker. changed in following commit *)
+          assert false
+    in
     let force =
       match operations with
       | [] -> assert false
@@ -627,8 +640,8 @@ module Make (Parameters : PARAMETERS) = struct
       Proto_client.simulate_operations
         state.cctxt
         ~force
-        ~source:state.signer.pkh
-        ~src_pk:state.signer.pk
+        ~source:signer.pkh
+        ~src_pk:signer.pk
         ~successor_level:true
           (* Operations are simulated in the next block, which is important for
              rollups and ok for other applications. *)
@@ -691,10 +704,18 @@ module Make (Parameters : PARAMETERS) = struct
 
   let inject_on_node state ~nb (module Unsigned_op : Proto_unsigned_op) =
     let open Lwt_result_syntax in
+    let signer =
+      match state.signers with
+      | signer :: _ -> signer
+      | [] ->
+          (* TODO: there is always at least a signer per
+             worker. changed in following commit *)
+          assert false
+    in
     let* signed_op_bytes =
       Unsigned_op.Proto_client.sign_operation
         state.cctxt
-        state.signer.sk
+        signer.sk
         Unsigned_op.value
     in
     let* oph =
@@ -1174,7 +1195,7 @@ module Make (Parameters : PARAMETERS) = struct
     type nonrec state = state
 
     type parameters = {
-      signer : Signature.public_key_hash;
+      signers : Signature.public_key_hash list;
       cctxt : Client_context.full;
       l1_ctxt : Layer_1.t;
       head_protocols : protocols;
@@ -1233,7 +1254,7 @@ module Make (Parameters : PARAMETERS) = struct
     let on_launch _w tags
         Types.
           {
-            signer;
+            signers;
             cctxt;
             l1_ctxt;
             head_protocols;
@@ -1254,7 +1275,7 @@ module Make (Parameters : PARAMETERS) = struct
            ~retention_period
            ~allowed_attempts
            ~injection_ttl
-           ~signer
+           ~signers
            strategy
            tags
 
@@ -1409,6 +1430,86 @@ module Make (Parameters : PARAMETERS) = struct
           (Printexc.to_string exn) ;
         async_monitor_l1_chain cctxt l1_ctxt)
 
+  let check_signer_is_not_already_registered registered_signers signers =
+    List.iter_ep
+      (fun pkh ->
+        fail_when (Signature.Public_key_hash.Set.mem pkh registered_signers)
+        @@ error_of_fmt
+             "key %a is already registered"
+             Signature.Public_key_hash.pp
+             pkh)
+      signers
+
+  let check_tag_is_not_already_registered registered_tags tags =
+    error_unless (Tags.disjoint tags registered_tags)
+    @@ error_of_fmt "tags %a is already registered" Tags.pp tags
+
+  let register_worker cctxt l1_ctxt head_protocols ~data_dir state
+      retention_period allowed_attempts injection_ttl signers strategy tags =
+    let open Lwt_result_syntax in
+    let* worker =
+      Worker.launch
+        table
+        tags
+        {
+          signers;
+          cctxt = (cctxt :> Client_context.full);
+          l1_ctxt;
+          head_protocols;
+          data_dir;
+          state;
+          retention_period;
+          allowed_attempts;
+          injection_ttl;
+          strategy;
+        }
+        (module Handlers)
+    in
+    let () = Tags.iter (fun tag -> Tags_table.add tags_table tag worker) tags in
+    return_unit
+
+  let register_disjoint_signers (cctxt : #Client_context.full) l1_ctxt ~data_dir
+      retention_period ~allowed_attempts ~injection_ttl state
+      (signers :
+        (Signature.public_key_hash list
+        * injection_strategy
+        * Parameters.Tag.t list)
+        list) =
+    let open Lwt_result_syntax in
+    let rec aux registered_signers registered_tags = function
+      | [] -> return_unit
+      | (signers, strategy, tags) :: rest ->
+          let* () =
+            check_signer_is_not_already_registered registered_signers signers
+          in
+          let tags = Tags.of_list tags in
+          let*? () = check_tag_is_not_already_registered registered_tags tags in
+          let*? () = Inj_proto.check_registered_proto_clients state in
+          let* head_protocols = protocols_of_head cctxt in
+          let* _ =
+            register_worker
+              cctxt
+              l1_ctxt
+              head_protocols
+              ~data_dir
+              state
+              retention_period
+              allowed_attempts
+              injection_ttl
+              signers
+              strategy
+              tags
+          in
+          let registered_signers =
+            Signature.Public_key_hash.Set.add_seq
+              (List.to_seq signers)
+              registered_signers
+          in
+          let registered_tags = Tags.union tags registered_tags in
+          aux registered_signers registered_tags rest
+    in
+    aux Signature.Public_key_hash.Set.empty Tags.empty signers
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
@@ -1418,60 +1519,17 @@ module Make (Parameters : PARAMETERS) = struct
     assert (retention_period >= 0) ;
     assert (allowed_attempts >= 0) ;
     assert (injection_ttl > 0) ;
-    let signers_map =
-      List.fold_left
-        (fun acc (signer, strategy, tags) ->
-          let tags = Tags.of_list tags in
-          let strategy, tags =
-            match Signature.Public_key_hash.Map.find_opt signer acc with
-            | None -> (strategy, tags)
-            | Some (other_strategy, other_tags) ->
-                let strategy =
-                  match (strategy, other_strategy) with
-                  | `Each_block, `Each_block -> `Each_block
-                  | `Delay_block f, _ | _, `Delay_block f ->
-                      (* Delay_block strategy takes over because we can always wait a
-                         little bit more to inject operation which are to be injected
-                         "each block". *)
-                      `Delay_block f
-                in
-                (strategy, Tags.union other_tags tags)
-          in
-          Signature.Public_key_hash.Map.add signer (strategy, tags) acc)
-        Signature.Public_key_hash.Map.empty
-        signers
-    in
-    let*? () = Inj_proto.check_registered_proto_clients state in
     let*! l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
-    let* head_protocols = protocols_of_head cctxt in
     let* () =
-      Signature.Public_key_hash.Map.iter_es
-        (fun signer (strategy, tags) ->
-          let* worker =
-            Worker.launch
-              table
-              tags
-              {
-                signer;
-                cctxt = (cctxt :> Client_context.full);
-                l1_ctxt;
-                head_protocols;
-                data_dir;
-                state;
-                retention_period;
-                allowed_attempts;
-                injection_ttl;
-                strategy;
-              }
-              (module Handlers)
-          in
-          Tags.iter_es
-            (fun tag ->
-              if Tags_table.mem tags_table tag then
-                tzfail Overlapping_operations
-              else return (Tags_table.add tags_table tag worker))
-            tags)
-        signers_map
+      register_disjoint_signers
+        (cctxt : #Client_context.full)
+        l1_ctxt
+        ~data_dir
+        retention_period
+        ~allowed_attempts
+        ~injection_ttl
+        state
+        signers
     in
     async_monitor_l1_chain cctxt l1_ctxt ;
     return_unit

@@ -283,9 +283,9 @@ module type S = sig
 
   val included_info_encoding : included_info Data_encoding.t
 
-  (** Initializes the injector with the rollup node state, for a list of
-      signers, and start the workers. Each signer has its own worker with a
-      queue of operations to inject.
+  (** Initializes the injector with the rollup node state, for a list
+      of signers, and start the workers. Each signer's list has its
+      own worker with a queue of operations to inject.
 
       [retention_period] is the number of blocks for which the injector keeps
       the included information for, must be positive or zero. By default (when
@@ -303,7 +303,8 @@ module type S = sig
       The injector monitors L1 heads to update the statuses of its operations
       accordingly. The argument [reconnection_delay] gives an initial value for
       the delay before attempting a reconnection (see {!Layer_1.init}).
-  *)
+
+      Each pkh's list and tag list of [signers] must be disjoint. *)
   val init :
     #Client_context.full ->
     data_dir:string ->
@@ -312,7 +313,8 @@ module type S = sig
     ?injection_ttl:int ->
     ?reconnection_delay:float ->
     state ->
-    signers:(Signature.public_key_hash * injection_strategy * tag list) list ->
+    signers:
+      (Signature.public_key_hash list * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 
   (** Add an operation as pending injection in the injector. It returns the hash

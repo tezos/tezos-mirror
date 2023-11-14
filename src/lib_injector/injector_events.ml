@@ -45,16 +45,22 @@ module Make
           ~level:Warning
           ("error", trace_encoding)
 
+      let pp_key_alias =
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> pp_print_string fmt "; ")
+            pp_print_string)
+
       let declare_1 ~name ~msg ~level ?pp1 enc1 =
         declare_3
           ~section
           ~name
-          ~msg:("[{signer}] " ^ msg)
+          ~msg:("[{signers}] " ^ msg)
           ~level
-          ("signer", Data_encoding.string)
+          ("signers", Data_encoding.(list string))
           ("tags", Tags.encoding)
           enc1
-          ~pp1:Format.pp_print_string
+          ~pp1:pp_key_alias
           ~pp2:Tags.pp
           ?pp3:pp1
 
@@ -62,13 +68,13 @@ module Make
         declare_4
           ~section
           ~name
-          ~msg:("[{signer}] " ^ msg)
+          ~msg:("[{signers}] " ^ msg)
           ~level
-          ("signer", Data_encoding.string)
+          ("signers", Data_encoding.(list string))
           ("tags", Tags.encoding)
           enc1
           enc2
-          ~pp1:Format.pp_print_string
+          ~pp1:pp_key_alias
           ~pp2:Tags.pp
           ?pp3:pp1
           ?pp4:pp2
@@ -77,14 +83,14 @@ module Make
         declare_5
           ~section
           ~name
-          ~msg:("[{signer}] " ^ msg)
+          ~msg:("[{signers}] " ^ msg)
           ~level
-          ("signer", Data_encoding.string)
+          ("signers", Data_encoding.(list string))
           ("tags", Tags.encoding)
           enc1
           enc2
           enc3
-          ~pp1:Format.pp_print_string
+          ~pp1:pp_key_alias
           ~pp2:Tags.pp
           ?pp3:pp1
           ?pp4:pp2

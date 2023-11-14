@@ -43,12 +43,11 @@ let make_signers_for_transactions signer block_delay =
   let open Result_syntax in
   let source = Signature.Public_key_hash.of_b58check_exn signer in
   return
-    ( source,
-      [
-        ( source,
-          `Delay_block block_delay,
-          [Injector_server.Configuration.Transaction] );
-      ] )
+    [
+      ( [source],
+        `Delay_block block_delay,
+        [Injector_server.Configuration.Transaction] );
+    ]
 
 let register_dir () =
   let open Lwt_result_syntax in
@@ -136,7 +135,7 @@ let run ~data_dir (cctxt : Client_context.full) =
        as config) =
     Configuration.load ~data_dir
   in
-  let*? _, signers = make_signers_for_transactions signer block_delay in
+  let*? signers = make_signers_for_transactions signer block_delay in
   let* () = Injector_server.init cctxt ~data_dir state ~signers in
   let*! () = Event.(emit accepting_requests) ("HTTP", config.rpc_port) in
   start ~rpc_address ~rpc_port ()

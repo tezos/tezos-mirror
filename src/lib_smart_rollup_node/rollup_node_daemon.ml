@@ -368,40 +368,75 @@ let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
             return_unit)
   else return_unit
 
+let make_signers_for_injector operators =
+  let update map (purpose, operator) =
+    match operator with
+    | Purpose.Operator (Single operator) | Operator (Multiple [operator]) ->
+        Signature.Public_key_hash.Map.update
+          operator
+          (function
+            | None -> Some ([operator], [purpose])
+            | Some ([operator], purposes) ->
+                Some ([operator], purpose :: purposes)
+            | Some (operators, purposes) ->
+                invalid_arg
+                  (Format.asprintf
+                     "operator %a appears to be used in another purpose (%a) \
+                      with multiple keys (%a). It can't be reused for another \
+                      purpose %a."
+                     Signature.Public_key_hash.pp
+                     operator
+                     (Format.pp_print_list Purpose.pp_ex_purpose)
+                     purposes
+                     (Format.pp_print_list Signature.Public_key_hash.pp)
+                     operators
+                     Purpose.pp_ex_purpose
+                     purpose))
+          map
+    | Operator (Multiple operators) ->
+        List.fold_left
+          (fun map pkh ->
+            Signature.Public_key_hash.Map.update
+              pkh
+              (function
+                | None -> Some (operators, [purpose])
+                | Some (_operators, purposes) ->
+                    invalid_arg
+                      (Format.asprintf
+                         "operator is already used in another purpose (%a). It \
+                          can't be reused for a purpose with multiple keys."
+                         (Format.pp_print_list Purpose.pp_ex_purpose)
+                         purposes))
+              map)
+          map
+          operators
+  in
+  List.fold_left
+    update
+    Signature.Public_key_hash.Map.empty
+    (Purpose.operators_bindings operators)
+  |> Signature.Public_key_hash.Map.bindings |> List.map snd
+  |> List.sort_uniq (fun (operators, _purposes) (operators', _purposes) ->
+         List.compare Signature.Public_key_hash.compare operators operators')
+  |> List.map (fun (operators, purposes) ->
+         let operation_kinds =
+           List.flatten @@ List.map Purpose.operation_kind purposes
+         in
+         let strategy =
+           match operation_kinds with
+           | [Operation_kind.Add_messages] ->
+               (* For the batcher We delay of 0.5 sec to allow more
+                  operator to get in *)
+               `Delay_block 0.5
+           | _ -> `Each_block
+         in
+         (operators, strategy, operation_kinds))
+
 let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let start () =
-    let signers =
-      Purpose.operators_bindings node_ctxt.config.operators
-      |> List.fold_left
-           (fun acc (purpose, operator) ->
-             let operation_kinds = Purpose.operation_kind purpose in
-             let operator_list =
-               match operator with
-               | Purpose.Operator (Single operator) -> [operator]
-               | Operator (Multiple operators) -> operators
-             in
-             List.fold_left
-               (fun acc operator ->
-                 let operation_kinds =
-                   match Signature.Public_key_hash.Map.find operator acc with
-                   | None -> operation_kinds
-                   | Some kinds -> operation_kinds @ kinds
-                 in
-                 Signature.Public_key_hash.Map.add operator operation_kinds acc)
-               acc
-               operator_list)
-           Signature.Public_key_hash.Map.empty
-      |> Signature.Public_key_hash.Map.bindings
-      |> List.map (fun (operator, operation_kinds) ->
-             let strategy =
-               match operation_kinds with
-               | [Operation_kind.Add_messages] -> `Delay_block 0.5
-               | _ -> `Each_block
-             in
-             (operator, strategy, operation_kinds))
-    in
+    let signers = make_signers_for_injector node_ctxt.config.operators in
     let* () =
       unless (signers = []) @@ fun () ->
       Injector.init
