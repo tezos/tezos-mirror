@@ -152,6 +152,7 @@ let adjust_frozen_stakes ctxt :
           let*? to_unstake = Tez_repr.(own_frozen -? optimal_frozen) in
           Staking.request_unstake
             ctxt
+            ~for_next_cycle_use_only_after_slashing:true
             ~sender_contract:Contract_repr.(Implicit delegate)
             ~delegate
             to_unstake

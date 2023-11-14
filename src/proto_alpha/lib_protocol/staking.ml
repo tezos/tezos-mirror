@@ -313,7 +313,8 @@ let stake ctxt ~for_next_cycle_use_only_after_slashing:_
     stake_balance_updates1 @ stake_balance_updates2 @ stake_balance_updates3
     @ finalize_balance_updates )
 
-let request_unstake ctxt ~sender_contract ~delegate requested_amount =
+let request_unstake ctxt ~for_next_cycle_use_only_after_slashing:_
+    ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* ctxt, tez_to_unstake, request_unstake_balance_updates =
     Staking_pseudotokens_storage.request_unstake

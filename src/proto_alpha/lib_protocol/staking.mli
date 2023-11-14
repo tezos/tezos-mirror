@@ -39,10 +39,15 @@ val stake :
   delegate:Signature.public_key_hash ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-(** [request_unstake ctxt ~sender_contract ~delegate amount] records a request
-    from [sender_contract] to unstake [amount] from [delegate]. *)
+(** [request_unstake ctxt ~for_next_cycle_use_only_after_slashing ~sender_contract ~delegate amount]
+    records a request from [sender_contract] to unstake [amount] from [delegate].
+
+    If [for_next_cycle_use_only_after_slashing] is true, the unstake request and
+    the implicit finalisation is done for the next cycle. It is meant to be used
+    only at cycle end after the application of the slashing.  *)
 val request_unstake :
   Raw_context.t ->
+  for_next_cycle_use_only_after_slashing:bool ->
   sender_contract:Contract_repr.t ->
   delegate:Signature.public_key_hash ->
   Tez_repr.t ->
