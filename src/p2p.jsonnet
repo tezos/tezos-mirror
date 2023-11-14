@@ -31,7 +31,47 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
 // P2P
 //##
 
+local mkPeersPanel(legendRightSide) =
+  local disconnected = 'Disconnected peers';
+  local running = 'Running peers';
+  local greylisted = 'Waiting to reconnect';
+  graphPanel.new(
+    title='P2P peers connections',
+    datasource='Prometheus',
+    linewidth=1,
+    format='none',
+    legend_alignAsTable=true,
+    legend_rightSide=legendRightSide,
+    legend_avg=true,
+    legend_min=true,
+    legend_max=true,
+    legend_show=true,
+    legend_values=true,
+    aliasColors={
+      [disconnected]: 'light-yellow',
+      [running]: 'light-green',
+      [greylisted]: 'light-red',
+    },
+  ).addTarget(
+    prometheus.target(
+      namespace + '_p2p_peers_disconnected' + node_instance,
+      legendFormat=disconnected,
+    )
+  ).addTarget(
+    prometheus.target(
+      namespace + '_p2p_peers_running' + node_instance,
+      legendFormat=running,
+    )
+  ).addTarget(
+    prometheus.target(
+      namespace + '_p2p_points_greylisted' + node_instance,
+      legendFormat=greylisted,
+    )
+  );
+
+
 {
+
   trustedPoints:
     singlestat.new(
       title='Trusted points',
@@ -58,47 +98,40 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       )
     ),
 
-  peers:
-    local disconnected = 'Disconnected peers';
-    local running = 'Running peers';
-    local greylisted = 'Waiting to reconnect';
+  peers: mkPeersPanel(true),
+  peersLegendBottom: mkPeersPanel(false),
+
+  exchangedData:
+    local received = 'Received data (KB)';
+    local sent = 'Sent data (KB)';
     graphPanel.new(
-      title='P2P peers connections',
+      title='Average data exchange (10-minute interval)',
       datasource='Prometheus',
+      legend_rightSide=false,
       linewidth=1,
       format='none',
-      legend_alignAsTable=true,
-      legend_rightSide=true,
-      legend_avg=true,
-      legend_min=true,
-      legend_max=true,
       legend_show=true,
-      legend_values=true,
       aliasColors={
-        [disconnected]: 'light-yellow',
-        [running]: 'light-green',
-        [greylisted]: 'light-red',
+        [received]: 'blue',
+        [sent]: 'green',
       },
-    ).addTarget(
+    ).addTargets([
       prometheus.target(
-        namespace + '_p2p_peers_disconnected' + node_instance,
-        legendFormat=disconnected,
-      )
-    ).addTarget(
+        // Divide by 1,000 for KB
+        'deriv(' + namespace + '_p2p_io_scheduler_total_recv' + node_instance + '[10m]) / 1000',
+        legendFormat=received,
+      ),
       prometheus.target(
-        namespace + '_p2p_peers_running' + node_instance,
-        legendFormat=running,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_points_greylisted' + node_instance,
-        legendFormat=greylisted,
-      )
-    ),
+        // Divide by 1,000 for KB
+        'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + node_instance + '[10m]) / 1000',
+        legendFormat=sent,
+      ),
+    ]),
 
   points:
     local disconnected = 'Disconnected points';
     local running = 'Running points';
+    local trusted = 'Trusted points';
     graphPanel.new(
       title='P2P points connections',
       datasource='Prometheus',
@@ -113,6 +146,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       aliasColors={
         [disconnected]: 'light-red',
         [running]: 'light-green',
+        [trusted]: 'light-yellow',
       },
     ).addTarget(
       prometheus.target(
@@ -123,6 +157,11 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         namespace + '_p2p_points_running' + node_instance,
         legendFormat=running,
+      )
+    ).addTarget(
+      prometheus.target(
+        namespace + '_p2p_points_trusted' + node_instance,
+        legendFormat=trusted,
       )
     ),
 

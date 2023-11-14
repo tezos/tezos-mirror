@@ -1,4 +1,4 @@
-all: basic logs full compact
+all: basic logs full compact dal-basic
 
 NODE_INSTANCE_LABEL ?= instance
 STORAGE_MODE ?= default
@@ -16,6 +16,7 @@ clean:
 
 fmt:
 	jsonnetfmt -i src/*.jsonnet
+	jsonnetfmt -i src/dal/*.jsonnet
 
 basic: octez-basic.jsonnet
 
@@ -24,3 +25,5 @@ logs : octez-with-logs.jsonnet
 full: octez-full.jsonnet
 
 compact: octez-compact.jsonnet
+
+dal-basic: dal/dal-basic.jsonnet
