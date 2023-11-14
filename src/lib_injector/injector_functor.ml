@@ -287,13 +287,16 @@ module Make (Parameters : PARAMETERS) = struct
       Injector_events.Make (Parameters) (Tags) (POperation) (Inj_operation)
         (Request)
 
-    let signers_alias state = List.map (fun s -> s.alias) state.signers
+    let signers_alias signers = List.map (fun s -> s.alias) signers
 
-    let emit1 e state x = emit e (signers_alias state, state.tags, x)
+    let emit1 e state ?(signers = state.signers) x =
+      emit e (signers_alias signers, state.tags, x)
 
-    let emit2 e state x y = emit e (signers_alias state, state.tags, x, y)
+    let emit2 e state ?(signers = state.signers) x y =
+      emit e (signers_alias signers, state.tags, x, y)
 
-    let emit3 e state x y z = emit e (signers_alias state, state.tags, x, y, z)
+    let emit3 e state ?(signers = state.signers) x y z =
+      emit e (signers_alias signers, state.tags, x, y, z)
   end
 
   let last_head_encoding =
@@ -459,11 +462,12 @@ module Make (Parameters : PARAMETERS) = struct
       Op_queue.replace state.queue op.hash op
 
   (** Mark operations as injected (in [oph]). *)
-  let add_injected_operations state oph ~injection_level operations =
+  let add_injected_operations state signer oph ~injection_level operations =
     let open Lwt_result_syntax in
     let*! () =
       Event.(emit2 injected_ops)
         state
+        ~signers:[signer]
         oph
         (List.map (fun (_, o) -> o.Inj_operation.operation) operations)
     in
@@ -695,12 +699,12 @@ module Make (Parameters : PARAMETERS) = struct
         end in
         return (results, (module Unsigned_op : Proto_unsigned_op))
 
-  let register_error state (op : Inj_operation.t) error =
+  let register_error state ?signers (op : Inj_operation.t) error =
     let open Lwt_result_syntax in
     Inj_operation.register_error op error ;
     if op.errors.count > state.allowed_attempts then
       let*! () =
-        Event.(emit3 discard_error_operation)
+        Event.(emit3 ?signers discard_error_operation)
           state
           op.operation
           op.errors.count
@@ -723,7 +727,7 @@ module Make (Parameters : PARAMETERS) = struct
         ~chain:state.cctxt#chain
         signed_op_bytes
     in
-    let*! () = Event.(emit2 injected) state nb oph in
+    let*! () = Event.(emit2 ~signers:[signer] injected) state nb oph in
     return oph
 
   (** Inject the given [operations] in an L1 batch. If [must_succeed] is [`All]
@@ -745,7 +749,9 @@ module Make (Parameters : PARAMETERS) = struct
       match simulation_result with
       | Ok _ -> return_unit
       | Error error ->
-          List.iter_es (fun op -> register_error state op error) operations
+          List.iter_es
+            (fun op -> register_error state ~signers:[signer] op error)
+            operations
     in
     let*? operations_results, raw_op = simulation_result in
     let failure = ref false in
@@ -755,7 +761,7 @@ module Make (Parameters : PARAMETERS) = struct
           match status with
           | Unsuccessful (Failed error) ->
               failure := true ;
-              let+ () = register_error state op error in
+              let+ () = register_error state ~signers:[signer] op error in
               acc
           | Successful
           | Unsuccessful (Backtracked | Skipped | Other_branch | Never_included)
@@ -849,7 +855,7 @@ module Make (Parameters : PARAMETERS) = struct
     (* Retrieve and remove operations from pending *)
     let operations_to_inject = get_operations_from_queue ~size_limit state in
     let*! () =
-      Event.(emit1 considered_operations_info)
+      Event.(emit1 ~signers:[signer] considered_operations_info)
         state
         (List.map (fun o -> o.Inj_operation.operation) operations_to_inject)
     in
@@ -871,7 +877,7 @@ module Make (Parameters : PARAMETERS) = struct
     | [] -> return `Stop
     | _ ->
         let*! () =
-          Event.(emit1 injecting_pending)
+          Event.(emit1 ~signers:[signer] injecting_pending)
             state
             (List.length operations_to_inject)
         in
@@ -903,13 +909,14 @@ module Make (Parameters : PARAMETERS) = struct
               in
               add_injected_operations
                 state
+                signer
                 oph
                 ~injection_level
                 injected_operations
           | `Ignored operations_to_drop ->
               (* Injection failed but we ignore the failure. *)
               let*! () =
-                Event.(emit1 dropped_operations)
+                Event.(emit1 ~signers:[signer] dropped_operations)
                   state
                   (List.map
                      (fun o -> o.Inj_operation.operation)
