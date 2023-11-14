@@ -937,7 +937,7 @@ let pp_manager_operation_result ppf
 let pp_contents_and_result :
     type kind. Format.formatter -> kind contents * kind contents_result -> unit
     =
-  let _pp_forbidden ppf forbidden =
+  let pp_forbidden ppf forbidden =
     match forbidden with
     | None -> ()
     | Some forbidden_delegate ->
@@ -970,20 +970,23 @@ let pp_contents_and_result :
           solution
           pp_balance_updates
           bus
-    | Double_baking_evidence {bh1; bh2}, Double_baking_evidence_result bus ->
+    | ( Double_baking_evidence {bh1; bh2},
+        Double_baking_evidence_result {forbidden_delegate; balance_updates} ) ->
         Format.fprintf
           ppf
           "@[<v 2>Double baking evidence:@,\
            Exhibit A: %a@,\
            Exhibit B: %a@,\
-           Balance updates:@,\
+           %aBalance updates:@,\
            %a@]"
           Block_hash.pp
           (Block_header.hash bh1)
           Block_hash.pp
           (Block_header.hash bh2)
+          pp_forbidden
+          forbidden_delegate
           pp_balance_updates
-          bus
+          balance_updates
     | ( Preattestation {level; _},
         Preattestation_result
           {balance_updates; delegate; consensus_key; consensus_power} ) ->

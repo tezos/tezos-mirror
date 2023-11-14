@@ -1110,7 +1110,7 @@ let balance_updates_of_single_content :
   | Vdf_revelation_result balance_updates
   | Double_attestation_evidence_result balance_updates
   | Double_preattestation_evidence_result balance_updates
-  | Double_baking_evidence_result balance_updates
+  | Double_baking_evidence_result {balance_updates; _}
   | Activate_account_result balance_updates
   | Drain_delegate_result {balance_updates; _} ->
       balance_updates

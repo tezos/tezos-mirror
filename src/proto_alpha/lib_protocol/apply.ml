@@ -2351,7 +2351,8 @@ let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
     level
     Double_baking
     ~payload_producer
-    (fun balance_updates -> Double_baking_evidence_result balance_updates)
+    (fun balance_updates ->
+      Double_baking_evidence_result {forbidden_delegate = None; balance_updates})
 
 let apply_contents_list (type kind) ctxt chain_id (mode : mode)
     ~payload_producer ~operation ~operation_hash
