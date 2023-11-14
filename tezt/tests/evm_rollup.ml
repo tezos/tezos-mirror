@@ -3842,6 +3842,32 @@ let test_l2_nested_create =
   let* () = check_tx_succeeded ~endpoint ~tx:tx2 in
   unit
 
+let test_block_hash_regression =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "block"; "hash"; "regression"]
+    ~title:"Regression test for L2 block hash"
+  @@ fun protocol ->
+  let config =
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
+  in
+  (* We use a timestamp equal to the next day after genesis.
+     The genesis timestamp can be found in tezt/lib_tezos/client.ml *)
+  let* {evm_node; sc_rollup_node; node; client; _} =
+    setup_past_genesis
+      ~config
+      ~admin:None
+      ~timestamp:(At (Option.get @@ Ptime.of_date (2018, 7, 1)))
+      protocol
+  in
+  let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
+  let raw_txs, _tx_hashes = List.split txs in
+  let* _requests, receipt, _hashes =
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_node raw_txs
+  in
+  Regression.capture @@ sf "Block hash: %s" receipt.blockHash ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -3907,7 +3933,8 @@ let register_evm_node ~protocols =
   test_rpc_getLogs protocols ;
   test_log_index protocols ;
   test_tx_pool_replacing_transactions protocols ;
-  test_l2_nested_create protocols
+  test_l2_nested_create protocols ;
+  test_block_hash_regression protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
