@@ -61,6 +61,8 @@ pub enum NoMatchingOverloadReason {
     ExpectedPair(Type),
     #[error("expected option 'a, but got {0:?}")]
     ExpectedOption(Type),
+    #[error("expected list 'a, but got {0:?}")]
+    ExpectedList(Type),
     #[error("type not comparable: {0:?}")]
     TypeNotComparable(Type),
 }
@@ -412,6 +414,14 @@ fn typecheck_instruction(
             I::Nil(())
         }
 
+        (I::Cons, [.., T::List(ty1), ty2]) => {
+            ensure_ty_eq(ctx, ty1, ty2)?;
+            pop!();
+            I::Cons
+        }
+        (I::Cons, [.., ty, _]) => no_overload!(CONS, NMOR::ExpectedList(ty.clone())),
+        (I::Cons, [] | [_]) => no_overload!(CONS, len 2),
+
         (I::Get(..), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let (kty, vty) = *pop!(T::Map);
@@ -475,13 +485,11 @@ pub fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, 
             }
             None => TV::new_option(None),
         },
-        (List(ty), V::Seq(vs)) => {
-            let lst: Result<Vec<TypedValue>, TcError> = vs
-                .into_iter()
+        (List(ty), V::Seq(vs)) => TV::List(
+            vs.into_iter()
                 .map(|v| typecheck_value(ctx, ty, v))
-                .collect();
-            TV::List(lst?)
-        }
+                .collect::<Result<_, TcError>>()?,
+        ),
         (Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
             // can only fail if the typechecker is invoked on invalid
@@ -1175,11 +1183,9 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(vec![Push(TypedValue::List(vec![
-                TypedValue::Int(1),
-                TypedValue::Int(2),
-                TypedValue::Int(3),
-            ]))])
+            Ok(vec![Push(TypedValue::List(
+                vec![TypedValue::Int(1), TypedValue::Int(2), TypedValue::Int(3),].into()
+            ))])
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
     }
@@ -1209,6 +1215,43 @@ mod typecheck_tests {
             Ok(vec![Nil(())])
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
+    }
+
+    #[test]
+    fn cons() {
+        let mut stack = tc_stk![Type::new_list(Type::Int), Type::Int];
+        assert_eq!(
+            typecheck(parse("{ CONS }").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(vec![Cons])
+        );
+        assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
+    }
+
+    #[test]
+    fn cons_too_short() {
+        too_short_test(Cons, Prim::CONS, 2);
+    }
+
+    #[test]
+    fn cons_mismatch_elt() {
+        let mut stack = tc_stk![Type::new_list(Type::Int), Type::Nat];
+        assert_eq!(
+            typecheck(parse("{ CONS }").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TypesNotEqual(Type::Int, Type::Nat).into())
+        );
+    }
+
+    #[test]
+    fn cons_mismatch_list() {
+        let mut stack = tc_stk![Type::String, Type::Nat];
+        assert_eq!(
+            typecheck(parse("{ CONS }").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CONS,
+                stack: stk![Type::String, Type::Nat],
+                reason: Some(NoMatchingOverloadReason::ExpectedList(Type::String))
+            })
+        );
     }
 
     #[test]

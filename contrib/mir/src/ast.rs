@@ -6,11 +6,13 @@
 /******************************************************************************/
 
 pub mod comparable;
+pub mod michelson_list;
 pub mod parsed;
 pub mod typechecked;
 
 use std::collections::BTreeMap;
 
+pub use michelson_list::MichelsonList;
 pub use parsed::{ParsedInstruction, ParsedStage};
 pub use typechecked::{overloads, TypecheckedInstruction, TypecheckedStage};
 
@@ -159,7 +161,7 @@ pub enum TypedValue {
     Unit,
     Pair(Box<(TypedValue, TypedValue)>),
     Option(Option<Box<TypedValue>>),
-    List(Vec<TypedValue>),
+    List(MichelsonList<TypedValue>),
     Map(BTreeMap<TypedValue, TypedValue>),
 }
 
@@ -265,6 +267,7 @@ pub enum Instruction<T: Stage> {
     Update(T::UpdateOverload),
     Seq(Vec<Instruction<T>>),
     Unpair,
+    Cons,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
