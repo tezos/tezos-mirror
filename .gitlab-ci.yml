@@ -51,6 +51,8 @@ release:
   dependencies:
     - build
   script:
+    - 'apt-get update'
+    - 'apt-get -y install curl'
     - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file binaries-${ARCH}-${OCTEZ_BRANCH} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-${ARCH}-${OCTEZ_BRANCH}"'
 
 docker:
