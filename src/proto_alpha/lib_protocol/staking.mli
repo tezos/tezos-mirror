@@ -78,3 +78,5 @@ val finalize_unstake :
 type staking_automation = Auto_staking | Manual_staking
 
 val staking_automation : Raw_context.t -> staking_automation
+
+val check_manual_staking_allowed : Raw_context.t -> unit tzresult

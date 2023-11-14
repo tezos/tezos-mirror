@@ -25,6 +25,7 @@
 
 type error +=
   | Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+  | Manual_staking_forbidden
 
 let () =
   let description =
@@ -45,7 +46,17 @@ let () =
           Some ()
       | _ -> None)
     (fun () ->
-      Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate)
+      Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.manual_staking_forbidden"
+    ~title:"Manual staking operations are forbidden"
+    ~description:
+      "Manual staking operations are forbidden because staking is currently \
+       automated."
+    Data_encoding.unit
+    (function Manual_staking_forbidden -> Some () | _ -> None)
+    (fun () -> Manual_staking_forbidden)
 
 let perform_finalizable_unstake_transfers ctxt contract finalizable =
   let open Lwt_result_syntax in
@@ -394,3 +405,9 @@ let staking_automation ctxt =
     || not (Constants_storage.adaptive_issuance_autostaking_enable ctxt)
   then Manual_staking
   else Auto_staking
+
+let check_manual_staking_allowed ctxt =
+  let open Result_syntax in
+  match staking_automation ctxt with
+  | Manual_staking -> return_unit
+  | Auto_staking -> error Manual_staking_forbidden
