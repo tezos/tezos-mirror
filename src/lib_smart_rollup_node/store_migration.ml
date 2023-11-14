@@ -477,3 +477,46 @@ module V3_migrations = struct
         let final_actions = final_actions
       end)
 end
+
+module V4_migrations = struct
+  let messages_store_location ~storage_dir =
+    let open Filename.Infix in
+    storage_dir // "messages"
+
+  let migrate_messages (v3_store : _ Store_v3.t) (v4_store : _ Store_v4.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* v3_messages =
+      Store_v3.Messages.read v3_store.messages l2_block.header.inbox_witness
+    in
+    match v3_messages with
+    | None -> return_unit
+    | Some (messages, _v3_header) ->
+        let header = l2_block.header.predecessor in
+        Store_v4.Messages.append
+          v4_store.messages
+          ~key:l2_block.header.inbox_witness
+          ~header
+          ~value:messages
+
+  let final_actions ~storage_dir ~tmp_dir _ _ =
+    let open Lwt_result_syntax in
+    let*! () =
+      Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
+    in
+    let*! () =
+      Lwt_unix.rename
+        (messages_store_location ~storage_dir:tmp_dir)
+        (messages_store_location ~storage_dir)
+    in
+    return_unit
+
+  module From_v3 =
+    Make (Store_v3) (Store_v4)
+      (struct
+        let migrate_block_action v3_store v4_store l2_block =
+          migrate_messages v3_store v4_store l2_block
+
+        let final_actions = final_actions
+      end)
+end
