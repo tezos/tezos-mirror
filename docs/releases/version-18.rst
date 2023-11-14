@@ -102,5 +102,6 @@ You can now download experimental Debian and Redhat packages on the `release pag
 Changelog
 ---------
 
+- `Version 18.1 <../CHANGES.html#version-18-1>`_
 - `Version 18.0 <../CHANGES.html#version-18-0>`_
 - `Version 18.0~rc1 <../CHANGES.html#version-18-0-rc1>`_
