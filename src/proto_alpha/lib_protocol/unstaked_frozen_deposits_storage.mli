@@ -69,3 +69,15 @@ val spend_only_call_from_token :
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+(** [decrease_initial_amount_only_for_stake_from_unstake ctxt staker cycle amount]
+    decreases [amount] from the unstaked frozen deposits for [staker] at [cycle].
+    It is only called if the cycle hasn't been slashed, so the amount removed is
+    the same as the amount spent in [current_amount].
+*)
+val decrease_initial_amount_only_for_stake_from_unstake :
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  Cycle_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t

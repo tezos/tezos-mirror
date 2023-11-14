@@ -87,3 +87,13 @@ let spend_only_call_from_token ctxt staker cycle amount =
   in
   let* ctxt = Stake_storage.remove_delegated_stake ctxt delegate amount in
   update_balance ~f ctxt delegate_contract cycle
+
+let decrease_initial_amount_only_for_stake_from_unstake ctxt delegate cycle
+    amount =
+  let delegate_contract = Contract_repr.Implicit delegate in
+  let f Deposits_repr.{initial_amount; current_amount} =
+    let open Result_syntax in
+    let+ initial_amount = Tez_repr.(initial_amount -? amount) in
+    Deposits_repr.{initial_amount; current_amount}
+  in
+  update_balance ~f ctxt delegate_contract cycle

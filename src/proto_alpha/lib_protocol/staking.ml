@@ -76,11 +76,11 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
     Unstake_requests_storage.prepare_finalize_unstake ctxt contract
   in
   match prepared_opt with
-  | None -> return (ctxt, [])
+  | None -> return (ctxt, [], None)
   | Some {finalizable; unfinalizable} -> (
       let* ctxt = check_unfinalizable ctxt unfinalizable in
       match finalizable with
-      | [] -> return (ctxt, [])
+      | [] -> return (ctxt, [], Some unfinalizable)
       | _ ->
           (* We only update the unstake requests if the [finalizable] list is not empty.
              Indeed, if it is not empty, it means that at least one of the unstake operations
@@ -96,11 +96,151 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
           let* ctxt =
             Unstake_requests_storage.update ctxt contract unfinalizable
           in
-          perform_finalizable_unstake_transfers ctxt contract finalizable)
+          let* ctxt, balance_updates =
+            perform_finalizable_unstake_transfers ctxt contract finalizable
+          in
+          return (ctxt, balance_updates, Some unfinalizable))
 
 let finalize_unstake ctxt contract =
+  let open Lwt_result_syntax in
   let check_unfinalizable ctxt _unfinalizable = return ctxt in
-  finalize_unstake_and_check ~check_unfinalizable ctxt contract
+  let* ctxt, balance_updates, _ =
+    finalize_unstake_and_check ~check_unfinalizable ctxt contract
+  in
+  return (ctxt, balance_updates)
+
+let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
+    amount =
+  let open Lwt_result_syntax in
+  let remove_from_unstaked_frozen_deposit ctxt cycle delegate sender_contract
+      amount =
+    let* ctxt, balance_updates =
+      Token.transfer
+        ctxt
+        (`Unstaked_frozen_deposits
+          (Unstaked_frozen_staker_repr.Single (sender_contract, delegate), cycle))
+        (`Frozen_deposits
+          (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
+        amount
+    in
+    let* ctxt =
+      Unstaked_frozen_deposits_storage
+      .decrease_initial_amount_only_for_stake_from_unstake
+        ctxt
+        delegate
+        cycle
+        amount
+    in
+    return (ctxt, balance_updates)
+  in
+  match unfinalizable_requests_opt with
+  | None -> return (ctxt, [], amount)
+  | Some Unstake_requests_storage.{delegate = delegate_requests; requests} ->
+      if Signature.Public_key_hash.(delegate <> delegate_requests) then
+        (* impossible *) return (ctxt, [], amount)
+      else
+        let* slashing_history_opt =
+          Storage.Contract.Slashed_deposits.find
+            ctxt
+            (Contract_repr.Implicit delegate)
+        in
+        let slashing_history = Option.value slashing_history_opt ~default:[] in
+        let current_cycle = (Raw_context.current_level ctxt).cycle in
+        let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+        let oldest_slashable_cycle =
+          Cycle_repr.sub current_cycle (preserved_cycles + 1)
+          |> Option.value ~default:Cycle_repr.root
+        in
+        if
+          List.exists
+            (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
+            slashing_history
+        then
+          (* a slash could have modified the unstaked frozen deposits: cannot stake from unstake *)
+          return (ctxt, [], amount)
+        else
+          let sender_contract = Contract_repr.Implicit delegate in
+          let requests_sorted =
+            List.sort
+              (fun (cycle1, _) (cycle2, _) ->
+                Cycle_repr.compare cycle2 cycle1
+                (* decreasing cycle order, to release first the tokens
+                   that would be frozen for the longest time *))
+              requests
+          in
+          let rec transfer_from_unstake ctxt balance_updates
+              remaining_amount_to_transfer updated_requests_rev requests =
+            if Tez_repr.(remaining_amount_to_transfer = zero) then
+              return
+                ( ctxt,
+                  balance_updates,
+                  Tez_repr.zero,
+                  List.rev_append requests updated_requests_rev )
+            else
+              match requests with
+              | [] ->
+                  return
+                    ( ctxt,
+                      balance_updates,
+                      remaining_amount_to_transfer,
+                      updated_requests_rev )
+              | (cycle, requested_amount) :: t ->
+                  if Tez_repr.(remaining_amount_to_transfer >= requested_amount)
+                  then
+                    let* ctxt, cycle_balance_updates =
+                      remove_from_unstaked_frozen_deposit
+                        ctxt
+                        cycle
+                        delegate
+                        sender_contract
+                        requested_amount
+                    in
+                    let*? remaining_amount =
+                      Tez_repr.(
+                        remaining_amount_to_transfer -? requested_amount)
+                    in
+                    transfer_from_unstake
+                      ctxt
+                      (balance_updates @ cycle_balance_updates)
+                      remaining_amount
+                      updated_requests_rev
+                      t
+                  else
+                    let* ctxt, cycle_balance_updates =
+                      remove_from_unstaked_frozen_deposit
+                        ctxt
+                        cycle
+                        delegate
+                        sender_contract
+                        remaining_amount_to_transfer
+                    in
+                    let*? new_requested_amount =
+                      Tez_repr.(
+                        requested_amount -? remaining_amount_to_transfer)
+                    in
+                    return
+                      ( ctxt,
+                        balance_updates @ cycle_balance_updates,
+                        Tez_repr.zero,
+                        List.rev_append
+                          t
+                          ((cycle, new_requested_amount) :: updated_requests_rev)
+                      )
+          in
+          let* ( ctxt,
+                 balance_updates,
+                 remaining_amount_to_transfer,
+                 updated_requests_rev ) =
+            transfer_from_unstake ctxt [] amount [] requests_sorted
+          in
+          let updated_requests = List.rev updated_requests_rev in
+          let* ctxt =
+            Unstake_requests_storage.update
+              ctxt
+              sender_contract
+              {delegate; requests = updated_requests}
+          in
+          return (ctxt, balance_updates, remaining_amount_to_transfer)
 
 let stake ctxt ~sender ~delegate amount =
   let open Lwt_result_syntax in
@@ -115,15 +255,25 @@ let stake ctxt ~sender ~delegate amount =
         else return ctxt
   in
   let sender_contract = Contract_repr.Implicit sender in
-  let* ctxt, finalize_balance_updates =
+  let* ctxt, finalize_balance_updates, unfinalizable_requests_opt =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
-  let* ctxt, stake_balance_updates1 =
-    Staking_pseudotokens_storage.stake
-      ctxt
-      ~contract:sender_contract
-      ~delegate
-      amount
+  let* ctxt, stake_balance_updates1, amount_from_liquid =
+    if Signature.Public_key_hash.(sender <> delegate) then
+      let* ctxt, stake_balance_updates_pseudotoken =
+        Staking_pseudotokens_storage.stake
+          ctxt
+          ~contract:sender_contract
+          ~delegate
+          amount
+      in
+      return (ctxt, stake_balance_updates_pseudotoken, amount)
+    else
+      stake_from_unstake_for_delegate
+        ctxt
+        ~delegate
+        ~unfinalizable_requests_opt
+        amount
   in
   let+ ctxt, stake_balance_updates2 =
     Token.transfer
@@ -131,7 +281,7 @@ let stake ctxt ~sender ~delegate amount =
       (`Contract sender_contract)
       (`Frozen_deposits
         (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
-      amount
+      amount_from_liquid
   in
   ( ctxt,
     stake_balance_updates1 @ stake_balance_updates2 @ finalize_balance_updates

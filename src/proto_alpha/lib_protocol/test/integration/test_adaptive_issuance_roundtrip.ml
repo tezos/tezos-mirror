@@ -33,6 +33,8 @@
 
 open Adaptive_issuance_helpers
 
+let fs = Format.asprintf
+
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
@@ -1478,6 +1480,23 @@ module Roundtrip = struct
     --> wait_for_unfreeze_and_check 2
     --> finalize "staker" --> next_cycle
 
+  let shorter_roundtrip_for_baker =
+    let constants = init_constants () in
+    let amount = Amount (Tez.of_mutez 333_000_000_000L) in
+    let preserved_cycles = constants.preserved_cycles in
+    begin_test ~activate_ai:true constants ["delegate"]
+    --> next_block --> wait_ai_activation
+    --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> next_cycle
+    --> snapshot_balances "init" ["delegate"]
+    --> unstake "delegate" amount
+    --> List.fold_left
+          (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
+          (Tag "wait 0 cycles" --> Empty)
+          (Stdlib.List.init (preserved_cycles + 1) (fun i -> i + 1))
+    --> stake "delegate" amount
+    --> check_snapshot_balances "init"
+
   let status_quo_rountrip =
     let full_amount = Tez.of_mutez 10_000_000L in
     let amount_1 = Tez.of_mutez 2_999_999L in
@@ -1676,6 +1695,7 @@ module Roundtrip = struct
          ("Test change delegate", change_delegate);
          ("Test unset delegate", unset_delegate);
          ("Test forbid costake", forbid_costaking);
+         ("Test stake from unstake", shorter_roundtrip_for_baker);
        ]
 end
 
