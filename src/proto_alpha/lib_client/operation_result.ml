@@ -1046,20 +1046,23 @@ let pp_contents_and_result :
           pp_balance_updates
           balance_updates
     | ( Double_preattestation_evidence {op1; op2},
-        Double_preattestation_evidence_result bus ) ->
+        Double_preattestation_evidence_result
+          {forbidden_delegate; balance_updates} ) ->
         Format.fprintf
           ppf
           "@[<v 2>Double preattestation evidence:@,\
            Exhibit A: %a@,\
            Exhibit B: %a@,\
-           Balance updates:@,\
+           %aBalance updates:@,\
           \  %a@]"
           Operation_hash.pp
           (Operation.hash op1)
           Operation_hash.pp
           (Operation.hash op2)
+          pp_forbidden
+          forbidden_delegate
           pp_balance_updates
-          bus
+          balance_updates
     | Activate_account {id; _}, Activate_account_result bus ->
         Format.fprintf
           ppf

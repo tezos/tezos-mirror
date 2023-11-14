@@ -2315,7 +2315,8 @@ let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
       kind Kind.double_consensus_operation_evidence contents_result =
     match op1.protocol_data.contents with
     | Single (Preattestation _) ->
-        Double_preattestation_evidence_result balance_updates
+        Double_preattestation_evidence_result
+          {forbidden_delegate = None; balance_updates}
     | Single (Attestation _) ->
         Double_attestation_evidence_result
           {forbidden_delegate = None; balance_updates}

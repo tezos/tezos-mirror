@@ -87,8 +87,10 @@ and 'kind contents_result =
       balance_updates : Receipt.balance_updates;
     }
       -> Kind.double_attestation_evidence contents_result
-  | Double_preattestation_evidence_result :
-      Receipt.balance_updates
+  | Double_preattestation_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_preattestation_evidence contents_result
   | Double_baking_evidence_result : {
       forbidden_delegate : Signature.public_key_hash option;
