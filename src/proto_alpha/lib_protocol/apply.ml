@@ -2293,7 +2293,7 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
     ~payload_producer =
   let open Lwt_result_syntax in
   let rewarded = payload_producer.Consensus_key.delegate in
-  let+ ctxt =
+  let+ ctxt, _forbidden_delegate =
     Delegate.punish_double_signing
       ctxt
       ~operation_hash
