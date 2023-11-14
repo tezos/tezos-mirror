@@ -53,14 +53,14 @@ module Consensus = struct
   let () =
     register_error_kind
       `Permanent
-      ~id:"validate.zero_frozen_deposits"
-      ~title:"Zero frozen deposits"
-      ~description:"The delegate has zero frozen deposits."
+      ~id:"validate.temporarily_forbidden_delegate"
+      ~title:"Temporarily forbidden delegate"
+      ~description:"The delegate has committed too many misbehaviours."
       ~pp:(fun ppf delegate ->
         Format.fprintf
           ppf
-          "Delegate %a has zero frozen deposits; it is not allowed to \
-           bake/preattest/attest."
+          "Delegate %a has committed too many misbehaviours; it is temporarily \
+           not allowed to bake/preattest/attest."
           Signature.Public_key_hash.pp
           delegate)
       Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
