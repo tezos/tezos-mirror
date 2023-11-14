@@ -937,167 +937,181 @@ let pp_manager_operation_result ppf
 let pp_contents_and_result :
     type kind. Format.formatter -> kind contents * kind contents_result -> unit
     =
- fun ppf -> function
-  | Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Seed nonce revelation:@,\
-         Level: %a@,\
-         Nonce (hash): %a@,\
-         Balance updates:@,\
-         %a@]"
-        Raw_level.pp
-        level
-        Nonce_hash.pp
-        (Nonce.hash nonce)
-        pp_balance_updates
-        bus
-  | Vdf_revelation {solution}, Vdf_revelation_result bus ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Vdf revelation:@,Solution: %a@,Balance updates:@,%a@]"
-        Seed.pp_solution
-        solution
-        pp_balance_updates
-        bus
-  | Double_baking_evidence {bh1; bh2}, Double_baking_evidence_result bus ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Double baking evidence:@,\
-         Exhibit A: %a@,\
-         Exhibit B: %a@,\
-         Balance updates:@,\
-         %a@]"
-        Block_hash.pp
-        (Block_header.hash bh1)
-        Block_hash.pp
-        (Block_header.hash bh2)
-        pp_balance_updates
-        bus
-  | ( Preattestation {level; _},
-      Preattestation_result
-        {balance_updates; delegate; consensus_key; consensus_power} ) ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Preattestation:@,\
-         Level: %a@,\
-         Balance updates:%a@,\
-         Delegate: %a@,\
-         Consensus Power: %d@]"
-        Raw_level.pp
-        level
-        pp_balance_updates
-        balance_updates
-        Consensus_key.pp
-        {delegate; consensus_pkh = consensus_key}
-        consensus_power
-  | ( Attestation {level; _},
-      Attestation_result
-        {balance_updates; delegate; consensus_key; consensus_power} ) ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Attestation:@,\
-         Level: %a@,\
-         Balance updates:%a@,\
-         Delegate: %a@,\
-         Consensus Power: %d@]"
-        Raw_level.pp
-        level
-        pp_balance_updates
-        balance_updates
-        Consensus_key.pp
-        {delegate; consensus_pkh = consensus_key}
-        consensus_power
-  | Dal_attestation _, Dal_attestation_result {delegate} ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Slot attestation:@,Delegate: %a@]"
-        Signature.Public_key_hash.pp
-        delegate
-  | ( Double_attestation_evidence {op1; op2},
-      Double_attestation_evidence_result bus ) ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Double attestation evidence:@,\
-         Exhibit A: %a@,\
-         Exhibit B: %a@,\
-         Balance updates:@,\
-        \  %a@]"
-        Operation_hash.pp
-        (Operation.hash op1)
-        Operation_hash.pp
-        (Operation.hash op2)
-        pp_balance_updates
-        bus
-  | ( Double_preattestation_evidence {op1; op2},
-      Double_preattestation_evidence_result bus ) ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Double preattestation evidence:@,\
-         Exhibit A: %a@,\
-         Exhibit B: %a@,\
-         Balance updates:@,\
-        \  %a@]"
-        Operation_hash.pp
-        (Operation.hash op1)
-        Operation_hash.pp
-        (Operation.hash op2)
-        pp_balance_updates
-        bus
-  | Activate_account {id; _}, Activate_account_result bus ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Genesis account activation:@,\
-         Account: %a@,\
-         Balance updates:@,\
-        \  %a@]"
-        Signature.Ed25519.Public_key_hash.pp
-        id
-        pp_balance_updates
-        bus
-  | Proposals {source; period; proposals}, Proposals_result ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Proposals:@,From: %a@,Period: %ld@,Protocols:@,  @[<v 0>%a@]@]"
-        Signature.Public_key_hash.pp
-        source
-        period
-        (Format.pp_print_list Protocol_hash.pp)
-        proposals
-  | Ballot {source; period; proposal; ballot}, Ballot_result ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
-        Signature.Public_key_hash.pp
-        source
-        period
-        Protocol_hash.pp
-        proposal
-        Data_encoding.Json.pp
-        (Data_encoding.Json.construct Vote.ballot_encoding ballot)
-  | ( Drain_delegate {consensus_key; delegate; destination},
-      Drain_delegate_result {balance_updates; allocated_destination_contract} )
-    ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Drain delegate:@,\
-         Consensus key hash: %a@,\
-         Delegate: %a@,\
-         Destination: %a%s%a@]"
-        Signature.Public_key_hash.pp
-        consensus_key
-        Signature.Public_key_hash.pp
-        delegate
-        Signature.Public_key_hash.pp
-        destination
-        (if allocated_destination_contract then " (allocated)" else "")
-        pp_balance_updates
-        balance_updates
-  | Failing_noop _arbitrary, _ ->
-      (* the Failing_noop operation always fails and can't have result *)
-      .
-  | (Manager_operation _ as op), (Manager_operation_result _ as res) ->
-      pp_manager_operation_result ppf (op, res)
+  let _pp_forbidden ppf forbidden =
+    match forbidden with
+    | None -> ()
+    | Some forbidden_delegate ->
+        Format.fprintf
+          ppf
+          "         Forbidden delegate: %a@,"
+          Signature.Public_key_hash.pp
+          forbidden_delegate
+  in
+  fun ppf -> function
+    | Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Seed nonce revelation:@,\
+           Level: %a@,\
+           Nonce (hash): %a@,\
+           Balance updates:@,\
+           %a@]"
+          Raw_level.pp
+          level
+          Nonce_hash.pp
+          (Nonce.hash nonce)
+          pp_balance_updates
+          bus
+    | Vdf_revelation {solution}, Vdf_revelation_result bus ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Vdf revelation:@,Solution: %a@,Balance updates:@,%a@]"
+          Seed.pp_solution
+          solution
+          pp_balance_updates
+          bus
+    | Double_baking_evidence {bh1; bh2}, Double_baking_evidence_result bus ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Double baking evidence:@,\
+           Exhibit A: %a@,\
+           Exhibit B: %a@,\
+           Balance updates:@,\
+           %a@]"
+          Block_hash.pp
+          (Block_header.hash bh1)
+          Block_hash.pp
+          (Block_header.hash bh2)
+          pp_balance_updates
+          bus
+    | ( Preattestation {level; _},
+        Preattestation_result
+          {balance_updates; delegate; consensus_key; consensus_power} ) ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Preattestation:@,\
+           Level: %a@,\
+           Balance updates:%a@,\
+           Delegate: %a@,\
+           Consensus Power: %d@]"
+          Raw_level.pp
+          level
+          pp_balance_updates
+          balance_updates
+          Consensus_key.pp
+          {delegate; consensus_pkh = consensus_key}
+          consensus_power
+    | ( Attestation {level; _},
+        Attestation_result
+          {balance_updates; delegate; consensus_key; consensus_power} ) ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Attestation:@,\
+           Level: %a@,\
+           Balance updates:%a@,\
+           Delegate: %a@,\
+           Consensus Power: %d@]"
+          Raw_level.pp
+          level
+          pp_balance_updates
+          balance_updates
+          Consensus_key.pp
+          {delegate; consensus_pkh = consensus_key}
+          consensus_power
+    | Dal_attestation _, Dal_attestation_result {delegate} ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Slot attestation:@,Delegate: %a@]"
+          Signature.Public_key_hash.pp
+          delegate
+    | ( Double_attestation_evidence {op1; op2},
+        Double_attestation_evidence_result bus ) ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Double attestation evidence:@,\
+           Exhibit A: %a@,\
+           Exhibit B: %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Operation_hash.pp
+          (Operation.hash op1)
+          Operation_hash.pp
+          (Operation.hash op2)
+          pp_balance_updates
+          bus
+    | ( Double_preattestation_evidence {op1; op2},
+        Double_preattestation_evidence_result bus ) ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Double preattestation evidence:@,\
+           Exhibit A: %a@,\
+           Exhibit B: %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Operation_hash.pp
+          (Operation.hash op1)
+          Operation_hash.pp
+          (Operation.hash op2)
+          pp_balance_updates
+          bus
+    | Activate_account {id; _}, Activate_account_result bus ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Genesis account activation:@,\
+           Account: %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Signature.Ed25519.Public_key_hash.pp
+          id
+          pp_balance_updates
+          bus
+    | Proposals {source; period; proposals}, Proposals_result ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Proposals:@,\
+           From: %a@,\
+           Period: %ld@,\
+           Protocols:@,\
+          \  @[<v 0>%a@]@]"
+          Signature.Public_key_hash.pp
+          source
+          period
+          (Format.pp_print_list Protocol_hash.pp)
+          proposals
+    | Ballot {source; period; proposal; ballot}, Ballot_result ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
+          Signature.Public_key_hash.pp
+          source
+          period
+          Protocol_hash.pp
+          proposal
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct Vote.ballot_encoding ballot)
+    | ( Drain_delegate {consensus_key; delegate; destination},
+        Drain_delegate_result {balance_updates; allocated_destination_contract}
+      ) ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Drain delegate:@,\
+           Consensus key hash: %a@,\
+           Delegate: %a@,\
+           Destination: %a%s%a@]"
+          Signature.Public_key_hash.pp
+          consensus_key
+          Signature.Public_key_hash.pp
+          delegate
+          Signature.Public_key_hash.pp
+          destination
+          (if allocated_destination_contract then " (allocated)" else "")
+          pp_balance_updates
+          balance_updates
+    | Failing_noop _arbitrary, _ ->
+        (* the Failing_noop operation always fails and can't have result *)
+        .
+    | (Manager_operation _ as op), (Manager_operation_result _ as res) ->
+        pp_manager_operation_result ppf (op, res)
 
 let rec pp_contents_and_result_list :
     type kind. Format.formatter -> kind contents_and_result_list -> unit =
