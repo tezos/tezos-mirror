@@ -94,6 +94,7 @@ val prepare_installer_kernel :
 (** [setup_l1 protocol] initializes a protocol with the given parameters, and
     returns the L1 node and client. *)
 val setup_l1 :
+  ?timestamp:Client.timestamp ->
   ?bootstrap_smart_rollups:Protocol.bootstrap_smart_rollup list ->
   ?bootstrap_contracts:Protocol.bootstrap_contract list ->
   ?commitment_period:int ->

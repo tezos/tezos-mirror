@@ -310,8 +310,10 @@ let setup_evm_kernel ?config ?kernel_installee
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(with_administrator = true) ~admin ?commitment_period ?challenge_window
-    protocol =
-  let* node, client = setup_l1 ?commitment_period ?challenge_window protocol in
+    ?timestamp protocol =
+  let* node, client =
+    setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
+  in
   let* l1_contracts =
     match admin with
     | Some admin ->
@@ -396,7 +398,7 @@ let setup_past_genesis
     ?(config :
        [< `Config of Installer_kernel_config.instr list | `Path of string]
        option) ?with_administrator ?kernel_installee ?originator_key
-    ?bootstrap_accounts ?rollup_operator_key ~admin protocol =
+    ?bootstrap_accounts ?rollup_operator_key ?timestamp ~admin protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
       ?config
@@ -405,6 +407,7 @@ let setup_past_genesis
       ?bootstrap_accounts
       ?rollup_operator_key
       ?with_administrator
+      ?timestamp
       ~admin
       protocol
   in
