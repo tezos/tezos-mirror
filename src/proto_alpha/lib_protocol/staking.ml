@@ -264,51 +264,41 @@ let stake ctxt ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t])
   let* ctxt, finalize_balance_updates, unfinalizable_requests_opt =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
-  let* amount =
-    let unfinalizable_requests =
-      Option.fold
-        ~none:[]
-        ~some:(fun x -> x.Unstake_requests_storage.requests)
-        unfinalizable_requests_opt
-    in
-    match amount with
-    | `Exactly amount -> return amount
-    | `At_most max_amount ->
-        let*? unstake_frozen_balance =
-          List.fold_left_e
-            (fun acc (_, t) -> Tez_repr.(acc +? t))
-            Tez_repr.zero
-            unfinalizable_requests
-        in
-        let* spendable =
-          Contract_storage.get_balance ctxt (Implicit delegate)
-        in
-        let* stake_from_unstake = can_stake_from_unstake ctxt ~delegate in
-        let*? max_spendable =
-          if stake_from_unstake then
-            Tez_repr.(spendable +? unstake_frozen_balance)
-          else ok spendable
-        in
-        return Tez_repr.(min max_amount max_spendable)
+  let tez_amount =
+    match amount with `Exactly amount | `At_most amount -> amount
   in
+  (* stake from unstake for eligible delegates *)
   let* ctxt, stake_balance_updates1, amount_from_liquid =
     if Signature.Public_key_hash.(sender <> delegate) then
-      let* ctxt, stake_balance_updates_pseudotoken =
-        Staking_pseudotokens_storage.stake
-          ctxt
-          ~contract:sender_contract
-          ~delegate
-          amount
-      in
-      return (ctxt, stake_balance_updates_pseudotoken, amount)
+      return (ctxt, [], tez_amount)
     else
       stake_from_unstake_for_delegate
         ctxt
         ~delegate
         ~unfinalizable_requests_opt
-        amount
+        tez_amount
   in
-  let+ ctxt, stake_balance_updates2 =
+  (* Get amount to transfer from liquid wrt mode *)
+  let* amount_from_liquid =
+    match amount with
+    | `Exactly _ -> return amount_from_liquid
+    | `At_most _ ->
+        let* spendable =
+          Contract_storage.get_balance ctxt (Implicit delegate)
+        in
+        return Tez_repr.(min amount_from_liquid spendable)
+  in
+  (* Issue pseudotokens for delegators *)
+  let* ctxt, stake_balance_updates2 =
+    if Signature.Public_key_hash.(sender <> delegate) then
+      Staking_pseudotokens_storage.stake
+        ctxt
+        ~contract:sender_contract
+        ~delegate
+        amount_from_liquid
+    else return (ctxt, [])
+  in
+  let+ ctxt, stake_balance_updates3 =
     Token.transfer
       ctxt
       (`Contract sender_contract)
@@ -317,8 +307,8 @@ let stake ctxt ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t])
       amount_from_liquid
   in
   ( ctxt,
-    stake_balance_updates1 @ stake_balance_updates2 @ finalize_balance_updates
-  )
+    stake_balance_updates1 @ stake_balance_updates2 @ stake_balance_updates3
+    @ finalize_balance_updates )
 
 let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
