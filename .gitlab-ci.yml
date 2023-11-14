@@ -1,5 +1,6 @@
 stages:
   - build
+  - deploy
   - docker
   - manifest
 
@@ -38,6 +39,21 @@ build:
     paths:
       - archiver/main.exe
       - server/main.exe
+
+release:
+  stage: deploy
+  only:
+    - main
+  variables:
+    ARCHIVE: "teztale.latest.zip"
+  dependencies:
+    - build
+  script:
+    - 'apt-get -y install zip'
+    - 'mv archiver/main.exe teztale-archiver.exe'
+    - 'mv server/main.exe teztale-server.exe'
+    - 'zip -r ${ARCHIVE} ./teztale-archiver.exe teztale-server.exe'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/${ARCHIVE}"'
 
 docker:
   stage: docker
