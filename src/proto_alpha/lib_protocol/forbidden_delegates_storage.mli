@@ -5,6 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module maintains the storage related to forbidden delegates.
+    It is responsible for maintaining the
+    {!Storage.Tenderbake.Forbidden_delegates} table.
+*)
+
 (** [is_forbidden ctxt delegate] returns [true] if the given [delegate]
     is forbidden to bake or attest. This means that its current frozen deposit
     is equal to zero. Returns [false] otherwise. *)
@@ -27,3 +32,5 @@ val load : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val update_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+
+val init_for_genesis_and_oxford : Raw_context.t -> Raw_context.t tzresult Lwt.t

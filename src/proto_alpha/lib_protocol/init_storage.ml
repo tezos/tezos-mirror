@@ -269,9 +269,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
           Storage.Tenderbake.First_level_of_protocol.init ctxt level
         in
         let* ctxt =
-          Storage.Tenderbake.Forbidden_delegates.init
-            ctxt
-            Signature.Public_key_hash.Set.empty
+          Forbidden_delegates_storage.init_for_genesis_and_oxford ctxt
         in
         let*! ctxt = Storage.Contract.Total_supply.add ctxt Tez_repr.zero in
         let* ctxt = Storage.Block_round.init ctxt Round_repr.zero in
@@ -342,9 +340,8 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
           Storage.Tenderbake.Attestation_branch.add_or_remove ctxt opt
         in
         let* ctxt =
-          Storage.Tenderbake.Forbidden_delegates.init
-            ctxt
-            Signature.Public_key_hash.Set.empty
+          (* In P, remove this call and rename the function. *)
+          Forbidden_delegates_storage.init_for_genesis_and_oxford ctxt
         in
         let* ctxt = migrate_staking_balance_for_o ctxt in
         let*! ctxt =

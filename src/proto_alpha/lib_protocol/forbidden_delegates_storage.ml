@@ -88,3 +88,8 @@ let update_at_cycle_end ctxt ~new_cycle =
       else return ctxt)
     ctxt
     selection_for_new_cycle
+
+let init_for_genesis_and_oxford ctxt =
+  Storage.Tenderbake.Forbidden_delegates.init
+    ctxt
+    Signature.Public_key_hash.Set.empty
