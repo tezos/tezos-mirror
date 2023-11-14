@@ -124,7 +124,7 @@ let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
   in
   let*! ctxt =
     if should_forbid_from_history then
-      Delegate_storage.forbid_delegate ctxt delegate
+      Forbidden_delegates_storage.forbid_delegate ctxt delegate
     else Lwt.return ctxt
   in
   let* ctxt =

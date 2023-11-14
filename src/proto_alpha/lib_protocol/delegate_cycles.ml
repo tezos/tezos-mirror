@@ -49,7 +49,7 @@ let update_activity ctxt last_cycle =
 
 let update_forbidden_delegates ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let*! ctxt = Delegate_storage.reset_forbidden_delegates ctxt in
+  let*! ctxt = Forbidden_delegates_storage.reset_forbidden_delegates ctxt in
   let* selection_for_new_cycle =
     Stake_storage.get_selected_distribution ctxt new_cycle
   in
@@ -61,7 +61,9 @@ let update_forbidden_delegates ctxt ~new_cycle =
       if Tez_repr.(current_deposits = zero) then
         (* If the delegate's current deposit remains at zero then we add it to
            the forbidden set. *)
-        let*! ctxt = Delegate_storage.forbid_delegate ctxt delegate in
+        let*! ctxt =
+          Forbidden_delegates_storage.forbid_delegate ctxt delegate
+        in
         return ctxt
       else return ctxt)
     ctxt

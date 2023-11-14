@@ -537,6 +537,8 @@ module Delegate = struct
 
   let deactivated = Delegate_activation_storage.is_inactive
 
+  let is_forbidden_delegate = Forbidden_delegates_storage.is_forbidden_delegate
+
   module Consensus_key = Delegate_consensus_key
 
   module Rewards = struct
@@ -636,7 +638,7 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
     Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   in
   let* ctxt = Consensus.load_attestation_branch ctxt in
-  let* ctxt = Delegate.load_forbidden_delegates ctxt in
+  let* ctxt = Forbidden_delegates_storage.load_forbidden_delegates ctxt in
   let* ctxt = Adaptive_issuance_storage.load_reward_coeff ctxt in
   return (ctxt, balance_updates, origination_results)
 

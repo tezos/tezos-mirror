@@ -2173,7 +2173,7 @@ end
 (** This module re-exports definitions from {!Delegate_storage},
    {!Delegate_consensus_key}, {!Delegate_missed_attestations_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
-   {!Delegate_rewards}. *)
+   {!Delegate_rewards}, and {!Forbidden_delegates_storage}. *)
 module Delegate : sig
   val check_not_tz4 : Signature.public_key_hash -> unit tzresult
 
@@ -2261,7 +2261,7 @@ module Delegate : sig
 
   val deactivated : context -> public_key_hash -> bool tzresult Lwt.t
 
-  (** See {!Delegate_storage.is_forbidden_delegate}. *)
+  (** See {!Forbidden_delegates_storage.is_forbidden_delegate}. *)
   val is_forbidden_delegate : t -> public_key_hash -> bool
 
   (** See {!Delegate_activation_storage.last_cycle_before_deactivation}. *)
