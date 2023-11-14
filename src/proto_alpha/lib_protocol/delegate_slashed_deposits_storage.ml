@@ -107,7 +107,7 @@ let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
-  let*! ctxt =
+  let*! ctxt, _did_forbid =
     Forbidden_delegates_storage.may_forbid
       ctxt
       delegate
