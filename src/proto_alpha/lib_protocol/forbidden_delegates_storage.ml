@@ -68,3 +68,23 @@ let reset ctxt =
       (Raw_context.Consensus.forbidden_delegates ctxt)
   then Lwt.return ctxt
   else set_forbidden_delegates ctxt Signature.Public_key_hash.Set.empty
+
+let update_at_cycle_end ctxt ~new_cycle =
+  let open Lwt_result_syntax in
+  let*! ctxt = reset ctxt in
+  let* selection_for_new_cycle =
+    Stake_storage.get_selected_distribution ctxt new_cycle
+  in
+  List.fold_left_es
+    (fun ctxt (delegate, _stake) ->
+      let* current_deposits =
+        Delegate_storage.current_frozen_deposits ctxt delegate
+      in
+      if Tez_repr.(current_deposits = zero) then
+        (* If the delegate's current deposit remains at zero then we add it to
+           the forbidden set. *)
+        let*! ctxt = forbid ctxt delegate in
+        return ctxt
+      else return ctxt)
+    ctxt
+    selection_for_new_cycle

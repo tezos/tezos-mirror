@@ -33,3 +33,6 @@ val load : Raw_context.t -> Raw_context.t tzresult Lwt.t
 (** [reset ctxt delegates] overwrites the forbidden
     delegates set with an empty set in both storage and in-memory. *)
 val reset : Raw_context.t -> Raw_context.t Lwt.t
+
+val update_at_cycle_end :
+  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t

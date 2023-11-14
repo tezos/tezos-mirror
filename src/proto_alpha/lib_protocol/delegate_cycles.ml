@@ -47,26 +47,6 @@ let update_activity ctxt last_cycle =
             return (ctxt, delegate :: deactivated)
           else return (ctxt, deactivated))
 
-let update_forbidden_delegates ctxt ~new_cycle =
-  let open Lwt_result_syntax in
-  let*! ctxt = Forbidden_delegates_storage.reset ctxt in
-  let* selection_for_new_cycle =
-    Stake_storage.get_selected_distribution ctxt new_cycle
-  in
-  List.fold_left_es
-    (fun ctxt (delegate, _stake) ->
-      let* current_deposits =
-        Delegate_storage.current_frozen_deposits ctxt delegate
-      in
-      if Tez_repr.(current_deposits = zero) then
-        (* If the delegate's current deposit remains at zero then we add it to
-           the forbidden set. *)
-        let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
-        return ctxt
-      else return ctxt)
-    ctxt
-    selection_for_new_cycle
-
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
@@ -204,7 +184,7 @@ let cycle_end ctxt last_cycle =
     then return (ctxt, [])
     else adjust_frozen_stakes ctxt
   in
-  let* ctxt = update_forbidden_delegates ctxt ~new_cycle in
+  let* ctxt = Forbidden_delegates_storage.update_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
