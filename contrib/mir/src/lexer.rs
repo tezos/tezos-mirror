@@ -89,6 +89,7 @@ defprim! {
     UNPAIR,
     CONS,
     IF_CONS,
+    ITER,
 }
 
 defprim! {

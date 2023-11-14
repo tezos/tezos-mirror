@@ -334,6 +334,35 @@ fn typecheck_instruction(
         (I::Loop(..), [.., ty]) => no_overload!(LOOP, TypesNotEqual(T::Bool, ty.clone())),
         (I::Loop(..), []) => no_overload!(LOOP, len 1),
 
+        (I::Iter(.., nested), [.., T::List(..)]) => {
+            // get the list element type
+            let ty = *pop!(T::List);
+            // clone the rest of the stack
+            let mut inner_stack = stack.clone();
+            // push the element type to the top of the inner stack and typecheck
+            inner_stack.push(ty);
+            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
+            let nested = typecheck(nested, ctx, &mut opt_inner_stack)?;
+            // If the starting stack (sans list) and result stack unify, all is good.
+            unify_stacks(ctx, opt_stack, opt_inner_stack)?;
+            I::Iter(overloads::Iter::List, nested)
+        }
+        (I::Iter(.., nested), [.., T::Map(..)]) => {
+            // get the map element type
+            let kty_vty_box = pop!(T::Map);
+            // clone the rest of the stack
+            let mut inner_stack = stack.clone();
+            // push the element type to the top of the inner stack and typecheck
+            inner_stack.push(T::Pair(kty_vty_box));
+            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
+            let nested = typecheck(nested, ctx, &mut opt_inner_stack)?;
+            // If the starting stack (sans map) and result stack unify, all is good.
+            unify_stacks(ctx, opt_stack, opt_inner_stack)?;
+            I::Iter(overloads::Iter::Map, nested)
+        }
+        (I::Iter(..), [.., _]) => no_overload!(ITER),
+        (I::Iter(..), []) => no_overload!(ITER, len 1),
+
         (I::Push((t, v)), ..) => {
             let v = typecheck_value(ctx, &t, v)?;
             stack.push(t);
@@ -850,6 +879,94 @@ mod typecheck_tests {
                 TypesNotEqual(Type::Bool, Type::Int).into()
             )
         );
+    }
+
+    #[test]
+    fn test_iter_list() {
+        let mut stack = tc_stk![Type::new_list(Type::Int)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck(parse("{ ITER { DROP } }").unwrap(), &mut ctx, &mut stack),
+            Ok(vec![Iter(overloads::Iter::List, vec![Drop(None)])])
+        );
+        assert_eq!(stack, tc_stk![]);
+    }
+
+    #[test]
+    fn test_iter_too_short() {
+        too_short_test(Iter((), vec![]), Prim::ITER, 1)
+    }
+
+    #[test]
+    fn test_iter_list_inner_mismatch() {
+        let mut stack = tc_stk![Type::new_list(Type::Int)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck(parse("{ ITER { } }").unwrap(), &mut ctx, &mut stack),
+            Err(TcError::StacksNotEqual(
+                stk![],
+                stk![Type::Int],
+                StacksNotEqualReason::LengthsDiffer(0, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_iter_map() {
+        let mut stack = tc_stk![Type::new_map(Type::Int, Type::Nat)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck(
+                parse("{ ITER { CAR; DROP } }").unwrap(),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(vec![Iter(overloads::Iter::Map, vec![Car, Drop(None)])])
+        );
+        assert_eq!(stack, tc_stk![]);
+    }
+
+    #[test]
+    fn test_iter_map_inner_mismatch() {
+        let mut stack = tc_stk![Type::new_map(Type::Int, Type::Nat)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck(parse("{ ITER { } }").unwrap(), &mut ctx, &mut stack),
+            Err(TcError::StacksNotEqual(
+                stk![],
+                stk![Type::new_pair(Type::Int, Type::Nat)],
+                StacksNotEqualReason::LengthsDiffer(0, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_iter_arg_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck(parse("{ ITER { DROP } }").unwrap(), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::ITER,
+                stack: stk![Type::String],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn test_iter_fail() {
+        let mut stack = tc_stk![Type::new_list(Type::Int)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck(
+                parse("{ ITER { FAILWITH } }").unwrap(),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(vec![Iter(overloads::Iter::List, vec![Failwith(Type::Int)])])
+        );
+        assert_eq!(stack, tc_stk![])
     }
 
     #[test]

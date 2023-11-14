@@ -237,6 +237,7 @@ pub trait Stage {
       GetOverload,
       UpdateOverload,
       FailwithType,
+      IterOverload,
     }
 }
 
@@ -269,6 +270,7 @@ pub enum Instruction<T: Stage> {
     Unpair,
     Cons,
     IfCons(Vec<Instruction<T>>, Vec<Instruction<T>>),
+    Iter(T::IterOverload, Vec<Instruction<T>>),
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;
