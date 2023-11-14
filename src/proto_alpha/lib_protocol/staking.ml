@@ -385,3 +385,12 @@ let request_unstake ctxt ~for_next_cycle_use_only_after_slashing
     ( ctxt,
       request_unstake_balance_updates @ balance_updates
       @ finalize_balance_updates )
+
+type staking_automation = Auto_staking | Manual_staking
+
+let staking_automation ctxt =
+  if
+    Raw_context.adaptive_issuance_enable ctxt
+    || not (Constants_storage.adaptive_issuance_autostaking_enable ctxt)
+  then Manual_staking
+  else Auto_staking
