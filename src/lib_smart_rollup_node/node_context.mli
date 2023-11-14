@@ -407,13 +407,13 @@ val find_messages :
 val get_num_messages :
   _ t -> Merkelized_payload_hashes_hash.t -> int tzresult Lwt.t
 
-(** [save_messages t payloads_hash ~block_hash messages] associates the list of
+(** [save_messages t payloads_hash ~predecessor messages] associates the list of
     [messages] to the [payloads_hash]. The payload hash must be computed by
     calling, e.g. {!Sc_rollup.Inbox.add_all_messages}. *)
 val save_messages :
   rw ->
   Merkelized_payload_hashes_hash.t ->
-  block_hash:Block_hash.t ->
+  predecessor:Block_hash.t ->
   string list ->
   unit tzresult Lwt.t
 
