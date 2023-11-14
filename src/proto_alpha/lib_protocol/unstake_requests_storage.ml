@@ -85,8 +85,8 @@ let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
     amount
     slashing_history
 
-let prepare_finalize_unstake ctxt
-    ?(for_next_cycle_use_only_after_slashing = false) contract =
+let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
+    contract =
   let open Lwt_result_syntax in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let max_slashing_period = Constants_repr.max_slashing_period in

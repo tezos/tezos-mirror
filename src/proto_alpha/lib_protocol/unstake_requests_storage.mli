@@ -60,7 +60,7 @@ val prepared_finalize_unstake_encoding :
  *)
 val prepare_finalize_unstake :
   Raw_context.t ->
-  ?for_next_cycle_use_only_after_slashing:bool ->
+  for_next_cycle_use_only_after_slashing:bool ->
   Contract_repr.t ->
   prepared_finalize_unstake option tzresult Lwt.t
 
