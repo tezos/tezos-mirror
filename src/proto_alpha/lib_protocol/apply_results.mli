@@ -82,8 +82,10 @@ and 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_attestation_evidence_result :
-      Receipt.balance_updates
+  | Double_attestation_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_attestation_evidence contents_result
   | Double_preattestation_evidence_result :
       Receipt.balance_updates
