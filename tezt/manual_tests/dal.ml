@@ -110,10 +110,10 @@ let start_dal_node ~peers ?data_dir ?rpc_port ?net_port ?public_ip_addr
     time. *)
 let teztnet_network_target =
   let dailynet () = Ptime_clock.now () |> Ptime.to_date in
-  let mondaynet () =
+  let weeklynet () =
     let t = Ptime_clock.now () in
-    let days_since_monday = (Ptime.weekday_num t + 6) mod 7 in
-    let span = Ptime.Span.of_int_s @@ (days_since_monday * 3600 * 24) in
+    let days_since_wednesday = (Ptime.weekday_num t + 4) mod 7 in
+    let span = Ptime.Span.of_int_s @@ (days_since_wednesday * 3600 * 24) in
     match Ptime.sub_span t span with
     | Some t -> t |> Ptime.to_date
     | _ -> assert false (* Unreachable*)
@@ -125,7 +125,7 @@ let teztnet_network_target =
         (let year, month, day =
            match network with
            | "dailynet" -> dailynet ()
-           | "mondaynet" -> mondaynet ()
+           | "weeklynet" -> weeklynet ()
            | s -> Test.fail "Unknown network %s@." s
          in
          Printf.sprintf "%04d-%02d-%02d" year month day)
@@ -153,7 +153,7 @@ let scenario_on_teztnet =
     (* The working-dir option is not mandatory. It allows providing a fix
        directly for nodes and wallet data/base dir. An advantage of this is the
        ability to stop & restart the infra without being obliged to resync
-       dailynet or mondaynet from genesis. In fact, Tezt chooses a different
+       dailynet or weeklynet from genesis. In fact, Tezt chooses a different
        (random) directory for binaries (usually in /tmp) if they are not
        explicitly specified. *)
     let working_dir = Cli.get_string_opt "working-dir" in
@@ -344,6 +344,9 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
     -a working-dir=./dal-e2e \
     -a rpc-port=30000 \
     -a dal-rpc-port=30001
+
+Replace dailynet with weeklynet to rather join weeklynet.
+
 *)
 let slots_injector_test ~network =
   Test.register
@@ -374,6 +377,8 @@ let slots_injector_test ~network =
     -a rpc-port=10000 \
     -a baker-sk="edpkuSZ6gD6reoGEuJyPiPk67gp94V7xXtP1EZ83H46fNW9YQBUUdg" \
     -a dal-rpc-port=10001
+
+Replace dailynet with weeklynet to rather join weeklynet.
 *)
 let baker_test ~network =
   Test.register
@@ -398,5 +403,5 @@ let register () =
     (fun network ->
       slots_injector_test ~network ;
       baker_test ~network)
-    ["dailynet"; "mondaynet"] ;
+    ["dailynet"; "weeklynet"] ;
   ()
