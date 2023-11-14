@@ -412,7 +412,7 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
     let open Main_Pack in
     let open D in
     (* TODO: can we commit only to the hidden pi?*)
-    let public_inputs_map, cms_pi = hash_pi pp input_commit_funcs inputs in
+    let public_inputs_map, cms_pi = commit_pi pp input_commit_funcs inputs in
     (* add the PI in the transcript *)
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
     let* ( (pp_proof, PP.{answers; batch; alpha; x; r; cms_answers; t_answers}),

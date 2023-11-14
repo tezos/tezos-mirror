@@ -14,7 +14,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add:
 Proof size: 1.98 KB
-Proof hash: a4d6767ef4388325aff100070eb05c492996e355ad7d6f94cb45470337f2f25c
+Proof hash: bff29c0374e769227ecd53910a2f02661b49347b289ae1092fba9868053fdbba
 Prover_pp hash: 5c540b0e97c074e3ee58ff51a58472c76fbed7d095b7374f7a6e6b2cb9421f63
 Verifier_pp hash: b40a164f88916ac0cd411caae244286223faf931213411ce8f034d77460d4c9c
 
@@ -34,7 +34,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add:
 Proof size: 1.98 KB
-Proof hash: 74493f9c24d34c02532b44d479f9fb9a86d8e764b42869a4733b5704ef81212d
+Proof hash: d80883c8dd6c6bb8dc446a5b4ed6b3b18fb87ab50a0465d11ca1f7c417968f61
 Prover_pp hash: 5c540b0e97c074e3ee58ff51a58472c76fbed7d095b7374f7a6e6b2cb9421f63
 Verifier_pp hash: b40a164f88916ac0cd411caae244286223faf931213411ce8f034d77460d4c9c
 
@@ -54,7 +54,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add_constant:
 Proof size: 2.19 KB
-Proof hash: 5a209b44c562a716f44f5c2164f19b9c9bec5d30ebb84aba7fabe059691d5d9c
+Proof hash: 26a4ec92b1c1aeac03e6c3fbcaf1acbe355e7b5f8078d7316c661ae29eb999a6
 Prover_pp hash: cbb26d42c3af3e9a34026017c088eb96962a021fe154dbaab0d20e04245a7bc6
 Verifier_pp hash: 3d3cf86f9d9b55d109bf85dfe6180297f1c1b81257378200705272d6e73fe0b8
 
@@ -74,7 +74,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add_constant:
 Proof size: 2.14 KB
-Proof hash: f4590351e11aec64ce4ed3b06248e7c2fca665c6840f8c37166c4168e6484508
+Proof hash: eb2ca1a4291a33cad5fdc3ca9a0530f2cb3be754f9b656e8a92be7dd6c417cc8
 Prover_pp hash: bccb351158442fa2ab93c82a98a9a675aaf65ca404c2ca6a725d3fe72cf6c083
 Verifier_pp hash: e262ca600840ccf9b5e4cf52c0111abfa6e150eb4f4dd2404c3fdffb2b286988
 
@@ -94,7 +94,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_sub:
 Proof size: 1.98 KB
-Proof hash: 843d6ac9f6262a2ba38202a491740f94c84f8f10cc02850971685456cca229a7
+Proof hash: 92cbca60db73ccdfbc3173681e441d423e69dd8283e575efa1b34cea5d581070
 Prover_pp hash: 1dd56eedccb6255b7d78f14413870fdc4a81a4963d97611b9897e31c626ac92b
 Verifier_pp hash: 2daf4618f0a20199558c9903fd06e3e29e44da81dcec8c1612e746a3620c2d19
 
@@ -114,7 +114,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_sub:
 Proof size: 1.98 KB
-Proof hash: 372bdcf3d09ae6c3db6090ae7ccc35b135b87f975a149475276bc049436d940c
+Proof hash: 00ffbf0dbbff858dc3e6a15affb9baa8b44ae87d74b53e9a22e047a6ab349f0f
 Prover_pp hash: 1dd56eedccb6255b7d78f14413870fdc4a81a4963d97611b9897e31c626ac92b
 Verifier_pp hash: 2daf4618f0a20199558c9903fd06e3e29e44da81dcec8c1612e746a3620c2d19
 
@@ -134,7 +134,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_mul:
 Proof size: 1.92 KB
-Proof hash: 6aa9dd8e38553ba7c96a70bffe03d8e6cafb731e0197e424a34490e21cd369fb
+Proof hash: fbd14ca5a2eb710eb1697c8c36176410e45bb1ad403ec1625e0018f0097602d7
 Prover_pp hash: 0d370138d147579ac4dfa99765ccbe890204d54781e39958fe4a18396c36ccf9
 Verifier_pp hash: 2dcd8999d0c153650e995db69fd77ed189104b3ccfbe3e710b2ee119a4577c2f
 
@@ -154,7 +154,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_mul:
 Proof size: 1.92 KB
-Proof hash: ad4ec96bc2a617ddfbfc268be8eefc826b4c0acefb41732f3b830fa6a6d65ff9
+Proof hash: 02ff1f04ddf1b7591fe410fea836d6219544c741acf9c987bc496b7934dd46b7
 Prover_pp hash: 0d370138d147579ac4dfa99765ccbe890204d54781e39958fe4a18396c36ccf9
 Verifier_pp hash: 2dcd8999d0c153650e995db69fd77ed189104b3ccfbe3e710b2ee119a4577c2f
 
@@ -174,7 +174,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_mul:
 Proof size: 1.92 KB
-Proof hash: f4ab4077725618dbc068d82e820599122aa991a33951e06a6e94726af70da926
+Proof hash: eae3082460b2d060601f5f091f3b9259ba4e91bbd74d9f644619cbb67b126df7
 Prover_pp hash: 0d370138d147579ac4dfa99765ccbe890204d54781e39958fe4a18396c36ccf9
 Verifier_pp hash: 2dcd8999d0c153650e995db69fd77ed189104b3ccfbe3e710b2ee119a4577c2f
 
@@ -194,7 +194,7 @@ Circuit Size      : 5 [2.32]
 
 Num.test_num:
 Proof size: 2.12 KB
-Proof hash: 9fd019eb4433183b8503a6c1676bf86b29f45291fec3237b0d44a42b3be2de89
+Proof hash: 2f71604e12aff82aaa46e13afb8769bcaef68a962011aad62d2ec58db3def932
 Prover_pp hash: 7796a560e1812805af8fad486b6721079a11a1241424024184dc177ff64f919f
 Verifier_pp hash: af42f792aed37740e2cf4eecdc0ce4887612115b89fae9c9cc45ecac83ab7403
 
@@ -214,7 +214,7 @@ Circuit Size      : 2 [1.00]
 
 Num.test_div:
 Proof size: 1.97 KB
-Proof hash: 6417acc165c04b94ad478a1dd5fa413b183bdf6407ca4bf0df3011f56800638a
+Proof hash: 6888aa42f93c3fb1f263e92d123acce6fa76fb963c4450448c70159c8fa8c304
 Prover_pp hash: 15068f010dbd0ba5dbbcef1c532c4a0a76138e93ba62b8ea6f419eb995e5ab13
 Verifier_pp hash: 6b91372f856078dd03f46755c7bfd192df7e7779c67b320f656cdab96b894bd1
 
@@ -234,7 +234,7 @@ Circuit Size      : 1 [0.00]
 
 pow5:
 Proof size: 1.74 KB
-Proof hash: c8e73ce57f4df80e4d9e51b8b8cac0ceffd02e79973fe55cadc3c7182a11e61e
+Proof hash: ab469e74220a05373a2570266a5ee79ff4c3f94747d2b9c0080c039b3261d7a8
 Prover_pp hash: df03fa5ebd0ab5e8eadd165d22f79f8c53be081029a621ecb6b98b9d3c69d8bb
 Verifier_pp hash: 440ca48cc42d8edb37554436cba8b658ef1d4e85bc2003f2bab9a8d2d9ad6dca
 
@@ -254,7 +254,7 @@ Circuit Size      : 1 [0.00]
 
 test:
 Proof size: 1.74 KB
-Proof hash: 212ae90528612a31f6e52e103ad4a71827da35e9962b05e5e310389eb1b99f00
+Proof hash: 3e1b39fd41cea717105cd8b56f835b50c030acbd0294f68e82ad47fcc353187f
 Prover_pp hash: bc716130d987b309464e1a7031edd4d7cc313ebf9aa01f79934dda5af4ab9cca
 Verifier_pp hash: 1cdae686f8cb5edc7f2b868071f6aa040e2dee114162261df1b0a6df55c75b8c
 
@@ -274,7 +274,7 @@ Circuit Size      : 1 [0.00]
 
 test:
 Proof size: 1.74 KB
-Proof hash: 3ceae38afdc90074d8a93fb1d291f0d82c4d00e19edd84f7a57b46b745b156a3
+Proof hash: 2d457895c9c50d3640713d40ec25e64842de2f907912f5e42932eaae4e2b522d
 Prover_pp hash: bc716130d987b309464e1a7031edd4d7cc313ebf9aa01f79934dda5af4ab9cca
 Verifier_pp hash: 1cdae686f8cb5edc7f2b868071f6aa040e2dee114162261df1b0a6df55c75b8c
 
@@ -294,7 +294,7 @@ Circuit Size      : 1 [0.00]
 
 test:
 Proof size: 1.74 KB
-Proof hash: 7ebfdf9ae526d853819a5db9b1865d66372ae2b46b04d7220410cbcad1083ff0
+Proof hash: 97e47b7c2361331b256d6e9add0e2c6cd9248d191bab33b22cd8e6fa835e2f20
 Prover_pp hash: bc716130d987b309464e1a7031edd4d7cc313ebf9aa01f79934dda5af4ab9cca
 Verifier_pp hash: 1cdae686f8cb5edc7f2b868071f6aa040e2dee114162261df1b0a6df55c75b8c
 
@@ -314,7 +314,7 @@ Circuit Size      : 4 [2.00]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: b2ca72f99054b942f0e8504b7dedd7d5a952536a8f64c882f2f173364b441cfe
+Proof hash: 336bea393d22ecf8de47b5becd437dfde3674f9582ac0fe2ea663245ba40d711
 Prover_pp hash: 02be315b2df994f688e9a5157dd8d338d809aeb2d0d00b90cf8b36fe715141a8
 Verifier_pp hash: 3c506db115fefebb7d0f00ef9607ac93e3ebcbdab1a7fd86e3e23d653a7f32dd
 
@@ -334,7 +334,7 @@ Circuit Size      : 4 [2.00]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: b2ab11df856f5c3643851e18e8924af580775365fa2ee4b53659729a10f6be75
+Proof hash: 613898997107140fe97dee0cf878717e8bfc6642d5f0b9d77c9b9525886245c6
 Prover_pp hash: 02be315b2df994f688e9a5157dd8d338d809aeb2d0d00b90cf8b36fe715141a8
 Verifier_pp hash: 3c506db115fefebb7d0f00ef9607ac93e3ebcbdab1a7fd86e3e23d653a7f32dd
 
@@ -354,7 +354,7 @@ Circuit Size      : 7 [2.81]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: 29222b0998815c530bc7e6267d7fe9d9aa4005aff1bca8e1293ff67fd402831a
+Proof hash: be99a42b43dfbb7af50f873fb6a9ff1f9c90761baa0415cfb5054d6ba77fd9c9
 Prover_pp hash: cfc5a6388352669e3e564f7f5d0e20de16b157d4fd52338dfdb55dd7e705460d
 Verifier_pp hash: 09f90c3b391f8835206bf14f37a1b4632ad546cc3193b06ac34da9f8fc3f8e3c
 
@@ -374,7 +374,7 @@ Circuit Size      : 7 [2.81]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: 12c5c741e8ab5217cae34b0708e3e5455ab6cc7a01c8adcdff3676b973e68433
+Proof hash: 2f752c6e5144d38453e2a76062fc36118e1e506de8faac3e09026fe911483f9c
 Prover_pp hash: cfc5a6388352669e3e564f7f5d0e20de16b157d4fd52338dfdb55dd7e705460d
 Verifier_pp hash: 09f90c3b391f8835206bf14f37a1b4632ad546cc3193b06ac34da9f8fc3f8e3c
 
@@ -394,7 +394,7 @@ Circuit Size      : 13 [3.70]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: d129b84e4b0e765dadd25f2d25632617b5387ba537233ea400075b42f5c00fbe
+Proof hash: 03d77ac2f2e5d0c79f0fe7f1eb9a3496661db4290dc1413270fe64fcc979f1ae
 Prover_pp hash: fb62d2ac6ebb7dc928d2002b70a423e9fce59d7005cbf3bd7e33e457181b8f12
 Verifier_pp hash: 023ab4847279bccdbf760768aec98fe836c079b896024316a363c3a3a94704e4
 
@@ -414,7 +414,7 @@ Circuit Size      : 19 [4.25]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: 03451d97ff923f9c0f620f4d2c6de2348ce39a7cf16a3d0ac6348268e736d2f6
+Proof hash: 974b7cd76941defc2230bd3b5f02461751dcdd5f8872f86abaadb901bda84b30
 Prover_pp hash: ceae3d56202ec39754584a77f8dc6368a85287a553dbcad3c14867dbce55ee31
 Verifier_pp hash: 3326d9f276159d5a31dbb2432305d49b4b898800b1e4b9ee69ed47054dbdc04e
 
@@ -434,7 +434,7 @@ Circuit Size      : 10 [3.32]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: 4c56bfb927bb7306cab72529a69bc5f871ae607983b54e60b7271f14fd0e01e6
+Proof hash: 46e995668877cebb454302d52bfb0ee3e8ba0cb4184a9a74c0db9df30e29cf44
 Prover_pp hash: 5a1ef163ff993109e0129b4eb9eb4fbe3833288207e42ca70ce0fea6832fec92
 Verifier_pp hash: 85bb7f33d3dd6e8d1aa6f29083e00e2e001a07f9d0c692d28c4d5b0cdcd6f531
 
@@ -454,7 +454,7 @@ Circuit Size      : 1 [0.00]
 
 Num.test_equal:
 Proof size: 1.97 KB
-Proof hash: 8815f0aaa3bcc378375e0769c892f4a0f99da177b4edcf89adec406888521128
+Proof hash: d8859b47e16045614ea30d7ccd729d2099f54b3cd87ae9568ff89175f359906a
 Prover_pp hash: 8fea8486642b45c7be05d2010101cbc22bdfa42a820125f2ff21d7843be91f82
 Verifier_pp hash: 092428fe884a8a1824c92d2c375402ff5bd634fd77d2aa687f6c8969147c6731
 
@@ -474,7 +474,7 @@ Circuit Size      : 6 [2.58]
 
 Num.bits_of_scalar:
 Proof size: 2.34 KB
-Proof hash: c2d09292360ea00c3e6471fb1624216e97af3b2a15f7c57c6425b1c86a384b45
+Proof hash: 6c0a255a0a30c671a255dee527637949a41031aeb2b9591c14ef6f3327a06614
 Prover_pp hash: baddad7fbf4c99bfea78c4ae7ee20a3e10d690ce9a10fca5b54f27bf12926d40
 Verifier_pp hash: fffe7fb4d591b9486795a30d4e3bf403c578a3501067b20f3c399c432e263ee5
 
@@ -494,7 +494,7 @@ Circuit Size      : 6 [2.58]
 
 Num.bits_of_scalar:
 Proof size: 2.34 KB
-Proof hash: a53394f2ef14f97dd998155cf37232cacc08caf029f7c50407df9044152a8deb
+Proof hash: 587cfd9d88b3d5b76657d946a65466d5227b188f453872ead69b491f63270a3c
 Prover_pp hash: e86b9bca4e0836274798b0449eb7e6d188df456fc31ef65df3a49e46787bb666
 Verifier_pp hash: 2cefb8566277501849561a5d6965a332c4717b94e7fd7230033b34d3b8c19945
 
@@ -514,7 +514,7 @@ Circuit Size      : 4 [2.00]
 
 Num.is_upper_bounded:
 Proof size: 2.28 KB
-Proof hash: 30d07bcf37057d4e76e248c9b90bdd9e785b326d9ccf3eda761da4f58390b36a
+Proof hash: f4f47eafd1db952f21b737e9d2b4e019fd169e934bab3710c4ea59eb0192ae89
 Prover_pp hash: 6ed66d729931b09d66acabfc47e6c0a469aad8c57159f9f22fd7a258e002875c
 Verifier_pp hash: 53bb6b9a06a505d4edcf3f8a30fa276f0fc7d0da0bacb4192bd16d4ff2e8a8a3
 
@@ -534,7 +534,7 @@ Circuit Size      : 7 [2.81]
 
 Num.is_upper_bounded:
 Proof size: 2.45 KB
-Proof hash: fb7e4c22c0a8d6503de103a07639e6aa0f44df30683c911254594cf01bcc0f11
+Proof hash: e6fe537ad98b2145ad8903efa01177d4a46023dd7d0d593ae5594ecf8cc2803c
 Prover_pp hash: 88297d28fee4293206a61a70809a7d849b4d2978aa58de7fb375db645baabe7f
 Verifier_pp hash: 39e52877b4fe44ea9ea042f17cc8f99b385217af05d0e06d0514c233af6bf2fc
 
@@ -554,7 +554,7 @@ Circuit Size      : 11 [3.46]
 
 Num.is_upper_bounded:
 Proof size: 2.91 KB
-Proof hash: 23a979d0bf034854c98dede28c516286a0e733e44365ac4becbe5c5ca22a52b4
+Proof hash: 0f5c6cb8472c26a595e9187103c41eb0ad964768cb322be5bc1f8a66736af708
 Prover_pp hash: a1546be5925a402c8e2bc0f3f530fe6d669b2a4ce4b74cbc06c94941f4e6ca7d
 Verifier_pp hash: 1421d200f3ce887b940946542a2571e672f39cd4bd607eb3d560b0c242e81c8b
 
@@ -574,7 +574,7 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 20cb34dbadfc7f455a2e1fb5546d2aee243bf8181329452821d75e4e350057f1
+Proof hash: 5658f60465c6c353c6d98c69e52857e25260bc8339388884a3b397b71e8464fb
 Prover_pp hash: 478bf6b595f3c3183dd4a65df5b757cb8ea241a4206f792fd5f5a7c53a2fe5e1
 Verifier_pp hash: 60b146b6a26d24fd3a8c6fb87e793763ddff31fe920033abd7466cd5f6a23ba9
 
@@ -594,7 +594,7 @@ Circuit Size      : 4 [2.00]
 
 Num.is_upper_bounded:
 Proof size: 2.28 KB
-Proof hash: 30d07bcf37057d4e76e248c9b90bdd9e785b326d9ccf3eda761da4f58390b36a
+Proof hash: f4f47eafd1db952f21b737e9d2b4e019fd169e934bab3710c4ea59eb0192ae89
 Prover_pp hash: 6ed66d729931b09d66acabfc47e6c0a469aad8c57159f9f22fd7a258e002875c
 Verifier_pp hash: 53bb6b9a06a505d4edcf3f8a30fa276f0fc7d0da0bacb4192bd16d4ff2e8a8a3
 
@@ -614,7 +614,7 @@ Circuit Size      : 303 [8.24]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 0969b037489f4d1c450ad32ea2d210db70f27e4de34418f043fbdaf9f756ec0e
+Proof hash: 3d9dfe608fce91346237379d0e08fe340d6b8d9d9635087456f77804b4d1574a
 Prover_pp hash: 535f2e9ac2492fdb538e02583d80c59525721e40d96f8ef3d3681bdb4ab46673
 Verifier_pp hash: 44db1c7f32cb349c575f4b81ec4a9f819c663c6c7b5ac114ed1a7bd460fe5f88
 
@@ -634,7 +634,7 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 71f9d19c31564ca4d2b18f1ea5fd46ead60bdf73af2889eea5d8e773a77a3729
+Proof hash: 1d6b4265fc274866c09d98ec850e4155924431433a5f2f31876b0475ab6b50e0
 Prover_pp hash: 053b7fdd3986182e3e97358470d6c8d6a28657e9d9fd10fc93cc6eaa0cac866a
 Verifier_pp hash: dd65cf3943c179337f58340bde0f9431e7cc1fa12d393587ac4d4e0d4ae0c44d
 
@@ -654,7 +654,7 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: bb68ac7c87ed46674311a6b27057aa1f0dab473e9f27ebe95cf55450678daa91
+Proof hash: 191eecfde37fd4cf44b93c4c5513aa2fa327c52d298fee4f47608e1407d448fc
 Prover_pp hash: 82e718c6c3287286f9f1e3638bb57b0eb14969c7bb101dcfb8529d9cf1bc92b1
 Verifier_pp hash: a5d404c705a0cef7dc26364194607476537b9a6500a98ff3b1edd418b7198bba
 
@@ -674,7 +674,7 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 367090d3f7530c357606a2e0e9171ee36e5dd4a39cc8380fe387fd682c0e56af
+Proof hash: 2814b8e24208d988d4e2909abc2f6bc60440ab5464c6765aa105acbedd0b27be
 Prover_pp hash: bcf6acce517d6d567494c9a32df689adb02150102413b61e08f47dec92e61323
 Verifier_pp hash: c34ae5315b80e1501edba43c0fba71598741192e390fd54e48d8ea5af65dcc0b
 
@@ -694,7 +694,7 @@ Circuit Size      : 303 [8.24]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 0969b037489f4d1c450ad32ea2d210db70f27e4de34418f043fbdaf9f756ec0e
+Proof hash: 3d9dfe608fce91346237379d0e08fe340d6b8d9d9635087456f77804b4d1574a
 Prover_pp hash: 535f2e9ac2492fdb538e02583d80c59525721e40d96f8ef3d3681bdb4ab46673
 Verifier_pp hash: 44db1c7f32cb349c575f4b81ec4a9f819c663c6c7b5ac114ed1a7bd460fe5f88
 
@@ -714,7 +714,7 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded_totality:
 Proof size: 3.51 KB
-Proof hash: 0f2ce82ed9e5f385e0a0c1fcab599f080f2c8ac97d43bbbb39345c16245352e8
+Proof hash: a4d21e946749bfedb303681e00243706adb472103d643f89433ffcd1df497c69
 Prover_pp hash: 1a15af063c9ef462d5bec22aa9bcbf5b097007844226a96867464c9dae82fc09
 Verifier_pp hash: ef18f392837212a7284180e59703e0c342122e46895916e9f6895bb79143522a
 
@@ -734,7 +734,7 @@ Circuit Size      : 303 [8.24]
 
 Num.is_upper_bounded_totality:
 Proof size: 3.51 KB
-Proof hash: 009eab08d8ce7d5251a0b2d9b9a9cd3334eec5aef1202122d30bc44640f727ba
+Proof hash: 01fa5e35d4bf9f5613fadc1eda48f1095cf6bb9ea96ef78ab99ebea114f9af8e
 Prover_pp hash: 25f55f9aea56d2136675e0ee7b8f0ec8da00d8b54d4f47c780b312e9de350c24
 Verifier_pp hash: 2ec05d66f42ceaf1bc215dc7021abb73319be987ca3233886da6e141326a9992
 
@@ -754,7 +754,7 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded_totality:
 Proof size: 3.51 KB
-Proof hash: 060b9b4a43c7133b0493aaef3d062af5e7e761461fe8a40acffbf1269036ee55
+Proof hash: 9afa5c4d31b1fa1f236f001019147de9962da1de972d73aab9ccf5893737743c
 Prover_pp hash: 26313b2afa684df67981c362737d2a2ba456ec1f79b8a92a5fb0ee689807a0ae
 Verifier_pp hash: 8641a3dab8d42352cd956b2e1b6434eadb4087da5194c5b2a3577ee0cb2b63b3
 
@@ -774,7 +774,7 @@ Circuit Size      : 9 [3.17]
 
 Num.geq:
 Proof size: 2.52 KB
-Proof hash: 97b07cbbf0d43df17d8f4923bc8ee14d4a83a2dc995833fcbfa81bb22371fbde
+Proof hash: c1cde8129d15e3de6a48f946e58a147634227be2c6c03ef6da58c0f41c45a412
 Prover_pp hash: 23e32d233378fce2cb7e1b501b2247141d1fa50ac5bbf7ff1b85f5a3587bf71e
 Verifier_pp hash: 838c5280dda80e16d27288d052748e87d2ad384e1e836ae3e827d494af544eb8
 
@@ -794,7 +794,7 @@ Circuit Size      : 8 [3.00]
 
 Num.geq:
 Proof size: 2.47 KB
-Proof hash: a0f5dee10817606081a4f1992ef2c7fb664c345820b5223182b06dfaf4a2704e
+Proof hash: e818860b964e51ba50a178c37aad06fa7e83853bc0cf3a8e9d276e0deed3a72e
 Prover_pp hash: 760e00318554798046080dc4932f2d487b199adb571a88f8034fe0c42920ec71
 Verifier_pp hash: 37ccba9a7a4d325cfde6e37c7832364cfbcdea2d030168374767746917fcda4f
 
@@ -8499,18 +8499,18 @@ Tables            : 0 [0.00]
 Circuit Size      : 8 [3.00]
 
 Range-checks:
-Constraints       : 24 [4.58]
-Range-Checks-Total: 132 [7.04]
-Range-Checks-Max  : 71 [6.15]
+Constraints       : 12 [3.58]
+Range-Checks-Total: 31 [4.95]
+Range-Checks-Max  : 17 [4.09]
 Tables            : 0 [0.00]
-Circuit Size      : 71 [6.15]
+Circuit Size      : 17 [4.09]
 
 Range-checks_optimized:
-Constraints       : 22 [4.46]
-Range-Checks-Total: 132 [7.04]
-Range-Checks-Max  : 85 [6.41]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 31 [4.95]
+Range-Checks-Max  : 18 [4.17]
 Tables            : 0 [0.00]
-Circuit Size      : 85 [6.41]
+Circuit Size      : 18 [4.17]
 
 Optimizer.test_long_sum:
 Constraints       : 100 [6.64]
