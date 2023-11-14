@@ -224,7 +224,7 @@ let cors_allowed_headers_arg =
 
 let cors_allowed_origins_arg =
   Tezos_clic.arg
-    ~long:"cors-origin"
+    ~long:"cors-origins"
     ~placeholder:"ALLOWED_ORIGINS"
     ~doc:"List of accepted cors origins."
     Params.string_list
