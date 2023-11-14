@@ -448,6 +448,29 @@ module P2P = struct
         ~output:(Data_encoding.list Topic.encoding)
         (open_root / "topics")
 
+    let get_topics_peers :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Types.Topic.t * Types.Peer.t list) list
+        ; prefix : unit
+        ; params : unit
+        ; query : < subscribed : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Get an association list between each topic subscribed to by the \
+           connected peers and the remote peers subscribed to that topic. If \
+           the 'subscribed' flag is given, then restrict the output to the \
+           topics this node is subscribed to."
+        ~query:subscribed_query
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "topic" Types.Topic.encoding)
+                 (req "peers" (list Types.Peer.encoding))))
+        (open_root / "topics" / "peers")
+
     let get_connections :
         < meth : [`GET]
         ; input : unit
@@ -507,27 +530,30 @@ module P2P = struct
                           (req "backoff" Tezos_base.Time.System.encoding))))))
         (open_root / "backoffs")
 
-    let get_topics_peers :
+    let get_message_cache :
         < meth : [`GET]
         ; input : unit
-        ; output : (Types.Topic.t * Types.Peer.t list) list
+        ; output : (int64 * (Types.Topic.t * int) list) list
         ; prefix : unit
         ; params : unit
-        ; query : < subscribed : bool > >
+        ; query : unit >
         service =
       Tezos_rpc.Service.get_service
         ~description:
-          "Get an association list between each topic subscribed to by the \
-           connected peers and the remote peers subscribed to that topic. If \
-           the 'subscribed' flag is given, then restrict the output to the \
-           topics this node is subscribed to."
-        ~query:subscribed_query
+          "Get the number of message ids in the message cache, grouped by \
+           heartbeat tick and topic."
+        ~query:Tezos_rpc.Query.empty
         ~output:
           Data_encoding.(
             list
               (obj2
-                 (req "topic" Types.Topic.encoding)
-                 (req "peers" (list Types.Peer.encoding))))
-        (open_root / "topics" / "peers")
+                 (req "tick" int64)
+                 (req
+                    "per_topic_cache_size"
+                    (list
+                       (obj2
+                          (req "topic" Types.Topic.encoding)
+                          (req "num_ids" int31))))))
+        (open_root / "message_cache")
   end
 end
