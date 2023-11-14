@@ -144,6 +144,7 @@ let adjust_frozen_stakes ctxt :
           let*? optimal_to_stake = Tez_repr.(optimal_frozen -? own_frozen) in
           Staking.stake
             ctxt
+            ~for_next_cycle_use_only_after_slashing:true
             ~amount:(`At_most optimal_to_stake)
             ~sender:delegate
             ~delegate

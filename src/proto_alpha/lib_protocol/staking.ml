@@ -249,8 +249,9 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 
-let stake ctxt ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t])
-    ~sender ~delegate =
+let stake ctxt ~for_next_cycle_use_only_after_slashing:_
+    ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t]) ~sender
+    ~delegate =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
       Unstake_requests_storage.{delegate = unstake_delegate; requests} =

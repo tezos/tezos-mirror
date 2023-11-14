@@ -23,10 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [stake ctxt ~sender ~delegate amount] add [amount] as [sender]'s stake
-    to [delegate]. *)
+(** [stake ctxt ~sender ~for_next_cycle_use_only_after_slashing ~delegate amount]
+    add [amount] as [sender]'s stake to [delegate].
+
+    If [for_next_cycle_use_only_after_slashing] is true, the implicit
+    finalisation is done for the next cycle. It is meant to be used only at
+    cycle end after the application of the slashing.
+
+ *)
 val stake :
   Raw_context.t ->
+  for_next_cycle_use_only_after_slashing:bool ->
   amount:[`At_most of Tez_repr.t | `Exactly of Tez_repr.t] ->
   sender:Signature.Public_key_hash.t ->
   delegate:Signature.public_key_hash ->
