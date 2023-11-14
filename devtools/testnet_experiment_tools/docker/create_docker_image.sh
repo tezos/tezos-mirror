@@ -63,8 +63,8 @@ echo "### Successfully built docker image: $build_image_name:$image_version"
 # Create temporary file with git history to import in the final container
 tmp_dir="$devtools_docker_dir"tmp
 git_history_file="$tmp_dir"/git_history
-mkdir $tmp_dir
-git log --oneline --decorate $(git merge-base master HEAD)~1..HEAD > $git_history_file
+mkdir "$tmp_dir"
+git log --oneline --decorate "$(git merge-base master HEAD)"~1..HEAD > "$git_history_file"
 
 docker build \
   -t "${image_name}bare:$image_version" \
@@ -80,7 +80,7 @@ docker build \
   "$src_dir"
 
 # Remove temporary file with git history
-rm -rf $tmp_dir
+rm -rf "$tmp_dir"
 
 echo "### Successfully built docker image: ${image_name}bare:$image_version"
 
