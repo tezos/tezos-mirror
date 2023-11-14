@@ -116,6 +116,12 @@ mod annots {
                 .map(|anns| (remaining, Annotations(anns)))
         }
     }
+
+    impl Annotations {
+        pub(crate) fn is_empty(&self) -> bool {
+            self.0.is_empty()
+        }
+    }
 }
 
 use annots::Annotations;
@@ -230,7 +236,7 @@ pub enum Node {
     Prim {
         prim_tag: u8,
         args: Vec<Node>,
-        annots: Option<Annotations>,
+        annots: Annotations,
     },
 }
 
@@ -260,7 +266,7 @@ impl<const PRIM_TAG: u8> From<MichelinePrimNoArgsNoAnnots<PRIM_TAG>> for Node {
         Node::Prim {
             prim_tag: PRIM_TAG,
             args: vec![],
-            annots: None,
+            annots: Annotations::default(),
         }
     }
 }
@@ -270,7 +276,7 @@ impl<const PRIM_TAG: u8> From<MichelinePrimNoArgsSomeAnnots<PRIM_TAG>> for Node 
         Node::Prim {
             prim_tag: PRIM_TAG,
             args: vec![],
-            annots: Some(a.annots),
+            annots: a.annots,
         }
     }
 }
@@ -284,7 +290,7 @@ where
         Node::Prim {
             prim_tag: PRIM_TAG,
             args: vec![a.arg.into()],
-            annots: None,
+            annots: Annotations::default(),
         }
     }
 }
@@ -298,7 +304,7 @@ where
         Node::Prim {
             prim_tag: PRIM_TAG,
             args: vec![a.arg.into()],
-            annots: Some(a.annots),
+            annots: a.annots,
         }
     }
 }
@@ -315,7 +321,7 @@ where
         Node::Prim {
             prim_tag: PRIM_TAG,
             args: vec![a.arg1.into(), a.arg2.into()],
-            annots: None,
+            annots: Annotations::default(),
         }
     }
 }
@@ -332,7 +338,7 @@ where
         Node::Prim {
             prim_tag: PRIM_TAG,
             args: vec![a.arg1.into(), a.arg2.into()],
-            annots: Some(a.annots),
+            annots: a.annots,
         }
     }
 }
@@ -553,7 +559,7 @@ impl Node {
                 |(prim_tag, ())| Prim {
                     prim_tag,
                     args: vec![],
-                    annots: None,
+                    annots: Annotations::default(),
                 },
             ),
             nom_read_app_aux(
@@ -562,7 +568,7 @@ impl Node {
                 |(prim_tag, annots)| Prim {
                     prim_tag,
                     args: vec![],
-                    annots: Some(annots),
+                    annots,
                 },
             ),
             nom_read_app_aux(
@@ -571,7 +577,7 @@ impl Node {
                 |(prim_tag, arg)| Prim {
                     prim_tag,
                     args: vec![arg],
-                    annots: None,
+                    annots: Annotations::default(),
                 },
             ),
             nom_read_app_aux(
@@ -580,7 +586,7 @@ impl Node {
                 |(prim_tag, (arg, annots))| Prim {
                     prim_tag,
                     args: vec![arg],
-                    annots: Some(annots),
+                    annots,
                 },
             ),
             nom_read_app_aux(
@@ -589,7 +595,7 @@ impl Node {
                 |(prim_tag, (arg1, arg2))| Prim {
                     prim_tag,
                     args: vec![arg1, arg2],
-                    annots: None,
+                    annots: Annotations::default(),
                 },
             ),
             nom_read_app_aux(
@@ -598,7 +604,7 @@ impl Node {
                 |(prim_tag, (arg1, arg2, annots))| Prim {
                     prim_tag,
                     args: vec![arg1, arg2],
-                    annots: Some(annots),
+                    annots,
                 },
             ),
             nom_read_app_aux(
@@ -610,7 +616,7 @@ impl Node {
                 |(prim_tag, (args, annots))| Prim {
                     prim_tag,
                     args,
-                    annots: Some(annots),
+                    annots,
                 },
             ),
         ))(input)
@@ -728,30 +734,28 @@ impl BinWriter for Node {
                 prim_tag,
                 args,
                 annots,
-            } => match (args.as_slice(), annots) {
-                ([], None) => bin_write_prim_no_args_no_annots(*prim_tag, output),
-                ([], Some(annots)) => {
+            } => match (args.as_slice(), annots.is_empty()) {
+                ([], true) => bin_write_prim_no_args_no_annots(*prim_tag, output),
+                ([], false) => {
                     bin_write_prim_no_args_some_annots(*prim_tag, annots, output)
                 }
-                ([arg], None) => bin_write_prim_1_arg_no_annots(*prim_tag, arg, output),
-                ([arg], Some(annots)) => {
+                ([arg], true) => bin_write_prim_1_arg_no_annots(*prim_tag, arg, output),
+                ([arg], false) => {
                     bin_write_prim_1_arg_some_annots(*prim_tag, arg, annots, output)
                 }
-                ([arg0, arg1], None) => {
+                ([arg0, arg1], true) => {
                     bin_write_prim_2_args_no_annots(*prim_tag, arg0, arg1, output)
                 }
-                ([arg0, arg1], Some(annots)) => bin_write_prim_2_args_some_annots(
+                ([arg0, arg1], false) => bin_write_prim_2_args_some_annots(
                     *prim_tag, arg0, arg1, annots, output,
                 ),
-                (_, None) => bin_write_prim_generic(
+                (_, true) => bin_write_prim_generic(
                     *prim_tag,
                     args,
                     &Annotations::default(),
                     output,
                 ),
-                (_, Some(annots)) => {
-                    bin_write_prim_generic(*prim_tag, args, annots, output)
-                }
+                (_, false) => bin_write_prim_generic(*prim_tag, args, annots, output),
             },
         }
     }
@@ -1422,7 +1426,7 @@ mod test {
         let expected = Node::Prim {
             prim_tag: 7,
             args: vec![unit.into(), 0.into(), 0.into()],
-            annots: Some(annots),
+            annots,
         };
 
         let (remaining_input, optnatfoo) = NomReader::nom_read(test.as_slice()).unwrap();
@@ -1452,7 +1456,7 @@ mod test {
         let test = Node::Prim {
             prim_tag: 7,
             args: vec![unit.into(), 0.into(), 0.into()],
-            annots: Some(annots),
+            annots,
         };
 
         let mut bin = Vec::new();
