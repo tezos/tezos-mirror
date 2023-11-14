@@ -1091,6 +1091,61 @@ mod test {
     }
 
     #[test]
+    fn call_ecrecover() {
+        // Arrange
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        // example from https://www.evm.codes/precompiled?fork=shanghai
+        let data_str = "456e9aea5e197a1f1af7a3e85a3212fa4049a3ba34c2289b4c860fc0b0c64ef3000000000000000000000000000000000000000000000000000000000000001c9242685bf161793cc25603c231bc2f568eb630ea16aa137d2664ac80388256084f8ae3bd7535248d0bd448298cc2e2071e56992d0774dc340c368ae950852ada";
+        let data = hex::decode(data_str)
+            .expect("Data should have been decoded from hex to bytes");
+        // targes precompiled 0x01: ecrecover
+        let target = H160::from_low_u64_be(1u64);
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let caller = H160::from_low_u64_be(118u64);
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            24001.into(),
+        );
+
+        // Act
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(target),
+            caller,
+            data.to_vec(),
+            Some(24000),
+            None,
+            true,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        // Assert
+        // ecrecover pad address with 0 to be encoded over 32 bytes
+        let expected_address =
+            "0000000000000000000000007156526fbd7a3c72969b54f64e42c10fbb768c8a";
+        let expected_result = Ok(Some(ExecutionOutcome {
+            gas_used: 24000,
+            is_success: true,
+            new_address: None,
+            logs: vec![],
+            result: Some(hex::decode(expected_address).unwrap()),
+            withdrawals: vec![],
+            estimated_ticks_used: 30_000_000,
+        }));
+
+        assert_eq!(expected_result, result);
+    }
+
+    #[test]
     fn create_and_call_contract() {
         // Arrange
         let mut mock_runtime = MockHost::default();

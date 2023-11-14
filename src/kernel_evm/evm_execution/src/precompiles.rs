@@ -472,6 +472,7 @@ mod tick_model {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use crate::account_storage::account_path;
     use crate::account_storage::init_account_storage as init_evm_account_storage;
@@ -761,5 +762,177 @@ mod tests {
         let result = execute_precompiled(target, input, transfer, Some(21000));
 
         assert_eq!(Ok(expected), result);
+    }
+
+    #[test]
+    fn test_ercover_parse_input_padding() {
+        let (h, v, r, s) = erec_parse_inputs(&[1u8]);
+        assert_eq!(1, h[0]);
+        assert_eq!([0; 31], h[1..]);
+        assert_eq!(0, v);
+        assert_eq!([0; 32], r);
+        assert_eq!([0; 32], s);
+    }
+
+    #[test]
+    fn test_ercover_parse_input_order() {
+        let input = [[1; 32], [2; 32], [3; 32], [4; 32]].join(&[0u8; 0][..]);
+        let (h, v, r, s) = erec_parse_inputs(&input);
+        assert_eq!([1; 32], h);
+        assert_eq!(2, v);
+        assert_eq!([3; 32], r);
+        assert_eq!([4; 32], s);
+    }
+
+    #[test]
+    fn test_ercover_parse_input_ignore_right_padding() {
+        let input = [[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]].join(&[0u8; 0][..]);
+        let (h, v, r, s) = erec_parse_inputs(&input);
+        assert_eq!([1; 32], h);
+        assert_eq!(2, v);
+        assert_eq!([3; 32], r);
+        assert_eq!([4; 32], s);
+    }
+
+    #[test]
+    fn test_ecrecover_invalid_empty() {
+        // act
+        let input: [u8; 0] = [0; 0];
+        let result =
+            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+
+        // assert
+        // expected outcome is OK and empty output
+
+        assert!(result.is_ok());
+        let outcome = result.unwrap();
+        assert!(outcome.is_success);
+        assert_eq!(Some(vec![]), outcome.result);
+    }
+
+    #[test]
+    fn test_ecrecover_invalid_zero() {
+        // act
+        let input: [u8; 128] = [0; 128];
+        let result =
+            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+
+        // assert
+        // expected outcome is OK but empty output
+
+        assert!(result.is_ok());
+        let outcome = result.unwrap();
+        assert!(outcome.is_success);
+        assert_eq!(Some(vec![]), outcome.result);
+    }
+
+    fn assemble_input(h: &str, v: &str, r: &str, s: &str) -> [u8; 128] {
+        let mut data_str = "".to_owned();
+        data_str.push_str(h);
+        data_str.push_str(v);
+        data_str.push_str(r);
+        data_str.push_str(s);
+        let data = hex::decode(data_str).unwrap();
+        let mut input: [u8; 128] = [0; 128];
+        input.copy_from_slice(&data);
+        input
+    }
+
+    fn input_legacy() -> (&'static str, &'static str, &'static str, &'static str) {
+        // Obtain by signing a transaction tx_legacy.json (even though it doesn't need to be)
+        // address: 0xf0affc80a5f69f4a9a3ee01a640873b6ba53e539
+        // privateKey: 0x84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502
+        // publicKey: 0x08a4681ba8c520aaab2308957d401ffded69155b358246596846f87c0728e76f618f9772f16687ed5a2854234b037b71e4c3bc92cad78e575fb12c8df8b8dae5
+        // node src/kernel_evm/benchmarks/scripts/sign_tx.js $(pwd)/src/kernel_evm/benchmarks/scripts/transactions_example/tx_legacy.json 0x84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502
+        let hash = "3c74ed8cf6d9695ac4de8e5dda38ac3719b3f42e913e0109344a5fcbd1ff8562";
+        let r = "b17daf010e907d83f0235467faac96f346c4cc46600477d1b5f543ced8c986b7";
+        let s = "70221fd3c40e0cbaef013e9bb62cf8adc70c77a5c313954c03897f3f08f90726";
+        // v = 27 -> 1b, is encoded as 32 bytes
+        let v = "000000000000000000000000000000000000000000000000000000000000001b";
+        (hash, v, r, s)
+    }
+
+    fn input_spec() -> (&'static str, &'static str, &'static str, &'static str) {
+        // taken from https://www.evm.codes/precompiled?fork=shanghai
+        let hash = "456e9aea5e197a1f1af7a3e85a3212fa4049a3ba34c2289b4c860fc0b0c64ef3";
+        let r = "9242685bf161793cc25603c231bc2f568eb630ea16aa137d2664ac8038825608";
+        let s = "4f8ae3bd7535248d0bd448298cc2e2071e56992d0774dc340c368ae950852ada";
+        // v = 28 -> 1c, is encoded as 32 bytes
+        let v = "000000000000000000000000000000000000000000000000000000000000001c";
+        (hash, v, r, s)
+    }
+
+    #[test]
+    fn test_ercover_parse_input_real() {
+        let (hash, v, r, s) = input_legacy();
+        let input: [u8; 128] = assemble_input(hash, v, r, s);
+        let (ho, vo, ro, so) = erec_parse_inputs(&input);
+        assert_eq!(hex::decode(hash).unwrap(), ho);
+        assert_eq!(27, vo);
+        assert_eq!(hex::decode(r).unwrap(), ro);
+        assert_eq!(hex::decode(s).unwrap(), so);
+    }
+
+    #[test]
+    fn test_ercover_parse_input_spec() {
+        let (hash, v, r, s) = input_spec();
+        let input: [u8; 128] = assemble_input(hash, v, r, s);
+        let (ho, vo, ro, so) = erec_parse_inputs(&input);
+        assert_eq!(hex::decode(hash).unwrap(), ho);
+        assert_eq!(28, vo);
+        assert_eq!(hex::decode(r).unwrap(), ro);
+        assert_eq!(hex::decode(s).unwrap(), so);
+    }
+
+    #[test]
+    fn test_ecrecover_input_real() {
+        // setup
+        let (hash, v, r, s) = input_legacy();
+        let input: [u8; 128] = assemble_input(hash, v, r, s);
+        let mut expected_address: Vec<u8> =
+            hex::decode("f0affc80a5f69f4a9a3ee01a640873b6ba53e539").unwrap();
+        let mut expected_output = [0u8; 12].to_vec();
+        expected_output.append(&mut expected_address);
+
+        // act
+        let result =
+            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+
+        // assert
+        // expected outcome is OK and address over 32 bytes
+
+        assert!(result.is_ok());
+        let outcome = result.unwrap();
+        assert!(outcome.is_success);
+        assert_eq!(
+            hex::encode(expected_output),
+            hex::encode(outcome.result.unwrap())
+        );
+    }
+
+    #[test]
+    fn test_ecrecover_input_spec() {
+        let (hash, v, r, s) = input_spec();
+        let input: [u8; 128] = assemble_input(hash, v, r, s);
+
+        let mut expected_address: Vec<u8> =
+            hex::decode("7156526fbd7a3c72969b54f64e42c10fbb768c8a").unwrap();
+        let mut expected_output = [0u8; 12].to_vec();
+        expected_output.append(&mut expected_address);
+
+        // act
+        let result =
+            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+
+        // assert
+        // expected outcome is OK and address over 32 bytes
+
+        assert!(result.is_ok());
+        let outcome = result.unwrap();
+        assert!(outcome.is_success);
+        assert_eq!(
+            hex::encode(expected_output),
+            hex::encode(outcome.result.unwrap())
+        );
     }
 }
