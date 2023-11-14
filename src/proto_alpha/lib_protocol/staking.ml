@@ -247,8 +247,7 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 
-let stake ctxt
-    ~(amount_strictness : [`Best_effort of Tez_repr.t | `Exact of Tez_repr.t])
+let stake ctxt ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t])
     ~sender ~delegate =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
@@ -272,9 +271,9 @@ let stake ctxt
         ~some:(fun x -> x.Unstake_requests_storage.requests)
         unfinalizable_requests_opt
     in
-    match amount_strictness with
-    | `Exact amount -> return amount
-    | `Best_effort max_amount ->
+    match amount with
+    | `Exactly amount -> return amount
+    | `At_most max_amount ->
         let*? unstake_frozen_balance =
           List.fold_left_e
             (fun acc (_, t) -> Tez_repr.(acc +? t))

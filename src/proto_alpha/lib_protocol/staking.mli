@@ -27,7 +27,7 @@
     to [delegate]. *)
 val stake :
   Raw_context.t ->
-  amount_strictness:[`Best_effort of Tez_repr.t | `Exact of Tez_repr.t] ->
+  amount:[`At_most of Tez_repr.t | `Exactly of Tez_repr.t] ->
   sender:Signature.Public_key_hash.t ->
   delegate:Signature.public_key_hash ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
