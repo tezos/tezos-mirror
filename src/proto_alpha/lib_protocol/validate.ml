@@ -448,7 +448,7 @@ module Consensus = struct
   let check_frozen_deposits_are_positive ctxt delegate_pkh =
     fail_when
       (Delegate.is_forbidden_delegate ctxt delegate_pkh)
-      (Zero_frozen_deposits delegate_pkh)
+      (Forbidden_delegate delegate_pkh)
 
   let get_delegate_details slot_map kind slot =
     let open Result_syntax in

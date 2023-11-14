@@ -321,7 +321,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   (* a delegate with 0 frozen deposits cannot bake *)
   let* () =
     Assert.proto_error ~loc:__LOC__ b (function
-        | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+        | Validate_errors.Consensus.Forbidden_delegate _ -> true
         | _ -> false)
   in
   (* Check that all frozen deposits have been slashed at the end of the cycle. *)
@@ -432,7 +432,7 @@ let test_two_double_attestation_evidences_staggered () =
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
   (* A forbidden delegate cannot bake *)
   Assert.proto_error ~loc:__LOC__ b (function
-      | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+      | Validate_errors.Consensus.Forbidden_delegate _ -> true
       | _ -> false)
 
 (** Say a delegate double-attests twice in two consecutive cycles,
@@ -508,7 +508,7 @@ let test_two_double_attestation_evidences_consecutive_cycles () =
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
   (* A forbidden delegate cannot bake *)
   Assert.proto_error ~loc:__LOC__ b (function
-      | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+      | Validate_errors.Consensus.Forbidden_delegate _ -> true
       | _ -> false)
 
 (****************************************************************)
@@ -811,7 +811,7 @@ let test_freeze_more_with_low_balance =
     (* Once the denunciations has summed up to 100%, the baker cannot bake anymore *)
     let* () =
       Assert.proto_error ~loc:__LOC__ c3 (function
-          | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+          | Validate_errors.Consensus.Forbidden_delegate _ -> true
           | _ -> false)
     in
     let* c3 = Block.bake_until_cycle_end c2 ~policy:(By_account account2) in

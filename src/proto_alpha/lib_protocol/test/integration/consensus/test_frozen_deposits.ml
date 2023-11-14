@@ -344,7 +344,7 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   let*! res = Block.bake ~policy:(By_account slashed_account) b in
   let* () =
     Assert.proto_error ~loc:__LOC__ res (function
-        | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+        | Validate_errors.Consensus.Forbidden_delegate _ -> true
         | _ -> false)
   in
   let* b, metadata, _ =
@@ -490,7 +490,7 @@ let test_cannot_bake_with_zero_deposits_limit () =
      cycle end, thus it cannot bake. *)
   let* () =
     Assert.proto_error ~loc:__LOC__ b1 (function
-        | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+        | Validate_errors.Consensus.Forbidden_delegate _ -> true
         | _ -> false)
   in
   let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in

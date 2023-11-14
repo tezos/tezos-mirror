@@ -48,7 +48,7 @@ let operation_conflict_encoding =
           (req "new_operation" Operation_hash.encoding))
 
 module Consensus = struct
-  type error += Zero_frozen_deposits of Signature.Public_key_hash.t
+  type error += Forbidden_delegate of Signature.Public_key_hash.t
 
   let () =
     register_error_kind
@@ -64,8 +64,8 @@ module Consensus = struct
           Signature.Public_key_hash.pp
           delegate)
       Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-      (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
-      (fun delegate -> Zero_frozen_deposits delegate)
+      (function Forbidden_delegate delegate -> Some delegate | _ -> None)
+      (fun delegate -> Forbidden_delegate delegate)
 
   (** This type is only used in consensus operation errors to make
       them more informative. *)
