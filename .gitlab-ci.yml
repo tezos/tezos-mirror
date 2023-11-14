@@ -24,8 +24,6 @@ build:
     # architectures.
     # See https://gitlab.com/tezos/tezos/-/issues/1788
     BLST_PORTABLE: "yes"
-    TARGET: "server"
-    TEST: "foo bar"
   before_script:
     - sudo apt update
   script:
