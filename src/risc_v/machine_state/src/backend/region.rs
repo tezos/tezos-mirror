@@ -6,7 +6,7 @@ use super::{Elem, Manager};
 use std::mem;
 
 /// Dedicated region in a [`super::Backend`]
-pub trait Region<E> {
+pub trait Region<E: Elem> {
     /// Read an element in the region.
     fn read(&self, index: usize) -> E;
 
@@ -105,7 +105,7 @@ impl<E: Elem, const LEN: usize> Region<E> for [E; LEN] {
     }
 }
 
-impl<E, T: Region<E>> Region<E> for &mut T {
+impl<E: Elem, T: Region<E>> Region<E> for &mut T {
     #[inline(always)]
     fn read(&self, index: usize) -> E {
         (self as &T).read(index)
@@ -159,6 +159,15 @@ impl<E: Elem, M: Manager + ?Sized> Cell<E, M> {
     pub fn write(&mut self, value: E) {
         self.region.write(0, value)
     }
+}
+
+/// Like [`Region<E>`] but accesses are treated as if the entire region is volatile
+pub trait VolatileRegion<E: Elem> {
+    /// Read an element at the given index.
+    fn read(&self, index: usize) -> E;
+
+    /// Write an element at the given index.
+    fn write(&mut self, index: usize, value: E);
 }
 
 #[cfg(test)]

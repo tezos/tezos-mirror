@@ -167,6 +167,15 @@ pub trait Manager {
         loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN>;
 
+    /// Like [`Self::Region`] but all element accesses are "volatile"
+    type VolatileRegion<E: Elem, const LEN: usize>: VolatileRegion<E>;
+
+    /// Allocate a volatile region in the state storage.
+    fn allocate_volatile_region<E: Elem, const LEN: usize>(
+        &mut self,
+        loc: Volatile<Location<[E; LEN]>>,
+    ) -> Self::VolatileRegion<E, LEN>;
+
     /// Allocate a cell in the state storage.
     #[inline]
     fn allocate_cell<E: Elem>(&mut self, loc: Location<E>) -> Cell<E, Self> {
@@ -206,7 +215,7 @@ pub trait Backend: BackendManagement + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::registers;
+    use crate::{bus, registers};
 
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
@@ -219,6 +228,7 @@ pub mod tests {
     pub fn test_backend(factory: &mut impl TestBackendFactory) {
         region::tests::test_backend(factory);
         registers::tests::test_backend(factory);
+        bus::main_memory::tests::test_backend(factory);
         test_example(factory);
     }
 
