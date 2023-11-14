@@ -13,8 +13,6 @@ pub mod typechecked;
 
 use std::collections::BTreeMap;
 
-use crate::gas::{tc_cost, Gas, OutOfGas};
-
 pub use michelson_list::MichelsonList;
 pub use or::Or;
 pub use parsed::{ParsedInstruction, ParsedStage};
@@ -36,85 +34,7 @@ pub enum Type {
     Or(Box<(Type, Type)>),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum TypeProperty {
-    Comparable,
-    Passable,
-    Storable,
-    Pushable,
-    Packable,
-    BigMapValue,
-    Duplicable,
-}
-
 impl Type {
-    #[inline(always)]
-    fn prop(&self, gas: &mut Gas, prop: TypeProperty) -> Result<bool, OutOfGas> {
-        use Type::*;
-        gas.consume(tc_cost::TYPE_PROP_STEP)?;
-        Ok(match self {
-            Nat | Int | Bool | Mutez | String | Unit => true,
-            Operation => match prop {
-                TypeProperty::Comparable
-                | TypeProperty::Passable
-                | TypeProperty::Storable
-                | TypeProperty::Pushable
-                | TypeProperty::Packable
-                | TypeProperty::BigMapValue => false,
-                TypeProperty::Duplicable => true,
-            },
-            Pair(p) | Or(p) => p.0.prop(gas, prop)? && p.1.prop(gas, prop)?,
-            Option(x) => x.prop(gas, prop)?,
-            List(x) => match prop {
-                TypeProperty::Comparable => false,
-                TypeProperty::Passable
-                | TypeProperty::Storable
-                | TypeProperty::Pushable
-                | TypeProperty::Packable
-                | TypeProperty::BigMapValue
-                | TypeProperty::Duplicable => x.prop(gas, prop)?,
-            },
-            Map(p) => match prop {
-                TypeProperty::Comparable => false,
-                TypeProperty::Passable
-                | TypeProperty::Storable
-                | TypeProperty::Pushable
-                | TypeProperty::Packable
-                | TypeProperty::BigMapValue
-                | TypeProperty::Duplicable => p.1.prop(gas, prop)?,
-            },
-        })
-    }
-
-    pub fn is_comparable(&self, gas: &mut Gas) -> Result<bool, OutOfGas> {
-        self.prop(gas, TypeProperty::Comparable)
-    }
-
-    pub fn is_passable(&self, gas: &mut Gas) -> Result<bool, OutOfGas> {
-        self.prop(gas, TypeProperty::Passable)
-    }
-
-    pub fn is_storable(&self, gas: &mut Gas) -> Result<bool, OutOfGas> {
-        self.prop(gas, TypeProperty::Storable)
-    }
-
-    pub fn is_pushable(&self, gas: &mut Gas) -> Result<bool, OutOfGas> {
-        self.prop(gas, TypeProperty::Pushable)
-    }
-
-    pub fn is_duplicable(&self, gas: &mut Gas) -> Result<bool, OutOfGas> {
-        self.prop(gas, TypeProperty::Duplicable)
-    }
-
-    #[allow(dead_code)] // while we don't have big_maps
-    pub fn is_big_map_value(&self, gas: &mut Gas) -> Result<bool, OutOfGas> {
-        self.prop(gas, TypeProperty::BigMapValue)
-    }
-
-    pub fn is_packable(&self, gas: &mut Gas) -> Result<bool, OutOfGas> {
-        self.prop(gas, TypeProperty::Packable)
-    }
-
     /// Returns abstract size of the type representation. Used for gas cost
     /// estimation.
     pub fn size_for_gas(&self) -> usize {
