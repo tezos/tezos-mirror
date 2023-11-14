@@ -1173,3 +1173,12 @@ let finalize_unstake ctxt ?(amount = Tez.zero) contract =
     contract
     contract
     amount
+
+let portion_of_rewards_to_liquid_for_cycle ?policy ctxt cycle pkh rewards =
+  let open Lwt_result_syntax in
+  let* {frozen; weighted_delegated} =
+    Context.Delegate.stake_for_cycle ?policy ctxt cycle pkh
+  in
+  let portion = Tez.(ratio weighted_delegated (frozen +! weighted_delegated)) in
+  let to_liquid = Tez.mul_q rewards portion in
+  return (Partial_tez.to_tez ~round_up:false to_liquid)

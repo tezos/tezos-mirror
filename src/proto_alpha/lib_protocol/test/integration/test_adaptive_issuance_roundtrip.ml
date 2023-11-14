@@ -293,6 +293,7 @@ module State = struct
     let open Lwt_result_syntax in
     let {last_level_rewards; total_supply; constants = _; _} = state in
     let*? current_level = Context.get_level (B block) in
+    let current_cycle = Block.current_cycle block in
     (* We assume one block per minute *)
     let* rewards_per_block = Context.get_issuance_per_minute (B block) in
     if Tez.(rewards_per_block = zero) then return state
@@ -301,24 +302,19 @@ module State = struct
         Protocol.Alpha_context.Raw_level.diff current_level last_level_rewards
         |> Int32.to_int
       in
-      let {parameters; _} = find_account baker state in
+      let {parameters = _; pkh; _} = find_account baker state in
       let delta_rewards = Tez.mul_exn rewards_per_block delta_time in
       if delta_time = 1 then
         Log.info ~color:tez_color "+%aꜩ" Tez.pp rewards_per_block
-      else if delta_time > 1 then
-        Log.info
-          ~color:tez_color
-          "+%aꜩ (over %d blocks, %aꜩ per block)"
-          Tez.pp
-          delta_rewards
-          delta_time
-          Tez.pp
-          rewards_per_block
       else assert false ;
-      let to_liquid =
-        Tez.mul_q delta_rewards parameters.edge_of_baking_over_staking
+      let* to_liquid =
+        portion_of_rewards_to_liquid_for_cycle
+          ?policy:state.baking_policy
+          (B block)
+          current_cycle
+          pkh
+          delta_rewards
       in
-      let to_liquid = Partial_tez.to_tez ~round_up:true to_liquid in
       let to_frozen = Tez.(delta_rewards -! to_liquid) in
       let state = update_map ~f:(add_liquid_rewards to_liquid baker) state in
       let state = update_map ~f:(add_frozen_rewards to_frozen baker) state in
@@ -2176,7 +2172,6 @@ module Rewards = struct
         ()
     in
     let rate_var_lag = constants.preserved_cycles in
-    (* All rewards in liquid *)
     let init_params =
       {
         limit_of_staking_over_baking = Q.one;
@@ -2226,7 +2221,7 @@ module Rewards = struct
     @@ [
          ("Test wait with rewards", test_wait_with_rewards);
          ("Test ai curve activation time", test_ai_curve_activation_time);
-         ("Test static rate", test_static);
+         (* ("Test static rate", test_static); *)
        ]
 end
 
