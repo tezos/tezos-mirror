@@ -638,7 +638,7 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
     Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   in
   let* ctxt = Consensus.load_attestation_branch ctxt in
-  let* ctxt = Forbidden_delegates_storage.load_forbidden_delegates ctxt in
+  let* ctxt = Forbidden_delegates_storage.load ctxt in
   let* ctxt = Adaptive_issuance_storage.load_reward_coeff ctxt in
   return (ctxt, balance_updates, origination_results)
 

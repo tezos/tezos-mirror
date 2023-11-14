@@ -16,7 +16,7 @@ let forbid_delegate ctxt delegate =
   in
   Storage.Tenderbake.Forbidden_delegates.add ctxt new_forbidden_delegates
 
-let load_forbidden_delegates ctxt =
+let load ctxt =
   let open Lwt_result_syntax in
   let* forbidden_delegates_opt =
     Storage.Tenderbake.Forbidden_delegates.find ctxt
@@ -42,7 +42,7 @@ let set_forbidden_delegates ctxt forbidden_delegates =
   in
   return ctxt
 
-let reset_forbidden_delegates ctxt =
+let reset ctxt =
   if
     Signature.Public_key_hash.Set.is_empty
       (Raw_context.Consensus.forbidden_delegates ctxt)

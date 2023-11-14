@@ -49,7 +49,7 @@ let update_activity ctxt last_cycle =
 
 let update_forbidden_delegates ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let*! ctxt = Forbidden_delegates_storage.reset_forbidden_delegates ctxt in
+  let*! ctxt = Forbidden_delegates_storage.reset ctxt in
   let* selection_for_new_cycle =
     Stake_storage.get_selected_distribution ctxt new_cycle
   in

@@ -16,10 +16,10 @@ val is_forbidden_delegate : Raw_context.t -> Signature.Public_key_hash.t -> bool
 val forbid_delegate :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 
-(** [load_forbidden_delegates ctxt] reads from the storage the saved set of
+(** [load ctxt] reads from the storage the saved set of
     forbidden delegates and sets the raw context's in-memory cached value. *)
-val load_forbidden_delegates : Raw_context.t -> Raw_context.t tzresult Lwt.t
+val load : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-(** [reset_forbidden_delegates ctxt delegates] overwrites the forbidden
+(** [reset ctxt delegates] overwrites the forbidden
     delegates set with an empty set in both storage and in-memory. *)
-val reset_forbidden_delegates : Raw_context.t -> Raw_context.t Lwt.t
+val reset : Raw_context.t -> Raw_context.t Lwt.t
