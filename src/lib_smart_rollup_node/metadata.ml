@@ -105,4 +105,4 @@ module Versioned = struct
   let write_metadata_file = write_metadata_file encoding
 end
 
-include V0
+include V1

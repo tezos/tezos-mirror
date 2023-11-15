@@ -42,4 +42,4 @@ module Versioned : sig
   val write_metadata_file : dir:string -> t -> unit tzresult Lwt.t
 end
 
-include module type of V0
+include module type of V1
