@@ -617,6 +617,10 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
 let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
+  let* () =
+    Tezos_base_unix.Internal_event_unix.enable_default_daily_logs_at
+      ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
+  in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
   let open Configuration in

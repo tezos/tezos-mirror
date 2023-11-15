@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Configure the event-logging framework for UNIx-based applications. *)
+(** Configure the event-logging framework for UNIX-based applications. *)
 
 (** The JSON-file-friendly definition of the configuration of the
     internal-events framework. It allows one to activate registered
@@ -87,3 +87,8 @@ val make_with_defaults :
   TEZOS_EVENTS_CONFIG="debug:// /path/to/config.json"].
 *)
 val init : ?config:Internal_event_config.t -> unit -> unit Lwt.t
+
+(** Adds a daily rotating sink at the given path with the following value:
+    ["file-descriptor-path:///<daily_logs_path>/daily.log
+    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp"] *)
+val enable_default_daily_logs_at : daily_logs_path:string -> unit tzresult Lwt.t
