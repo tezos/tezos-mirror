@@ -44,9 +44,6 @@ type mode =
   - 0 < [min_batch_elements] <= [max_batch_elements]
 *)
 type batcher = {
-  simulate : bool;
-      (** If [true], the batcher will simulate the messages it receives, in an
-          incremental context, before queuing them. *)
   min_batch_elements : int;
       (** The minimum number elements in a batch for it to be produced when the
           batcher receives new messages. *)

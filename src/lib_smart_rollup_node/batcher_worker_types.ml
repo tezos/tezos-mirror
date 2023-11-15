@@ -26,7 +26,7 @@
 module Request = struct
   type ('a, 'b) t =
     | Register : string list -> (L2_message.hash list, error trace) t
-    | New_head : Layer1.head -> (unit, error trace) t
+    | Produce_batches : (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -47,23 +47,15 @@ module Request = struct
           (fun ((), messages) -> View (Register messages));
         case
           (Tag 1)
-          ~title:"New_head"
-          (obj2
-             (req "request" (constant "new_head"))
-             (req "block" Layer1.head_encoding))
-          (function View (New_head b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (New_head b));
+          ~title:"Produce_batches"
+          (obj1 (req "request" (constant "produce_batches")))
+          (function View Produce_batches -> Some () | _ -> None)
+          (fun () -> View Produce_batches);
       ]
 
   let pp ppf (View r) =
     match r with
     | Register messages ->
         Format.fprintf ppf "register %d new L2 message" (List.length messages)
-    | New_head {Layer1.hash; level} ->
-        Format.fprintf
-          ppf
-          "switching to new L1 head %a at level %ld"
-          Block_hash.pp
-          hash
-          level
+    | Produce_batches -> Format.fprintf ppf "Producing messages batches."
 end
