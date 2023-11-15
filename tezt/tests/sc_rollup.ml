@@ -634,7 +634,8 @@ let bake_levels ?hook n client =
     Then continues baking until an event happens.
     waiting for the rollup node to catch up to the client's level.
     Returns the event value. *)
-let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client event =
+let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client ?event_name
+    event =
   let event_value = ref None in
   let _ =
     let* return_value = event in
@@ -655,8 +656,11 @@ let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client event =
       (function
         | Lwt_unix.Timeout ->
             Test.fail
-              "Timeout of %f seconds reached when waiting for event to happens."
+              "Timeout of %f seconds reached when waiting for event %a to \
+               happens."
               timeout
+              (Format.pp_print_option Format.pp_print_string)
+              event_name
         | e -> raise e)
   in
   return updated_level
@@ -666,13 +670,12 @@ let bake_until_event ?hook ?(at_least = 0) ?(timeout = 15.) client event =
     waiting for the rollup node to catch up to the client's level.
     Returns the level at which the lpc was updated. *)
 let bake_until_lpc_updated ?hook ?at_least ?timeout client sc_rollup_node =
+  let event_name = "smart_rollup_node_commitment_lpc_updated.v0" in
   let event =
-    Sc_rollup_node.wait_for
-      sc_rollup_node
-      "smart_rollup_node_commitment_lpc_updated.v0"
-    @@ fun json -> JSON.(json |-> "level" |> as_int_opt)
+    Sc_rollup_node.wait_for sc_rollup_node event_name @@ fun json ->
+    JSON.(json |-> "level" |> as_int_opt)
   in
-  bake_until_event ?hook ?at_least ?timeout client event
+  bake_until_event ?hook ?at_least ?timeout client ~event_name event
 
 (** helpers that send a message then bake until the rollup node
     executes an output message (whitelist_update) *)
@@ -684,6 +687,7 @@ let send_messages_then_bake_until_rollup_node_execute_output_message
       ~timeout:5.0
       ~at_least:(commitment_period + challenge_window + 1)
       client
+      ~event_name:"included_successful_operation"
     @@ wait_for_included_successful_operation
          rollup_node
          ~operation_kind:"execute_outbox_message"
@@ -3003,7 +3007,7 @@ let bailout_mode_fail_operator_no_stake ~kind =
     - start an operator rollup and wait until it publish a commitment
     - stop the rollup node
     - bakes until refutation period is over
-    - using octez client cement the commitment   
+    - using octez client cement the commitment
     - restart the rollup node in bailout mode
   check that it fails directly when the operator has no stake.
     *)
@@ -3098,11 +3102,9 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
   in
   let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup []
   and* () =
-    bake_until_event tezos_client
-    @@ Sc_rollup_node.wait_for
-         sc_rollup_node'
-         "smart_rollup_node_daemon_exit_bailout_mode.v0"
-         (Fun.const (Some ()))
+    let event_name = "smart_rollup_node_daemon_exit_bailout_mode.v0" in
+    bake_until_event tezos_client ~event_name
+    @@ Sc_rollup_node.wait_for sc_rollup_node' event_name (Fun.const (Some ()))
   in
   Log.info "Check that the bond have been recovered by the rollup node" ;
   let* frozen_balance =
