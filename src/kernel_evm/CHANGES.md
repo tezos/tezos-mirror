@@ -12,6 +12,8 @@
 
 ### Internal
 
+- Add a debug feature flag to the log crate for optional debug traces. (!10692)
+
 ## Version 43bbcea48eca22511d9bda0a739302985fab9d24
 
 ### EVM Kernel
