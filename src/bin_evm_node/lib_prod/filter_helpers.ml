@@ -48,7 +48,7 @@ type valid_filter = {
 }
 
 module Event = struct
-  let section = ["evm_node"; "logs_filter"]
+  let section = ["evm_node"; "prod"; "logs_filter"]
 
   let incompatible_block_params =
     Internal_event.Simple.declare_0
