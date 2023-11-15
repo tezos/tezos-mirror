@@ -468,6 +468,8 @@ module Delegate = struct
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
 
+  type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
+
   let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
 
   let full_balance ctxt pkh = Delegate_services.full_balance rpc_ctxt ctxt pkh
@@ -503,6 +505,27 @@ module Delegate = struct
     let open Lwt_result_syntax in
     let* ctxt = get_alpha_ctxt ?policy ctxt in
     return (Delegate.is_forbidden_delegate ctxt pkh)
+
+  let stake_for_cycle ?policy ctxt cycle pkh =
+    let open Lwt_result_wrap_syntax in
+    let* alpha_ctxt = get_alpha_ctxt ?policy ctxt in
+    let*@ stakes =
+      Protocol.Alpha_context.Stake_distribution.Internal_for_tests
+      .get_selected_distribution
+        alpha_ctxt
+        cycle
+    in
+    let stake_opt =
+      List.assoc ~equal:Signature.Public_key_hash.equal pkh stakes
+    in
+    let Protocol.Stake_repr.{frozen; weighted_delegated} =
+      Option.value ~default:Protocol.Stake_repr.zero stake_opt
+    in
+    let frozen = Protocol.Tez_repr.to_mutez frozen |> Tez.of_mutez_exn in
+    let weighted_delegated =
+      Protocol.Tez_repr.to_mutez weighted_delegated |> Tez.of_mutez_exn
+    in
+    return {frozen; weighted_delegated}
 end
 
 module Sc_rollup = struct

@@ -244,6 +244,8 @@ module Delegate : sig
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
 
+  type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
+
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
 
   val full_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
@@ -275,6 +277,13 @@ module Delegate : sig
       specify a valid baker for the new block (default [By_round 0]) *)
   val is_forbidden :
     ?policy:Block.baker_policy -> t -> public_key_hash -> bool tzresult Lwt.t
+
+  val stake_for_cycle :
+    ?policy:Block.baker_policy ->
+    t ->
+    Cycle.t ->
+    public_key_hash ->
+    stake tzresult Lwt.t
 end
 
 module Sc_rollup : sig
