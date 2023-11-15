@@ -448,7 +448,12 @@ fn typecheck_instruction(
 
         (I::Failwith(..), [.., _]) => {
             let ty = pop!();
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Packable)?;
+            // NB: the docs for the FAILWITH instruction
+            // https://tezos.gitlab.io/michelson-reference/#instr-FAILWITH claim
+            // the type needs to be packable, but that's not quite correct, as
+            // `contract _` is forbidden. The correct constraint is seemingly
+            // "pushable", as "pushable" is just "packable" without `contract _`
+            ty.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
             I::Failwith(ty)
@@ -1566,7 +1571,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(parse("FAILWITH").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TcError::InvalidTypeProperty(
-                TypeProperty::Packable,
+                TypeProperty::Pushable,
                 Type::Operation
             ))
         );
@@ -2218,14 +2223,31 @@ mod typecheck_tests {
             ContractScript {
                 parameter: Type::new_contract(Type::Unit),
                 storage: Type::Unit,
-                code: Failwith(())
+                code: Seq(vec![Drop(None), Unit, Failwith(())])
             }
             .typecheck(&mut ctx),
             Ok(ContractScript {
                 parameter: Type::new_contract(Type::Unit),
                 storage: Type::Unit,
-                code: Failwith(Type::new_pair(Type::new_contract(Type::Unit), Type::Unit))
+                code: Seq(vec![Drop(None), Unit, Failwith(Type::Unit)])
             })
+        );
+    }
+
+    #[test]
+    fn test_fail_with_contract_should_fail() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::new_contract(Type::Unit),
+                storage: Type::Unit,
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::new_contract(Type::Unit)
+            ))
         );
     }
 }
