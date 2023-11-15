@@ -94,7 +94,7 @@ case "$1" in
 start)	initial_checks
 	rotate_logs
 	[ "$waitfornode" = "yes" ] && wait_for_bootstrap
-	su $user -c "${sr} -d "$clientdir" run -E $nodeurl --data-dir "$rollupdatadir" ${othercliopts_smartrollup} >> ${logfile} 2>&1 &"
+	su $user -c "${sr} -d "$clientdir" -E $nodeurl run --data-dir "$rollupdatadir" ${othercliopts_smartrollup} >> ${logfile} 2>&1 &"
 	;;
 stop)	
        	pkill octez-smart-rollup-node
