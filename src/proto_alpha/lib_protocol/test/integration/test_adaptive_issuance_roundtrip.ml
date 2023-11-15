@@ -272,10 +272,22 @@ module State = struct
     let f = apply_finalize staker_name in
     update_map ~log_updates:[staker_name] ~f state
 
-  let apply_unslashable cycle (state : t) : t =
-    let f = apply_unslashable cycle in
-    (* no log *)
-    update_map ~f state
+  let apply_unslashable current_cycle account_name (state : t) : t =
+    let unstake_wait = unstake_wait state in
+    match Cycle.sub current_cycle unstake_wait with
+    | None -> state
+    | Some cycle ->
+        let f = apply_unslashable cycle account_name in
+        update_map ~log_updates:[account_name] ~f state
+
+  let apply_unslashable_for_all current_cycle (state : t) : t =
+    let unstake_wait = unstake_wait state in
+    match Cycle.sub current_cycle unstake_wait with
+    | None -> state
+    | Some cycle ->
+        let f = apply_unslashable_for_all cycle in
+        (* no log *)
+        update_map ~f state
 
   let apply_rewards ~(baker : string) block (state : t) : t tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -513,11 +525,17 @@ module State = struct
       let autostaked =
         Int64.(sub (Tez.to_mutez optimal) (Tez.to_mutez current_frozen))
       in
+      let state = apply_unslashable (Cycle.succ old_cycle) name state in
+      let state = apply_finalize name state in
       (* stake or unstake *)
       let new_state =
         if autostaked > 0L then (
           log_model_autostake ~optimal name pkh old_cycle "stake" autostaked ;
-          apply_stake (Test_tez.of_mutez_exn autostaked) old_cycle name state)
+          apply_stake
+            (Test_tez.of_mutez_exn autostaked)
+            (Cycle.succ old_cycle)
+            name
+            state)
         else if autostaked < 0L then (
           log_model_autostake
             ~optimal
@@ -527,7 +545,7 @@ module State = struct
             "unstake"
             (Int64.neg autostaked) ;
           apply_unstake
-            old_cycle
+            (Cycle.succ old_cycle)
             (Test_tez.of_mutez_exn Int64.(neg autostaked))
             name
             state)
@@ -541,7 +559,7 @@ module State = struct
             autostaked ;
           state)
       in
-      return @@ apply_finalize name new_state
+      return new_state
 
   (** Applies when baking the last block of a cycle *)
   let apply_end_cycle current_cycle block state : t tzresult Lwt.t =
@@ -597,14 +615,7 @@ module State = struct
       Technically nothing special happens, but we need to update the unslashable unstakes
       since it's done lazily *)
   let apply_new_cycle new_cycle state : t =
-    let unstake_wait = unstake_wait state in
-    (* Prepare finalizable unstakes *)
-    let state =
-      match Cycle.sub new_cycle unstake_wait with
-      | None -> state
-      | Some cycle -> apply_unslashable cycle state
-    in
-    state
+    apply_unslashable_for_all new_cycle state
 
   (* end module State *)
 end
@@ -2223,6 +2234,9 @@ module Autostaking = struct
       ~new_balance compare =
     let old_b, new_b =
       match part with
+      | `liquid ->
+          ( Q.of_int64 @@ Tez.to_mutez old_balance.liquid_b,
+            Q.of_int64 @@ Tez.to_mutez new_balance.liquid_b )
       | `staked -> (old_balance.staked_b, new_balance.staked_b)
       | `unstaked_frozen ->
           (old_balance.unstaked_frozen_b, new_balance.unstaked_frozen_b)
@@ -2311,7 +2325,7 @@ module Autostaking = struct
            --> snapshot_balances "after unstake" [delegate]
            --> next_cycle
            --> check_snapshot_balances "after unstake"
-           --> wait_n_cycles 3
+           --> wait_n_cycles 4
            --> check_snapshot_balances
                  ~f:
                    (assert_balance_evolution
@@ -2320,23 +2334,13 @@ module Autostaking = struct
                       ~part:`unstaked_frozen
                       Q.lt)
                  "after unstake"
-           (* finalizable are auto-finalize with one cycle shift *)
+           (* finalizable are auto-finalize immediately  *)
            --> check_snapshot_balances
                  ~f:
                    (assert_balance_evolution
                       ~loc:__LOC__
                       ~for_accounts:[delegate]
-                      ~part:`unstaked_finalizable
-                      Q.gt)
-                 "after unstake"
-           --> snapshot_balances "before finalisation" [delegate]
-           --> next_cycle
-           --> check_snapshot_balances
-                 ~f:
-                   (assert_balance_evolution
-                      ~loc:__LOC__
-                      ~for_accounts:[delegate]
-                      ~part:`unstaked_finalizable
+                      ~part:`liquid
                       Q.lt)
                  "before finalisation")
     |+ Tag "Yes AI" --> setup ~activate_ai:true
@@ -2530,7 +2534,7 @@ module Slashing = struct
       init_constants
         ~force_snapshot_at_end:true
         ~blocks_per_cycle:8l
-        ~autostaking_enable:false
+        ~autostaking_enable:true
         ()
     in
     begin_test ~activate_ai:false constants ["delegate"]
