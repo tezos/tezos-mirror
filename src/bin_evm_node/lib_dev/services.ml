@@ -234,7 +234,7 @@ let dispatch_input (config : Configuration.t)
     | Eth_call.Input (Some (call, _)) ->
         let* call_result = Rollup_node_rpc.simulate_call call in
         return (Eth_call.Output (Ok call_result))
-    | Get_estimate_gas.Input (Some call) ->
+    | Get_estimate_gas.Input (Some (call, _)) ->
         let* gas = Rollup_node_rpc.estimate_gas call in
         return (Get_estimate_gas.Output (Ok gas))
     | Txpool_content.Input _ ->
