@@ -45,14 +45,13 @@ release:
   image: curlimages/curl
   only:
     - main
-  parallel:
-    matrix:
-      - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v18.0", "master"]
   dependencies:
     - build
   script:
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file binaries-${ARCH}-${OCTEZ_BRANCH} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-${ARCH}-${OCTEZ_BRANCH}"'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-amd64-v18.0.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-amd64-v18.0.zip"'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-amd64-master.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-amd64-master.zip"'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-arm64-v18.0.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-arm64-v18.0.zip"'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-arm64-master.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-arm64-master.zip"'
 
 docker:
   stage: docker
