@@ -13,6 +13,8 @@ use tezos_smart_rollup_host::runtime::Runtime;
 use bytes::Bytes;
 use primitive_types::{H160, H256, U256};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::str::FromStr;
 
 fn check_should_not_exist<Host: Runtime>(
@@ -21,13 +23,19 @@ fn check_should_not_exist<Host: Runtime>(
     invalid_state: &mut bool,
     shouldnotexist: &Option<String>,
     hex_address: &str,
+    output_file: &mut File,
 ) {
     if let Some(_shouldnotexist) = shouldnotexist {
         if account.balance(host).is_ok() {
-            println!("Account {} should not exist.", hex_address);
+            writeln!(output_file, "Account {} should not exist.", hex_address).unwrap();
             *invalid_state = true;
         } else {
-            println!("Account {} rightfully do not exist.", hex_address)
+            writeln!(
+                output_file,
+                "Account {} rightfully do not exist.",
+                hex_address
+            )
+            .unwrap();
         }
     }
 }
@@ -38,20 +46,27 @@ fn check_balance<Host: Runtime>(
     invalid_state: &mut bool,
     balance: &Option<U256>,
     hex_address: &str,
+    output_file: &mut File,
 ) {
     if let Some(balance) = balance {
         match account.balance(host) {
             Ok(current_balance) => {
                 if current_balance != *balance {
                     *invalid_state = true;
-                    println!("Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance)
+                    writeln!(output_file, "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance).unwrap();
                 } else {
-                    println!("Account {}: balance matched.", hex_address)
+                    writeln!(output_file, "Account {}: balance matched.", hex_address)
+                        .unwrap();
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                println!("Account {} should have a balance.", hex_address);
+                writeln!(
+                    output_file,
+                    "Account {} should have a balance.",
+                    hex_address
+                )
+                .unwrap();
             }
         }
     }
@@ -63,6 +78,7 @@ fn check_code<Host: Runtime>(
     invalid_state: &mut bool,
     code: &Option<Bytes>,
     hex_address: &str,
+    output_file: &mut File,
 ) {
     if let Some(code) = &code {
         match account.code(host) {
@@ -70,14 +86,16 @@ fn check_code<Host: Runtime>(
                 let current_code: Bytes = current_code.into();
                 if current_code != code {
                     *invalid_state = true;
-                    println!("Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code)
+                    writeln!(output_file, "Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code).unwrap();
                 } else {
-                    println!("Account {}: code matched.", hex_address)
+                    writeln!(output_file, "Account {}: code matched.", hex_address)
+                        .unwrap();
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                println!("Account {} should have a code.", hex_address);
+                writeln!(output_file, "Account {} should have a code.", hex_address)
+                    .unwrap();
             }
         }
     }
@@ -89,20 +107,23 @@ fn check_nonce<Host: Runtime>(
     invalid_state: &mut bool,
     nonce: &Option<u64>,
     hex_address: &str,
+    output_file: &mut File,
 ) {
     if let Some(nonce) = nonce {
         match account.nonce(host) {
             Ok(current_nonce) => {
                 if current_nonce != (*nonce).into() {
                     *invalid_state = true;
-                    println!("Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce)
+                    writeln!(output_file, "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce).unwrap();
                 } else {
-                    println!("Account {}: nonce matched.", hex_address)
+                    writeln!(output_file, "Account {}: nonce matched.", hex_address)
+                        .unwrap();
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                println!("Account {} should have a nonce.", hex_address);
+                writeln!(output_file, "Account {} should have a nonce.", hex_address)
+                    .unwrap();
             }
         }
     }
@@ -114,10 +135,16 @@ fn check_storage<Host: Runtime>(
     invalid_state: &mut bool,
     storage: &Option<HashMap<H256, H256>>,
     hex_address: &str,
+    output_file: &mut File,
 ) {
     if let Some(storage) = &storage {
         if storage.is_empty() {
-            println!("Account {}: storage matched (both empty).", hex_address)
+            writeln!(
+                output_file,
+                "Account {}: storage matched (both empty).",
+                hex_address
+            )
+            .unwrap();
         }
         for (index, value) in storage.iter() {
             match account.get_storage(host, index) {
@@ -125,14 +152,24 @@ fn check_storage<Host: Runtime>(
                     let storage_value = value;
                     if current_storage_value != *storage_value {
                         *invalid_state = true;
-                        println!("Account {}: storage don't match current one, {} was expected, but got {}.", hex_address, storage_value, current_storage_value)
+                        writeln!(output_file, "Account {}: storage don't match current one, {} was expected, but got {}.", hex_address, storage_value, current_storage_value).unwrap();
                     } else {
-                        println!("Account {}: storage matched.", hex_address)
+                        writeln!(
+                            output_file,
+                            "Account {}: storage matched.",
+                            hex_address
+                        )
+                        .unwrap();
                     }
                 }
                 Err(_) => {
                     *invalid_state = true;
-                    println!("Account {} should have a storage.", hex_address);
+                    writeln!(
+                        output_file,
+                        "Account {} should have a storage.",
+                        hex_address
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -143,6 +180,7 @@ fn check_durable_storage<Host: Runtime>(
     host: &mut Host,
     filler_expectation_result: &HashMap<String, AccountInfoFiller>,
     good_state: &mut bool,
+    output_file: &mut File,
 ) {
     for (account, info) in filler_expectation_result.iter() {
         let hex_address = if account.contains("0x") {
@@ -162,6 +200,7 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.shouldnotexist,
             &hex_address,
+            output_file,
         );
 
         check_balance(
@@ -170,9 +209,17 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.balance,
             &hex_address,
+            output_file,
         );
 
-        check_code(host, &account, &mut invalid_state, &info.code, &hex_address);
+        check_code(
+            host,
+            &account,
+            &mut invalid_state,
+            &info.code,
+            &hex_address,
+            output_file,
+        );
 
         check_nonce(
             host,
@@ -180,6 +227,7 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.nonce,
             &hex_address,
+            output_file,
         );
 
         check_storage(
@@ -188,14 +236,15 @@ fn check_durable_storage<Host: Runtime>(
             &mut invalid_state,
             &info.storage,
             &hex_address,
+            output_file,
         );
 
         if invalid_state {
             // One invalid state will cause the entire test to be a failure.
             *good_state = false;
-            println!("==> [INVALID STATE]\n")
+            writeln!(output_file, "==> [INVALID STATE]\n").unwrap();
         } else {
-            println!("==> [CORRECT STATE]\n")
+            writeln!(output_file, "==> [CORRECT STATE]\n").unwrap();
         }
     }
 }
@@ -206,11 +255,17 @@ pub fn process<Host: Runtime>(
     spec_name: &SpecName,
     report_map: &mut HashMap<String, ReportValue>,
     report_key: String,
+    output_file: &mut File,
 ) {
     let mut good_state = true;
 
     for (name, fillers) in filler_source.0.into_iter() {
-        println!("Processing checks with filler: {}Filler\n", name);
+        writeln!(
+            output_file,
+            "Processing checks with filler: {}Filler\n",
+            name
+        )
+        .unwrap();
         for filler_expectation in fillers.expect {
             for filler_network in filler_expectation.network {
                 let cmp_spec_id = parse_and_get_cmp(&filler_network);
@@ -222,16 +277,23 @@ pub fn process<Host: Runtime>(
                     continue;
                 }
 
-                println!("CONFIG NETWORK ---- {}", spec_name.to_str());
-                println!("CHECK  NETWORK ---- {}\n", filler_network);
+                writeln!(output_file, "CONFIG NETWORK ---- {}", spec_name.to_str())
+                    .unwrap();
+                writeln!(output_file, "CHECK  NETWORK ---- {}\n", filler_network)
+                    .unwrap();
 
-                check_durable_storage(host, &filler_expectation.result, &mut good_state);
+                check_durable_storage(
+                    host,
+                    &filler_expectation.result,
+                    &mut good_state,
+                    output_file,
+                );
             }
         }
     }
 
     if good_state {
-        println!("FINAL INTERPRETATION: SUCCESS\n");
+        writeln!(output_file, "FINAL INTERPRETATION: SUCCESS\n").unwrap();
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
                 successes: report_value.successes + 1,
@@ -239,7 +301,7 @@ pub fn process<Host: Runtime>(
             };
         });
     } else {
-        println!("FINAL INTERPRETATION: FAILURE\n");
+        writeln!(output_file, "FINAL INTERPRETATION: FAILURE\n").unwrap();
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
                 successes: report_value.successes,
