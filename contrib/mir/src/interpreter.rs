@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
+use crate::ast::annotations::NO_ANNS;
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
@@ -43,7 +44,7 @@ impl ContractScript {
     ) -> Result<(Vec<TypedValue>, TypedValue), ContractInterpretError> {
         let in_ty = Type::new_pair(self.parameter.clone(), self.storage.clone());
         let in_val = &[parameter, storage];
-        let in_val = Micheline::App(Prim::Pair, in_val, vec![]);
+        let in_val = Micheline::App(Prim::Pair, in_val, NO_ANNS);
         let tc_val = typecheck_value(&in_val, ctx, &in_ty)?;
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, &mut stack)?;

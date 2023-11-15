@@ -13,6 +13,7 @@ pub mod type_props;
 
 use type_props::TypeProperty;
 
+use crate::ast::annotations::NO_ANNS;
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
 };
@@ -884,7 +885,7 @@ pub(crate) fn typecheck_value(
             let l = typecheck_value(vl, ctx, tl)?;
             let r = match rest {
                 [vr] => typecheck_value(vr, ctx, tr)?,
-                vrs => typecheck_value(&V::App(Prim::Pair, vrs, vec![]), ctx, tr)?,
+                vrs => typecheck_value(&V::App(Prim::Pair, vrs, NO_ANNS), ctx, tr)?,
             };
             TV::new_pair(l, r)
         }

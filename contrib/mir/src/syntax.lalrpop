@@ -10,6 +10,7 @@
 #![cfg(not(tarpaulin_include))]
 
 use crate::ast::*;
+use crate::ast::annotations::*;
 use crate::parser::ParserError;
 use crate::lexer::{Annotation, LexerError, Prim, PrimWithTzt, TztPrim as TzP, Tok};
 use crate::typechecker as TC;
@@ -68,8 +69,8 @@ MichelineAtomic: Micheline<'a> = {
 }
 
 MichelineComplex: Micheline<'a> = {
-  <prim:Prim> ann+ => Micheline::App(prim, &[], vec![]),
-  <prim:Prim> ann* <args:Micheline+> => Micheline::App(prim, arena.alloc_extend(args), vec![]),
+  <prim:Prim> ann+ => Micheline::App(prim, &[], NO_ANNS),
+  <prim:Prim> ann* <args:Micheline+> => Micheline::App(prim, arena.alloc_extend(args), NO_ANNS),
 }
 
 pub MichelineNaked: Micheline<'a> = {
