@@ -123,6 +123,9 @@ Smart Rollup node
 - Added the argument ``cors-headers`` and ``cors-origins`` to specify respectively the
   allowed headers and origins. (MR :gl:`!10571`)
 
+- Fix header in messages store to use predecessor hash to avoid missing pointer
+  in case of reorganization and GC. (MR :gl:`!10847`)
+
 Smart Rollup client
 -------------------
 
