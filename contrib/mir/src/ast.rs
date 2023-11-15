@@ -183,7 +183,7 @@ pub enum Instruction {
     IfLeft(Vec<Self>, Vec<Self>),
     ChainId,
     /// `ISelf` because `Self` is a reserved keyword
-    ISelf,
+    ISelf(Entrypoint),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

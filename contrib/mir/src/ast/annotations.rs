@@ -12,6 +12,12 @@ pub struct Annotations<'a>(Vec<Annotation<'a>>);
 
 pub const NO_ANNS: Annotations = Annotations::new();
 
+#[derive(Debug, Clone, Eq, PartialEq, thiserror::Error)]
+pub enum AnnotationError {
+    #[error("unexpected second field annotation: {0}")]
+    TooManyFieldAnns(String),
+}
+
 impl Default for Annotations<'_> {
     fn default() -> Self {
         Self::new()
@@ -24,6 +30,14 @@ impl std::fmt::Debug for Annotations<'_> {
     }
 }
 
+pub struct FieldAnnotation<'a>(&'a str);
+
+impl FieldAnnotation<'_> {
+    pub fn as_str(&self) -> &str {
+        self.0
+    }
+}
+
 impl<'a> Annotations<'a> {
     pub const fn new() -> Self {
         Annotations(Vec::new())
@@ -31,6 +45,24 @@ impl<'a> Annotations<'a> {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub fn get_single_field_ann(&self) -> Result<Option<FieldAnnotation<'a>>, AnnotationError> {
+        use Annotation::*;
+        let mut res = None;
+        for i in &self.0 {
+            match i {
+                Special(..) | Type(..) | Variable(..) => (),
+                Field(s) => {
+                    if res.is_none() {
+                        res = Option::Some(FieldAnnotation(s));
+                    } else {
+                        return Err(AnnotationError::TooManyFieldAnns(s.to_string()));
+                    }
+                }
+            }
+        }
+        Ok(res)
     }
 }
 
