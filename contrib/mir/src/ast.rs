@@ -242,6 +242,7 @@ pub enum Instruction {
     Push(TypedValue),
     Swap,
     Failwith(Type),
+    Never,
     Unit,
     Car,
     Cdr,

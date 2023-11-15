@@ -822,6 +822,16 @@ pub(crate) fn typecheck_instruction(
         (App(FAILWITH, [], _), []) => no_overload!(FAILWITH, len 1),
         (App(FAILWITH, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NEVER, [], _), [.., T::Never]) => {
+            *opt_stack = FailingTypeStack::Failed;
+            I::Never
+        }
+        (App(NEVER, [], _), [.., t]) => {
+            no_overload!(NEVER, TypesNotEqual(T::Never, t.clone()))
+        }
+        (App(NEVER, [], _), []) => no_overload!(NEVER, len 1),
+        (App(NEVER, ..), _) => unexpected_micheline!(),
+
         (App(UNIT, [], _), ..) => {
             stack.push(T::Unit);
             I::Unit
@@ -1610,6 +1620,14 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_never() {
+        assert_eq!(
+            typecheck_instruction(&app!(NEVER), &mut Ctx::default(), &mut tc_stk![Type::Never]),
+            Ok(Never)
+        );
+    }
+
+    #[test]
     fn test_failed_stacks() {
         macro_rules! test_fail {
             ($code:expr) => {
@@ -1626,6 +1644,7 @@ mod typecheck_tests {
         test_fail!("{ PUSH int 1; FAILWITH; PUSH int 1 }");
         test_fail!("{ PUSH int 1; DIP { PUSH int 1; FAILWITH } }");
         test_fail!("{ PUSH bool True; IF { PUSH int 1; FAILWITH } { PUSH int 1; FAILWITH }; GT }");
+        test_fail!("{ PUSH (or never unit) (Right Unit); IF_LEFT { NEVER; PUSH int 1 } {} }");
         macro_rules! test_ok {
             ($code:expr) => {
                 assert!(typecheck_instruction(
@@ -1640,6 +1659,7 @@ mod typecheck_tests {
         test_ok!("{ PUSH bool True; IF { PUSH int 1 } { PUSH int 1; FAILWITH }; GT }");
         test_ok!("{ PUSH bool True; IF { PUSH int 1; FAILWITH } { PUSH int 1; FAILWITH } }");
         test_ok!("{ PUSH bool True; LOOP { PUSH int 1; FAILWITH }; PUSH int 1 }");
+        test_ok!("{ PUSH (or never unit) (Right Unit); IF_LEFT { NEVER } {}; DROP }");
     }
 
     #[test]
@@ -2187,6 +2207,22 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn never_wrong_type() {
+        let mut stack = tc_stk![Type::Unit];
+        assert_eq!(
+            typecheck_instruction(&parse("NEVER").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::NEVER,
+                stack: stk![Type::Unit],
+                reason: Some(NoMatchingOverloadReason::TypesNotEqual(TypesNotEqual(
+                    Type::Never,
+                    Type::Unit
+                )))
+            })
+        );
+    }
+
+    #[test]
     fn push_map() {
         let mut stack = tc_stk![];
         assert_eq!(
@@ -2623,6 +2659,11 @@ mod typecheck_tests {
     #[test]
     fn test_failwith_short() {
         too_short_test(&app!(FAILWITH), Prim::FAILWITH, 1);
+    }
+
+    #[test]
+    fn test_never_short() {
+        too_short_test(&app!(NEVER), Prim::NEVER, 1);
     }
 
     #[test]
