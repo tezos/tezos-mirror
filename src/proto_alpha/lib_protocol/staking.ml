@@ -157,7 +157,9 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
   | None -> return (ctxt, [], amount)
   | Some Unstake_requests_storage.{delegate = delegate_requests; requests} ->
       if Signature.Public_key_hash.(delegate <> delegate_requests) then
-        (* impossible *) return (ctxt, [], amount)
+        (* Possible. If reached, stake should not do anything,
+           so we also set the amount to stake from the liquid part to zero. *)
+        return (ctxt, [], Tez_repr.zero)
       else
         let* allowed = can_stake_from_unstake ctxt ~delegate in
         if not allowed then
@@ -252,9 +254,9 @@ let stake ctxt ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t])
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
       Unstake_requests_storage.{delegate = unstake_delegate; requests} =
-    match requests with
-    | [] -> return ctxt
-    | _ :: _ ->
+    match (requests, amount) with
+    | [], _ | _ :: _, `At_most _ -> return ctxt
+    | _ :: _, `Exactly _ ->
         if Signature.Public_key_hash.(delegate <> unstake_delegate) then
           tzfail
             Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
