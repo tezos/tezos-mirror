@@ -350,7 +350,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
     let expected_bal =
       Test_tez.(
         Tez.of_mutez_exn initial_bal1
-        -! frozen_deposit +! baking_reward_fixed_portion)
+        +! baking_reward_fixed_portion -! frozen_deposit)
     in
     Assert.equal_tez ~loc:__LOC__ bal expected_bal
   else

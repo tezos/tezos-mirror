@@ -2149,6 +2149,7 @@ module Rewards = struct
       init_constants
         ~reward_per_block:1_000_000_000L
         ~deactivate_dynamic:true
+        ~autostaking_enable:false
         ()
     in
     let pc = constants.preserved_cycles in

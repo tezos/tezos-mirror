@@ -127,17 +127,22 @@ let test_participation ~sufficient_participation () =
      - If sufficient participation, we check that the balance of del2 at b is the
      balance of del2 at pred_b plus the attesting rewards. *)
   let* er =
-    let+ t =
-      Context.get_attesting_reward
-        (B b)
-        ~expected_attesting_power:expected_nb_slots
-    in
-    Tez.to_mutez t
+    Context.get_attesting_reward
+      (B b)
+      ~expected_attesting_power:expected_nb_slots
   in
   let autostaked =
     Tez.to_mutez @@ Option.value ~default:Tez.zero last_del2_autostaked
   in
-  let attesting_rewards = if sufficient_participation then er else 0L in
+  let attesting_rewards = if sufficient_participation then er else Tez.zero in
+  let* attesting_rewards =
+    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
+      (B b)
+      (Block.current_cycle b)
+      del2
+      attesting_rewards
+  in
+  let attesting_rewards = Test_tez.to_mutez attesting_rewards in
   let expected_bal2_at_b =
     Int64.(sub (add bal2_at_pred_b attesting_rewards) autostaked)
   in

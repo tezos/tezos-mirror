@@ -314,7 +314,21 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Context.Delegate.current_frozen_deposits (B b) delegate
   in
   let frozen_deposits_after = Test_tez.(frozen_deposits_after -! autostaked) in
-  Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after
+  let* base_reward = Context.get_baking_reward_fixed_portion (B genesis) in
+  let* to_liquid =
+    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
+      ~policy:(By_account baker)
+      (B b)
+      (Block.current_cycle blk_with_evidence2)
+      delegate
+      base_reward
+  in
+  (* [delegate] baked one block. The block rewards for that block should be all
+     that's left *)
+  Assert.equal_tez
+    ~loc:__LOC__
+    Test_tez.(base_reward -! to_liquid)
+    frozen_deposits_after
 
 (** Say a delegate double-attests twice in a cycle,
     and say the 2 evidences are included in different (valid) cycles.
