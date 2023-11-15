@@ -40,7 +40,7 @@ mod tests {
     fn interpret_test_expect_success() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck(&mut Ctx::default(), None, &[app!(nat)])
+            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::Nat(10)];
         assert!(ast.interpret(&mut Ctx::default(), &mut istack).is_ok());
@@ -51,7 +51,7 @@ mod tests {
     fn interpret_mutez_push_add() {
         let ast = parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
         let mut ctx = Ctx::default();
-        let ast = ast.typecheck(&mut ctx, None, &[]).unwrap();
+        let ast = ast.typecheck_instruction(&mut ctx, None, &[]).unwrap();
         let mut istack = stk![];
         assert!(ast.interpret(&mut ctx, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
@@ -61,7 +61,7 @@ mod tests {
     fn interpret_test_gas_consumption() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck(&mut Ctx::default(), None, &[app!(nat)])
+            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::Nat(5)];
         let mut ctx = Ctx::default();
@@ -75,7 +75,7 @@ mod tests {
     fn interpret_test_gas_out_of_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck(&mut Ctx::default(), None, &[app!(nat)])
+            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::Nat(5)];
         let mut ctx = Ctx {
@@ -104,7 +104,7 @@ mod tests {
         let mut ctx = Ctx::default();
         let start_milligas = ctx.gas.milligas();
         report_gas(&mut ctx, |ctx| {
-            assert!(ast.typecheck(ctx, None, &[app!(nat)]).is_ok());
+            assert!(ast.typecheck_instruction(ctx, None, &[app!(nat)]).is_ok());
         });
         assert_eq!(start_milligas - ctx.gas.milligas(), 12680);
     }
@@ -117,7 +117,7 @@ mod tests {
             ..Ctx::default()
         };
         assert_eq!(
-            ast.typecheck(&mut ctx, None, &[app!(nat)]),
+            ast.typecheck_instruction(&mut ctx, None, &[app!(nat)]),
             Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
@@ -127,7 +127,7 @@ mod tests {
         use typechecker::{NoMatchingOverloadReason, TcError};
         let ast = parse(FIBONACCI_ILLTYPED_SRC).unwrap();
         assert_eq!(
-            ast.typecheck(&mut Ctx::default(), None, &[app!(nat)]),
+            ast.typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)]),
             Err(TcError::NoMatchingOverload {
                 instr: crate::lexer::Prim::DUP,
                 stack: stk![Type::Int, Type::Int, Type::Int],
@@ -180,11 +180,9 @@ mod tests {
     fn parser_test_expect_fail() {
         use crate::ast::micheline::test_helpers::app;
         assert_eq!(
-            parse(FIBONACCI_MALFORMED_SRC).unwrap().typecheck(
-                &mut Ctx::default(),
-                None,
-                &[app!(nat)]
-            ),
+            parse(FIBONACCI_MALFORMED_SRC)
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)]),
             Err(typechecker::TcError::UnexpectedMicheline(format!(
                 "{:?}",
                 app!(DUP[4, app!(GT)])

@@ -145,7 +145,7 @@ impl Micheline<'_> {
     ///
     /// When `self_type` is `None`, `SELF` instruction is forbidden (e.g. like
     /// in lambdas).
-    pub fn typecheck(
+    pub fn typecheck_instruction(
         &self,
         ctx: &mut Ctx,
         self_type: Option<&Micheline>,
@@ -2079,7 +2079,7 @@ mod typecheck_tests {
     #[test]
     fn get_map_incomparable() {
         assert_eq!(
-            parse("GET").unwrap().typecheck(
+            parse("GET").unwrap().typecheck_instruction(
                 &mut Ctx::default(),
                 None,
                 &[
@@ -2133,7 +2133,7 @@ mod typecheck_tests {
     #[test]
     fn update_map_incomparable() {
         assert_eq!(
-            parse("UPDATE").unwrap().typecheck(
+            parse("UPDATE").unwrap().typecheck_instruction(
                 &mut Ctx::default(),
                 None,
                 &[
@@ -2974,19 +2974,19 @@ mod typecheck_tests {
         assert_eq!(
             parse("DROP 1025")
                 .unwrap()
-                .typecheck(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Err(TcError::ExpectedU10(1025))
         );
         assert_eq!(
             parse("DIP 1024 {}")
                 .unwrap()
-                .typecheck(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Err(TcError::ExpectedU10(1024))
         );
         assert_eq!(
             parse("DUP 65536")
                 .unwrap()
-                .typecheck(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Err(TcError::ExpectedU10(65536))
         );
     }
