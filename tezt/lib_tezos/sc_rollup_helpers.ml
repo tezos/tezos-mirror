@@ -267,18 +267,21 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
 *)
 let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?boot_sector ?(parameters_ty = "string") ?(src = Constant.bootstrap1.alias)
-    ?operator ?operators ?data_dir ?rollup_node_name ?whitelist tezos_node
-    tezos_client =
+    ?operator ?operators ?data_dir ?rollup_node_name ?whitelist ?sc_rollup
+    tezos_node tezos_client =
   let* sc_rollup =
-    originate_sc_rollup
-      ?hooks
-      ~kind
-      ?boot_sector
-      ~parameters_ty
-      ?alias
-      ?whitelist
-      ~src
-      tezos_client
+    match sc_rollup with
+    | Some sc_rollup -> return sc_rollup
+    | None ->
+        originate_sc_rollup
+          ?hooks
+          ~kind
+          ?boot_sector
+          ~parameters_ty
+          ?alias
+          ?whitelist
+          ~src
+          tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create

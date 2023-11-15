@@ -141,6 +141,7 @@ val setup_rollup :
   ?data_dir:string ->
   ?rollup_node_name:string ->
   ?whitelist:string list ->
+  ?sc_rollup:string ->
   Node.t ->
   Client.t ->
   (Sc_rollup_node.t * Sc_rollup_client.t * string) Lwt.t
