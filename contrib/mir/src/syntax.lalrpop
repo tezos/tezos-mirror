@@ -69,8 +69,8 @@ MichelineAtomic: Micheline<'a> = {
 }
 
 MichelineComplex: Micheline<'a> = {
-  <prim:Prim> ann+ => Micheline::App(prim, &[], NO_ANNS),
-  <prim:Prim> ann* <args:Micheline+> => Micheline::App(prim, arena.alloc_extend(args), NO_ANNS),
+  <prim:Prim> <anns:ann+> => Micheline::App(prim, &[], anns.into()),
+  <prim:Prim> <anns:ann*> <args:Micheline+> => Micheline::App(prim, arena.alloc_extend(args), anns.into()),
 }
 
 pub MichelineNaked: Micheline<'a> = {

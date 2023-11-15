@@ -81,6 +81,8 @@ pub mod test_helpers {
 mod tests {
     use super::test_helpers::*;
     use crate::ast::micheline::test_helpers::{app, seq};
+    use crate::ast::Micheline;
+    use crate::lexer::{Annotation, Prim};
 
     #[test]
     fn pair_type() {
@@ -154,21 +156,75 @@ mod tests {
 
     #[test]
     fn type_anns() {
-        assert_eq!(parse("(int :p)"), Ok(app!(int)));
+        assert_eq!(
+            parse("(int :p)"),
+            Ok(Micheline::App(
+                Prim::int,
+                &[],
+                [Annotation::Type("p")].into()
+            ))
+        );
         assert_eq!(
             parse("(pair :point (int :x_pos) (int :y_pos))"),
-            Ok(app!(pair[app!(int), app!(int)]))
+            Ok(Micheline::App(
+                Prim::pair,
+                &[
+                    Micheline::App(Prim::int, &[], [Annotation::Type("x_pos")].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Type("y_pos")].into()),
+                ],
+                [Annotation::Type("point")].into()
+            ))
         );
-        assert_eq!(parse("(string %foo)"), Ok(app!(string)));
-        assert_eq!(parse("(string %foo :bar @baz)"), Ok(app!(string)));
-        assert_eq!(parse("(string @foo)"), Ok(app!(string)));
+        assert_eq!(
+            parse("(string %foo)"),
+            Ok(Micheline::App(
+                Prim::string,
+                &[],
+                [Annotation::Field("foo")].into()
+            ))
+        );
+        assert_eq!(
+            parse("(string %foo :bar @baz)"),
+            Ok(Micheline::App(
+                Prim::string,
+                &[],
+                [
+                    Annotation::Field("foo"),
+                    Annotation::Type("bar"),
+                    Annotation::Variable("baz")
+                ]
+                .into()
+            ))
+        );
+        assert_eq!(
+            parse("(string @foo)"),
+            Ok(Micheline::App(
+                Prim::string,
+                &[],
+                [Annotation::Variable("foo")].into()
+            ))
+        );
         assert_eq!(
             parse("(pair %a (int %b) (int %c))"),
-            Ok(app!(pair[app!(int), app!(int)]))
+            Ok(Micheline::App(
+                Prim::pair,
+                &[
+                    Micheline::App(Prim::int, &[], [Annotation::Field("b")].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("c")].into()),
+                ],
+                [Annotation::Field("a")].into()
+            ))
         );
         assert_eq!(
             parse("(or %a (int %b) (int %c))"),
-            Ok(app!(or[app!(int), app!(int)]))
+            Ok(Micheline::App(
+                Prim::or,
+                &[
+                    Micheline::App(Prim::int, &[], [Annotation::Field("b")].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("c")].into()),
+                ],
+                [Annotation::Field("a")].into()
+            ))
         );
         assert_eq!(
             parse("(option %a int %b)")
@@ -186,11 +242,32 @@ mod tests {
     fn instr_anns() {
         assert_eq!(
             parse("PUSH @var :ty %field int 1").unwrap(),
-            app!(PUSH[app!(int), 1]),
+            Micheline::App(
+                Prim::PUSH,
+                &[app!(int), 1.into()],
+                [
+                    Annotation::Variable("var"),
+                    Annotation::Type("ty"),
+                    Annotation::Field("field")
+                ]
+                .into()
+            ),
         );
         assert_eq!(
             parse("CAR @var :ty %field :ty.2 @var.2 %field.2").unwrap(),
-            app!(CAR),
+            Micheline::App(
+                Prim::CAR,
+                &[],
+                [
+                    Annotation::Variable("var"),
+                    Annotation::Type("ty"),
+                    Annotation::Field("field"),
+                    Annotation::Type("ty.2"),
+                    Annotation::Variable("var.2"),
+                    Annotation::Field("field.2"),
+                ]
+                .into()
+            ),
         );
     }
 
@@ -240,7 +317,14 @@ mod tests {
     fn contract_ty_push() {
         assert_eq!(
             parse("PUSH (contract :ct %foo unit) Unit").unwrap(),
-            app!(PUSH[app!(contract[app!(unit)]), app!(Unit)])
+            app!(PUSH[
+                Micheline::App(
+                    Prim::contract,
+                    &[app!(unit)],
+                    [Annotation::Type("ct"), Annotation::Field("foo")].into(),
+                ),
+                app!(Unit)
+            ])
         );
     }
 
