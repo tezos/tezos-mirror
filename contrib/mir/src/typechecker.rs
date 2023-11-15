@@ -305,6 +305,9 @@ fn parse_ty_with_entrypoints(
         App(operation, [], _) => Type::Operation,
         App(operation, ..) => unexpected()?,
 
+        App(never, [], _) => Type::Never,
+        App(never, ..) => unexpected()?,
+
         App(unit, [], _) => Type::Unit,
         App(unit, ..) => unexpected()?,
 

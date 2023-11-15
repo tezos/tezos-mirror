@@ -62,6 +62,7 @@ pub enum Type {
     Mutez,
     String,
     Unit,
+    Never,
     Pair(Box<(Type, Type)>),
     Option(Box<Type>),
     List(Box<Type>),
@@ -83,7 +84,7 @@ impl Type {
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
         match self {
-            Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId | Bytes
+            Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId | Bytes
             | Key | Signature | KeyHash => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
