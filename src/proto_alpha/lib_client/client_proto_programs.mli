@@ -71,6 +71,17 @@ type run_params = {
   self : Contract_hash.t option;
 }
 
+(* Parameters specific to simulations of single steps *)
+type run_instr_params = {
+  shared_params : simulation_params;
+  amount : Tez.t;
+  balance : Tez.t option;
+  stack : (Script.expr * Script.expr) list;
+  self : Contract_hash.t option;
+  parameter : Script.expr option;
+  legacy : bool;
+}
+
 (** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_tzip4_view} *)
 val run_view :
   #Protocol_client_context.rpc_context ->
@@ -115,6 +126,14 @@ val trace :
   tzresult
   Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_instr} *)
+val run_instr :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  run_instr_params ->
+  ((Script.expr * Script.expr) list * Gas.t) tzresult Lwt.t
+
 val print_view_result :
   #Protocol_client_context.full ->
   Script_repr.expr tzresult ->
@@ -139,6 +158,13 @@ val print_trace_result :
   * Script_typed_ir.execution_trace
   * Lazy_storage.diffs option)
   tzresult ->
+  unit tzresult Lwt.t
+
+val print_run_instr_result :
+  #Protocol_client_context.full ->
+  show_source:bool ->
+  parsed:Michelson_v1_parser.parsed ->
+  ((Script.expr * Script.expr) list * Gas.t) tzresult ->
   unit tzresult Lwt.t
 
 (** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.typecheck_data} *)

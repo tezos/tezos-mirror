@@ -184,6 +184,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Rpc_config_logging.register ~protocols ;
   Run_operation_RPC.register ~protocols ;
   Run_script.register ~protocols ;
+  Run_code.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
   Sapling.register ~protocols ;
   Script_annotations.register ~protocols ;

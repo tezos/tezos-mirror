@@ -1,13 +1,6 @@
 Various
 =======
 
-Environment for writing Michelson contracts
--------------------------------------------
-
-`Emacs <https://www.gnu.org/software/emacs/>`_ can be used as a practical environment for writing,
-editing and debugging Michelson programs. `Install it <https://www.gnu.org/software/emacs/>`_ and follow the
-configuration instructions in the Michelson Emacs README `here <https://gitlab.com/tezos/tezos/-/tree/master/emacs>`__.
-
 .. _octez-admin-client:
 
 Admin Client
