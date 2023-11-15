@@ -589,6 +589,14 @@ end
 
 module Staking = struct
   include Staking
+
+  let stake = stake ~for_next_cycle_use_only_after_slashing:false
+
+  let request_unstake =
+    request_unstake ~for_next_cycle_use_only_after_slashing:false
+
+  let finalize_unstake =
+    finalize_unstake ~for_next_cycle_use_only_after_slashing:false
 end
 
 module Nonce = Nonce_storage
@@ -703,6 +711,9 @@ module Cache = Cache_repr
 
 module Unstake_requests = struct
   include Unstake_requests_storage
+
+  let prepare_finalize_unstake =
+    prepare_finalize_unstake ~for_next_cycle_use_only_after_slashing:false
 
   module For_RPC = struct
     let apply_slash_to_unstaked_unfinalizable ctxt ~delegate ~requests =

@@ -44,15 +44,23 @@ type prepared_finalize_unstake = {
 val prepared_finalize_unstake_encoding :
   prepared_finalize_unstake Data_encoding.encoding
 
-(** [prepare_finalize_unstake ctxt contract] preprocesses a [finalize_unstake]
-    for [contract]. It returns a list of transfers [(d, c, a)] to do from
-    delegate's [d] unstaked frozen deposits for cycle [c] of amount [a] in
-    the [finalizable_field] as well as the remaining unfinalizable requests
-    that should be kept in the storage in [unfinalizable].
+(** [prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing contract]
+    preprocesses a [finalize_unstake] for [contract]. It returns a
+    list of transfers [(d, c, a)] to do from delegate's [d] unstaked frozen
+    deposits for cycle [c] of amount [a] in the [finalizable_field] as well as
+    the remaining unfinalizable requests that should be kept in the storage in
+    [unfinalizable].
 
-    It returns [None] if there are no unstake requests. *)
+    It returns [None] if there are no unstake requests.
+
+    If [for_next_cycle_use_only_after_slashing] is true, the finalisation is
+    done for the next cycle. It is meant to be used only at cycle end after the
+    application of the slashing.
+
+ *)
 val prepare_finalize_unstake :
   Raw_context.t ->
+  for_next_cycle_use_only_after_slashing:bool ->
   Contract_repr.t ->
   prepared_finalize_unstake option tzresult Lwt.t
 

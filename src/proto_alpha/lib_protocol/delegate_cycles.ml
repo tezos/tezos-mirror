@@ -144,6 +144,7 @@ let adjust_frozen_stakes ctxt :
           let*? optimal_to_stake = Tez_repr.(optimal_frozen -? own_frozen) in
           Staking.stake
             ctxt
+            ~for_next_cycle_use_only_after_slashing:true
             ~amount:(`At_most optimal_to_stake)
             ~sender:delegate
             ~delegate
@@ -151,10 +152,15 @@ let adjust_frozen_stakes ctxt :
           let*? to_unstake = Tez_repr.(own_frozen -? optimal_frozen) in
           Staking.request_unstake
             ctxt
+            ~for_next_cycle_use_only_after_slashing:true
             ~sender_contract:Contract_repr.(Implicit delegate)
             ~delegate
             to_unstake
-        else Staking.finalize_unstake ctxt Contract_repr.(Implicit delegate)
+        else
+          Staking.finalize_unstake
+            ctxt
+            ~for_next_cycle_use_only_after_slashing:true
+            Contract_repr.(Implicit delegate)
       in
       return (ctxt, new_balance_updates @ balance_updates))
 

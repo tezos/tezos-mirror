@@ -843,20 +843,24 @@ let apply_unstake cycle amount staker_name account_map =
               in
               update_account ~f delegate_name account_map))
 
-(* Updates unstaked unslashable values in all accounts *)
-let apply_unslashable cycle account_map =
-  let f delegate =
-    let amount_unslashable, unstaked_frozen =
-      Unstaked_frozen.pop_cycle cycle delegate.unstaked_frozen
-    in
-    let unstaked_finalizable =
-      Unstaked_finalizable.add_from_frozen
-        amount_unslashable
-        delegate.unstaked_finalizable
-    in
-    {delegate with unstaked_frozen; unstaked_finalizable}
+let apply_unslashable_f cycle delegate =
+  let amount_unslashable, unstaked_frozen =
+    Unstaked_frozen.pop_cycle cycle delegate.unstaked_frozen
   in
-  String.Map.map f account_map
+  let unstaked_finalizable =
+    Unstaked_finalizable.add_from_frozen
+      amount_unslashable
+      delegate.unstaked_finalizable
+  in
+  {delegate with unstaked_frozen; unstaked_finalizable}
+
+(* Updates unstaked unslashable values for given account *)
+let apply_unslashable cycle account_name account_map =
+  update_account ~f:(apply_unslashable_f cycle) account_name account_map
+
+(* Updates unstaked unslashable values in all accounts *)
+let apply_unslashable_for_all cycle account_map =
+  String.Map.map (apply_unslashable_f cycle) account_map
 
 let apply_finalize staker_name account_map =
   match String.Map.find staker_name account_map with
