@@ -7,12 +7,14 @@
 
 pub mod comparable;
 pub mod michelson_list;
+pub mod or;
 pub mod parsed;
 pub mod typechecked;
 
 use std::collections::BTreeMap;
 
 pub use michelson_list::MichelsonList;
+pub use or::Or;
 pub use parsed::{ParsedInstruction, ParsedStage};
 pub use typechecked::{overloads, TypecheckedInstruction, TypecheckedStage};
 
@@ -29,16 +31,17 @@ pub enum Type {
     List(Box<Type>),
     Operation,
     Map(Box<(Type, Type)>),
+    Or(Box<(Type, Type)>),
 }
 
 impl Type {
     pub fn is_comparable(&self) -> bool {
         use Type::*;
-        match &self {
+        match self {
             List(..) | Map(..) => false,
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(p) => p.0.is_comparable() && p.1.is_comparable(),
+            Pair(p) | Or(p) => p.0.is_comparable() && p.1.is_comparable(),
             Option(x) => x.is_comparable(),
         }
     }
@@ -48,7 +51,7 @@ impl Type {
         match self {
             Operation => false,
             Nat | Int | Bool | Mutez | String | Unit => true,
-            Pair(p) => p.0.is_packable() && p.1.is_packable(),
+            Pair(p) | Or(p) => p.0.is_packable() && p.1.is_packable(),
             Option(x) | List(x) => x.is_packable(),
             Map(m) => m.1.is_packable(),
         }
@@ -65,7 +68,7 @@ impl Type {
             Type::String => 1,
             Type::Unit => 1,
             Type::Operation => 1,
-            Type::Pair(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
+            Type::Pair(p) | Type::Or(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Type::Option(x) => 1 + x.size_for_gas(),
             Type::List(x) => 1 + x.size_for_gas(),
             Type::Map(m) => 1 + m.0.size_for_gas() + m.1.size_for_gas(),
@@ -87,6 +90,10 @@ impl Type {
     pub fn new_map(k: Self, v: Self) -> Self {
         Self::Map(Box::new((k, v)))
     }
+
+    pub fn new_or(l: Self, r: Self) -> Self {
+        Self::Or(Box::new((l, r)))
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -99,6 +106,7 @@ pub enum Value {
     Option(Option<Box<Value>>),
     Seq(Vec<Value>),
     Elt(Box<(Value, Value)>),
+    Or(Box<Or<Value, Value>>),
 }
 
 impl Value {
@@ -112,6 +120,10 @@ impl Value {
 
     pub fn new_elt(k: Self, v: Self) -> Self {
         Self::Elt(Box::new((k, v)))
+    }
+
+    pub fn new_or(v: Or<Self, Self>) -> Self {
+        Self::Or(Box::new(v))
     }
 }
 
@@ -143,6 +155,7 @@ valuefrom! {
   <L, R> Elt<L, R>, |Elt(l, r): Elt<L, R>| Value::new_elt(l.into(), r.into());
   <T> Option<T>, |x: Option<T>| Value::new_option(x.map(Into::into));
   <T> Vec<T>, |x: Vec<T>| Value::Seq(x.into_iter().map(Into::into).collect());
+  <L, R> Or<L, R>, |x: Or<L, R>| Value::new_or(x.bimap(Into::into, Into::into));
 }
 
 impl From<&str> for Value {
@@ -163,6 +176,7 @@ pub enum TypedValue {
     Option(Option<Box<TypedValue>>),
     List(MichelsonList<TypedValue>),
     Map(BTreeMap<TypedValue, TypedValue>),
+    Or(Box<Or<TypedValue, TypedValue>>),
 }
 
 pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
@@ -195,6 +209,7 @@ pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
         ),
         TV::Option(None) => V::Option(None),
         TV::Option(Some(r)) => V::new_option(Some(typed_value_to_value_optimized(*r))),
+        TV::Or(x) => V::new_or(x.map(typed_value_to_value_optimized)),
     }
 }
 
@@ -218,6 +233,10 @@ impl TypedValue {
 
     pub fn new_option(x: Option<Self>) -> Self {
         Self::Option(x.map(Box::new))
+    }
+
+    pub fn new_or(x: Or<Self, Self>) -> Self {
+        Self::Or(Box::new(x))
     }
 }
 
@@ -271,6 +290,7 @@ pub enum Instruction<T: Stage> {
     Cons,
     IfCons(Vec<Instruction<T>>, Vec<Instruction<T>>),
     Iter(T::IterOverload, Vec<Instruction<T>>),
+    IfLeft(Vec<Instruction<T>>, Vec<Instruction<T>>),
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

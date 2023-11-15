@@ -12,6 +12,7 @@ impl PartialOrd for TypedValue {
             (Unit, Unit) => Some(std::cmp::Ordering::Equal),
             (Pair(l), Pair(r)) => l.partial_cmp(r),
             (Option(x), Option(y)) => x.as_deref().partial_cmp(&y.as_deref()),
+            (Or(x), Or(y)) => x.as_ref().partial_cmp(y.as_ref()),
             _ => None,
         }
     }
@@ -74,6 +75,17 @@ mod tests {
         assert_cmp!(V::new_pair; Int(3), Nat(4); Int(3), Nat(4); Equal);
         assert_cmp!(V::new_pair; Int(4), Nat(4); Int(3), Nat(4); Greater);
         assert_cmp!(V::new_pair; Int(3), Nat(5); Int(3), Nat(4); Greater);
+
+        use crate::ast::Or;
+
+        assert_cmp!(V::new_or; Or::Left(Int(3)); Or::Left(Int(4)); Less);
+        assert_cmp!(V::new_or; Or::Left(Int(5)); Or::Left(Int(4)); Greater);
+        assert_cmp!(V::new_or; Or::Left(Int(4)); Or::Left(Int(4)); Equal);
+        assert_cmp!(V::new_or; Or::Right(Int(3)); Or::Right(Int(4)); Less);
+        assert_cmp!(V::new_or; Or::Right(Int(5)); Or::Right(Int(4)); Greater);
+        assert_cmp!(V::new_or; Or::Right(Int(4)); Or::Right(Int(4)); Equal);
+        assert_cmp!(V::new_or; Or::Left(Int(5)); Or::Right(Int(3)); Less);
+        assert_cmp!(V::new_or; Or::Right(Int(3)); Or::Left(Int(5)); Greater);
 
         // different types don't compare
         assert_eq!(Bool(true).partial_cmp(&Int(5)), None);

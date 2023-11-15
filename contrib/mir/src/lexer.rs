@@ -90,6 +90,10 @@ defprim! {
     CONS,
     IF_CONS,
     ITER,
+    or,
+    Left,
+    Right,
+    IF_LEFT,
 }
 
 defprim! {

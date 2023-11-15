@@ -49,6 +49,7 @@ extern {
         "option" => Tok::Prim(PT::Prim(Prim::option)),
         "list" => Tok::Prim(PT::Prim(Prim::list)),
         "map" => Tok::Prim(PT::Prim(Prim::map)),
+        "or" => Tok::Prim(PT::Prim(Prim::or)),
         "True" => Tok::Prim(PT::Prim(Prim::True)),
         "False" => Tok::Prim(PT::Prim(Prim::False)),
         "Unit" => Tok::Prim(PT::Prim(Prim::Unit)),
@@ -56,6 +57,8 @@ extern {
         "Pair" => Tok::Prim(PT::Prim(Prim::Pair)),
         "Some" => Tok::Prim(PT::Prim(Prim::Some)),
         "Elt" => Tok::Prim(PT::Prim(Prim::Elt)),
+        "Left" => Tok::Prim(PT::Prim(Prim::Left)),
+        "Right" => Tok::Prim(PT::Prim(Prim::Right)),
         "PUSH" => Tok::Prim(PT::Prim(Prim::PUSH)),
         "INT" => Tok::Prim(PT::Prim(Prim::INT)),
         "GT" => Tok::Prim(PT::Prim(Prim::GT)),
@@ -82,6 +85,7 @@ extern {
         "CONS" => Tok::Prim(PT::Prim(Prim::CONS)),
         "IF_CONS" => Tok::Prim(PT::Prim(Prim::IF_CONS)),
         "ITER" => Tok::Prim(PT::Prim(Prim::ITER)),
+        "IF_LEFT" => Tok::Prim(PT::Prim(Prim::IF_LEFT)),
         "(" => Tok::LParen,
         ")" => Tok::RParen,
         "{" => Tok::LBrace,
@@ -115,6 +119,7 @@ composite_type: Type = {
     "option" anns <type_expr> => Type::new_option(<>),
     "list"   anns <type_expr> => Type::new_list(<>),
     "map"    anns <type_expr> <type_expr> => Type::new_map(<>),
+    "or"     anns <type_expr> <type_expr> => Type::new_or(<>),
 }
 
 type_expr: Type = {
@@ -146,6 +151,8 @@ composite_value: Value = {
   "Pair" <value_expr> <pair_val_args> => Value::new_pair(<>),
   "Some" <value_expr> => Value::new_option(Some(<>)),
   "Elt" <value_expr> <value_expr> => Value::new_elt(<>),
+  "Left" <value_expr> => Value::new_or(Or::Left(<>)),
+  "Right" <value_expr> => Value::new_or(Or::Right(<>)),
 }
 
 value_expr: Value = {
@@ -197,6 +204,7 @@ instruction: ParsedInstruction = {
   "NIL" anns <type_expr> => Nil(<>),
   "IF_CONS" anns <instructionBlock> <instructionBlock> => IfCons(<>),
   "ITER" anns <instructionBlock> => Iter((), <>),
+  "IF_LEFT" anns <instructionBlock> <instructionBlock> => IfLeft(<>),
   instructionBlock => Instruction::Seq(<>),
 }
 

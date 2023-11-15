@@ -209,6 +209,20 @@ fn interpret_one(
                 }
             }
         }
+        I::IfLeft(when_left, when_right) => {
+            ctx.gas.consume(interpret_cost::IF_LEFT)?;
+            let or = *pop!(V::Or);
+            match or {
+                Or::Left(x) => {
+                    stack.push(x);
+                    interpret(when_left, ctx, stack)?
+                }
+                Or::Right(x) => {
+                    stack.push(x);
+                    interpret(when_right, ctx, stack)?;
+                }
+            }
+        }
         I::Int => {
             let i = pop!(V::Nat);
             ctx.gas.consume(interpret_cost::INT_NAT)?;
@@ -884,6 +898,36 @@ mod interpreter_tests {
             ctx.gas.milligas(),
             Gas::default().milligas()
                 - interpret_cost::IF_CONS
+                - interpret_cost::PUSH
+                - interpret_cost::INTERPRET_RET * 2
+        );
+    }
+
+    #[test]
+    fn if_left_left() {
+        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::Int(0))])];
+        let mut stack = stk![V::new_or(Or::Left(V::Int(1)))];
+        let mut ctx = Ctx::default();
+        assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Int(1)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::IF_LEFT - interpret_cost::INTERPRET_RET * 2
+        );
+    }
+
+    #[test]
+    fn if_left_right() {
+        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::Int(0))])];
+        let mut stack = stk![V::new_or(Or::Right(V::Unit))];
+        let mut ctx = Ctx::default();
+        assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Int(0)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::IF_LEFT
+                - interpret_cost::DROP
                 - interpret_cost::PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );
