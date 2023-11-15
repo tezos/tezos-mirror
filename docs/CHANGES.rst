@@ -19,6 +19,10 @@ Smart Rollup node
 - Fixed an issue where the rollup node could forget to update its Layer 2 head for a
   block. (MR :gl:`!9868`)
 
+- Remove the batcher simulation. This simulation was generic and could
+  not catch problematic transaction. Batcher configuration now has a
+  one less field ``simulate``. (MR :gl:`!10842`)
+
 Version 18.0-rc1
 ================
 
