@@ -443,7 +443,10 @@ mod tests {
     fn test_invalid_transactions_receipt_status() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -485,7 +488,10 @@ mod tests {
     fn test_valid_transactions_receipt_status() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -527,7 +533,10 @@ mod tests {
     fn test_valid_transactions_receipt_contract_address() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx = dummy_eth_transaction_deploy();
@@ -581,7 +590,10 @@ mod tests {
     fn test_several_valid_transactions() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
         let mut evm_account_storage = init_account_storage().unwrap();
 
         produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
@@ -599,7 +611,10 @@ mod tests {
     fn test_several_valid_proposals() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -649,7 +664,10 @@ mod tests {
     fn test_cumulative_transfers_gas_consumption() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
         let base_gas = U256::from(21000);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
@@ -705,7 +723,10 @@ mod tests {
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -719,7 +740,10 @@ mod tests {
     fn test_replay_attack() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
@@ -765,7 +789,10 @@ mod tests {
     fn test_accounts_are_indexed() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let accounts_index = init_account_index().unwrap();
 
@@ -815,7 +842,10 @@ mod tests {
     fn test_accounts_are_indexed_once() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let accounts_index = init_account_index().unwrap();
 
@@ -867,7 +897,10 @@ mod tests {
     fn test_blocks_and_transactions_are_indexed() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let blocks_index = init_blocks_index().unwrap();
         let transaction_hashes_index = init_transaction_hashes_index().unwrap();
@@ -958,7 +991,10 @@ mod tests {
         // init host
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let block_constants = first_block(&mut host);
         let precompiles = precompiles::precompile_set();
@@ -1026,7 +1062,10 @@ mod tests {
     fn invalid_transaction_should_bump_nonce() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -1110,7 +1149,10 @@ mod tests {
     fn test_first_blocks() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         // first block should be 0
         produce(
@@ -1192,7 +1234,10 @@ mod tests {
         // init host
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         // sanity check: no current block
         assert!(
@@ -1248,7 +1293,10 @@ mod tests {
         // init host
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         // sanity check: no current block
         assert!(
