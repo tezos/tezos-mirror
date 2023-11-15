@@ -2,5 +2,5 @@ Package: @PKG@
 Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: @MAINT@
-Description: The Octez SCORU daemons
-Depends: @DPKG@-node (>=@VERSION@), @DEPENDS@
+Description: The Octez Smart Rollup daemons
+Depends: @DPKG@-client (>=@VERSION@), @DEPENDS@
