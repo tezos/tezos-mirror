@@ -11,7 +11,7 @@ Starting from Oxford, Endorsements have been renamed to Attestations.
 Thus, Octez now uses Attestations:
 
 - | RPCs now accept both endorsements and attestations as input and/or output. For now, these RPCs still output endorsement by default. For more information see the :doc:`OpenAPI specifications here <../api/openapi>`.
-  | Please note that the endorsement RPCs versions are considered as deprecated and will be removed in the next Octez major version (``v19.x``).
+  | Please note that the endorsement RPCs versions are considered as deprecated and may be removed in a future major version.
 - Client, baker, and accuser executables use ``attestation`` instead of ``endorsement`` in error messages and events.
 
 DAC node and client executables are released for experimental usage only.
