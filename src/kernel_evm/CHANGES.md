@@ -28,7 +28,9 @@
 - Add configuration file, automatically created on the first run of the EVM
   node. Subsequent executions of the node with different values for the
   arguments will update the configuration file accordingly. (!10790)
-
+- The EVM Node now has a transaction pool that supports injection of transaction
+  with nonce in the future and transaction replacement by fees. (!10289, !10290,
+  !10291, !10625, !10627, !10628, !10629)
 
 ### Bug fixes
 
