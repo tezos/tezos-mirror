@@ -24,44 +24,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-type config = {
-  rpc_addr : string;
-  rpc_port : int;
-  debug : bool;
-  rollup_node_endpoint : Uri.t;
-  devmode : bool;
-  cors_origins : string list;
-  cors_headers : string list;
-  verbose : bool;
-}
-
-let default_config =
-  {
-    rpc_addr = "127.0.0.1";
-    rpc_port = 8545;
-    debug = true;
-    rollup_node_endpoint = Uri.empty;
-    devmode = false;
-    cors_origins = [];
-    cors_headers = [];
-    verbose = false;
-  }
-
-let make_config ~devmode ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
-    ~rollup_node_endpoint ~verbose () =
-  {
-    rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
-    rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
-    debug = Option.value ~default:default_config.debug debug;
-    rollup_node_endpoint;
-    devmode;
-    cors_origins =
-      Option.value ~default:default_config.cors_origins cors_origins;
-    cors_headers =
-      Option.value ~default:default_config.cors_headers cors_headers;
-    verbose;
-  }
+open Configuration
 
 let install_finalizer_prod server =
   let open Lwt_syntax in
@@ -134,10 +97,10 @@ let prod_directory ~verbose rollup_node_config =
   let open Evm_node_lib_prod in
   return @@ Services.directory ~verbose rollup_node_config
 
-let dev_directory ~verbose rollup_node_config =
+let dev_directory config rollup_node_config =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
-  return @@ Services.directory ~verbose rollup_node_config
+  return @@ Services.directory config rollup_node_config
 
 let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
     =
@@ -227,6 +190,18 @@ let verbose_arg =
     ~doc:"If verbose is set, the node will display the responses to RPCs."
     ()
 
+let data_dir_arg =
+  let default = Configuration.default_data_dir in
+  Tezos_clic.default_arg
+    ~long:"data-dir"
+    ~placeholder:"data-dir"
+    ~doc:
+      (Format.sprintf
+         "The path to the EVM node data directory. Default value is %s"
+         default)
+    ~default
+    Params.string
+
 let rollup_node_endpoint_param =
   Tezos_clic.param
     ~name:"rollup-node-endpoint"
@@ -268,7 +243,8 @@ let proxy_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the RPC server"
-    (args6
+    (args7
+       data_dir_arg
        devmode_arg
        rpc_addr_arg
        rpc_port_arg
@@ -277,13 +253,20 @@ let proxy_command =
        verbose_arg)
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
     @@ rollup_node_endpoint_param @@ stop)
-    (fun (devmode, rpc_addr, rpc_port, cors_origins, cors_headers, verbose)
+    (fun ( data_dir,
+           devmode,
+           rpc_addr,
+           rpc_port,
+           cors_origins,
+           cors_headers,
+           verbose )
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting () in
-      let config =
-        make_config
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
           ~devmode
           ?rpc_addr
           ?rpc_port
@@ -293,6 +276,7 @@ let proxy_command =
           ~verbose
           ()
       in
+      let* () = Configuration.save ~force:true ~data_dir config in
       let* () =
         if not config.devmode then
           let* rollup_config = rollup_node_config_prod ~rollup_node_endpoint in
@@ -308,9 +292,7 @@ let proxy_command =
         else
           let* rollup_config = rollup_node_config_dev ~rollup_node_endpoint in
           let* () = Evm_node_lib_dev.Tx_pool.start rollup_config in
-          let* directory =
-            dev_directory ~verbose:config.verbose rollup_config
-          in
+          let* directory = dev_directory config rollup_config in
           let* server = start config ~directory in
           let (_ : Lwt_exit.clean_up_callback_id) =
             install_finalizer_dev server

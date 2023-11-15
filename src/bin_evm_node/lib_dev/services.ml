@@ -103,8 +103,8 @@ let block_transaction_count block =
   | TxHash l -> List.length l
   | TxFull l -> List.length l
 
-let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
-    (input, id) =
+let dispatch_input (config : Configuration.t)
+    ((module Rollup_node_rpc : Rollup_node.S), _) (input, id) =
   let open Lwt_result_syntax in
   let dispatch_input_aux : type w. w input -> w output tzresult Lwt.t = function
     (* INTERNAL RPCs *)
@@ -250,36 +250,41 @@ let dispatch_input ~verbose ((module Rollup_node_rpc : Rollup_node.S), _)
         let hash = Hex.of_bytes hash_bytes |> Hex.show in
         return (Web3_sha3.Output (Ok (Hash (Hex hash))))
     | Get_logs.Input (Some filter) ->
-        let+ logs = Filter_helpers.get_logs (module Rollup_node_rpc) filter in
+        let+ logs =
+          Filter_helpers.get_logs
+            config.log_filter
+            (module Rollup_node_rpc)
+            filter
+        in
         Get_logs.Output (Ok logs)
     | _ -> Error_monad.failwith "Unsupported method\n%!"
   in
   let* output = dispatch_input_aux input in
-  if verbose then
+  if config.verbose then
     Data_encoding.Json.construct Output.encoding (Output.Box output, id)
     |> Data_encoding.Json.to_string |> Printf.printf "%s\n%!" ;
   return (output, id)
 
-let dispatch ~verbose ctx dir =
+let dispatch config ctx dir =
   Directory.register0 dir dispatch_service (fun () input ->
       let open Lwt_result_syntax in
       match input with
       | Singleton (Box input, rpc) ->
-          let+ output, rpc = dispatch_input ~verbose ctx (input, rpc) in
+          let+ output, rpc = dispatch_input config ctx (input, rpc) in
           Singleton (Output.Box output, rpc)
       | Batch inputs ->
           let+ outputs =
             List.map_es
               (fun (Input.Box input, rpc) ->
-                let+ output, rpc = dispatch_input ~verbose ctx (input, rpc) in
+                let+ output, rpc = dispatch_input config ctx (input, rpc) in
                 (Output.Box output, rpc))
               inputs
           in
           Batch outputs)
 
-let directory ~verbose
+let directory config
     ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
   Directory.empty |> version
   |> dispatch
-       ~verbose
+       config
        ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)

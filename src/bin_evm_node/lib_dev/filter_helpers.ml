@@ -6,19 +6,6 @@
 (*****************************************************************************)
 open Ethereum_types
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6574
-   Move this constants to a configuration file. *)
-(* Maximum block range for [get_logs]. *)
-let max_nb_blocks = 100
-
-(* Maximum number of logs that [get_logs] can return. *)
-let max_nb_logs = 1000
-
-(* Number of blocks that will be filtered in a batch before
-   checking if the bound on produced logs has been reached.
-   See [get_logs] for more details. *)
-let chunk_size = 10
-
 (**
   A bloom filter can be seen as a probabilistic set. As such, the order of
   its elements is not important.
@@ -118,8 +105,10 @@ let height_from_param (module Rollup_node_rpc : Rollup_node.S) from to_ =
       let+ h = Rollup_node_rpc.current_block_number () in
       (h, h)
 
-let valid_range (Block_height from) (Block_height to_) =
-  Z.(to_ >= from && to_ - from < of_int max_nb_blocks)
+let valid_range log_filter_config (Block_height from) (Block_height to_) =
+  Z.(
+    to_ >= from
+    && to_ - from < of_int log_filter_config.Configuration.max_nb_blocks)
 
 let emit_and_return_none event arg =
   let open Lwt_result_syntax in
@@ -127,7 +116,8 @@ let emit_and_return_none event arg =
   return_none
 
 (* Parses the [from_block] and [to_block] fields, as described before.  *)
-let validate_range (module Rollup_node_rpc : Rollup_node.S) (filter : filter) =
+let validate_range log_filter_config (module Rollup_node_rpc : Rollup_node.S)
+    (filter : filter) =
   let open Lwt_result_syntax in
   match filter with
   | {from_block = Some _; to_block = Some _; block_hash = Some _; _} ->
@@ -143,7 +133,8 @@ let validate_range (module Rollup_node_rpc : Rollup_node.S) (filter : filter) =
       let* from_block, to_block =
         height_from_param (module Rollup_node_rpc) from_block to_block
       in
-      if valid_range from_block to_block then return_some (from_block, to_block)
+      if valid_range log_filter_config from_block to_block then
+        return_some (from_block, to_block)
       else emit_and_return_none Event.block_range_too_large ()
 
 (* Constructs the bloom filter *)
@@ -174,12 +165,12 @@ let ( let*?? ) m f =
 
 (* Parsing a filter into a simpler representation, this is the
    input validation step *)
-let validate_filter (module Rollup_node_rpc : Rollup_node.S) :
+let validate_filter log_filter_config (module Rollup_node_rpc : Rollup_node.S) :
     filter -> valid_filter option tzresult Lwt.t =
  fun filter ->
   let open Lwt_result_syntax in
   let*?? from_block, to_block =
-    validate_range (module Rollup_node_rpc) filter
+    validate_range log_filter_config (module Rollup_node_rpc) filter
   in
   let*?? () = validate_topics filter in
   let bloom = make_bloom filter in
@@ -300,14 +291,22 @@ let split_in_chunks ~chunk_size ~base ~length =
    This design is meant to strike a balance between concurrent
    performace and not exceeding the bound in number of logs.
 *)
-let get_logs (module Rollup_node_rpc : Rollup_node.S) filter =
+let get_logs (log_filter_config : Configuration.log_filter_config)
+    (module Rollup_node_rpc : Rollup_node.S) filter =
   let open Lwt_result_syntax in
   let+ logs =
-    let*?? filter = validate_filter (module Rollup_node_rpc) filter in
+    let*?? filter =
+      validate_filter log_filter_config (module Rollup_node_rpc) filter
+    in
     let (Block_height from) = filter.from_block in
     let (Block_height to_) = filter.to_block in
     let length = Z.(to_int (to_ - from)) + 1 in
-    let block_numbers = split_in_chunks ~chunk_size ~length ~base:from in
+    let block_numbers =
+      split_in_chunks
+        ~chunk_size:log_filter_config.chunk_size
+        ~length
+        ~base:from
+    in
     let*?? logs, _n_logs =
       List.fold_left_es
         (function
@@ -321,7 +320,7 @@ let get_logs (module Rollup_node_rpc : Rollup_node.S) filter =
                        chunk
                 in
                 let n_new_logs = List.length new_logs in
-                if n_logs + n_new_logs > max_nb_logs then
+                if n_logs + n_new_logs > log_filter_config.max_nb_logs then
                   emit_and_return_none Event.too_many_logs ()
                 else return_some (acc_logs @ new_logs, n_logs + n_new_logs)
           | None ->

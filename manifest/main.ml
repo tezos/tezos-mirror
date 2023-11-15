@@ -8283,6 +8283,18 @@ let octez_evm_node_lib : Sub_lib.maker =
     ~container:registered_octez_evm_node_libs
     ~package:"octez-evm-node-libs"
 
+let evm_node_config =
+  octez_evm_node_lib
+    "evm_node_config"
+    ~path:"src/bin_evm_node/config"
+    ~synopsis:"Configuration for the EVM node"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+      ]
+
 let evm_node_lib_prod_encoding =
   octez_evm_node_lib
     "evm_node_lib_prod_encoding"
@@ -8339,6 +8351,7 @@ let evm_node_lib_dev =
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
         lwt_exit;
+        evm_node_config |> open_;
       ]
 
 let _octez_evm_node_tests =
@@ -8380,6 +8393,7 @@ let _evm_node =
         evm_node_lib_prod;
         evm_node_lib_dev;
         evm_node_lib_dev_encoding |> open_;
+        evm_node_config |> open_;
       ]
     ~bisect_ppx:Yes
 
