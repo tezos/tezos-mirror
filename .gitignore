@@ -110,6 +110,7 @@ target
 evm_kernel.wasm
 evm_installer.wasm
 evm_kernel_unstripped.wasm
+evm-evaluation-assessor
 sequenced_kernel.wasm
 smart-rollup-installer
 _evm_installer_preimages/
