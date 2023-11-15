@@ -47,26 +47,6 @@ let update_activity ctxt last_cycle =
             return (ctxt, delegate :: deactivated)
           else return (ctxt, deactivated))
 
-let update_forbidden_delegates ctxt ~new_cycle =
-  let open Lwt_result_syntax in
-  let*! ctxt = Delegate_storage.reset_forbidden_delegates ctxt in
-  let* selection_for_new_cycle =
-    Stake_storage.get_selected_distribution ctxt new_cycle
-  in
-  List.fold_left_es
-    (fun ctxt (delegate, _stake) ->
-      let* current_deposits =
-        Delegate_storage.current_frozen_deposits ctxt delegate
-      in
-      if Tez_repr.(current_deposits = zero) then
-        (* If the delegate's current deposit remains at zero then we add it to
-           the forbidden set. *)
-        let*! ctxt = Delegate_storage.forbid_delegate ctxt delegate in
-        return ctxt
-      else return ctxt)
-    ctxt
-    selection_for_new_cycle
-
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
@@ -204,7 +184,7 @@ let cycle_end ctxt last_cycle =
     then return (ctxt, [])
     else adjust_frozen_stakes ctxt
   in
-  let* ctxt = update_forbidden_delegates ctxt ~new_cycle in
+  let* ctxt = Forbidden_delegates_storage.update_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
@@ -221,19 +201,15 @@ let cycle_end ctxt last_cycle =
 let init_first_cycles ctxt =
   let open Lwt_result_syntax in
   let preserved = Constants_storage.preserved_cycles ctxt in
-  let* ctxt =
-    List.fold_left_es
-      (fun ctxt c ->
-        let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
-        let* ctxt = Stake_storage.snapshot ctxt in
-        (* NB: we need to take several snapshots because
-           select_distribution_for_cycle deletes the snapshots *)
-        Delegate_sampler.select_distribution_for_cycle
-          ctxt
-          ~slashings:Signature.Public_key_hash.Map.empty
-          cycle)
-      ctxt
-      Misc.(0 --> preserved)
-  in
-  let cycle = (Raw_context.current_level ctxt).cycle in
-  update_forbidden_delegates ~new_cycle:cycle ctxt
+  List.fold_left_es
+    (fun ctxt c ->
+      let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
+      let* ctxt = Stake_storage.snapshot ctxt in
+      (* NB: we need to take several snapshots because
+         select_distribution_for_cycle deletes the snapshots *)
+      Delegate_sampler.select_distribution_for_cycle
+        ctxt
+        ~slashings:Signature.Public_key_hash.Map.empty
+        cycle)
+    ctxt
+    Misc.(0 --> preserved)

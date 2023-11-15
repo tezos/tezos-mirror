@@ -196,6 +196,7 @@
   Delegate_sampler
   Delegate_rewards
   Delegate_missed_attestations_storage
+  Forbidden_delegates_storage
   Delegate_slashed_deposits_storage
   Staking
   Delegate_cycles
@@ -493,6 +494,7 @@
   delegate_rewards.ml delegate_rewards.mli
   delegate_missed_attestations_storage.ml
   delegate_missed_attestations_storage.mli
+  forbidden_delegates_storage.ml forbidden_delegates_storage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   delegate_cycles.ml delegate_cycles.mli
@@ -791,6 +793,7 @@
   delegate_rewards.ml delegate_rewards.mli
   delegate_missed_attestations_storage.ml
   delegate_missed_attestations_storage.mli
+  forbidden_delegates_storage.ml forbidden_delegates_storage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   delegate_cycles.ml delegate_cycles.mli
@@ -1073,6 +1076,7 @@
   delegate_rewards.ml delegate_rewards.mli
   delegate_missed_attestations_storage.ml
   delegate_missed_attestations_storage.mli
+  forbidden_delegates_storage.ml forbidden_delegates_storage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   delegate_cycles.ml delegate_cycles.mli
