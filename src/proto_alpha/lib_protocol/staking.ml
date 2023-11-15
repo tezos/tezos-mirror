@@ -109,6 +109,26 @@ let finalize_unstake ctxt contract =
   in
   return (ctxt, balance_updates)
 
+let can_stake_from_unstake ctxt ~delegate =
+  let open Lwt_result_syntax in
+  let* slashing_history_opt =
+    Storage.Contract.Slashed_deposits.find
+      ctxt
+      (Contract_repr.Implicit delegate)
+  in
+  let slashing_history = Option.value slashing_history_opt ~default:[] in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let oldest_slashable_cycle =
+    Cycle_repr.sub current_cycle (preserved_cycles + 1)
+    |> Option.value ~default:Cycle_repr.root
+  in
+  return
+  @@ not
+       (List.exists
+          (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
+          slashing_history)
+
 let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
     amount =
   let open Lwt_result_syntax in
@@ -137,25 +157,12 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
   | None -> return (ctxt, [], amount)
   | Some Unstake_requests_storage.{delegate = delegate_requests; requests} ->
       if Signature.Public_key_hash.(delegate <> delegate_requests) then
-        (* impossible *) return (ctxt, [], amount)
+        (* Possible. If reached, stake should not do anything,
+           so we also set the amount to stake from the liquid part to zero. *)
+        return (ctxt, [], Tez_repr.zero)
       else
-        let* slashing_history_opt =
-          Storage.Contract.Slashed_deposits.find
-            ctxt
-            (Contract_repr.Implicit delegate)
-        in
-        let slashing_history = Option.value slashing_history_opt ~default:[] in
-        let current_cycle = (Raw_context.current_level ctxt).cycle in
-        let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-        let oldest_slashable_cycle =
-          Cycle_repr.sub current_cycle (preserved_cycles + 1)
-          |> Option.value ~default:Cycle_repr.root
-        in
-        if
-          List.exists
-            (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
-            slashing_history
-        then
+        let* allowed = can_stake_from_unstake ctxt ~delegate in
+        if not allowed then
           (* a slash could have modified the unstaked frozen deposits: cannot stake from unstake *)
           return (ctxt, [], amount)
         else
@@ -242,13 +249,14 @@ let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 
-let stake ctxt ~sender ~delegate amount =
+let stake ctxt ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t])
+    ~sender ~delegate =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
       Unstake_requests_storage.{delegate = unstake_delegate; requests} =
-    match requests with
-    | [] -> return ctxt
-    | _ :: _ ->
+    match (requests, amount) with
+    | [], _ | _ :: _, `At_most _ -> return ctxt
+    | _ :: _, `Exactly _ ->
         if Signature.Public_key_hash.(delegate <> unstake_delegate) then
           tzfail
             Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
@@ -258,24 +266,41 @@ let stake ctxt ~sender ~delegate amount =
   let* ctxt, finalize_balance_updates, unfinalizable_requests_opt =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
+  let tez_amount =
+    match amount with `Exactly amount | `At_most amount -> amount
+  in
+  (* stake from unstake for eligible delegates *)
   let* ctxt, stake_balance_updates1, amount_from_liquid =
     if Signature.Public_key_hash.(sender <> delegate) then
-      let* ctxt, stake_balance_updates_pseudotoken =
-        Staking_pseudotokens_storage.stake
-          ctxt
-          ~contract:sender_contract
-          ~delegate
-          amount
-      in
-      return (ctxt, stake_balance_updates_pseudotoken, amount)
+      return (ctxt, [], tez_amount)
     else
       stake_from_unstake_for_delegate
         ctxt
         ~delegate
         ~unfinalizable_requests_opt
-        amount
+        tez_amount
   in
-  let+ ctxt, stake_balance_updates2 =
+  (* Get amount to transfer from liquid wrt mode *)
+  let* amount_from_liquid =
+    match amount with
+    | `Exactly _ -> return amount_from_liquid
+    | `At_most _ ->
+        let* spendable =
+          Contract_storage.get_balance ctxt (Implicit delegate)
+        in
+        return Tez_repr.(min amount_from_liquid spendable)
+  in
+  (* Issue pseudotokens for delegators *)
+  let* ctxt, stake_balance_updates2 =
+    if Signature.Public_key_hash.(sender <> delegate) then
+      Staking_pseudotokens_storage.stake
+        ctxt
+        ~contract:sender_contract
+        ~delegate
+        amount_from_liquid
+    else return (ctxt, [])
+  in
+  let+ ctxt, stake_balance_updates3 =
     Token.transfer
       ctxt
       (`Contract sender_contract)
@@ -284,8 +309,8 @@ let stake ctxt ~sender ~delegate amount =
       amount_from_liquid
   in
   ( ctxt,
-    stake_balance_updates1 @ stake_balance_updates2 @ finalize_balance_updates
-  )
+    stake_balance_updates1 @ stake_balance_updates2 @ stake_balance_updates3
+    @ finalize_balance_updates )
 
 let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in

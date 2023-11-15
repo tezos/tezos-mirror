@@ -31,6 +31,7 @@ open Alpha_context
 
 type error +=
   | Faulty_validation_wrong_slot
+  | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
@@ -62,6 +63,21 @@ let () =
     Data_encoding.empty
     (function Faulty_validation_wrong_slot -> Some () | _ -> None)
     (fun () -> Faulty_validation_wrong_slot) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.set_deposits_limit_on_unregistered_delegate"
+    ~title:"Set deposits limit on an unregistered delegate"
+    ~description:"Cannot set deposits limit on an unregistered delegate."
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Cannot set a deposits limit on the unregistered delegate %a."
+        Signature.Public_key_hash.pp
+        c)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    (function
+      | Set_deposits_limit_on_unregistered_delegate c -> Some c | _ -> None)
+    (fun c -> Set_deposits_limit_on_unregistered_delegate c) ;
 
   let error_while_taking_fees_description =
     "There was an error while taking the fees, which should not happen and \
@@ -391,7 +407,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         error_when forbidden Staking_to_delegate_that_refuses_external_staking
       in
       let* ctxt, balance_updates =
-        Staking.stake ctxt ~sender ~delegate amount
+        Staking.stake ctxt ~amount:(`Exactly amount) ~sender ~delegate
       in
       (* Since [delegate] is an already existing delegate, it is already allocated. *)
       let allocated_destination_contract = false in
@@ -1326,6 +1342,19 @@ let apply_manager_operation :
             }
         in
         return (ctxt, result, [])
+    | Set_deposits_limit limit ->
+        let*! is_registered = Delegate.registered ctxt source in
+        let*? () =
+          error_unless
+            is_registered
+            (Set_deposits_limit_on_unregistered_delegate source)
+        in
+        let*! ctxt = Delegate.set_frozen_deposits_limit ctxt source limit in
+        return
+          ( ctxt,
+            Set_deposits_limit_result
+              {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
+            [] )
     | Increase_paid_storage {amount_in_bytes; destination} ->
         let* ctxt =
           Contract.increase_paid_storage ctxt destination ~amount_in_bytes
@@ -1691,7 +1720,8 @@ let burn_manager_storage_fees :
               size_of_constant = payload.size_of_constant;
               global_address = payload.global_address;
             } )
-    | Update_consensus_key_result _ -> return (ctxt, storage_limit, smopr)
+    | Set_deposits_limit_result _ | Update_consensus_key_result _ ->
+        return (ctxt, storage_limit, smopr)
     | Increase_paid_storage_result _ -> return (ctxt, storage_limit, smopr)
     | Transfer_ticket_result payload ->
         let consumed = payload.paid_storage_size_diff in

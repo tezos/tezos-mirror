@@ -635,6 +635,22 @@ let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
   let+ account = Context.Contract.manager ctxt source in
   sign account.sk (Context.branch ctxt) sop
 
+let set_deposits_limit ?force_reveal ?fee ?gas_limit ?storage_limit ?counter
+    ctxt source limit =
+  let top = Set_deposits_limit limit in
+  manager_operation
+    ?force_reveal
+    ?fee
+    ?counter
+    ?storage_limit
+    ?gas_limit
+    ~source
+    ctxt
+    top
+  >>=? fun sop ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk (Context.branch ctxt) sop
+
 let increase_paid_storage ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ctxt ~source ~destination (amount : Z.t) =
   let open Lwt_result_syntax in

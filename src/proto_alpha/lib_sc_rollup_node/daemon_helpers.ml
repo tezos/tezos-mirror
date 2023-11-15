@@ -323,7 +323,7 @@ let process_l1_operation (type kind) ~catching_up node_ctxt
           rollup = node_ctxt.Node_context.config.sc_rollup_address)
     | Dal_publish_slot_header _ -> true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
-    | Update_consensus_key _ | Register_global_constant _
+    | Update_consensus_key _ | Register_global_constant _ | Set_deposits_limit _
     | Increase_paid_storage _ | Transfer_ticket _ | Sc_rollup_originate _
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         false

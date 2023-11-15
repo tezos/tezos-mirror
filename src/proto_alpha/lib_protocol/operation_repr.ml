@@ -72,6 +72,8 @@ module Kind = struct
 
   type event = Event_kind
 
+  type set_deposits_limit = Set_deposits_limit_kind
+
   type increase_paid_storage = Increase_paid_storage_kind
 
   type update_consensus_key = Update_consensus_key_kind
@@ -116,6 +118,7 @@ module Kind = struct
     | Delegation_manager_kind : delegation manager
     | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
+    | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
@@ -320,6 +323,9 @@ and _ manager_operation =
       value : Script_repr.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
+  | Set_deposits_limit :
+      Tez_repr.t option
+      -> Kind.set_deposits_limit manager_operation
   | Increase_paid_storage : {
       amount_in_bytes : Z.t;
       destination : Contract_hash.t;
@@ -407,6 +413,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
+  | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
@@ -675,7 +682,18 @@ module Encoding = struct
           inj = (fun value -> Register_global_constant {value});
         }
 
-    (* Tag 5 was for Set_deposits_limit. *)
+    let set_deposits_limit_case =
+      MCase
+        {
+          tag = 5;
+          name = "set_deposits_limit";
+          encoding = obj1 (opt "limit" Tez_repr.encoding);
+          select =
+            (function
+            | Manager (Set_deposits_limit _ as op) -> Some op | _ -> None);
+          proj = (function Set_deposits_limit key -> key);
+          inj = (fun key -> Set_deposits_limit key);
+        }
 
     let increase_paid_storage_case =
       MCase
@@ -1443,7 +1461,8 @@ module Encoding = struct
   let register_global_constant_case =
     make_manager_case 111 Manager_operations.register_global_constant_case
 
-  (* 112 was for Set_deposits_limit. *)
+  let set_deposits_limit_case =
+    make_manager_case 112 Manager_operations.set_deposits_limit_case
 
   let increase_paid_storage_case =
     make_manager_case 113 Manager_operations.increase_paid_storage_case
@@ -1531,6 +1550,7 @@ module Encoding = struct
       PCase transaction_case;
       PCase origination_case;
       PCase delegation_case;
+      PCase set_deposits_limit_case;
       PCase increase_paid_storage_case;
       PCase update_consensus_key_case;
       PCase drain_delegate_case;
@@ -1985,6 +2005,8 @@ let equal_manager_operation_kind :
   | Delegation _, _ -> None
   | Register_global_constant _, Register_global_constant _ -> Some Eq
   | Register_global_constant _, _ -> None
+  | Set_deposits_limit _, Set_deposits_limit _ -> Some Eq
+  | Set_deposits_limit _, _ -> None
   | Increase_paid_storage _, Increase_paid_storage _ -> Some Eq
   | Increase_paid_storage _, _ -> None
   | Update_consensus_key _, Update_consensus_key _ -> Some Eq
