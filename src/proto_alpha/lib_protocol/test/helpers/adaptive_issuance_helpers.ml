@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let join_errors e1 e2 =
+  let open Lwt_result_syntax in
+  match (e1, e2) with
+  | Ok (), Ok () -> return_unit
+  | Error e, Ok () | Ok (), Error e -> fail e
+  | Error e1, Error e2 -> fail (e1 @ e2)
+
 (** Tez manipulation module *)
 module Tez = struct
   include Protocol.Alpha_context.Tez
@@ -51,7 +58,8 @@ module Tez = struct
 
   let of_z a = Z.to_int64 a |> of_mutez
 
-  let of_q a = Q.to_bigint a |> of_z
+  let of_q ~round_up Q.{num; den} =
+    (if round_up then Z.cdiv num den else Z.div num den) |> of_z
 
   let ratio num den =
     Q.make (Z.of_int64 (to_mutez num)) (Z.of_int64 (to_mutez den))
@@ -71,9 +79,7 @@ module Partial_tez = struct
     let tez, rem = Z.div_rem num den in
     (Tez.of_z tez, rem /// den)
 
-  let to_tez ?(round_up = false) a =
-    let tez, rem = to_tez_rem a in
-    if round_up && Q.(gt rem zero) then Tez.(tez +! one_mutez) else tez
+  let to_tez ~round_up = Tez.of_q ~round_up
 
   let get_rem a = snd (to_tez_rem a)
 
@@ -88,7 +94,6 @@ module Cycle = Protocol.Alpha_context.Cycle
 (** [Frozen_tez] represents frozen stake and frozen unstaked funds.
     Properties:
     - sum of all current partial tez is an integer
-    - slashing is always a portion of initial
     - Can only add integer amounts
     - Can always subtract integer amount (if lower than frozen amount)
     - If subtracting partial amount, must be the whole frozen amount (for given contract).
@@ -98,105 +103,161 @@ module Cycle = Protocol.Alpha_context.Cycle
 module Frozen_tez = struct
   (* The map in current maps the stakers' name with their staked value.
      It contains only delegators of the delegate which owns the frozen tez *)
-  type t = {initial : Tez.t; current : Partial_tez.t String.Map.t}
+  type t = {
+    delegate : string;
+    initial : Tez.t;
+    self_current : Tez.t;
+    co_current : Partial_tez.t String.Map.t;
+  }
 
-  let zero = {initial = Tez.zero; current = String.Map.empty}
-
-  let init amount account =
+  let zero =
     {
-      initial = amount;
-      current = String.Map.singleton account (Partial_tez.of_tez amount);
+      delegate = "";
+      initial = Tez.zero;
+      self_current = Tez.zero;
+      co_current = String.Map.empty;
+    }
+
+  let init amount account delegate =
+    if account = delegate then
+      {
+        delegate;
+        initial = amount;
+        self_current = amount;
+        co_current = String.Map.empty;
+      }
+    else
+      {
+        delegate;
+        initial = amount;
+        self_current = Tez.zero;
+        co_current = String.Map.singleton account (Partial_tez.of_tez amount);
+      }
+
+  let union a b =
+    assert (a.delegate = b.delegate) ;
+    {
+      delegate = a.delegate;
+      initial = Tez.(a.initial +! b.initial);
+      self_current = Tez.(a.self_current +! b.self_current);
+      co_current =
+        String.Map.union
+          (fun _ x y -> Some Partial_tez.(x + y))
+          a.co_current
+          b.co_current;
     }
 
   let get account frozen_tez =
-    match String.Map.find account frozen_tez.current with
-    | None -> Partial_tez.zero
-    | Some p -> p
+    if account = frozen_tez.delegate then
+      Partial_tez.of_tez frozen_tez.self_current
+    else
+      match String.Map.find account frozen_tez.co_current with
+      | None -> Partial_tez.zero
+      | Some p -> p
 
-  let union a b =
-    {
-      initial = Tez.(a.initial +! b.initial);
-      current =
-        String.Map.union
-          (fun _ x y -> Some Partial_tez.(x + y))
-          a.current
-          b.current;
-    }
-
-  let total_current_q current =
+  let total_co_current_q co_current =
     String.Map.fold
       (fun _ x acc -> Partial_tez.(x + acc))
-      current
+      co_current
       Partial_tez.zero
 
   let total_current a =
-    let r = total_current_q a.current in
+    let r = total_co_current_q a.co_current in
     let tez, rem = Partial_tez.to_tez_rem r in
     assert (Q.(equal rem zero)) ;
-    tez
+    Tez.(tez +! a.self_current)
 
-  let add_q_to_all_current quantity current =
-    let s = total_current_q current in
+  let add_q_to_all_co_current quantity co_current =
+    let s = total_co_current_q co_current in
     let f p_amount =
       let q = Q.div p_amount s in
       Partial_tez.add p_amount (Q.mul quantity q)
     in
-    String.Map.map f current
+    String.Map.map f co_current
 
   (* For rewards, distribute equally *)
   let add_tez_to_all_current tez a =
-    let quantity = Partial_tez.of_tez tez in
-    let current = add_q_to_all_current quantity a.current in
-    {a with current}
+    let self_portion = Tez.ratio a.self_current (total_current a) in
+    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round_up:true in
+    let co_quantity = Partial_tez.of_tez Tez.(tez -! self_quantity) in
+    let co_current = add_q_to_all_co_current co_quantity a.co_current in
+    {a with co_current; self_current = Tez.(a.self_current +! self_quantity)}
 
   (* For slashing, slash equally *)
   let sub_tez_from_all_current tez a =
-    let s = total_current_q a.current in
-    if Partial_tez.(geq (of_tez tez) s) then {a with current = String.Map.empty}
+    let self_portion = Tez.ratio a.self_current (total_current a) in
+    let self_quantity =
+      Tez.mul_q tez self_portion |> Tez.of_q ~round_up:false
+    in
+    let self_current =
+      if Tez.(self_quantity >= a.self_current) then Tez.zero
+      else Tez.(a.self_current -! self_quantity)
+    in
+    let co_quantity = Tez.(tez -! self_quantity) in
+    let s = total_co_current_q a.co_current in
+    if Partial_tez.(geq (of_tez co_quantity) s) then
+      {a with self_current; co_current = String.Map.empty}
     else
       let f p_amount =
         let q = Q.div p_amount s in
-        Partial_tez.sub p_amount (Tez.mul_q tez q)
+        Partial_tez.sub p_amount (Tez.mul_q co_quantity q)
         (* > 0 *)
       in
-      {a with current = String.Map.map f a.current}
+      {a with self_current; co_current = String.Map.map f a.co_current}
 
   (* Adds frozen to account. Happens each stake in frozen deposits *)
   let add_current amount account a =
-    {
-      a with
-      current =
-        String.Map.update
-          account
-          (function
-            | None -> Some (Partial_tez.of_tez amount)
-            | Some q -> Some Partial_tez.(add q (of_tez amount)))
-          a.current;
-    }
+    if account = a.delegate then
+      {a with self_current = Tez.(a.self_current +! amount)}
+    else
+      {
+        a with
+        co_current =
+          String.Map.update
+            account
+            (function
+              | None -> Some (Partial_tez.of_tez amount)
+              | Some q -> Some Partial_tez.(add q (of_tez amount)))
+            a.co_current;
+      }
 
   (* Adds frozen to account. Happens each unstake to unstaked frozen deposits *)
-  let add_init amount account a = union a (init amount account)
+  let add_init amount account a = union a (init amount account a.delegate)
 
   (* Allows amount greater than current frozen amount.
      Happens each unstake in frozen deposits *)
   let sub_current amount account a =
-    match String.Map.find account a.current with
-    | None -> (a, Tez.zero)
-    | Some frozen ->
-        let amount_q = Partial_tez.of_tez amount in
-        if Q.(geq amount_q frozen) then
-          let removed, remainder = Partial_tez.to_tez_rem frozen in
-          let current = String.Map.remove account a.current in
-          let current = add_q_to_all_current remainder current in
-          ({a with current}, removed)
-        else
-          let current =
-            String.Map.add account Q.(frozen - amount_q) a.current
-          in
-          ({a with current}, amount)
+    if account = a.delegate then
+      let amount = Tez.min amount a.self_current in
+      ({a with self_current = Tez.(a.self_current -! amount)}, amount)
+    else
+      match String.Map.find account a.co_current with
+      | None -> (a, Tez.zero)
+      | Some frozen ->
+          let amount_q = Partial_tez.of_tez amount in
+          if Q.(geq amount_q frozen) then
+            let removed, remainder = Partial_tez.to_tez_rem frozen in
+            let co_current = String.Map.remove account a.co_current in
+            let co_current = add_q_to_all_co_current remainder co_current in
+            ({a with co_current}, removed)
+          else
+            let co_current =
+              String.Map.add account Q.(frozen - amount_q) a.co_current
+            in
+            ({a with co_current}, amount)
 
-  (* Refresh initial amount at beginning of cycle *)
-  let refresh_at_new_cycle a = {a with initial = total_current a}
+  let sub_current_and_init amount account a =
+    let a, amount = sub_current amount account a in
+    ({a with initial = Tez.(a.initial -! amount)}, amount)
+
+  let slash base_amount (pct : Protocol.Int_percentage.t) a =
+    let pct_times_100 = (pct :> int) in
+    let slashed_amount =
+      Tez.mul_q base_amount Q.(pct_times_100 // 100) |> Tez.of_q ~round_up:false
+    in
+    let total_current = total_current a in
+    let slashed_amount_final = Tez.min slashed_amount total_current in
+    (sub_tez_from_all_current slashed_amount a, slashed_amount_final)
 end
 
 (** Representation of Unstaked frozen deposits *)
@@ -211,6 +272,11 @@ module Unstaked_frozen = struct
       Frozen_tez.zero
       unstaked
 
+  let remove_zeros a =
+    List.filter
+      (fun (_, frozen) -> Tez.(Frozen_tez.total_current frozen > zero))
+      a
+
   let get account unstaked =
     List.map (fun (c, frozen) -> (c, Frozen_tez.get account frozen)) unstaked
 
@@ -220,7 +286,8 @@ module Unstaked_frozen = struct
 
   (* Happens each unstake operation *)
   let rec add_unstake cycle amount account = function
-    | [] -> [(cycle, Frozen_tez.init amount account)]
+    (* fun trick: use "" as delegate, because even the delegate has to share in ufd *)
+    | [] -> [(cycle, Frozen_tez.init amount account "")]
     | (c, a) :: t ->
         if Cycle.equal c cycle then
           (c, Frozen_tez.add_init amount account a) :: t
@@ -239,9 +306,18 @@ module Unstaked_frozen = struct
           let amount, rest = pop_cycle cycle t in
           (amount, (c, a) :: rest)
 
-  (* Refresh initial amount at beginning of cycle (unused) *)
-  let refresh_at_new_cycle l =
-    List.map (fun (c, t) -> (c, Frozen_tez.refresh_at_new_cycle t)) l
+  let slash ~preserved_cycles slashed_cycle pct_times_100 a =
+    remove_zeros a
+    |> List.map (fun (c, frozen) ->
+           if
+             Cycle.(c > slashed_cycle || add c preserved_cycles < slashed_cycle)
+           then ((c, frozen), Tez.zero)
+           else
+             let ufd, slashed =
+               Frozen_tez.slash frozen.Frozen_tez.initial pct_times_100 frozen
+             in
+             ((c, ufd), slashed))
+    |> List.split
 end
 
 (** Representation of unstaked finalizable tez *)
@@ -256,7 +332,9 @@ module Unstaked_finalizable = struct
   (* Called when unstaked frozen for some cycle becomes finalizable *)
   let add_from_frozen (frozen : Frozen_tez.t) {map; remainder} =
     let map_rounded_down =
-      String.Map.map (fun qt -> Partial_tez.to_tez qt) frozen.current
+      String.Map.map
+        (fun qt -> Partial_tez.to_tez ~round_up:false qt)
+        frozen.co_current
     in
     let map =
       String.Map.union (fun _ a b -> Some Tez.(a +! b)) map map_rounded_down
@@ -282,6 +360,8 @@ type staking_parameters = {
   edge_of_baking_over_staking : Q.t;
 }
 
+module CycleMap = Map.Make (Cycle)
+
 (** Abstract information of accounts *)
 type account_state = {
   pkh : Signature.Public_key_hash.t;
@@ -293,12 +373,14 @@ type account_state = {
   (* The three following fields contain maps from the account's stakers to,
      respectively, their frozen stake, their unstaked frozen balance, and
      their unstaked finalizable funds. Additionally, [unstaked_frozen] indexes
-     the maps with the cycle at which the unstake operation occured. *)
+     the maps with the cycle at which the unstake operation occurred. *)
   frozen_deposits : Frozen_tez.t;
   unstaked_frozen : Unstaked_frozen.t;
   unstaked_finalizable : Unstaked_finalizable.t;
   staking_delegator_numerator : Z.t;
   staking_delegate_denominator : Z.t;
+  frozen_rights : Tez.t CycleMap.t;
+  slashed_cycles : Cycle.t list;
 }
 
 let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
@@ -306,7 +388,8 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(unstaked_frozen = Unstaked_frozen.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
-    ?(staking_delegate_denominator = Z.zero) () =
+    ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
+    ?(slashed_cycles = []) () =
   {
     pkh;
     contract;
@@ -319,6 +402,8 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     unstaked_finalizable;
     staking_delegator_numerator;
     staking_delegate_denominator;
+    frozen_rights;
+    slashed_cycles;
   }
 
 type account_map = account_state String.Map.t
@@ -361,6 +446,8 @@ let balance_of_account account_name (account_map : account_map) =
         unstaked_finalizable = _;
         staking_delegator_numerator;
         staking_delegate_denominator;
+        frozen_rights = _;
+        slashed_cycles = _;
       } ->
       let balance =
         {
@@ -504,7 +591,7 @@ let balance_update_pp fmt
     Z.pp_print
     b_staking_delegate_denominator_b
 
-let assert_balance_equal ~loc
+let assert_balance_equal ~loc account_name
     {
       liquid_b = a_liquid_b;
       bonds_b = a_bonds_b;
@@ -524,34 +611,65 @@ let assert_balance_equal ~loc
       staking_delegate_denominator_b = b_staking_delegate_denominator_b;
     } =
   let open Lwt_result_syntax in
-  let* () = Assert.equal_tez ~loc a_liquid_b b_liquid_b in
-  let* () = Assert.equal_tez ~loc a_bonds_b b_bonds_b in
+  let f s = Format.asprintf "%s: %s" account_name s in
   let* () =
-    Assert.equal_tez
-      ~loc
-      (Partial_tez.to_tez a_staked_b)
-      (Partial_tez.to_tez b_staked_b)
-  in
-  let* () =
-    Assert.equal_tez
-      ~loc
-      (Partial_tez.to_tez a_unstaked_frozen_b)
-      (Partial_tez.to_tez b_unstaked_frozen_b)
-  in
-  let* () =
-    Assert.equal_tez ~loc a_unstaked_finalizable_b b_unstaked_finalizable_b
-  in
-  let* () =
-    Assert.equal_z
-      ~loc
-      a_staking_delegator_numerator_b
-      b_staking_delegator_numerator_b
-  in
-  let* () =
-    Assert.equal_z
-      ~loc
-      a_staking_delegate_denominator_b
-      b_staking_delegate_denominator_b
+    List.fold_left
+      (fun a b ->
+        let*! a in
+        let*! b in
+        join_errors a b)
+      return_unit
+      [
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Liquid balances do not match")
+          Tez.pp
+          a_liquid_b
+          b_liquid_b;
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Bonds balances do not match")
+          Tez.pp
+          a_bonds_b
+          b_bonds_b;
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Staked balances do not match")
+          Tez.pp
+          (Partial_tez.to_tez ~round_up:false a_staked_b)
+          (Partial_tez.to_tez ~round_up:false b_staked_b);
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Unstaked frozen balances do not match")
+          Tez.pp
+          (Partial_tez.to_tez ~round_up:false a_unstaked_frozen_b)
+          (Partial_tez.to_tez ~round_up:false b_unstaked_frozen_b);
+        Assert.equal
+          ~loc
+          Tez.equal
+          (f "Unstaked finalizable balances do not match")
+          Tez.pp
+          a_unstaked_finalizable_b
+          b_unstaked_finalizable_b;
+        Assert.equal
+          ~loc
+          Z.equal
+          (f "Staking delegator numerators do not match")
+          Z.pp_print
+          a_staking_delegator_numerator_b
+          b_staking_delegator_numerator_b;
+        Assert.equal
+          ~loc
+          Z.equal
+          (f "Staking delegate denominators do not match")
+          Z.pp_print
+          a_staking_delegate_denominator_b
+          b_staking_delegate_denominator_b;
+      ]
   in
   return_unit
 
@@ -602,42 +720,56 @@ let apply_transfer amount src_name dst_name account_map =
         update_account ~f:f_dst dst_name account_map
   | _ -> raise Not_found
 
-let stake_from_unstake amount delegate_name account_map =
+let stake_from_unstake amount current_cycle preserved_cycles delegate_name
+    account_map =
   match String.Map.find delegate_name account_map with
   | None -> raise Not_found
-  | Some ({unstaked_frozen; frozen_deposits; _} as account) ->
-      let unstaked_frozen =
-        List.sort
-          (fun (cycle1, _) (cycle2, _) -> Cycle.compare cycle2 cycle1)
-          unstaked_frozen
+  | Some ({unstaked_frozen; frozen_deposits; slashed_cycles; _} as account) ->
+      let oldest_slashable_cycle =
+        Cycle.(sub current_cycle (preserved_cycles + 1))
+        |> Option.value ~default:Cycle.root
       in
-      let rec aux acc_unstakes rem_amount rem_unstakes =
-        match rem_unstakes with
-        | [] -> (acc_unstakes, rem_amount)
-        | (cycle, frozen_map) :: t ->
-            if Tez.(rem_amount = zero) then
-              (acc_unstakes @ rem_unstakes, Tez.zero)
-            else
-              let frozen_map, removed =
-                Frozen_tez.sub_current rem_amount delegate_name frozen_map
-              in
-              let rem_amount = Tez.(rem_amount -! removed) in
-              aux (acc_unstakes @ [(cycle, frozen_map)]) rem_amount t
-      in
-      let unstaked_frozen, rem_amount = aux [] amount unstaked_frozen in
-      let frozen_deposits =
-        Frozen_tez.add_current
-          Tez.(amount -! rem_amount)
-          delegate_name
-          frozen_deposits
-      in
-      let account = {account with unstaked_frozen; frozen_deposits} in
-      let account_map =
-        update_account ~f:(fun _ -> account) delegate_name account_map
-      in
-      (account_map, rem_amount)
+      if
+        List.exists
+          (fun x -> Cycle.(x >= oldest_slashable_cycle))
+          slashed_cycles
+      then (account_map, amount)
+      else
+        let unstaked_frozen =
+          List.sort
+            (fun (cycle1, _) (cycle2, _) -> Cycle.compare cycle2 cycle1)
+            unstaked_frozen
+        in
+        let rec aux acc_unstakes rem_amount rem_unstakes =
+          match rem_unstakes with
+          | [] -> (acc_unstakes, rem_amount)
+          | (cycle, frozen_map) :: t ->
+              if Tez.(rem_amount = zero) then
+                (acc_unstakes @ rem_unstakes, Tez.zero)
+              else
+                let frozen_map, removed =
+                  Frozen_tez.sub_current_and_init
+                    rem_amount
+                    delegate_name
+                    frozen_map
+                in
+                let rem_amount = Tez.(rem_amount -! removed) in
+                aux (acc_unstakes @ [(cycle, frozen_map)]) rem_amount t
+        in
+        let unstaked_frozen, rem_amount = aux [] amount unstaked_frozen in
+        let frozen_deposits =
+          Frozen_tez.add_current
+            Tez.(amount -! rem_amount)
+            delegate_name
+            frozen_deposits
+        in
+        let account = {account with unstaked_frozen; frozen_deposits} in
+        let account_map =
+          update_account ~f:(fun _ -> account) delegate_name account_map
+        in
+        (account_map, rem_amount)
 
-let apply_stake amount staker_name account_map =
+let apply_stake amount current_cycle preserved_cycles staker_name account_map =
   match String.Map.find staker_name account_map with
   | None -> raise Not_found
   | Some staker -> (
@@ -649,7 +781,12 @@ let apply_stake amount staker_name account_map =
           let old_account_map = account_map in
           let account_map, amount =
             if delegate_name = staker_name then
-              stake_from_unstake amount staker_name account_map
+              stake_from_unstake
+                amount
+                current_cycle
+                preserved_cycles
+                staker_name
+                account_map
             else (account_map, amount)
           in
           if Tez.(staker.liquid < amount) then
@@ -772,9 +909,136 @@ let balance_and_total_balance_of_account account_name account_map =
   ( balance,
     Tez.(
       liquid_b +! bonds_b
-      +! Partial_tez.to_tez staked_b
-      +! Partial_tez.to_tez unstaked_frozen_b
+      +! Partial_tez.to_tez ~round_up:false staked_b
+      +! Partial_tez.to_tez ~round_up:false unstaked_frozen_b
       +! unstaked_finalizable_b) )
+
+let apply_slashing
+    ( culprit,
+      Protocol.Denunciations_repr.
+        {rewarded; misbehaviour; misbehaviour_cycle; operation_hash = _} )
+    current_cycle constants account_map =
+  let find_account_name_from_pkh_exn pkh account_map =
+    match
+      Option.map
+        fst
+        String.Map.(
+          choose
+          @@ filter
+               (fun _ account ->
+                 Signature.Public_key_hash.equal pkh account.pkh)
+               account_map)
+    with
+    | None -> assert false
+    | Some x -> x
+  in
+  let culprit_name = find_account_name_from_pkh_exn culprit account_map in
+  let rewarded_name = find_account_name_from_pkh_exn rewarded account_map in
+  let slashed_cycle =
+    match misbehaviour_cycle with
+    | Current -> current_cycle
+    | Previous ->
+        Cycle.pred current_cycle
+        |> Option.value_f ~default:(fun _ -> assert false)
+  in
+  let slashed_pct =
+    match misbehaviour with
+    | Double_baking ->
+        constants
+          .Protocol.Alpha_context.Constants.Parametric
+           .percentage_of_frozen_deposits_slashed_per_double_baking
+    | Double_attesting ->
+        constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+  in
+  let get_total_supply acc_map =
+    String.Map.fold
+      (fun k _ tot ->
+        let _, tt = balance_and_total_balance_of_account k acc_map in
+        Tez.(tt +! tot))
+      acc_map
+      Tez.zero
+  in
+  let total_before_slash = get_total_supply account_map in
+  let slash_culprit
+      ({frozen_deposits; unstaked_frozen; frozen_rights; _} as acc) =
+    let base_rights =
+      CycleMap.find slashed_cycle frozen_rights
+      |> Option.value ~default:Tez.zero
+    in
+    let frozen_deposits, slashed_frozen =
+      Frozen_tez.slash base_rights slashed_pct frozen_deposits
+    in
+    let unstaked_frozen, slashed_unstaked =
+      Unstaked_frozen.slash
+        ~preserved_cycles:constants.preserved_cycles
+        slashed_cycle
+        slashed_pct
+        unstaked_frozen
+    in
+    ( {acc with frozen_deposits; unstaked_frozen},
+      slashed_frozen :: slashed_unstaked )
+  in
+  let culprit_account =
+    String.Map.find culprit_name account_map
+    |> Option.value_f ~default:(fun () -> raise Not_found)
+  in
+  let slashed_culprit_account, total_slashed = slash_culprit culprit_account in
+  let account_map =
+    update_account
+      ~f:(fun _ -> slashed_culprit_account)
+      culprit_name
+      account_map
+  in
+  let update_frozen_rights_with_slash ({frozen_rights; _} as acc) =
+    let cycle_to_slash =
+      Cycle.add current_cycle (constants.preserved_cycles + 1)
+    in
+    let frozen_rights =
+      CycleMap.update
+        cycle_to_slash
+        (function
+          | None -> None
+          | Some x ->
+              Some
+                (Tez.mul_q
+                   x
+                   Q.((Protocol.Int_percentage.neg slashed_pct :> int) // 100)
+                |> Tez.of_q ~round_up:false))
+        frozen_rights
+    in
+    {acc with frozen_rights}
+  in
+  let account_map =
+    update_account ~f:update_frozen_rights_with_slash culprit_name account_map
+  in
+  let total_after_slash = get_total_supply account_map in
+  let portion_reward =
+    constants.adaptive_issuance.global_limit_of_staking_over_baking + 2
+  in
+  (* For each container slashed, the snitch gets a reward transferred. It gets rounded
+     down each time *)
+  let reward_to_snitch =
+    List.map
+      (fun x -> Tez.mul_q x Q.(1 // portion_reward) |> Tez.of_q ~round_up:false)
+      total_slashed
+    |> List.fold_left Tez.( +! ) Tez.zero
+  in
+  let account_map =
+    add_liquid_rewards reward_to_snitch rewarded_name account_map
+  in
+  let actual_total_burnt_amount =
+    Tez.(total_before_slash -! total_after_slash -! reward_to_snitch)
+  in
+  (account_map, actual_total_burnt_amount)
+
+(* Given cycle is the cycle for which the rights are computed, usually current + preserved cycles *)
+let update_frozen_rights_cycle cycle account_map =
+  String.Map.map
+    (fun ({frozen_deposits; frozen_rights; _} as acc) ->
+      let total_frozen = Frozen_tez.total_current frozen_deposits in
+      let frozen_rights = CycleMap.add cycle total_frozen frozen_rights in
+      {acc with frozen_rights})
+    account_map
 
 let get_balance_from_context ctxt contract =
   let open Lwt_result_syntax in
@@ -834,9 +1098,17 @@ let assert_balance_check ~loc ctxt account_name account_map =
       let balance, total_balance =
         balance_and_total_balance_of_account account_name account_map
       in
-      let* () = assert_balance_equal ~loc balance_ctxt balance in
-      let* () = Assert.equal_tez ~loc total_balance_ctxt total_balance in
-      return_unit
+      let*! r1 = assert_balance_equal ~loc account_name balance_ctxt balance in
+      let*! r2 =
+        Assert.equal
+          ~loc
+          Tez.equal
+          (Format.asprintf "%s : Total balances do not match" account_name)
+          Tez.pp
+          total_balance_ctxt
+          total_balance
+      in
+      join_errors r1 r2
 
 let get_launch_cycle ~loc blk =
   let open Lwt_result_syntax in
