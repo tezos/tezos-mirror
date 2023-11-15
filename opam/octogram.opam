@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-shell-libs"
   "octez-libs"
-  "tezt" { >= "3.1.1" }
+  "tezt" { >= "3.1.1" & < "4.0.0" }
   "tezt-tezos"
   "jingoo"
   "dmap"
