@@ -43,6 +43,8 @@
 ### Internal
 
 - `evm-evaluation-assessor` binary was added to run `ethereum/tests`. (!10798)
+- Conservative tick model for gas per opcodes. (!10715)
+- Safe tick model for precompiled contracts. (!10748)
 
 ## Version 7ff44c30366c3d2b860413905a2253522454fe5e
 
