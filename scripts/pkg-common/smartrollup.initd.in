@@ -37,10 +37,11 @@ waitfornode=yes
 nodeaddr=127.0.0.1
 rpcport=8732
 othercliopts_smartrollup=""
-nodeurl="http://$nodeaddr:$rpcport"
 
 [ -r /etc/octez/node.conf ] && . /etc/octez/node.conf
 [ -r /etc/octez/smartrollup.conf ] && . /etc/octez/smartrollup.conf
+
+[ -z "$nodeurl" ] && nodeurl="http://$nodeaddr:$rpcport"
 
 logfile="${logdir}/smartrollup.log"
 sr="/usr/bin/octez-smart-rollup-node"
