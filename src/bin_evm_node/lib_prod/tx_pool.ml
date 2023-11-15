@@ -7,38 +7,51 @@
 
 module Pool = struct
   module Pkey_map = Map.Make (Ethereum_types.Address)
+  module Nonce_map = Map.Make (Z)
 
   (** Transaction stored in the pool. *)
   type transaction = {
     index : int64; (* Global index of the transaction. *)
-    nonce : Ethereum_types.quantity; (* The nonce of the transaction.*)
     raw_tx : Ethereum_types.hex; (* Current transaction. *)
+    gas_price : Z.t; (* The maximum price the user can pay for fees. *)
   }
 
   type t = {
-    transactions :
-      transaction list Pkey_map.t (* Transactions are stored by public key. *);
+    transactions : transaction Nonce_map.t Pkey_map.t;
     global_index : int64; (* Index to order the transactions. *)
   }
 
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
   (** Add a transacion to the pool.*)
-  let add t pkey (raw_tx : Ethereum_types.hex) =
+  let add t pkey base_fee (raw_tx : Ethereum_types.hex) =
+    let open Result_syntax in
     let {transactions; global_index} = t in
-    let nonce = Ethereum_types.transaction_nonce raw_tx in
-    let txs = Pkey_map.find pkey transactions |> Option.value ~default:[] in
-    let txs = {index = global_index; nonce; raw_tx} :: txs in
-    (* Sort txs by nonce*)
-    let txs =
-      List.sort
-        (fun {nonce = Qty nonce_a; _} {nonce = Qty nonce_b; _} ->
-          Z.compare nonce_a nonce_b)
-        txs
+    let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
+    let* gas_price = Ethereum_types.transaction_gas_price base_fee raw_tx in
+    let transaction = {index = global_index; raw_tx; gas_price} in
+    (* Add the transaction to the user's transaction map *)
+    let transactions =
+      Pkey_map.update
+        pkey
+        (function
+          | None ->
+              (* User has no transactions in the pool *)
+              Some (Nonce_map.singleton nonce transaction)
+          | Some user_transactions ->
+              Some
+                (Nonce_map.update
+                   nonce
+                   (function
+                     | None -> Some transaction
+                     | Some user_transaction ->
+                         if gas_price > user_transaction.gas_price then
+                           Some transaction
+                         else Some user_transaction)
+                   user_transactions))
+        transactions
     in
-    (* Update the pool for the given pkey *)
-    let transactions = Pkey_map.add pkey txs transactions in
-    {transactions; global_index = Int64.(add global_index one)}
+    return {transactions; global_index = Int64.(add global_index one)}
 
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
@@ -47,17 +60,22 @@ module Pool = struct
   (** Returns the transaction matching the predicate.
       And remove them from the pool. *)
   let partition pkey predicate {transactions; global_index} =
+    (* Get the sequence of transaction *)
     let selected, remaining =
-      transactions |> Pkey_map.find pkey |> Option.value ~default:[]
-      |> List.partition predicate
+      transactions |> Pkey_map.find pkey
+      |> Option.value ~default:Nonce_map.empty
+      |> Nonce_map.partition predicate
     in
+    (* Remove transactions from the public key map if empty *)
     let transactions =
-      if List.is_empty remaining then Pkey_map.remove pkey transactions
+      if Nonce_map.is_empty remaining then Pkey_map.remove pkey transactions
       else Pkey_map.add pkey remaining transactions
     in
+    (* Convert the sequence to a list *)
+    let selected = selected |> Nonce_map.bindings |> List.map snd in
     (selected, {transactions; global_index})
 
-  (** Removes from the pool the transactions matching the predicate
+  (** Removes from the pool the transactions matching the predicate 
       for the given pkey. *)
   let remove pkey predicate t =
     let _txs, t = partition pkey predicate t in
@@ -66,20 +84,24 @@ module Pool = struct
   (** Returns the next nonce for a given user.
       Returns the given nonce if the user does not have any transactions in the pool. *)
   let next_nonce pkey current_nonce (t : t) =
+    let open Ethereum_types in
     let {transactions; global_index = _} = t in
-    let txs = Pkey_map.find pkey transactions |> Option.value ~default:[] in
+    (* Retrieves the list of transactions for a given user. *)
+    let user_transactions =
+      Pkey_map.find pkey transactions
+      |> Option.value ~default:Nonce_map.empty
+      |> Nonce_map.bindings |> List.map fst
+    in
     let rec aux current_nonce = function
       | [] -> current_nonce
-      | {nonce; _} :: txs ->
+      | nonce :: txs ->
           if current_nonce > nonce then aux current_nonce txs
           else if current_nonce = nonce then
-            let (Qty current_nonce) = current_nonce in
-            (aux [@tailcall])
-              Z.(add current_nonce one |> Ethereum_types.quantity_of_z)
-              txs
+            (aux [@tailcall]) Z.(add current_nonce one) txs
           else current_nonce
     in
-    aux current_nonce txs
+    let (Qty current_nonce) = current_nonce in
+    aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
 module Types = struct
@@ -160,6 +182,7 @@ let on_transaction state tx_raw =
   let {rollup_node = (module Rollup_node); pool; _} = state in
   Format.printf "[tx-pool] Incoming transaction.\n%!" ;
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
+  let* (Qty base_fee) = Rollup_node.base_fee_per_gas () in
   match is_valid with
   | Error err ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
@@ -167,7 +190,7 @@ let on_transaction state tx_raw =
       return (Error err)
   | Ok pkey ->
       (* Add the tx to the pool*)
-      let pool = Pool.add pool pkey tx_raw in
+      let*? pool = Pool.add pool pkey base_fee tx_raw in
       (* compute the hash *)
       let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
@@ -206,8 +229,7 @@ let on_head state block_height =
          (fun pool (pkey, current_nonce) ->
            Pool.remove
              pkey
-             (fun {nonce; _} ->
-               let (Ethereum_types.Qty nonce) = nonce in
+             (fun nonce _tx ->
                let (Ethereum_types.Qty current_nonce) = current_nonce in
                Z.lt nonce current_nonce)
              pool)
@@ -222,8 +244,7 @@ let on_head state block_height =
            let selected, pool =
              Pool.partition
                pkey
-               (fun {nonce; _} ->
-                 let (Ethereum_types.Qty nonce) = nonce in
+               (fun nonce _tx ->
                  let (Ethereum_types.Qty current_nonce) = current_nonce in
                  Z.equal nonce current_nonce)
                pool
@@ -328,7 +349,7 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-(** Sends New_l2_level each time there is a new l2 level
+(** Sends New_l2_level each time there is a new l2 level 
 TODO: https://gitlab.com/tezos/tezos/-/issues/6079
 listen to the node instead of pulling the level each 5s
 *)

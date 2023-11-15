@@ -6,12 +6,31 @@
 
 ### EVM Node
 
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version 43bbcea48eca22511d9bda0a739302985fab9d24
+
+### EVM Kernel
+
+- Change the L1 type of the rollup into an entrypoint style: `or (or (pair bytes
+  (ticket (pair nat (option bytes)))) bytes) bytes`. (!10735)
+- The L1 type now expects FA2.1-compatible tickets. (!10738)
+
+### EVM Node
+
 - Add support for `eth_getLogs`. (!10624)
 - Replaced the argument `--version <mode>` to a flag `--devmode` for dev, and
   mode production by default. (!10821)
 - Add configuration file, automatically created on the first run of the EVM
   node. Subsequent executions of the node with different values for the
   arguments will update the configuration file accordingly. (!10790)
+- The EVM Node now has a transaction pool that supports injection of transaction
+  with nonce in the future and transaction replacement by fees. (!10289, !10290,
+  !10291, !10625, !10627, !10628, !10629)
 
 ### Bug fixes
 
@@ -19,9 +38,13 @@
 
 ### Breaking changes
 
+- L1 Entrypoint of the rollup has changed and now has type `or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes`.
+
 ### Internal
 
 - `evm-evaluation-assessor` binary was added to run `ethereum/tests`. (!10798)
+- Conservative tick model for gas per opcodes. (!10715)
+- Safe tick model for precompiled contracts. (!10748)
 
 ## Version 7ff44c30366c3d2b860413905a2253522454fe5e
 
