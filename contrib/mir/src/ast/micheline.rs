@@ -7,7 +7,7 @@
 
 use typed_arena::Arena;
 
-use crate::lexer::Prim;
+use crate::lexer::{Annotation, Prim};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Micheline<'a> {
@@ -17,7 +17,7 @@ pub enum Micheline<'a> {
     /// Application of a Micheline primitive to some arguments with optional
     /// annotations. The primitive is the first field, arguments are the second
     /// field, annotations are the last field.
-    App(Prim, &'a [Micheline<'a>], Vec<&'a str>),
+    App(Prim, &'a [Micheline<'a>], Vec<Annotation<'a>>),
     Seq(&'a [Micheline<'a>]),
 }
 

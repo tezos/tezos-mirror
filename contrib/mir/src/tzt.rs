@@ -82,7 +82,7 @@ fn typecheck_stack(stk: Vec<(Micheline, Micheline)>) -> Result<Vec<(Type, TypedV
 }
 
 impl<'a> Parser<'a> {
-    pub fn parse_tzt_test(&'a self, src: &str) -> Result<TztTest, Box<dyn Error + '_>> {
+    pub fn parse_tzt_test(&'a self, src: &'a str) -> Result<TztTest, Box<dyn Error + '_>> {
         tztTestEntitiesParser::new()
             .parse(&self.arena, spanned_lexer(src))?
             .try_into()

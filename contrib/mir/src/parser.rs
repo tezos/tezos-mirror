@@ -37,13 +37,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&'a self, src: &str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+    pub fn parse(&'a self, src: &'a str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
         syntax::MichelineNakedParser::new().parse(&self.arena, spanned_lexer(src))
     }
 
     pub fn parse_top_level(
         &'a self,
-        src: &str,
+        src: &'a str,
     ) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
         syntax::MichelineTopLevelParser::new().parse(&self.arena, spanned_lexer(src))
     }
@@ -178,7 +178,7 @@ mod tests {
                 .lines()
                 .next()
                 .unwrap(),
-            "Unrecognized token `<ann>` found at 15:17"
+            "Unrecognized token `%b` found at 15:17"
         );
     }
 
