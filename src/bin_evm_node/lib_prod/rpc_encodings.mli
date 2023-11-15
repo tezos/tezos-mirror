@@ -317,7 +317,7 @@ module Eth_call :
 
 module Get_estimate_gas :
   METHOD
-    with type m_input = Ethereum_types.call
+    with type m_input = Ethereum_types.call * Ethereum_types.block_param
      and type m_output = Ethereum_types.quantity
 
 module Txpool_content :

@@ -1711,7 +1711,10 @@ let test_estimate_gas =
         Evm_node.(
           call_evm_rpc
             evm_node
-            {method_ = "eth_estimateGas"; parameters = `A [`O eth_call]})
+            {
+              method_ = "eth_estimateGas";
+              parameters = `A [`O eth_call; `String "latest"];
+            })
       in
 
       (* Check the RPC returns a `result`. *)
@@ -1749,7 +1752,10 @@ let test_estimate_gas_additionnal_field =
         Evm_node.(
           call_evm_rpc
             evm_node
-            {method_ = "eth_estimateGas"; parameters = `A [`O eth_call]})
+            {
+              method_ = "eth_estimateGas";
+              parameters = `A [`O eth_call; `String "latest"];
+            })
       in
 
       (* Check the RPC returns a `result`. *)
