@@ -27,7 +27,10 @@
 
 type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
 
-type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
+type genesis_info = Metadata.genesis_info = {
+  level : int32;
+  commitment_hash : Commitment.Hash.t;
+}
 
 type 'a store = 'a Store.t
 
