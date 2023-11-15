@@ -92,10 +92,10 @@ let rollup_node_config_dev ~rollup_node_endpoint =
   let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
   return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
 
-let prod_directory ~verbose rollup_node_config =
+let prod_directory config rollup_node_config =
   let open Lwt_result_syntax in
   let open Evm_node_lib_prod in
-  return @@ Services.directory ~verbose rollup_node_config
+  return @@ Services.directory config rollup_node_config
 
 let dev_directory config rollup_node_config =
   let open Lwt_result_syntax in
@@ -281,9 +281,7 @@ let proxy_command =
         if not config.devmode then
           let* rollup_config = rollup_node_config_prod ~rollup_node_endpoint in
           let* () = Evm_node_lib_prod.Tx_pool.start rollup_config in
-          let* directory =
-            prod_directory ~verbose:config.verbose rollup_config
-          in
+          let* directory = prod_directory config rollup_config in
           let* server = start config ~directory in
           let (_ : Lwt_exit.clean_up_callback_id) =
             install_finalizer_prod server

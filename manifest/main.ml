@@ -8322,6 +8322,7 @@ let evm_node_lib_prod =
         octez_stdlib_unix |> open_;
         evm_node_lib_prod_encoding |> open_;
         lwt_exit;
+        evm_node_config |> open_;
       ]
 
 let evm_node_lib_dev_encoding =

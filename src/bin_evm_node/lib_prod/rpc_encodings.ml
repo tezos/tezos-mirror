@@ -650,6 +650,22 @@ module Web3_sha3 = MethodMaker (struct
   let method_ = "web3_sha3"
 end)
 
+module Get_logs = MethodMaker (struct
+  open Ethereum_types
+
+  type method_
+
+  type input = filter
+
+  type output = filter_changes list
+
+  let input_encoding = Data_encoding.tup1 filter_encoding
+
+  let output_encoding = Data_encoding.list filter_changes_encoding
+
+  let method_ = "eth_getLogs"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Kernel_version);
@@ -666,6 +682,7 @@ let methods : (module METHOD) list =
     (module Get_transaction_count);
     (module Get_block_transaction_count_by_hash);
     (module Get_block_transaction_count_by_number);
+    (module Get_logs);
     (module Get_uncle_count_by_block_hash);
     (module Get_uncle_count_by_block_number);
     (module Get_transaction_receipt);
