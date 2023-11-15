@@ -16,6 +16,10 @@
 
 ### EVM Kernel
 
+- Change the L1 type of the rollup into an entrypoint style: `or (or (pair bytes
+  (ticket (pair nat (option bytes)))) bytes) bytes`. (!10735)
+- The L1 type now expects FA2.1-compatible tickets. (!10738)
+
 ### EVM Node
 
 - Add support for `eth_getLogs`. (!10624)
@@ -31,6 +35,8 @@
 - Transaction's log indices correspond to the position in the block. (!10615)
 
 ### Breaking changes
+
+- L1 Entrypoint of the rollup has changed and now has type `or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes`.
 
 ### Internal
 
