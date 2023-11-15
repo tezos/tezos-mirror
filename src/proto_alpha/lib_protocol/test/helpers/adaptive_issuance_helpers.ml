@@ -915,8 +915,9 @@ let balance_and_total_balance_of_account account_name account_map =
 
 let apply_slashing
     ( culprit,
-      Protocol.Denunciations_repr.{rewarded; misbehaviour; misbehaviour_cycle}
-    ) current_cycle constants account_map =
+      Protocol.Denunciations_repr.
+        {rewarded; misbehaviour; misbehaviour_cycle; operation_hash = _} )
+    current_cycle constants account_map =
   let find_account_name_from_pkh_exn pkh account_map =
     match
       Option.map

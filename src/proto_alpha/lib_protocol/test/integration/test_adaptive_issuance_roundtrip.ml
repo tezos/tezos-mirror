@@ -398,11 +398,12 @@ module State = struct
 
   let apply_slashing
       ( culprit,
-        Protocol.Denunciations_repr.{rewarded; misbehaviour; misbehaviour_cycle}
-      ) current_cycle (state : t) : t * Tez.t =
+        Protocol.Denunciations_repr.
+          {rewarded; misbehaviour; misbehaviour_cycle; operation_hash} )
+      current_cycle (state : t) : t * Tez.t =
     let account_map, total_burnt =
       apply_slashing
-        (culprit, {rewarded; misbehaviour; misbehaviour_cycle})
+        (culprit, {rewarded; misbehaviour; misbehaviour_cycle; operation_hash})
         current_cycle
         state.constants
         state.account_map
@@ -1312,16 +1313,16 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
   let open Protocol.Denunciations_repr in
   let* denunciations_rpc = Context.get_denunciations (B block) in
   let denunciations_obj_equal
-      (pkh_1, {rewarded = r1; misbehaviour = m1; misbehaviour_cycle = mc1})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2}) =
+      (pkh_1, {rewarded = r1; misbehaviour = m1; misbehaviour_cycle = mc1; _})
+      (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2; _}) =
     Signature.Public_key_hash.equal pkh_1 pkh_2
     && Signature.Public_key_hash.equal r1 r2
     && Stdlib.(m1 = m2)
     && Stdlib.(mc1 = mc2)
   in
   let compare_denunciations
-      (pkh_1, {rewarded = r1; misbehaviour = m1; misbehaviour_cycle = mc1})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2}) =
+      (pkh_1, {rewarded = r1; misbehaviour = m1; misbehaviour_cycle = mc1; _})
+      (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2; _}) =
     let c1 = Signature.Public_key_hash.compare pkh_1 pkh_2 in
     if c1 <> 0 then c1
     else
@@ -1347,7 +1348,7 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
   in
   let denunciations_equal = List.equal denunciations_obj_equal in
   let denunciations_obj_pp fmt
-      (pkh, {rewarded; misbehaviour; misbehaviour_cycle}) =
+      (pkh, {rewarded; misbehaviour; misbehaviour_cycle; operation_hash = _}) =
     Format.fprintf
       fmt
       "slashed: %a; rewarded: %a; kind: %s; cycle: %s@."
@@ -1583,6 +1584,8 @@ let update_state_denunciation (block, state)
               Protocol.Denunciations_repr.rewarded;
               misbehaviour;
               misbehaviour_cycle;
+              operation_hash = Operation_hash.zero;
+              (* unused *)
             } )
         in
         (* TODO: better log... *)
