@@ -327,8 +327,25 @@ let rec seq_field_of_data_encoding0 :
   | String (`Variable, _) -> (state, [Ground.Attr.string ~id Variable])
   | Dynamic_size {kind; encoding = {encoding = String (`Variable, _); _}} ->
       let len_id = len_id_of_id id in
-      let len_attr = Ground.Attr.binary_length_kind ~id:len_id kind in
-      (state, [len_attr; Ground.Attr.string ~id (Dynamic len_id)])
+      let size_attr = Ground.Attr.binary_length_kind ~id:len_id kind in
+      (state, [size_attr; Ground.Attr.string ~id (Dynamic len_id)])
+  | Dynamic_size {kind; encoding = {encoding = Check_size {limit; encoding}; _}}
+    ->
+      let len_id = len_id_of_id id in
+      let len_attr =
+        Helpers.merge_valid
+          (Ground.Attr.binary_length_kind ~id:len_id kind)
+          (ValidationMax (Ast.IntNum limit))
+      in
+      let state, attrs = seq_field_of_data_encoding state encoding id in
+      let state, attr =
+        redirect
+          state
+          attrs
+          (fun attr -> {attr with size = Some (Ast.Name len_id)})
+          id
+      in
+      (state, [len_attr; attr])
   | Padded (encoding, pad) ->
       let state, attrs = seq_field_of_data_encoding state encoding id in
       let pad_attr =
@@ -727,7 +744,7 @@ and seq_field_of_collection :
     state * AttrSpec.t list =
  fun state length_limit length_encoding elts id ->
   match (length_limit, length_encoding, elts) with
-  | At_most _max_length, Some le, elts ->
+  | At_most max_length, Some le, elts ->
       (* Kaitai recommend to use the [num_] prefix *)
       let length_id = "num_" ^ id in
       let state, length_attrs = seq_field_of_data_encoding state le length_id in
@@ -735,8 +752,9 @@ and seq_field_of_collection :
         match length_attrs with
         | [] -> assert false
         | [attr] ->
-            (* TODO: use [length_limit] to set a [valid:max:] value for length*)
-            attr
+            Helpers.merge_valid
+              attr
+              (ValidationSpec.ValidationMax (Ast.IntNum max_length))
         | _ :: _ :: _ ->
             (* TODO: Big number length size not yet supported. We expect
                      [`Uint30/16/8] to produce only one attribute. *)

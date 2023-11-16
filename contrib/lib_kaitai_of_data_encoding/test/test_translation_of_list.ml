@@ -112,6 +112,8 @@ let%expect_test "test dynamic size list with max length" =
   seq:
   - id: len_list_with_length
     type: s4
+    valid:
+      max: 5
   - id: list_with_length
     type: list_with_length
     size: len_list_with_length
@@ -162,6 +164,8 @@ let%expect_test "test list with length" =
   seq:
   - id: num_list_with_length
     type: s4
+    valid:
+      max: 1073741823
   - id: list_with_length_entries
     type: list_with_length_entries
     repeat: expr
@@ -189,6 +193,8 @@ let%expect_test "test list with length" =
   seq:
   - id: num_list_with_length
     type: u1
+    valid:
+      max: 255
   - id: list_with_length_entries
     type: list_with_length_entries
     repeat: expr
@@ -216,6 +222,8 @@ let%expect_test "test list with length" =
   seq:
   - id: num_list_with_length
     type: u2
+    valid:
+      max: 65535
   - id: list_with_length_entries
     type: list_with_length_entries
     repeat: expr
