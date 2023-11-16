@@ -585,6 +585,10 @@ module Stake_distribution = struct
     return (Stake_repr.get_frozen total_stake)
 
   module For_RPC = Delegate_sampler.For_RPC
+
+  module Internal_for_tests = struct
+    let get_selected_distribution = Stake_storage.get_selected_distribution
+  end
 end
 
 module Staking = struct

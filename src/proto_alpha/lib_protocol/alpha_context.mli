@@ -4864,6 +4864,13 @@ module Stake_distribution : sig
     val delegate_current_baking_power :
       context -> Signature.public_key_hash -> int64 tzresult Lwt.t
   end
+
+  module Internal_for_tests : sig
+    val get_selected_distribution :
+      context ->
+      Cycle.t ->
+      (Signature.public_key_hash * Stake_repr.t) list tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,

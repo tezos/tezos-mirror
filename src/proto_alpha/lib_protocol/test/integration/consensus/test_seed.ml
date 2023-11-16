@@ -140,18 +140,22 @@ let test_revelation_early_wrong_right_twice () =
   (* bake until commitment - 2, excluding id *)
   let* b = Block.bake_n ~policy (blocks_per_commitment - 2) b in
   let* bal_main = Context.Contract.balance (B b) id in
+  let cycle_for_rewards = Block.current_cycle b in
   (* the baker [id] will include a seed_nonce commitment *)
   let* b = Block.bake ~policy:(Block.By_account pkh) b in
   let*? level_commitment = Context.get_level (B b) in
   let* committed_hash = Context.get_seed_nonce_hash (B b) in
   (* test that the baking reward is received *)
-  let* () =
-    balance_was_credited
-      ~loc:__LOC__
+  let* reward_to_liquid =
+    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
+      ~policy
       (B b)
-      id
-      bal_main
+      cycle_for_rewards
+      pkh
       baking_reward_fixed_portion
+  in
+  let* () =
+    balance_was_credited ~loc:__LOC__ (B b) id bal_main reward_to_liquid
   in
   (* test that revealing too early produces an error *)
   let operation =
@@ -205,15 +209,19 @@ let test_revelation_early_wrong_right_twice () =
         | Validate_errors.Anonymous.Conflicting_nonce_revelation _ -> true
         | _ -> false)
   in
+  let cycle_for_rewards = Block.current_cycle b in
   let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
   (* test that the baker gets the tip reward plus the baking reward*)
-  let* () =
-    balance_was_credited
-      ~loc:__LOC__
+  let* reward_to_liquid =
+    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
+      ~policy
       (B b)
-      baker
-      baker_bal
+      cycle_for_rewards
+      pkh
       Test_tez.(tip +! baking_reward_fixed_portion)
+  in
+  let* () =
+    balance_was_credited ~loc:__LOC__ (B b) baker baker_bal reward_to_liquid
   in
   (* test that revealing twice produces an error *)
   let operation =
@@ -393,17 +401,21 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let* b = Block.bake_n ~policy (blocks_per_commitment - 2) b in
   let* bal_main = Context.Contract.balance (B b) id in
   (* the baker [id] will include a seed_nonce commitment *)
+  let cycle_for_rewards = Block.current_cycle b in
   let* b = Block.bake ~policy:(Block.By_account pkh) b in
   let*? level_commitment = Context.get_level (B b) in
   let* committed_hash = Context.get_seed_nonce_hash (B b) in
   (* test that the baking reward is received *)
-  let* () =
-    balance_was_credited
-      ~loc:__LOC__
+  let* reward_to_liquid =
+    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
+      ~policy
       (B b)
-      id
-      bal_main
+      cycle_for_rewards
+      pkh
       baking_reward_fixed_portion
+  in
+  let* () =
+    balance_was_credited ~loc:__LOC__ (B b) id bal_main reward_to_liquid
   in
   (* finish the cycle excluding the committing baker, id *)
   let* b = Block.bake_until_cycle_end ~policy b in
@@ -417,15 +429,19 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let* baker_pkh, _, _, _ = Block.get_next_baker ~policy b in
   let baker = Alpha_context.Contract.Implicit baker_pkh in
   let* baker_bal = Context.Contract.balance (B b) baker in
+  let cycle_for_rewards = Block.current_cycle b in
   let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
   (* test that the baker gets the tip reward plus the baking reward*)
-  let* () =
-    balance_was_credited
-      ~loc:__LOC__
+  let* reward_to_liquid =
+    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
+      ~policy
       (B b)
-      baker
-      baker_bal
+      cycle_for_rewards
+      pkh
       Test_tez.(seed_nonce_revelation_tip +! baking_reward_fixed_portion)
+  in
+  let* () =
+    balance_was_credited ~loc:__LOC__ (B b) baker baker_bal reward_to_liquid
   in
   (* test that revealing the VDF early produces an error *)
   let dummy_solution =
@@ -501,14 +517,18 @@ let test_early_incorrect_unverified_correct_already_vdf () =
             | _ -> false)
       in
       (* verify the balance was credited following operation inclusion *)
+      let cycle_for_rewards = Block.current_cycle b in
       let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
-      let* () =
-        balance_was_credited
-          ~loc:__LOC__
+      let* reward_to_liquid =
+        Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
+          ~policy
           (B b)
-          baker
-          baker_bal
+          cycle_for_rewards
+          pkh
           Test_tez.(vdf_nonce_revelation_tip +! baking_reward_fixed_portion)
+      in
+      let* () =
+        balance_was_credited ~loc:__LOC__ (B b) baker baker_bal reward_to_liquid
       in
       (* verify the seed status has changed *)
       let* seed_status = Context.get_seed_computation (B b) in

@@ -99,11 +99,17 @@ let test_valid_double_baking_evidence () =
       frozen_deposits_right_after
   in
   (* Check that the initial frozen deposits has not changed *)
-  let* initial_frozen_deposits =
+  let* initial_frozen_deposits_before =
+    Context.Delegate.initial_frozen_deposits (B blk_a) baker1
+  in
+  let* initial_frozen_deposits_after =
     Context.Delegate.initial_frozen_deposits (B blk_final) baker1
   in
   let* () =
-    Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
+    Assert.equal_tez
+      ~loc:__LOC__
+      initial_frozen_deposits_before
+      initial_frozen_deposits_after
   in
   (* Check that the frozen deposits have been slashed at the end of the cycle. *)
   let* blk_eoc, end_cycle_metadata, _next_cycle =
@@ -120,7 +126,8 @@ let test_valid_double_baking_evidence () =
   let autostaked = Block.autostaked baker1 end_cycle_metadata in
   let expected_frozen_deposits_after =
     Test_tez.(
-      (frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+      frozen_deposits_before
+      -! (initial_frozen_deposits_before *! Int64.of_int (p :> int) /! 100L)
       +! autostaked)
   in
   Assert.equal_tez
@@ -149,10 +156,13 @@ let test_valid_double_baking_followed_by_double_attesting () =
   let* genesis, contracts = Context.init2 ~consensus_threshold:0 () in
   let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
   let* b = Block.bake genesis in
-  let* frozen_deposits_before =
-    Context.Delegate.current_frozen_deposits (B b) baker1
-  in
   let* blk_a, blk_b = block_fork ~policy:(By_account baker1) contracts b in
+  let* frozen_deposits_before =
+    Context.Delegate.current_frozen_deposits (B blk_a) baker1
+  in
+  let* initial_frozen_deposits_before =
+    Context.Delegate.initial_frozen_deposits (B blk_a) baker1
+  in
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
   let* blk_with_db_evidence =
     Block.bake ~policy:(By_account baker2) ~operation blk_a
@@ -166,7 +176,7 @@ let test_valid_double_baking_followed_by_double_attesting () =
   let* attestation_b = Op.raw_attestation ~delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* blk_final =
-    Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
+    Block.bake ~policy:(By_account baker2) ~operation blk_with_db_evidence
   in
   let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_final) baker1
@@ -200,7 +210,9 @@ let test_valid_double_baking_followed_by_double_attesting () =
   in
   let expected_frozen_deposits_after =
     Test_tez.(
-      (frozen_deposits_before *! Int64.of_int (100 - p) /! 100L) +! autostaked)
+      frozen_deposits_before
+      -! (initial_frozen_deposits_before *! Int64.of_int p /! 100L)
+      +! autostaked)
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
      the percentages are additive, not multiplicative. *)
@@ -222,11 +234,14 @@ let test_valid_double_attesting_followed_by_double_baking () =
   let* genesis, contracts = Context.init2 ~consensus_threshold:0 () in
   let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
   let* blk_1, blk_2 = block_fork_diff genesis in
-  let* frozen_deposits_before =
-    Context.Delegate.current_frozen_deposits (B genesis) baker1
-  in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
+  let* frozen_deposits_before =
+    Context.Delegate.current_frozen_deposits (B blk_a) baker1
+  in
+  let* initial_frozen_deposits_before =
+    Context.Delegate.initial_frozen_deposits (B blk_a) baker1
+  in
   let* e1, e2 = Context.get_first_different_attesters (B blk_a) in
   let delegate =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
@@ -236,7 +251,7 @@ let test_valid_double_attesting_followed_by_double_baking () =
   let* attestation_b = Op.raw_attestation ~delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* blk_with_de_evidence =
-    Block.bake ~policy:(By_account baker1) ~operation blk_a
+    Block.bake ~policy:(By_account baker2) ~operation blk_a
   in
   let* blk_a, blk_b = block_fork ~policy:(By_account baker1) contracts blk_1 in
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
@@ -277,7 +292,9 @@ let test_valid_double_attesting_followed_by_double_baking () =
   in
   let expected_frozen_deposits_after =
     Test_tez.(
-      (frozen_deposits_before *! Int64.of_int (100 - p) /! 100L) +! autostaked)
+      frozen_deposits_before
+      -! (initial_frozen_deposits_before *! Int64.of_int p /! 100L)
+      +! autostaked)
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
      the percentages are additive, not multiplicative. *)
@@ -333,6 +350,9 @@ let test_payload_producer_gets_evidence_rewards () =
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B b1) baker1
   in
+  let* initial_frozen_deposits_before =
+    Context.Delegate.initial_frozen_deposits (B b1) baker1
+  in
   let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in
@@ -370,7 +390,8 @@ let test_payload_producer_gets_evidence_rewards () =
   in
   let expected_frozen_deposits_after =
     Test_tez.(
-      (frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+      frozen_deposits_before
+      -! (initial_frozen_deposits_before *! Int64.of_int (p :> int) /! 100L)
       +! autostaked)
   in
   (* the frozen deposits of the double-signer [baker1] are slashed *)
