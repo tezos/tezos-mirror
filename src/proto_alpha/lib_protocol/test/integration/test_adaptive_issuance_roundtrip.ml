@@ -478,7 +478,7 @@ module State = struct
          contract = _;
          delegate;
          parameters = _;
-         liquid = _;
+         liquid;
          bonds = _;
          frozen_deposits;
          unstaked_frozen;
@@ -528,7 +528,7 @@ module State = struct
         if autostaked > 0L then (
           log_model_autostake ~optimal name pkh old_cycle "stake" autostaked ;
           apply_stake
-            (Test_tez.of_mutez_exn autostaked)
+            Tez.(min liquid (of_mutez autostaked))
             (Cycle.succ old_cycle)
             name
             state)
@@ -2343,7 +2343,51 @@ module Autostaking = struct
     |+ Tag "Yes AI" --> setup ~activate_ai:true
        --> check_snapshot_balances "before delegation"
 
-  let tests = tests_of_scenarios [("Test auto-staking", test_autostaking)]
+  let test_overdelegation =
+    (* This test assumes that all delegate accounts created in [begin_test]
+       begin with 4M tz, with 5% staked *)
+    let constants = init_constants () in
+    begin_test
+      ~activate_ai:false
+      constants
+      ["delegate"; "faucet1"; "faucet2"; "faucet3"]
+    --> add_account_with_funds
+          "delegator_to_fund"
+          "delegate"
+          (Amount (Tez.of_mutez 3_600_000_000_000L))
+    (* Delegate has 200k staked and 200k liquid *)
+    --> set_delegate "delegator_to_fund" (Some "delegate")
+    (* Delegate stake will not change at the end of cycle: same stake *)
+    --> next_cycle
+    --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
+    --> transfer
+          "faucet1"
+          "delegator_to_fund"
+          (Amount (Tez.of_mutez 3_600_000_000_000L))
+    (* Delegate is not overdelegated, but will need to freeze 180k *)
+    --> next_cycle
+    --> check_balance_field "delegate" `Staked (Tez.of_mutez 380_000_000_000L)
+    --> transfer
+          "faucet2"
+          "delegator_to_fund"
+          (Amount (Tez.of_mutez 3_600_000_000_000L))
+    (* Delegate is now overdelegated, it will freeze 100% *)
+    --> next_cycle
+    --> check_balance_field "delegate" `Staked (Tez.of_mutez 400_000_000_000L)
+    --> transfer
+          "faucet3"
+          "delegator_to_fund"
+          (Amount (Tez.of_mutez 3_600_000_000_000L))
+    (* Delegate is overmegadelegated *)
+    --> next_cycle
+    --> check_balance_field "delegate" `Staked (Tez.of_mutez 400_000_000_000L)
+
+  let tests =
+    tests_of_scenarios
+      [
+        ("Test auto-staking", test_autostaking);
+        ("Test auto-staking with overdelegation", test_overdelegation);
+      ]
 end
 
 module Slashing = struct
