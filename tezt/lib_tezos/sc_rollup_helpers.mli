@@ -30,6 +30,9 @@
 (** Hooks that handles hashes specific to smart rollups. *)
 val hooks : Tezt.Process.hooks
 
+(** Expose Tezos_regression.rpc_hooks for regressions *)
+val rpc_hooks : RPC_core.rpc_hooks
+
 (** [hex_encode s] returns the hexadecimal representation of the given string [s]. *)
 val hex_encode : string -> string
 

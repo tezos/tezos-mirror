@@ -207,41 +207,6 @@ let rpc_get_rich ?hooks ?log_output sc_client path parameters =
   |> Runnable.map @@ fun output ->
      JSON.parse ~origin:(Client.string_of_path path ^ " response") output
 
-type 'output_type durable_state_operation =
-  | Value : string option durable_state_operation
-  | Length : int64 option durable_state_operation
-  | Subkeys : string list durable_state_operation
-
-let string_of_durable_state_operation (type a) (x : a durable_state_operation) =
-  match x with Value -> "value" | Length -> "length" | Subkeys -> "subkeys"
-
-let inspect_durable_state_value :
-    type a.
-    ?hooks:Process.hooks ->
-    ?log_output:bool ->
-    ?block:string ->
-    t ->
-    pvm_kind:string ->
-    operation:a durable_state_operation ->
-    key:string ->
-    a Runnable.process =
- fun ?hooks ?log_output ?(block = "head") sc_client ~pvm_kind ~operation ~key ->
-  let op = string_of_durable_state_operation operation in
-  let rpc_req () =
-    rpc_get_rich
-      ?hooks
-      ?log_output
-      sc_client
-      ["global"; "block"; block; "durable"; pvm_kind; op]
-      [("key", key)]
-  in
-  match operation with
-  | Value -> rpc_req () |> Runnable.map (fun json -> JSON.as_string_opt json)
-  | Length -> rpc_req () |> Runnable.map (fun json -> JSON.as_int64_opt json)
-  | Subkeys ->
-      rpc_req ()
-      |> Runnable.map (fun json -> List.map JSON.as_string (JSON.as_list json))
-
 let inject ?hooks sc_client messages =
   let messages_json =
     `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)

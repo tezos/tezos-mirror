@@ -109,16 +109,16 @@ let check_status_n_logs ~endpoint ~status ~logs ~tx =
 
 (** [get_value_in_storage client addr nth] fetch the [nth] value in the storage
     of account [addr]  *)
-let get_value_in_storage sc_rollup_client address nth =
-  Sc_rollup_client.inspect_durable_state_value
-    ~hooks
-    sc_rollup_client
-    ~pvm_kind
-    ~operation:Sc_rollup_client.Value
-    ~key:(Durable_storage_path.storage address ~key:(hex_256_of nth) ())
+let get_value_in_storage sc_rollup_node address nth =
+  Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+  @@ Sc_rollup_rpc.get_global_block_durable_state_value
+       ~pvm_kind
+       ~operation:Sc_rollup_rpc.Value
+       ~key:(Durable_storage_path.storage address ~key:(hex_256_of nth) ())
+       ()
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
-  let*! value = get_value_in_storage evm_setup.sc_rollup_client address nth in
+  let* value = get_value_in_storage evm_setup.sc_rollup_node address nth in
   Check.((value = Some expected) (option string))
     ~error_msg:"Unexpected value in storage, should be %R, but got %L" ;
   unit
@@ -126,14 +126,14 @@ let check_str_in_storage ~evm_setup ~address ~nth ~expected =
 let check_nb_in_storage ~evm_setup ~address ~nth ~expected =
   check_str_in_storage ~evm_setup ~address ~nth ~expected:(hex_256_of expected)
 
-let get_storage_size sc_rollup_client ~address =
-  let*! storage =
-    Sc_rollup_client.inspect_durable_state_value
-      ~hooks
-      sc_rollup_client
-      ~pvm_kind
-      ~operation:Sc_rollup_client.Subkeys
-      ~key:(Durable_storage_path.storage address ())
+let get_storage_size sc_rollup_node ~address =
+  let* storage =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:(Durable_storage_path.storage address ())
+         ()
   in
   return (List.length storage)
 
@@ -400,7 +400,7 @@ type deploy_checks = {
 
 let deploy_with_base_checks {contract; expected_address; expected_code} protocol
     =
-  let* ({sc_rollup_client; evm_node; _} as full_evm_setup) =
+  let* ({sc_rollup_node; evm_node; _} as full_evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -426,13 +426,13 @@ let deploy_with_base_checks {contract; expected_address; expected_code} protocol
           "The transaction object of a contract creation should not have the \
            [to] field present"
   | None -> Test.fail "The transaction object of %s should be available" tx) ;
-  let*! accounts =
-    Sc_rollup_client.inspect_durable_state_value
-      ~hooks
-      sc_rollup_client
-      ~pvm_kind
-      ~operation:Sc_rollup_client.Subkeys
-      ~key:Durable_storage_path.eth_accounts
+  let* accounts =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:Durable_storage_path.eth_accounts
+         ()
   in
   (* check tx status*)
   let* () = check_tx_succeeded ~endpoint ~tx in
@@ -513,7 +513,7 @@ let test_originate_evm_kernel =
       ])
     ~title:"Originate EVM kernel with installer"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; sc_rollup_client; _} =
+  let* {node; client; sc_rollup_node; _} =
     setup_evm_kernel ~admin:None protocol
   in
   (* First run of the installed EVM kernel, it will initialize the directory
@@ -530,13 +530,13 @@ let test_originate_evm_kernel =
     Check.int
     ~error_msg:"Current level has moved past first EVM run (%L = %R)" ;
   let evm_key = "evm" in
-  let*! storage_root_keys =
-    Sc_rollup_client.inspect_durable_state_value
-      ~hooks
-      sc_rollup_client
-      ~pvm_kind
-      ~operation:Sc_rollup_client.Subkeys
-      ~key:""
+  let* storage_root_keys =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:""
+         ()
   in
   Check.(
     list_mem
@@ -980,7 +980,7 @@ let test_l2_call_simple_storage =
     ~title:"Check L2 contract call"
   @@ fun protocol ->
   (* setup *)
-  let* ({evm_node; sc_rollup_client; _} as evm_setup) =
+  let* ({evm_node; sc_rollup_node; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -993,7 +993,7 @@ let test_l2_call_simple_storage =
   let* tx = send_call_set_storage_simple address sender 42 evm_setup in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_client ~address 1 in
+  let* () = check_storage_size sc_rollup_node ~address 1 in
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:42 in
 
   (* set 24 by another user *)
@@ -1006,7 +1006,7 @@ let test_l2_call_simple_storage =
   in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_client ~address 1 in
+  let* () = check_storage_size sc_rollup_node ~address 1 in
   (* value stored has changed *)
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:24 in
 
@@ -1016,7 +1016,7 @@ let test_l2_call_simple_storage =
   let* tx = send_call_set_storage_simple address sender (-1) evm_setup in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_client ~address 1 in
+  let* () = check_storage_size sc_rollup_node ~address 1 in
   (* value stored has changed *)
   let* () =
     check_str_in_storage
@@ -1042,8 +1042,7 @@ let test_l2_deploy_erc20 =
     ~title:"Check L2 erc20 contract deployment"
   @@ fun protocol ->
   (* setup *)
-  let* ({sc_rollup_client; evm_node; node; client; sc_rollup_node; _} as
-       evm_setup) =
+  let* ({evm_node; node; client; sc_rollup_node; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -1062,13 +1061,13 @@ let test_l2_deploy_erc20 =
   let* () = check_tx_succeeded ~endpoint ~tx in
 
   (* check account was created *)
-  let*! accounts =
-    Sc_rollup_client.inspect_durable_state_value
-      ~hooks
-      sc_rollup_client
-      ~pvm_kind
-      ~operation:Sc_rollup_client.Subkeys
-      ~key:Durable_storage_path.eth_accounts
+  let* accounts =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:Durable_storage_path.eth_accounts
+         ()
   in
   Check.(
     list_mem
@@ -2095,13 +2094,14 @@ let test_preinitialized_evm_kernel =
             };
         ]
   in
-  let* {sc_rollup_client; _} = setup_evm_kernel ~config ~admin:None protocol in
-  let*! found_administrator_key_hex =
-    Sc_rollup_client.inspect_durable_state_value
-      sc_rollup_client
-      ~pvm_kind:"wasm_2_0_0"
-      ~operation:Sc_rollup_client.Value
-      ~key:administrator_key_path
+  let* {sc_rollup_node; _} = setup_evm_kernel ~config ~admin:None protocol in
+  let* found_administrator_key_hex =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:administrator_key_path
+         ()
   in
   let found_administrator_key =
     Option.map
@@ -2324,20 +2324,19 @@ let test_deposit_and_withdraw =
     ~error_msg:(sf "Expected %%R amount instead of %%L after withdrawal") ;
   return ()
 
-let get_kernel_boot_wasm ~sc_rollup_client =
-  let hooks : Process_hooks.t =
-    let on_spawn _command _arguments = () in
-    let on_log _output = Regression.capture "<boot.wasm>" in
-    {on_spawn; on_log}
+let get_kernel_boot_wasm ~sc_rollup_node =
+  let rpc_hooks : RPC_core.rpc_hooks =
+    let on_request _verb ~uri:_ _data = Regression.capture "<boot.wasm>" in
+    let on_response _status ~body:_ = Regression.capture "<boot.wasm>" in
+    {on_request; on_response}
   in
-  let*! kernel_boot_opt =
-    Sc_rollup_client.inspect_durable_state_value
-      sc_rollup_client
-      ~hooks
-      ~log_output:false
-      ~pvm_kind:"wasm_2_0_0"
-      ~operation:Sc_rollup_client.Value
-      ~key:Durable_storage_path.kernel_boot_wasm
+  let* kernel_boot_opt =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:Durable_storage_path.kernel_boot_wasm
+         ()
   in
   match kernel_boot_opt with
   | Some boot_wasm -> return boot_wasm
@@ -2350,7 +2349,6 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
          node;
          client;
          sc_rollup_node;
-         sc_rollup_client;
          sc_rollup_address;
          evm_node;
          l1_contracts;
@@ -2375,9 +2373,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
       ~base_installee
       installee
   in
-  let* kernel_boot_wasm_before_upgrade =
-    get_kernel_boot_wasm ~sc_rollup_client
-  in
+  let* kernel_boot_wasm_before_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
   let* expected_kernel_boot_wasm =
     if should_fail then return kernel_boot_wasm_before_upgrade
     else
@@ -2398,18 +2394,11 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
     let* _ = next_evm_level ~sc_rollup_node ~node ~client in
     unit
   in
-  let* kernel_boot_wasm_after_upgrade =
-    get_kernel_boot_wasm ~sc_rollup_client
-  in
+  let* kernel_boot_wasm_after_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
   Check.((expected_kernel_boot_wasm = kernel_boot_wasm_after_upgrade) string)
     ~error_msg:(sf "Unexpected `boot.wasm`.") ;
   return
-    ( sc_rollup_node,
-      sc_rollup_client,
-      node,
-      client,
-      evm_node,
-      kernel_boot_wasm_before_upgrade )
+    (sc_rollup_node, node, client, evm_node, kernel_boot_wasm_before_upgrade)
 
 let test_kernel_upgrade_to_debug =
   Protocol.register_test
@@ -2444,7 +2433,7 @@ let test_kernel_upgrade_evm_to_evm =
   @@ fun protocol ->
   let base_installee = "./" in
   let installee = "evm_kernel" in
-  let* sc_rollup_node, _, node, client, evm_node, _ =
+  let* sc_rollup_node, node, client, evm_node, _ =
     gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
   (* We ensure the upgrade went well by checking if the kernel still produces
@@ -2550,29 +2539,25 @@ let test_kernel_upgrade_failing_migration =
   @@ fun protocol ->
   let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
   let installee = "failed_migration" in
-  let* ( sc_rollup_node,
-         sc_rollup_client,
-         node,
-         client,
-         evm_node,
-         original_kernel_boot_wasm ) =
+  let* sc_rollup_node, node, client, evm_node, original_kernel_boot_wasm =
     gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
   (* Fallback mechanism is triggered, no block is produced at that level. *)
   let* _ = next_evm_level ~sc_rollup_node ~node ~client in
   (* We make sure that we can't read under the tmp file, after migration failed,
      everything is reverted. *)
-  let*! tmp_dummy =
-    Sc_rollup_client.inspect_durable_state_value
-      sc_rollup_client
-      ~pvm_kind:"wasm_2_0_0"
-      ~operation:Sc_rollup_client.Value
-      ~key:"/tmp/__dummy"
+  let* tmp_dummy =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:"/tmp/__dummy"
+         ()
   in
   (match tmp_dummy with
   | Some _ -> failwith "Nothing should be readable under the temporary dir."
   | None -> ()) ;
-  let* kernel_after_migration_failed = get_kernel_boot_wasm ~sc_rollup_client in
+  let* kernel_after_migration_failed = get_kernel_boot_wasm ~sc_rollup_node in
   (* The upgrade succeeded, but the fallback mechanism was activated, so the kernel
      after the upgrade/migration is still the previous one. *)
   Check.((original_kernel_boot_wasm = kernel_after_migration_failed) string)
@@ -3759,16 +3744,17 @@ let test_accounts_double_indexing =
       ])
     ~title:"Accounts have a unique index"
   @@ fun protocol ->
-  let* ({sc_rollup_client; _} as full_evm_setup) =
+  let* ({sc_rollup_node; _} as full_evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let check_accounts_length expected_length =
-    let*! length =
-      Sc_rollup_client.inspect_durable_state_value
-        sc_rollup_client
-        ~pvm_kind:"wasm_2_0_0"
-        ~operation:Sc_rollup_client.Value
-        ~key:"/evm/indexes/accounts/length"
+    let* length =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/indexes/accounts/length"
+           ()
     in
     let length = Option.map Helpers.hex_string_to_int length in
     Check.((length = Some expected_length) (option int))
@@ -3799,7 +3785,7 @@ let test_originate_evm_kernel_and_dump_pvm_state =
       ])
     ~title:"Originate EVM kernel with installer and dump PVM state"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; sc_rollup_client; _} =
+  let* {node; client; sc_rollup_node; _} =
     setup_evm_kernel ~admin:None protocol
   in
   (* First run of the installed EVM kernel, it will initialize the directory
@@ -3815,12 +3801,13 @@ let test_originate_evm_kernel_and_dump_pvm_state =
       (* We consider only the Set instruction because the dump durable storage
          command of the node produce only this instruction. *)
       | Installer_kernel_config.Set {value; to_} ->
-          let*! expected_value =
-            Sc_rollup_client.inspect_durable_state_value
-              sc_rollup_client
-              ~pvm_kind:"wasm_2_0_0"
-              ~operation:Sc_rollup_client.Value
-              ~key:to_
+          let* expected_value =
+            Sc_rollup_node.RPC.call sc_rollup_node
+            @@ Sc_rollup_rpc.get_global_block_durable_state_value
+                 ~pvm_kind:"wasm_2_0_0"
+                 ~operation:Sc_rollup_rpc.Value
+                 ~key:to_
+                 ()
           in
           let expected_value =
             match expected_value with
@@ -3851,8 +3838,7 @@ let test_l2_call_inter_contract =
     ~title:"Check L2 inter contract call"
   @@ fun protocol ->
   (* setup *)
-  let* ({evm_node; sc_rollup_client; sc_rollup_node; node; client; _} as
-       evm_setup) =
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -3880,7 +3866,7 @@ let test_l2_call_inter_contract =
   in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_client ~address:callee_address 1 in
+  let* () = check_storage_size sc_rollup_node ~address:callee_address 1 in
   let* () =
     check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:20
   in
@@ -3907,7 +3893,7 @@ let test_l2_call_inter_contract =
   in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_client ~address:callee_address 1 in
+  let* () = check_storage_size sc_rollup_node ~address:callee_address 1 in
   let* () =
     check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:10
   in
