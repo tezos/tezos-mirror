@@ -192,6 +192,8 @@ types:
     seq:
     - id: len_case__129_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__129_elt_field0
       type: case__129_elt_field0
       size: len_case__129_elt_field0
@@ -224,6 +226,8 @@ types:
     seq:
     - id: len_case__130_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__130_elt_field0
       type: case__130_elt_field0
       size: len_case__130_elt_field0
@@ -241,6 +245,8 @@ types:
     seq:
     - id: len_case__131_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__131_elt_field0
       type: case__131_elt_field0
       size: len_case__131_elt_field0
@@ -258,6 +264,8 @@ types:
     seq:
     - id: len_case__132_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__132_elt_field0
       type: case__132_elt_field0
       size: len_case__132_elt_field0
@@ -275,6 +283,8 @@ types:
     seq:
     - id: len_case__133_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__133_elt_field0
       type: case__133_elt_field0
       size: len_case__133_elt_field0
@@ -292,6 +302,8 @@ types:
     seq:
     - id: len_case__134_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__134_elt_field0
       type: case__134_elt_field0
       size: len_case__134_elt_field0
@@ -309,6 +321,8 @@ types:
     seq:
     - id: len_case__135_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__135_elt_field0
       type: case__135_elt_field0
       size: len_case__135_elt_field0
@@ -326,6 +340,8 @@ types:
     seq:
     - id: len_case__136_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__136_elt_field0
       type: case__136_elt_field0
       size: len_case__136_elt_field0
@@ -343,6 +359,8 @@ types:
     seq:
     - id: len_case__137_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__137_elt_field0
       type: case__137_elt_field0
       size: len_case__137_elt_field0
@@ -360,6 +378,8 @@ types:
     seq:
     - id: len_case__138_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__138_elt_field0
       type: case__138_elt_field0
       size: len_case__138_elt_field0
@@ -377,6 +397,8 @@ types:
     seq:
     - id: len_case__139_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__139_elt_field0
       type: case__139_elt_field0
       size: len_case__139_elt_field0
@@ -409,6 +431,8 @@ types:
     seq:
     - id: len_case__140_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__140_elt_field0
       type: case__140_elt_field0
       size: len_case__140_elt_field0
@@ -426,6 +450,8 @@ types:
     seq:
     - id: len_case__141_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__141_elt_field0
       type: case__141_elt_field0
       size: len_case__141_elt_field0
@@ -443,6 +469,8 @@ types:
     seq:
     - id: len_case__142_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__142_elt_field0
       type: case__142_elt_field0
       size: len_case__142_elt_field0
@@ -460,6 +488,8 @@ types:
     seq:
     - id: len_case__143_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__143_elt_field0
       type: case__143_elt_field0
       size: len_case__143_elt_field0
@@ -477,6 +507,8 @@ types:
     seq:
     - id: len_case__144_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__144_elt_field0
       type: case__144_elt_field0
       size: len_case__144_elt_field0
@@ -494,6 +526,8 @@ types:
     seq:
     - id: len_case__145_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__145_elt_field0
       type: case__145_elt_field0
       size: len_case__145_elt_field0
@@ -511,6 +545,8 @@ types:
     seq:
     - id: len_case__146_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__146_elt_field0
       type: case__146_elt_field0
       size: len_case__146_elt_field0
@@ -528,6 +564,8 @@ types:
     seq:
     - id: len_case__147_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__147_elt_field0
       type: case__147_elt_field0
       size: len_case__147_elt_field0
@@ -545,6 +583,8 @@ types:
     seq:
     - id: len_case__148_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__148_elt_field0
       type: case__148_elt_field0
       size: len_case__148_elt_field0
@@ -562,6 +602,8 @@ types:
     seq:
     - id: len_case__149_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__149_elt_field0
       type: case__149_elt_field0
       size: len_case__149_elt_field0
@@ -594,6 +636,8 @@ types:
     seq:
     - id: len_case__150_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__150_elt_field0
       type: case__150_elt_field0
       size: len_case__150_elt_field0
@@ -611,6 +655,8 @@ types:
     seq:
     - id: len_case__151_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__151_elt_field0
       type: case__151_elt_field0
       size: len_case__151_elt_field0
@@ -628,6 +674,8 @@ types:
     seq:
     - id: len_case__152_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__152_elt_field0
       type: case__152_elt_field0
       size: len_case__152_elt_field0
@@ -645,6 +693,8 @@ types:
     seq:
     - id: len_case__153_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__153_elt_field0
       type: case__153_elt_field0
       size: len_case__153_elt_field0
@@ -662,6 +712,8 @@ types:
     seq:
     - id: len_case__154_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__154_elt_field0
       type: case__154_elt_field0
       size: len_case__154_elt_field0
@@ -679,6 +731,8 @@ types:
     seq:
     - id: len_case__155_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__155_elt_field0
       type: case__155_elt_field0
       size: len_case__155_elt_field0
@@ -696,6 +750,8 @@ types:
     seq:
     - id: len_case__156_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__156_elt_field0
       type: case__156_elt_field0
       size: len_case__156_elt_field0
@@ -713,6 +769,8 @@ types:
     seq:
     - id: len_case__157_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__157_elt_field0
       type: case__157_elt_field0
       size: len_case__157_elt_field0
@@ -730,6 +788,8 @@ types:
     seq:
     - id: len_case__158_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__158_elt_field0
       type: case__158_elt_field0
       size: len_case__158_elt_field0
@@ -747,6 +807,8 @@ types:
     seq:
     - id: len_case__159_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__159_elt_field0
       type: case__159_elt_field0
       size: len_case__159_elt_field0
@@ -779,6 +841,8 @@ types:
     seq:
     - id: len_case__160_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__160_elt_field0
       type: case__160_elt_field0
       size: len_case__160_elt_field0
@@ -796,6 +860,8 @@ types:
     seq:
     - id: len_case__161_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__161_elt_field0
       type: case__161_elt_field0
       size: len_case__161_elt_field0
@@ -813,6 +879,8 @@ types:
     seq:
     - id: len_case__162_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__162_elt_field0
       type: case__162_elt_field0
       size: len_case__162_elt_field0
@@ -830,6 +898,8 @@ types:
     seq:
     - id: len_case__163_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__163_elt_field0
       type: case__163_elt_field0
       size: len_case__163_elt_field0
@@ -847,6 +917,8 @@ types:
     seq:
     - id: len_case__164_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__164_elt_field0
       type: case__164_elt_field0
       size: len_case__164_elt_field0
@@ -864,6 +936,8 @@ types:
     seq:
     - id: len_case__165_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__165_elt_field0
       type: case__165_elt_field0
       size: len_case__165_elt_field0
@@ -881,6 +955,8 @@ types:
     seq:
     - id: len_case__166_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__166_elt_field0
       type: case__166_elt_field0
       size: len_case__166_elt_field0
@@ -898,6 +974,8 @@ types:
     seq:
     - id: len_case__167_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__167_elt_field0
       type: case__167_elt_field0
       size: len_case__167_elt_field0
@@ -915,6 +993,8 @@ types:
     seq:
     - id: len_case__168_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__168_elt_field0
       type: case__168_elt_field0
       size: len_case__168_elt_field0
@@ -932,6 +1012,8 @@ types:
     seq:
     - id: len_case__169_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__169_elt_field0
       type: case__169_elt_field0
       size: len_case__169_elt_field0
@@ -964,6 +1046,8 @@ types:
     seq:
     - id: len_case__170_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__170_elt_field0
       type: case__170_elt_field0
       size: len_case__170_elt_field0
@@ -981,6 +1065,8 @@ types:
     seq:
     - id: len_case__171_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__171_elt_field0
       type: case__171_elt_field0
       size: len_case__171_elt_field0
@@ -998,6 +1084,8 @@ types:
     seq:
     - id: len_case__172_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__172_elt_field0
       type: case__172_elt_field0
       size: len_case__172_elt_field0
@@ -1015,6 +1103,8 @@ types:
     seq:
     - id: len_case__173_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__173_elt_field0
       type: case__173_elt_field0
       size: len_case__173_elt_field0
@@ -1032,6 +1122,8 @@ types:
     seq:
     - id: len_case__174_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__174_elt_field0
       type: case__174_elt_field0
       size: len_case__174_elt_field0
@@ -1049,6 +1141,8 @@ types:
     seq:
     - id: len_case__175_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__175_elt_field0
       type: case__175_elt_field0
       size: len_case__175_elt_field0
@@ -1066,6 +1160,8 @@ types:
     seq:
     - id: len_case__176_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__176_elt_field0
       type: case__176_elt_field0
       size: len_case__176_elt_field0
@@ -1083,6 +1179,8 @@ types:
     seq:
     - id: len_case__177_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__177_elt_field0
       type: case__177_elt_field0
       size: len_case__177_elt_field0
@@ -1100,6 +1198,8 @@ types:
     seq:
     - id: len_case__178_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__178_elt_field0
       type: case__178_elt_field0
       size: len_case__178_elt_field0
@@ -1117,6 +1217,8 @@ types:
     seq:
     - id: len_case__179_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__179_elt_field0
       type: case__179_elt_field0
       size: len_case__179_elt_field0
@@ -1149,6 +1251,8 @@ types:
     seq:
     - id: len_case__180_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__180_elt_field0
       type: case__180_elt_field0
       size: len_case__180_elt_field0
@@ -1166,6 +1270,8 @@ types:
     seq:
     - id: len_case__181_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__181_elt_field0
       type: case__181_elt_field0
       size: len_case__181_elt_field0
@@ -1183,6 +1289,8 @@ types:
     seq:
     - id: len_case__182_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__182_elt_field0
       type: case__182_elt_field0
       size: len_case__182_elt_field0
@@ -1200,6 +1308,8 @@ types:
     seq:
     - id: len_case__183_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__183_elt_field0
       type: case__183_elt_field0
       size: len_case__183_elt_field0
@@ -1217,6 +1327,8 @@ types:
     seq:
     - id: len_case__184_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__184_elt_field0
       type: case__184_elt_field0
       size: len_case__184_elt_field0
@@ -1234,6 +1346,8 @@ types:
     seq:
     - id: len_case__185_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__185_elt_field0
       type: case__185_elt_field0
       size: len_case__185_elt_field0
@@ -1251,6 +1365,8 @@ types:
     seq:
     - id: len_case__186_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__186_elt_field0
       type: case__186_elt_field0
       size: len_case__186_elt_field0
@@ -1268,6 +1384,8 @@ types:
     seq:
     - id: len_case__187_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__187_elt_field0
       type: case__187_elt_field0
       size: len_case__187_elt_field0
@@ -1285,6 +1403,8 @@ types:
     seq:
     - id: len_case__188_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__188_elt_field0
       type: case__188_elt_field0
       size: len_case__188_elt_field0
@@ -1302,6 +1422,8 @@ types:
     seq:
     - id: len_case__189_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__189_elt_field0
       type: case__189_elt_field0
       size: len_case__189_elt_field0
@@ -1334,6 +1456,8 @@ types:
     seq:
     - id: len_case__190_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__190_elt_field0
       type: case__190_elt_field0
       size: len_case__190_elt_field0
@@ -1370,6 +1494,8 @@ types:
     seq:
     - id: len_case__191_elt_field0
       type: u1
+      valid:
+        max: 255
     - id: case__191_elt_field0
       type: case__191_elt_field0
       size: len_case__191_elt_field0
@@ -1387,6 +1513,8 @@ types:
     seq:
     - id: len_case__192
       type: u1
+      valid:
+        max: 255
     - id: case__192
       type: case__192
       size: len_case__192
@@ -1398,6 +1526,8 @@ types:
     seq:
     - id: len_case__193
       type: u2
+      valid:
+        max: 65535
     - id: case__193
       type: case__193
       size: len_case__193
@@ -1450,6 +1580,8 @@ types:
     seq:
     - id: len_case__208_field1
       type: u1
+      valid:
+        max: 255
     - id: case__208_field1
       type: case__208_field1
       size: len_case__208_field1
@@ -1469,6 +1601,8 @@ types:
     seq:
     - id: len_case__209_field1
       type: u1
+      valid:
+        max: 255
     - id: case__209_field1
       type: case__209_field1
       size: len_case__209_field1
@@ -1503,6 +1637,8 @@ types:
     seq:
     - id: len_case__210_field1
       type: u1
+      valid:
+        max: 255
     - id: case__210_field1
       type: case__210_field1
       size: len_case__210_field1
@@ -1522,6 +1658,8 @@ types:
     seq:
     - id: len_case__211_field1
       type: u1
+      valid:
+        max: 255
     - id: case__211_field1
       type: case__211_field1
       size: len_case__211_field1
@@ -1541,6 +1679,8 @@ types:
     seq:
     - id: len_case__216_field1
       type: u1
+      valid:
+        max: 255
     - id: case__216_field1
       type: case__216_field1
       size: len_case__216_field1
@@ -1560,6 +1700,8 @@ types:
     seq:
     - id: len_case__217_field1
       type: u1
+      valid:
+        max: 255
     - id: case__217_field1
       type: case__217_field1
       size: len_case__217_field1
@@ -1579,6 +1721,8 @@ types:
     seq:
     - id: len_case__218_field1
       type: u1
+      valid:
+        max: 255
     - id: case__218_field1
       type: case__218_field1
       size: len_case__218_field1
@@ -1598,6 +1742,8 @@ types:
     seq:
     - id: len_case__219_field1
       type: u1
+      valid:
+        max: 255
     - id: case__219_field1
       type: case__219_field1
       size: len_case__219_field1
@@ -3496,6 +3642,8 @@ types:
     seq:
     - id: len_named
       type: u1
+      valid:
+        max: 31
     - id: named
       type: named
       size: len_named
@@ -3805,6 +3953,8 @@ types:
     seq:
     - id: len_proposals
       type: s4
+      valid:
+        max: 640
     - id: proposals
       type: proposals
       size: len_proposals

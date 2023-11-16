@@ -206,6 +206,8 @@ types:
     seq:
     - id: len_named
       type: u1
+      valid:
+        max: 31
     - id: named
       type: named
       size: len_named
