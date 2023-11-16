@@ -1,0 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_wasm_debugger_lib)
+ (public_name octez-smart-rollup-wasm-debugger-lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  octez-libs.tree-encoding
+  octez-libs.base.unix
+  octez-protocol-alpha-libs.client
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-helpers
+  octez-l2-libs.smart-rollup
+  octez-l2-libs.webassembly-interpreter
+  octez-l2-libs.webassembly-interpreter-extra
+  octez-version.value
+  octez-smart-rollup-wasm-debugger-plugin
+  dynlink
+  lambda-term)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_scoru_wasm_helpers
+  -open Tezos_webassembly_interpreter
+  -open Tezos_webassembly_interpreter_extra))

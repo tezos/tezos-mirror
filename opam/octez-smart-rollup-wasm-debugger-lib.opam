@@ -10,11 +10,16 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" & < "3.11" }
   "ocaml" { >= "4.14" }
-  "octez-smart-rollup-wasm-debugger-lib"
+  "octez-libs"
+  "octez-protocol-alpha-libs"
+  "octez-l2-libs"
+  "octez-version"
+  "octez-smart-rollup-wasm-debugger-plugin"
+  "lambda-term" { >= "3.3.1" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: Debugger for the smart rollups’ WASM kernels"
+synopsis: "Tezos: Library used for the Smart Rollups' WASM debugger"
