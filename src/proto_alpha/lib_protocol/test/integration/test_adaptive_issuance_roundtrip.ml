@@ -1786,18 +1786,13 @@ let test_expected_error =
            (exec (fun _ -> failwith "")))
 
 let init_constants ?reward_per_block ?(deactivate_dynamic = false)
-    ?blocks_per_cycle ?(force_snapshot_at_end = false) ?autostaking_enable () =
+    ?blocks_per_cycle ?(force_snapshot_at_end = false) ~autostaking_enable () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
   (* default for tests: 12 *)
   let blocks_per_cycle =
     Option.value ~default:default_constants.blocks_per_cycle blocks_per_cycle
-  in
-  let autostaking_enable =
-    Option.value
-      ~default:default_constants.adaptive_issuance.autostaking_enable
-      autostaking_enable
   in
   let blocks_per_stake_snapshot =
     if force_snapshot_at_end then blocks_per_cycle
@@ -1849,7 +1844,9 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
     Any scenario that begins with this will be triplicated.
  *)
 let init_scenario ?(force_ai = true) ?reward_per_block () =
-  let constants = init_constants ?reward_per_block () in
+  let constants =
+    init_constants ?reward_per_block ~autostaking_enable:false ()
+  in
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
@@ -1916,7 +1913,7 @@ module Roundtrip = struct
     --> finalize "staker" --> next_cycle
 
   let shorter_roundtrip_for_baker =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     let amount = Amount (Tez.of_mutez 333_000_000_000L) in
     let preserved_cycles = constants.preserved_cycles in
     begin_test ~activate_ai:true constants ["delegate"]
@@ -2012,7 +2009,7 @@ module Roundtrip = struct
     loop 20 one_cycle
 
   let change_delegate =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     let init_params =
       {
         limit_of_staking_over_baking = Q.one;
@@ -2035,7 +2032,7 @@ module Roundtrip = struct
     --> stake "staker" Half
 
   let unset_delegate =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     let init_params =
       {
         limit_of_staking_over_baking = Q.one;
@@ -2063,7 +2060,7 @@ module Roundtrip = struct
     --> finalize_unstake "staker"
 
   let forbid_costaking =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     let init_params =
       {
         limit_of_staking_over_baking = Q.one;
@@ -2136,7 +2133,12 @@ end
 
 module Rewards = struct
   let test_wait_with_rewards =
-    let constants = init_constants ~reward_per_block:1_000_000_000L () in
+    let constants =
+      init_constants
+        ~reward_per_block:1_000_000_000L
+        ~autostaking_enable:false
+        ()
+    in
     begin_test ~activate_ai:true constants ["delegate"]
     --> (Tag "block step" --> wait_n_blocks 200
         |+ Tag "cycle step" --> wait_n_cycles 20
@@ -2170,6 +2172,7 @@ module Rewards = struct
       init_constants
         ~reward_per_block:1_000_000_000L
         ~deactivate_dynamic:true
+        ~autostaking_enable:false
         ()
     in
     let rate_var_lag = constants.preserved_cycles in
@@ -2257,7 +2260,7 @@ module Autostaking = struct
   and delegator2 = "delegator2"
 
   let setup ~activate_ai =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:true () in
     begin_test ~activate_ai constants [delegate]
     --> add_account_with_funds
           delegator1
@@ -2346,7 +2349,7 @@ module Autostaking = struct
   let test_overdelegation =
     (* This test assumes that all delegate accounts created in [begin_test]
        begin with 4M tz, with 5% staked *)
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:true () in
     begin_test
       ~activate_ai:false
       constants
@@ -2459,7 +2462,9 @@ module Slashing = struct
         return input)
 
   let test_delegate_forbidden =
-    let constants = init_constants ~blocks_per_cycle:30l () in
+    let constants =
+      init_constants ~blocks_per_cycle:30l ~autostaking_enable:false ()
+    in
     begin_test
       ~activate_ai:false
       constants
@@ -2530,7 +2535,7 @@ module Slashing = struct
            --> check_is_forbidden "delegate")
 
   let test_slash_unstake =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     begin_test
       ~activate_ai:false
       constants
@@ -2575,7 +2580,7 @@ module Slashing = struct
       init_constants
         ~force_snapshot_at_end:true
         ~blocks_per_cycle:8l
-        ~autostaking_enable:true
+        ~autostaking_enable:false
         ()
     in
     begin_test ~activate_ai:false constants ["delegate"]
@@ -2593,7 +2598,9 @@ module Slashing = struct
     --> double_bake "delegate" --> make_denunciations () --> next_cycle
 
   let init_scenario_with_delegators delegate_name delegators_list =
-    let constants = init_constants ~force_snapshot_at_end:true () in
+    let constants =
+      init_constants ~force_snapshot_at_end:true ~autostaking_enable:false ()
+    in
     let rec init_delegators = function
       | [] -> Empty
       | (delegator, amount) :: t ->
@@ -2654,7 +2661,7 @@ module Slashing = struct
               --> slash "delegate" --> next_cycle)) *)
 
   let test_no_shortcut_for_cheaters =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     let amount = Amount (Tez.of_mutez 333_000_000_000L) in
     let preserved_cycles = constants.preserved_cycles in
     begin_test ~activate_ai:true constants ["delegate"]
@@ -2676,7 +2683,7 @@ module Slashing = struct
            --> check_snapshot_balances "init")
 
   let test_slash_correct_amount_after_stake_from_unstake =
-    let constants = init_constants () in
+    let constants = init_constants ~autostaking_enable:false () in
     let amount_to_unstake = Amount (Tez.of_mutez 200_000_000_000L) in
     let amount_to_restake = Amount (Tez.of_mutez 100_000_000_000L) in
     let amount_expected_in_unstake_after_slash = Tez.of_mutez 50_000_000_000L in
