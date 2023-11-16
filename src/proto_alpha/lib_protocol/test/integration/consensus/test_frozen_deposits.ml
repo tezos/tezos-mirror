@@ -342,7 +342,11 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   let* () = Assert.equal_tez ~loc:__LOC__ fd fd_before in
   (* ...though we are immediately not allowed to bake with [slashed_account] *)
   let*! res = Block.bake ~policy:(By_account slashed_account) b in
-  let* () = Assert.error ~loc:__LOC__ res (fun _ -> true) in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+        | _ -> false)
+  in
   let* b, metadata, _ =
     Block.bake_until_cycle_end_with_metadata ~policy:(By_account good_account) b
   in
@@ -482,19 +486,24 @@ let test_cannot_bake_with_zero_deposits_limit () =
       b
   in
   let*! b1 = Block.bake ~policy:(By_account account1) b in
-  (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
-     cannot be a proposer, thus it cannot bake. Precisely, bake fails because
-     get_next_baker_by_account fails with "No slots found" *)
-  let* () = Assert.error ~loc:__LOC__ b1 (fun _ -> true) in
+  (* by now, the active stake of account1 is 0 so it has been forbidden at
+     cycle end, thus it cannot bake. *)
+  let* () =
+    Assert.proto_error ~loc:__LOC__ b1 (function
+        | Validate_errors.Consensus.Zero_frozen_deposits _ -> true
+        | _ -> false)
+  in
   let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
   (* after one cycle is passed, the frozen deposit window has passed
-     and the frozen deposits should now be effectively 0. *)
+     and the baker should now effectively have no baking rights.
+     Precisely, bake fails because get_next_baker_by_account fails with
+     "No slots found" *)
   let* fd = Context.Delegate.current_frozen_deposits (B b) account1 in
   let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
   let*! b1 = Block.bake ~policy:(By_account account1) b in
-  (* don't know why the zero frozen deposits error is not caught here *)
-  (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
-  Assert.error ~loc:__LOC__ b1 (fun _ -> true)
+  Assert.error ~loc:__LOC__ b1 (function
+      | Block.No_slots_found_for _ -> true
+      | _ -> false)
 
 let test_deposits_after_stake_removal () =
   let open Lwt_result_syntax in
