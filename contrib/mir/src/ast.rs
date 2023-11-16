@@ -9,6 +9,7 @@ pub mod annotations;
 pub mod comparable;
 pub mod micheline;
 pub mod michelson_address;
+pub mod michelson_key;
 pub mod michelson_list;
 pub mod or;
 pub mod overloads;
@@ -21,6 +22,7 @@ use typed_arena::Arena;
 use crate::lexer::Prim;
 
 pub use michelson_address::*;
+pub use michelson_key::Key;
 pub use michelson_list::MichelsonList;
 pub use or::Or;
 
@@ -100,6 +102,7 @@ pub enum TypedValue {
     ChainId(ChainId),
     Contract(Address),
     Bytes(Vec<u8>),
+    Key(Key),
 }
 
 pub fn typed_value_to_value_optimized<'a>(
@@ -138,6 +141,7 @@ pub fn typed_value_to_value_optimized<'a>(
         TV::ChainId(x) => V::Bytes(x.into()),
         TV::Contract(x) => go(TV::Address(x)),
         TV::Bytes(x) => V::Bytes(x),
+        TV::Key(k) => V::Bytes(k.to_bytes_vec()),
     }
 }
 
