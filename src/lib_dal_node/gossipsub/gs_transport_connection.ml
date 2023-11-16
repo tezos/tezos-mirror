@@ -172,7 +172,11 @@ let px_of_peer p2p_layer peer =
   let* port = Option.either advertised_net_port conn_port_opt in
   return {point = (addr, port); peer}
 
-(* TODO: Use this function when trusting a peer via an RPC. *)
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/6637
+
+   When adding an RPC to trust peers/points. Use this function when trusting a peer
+   via an RPC. *)
+
 (* This function inserts the point of a trusted peer into the [px_cache]
    table. *)
 let cache_point_of_trusted_peer p2p_layer px_cache peer =
