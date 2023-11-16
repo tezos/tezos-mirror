@@ -198,6 +198,7 @@ pub mod interpret_cost {
     pub const AMOUNT: u32 = 10;
     pub const NIL: u32 = 10;
     pub const CONS: u32 = 15;
+    pub const EMPTY_SET: u32 = 300;
     pub const CHAIN_ID: u32 = 15;
     pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;

@@ -948,6 +948,14 @@ pub(crate) fn typecheck_instruction(
         (App(CONS, [], _), [] | [_]) => no_overload!(CONS, len 2),
         (App(CONS, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(EMPTY_SET, [ty], _), _) => {
+            let ty = parse_ty(ctx, ty)?;
+            ty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            stack.push(T::new_set(ty));
+            I::EmptySet
+        }
+        (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
+
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let (kty, vty) = *pop!(T::Map);
@@ -2484,6 +2492,36 @@ mod typecheck_tests {
                 Type::Int,
                 Type::String
             )))
+        );
+    }
+
+    #[test]
+    fn empty_set() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMPTY_SET int").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(EmptySet)
+        );
+        assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
+    }
+
+    #[test]
+    fn empty_set_incomparable() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMPTY_SET operation").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::Operation
+            ))
         );
     }
 

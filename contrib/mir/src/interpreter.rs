@@ -362,6 +362,11 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             lst.cons(elt);
             stack.push(V::List(lst));
         }
+        I::EmptySet => {
+            use std::collections::BTreeSet;
+            ctx.gas.consume(interpret_cost::EMPTY_SET)?;
+            stack.push(V::Set(BTreeSet::new()))
+        }
         I::Get(overload) => match overload {
             overloads::Get::Map => {
                 let key = pop!();
@@ -1367,6 +1372,18 @@ mod interpreter_tests {
             Gas::default().milligas()
                 - interpret_cost::map_get(&TypedValue::Int(100500), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn empty_set() {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![];
+        assert_eq!(interpret(&vec![EmptySet], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::EMPTY_SET - interpret_cost::INTERPRET_RET
         );
     }
 

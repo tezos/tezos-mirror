@@ -260,6 +260,7 @@ pub enum Instruction {
     Compare,
     Amount,
     Nil,
+    EmptySet,
     Get(overloads::Get),
     Update(overloads::Update),
     Seq(Vec<Self>),
