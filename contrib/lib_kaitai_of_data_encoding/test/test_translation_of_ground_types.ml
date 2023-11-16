@@ -130,9 +130,17 @@ let%expect_test "test int31 translation" =
       id: ground_int31
       endian: be
     doc: ! 'Encoding id: ground_int31'
+    types:
+      int31:
+        seq:
+        - id: int31
+          type: s4
+          valid:
+            min: -1073741824
+            max: 1073741823
     seq:
     - id: ground_int31
-      type: s4
+      type: int31
   |}]
 
 let%expect_test "test float translation" =
@@ -189,11 +197,18 @@ let%expect_test "test dynamic size bytes translation" =
       id: ground_bytes
       endian: be
     doc: ! 'Encoding id: ground_bytes'
+    types:
+      bytes_dyn_uint30:
+        seq:
+        - id: len_bytes_dyn_uint30
+          type: u4
+          valid:
+            max: 1073741823
+        - id: bytes_dyn_uint30
+          size: len_bytes_dyn_uint30
     seq:
-    - id: len_ground_bytes
-      type: s4
     - id: ground_bytes
-      size: len_ground_bytes |}]
+      type: bytes_dyn_uint30 |}]
 
 let%expect_test "test fixed size bytes translation" =
   let s =
@@ -242,11 +257,18 @@ let%expect_test "test dynamic size string translation" =
       id: ground_string
       endian: be
     doc: ! 'Encoding id: ground_string'
+    types:
+      bytes_dyn_uint30:
+        seq:
+        - id: len_bytes_dyn_uint30
+          type: u4
+          valid:
+            max: 1073741823
+        - id: bytes_dyn_uint30
+          size: len_bytes_dyn_uint30
     seq:
-    - id: len_ground_string
-      type: s4
     - id: ground_string
-      size: len_ground_string |}]
+      type: bytes_dyn_uint30 |}]
 
 let%expect_test "test big numbers translation" =
   let s =

@@ -209,17 +209,19 @@ let%expect_test "test nested object translation" =
     endian: be
   doc: ! 'Encoding id: nested_objects'
   types:
-    protocol_hash:
+    bytes_dyn_uint30:
       seq:
-      - id: len_protocol_hash
-        type: s4
-      - id: protocol_hash
-        size: len_protocol_hash
+      - id: len_bytes_dyn_uint30
+        type: u4
+        valid:
+          max: 1073741823
+      - id: bytes_dyn_uint30
+        size: len_bytes_dyn_uint30
   seq:
   - id: replaced_protocol
-    type: protocol_hash
+    type: bytes_dyn_uint30
   - id: replacement_protocol
-    type: protocol_hash
+    type: bytes_dyn_uint30
   |}]
 
 let%expect_test "test object translation with empty fields" =
