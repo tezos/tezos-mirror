@@ -552,7 +552,7 @@ let check_consensus_key ~__LOC__ delegate ?(expected_active = delegate)
 
 let register_key_as_delegate ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(owner : Account.key)
-    ~(consensus_key : Account.key) client =
+    ~(consensus_key : Account.key) ~manual_staking client =
   let* _ =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
@@ -574,8 +574,26 @@ let register_key_as_delegate ?(expect_failure = false)
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
   in
+
+  (* To get rights at the same time in manual staking and auto staking
+     cases, we call the stake manual pseudo-operation at cycle switch,
+     which is (as close as possible to) the level at which autostaking
+     would do it. *)
+  let* () = bake_n_cycles 1 client in
+  let* () =
+    if manual_staking then
+      Client.transfer
+        ~entrypoint:"stake"
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 500_000)
+        ~giver:owner.alias
+        ~receiver:owner.alias
+        client
+    else unit
+  in
+
   (* Wait for consensus key to be active *)
-  let* () = bake_n_cycles (preserved_cycles + 1) client in
+  let* () = bake_n_cycles preserved_cycles client in
   let* _ =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate owner.public_key_hash
@@ -641,6 +659,7 @@ let test_register_delegate_with_consensus_key ~manual_staking
       ~owner:new_delegate
       ~consensus_key:new_consensus_key
       ~baker
+      ~manual_staking
       client
   in
   let* () = Client.bake_for_and_wait client in
@@ -675,7 +694,8 @@ let test_register_delegate_with_consensus_key ~manual_staking
    does not store a regression trace. Instead, it [Check]s that the new
    consensus key is as expected. *)
 let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
-    ~(owner : Account.key) ~(consensus_key : Account.key) client =
+    ~(owner : Account.key) ~(consensus_key : Account.key) ~manual_staking client
+    =
   let* () =
     Client.register_key ~consensus:consensus_key.alias owner.alias client
   in
@@ -689,8 +709,26 @@ let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
         [(level_information.cycle + preserved_cycles + 1, consensus_key)]
       client
   in
+
+  (* To get rights at the same time in manual staking and auto staking
+     cases, we call the stake manual pseudo-operation at cycle switch,
+     which is (as close as possible to) the level at which autostaking
+     would do it. *)
+  let* () = bake_n_cycles 1 client in
+  let* () =
+    if manual_staking then
+      Client.transfer
+        ~entrypoint:"stake"
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 500_000)
+        ~giver:owner.alias
+        ~receiver:owner.alias
+        client
+    else unit
+  in
+
   (* Wait for consensus key to be active *)
-  let* () = bake_n_cycles (preserved_cycles + 1) client in
+  let* () = bake_n_cycles preserved_cycles client in
   check_consensus_key ~__LOC__ owner ~expected_active:consensus_key client
 
 (* Like [update_consensus_key] this function updates the consensus key
@@ -741,29 +779,10 @@ let test_revert_to_unique_consensus_key ~manual_staking
       ~owner:new_delegate
       ~consensus_key:new_consensus_key
       ~baker
+      ~manual_staking
       client
   in
   let* () = Client.bake_for_and_wait client in
-
-  let* () =
-    if manual_staking then (
-      Log.info
-        "Add stake for `new_delegate` so that `new_consensus_key` can bake \
-         later on." ;
-      let* () =
-        Client.transfer
-          ~entrypoint:"stake"
-          ~burn_cap:Tez.one
-          ~amount:(Tez.of_int 500_000)
-          ~giver:new_delegate.alias
-          ~receiver:new_delegate.alias
-          client
-      in
-
-      Log.info "Bake until the end of the next cycle with `baker`..." ;
-      bake_n_cycles (preserved_cycles + 1) ~keys:[baker] client)
-    else return ()
-  in
 
   let* () =
     Log.info "Check that the new consensus key can bake" ;
