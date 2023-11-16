@@ -21,12 +21,14 @@ pub enum Get {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Update {
+    Set,
     Map,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Iter {
     List,
+    Set,
     Map,
 }
 

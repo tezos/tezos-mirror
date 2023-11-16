@@ -781,6 +781,19 @@ pub(crate) fn typecheck_instruction(
             unify_stacks(ctx, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::List, nested)
         }
+        (App(ITER, [Seq(nested)], _), [.., T::Set(..)]) => {
+            // get the set element type
+            let ty = pop!(T::Set);
+            // clone the rest of the stack
+            let mut inner_stack = stack.clone();
+            // push the element type to the top of the inner stack and typecheck
+            inner_stack.push(*ty);
+            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
+            let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
+            // If the starting stack (sans set) and result stack unify, all is good.
+            unify_stacks(ctx, opt_stack, opt_inner_stack)?;
+            I::Iter(overloads::Iter::Set, nested)
+        }
         (App(ITER, [Seq(nested)], _), [.., T::Map(..)]) => {
             // get the map element type
             let kty_vty_box = pop!(T::Map);
@@ -946,12 +959,16 @@ pub(crate) fn typecheck_instruction(
         (App(GET, [], _), [] | [_]) => no_overload!(GET, len 2),
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
+            ensure_ty_eq(ctx, ty, ty_)?;
+            stack.drop_top(2);
+            I::Update(overloads::Update::Set)
+        }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
             ensure_ty_eq(ctx, kty, kty_)?;
             ensure_ty_eq(ctx, vty, vty_new)?;
-            pop!();
-            pop!();
+            stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
         (App(UPDATE, [], _), [.., _, _, _]) => no_overload!(UPDATE),
@@ -1580,6 +1597,31 @@ mod typecheck_tests {
     #[test]
     fn test_iter_list_inner_mismatch() {
         let mut stack = tc_stk![Type::new_list(Type::Int)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("ITER { }").unwrap(), &mut ctx, &mut stack),
+            Err(TcError::StacksNotEqual(
+                stk![],
+                stk![Type::Int],
+                StacksNotEqualReason::LengthsDiffer(0, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_iter_set() {
+        let mut stack = tc_stk![Type::new_set(Type::Int)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut ctx, &mut stack),
+            Ok(Iter(overloads::Iter::Set, vec![Drop(None)]))
+        );
+        assert_eq!(stack, tc_stk![]);
+    }
+
+    #[test]
+    fn test_iter_set_inner_mismatch() {
+        let mut stack = tc_stk![Type::new_set(Type::Int)];
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(&parse("ITER { }").unwrap(), &mut ctx, &mut stack),
@@ -2479,6 +2521,44 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
+        );
+    }
+
+    #[test]
+    fn update_set() {
+        let mut stack = tc_stk![Type::new_set(Type::Int), Type::Bool, Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Update(overloads::Update::Set))
+        );
+        assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
+    }
+
+    #[test]
+    fn update_set_wrong_ty() {
+        let mut stack = tc_stk![Type::new_set(Type::Int), Type::Bool, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TypesNotEqual(Type::Int, Type::Nat).into())
+        );
+    }
+
+    #[test]
+    fn update_set_incomparable() {
+        assert_eq!(
+            parse("UPDATE").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[
+                    app!(set[app!(list[app!(int)])]),
+                    app!(bool),
+                    app!(list[app!(int)])
+                ]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
         );
     }
 

@@ -380,6 +380,16 @@ pub mod interpret_cost {
         (80 + 2 * lookup_cost).as_gas_cost()
     }
 
+    pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+        // NB: same considerations as for map_update
+        let compare_cost = compare(k, k)?;
+        let size_log = super::log2i(map_size + 1);
+        let lookup_cost = Checked::from(compare_cost) * size_log;
+        // coefficient larger than in case of Map looks suspicious, something
+        // to benchmark later
+        (130 + 2 * lookup_cost).as_gas_cost()
+    }
+
     /// Measures size of Michelson using several metrics.
     pub struct MichelineSize {
         /// Total number of nodes (including leaves).

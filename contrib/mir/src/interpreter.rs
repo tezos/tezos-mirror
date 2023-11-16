@@ -272,6 +272,14 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
                         interpret(nested, ctx, stack)?;
                     }
                 }
+                overloads::Iter::Set => {
+                    let set = pop!(V::Set);
+                    for v in set {
+                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        stack.push(v);
+                        interpret(nested, ctx, stack)?;
+                    }
+                }
                 overloads::Iter::Map => {
                     let map = pop!(V::Map);
                     for (k, v) in map {
@@ -364,17 +372,28 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             }
         },
         I::Update(overload) => match overload {
+            overloads::Update::Set => {
+                let key = pop!();
+                let new_present = pop!(V::Bool);
+                let set = irrefutable_match!(&mut stack[0]; V::Set);
+                ctx.gas
+                    .consume(interpret_cost::set_update(&key, set.len())?)?;
+                if new_present {
+                    set.insert(key)
+                } else {
+                    set.remove(&key)
+                };
+            }
             overloads::Update::Map => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
-                let mut map = pop!(V::Map);
+                let map = irrefutable_match!(&mut stack[0]; V::Map);
                 ctx.gas
                     .consume(interpret_cost::map_update(&key, map.len())?)?;
                 match opt_new_val {
                     None => map.remove(&key),
                     Some(val) => map.insert(key, *val),
                 };
-                stack.push(V::Map(map));
             }
         },
         I::ChainId => {
@@ -499,7 +518,7 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
 
 #[cfg(test)]
 mod interpreter_tests {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     use super::*;
     use crate::ast::michelson_address as addr;
@@ -797,6 +816,45 @@ mod interpreter_tests {
         )
         .is_ok());
         assert_eq!(stack, stk![V::Unit]);
+    }
+
+    #[test]
+    fn test_iter_set_many() {
+        let mut stack = stk![
+            V::List(vec![].into()),
+            V::Set(
+                vec![(V::Int(1)), (V::Int(2)), (V::Int(3)),]
+                    .into_iter()
+                    .collect()
+            )
+        ];
+        assert!(interpret_one(
+            &Iter(overloads::Iter::Set, vec![Cons]),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(
+            stack,
+            stk![V::List(
+                // NB: traversing the set start-to-end, we're CONSing to a
+                // list, thus the first element of the map is the last element
+                // of the list.
+                vec![V::Int(3), V::Int(2), V::Int(1),].into()
+            )]
+        );
+    }
+
+    #[test]
+    fn test_iter_set_zero() {
+        let mut stack = stk![V::Int(0), V::Set(BTreeSet::new())];
+        assert!(interpret_one(
+            &Iter(overloads::Iter::Set, vec![Add(overloads::Add::IntInt)]),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, stk![V::Int(0)]);
     }
 
     #[test]
@@ -1308,6 +1366,96 @@ mod interpreter_tests {
             ctx.gas.milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_get(&TypedValue::Int(100500), 2).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn update_set_insert() {
+        let mut ctx = Ctx::default();
+        let set = BTreeSet::new();
+        let mut stack = stk![
+            TypedValue::Set(set),
+            TypedValue::Bool(true),
+            TypedValue::Int(1)
+        ];
+        assert_eq!(
+            interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::Set(BTreeSet::from([TypedValue::Int(1)])),]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::set_update(&TypedValue::Int(1), 0).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn update_set_remove() {
+        let mut ctx = Ctx::default();
+        let set = BTreeSet::from([TypedValue::Int(1)]);
+        let mut stack = stk![
+            TypedValue::Set(set),
+            TypedValue::Bool(false),
+            TypedValue::Int(1)
+        ];
+        assert_eq!(
+            interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::set_update(&TypedValue::Int(1), 1).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn update_set_insert_when_exists() {
+        let mut ctx = Ctx::default();
+        let set = BTreeSet::from([TypedValue::Int(1)]);
+        let mut stack = stk![
+            TypedValue::Set(set.clone()),
+            TypedValue::Bool(true),
+            TypedValue::Int(1)
+        ];
+        assert_eq!(
+            interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Set(set)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::set_update(&TypedValue::Int(1), 1).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn update_set_remove_when_absent() {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![
+            TypedValue::Set(BTreeSet::new()),
+            TypedValue::Bool(false),
+            TypedValue::Int(1)
+        ];
+        assert_eq!(
+            interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::set_update(&TypedValue::Int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
