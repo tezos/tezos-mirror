@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::fs::OpenOptions;
-use std::io::Write;
+use std::{cell::RefCell, io::Write};
 
 use tezos_smart_rollup_mock::MockHost;
 
@@ -12,18 +11,15 @@ use tezos_smart_rollup_core::smart_rollup_core::{ReadInputMessageInfo, SmartRoll
 
 pub struct EvalHost {
     pub host: MockHost,
-    pub output_file: Option<String>,
+    pub buffer: RefCell<Vec<u8>>,
 }
 
 impl EvalHost {
-    /// Create a new instance of the `MockHost`, additionally provide the file's
-    /// name where the logs will be outputed.
-    pub fn default_with_output_file(output_file: String) -> Self {
+    /// Create a new instance of the `MockHost`, additionally provide the buffer
+    /// where the logs will be outputed.
+    pub fn default_with_buffer(buffer: RefCell<Vec<u8>>) -> Self {
         let host = MockHost::default();
-        Self {
-            host,
-            output_file: Some(output_file),
-        }
+        Self { host, buffer }
     }
 }
 
@@ -42,23 +38,9 @@ unsafe impl SmartRollupCore for EvalHost {
 
         let debug = String::from_utf8(debug_out).expect("unexpected non-utf8 debug log");
 
-        match &self.output_file {
-            Some(output_file) => {
-                let output_file = OpenOptions::new()
-                    .append(true)
-                    .truncate(false)
-                    .create(true)
-                    .open(output_file);
-                match output_file {
-                    Ok(mut output_file) => {
-                        if let Err(e) = write!(output_file, "{}", &debug) {
-                            eprint!("Error due to: {}", e)
-                        }
-                    }
-                    Err(e) => eprint!("Error due to: {}", e),
-                }
-            }
-            None => eprint!("{}", &debug),
+        let mut unboxed_buffer = self.buffer.borrow_mut();
+        if let Err(e) = write!(*unboxed_buffer, "{}", &debug) {
+            eprint!("Error due to: {}", e)
         }
     }
 
