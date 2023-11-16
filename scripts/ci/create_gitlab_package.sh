@@ -13,15 +13,15 @@ set -eu
 
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
-gitlab_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_package_name}/${gitlab_package_version}"
-gitlab_deb_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_deb_package_name}/${gitlab_package_version}"
-gitlab_rpm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_rpm_package_name}/${gitlab_package_version}"
+gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_package_name}/${gitlab_package_version}"
+gitlab_octez_deb_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_deb_package_name}/${gitlab_package_version}"
+gitlab_octez_rpm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rpm_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
   remote_file="${2}"
-  url="${3-${gitlab_package_url}}"
-  echo "Upload to ${gitlab_package_url}/${remote_file}"
+  url="${3-${gitlab_octez_package_url}}"
+  echo "Upload to ${gitlab_octez_package_url}/${remote_file}"
 
   i=0
   max_attempts=10
@@ -66,7 +66,7 @@ do
   # Loop over debian packages
   for package in ${deb_packages}
   do
-    gitlab_upload "${package}" "${package}" "${gitlab_deb_package_url}"
+    gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
   done
 
   echo "Upload rpm packages (${architecture})"
@@ -74,7 +74,7 @@ do
   # Loop over rpm packages
   for package in ${rpm_packages}
   do
-    gitlab_upload "./${package}" "${package}" "${gitlab_rpm_package_url}"
+    gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
   done
 
   echo "Upload tarball with all binaries (${architecture})"
@@ -84,7 +84,7 @@ do
 
   cd octez-binaries/
   tar -czf "octez-${architecture}.tar.gz" "octez-${architecture}/"
-  gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_package_name}-linux-${architecture}.tar.gz"
+  gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_package_name}-linux-${architecture}.tar.gz"
   cd ..
 done
 
@@ -93,7 +93,7 @@ done
 # => create and upload manually
 echo 'Upload tarball of source code and its checksums'
 
-source_tarball="${gitlab_package_name}.tar.bz2"
+source_tarball="${gitlab_octez_package_name}.tar.bz2"
 
 # We are using the export-subst feature of git onfigured in .gitattributes, requires git version >= 2.35
 # https://git-scm.com/docs/git-archive

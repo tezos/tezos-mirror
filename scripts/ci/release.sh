@@ -48,9 +48,9 @@ fi
 
 ### Compute GitLab generic package names
 
-gitlab_package_name="${CI_PROJECT_NAME}-${gitlab_release_no_v}"
-gitlab_deb_package_name="${CI_PROJECT_NAME}-debian-${gitlab_release_no_v}"
-gitlab_rpm_package_name="${CI_PROJECT_NAME}-redhat-${gitlab_release_no_v}"
+gitlab_octez_package_name="octez-${gitlab_release_no_v}"
+gitlab_octez_deb_package_name="octez-debian-${gitlab_release_no_v}"
+gitlab_octez_rpm_package_name="octez-redhat-${gitlab_release_no_v}"
 
 # X.Y or X.Y-rcZ
 gitlab_package_version="${gitlab_release_no_v}"
