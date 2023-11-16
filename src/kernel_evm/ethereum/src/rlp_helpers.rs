@@ -10,6 +10,7 @@ use crate::transaction::{
 };
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 pub fn next<'a, 'v>(decoder: &mut RlpIterator<'a, 'v>) -> Result<Rlp<'a>, DecoderError> {
     decoder.next().ok_or(DecoderError::RlpIncorrectListLen)
@@ -220,4 +221,20 @@ impl<T: Decodable> FromRlpBytes for T {
         let decoder = Rlp::new(bytes);
         Self::decode(&decoder)
     }
+}
+
+pub fn append_timestamp(stream: &mut RlpStream, timestamp: Timestamp) {
+    stream.append(&timestamp.i64().to_le_bytes().to_vec());
+}
+
+pub fn decode_timestamp(decoder: &Rlp<'_>) -> Result<Timestamp, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, "timestamp")?;
+
+    let timestamp = i64::from_le_bytes(bytes.try_into().map_err(|_| {
+        DecoderError::Custom(
+            "Invalid conversion from timestamp vector of bytes to bytes.",
+        )
+    })?)
+    .into();
+    Ok(timestamp)
 }

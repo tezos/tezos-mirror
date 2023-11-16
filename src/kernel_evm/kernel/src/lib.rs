@@ -354,6 +354,7 @@ mod tests {
         tx_common::EthereumTransactionCommon,
     };
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_mock::MockHost;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
@@ -429,7 +430,10 @@ mod tests {
     }
 
     fn blueprint(transactions: Vec<Transaction>) -> QueueElement {
-        QueueElement::Blueprint(Blueprint { transactions })
+        QueueElement::Blueprint(Blueprint {
+            transactions,
+            timestamp: Timestamp::from(0i64),
+        })
     }
 
     #[test]

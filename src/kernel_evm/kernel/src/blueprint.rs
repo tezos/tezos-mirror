@@ -6,24 +6,28 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
+use crate::current_timestamp;
 use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
 use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::rlp_helpers;
+use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 /// The blueprint of a block is a list of transactions.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Blueprint {
     pub transactions: Vec<Transaction>,
+    pub timestamp: Timestamp,
 }
 
 impl Encodable for Blueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(1);
+        stream.begin_list(2);
         stream.append_list(&self.transactions);
+        append_timestamp(stream, self.timestamp);
     }
 }
 
@@ -32,14 +36,19 @@ impl Decodable for Blueprint {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 1 {
+        if decoder.item_count()? != 2 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
         let mut it = decoder.iter();
         let transactions =
             rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "transactions")?;
-        Ok(Blueprint { transactions })
+        let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+
+        Ok(Blueprint {
+            transactions,
+            timestamp,
+        })
     }
 }
 
@@ -167,7 +176,12 @@ pub fn fetch<Host: Runtime>(
 ) -> Result<Queue, anyhow::Error> {
     let inbox_content = read_inbox(host, smart_rollup_address, ticketer, admin)?;
     let transactions = filter_invalid_transactions(inbox_content.transactions, chain_id);
-    let blueprint = QueueElement::Blueprint(Blueprint { transactions });
+    let timestamp = current_timestamp(host);
+
+    let blueprint = QueueElement::Blueprint(Blueprint {
+        transactions,
+        timestamp,
+    });
     Ok(Queue {
         proposals: vec![blueprint],
         kernel_upgrade: inbox_content.kernel_upgrade,
@@ -274,6 +288,7 @@ mod tests {
     fn test_encode_queue_elt() {
         let proposal = QueueElement::Blueprint(Blueprint {
             transactions: vec![dummy_transaction(0), dummy_transaction(1)],
+            timestamp: Timestamp::from(0i64),
         });
 
         let encoded = proposal.rlp_bytes();
@@ -289,6 +304,7 @@ mod tests {
             U256::zero(),
             VecDeque::new(),
             0,
+            Timestamp::from(0i64),
         )
     }
 
@@ -296,6 +312,7 @@ mod tests {
     fn test_encode_queue() {
         let proposal = QueueElement::Blueprint(Blueprint {
             transactions: vec![dummy_transaction(0), dummy_transaction(1)],
+            timestamp: Timestamp::from(0i64),
         });
 
         let proposals = vec![
