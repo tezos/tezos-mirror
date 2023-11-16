@@ -18,7 +18,7 @@ pub mod or;
 pub mod overloads;
 
 pub use micheline::Micheline;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
@@ -67,6 +67,7 @@ pub enum Type {
     Option(Box<Type>),
     List(Box<Type>),
     Operation,
+    Set(Box<Type>),
     Map(Box<(Type, Type)>),
     Or(Box<(Type, Type)>),
     Contract(Box<Type>),
@@ -87,7 +88,7 @@ impl Type {
             Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId | Bytes
             | Key | Signature | KeyHash => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
-            Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
+            Option(x) | List(x) | Set(x) | Contract(x) => 1 + x.size_for_gas(),
         }
     }
 
@@ -101,6 +102,10 @@ impl Type {
 
     pub fn new_list(x: Self) -> Self {
         Self::List(Box::new(x))
+    }
+
+    pub fn new_set(v: Self) -> Self {
+        Self::Set(Box::new(v))
     }
 
     pub fn new_map(k: Self, v: Self) -> Self {
@@ -127,6 +132,7 @@ pub enum TypedValue {
     Pair(Box<(TypedValue, TypedValue)>),
     Option(Option<Box<TypedValue>>),
     List(MichelsonList<TypedValue>),
+    Set(BTreeSet<TypedValue>),
     Map(BTreeMap<TypedValue, TypedValue>),
     Or(Box<Or<TypedValue, TypedValue>>),
     Address(Address),
@@ -164,6 +170,7 @@ pub fn typed_value_to_value_optimized_legacy<'a>(
         // and uses an untyped representation that is the shortest.
         TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
         TV::List(l) => V::Seq(arena.alloc_extend(l.into_iter().map(go))),
+        TV::Set(s) => V::Seq(arena.alloc_extend(s.into_iter().map(go))),
         TV::Map(m) => V::Seq(
             arena.alloc_extend(
                 m.into_iter()

@@ -156,6 +156,14 @@ pub mod tc_cost {
         let log2n = super::log2i((n + 1).ok_or(OutOfGas)?) as usize;
         (80 * n + key_size * n * log2n).as_gas_cost()
     }
+
+    pub fn construct_set(val_size: usize, sz: usize) -> Result<u32, OutOfGas> {
+        // Similar to `construct_map`, only the coefficient differs
+        let n = Checked::from(sz);
+        let key_size = Checked::from(val_size);
+        let log2n = super::log2i((n + 1).ok_or(OutOfGas)?) as usize;
+        (130 * n + key_size * n * log2n).as_gas_cost()
+    }
 }
 
 pub mod interpret_cost {
@@ -338,7 +346,9 @@ pub mod interpret_cost {
             .as_gas_cost()?,
             (V::Or(..), _) => incomparable(),
 
-            (V::List(..) | V::Map(..) | V::Contract(_) | V::Operation(_), _) => incomparable(),
+            (V::List(..) | V::Set(..) | V::Map(..) | V::Contract(_) | V::Operation(_), _) => {
+                incomparable()
+            }
         })
     }
 

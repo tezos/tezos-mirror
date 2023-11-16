@@ -6,7 +6,7 @@
 /******************************************************************************/
 
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::num::TryFromIntError;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
@@ -343,6 +343,13 @@ fn parse_ty_with_entrypoints(
             Type::new_contract(t)
         }
         App(contract, ..) => unexpected()?,
+
+        App(set, [k], _) => {
+            let k = parse_ty(ctx, k)?;
+            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            Type::new_set(k)
+        }
+        App(set, ..) => unexpected()?,
 
         App(map, [k, v], _) => {
             let k = parse_ty(ctx, k)?;
@@ -1052,9 +1059,9 @@ pub(crate) fn typecheck_instruction(
         }
         (App(RIGHT, [_ty_left], _), []) => no_overload!(RIGHT, len 1),
         (App(RIGHT, expect_args!(1), _), _) => unexpected_micheline!(),
-        
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
-        
+
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
 }
@@ -1106,6 +1113,18 @@ pub(crate) fn typecheck_value(
                 .map(|v| typecheck_value(v, ctx, ty))
                 .collect::<Result<_, TcError>>()?,
         ),
+        (T::Set(ty), V::Seq(vs)) => {
+            let vs = vs
+                .iter()
+                .map(|v| typecheck_value(v, ctx, ty))
+                .collect::<Result<Vec<TypedValue>, TcError>>()?;
+            validate_ordered_by(ctx, t, &vs, |x| x)?;
+            ctx.gas
+                .consume(gas::tc_cost::construct_set(ty.size_for_gas(), vs.len())?)?;
+            // See the same concern about constructing from ordered sequence as in Map
+            let set: BTreeSet<TypedValue> = vs.into_iter().collect();
+            TV::Set(set)
+        }
         (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
             let tc_elt = |v: &Micheline| -> Result<(TypedValue, TypedValue), TcError> {
@@ -1120,22 +1139,7 @@ pub(crate) fn typecheck_value(
             };
             let elts: Vec<(TypedValue, TypedValue)> =
                 vs.iter().map(tc_elt).collect::<Result<_, TcError>>()?;
-            if elts.len() > 1 {
-                let mut prev = &elts[0].0;
-                for i in &elts[1..] {
-                    ctx.gas.consume(gas::interpret_cost::compare(prev, &i.0)?)?;
-                    match prev.cmp(&i.0) {
-                        std::cmp::Ordering::Less => (),
-                        std::cmp::Ordering::Equal => {
-                            return Err(TcError::DuplicateElements(t.clone()))
-                        }
-                        std::cmp::Ordering::Greater => {
-                            return Err(TcError::ElementsNotSorted(t.clone()))
-                        }
-                    }
-                    prev = &i.0;
-                }
-            }
+            validate_ordered_by(ctx, t, &elts, |(k, _)| k)?;
             ctx.gas
                 .consume(gas::tc_cost::construct_map(tk.size_for_gas(), elts.len())?)?;
             // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
@@ -1232,6 +1236,36 @@ fn validate_u10(n: i128) -> Result<u16, TcError> {
         return Err(TcError::ExpectedU10(n));
     }
     Ok(res)
+}
+
+/// Ensures given elements have their keys in strictly ascending order
+/// (where you specify a getter to obtain the key from an element).
+///
+/// Also charges gas for this check.
+fn validate_ordered_by<T>(
+    ctx: &mut Ctx,
+    container_t: &Type,
+    vs: &[T],
+    to_key: impl Fn(&T) -> &TypedValue,
+) -> Result<(), TcError> {
+    if vs.len() > 1 {
+        let mut prev = to_key(&vs[0]);
+        for i in &vs[1..] {
+            ctx.gas
+                .consume(gas::interpret_cost::compare(prev, to_key(i))?)?;
+            match prev.cmp(to_key(i)) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => {
+                    return Err(TcError::DuplicateElements(container_t.clone()))
+                }
+                std::cmp::Ordering::Greater => {
+                    return Err(TcError::ElementsNotSorted(container_t.clone()))
+                }
+            }
+            prev = to_key(i);
+        }
+    }
+    Ok(())
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -2219,6 +2253,81 @@ mod typecheck_tests {
                     Type::Unit
                 )))
             })
+        );
+    }
+
+    #[test]
+    fn push_set() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { 1; 2 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Push(TypedValue::Set(BTreeSet::from([
+                TypedValue::Int(1),
+                TypedValue::Int(2)
+            ]))))
+        );
+        assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
+    }
+
+    #[test]
+    fn push_set_unsorted() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { 2; 1 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::ElementsNotSorted(Type::new_set(Type::Int)))
+        );
+    }
+
+    #[test]
+    fn push_set_incomparable() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set (list int)) { }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
+        );
+    }
+
+    #[test]
+    fn push_set_wrong_key_type() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { "1"; 2 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(
+                "String(\"1\")".into(),
+                Type::Int
+            ))
+        );
+    }
+
+    #[test]
+    fn push_set_duplicate_key() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { 1; 1 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::DuplicateElements(Type::new_set(Type::Int)))
         );
     }
 
