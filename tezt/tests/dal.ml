@@ -926,15 +926,6 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   let* () = Client.bake_for_and_wait client in
   let* () = Client.register_key new_account.alias client in
   let* () = Client.bake_for_and_wait client in
-  let* () =
-    Client.transfer
-      ~entrypoint:"stake"
-      ~burn_cap:Tez.one
-      ~amount:stake
-      ~giver:new_account.alias
-      ~receiver:new_account.alias
-      client
-  in
   let num_cycles = 2 + preserved_cycles in
   Log.info
     "Bake for %d cycles for %s to be a baker"
