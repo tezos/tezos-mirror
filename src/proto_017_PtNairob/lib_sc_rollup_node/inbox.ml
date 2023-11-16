@@ -173,7 +173,7 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
     Node_context.save_messages
       node_ctxt
       witness_hash
-      ~block_hash:head.hash
+      ~predecessor:predecessor.hash
       serialized_messages
   in
   let*? messages_with_protocol_internal_messages =
@@ -221,7 +221,11 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
       Octez_smart_rollup.Inbox.Skip_list.content inbox.old_levels_messages
     in
     let* () =
-      Node_context.save_messages node_ctxt witness ~block_hash:head.hash []
+      Node_context.save_messages
+        node_ctxt
+        witness
+        ~predecessor:predecessor.hash
+        []
     in
     let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
     return (inbox_hash, inbox, witness, [])

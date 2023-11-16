@@ -763,9 +763,8 @@ let find_messages node_ctxt messages_hash =
   let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
   match msg with
   | None -> return_none
-  | Some (messages, block_hash) ->
-      let* header = header_of_hash node_ctxt block_hash in
-      let* pred_header = header_of_hash node_ctxt header.header.predecessor in
+  | Some (messages, pred_hash) ->
+      let* pred_header = header_of_hash node_ctxt pred_hash in
       let* grand_parent_header =
         header_of_hash node_ctxt pred_header.header.predecessor
       in
@@ -801,7 +800,7 @@ let get_messages_without_proto_messages node_ctxt =
       let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
       match msg with
       | None -> return_none
-      | Some (messages, _block_hash) -> return_some messages)
+      | Some (messages, _pred_hash) -> return_some messages)
     Merkelized_payload_hashes_hash.pp
     node_ctxt
 
@@ -814,13 +813,13 @@ let get_num_messages {store; _} hash =
         "Could not retrieve number of messages for inbox witness %a"
         Merkelized_payload_hashes_hash.pp
         hash
-  | Some (messages, _block_hash) -> return (List.length messages)
+  | Some (messages, _pred_hash) -> return (List.length messages)
 
-let save_messages {store; _} key ~block_hash messages =
+let save_messages {store; _} key ~predecessor messages =
   Store.Messages.append
     store.messages
     ~key
-    ~header:block_hash
+    ~header:predecessor
     ~value:(messages :> string list)
 
 let get_full_l2_block node_ctxt block_hash =

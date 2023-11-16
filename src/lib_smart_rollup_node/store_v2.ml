@@ -529,17 +529,16 @@ let gc_messages messages l2_blocks ~(head : Sc_rollup_block.t) ~level =
        {
          first = head.header.inbox_witness;
          next =
-           (fun _witness (_msgs, block_hash) ->
+           (fun _witness (_msgs, predecessor) ->
              let open Lwt_syntax in
              let* pred_inbox_witness =
                let open Lwt_result_syntax in
-               let* header = L2_blocks.header l2_blocks block_hash in
-               match header with
-               | None -> return_none
-               | Some {level = blevel; _} when blevel <= level -> return_none
-               | Some {predecessor; _} ->
-                   let+ pred = L2_blocks.header l2_blocks predecessor in
-                   Option.map (fun b -> b.Sc_rollup_block.inbox_witness) pred
+               let+ pred = L2_blocks.header l2_blocks predecessor in
+               match pred with
+               | Some {level = pred_level; inbox_witness; _}
+                 when pred_level >= level ->
+                   Some inbox_witness
+               | _ -> None
              in
              match pred_inbox_witness with
              | Error e ->
