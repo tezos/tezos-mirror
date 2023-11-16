@@ -911,7 +911,16 @@ let test_supermajority_in_proposal there_is_a_winner () =
       10
       ()
   in
-  let* {parametric = {minimal_stake; minimal_frozen_stake; _}; _} =
+  let* {
+         parametric =
+           {
+             minimal_stake;
+             minimal_frozen_stake;
+             adaptive_issuance = {autostaking_enable; _};
+             _;
+           };
+         _;
+       } =
     Context.get_constants (B b)
   in
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
@@ -949,10 +958,21 @@ let test_supermajority_in_proposal there_is_a_winner () =
       del3
       bal3
   in
-  let* op4 = Adaptive_issuance_helpers.stake (B b) del1 minimal_frozen_stake in
-  let* op5 = Adaptive_issuance_helpers.stake (B b) del2 minimal_frozen_stake in
-  let* op6 = Adaptive_issuance_helpers.stake (B b) del3 minimal_frozen_stake in
-  let* b = Block.bake ~policy ~operations:[op1; op2; op3; op4; op5; op6] b in
+  let* staking_ops =
+    if autostaking_enable then return_nil
+    else
+      let* op4 =
+        Adaptive_issuance_helpers.stake (B b) del1 minimal_frozen_stake
+      in
+      let* op5 =
+        Adaptive_issuance_helpers.stake (B b) del2 minimal_frozen_stake
+      in
+      let* op6 =
+        Adaptive_issuance_helpers.stake (B b) del3 minimal_frozen_stake
+      in
+      return [op4; op5; op6]
+  in
+  let* b = Block.bake ~policy ~operations:([op1; op2; op3] @ staking_ops) b in
   let* b = bake_until_first_block_of_next_period ~policy b in
   (* make the proposals *)
   let* ops1 = Op.proposals (B b) del1 [protos.(0)] in
@@ -978,7 +998,11 @@ let test_quorum_in_proposal has_quorum () =
   let* b, delegates =
     context_init ~bootstrap_balances:[1L; half_tokens; half_tokens] 3 ()
   in
-  let* {parametric = {min_proposal_quorum; _}; _} =
+  let* {
+         parametric =
+           {min_proposal_quorum; adaptive_issuance = {autostaking_enable; _}; _};
+         _;
+       } =
     Context.get_constants (B b)
   in
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
@@ -994,8 +1018,12 @@ let test_quorum_in_proposal has_quorum () =
   in
   let* op2 = Op.transaction (B b) del2 del1 bal in
   let* b = Block.bake ~policy ~operation:op2 b in
-  let* stake = Adaptive_issuance_helpers.stake (B b) del1 bal in
-  let* b = Block.bake ~policy ~operation:stake b in
+  let* b =
+    if autostaking_enable then return b
+    else
+      let* stake = Adaptive_issuance_helpers.stake (B b) del1 bal in
+      Block.bake ~policy ~operation:stake b
+  in
   let* b = bake_until_first_block_of_next_period b in
   (* make the proposal *)
   let* operation = Op.proposals (B b) del1 [protos.(0)] in
