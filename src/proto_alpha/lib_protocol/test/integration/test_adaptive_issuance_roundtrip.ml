@@ -2697,6 +2697,25 @@ module Slashing = struct
           `Unstaked_frozen_total
           amount_expected_in_unstake_after_slash
 
+  (* Test a non-zero request finalizes for a non-zero amount if it hasn't been slashed 100% *)
+  let test_mini_slash =
+    let constants = init_constants ~autostaking_enable:false () in
+    (Tag "Yes AI"
+     --> begin_test ~activate_ai:true constants ["delegate"; "baker"]
+     --> next_block --> wait_ai_activation
+    |+ Tag "No AI"
+       --> begin_test ~activate_ai:false constants ["delegate"; "baker"])
+    --> unstake "delegate" (Amount Tez.one_mutez)
+    --> next_cycle
+    --> ((Tag "7% slash" --> double_bake "delegate" --> make_denunciations ()
+         |+ Tag "99% slash" --> next_cycle --> double_attest "delegate"
+            --> loop 7 (double_bake "delegate")
+            --> make_denunciations ())
+        --> next_cycle
+        --> check_balance_field "delegate" `Unstaked_frozen_total Tez.one_mutez
+        )
+    --> wait_n_cycles (constants.preserved_cycles + 1)
+
   let tests =
     tests_of_scenarios
     @@ [
@@ -2711,6 +2730,7 @@ module Slashing = struct
            test_no_shortcut_for_cheaters );
          ( "Test stake from unstake reduce initial amount",
            test_slash_correct_amount_after_stake_from_unstake );
+         ("Test unstake 1 mutez then slash", test_mini_slash);
        ]
 end
 
