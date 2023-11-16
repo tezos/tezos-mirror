@@ -143,48 +143,6 @@ let test_invariants () =
   in
   Assert.equal_tez ~loc:__LOC__ new_frozen_deposits expected_new_frozen_deposits
 
-let test_cannot_bake_with_zero_deposits () =
-  let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init_with_constants2 constants in
-  let (contract1, account1), (_contract2, account2) =
-    get_first_2_accounts_contracts contracts
-  in
-  (* N.B. there is no non-zero frozen deposits value for which one cannot bake:
-     even with a small deposit one can still bake, though with a smaller probability
-     (because the frozen deposits value impacts the active stake and the active
-     stake is the one used to determine baking/attesting rights. *)
-  (* To make account1 have zero deposits, we unstake all its deposits. *)
-  let* operation =
-    Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
-  in
-  let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
-  let expected_number_of_cycles_with_previous_deposit =
-    constants.preserved_cycles + Constants.max_slashing_period - 1
-  in
-  let* b =
-    Block.bake_until_n_cycle_end
-      ~policy:(By_account account2)
-      expected_number_of_cycles_with_previous_deposit
-      b
-  in
-  let*! b1 = Block.bake ~policy:(By_account account1) b in
-  (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
-     cannot be a proposer, thus it cannot bake. Precisely, bake fails with error
-     Validate_errors.Consensus.Zero_frozen_deposits*)
-  let* () =
-    Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits"
-  in
-  let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
-  (* after one cycle is passed, the frozen deposit window has passed
-     and the frozen deposits should now be effectively 0. *)
-  let* fd = Context.Delegate.current_frozen_deposits (B b) account1 in
-  let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
-  let*! b1 = Block.bake ~policy:(By_account account1) b in
-  (* Since there's zero frozen deposits, there won't be a baking slot available: *)
-  Assert.error ~loc:__LOC__ b1 (function
-      | Block.No_slots_found_for _ -> true
-      | _ -> false)
-
 let adjust_staking_towards_limit ~limit ~block ~account ~contract =
   let open Lwt_result_syntax in
   (* Since we do not have the set_deposit_limit operation anymore (nor
@@ -1043,10 +1001,6 @@ let tests =
         "frozen deposits with delegation"
         `Quick
         test_frozen_deposits_with_delegation;
-      tztest
-        "test cannot bake with zero deposits"
-        `Quick
-        test_cannot_bake_with_zero_deposits;
       tztest
         "test simulation of limited staking with overdelegation"
         `Quick
