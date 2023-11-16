@@ -11,7 +11,7 @@ license = "MIT"
 [dependencies]
 thiserror.workspace = true
 
-evm-execution.workspace = true
+evm-execution = { workspace = true, features = ["debug"] }
 tezos_ethereum.workspace = true
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-host.workspace = true
