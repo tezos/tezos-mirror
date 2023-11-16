@@ -294,6 +294,9 @@ pub mod interpret_cost {
             (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
             (V::ChainId(_), _) => incomparable(),
 
+            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len(), r.len())?,
+            (V::Bytes(_), _) => incomparable(),
+
             (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
                 (Or::Left(x), Or::Left(y)) => cmp_or + compare(x, y)?,
                 (Or::Right(x), Or::Right(y)) => cmp_or + compare(x, y)?,

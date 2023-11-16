@@ -37,6 +37,9 @@ impl PartialOrd for TypedValue {
             (ChainId(l), ChainId(r)) => l.partial_cmp(r),
             (ChainId(..), _) => None,
 
+            (Bytes(l), Bytes(r)) => l.partial_cmp(r),
+            (Bytes(..), _) => None,
+
             // non-comparable types
             (List(..) | Map(..) | Contract(..), _) => None,
         }
