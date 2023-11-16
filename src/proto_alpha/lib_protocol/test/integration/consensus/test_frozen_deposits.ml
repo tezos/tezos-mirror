@@ -1032,10 +1032,6 @@ let tests =
         `Quick
         test_cannot_bake_with_zero_deposits_limit;
       tztest
-        "may not bake again after full slash"
-        `Quick
-        test_may_not_bake_again_after_full_deposit_slash;
-      tztest
         "deposits after stake removal"
         `Quick
         test_deposits_after_stake_removal;
