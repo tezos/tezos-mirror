@@ -38,7 +38,10 @@ let blocks_per_cycle = 4
 
 let preserved_cycles = 1
 
-let manual_staking protocol = Protocol.(protocol > Nairobi)
+let manual_staking (_ : Protocol.t) =
+  (* Currently all protocols use autostaking by default; this will
+     probably change if and when AI gets activated on mainnet. *)
+  false
 
 module Helpers = struct
   let level_type : RPC.level Check.typ =
