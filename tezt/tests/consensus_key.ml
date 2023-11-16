@@ -38,6 +38,8 @@ let blocks_per_cycle = 4
 
 let preserved_cycles = 1
 
+let manual_staking protocol = Protocol.(protocol > Nairobi)
+
 module Helpers = struct
   let level_type : RPC.level Check.typ =
     Check.convert
@@ -87,7 +89,7 @@ let test_update_consensus_key =
     ~title:"update consensus key"
     ~tags:["consensus_key"]
   @@ fun protocol ->
-  let manual_staking = Protocol.(protocol > Nairobi) in
+  let manual_staking = manual_staking protocol in
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
@@ -616,7 +618,7 @@ let register ?(regression = true) title test =
   let baker_1 = Constant.bootstrap2 in
   let* account_0 = Client.gen_and_show_keys ~alias:"dummy_account_0" client in
   let* account_1 = Client.gen_and_show_keys ~alias:"dummy_account_1" client in
-  let manual_staking = Protocol.(protocol > Nairobi) in
+  let manual_staking = manual_staking protocol in
   test ~manual_staking client baker_0 baker_1 account_0 account_1
 
 let test_register_delegate_with_consensus_key ~manual_staking
