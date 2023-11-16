@@ -42,30 +42,35 @@ build:
 
 .release:
   image: curlimages/curl
-  only: main
+  only:
+    - main
   script:
     - 'zip ./${ARCHIVE} archiver/main.exe server/main.exe'
     - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/${ARCHIVE}"'
 
 release:amd64:v18.0:
+  stage: deploy
   extends: .release
   dependencies: ["build: [amd64, v18.0]"]
   variables:
     ARCHIVE: "binaries-amd64-v18.0.zip"
 
 release:amd64:master:
+  stage: deploy
   extends: .release
   dependencies: ["build: [amd64, master]"]
   variables:
     ARCHIVE: "binaries-amd64-master.zip"
 
 release:arm64:v18.0:
+  stage: deploy
   extends: .release
   dependencies: ["build: [arm64, v18.0]"]
   variables:
     ARCHIVE: "binaries-arm64-v18.0.zip"
 
 release:arm64:master:
+  stage: deploy
   extends: .release
   dependencies: ["build: [arm64, master]"]
   variables:
