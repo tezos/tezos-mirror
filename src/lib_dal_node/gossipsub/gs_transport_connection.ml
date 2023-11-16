@@ -128,8 +128,8 @@ end = struct
 
     let hash {origin; px} =
       match origin with
-      | PX peer -> (P2p_peer.Id.hash px + P2p_peer.Id.hash peer) * 2
-      | Trusted -> P2p_peer.Id.hash px * 3
+      | PX peer -> (P2p_peer.Id.hash px * 31) + P2p_peer.Id.hash peer
+      | Trusted -> P2p_peer.Id.hash px * 17
   end)
 
   type t = P2p_point.Id.t Table.t
