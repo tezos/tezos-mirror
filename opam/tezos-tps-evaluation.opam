@@ -19,7 +19,7 @@ depends: [
   "octez-protocol-alpha-libs"
   "octez-shell-libs"
   "tezos-protocol-alpha"
-  "tezt" { >= "3.1.1" & < "4.0.0" }
+  "tezt" { >= "4.0.0" & < "5.0.0" }
   "tezt-tezos"
   "uri" { >= "3.1.0" }
 ]
