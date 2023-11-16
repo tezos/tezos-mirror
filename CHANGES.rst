@@ -154,7 +154,7 @@ Miscellaneous
 
 - Beta scripts to build Debian and RedHat packages have been added to the tree.
 
-- New Recommended Rust version 1.65.0 instead of 1.64.0.
+- New Recommended Rust version 1.71.1 instead of 1.64.0.
 
 - Extended the Micheline lexer to allow primitives starting with the
   underscore symbol (``_``). (MR :gl:`!10782`)

@@ -10,7 +10,7 @@ dpkg:amd64:
     - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev
     - wget https://sh.rustup.rs/rustup-init.sh
     - chmod +x rustup-init.sh
-    - ./rustup-init.sh --profile minimal --default-toolchain 1.65.0 -y
+    - ./rustup-init.sh --profile minimal --default-toolchain 1.71.1 -y
     - . $HOME/.cargo/env
     - export OPAMYES="true"
     - opam init --bare --disable-sandboxing
@@ -39,7 +39,7 @@ rpm:amd64:
     - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env
     - wget https://sh.rustup.rs/rustup-init.sh
     - chmod +x rustup-init.sh
-    - ./rustup-init.sh --profile minimal --default-toolchain 1.65.0 -y
+    - ./rustup-init.sh --profile minimal --default-toolchain 1.71.1 -y
     - . $HOME/.cargo/env
     - export OPAMYES="true"
     - opam init --bare --disable-sandboxing
