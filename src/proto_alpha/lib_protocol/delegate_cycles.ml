@@ -188,6 +188,7 @@ let cycle_end ctxt last_cycle =
       ctxt
       ~new_cycle
   in
+  let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
   let* ctxt, autostake_balance_updates =
     match Staking.staking_automation ctxt with
     | Manual_staking -> return (ctxt, [])
@@ -197,7 +198,6 @@ let cycle_end ctxt last_cycle =
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
-  let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
   let* ctxt =
     Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   in
