@@ -955,6 +955,15 @@ pub(crate) fn typecheck_instruction(
         }
         (App(SELF, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(ADDRESS, [], _), [.., T::Contract(..)]) => {
+            let _ = *pop!(T::Contract);
+            stack.push(T::Address);
+            I::Address
+        }
+        (App(ADDRESS, [], _), [.., _]) => no_overload!(ADDRESS),
+        (App(ADDRESS, [], _), []) => no_overload!(ADDRESS, len 1),
+        (App(ADDRESS, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(PACK, [], _), [.., _]) => {
             let t = pop!();
             t.ensure_prop(&mut ctx.gas, TypeProperty::Packable)?;
@@ -1239,6 +1248,7 @@ fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
 #[cfg(test)]
 mod typecheck_tests {
     use crate::ast::micheline::test_helpers::*;
+    use crate::ast::michelson_address as addr;
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
@@ -2845,7 +2855,7 @@ mod typecheck_tests {
     #[test]
     fn test_push_address() {
         #[track_caller]
-        fn test_ok(lit: &str, bytes: &str, exp: Address) {
+        fn test_ok(lit: &str, bytes: &str, exp: addr::Address) {
             let exp = Ok(Push(TypedValue::Address(exp)));
             assert_eq!(
                 &typecheck_instruction(
@@ -2864,8 +2874,8 @@ mod typecheck_tests {
                 &exp
             );
         }
-        fn hex<T: Into<AddressHash>>(con: fn(Vec<u8>) -> T, hex: &str, ep: &str) -> Address {
-            Address {
+        fn hex<T: Into<AddressHash>>(con: fn(Vec<u8>) -> T, hex: &str, ep: &str) -> addr::Address {
+            addr::Address {
                 hash: con(hex::decode(hex).unwrap()).into(),
                 entrypoint: Entrypoint::try_from(ep).unwrap(),
             }
@@ -3293,6 +3303,34 @@ mod typecheck_tests {
                     Unit,
                     Failwith(Type::Unit)
                 ])
+            })
+        );
+    }
+
+    #[test]
+    fn address_instr() {
+        let stk = &mut tc_stk![Type::new_contract(Type::Nat)];
+        assert_eq!(
+            typecheck_instruction(&parse("ADDRESS").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Address)
+        );
+        assert_eq!(stk, &tc_stk![Type::Address]);
+    }
+
+    #[test]
+    fn test_address_short() {
+        too_short_test(&app!(ADDRESS), Prim::ADDRESS, 1);
+    }
+
+    #[test]
+    fn test_address_mismatch() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ADDRESS), &mut ctx, &mut tc_stk![Type::Unit]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::ADDRESS,
+                stack: stk![Type::Unit],
+                reason: None,
             })
         );
     }

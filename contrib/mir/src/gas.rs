@@ -162,7 +162,7 @@ pub mod interpret_cost {
     use checked::Checked;
 
     use super::{AsGasCost, OutOfGas};
-    use crate::ast::{Key, Micheline, KeyHash, Or, TypedValue};
+    use crate::ast::{Key, KeyHash, Micheline, Or, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -192,6 +192,8 @@ pub mod interpret_cost {
     pub const CHAIN_ID: u32 = 15;
     pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;
+    pub const ADDRESS: u32 = 10;
+
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 60;
     pub const SET_DELEGATE: u32 = 60;

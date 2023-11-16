@@ -427,6 +427,11 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
                 counter,
             ))
         }
+        I::Address => {
+            ctx.gas.consume(interpret_cost::ADDRESS)?;
+            let address = pop!(V::Contract);
+            stack.push(V::Address(address));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -437,6 +442,7 @@ mod interpreter_tests {
     use std::collections::BTreeMap;
 
     use super::*;
+    use crate::ast::michelson_address as addr;
     use crate::gas::Gas;
     use Instruction::*;
     use TypedValue as V;
@@ -1446,7 +1452,7 @@ mod interpreter_tests {
     fn transfer_tokens() {
         let tt = super::TransferTokens {
             param: TypedValue::Nat(42),
-            destination_address: Address::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap(),
+            destination_address: addr::Address::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap(),
             amount: 0,
         };
         let stk = &mut stk![
@@ -1551,5 +1557,21 @@ mod interpreter_tests {
             );
             assert_eq!(stack, stk![V::Bool(res)])
         }
+    }
+
+    #[test]
+    fn address_instr() {
+        let address: addr::Address = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT%some_entrypoint"
+            .try_into()
+            .unwrap();
+        let contract = V::Contract(address.clone());
+        let stk = &mut stk![contract];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret(&vec![Address], ctx, stk), Ok(()));
+        assert_eq!(stk, &stk![V::Address(address)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::ADDRESS - interpret_cost::INTERPRET_RET
+        );
     }
 }
