@@ -58,7 +58,8 @@ type punishing_amounts = {
     The double signing event corresponds to a field in {!Storage.slashed_level}.
 *)
 let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
-    delegate (level : Level_repr.t) ~rewarded =
+    delegate (level : Level_repr.t) ~rewarded :
+    (Raw_context.t * bool) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* slashed_opt =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
@@ -107,7 +108,7 @@ let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
-  let*! ctxt =
+  let*! ctxt, did_forbid =
     Forbidden_delegates_storage.may_forbid
       ctxt
       delegate
@@ -145,7 +146,7 @@ let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
       in
       return ctxt
   in
-  return ctxt
+  return (ctxt, did_forbid)
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
   let max_slashable_period = Constants_repr.max_slashing_period in

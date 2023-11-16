@@ -277,9 +277,24 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let operation =
     double_attestation (B blk_with_evidence1) attestation_3 attestation_4
   in
-  let* blk_with_evidence2 =
-    Block.bake ~policy:(By_account baker) ~operation blk_3
+  let* blk_with_evidence2, (_blk_metadata, operations_recpts) =
+    Block.bake_with_metadata ~policy:(By_account baker) ~operation blk_3
   in
+  let rcpt =
+    List.find
+      (fun (rcpt : operation_receipt) ->
+        match rcpt with
+        | Operation_metadata
+            {
+              contents =
+                Apply_results.Single_result
+                  (Apply_results.Double_attestation_evidence_result rslt);
+            } ->
+            rslt.forbidden_delegate = Some delegate
+        | _ -> false)
+      operations_recpts
+  in
+  let* _ = Assert.get_some ~loc:__LOC__ rcpt in
   (* Check that the frozen deposits haven't changed yet. *)
   let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate

@@ -2235,7 +2235,7 @@ module Delegate : sig
     public_key_hash ->
     Level.t ->
     rewarded:public_key_hash ->
-    context tzresult Lwt.t
+    (context * bool) tzresult Lwt.t
 
   type level_participation = Participated | Didn't_participate
 

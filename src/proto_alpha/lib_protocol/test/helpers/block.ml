@@ -1108,9 +1108,9 @@ let balance_updates_of_single_content :
   | Attestation_result {balance_updates; _}
   | Seed_nonce_revelation_result balance_updates
   | Vdf_revelation_result balance_updates
-  | Double_attestation_evidence_result balance_updates
-  | Double_preattestation_evidence_result balance_updates
-  | Double_baking_evidence_result balance_updates
+  | Double_attestation_evidence_result {balance_updates; _}
+  | Double_preattestation_evidence_result {balance_updates; _}
+  | Double_baking_evidence_result {balance_updates; _}
   | Activate_account_result balance_updates
   | Drain_delegate_result {balance_updates; _} ->
       balance_updates

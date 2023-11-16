@@ -2293,7 +2293,7 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
     ~payload_producer =
   let open Lwt_result_syntax in
   let rewarded = payload_producer.Consensus_key.delegate in
-  let+ ctxt =
+  let+ ctxt, forbidden_delegate =
     Delegate.punish_double_signing
       ctxt
       ~operation_hash
@@ -2302,7 +2302,9 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
       level
       ~rewarded
   in
-  (ctxt, Single_result (mk_result []))
+  ( ctxt,
+    Single_result
+      (mk_result (if forbidden_delegate then Some delegate else None) []) )
 
 let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
@@ -2311,13 +2313,14 @@ let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
     tzresult
     Lwt.t =
   let open Lwt_result_syntax in
-  let mk_result (balance_updates : Receipt.balance_updates) :
+  let mk_result forbidden_delegate (balance_updates : Receipt.balance_updates) :
       kind Kind.double_consensus_operation_evidence contents_result =
     match op1.protocol_data.contents with
     | Single (Preattestation _) ->
-        Double_preattestation_evidence_result balance_updates
+        Double_preattestation_evidence_result
+          {forbidden_delegate; balance_updates}
     | Single (Attestation _) ->
-        Double_attestation_evidence_result balance_updates
+        Double_attestation_evidence_result {forbidden_delegate; balance_updates}
   in
   match op1.protocol_data.contents with
   | Single (Preattestation e1) | Single (Attestation e1) ->
@@ -2351,7 +2354,8 @@ let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
     level
     Double_baking
     ~payload_producer
-    (fun balance_updates -> Double_baking_evidence_result balance_updates)
+    (fun forbidden_delegate balance_updates ->
+      Double_baking_evidence_result {forbidden_delegate; balance_updates})
 
 let apply_contents_list (type kind) ctxt chain_id (mode : mode)
     ~payload_producer ~operation ~operation_hash

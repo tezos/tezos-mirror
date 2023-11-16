@@ -935,14 +935,20 @@ type 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_attestation_evidence_result :
-      Receipt.balance_updates
+  | Double_attestation_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_attestation_evidence contents_result
-  | Double_preattestation_evidence_result :
-      Receipt.balance_updates
+  | Double_preattestation_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_preattestation_evidence contents_result
-  | Double_baking_evidence_result :
-      Receipt.balance_updates
+  | Double_baking_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_baking_evidence contents_result
   | Activate_account_result :
       Receipt.balance_updates
@@ -1248,7 +1254,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_endorsement_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1263,8 +1270,14 @@ module Encoding = struct
           | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_attestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_attestation_evidence_result bus);
+        proj =
+          (fun (Double_attestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_attestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_attestation_evidence_case =
@@ -1272,7 +1285,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_attestation_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1287,8 +1301,14 @@ module Encoding = struct
           | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_attestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_attestation_evidence_result bus);
+        proj =
+          (fun (Double_attestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_attestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_preendorsement_evidence_case =
@@ -1296,7 +1316,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_preendorsement_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1312,8 +1333,14 @@ module Encoding = struct
             ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_preattestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_preattestation_evidence_result bus);
+        proj =
+          (fun (Double_preattestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_preattestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_preattestation_evidence_case =
@@ -1321,7 +1348,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_preattestation_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1337,8 +1365,14 @@ module Encoding = struct
             ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_preattestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_preattestation_evidence_result bus);
+        proj =
+          (fun (Double_preattestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_preattestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_baking_evidence_case =
@@ -1346,7 +1380,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_baking_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1360,8 +1395,13 @@ module Encoding = struct
           | Contents_and_result ((Double_baking_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_baking_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_baking_evidence_result bus);
+        proj =
+          (fun (Double_baking_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_baking_evidence_result {forbidden_delegate; balance_updates});
       }
 
   let activate_account_case =
