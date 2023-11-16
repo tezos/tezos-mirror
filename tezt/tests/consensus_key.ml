@@ -598,6 +598,8 @@ let register_key_as_delegate ?(expect_failure = false)
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate owner.public_key_hash
   in
+  (* Wait for consensus key to have rights *)
+  let* () = bake_n_cycles 1 client in
   unit
 
 let transfer ?hooks ?(expect_failure = false)
@@ -729,7 +731,12 @@ let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
 
   (* Wait for consensus key to be active *)
   let* () = bake_n_cycles preserved_cycles client in
-  check_consensus_key ~__LOC__ owner ~expected_active:consensus_key client
+  let* () =
+    check_consensus_key ~__LOC__ owner ~expected_active:consensus_key client
+  in
+  (* Wait for consensus key to have rights *)
+  let* () = bake_n_cycles 1 client in
+  unit
 
 (* Like [update_consensus_key] this function updates the consensus key
    of [src] to [consensus_key] and bakes until the new [consensus_key]
