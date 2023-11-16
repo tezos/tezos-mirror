@@ -38,6 +38,11 @@ open Alpha_context
 (****************************************************************)
 (*                  Utility functions                           *)
 (****************************************************************)
+let autostaking_disabled =
+  {
+    Default_parameters.constants_test.adaptive_issuance with
+    autostaking_enable = false;
+  }
 
 let block_fork b =
   let open Lwt_result_syntax in
@@ -350,7 +355,12 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Then the delegate is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_staggered () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts =
+    Context.init2
+      ~consensus_threshold:0
+      ~adaptive_issuance:autostaking_disabled
+      ()
+  in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -385,7 +395,7 @@ let test_two_double_attestation_evidences_staggered () =
   let* blk_with_stake =
     Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
   in
-  let* blk_new_cycle, metadata, _ =
+  let* blk_new_cycle, _metadata, _ =
     Block.bake_until_cycle_end_with_metadata
       ~policy:(By_account baker)
       blk_with_stake
@@ -400,9 +410,6 @@ let test_two_double_attestation_evidences_staggered () =
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
   in
-  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
-  let autostaked = Block.autostaked delegate metadata in
-  let frozen_deposits_after = Test_tez.(frozen_deposits_after -! autostaked) in
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_new_cycle) delegate
   in
@@ -429,7 +436,12 @@ let test_two_double_attestation_evidences_staggered () =
     is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_consecutive_cycles () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts =
+    Context.init2
+      ~consensus_threshold:0
+      ~adaptive_issuance:autostaking_disabled
+      ()
+  in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
