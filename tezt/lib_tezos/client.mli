@@ -893,7 +893,7 @@ val multiple_transfers :
 
 (** Run octez-client register key <delegate> as delegate. *)
 val register_delegate :
-  ?endpoint:endpoint -> delegate:string -> t -> string Lwt.t
+  ?endpoint:endpoint -> ?wait:string -> delegate:string -> t -> string Lwt.t
 
 (** Run octez-client get delegate for <src>. Returns [Some address] if delegate
     is set or [None] otherwise. *)
