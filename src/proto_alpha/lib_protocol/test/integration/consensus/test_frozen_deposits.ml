@@ -485,25 +485,34 @@ let test_cannot_bake_with_zero_deposits_limit () =
       expected_number_of_cycles_with_rights_from_previous_deposit
       b
   in
-  let*! b1 = Block.bake ~policy:(By_account account1) b in
-  (* by now, the active stake of account1 is 0 so it has been forbidden at
-     cycle end, thus it cannot bake. *)
-  let* () =
-    Assert.proto_error ~loc:__LOC__ b1 (function
-        | Validate_errors.Consensus.Forbidden_delegate _ -> true
-        | _ -> false)
+  (* by now, the frozen deposits of account1 are 0 but it still has slashable
+     unstaked frozen deposits so it can still bake. *)
+  let* fd = Context.Delegate.current_frozen_deposits (B b) account1 in
+  let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
+  let* ufd =
+    Context.Contract.unstaked_frozen_balance (B b) (Implicit account1)
   in
+  let ufd = Option.value_f ufd ~default:(fun () -> assert false) in
+  let* () = Assert.not_equal_tez ~loc:__LOC__ ufd Tez.zero in
+  let* (_ : Block.t) = Block.bake ~policy:(By_account account1) b in
   let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
   (* after one cycle is passed, the frozen deposit window has passed
-     and the baker should now effectively have no baking rights.
-     Precisely, bake fails because get_next_baker_by_account fails with
-     "No slots found" *)
+     and the baker should now effectively have no baking rights. *)
   let* fd = Context.Delegate.current_frozen_deposits (B b) account1 in
   let* () = Assert.equal_tez ~loc:__LOC__ fd Tez.zero in
   let*! b1 = Block.bake ~policy:(By_account account1) b in
-  Assert.error ~loc:__LOC__ b1 (function
-      | Block.No_slots_found_for _ -> true
-      | _ -> false)
+  let* () =
+    Assert.error ~loc:__LOC__ b1 (function
+        | Block.No_slots_found_for _ -> true
+        | _ -> false)
+  in
+  (* Unstaked frozen deposits are released one cycle later. *)
+  let* b = Block.bake_until_cycle_end b in
+  let* ufd =
+    Context.Contract.unstaked_frozen_balance (B b) (Implicit account1)
+  in
+  let ufd = Option.value_f ufd ~default:(fun () -> assert false) in
+  Assert.equal_tez ~loc:__LOC__ ufd Tez.zero
 
 let test_deposits_after_stake_removal () =
   let open Lwt_result_syntax in
