@@ -1836,10 +1836,9 @@ module Target = struct
       | Experimental | Released | Auto_opam -> true
     then
       if
+        let prefixes = ["src/"; "tezt/"; "etherlink/"; "irmin/"] in
         not
-          (String.starts_with ~prefix:"src/" path
-          || String.starts_with ~prefix:"tezt/" path
-          || String.starts_with ~prefix:"etherlink/" path)
+          (List.exists (fun prefix -> String.starts_with ~prefix path) prefixes)
       then
         invalid_argf
           "A target has the release status %s but is located at %s which is \

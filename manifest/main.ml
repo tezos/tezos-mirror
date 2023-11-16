@@ -75,6 +75,8 @@ let alcotest = external_lib ~js_compatible:true "alcotest" V.(at_least "1.5.0")
 
 let astring = external_lib ~js_compatible:true "astring" V.True
 
+let bheap = external_lib "bheap" V.True
+
 let bigarray_compat = external_lib ~js_compatible:true "bigarray-compat" V.True
 
 let bigstring = external_lib ~js_compatible:true "bigstring" V.True
@@ -93,6 +95,12 @@ let caqti_lwt = external_lib "caqti-lwt" V.(at_least "2.0.1")
 let caqti_lwt_unix = external_sublib caqti_lwt "caqti-lwt.unix"
 
 let caqti_dynload = external_lib "caqti-dynload" V.True
+
+(* Checkseum is an irmin-pack dependency. Version 0.5.0 is known to be
+   bugged and this release was disabled. *)
+let checkseum = external_lib "checkseum" (V.different_from "0.5.0")
+
+let checkseum_ocaml = external_sublib checkseum "checkseum.ocaml"
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
@@ -129,6 +137,8 @@ let data_encoding =
     "data-encoding"
     V.(at_least "0.7.1" && less_than "1.0.0")
 
+let digestif = external_lib "digestif" V.True
+
 let dune_configurator = external_lib "dune-configurator" V.True
 
 let dynlink = external_lib "dynlink" V.True ~opam:""
@@ -159,6 +169,8 @@ let hex = external_lib ~js_compatible:true "hex" V.(at_least "1.3.0")
 
 let index = external_lib "index" V.(at_least "1.6.0" && less_than "1.7.0")
 
+let index_unix = external_sublib index "index.unix"
+
 let integers = external_lib ~js_compatible:true "integers" V.True
 
 let integers_stubs_js =
@@ -172,20 +184,13 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "3.8.0" && less_than "3.9.0")
-
-let irmin_pack =
-  external_lib "irmin-pack" V.(at_least "3.8.0" && less_than "3.9.0")
-
-let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
-
-let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
-
 let json_data_encoding =
   external_lib
     ~js_compatible:true
     "json-data-encoding"
     V.(at_least "0.12" && less_than "0.13")
+
+let jsonm = external_lib "jsonm" V.True
 
 let logs = external_lib "logs" V.True
 
@@ -225,7 +230,13 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
+let optint = external_lib "optint" V.True
+
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
+
+let ppxlib = external_lib "ppxlib" V.True
+
+let ppxlib_metaquot = external_sublib ppxlib "ppxlib.metaquot"
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.1.0")
 
@@ -236,6 +247,8 @@ let ppx_deriving = external_lib "ppx_deriving" V.True
 let ppx_deriving_show = external_sublib ppx_deriving "ppx_deriving.show"
 
 let ppx_repr = external_lib "ppx_repr" V.(at_least "0.6.0")
+
+let ppx_repr_lib = external_sublib ppx_repr "ppx_repr.lib"
 
 let ppx_sexp_conv = external_lib "ppx_sexp_conv" V.True
 
@@ -286,6 +299,8 @@ let resto_directory =
   external_lib ~js_compatible:true "resto-directory" resto_version
 
 let ringo = external_lib ~js_compatible:true "ringo" V.(at_least "1.0.0")
+
+let rusage = external_lib "rusage" V.True
 
 let aches = external_lib ~js_compatible:true "aches" V.(at_least "1.0.0")
 
@@ -471,6 +486,9 @@ let registered_octez_proto_libs : Sub_lib.container = Sub_lib.make_container ()
 (* Container of the registered sublibraries of [octez-l2-libs] *)
 let registered_octez_l2_libs : Sub_lib.container = Sub_lib.make_container ()
 
+(* Container of the registered sublibraries of [octez-internal-libs] *)
+let octez_internal_libs : Sub_lib.container = Sub_lib.make_container ()
+
 (* Registers a sub-library in [octez-libs] packages.
    This package should contain all Octez basic libraries. *)
 let octez_lib : Sub_lib.maker =
@@ -503,6 +521,20 @@ let octez_l2_lib : Sub_lib.maker =
     ~package_synopsis:"Octez layer2 libraries"
     ~container:registered_octez_l2_libs
     ~package:"octez-l2-libs"
+
+(* Registers a sub-library in the [octez-internal-libs] package.
+
+   This package should contain Octez dependencies that are under the
+   ISC license (as of December 2023, these are exactly the Irmin
+   packages). *)
+let octez_internal_lib =
+  Sub_lib.sub_lib
+    ~package_synopsis:
+      "A package that contains some libraries used by the Octez suite"
+    ~container:octez_internal_libs
+    ~package:"octez-internal-libs"
+    ~license:"ISC"
+    ~extra_authors:["Thomas Gazagnaire"; "Thomas Leonard"; "Craig Ferguson"]
 
 let tezt_wrapper =
   octez_lib "tezt-wrapper" ~path:"tezt/lib_wrapper" ~deps:[tezt_lib]
@@ -2038,6 +2070,106 @@ let _octez_stdlib_unix_test =
         qcheck_alcotest;
         alcotezt;
       ]
+
+let ppx_irmin =
+  octez_internal_lib
+    "ppx_irmin"
+    ~path:"irmin/lib_ppx_irmin"
+    ~deps:[ppx_repr_lib]
+    ~ppx_kind:Ppx_deriver
+
+let ppx_irmin_internal_lib =
+  octez_internal_lib
+    "ppx_irmin.internal_lib"
+    ~path:"irmin/lib_ppx_irmin/internal"
+    ~modules:["ppx_irmin_internal_lib"]
+    ~deps:[logs]
+
+let ppx_irmin_internal =
+  octez_internal_lib
+    "ppx_irmin.internal"
+    ~path:"irmin/lib_ppx_irmin/internal"
+    ~modules:["ppx_irmin_internal"]
+    ~deps:[ppxlib; ppx_irmin_internal_lib; ppx_irmin]
+    ~ppx_kind:Ppx_rewriter
+    ~ppx_runtime_libraries:[logs; ppx_irmin_internal_lib]
+    ~preprocess:[pps ppxlib_metaquot]
+
+let irmin_data =
+  octez_internal_lib
+    "irmin.data"
+    ~path:"irmin/lib_irmin/data"
+    ~deps:[bigstringaf; fmt]
+
+let irmin =
+  octez_internal_lib
+    "irmin"
+    ~path:"irmin/lib_irmin"
+    ~deps:
+      [
+        irmin_data;
+        astring;
+        bheap;
+        digestif;
+        fmt;
+        jsonm;
+        logs;
+        logs_fmt;
+        lwt;
+        mtime;
+        ocamlgraph;
+        uri;
+        uutf;
+        re_export repr;
+      ]
+    ~preprocess:[pps ~args:["--"; "--lib"; "Type"] ppx_irmin_internal]
+
+let irmin_mem =
+  octez_internal_lib
+    "irmin.mem"
+    ~path:"irmin/lib_irmin/mem"
+    ~deps:[irmin; logs; lwt]
+    ~preprocess:[pps ppx_irmin_internal]
+    ~flags:(Flags.standard ~disable_warnings:[68] ())
+
+let irmin_pack =
+  octez_internal_lib
+    "irmin_pack"
+    ~path:"irmin/lib_irmin_pack"
+    ~deps:[fmt; irmin; irmin_data; logs; lwt; optint]
+    ~preprocess:[pps ppx_irmin_internal]
+    ~flags:(Flags.standard ~disable_warnings:[66] ())
+
+let irmin_pack_mem =
+  octez_internal_lib
+    "irmin_pack.mem"
+    ~path:"irmin/lib_irmin_pack/mem"
+    ~deps:[irmin_pack; irmin_mem]
+    ~preprocess:[pps ppx_irmin_internal]
+
+let irmin_pack_unix =
+  octez_internal_lib
+    "irmin_pack.unix"
+    ~path:"irmin/lib_irmin_pack/unix"
+    ~deps:
+      [
+        fmt;
+        index;
+        index_unix;
+        irmin;
+        irmin_pack;
+        logs;
+        lwt;
+        lwt_unix;
+        mtime;
+        cmdliner;
+        optint;
+        checkseum;
+        checkseum_ocaml;
+        rusage;
+      ]
+    ~preprocess:[pps ppx_irmin_internal]
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let octez_clic =
   octez_lib

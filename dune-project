@@ -29,6 +29,7 @@
 (package (name octez-evm-node-tests)(allow_empty))
 (package (name octez-injector))
 (package (name octez-injector-server))
+(package (name octez-internal-libs))
 (package (name octez-l2-libs))
 (package (name octez-libs))
 (package (name octez-node))

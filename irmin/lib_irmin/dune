@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name irmin)
- (public_name irmin)
+ (public_name octez-internal-libs.irmin)
+ (instrumentation (backend bisect_ppx))
  (libraries
-  irmin.data
+  octez-internal-libs.irmin.data
   astring
   bheap
   digestif
@@ -16,7 +20,4 @@
   uri
   uutf
   (re_export repr))
- (preprocess
-  (pps ppx_irmin.internal -- --lib "Type"))
- (instrumentation
-  (backend bisect_ppx)))
+ (preprocess (pps octez-internal-libs.ppx_irmin.internal -- --lib Type)))

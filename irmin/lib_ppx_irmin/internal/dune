@@ -1,21 +1,25 @@
-;; Extensions to `ppx_irmin` intended for Irmin developers only
-
-(library
- (kind ppx_rewriter)
- (name ppx_irmin_internal)
- (public_name ppx_irmin.internal)
- (modules ppx_irmin_internal)
- (ppx_runtime_libraries logs ppx_irmin.internal-lib)
- (preprocess
-  (pps ppxlib.metaquot))
- (libraries
-  ppxlib
-  ppx_irmin.internal-lib
-  ;; Depending on [ppx_irmin.internal] implies a dependency on [ppx_irmin]
-  ppx_irmin))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
 (library
  (name ppx_irmin_internal_lib)
- (public_name ppx_irmin.internal-lib)
- (modules ppx_irmin_internal_lib)
- (libraries logs))
+ (public_name octez-internal-libs.ppx_irmin.internal_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  logs)
+ (modules ppx_irmin_internal_lib))
+
+(library
+ (name ppx_irmin_internal)
+ (public_name octez-internal-libs.ppx_irmin.internal)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ppxlib
+  octez-internal-libs.ppx_irmin.internal_lib
+  octez-internal-libs.ppx_irmin)
+ (kind ppx_rewriter)
+ (ppx_runtime_libraries
+  logs
+  octez-internal-libs.ppx_irmin.internal_lib)
+ (preprocess (pps ppxlib.metaquot))
+ (modules ppx_irmin_internal))

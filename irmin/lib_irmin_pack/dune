@@ -1,8 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
- (public_name irmin-pack)
  (name irmin_pack)
- (libraries fmt irmin irmin.data logs lwt optint)
- (preprocess
-  (pps ppx_irmin.internal))
- (instrumentation
-  (backend bisect_ppx)))
+ (public_name octez-internal-libs.irmin_pack)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  fmt
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin.data
+  logs
+  lwt
+  optint)
+ (preprocess (pps octez-internal-libs.ppx_irmin.internal))
+ (flags
+  (:standard)
+  -w -66))
