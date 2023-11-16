@@ -1174,11 +1174,14 @@ let multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
   in
   {value; run = Process.check}
 
-let spawn_register_delegate ?endpoint ~delegate client =
-  spawn_command ?endpoint client ["register"; "key"; delegate; "as"; "delegate"]
+let spawn_register_delegate ?endpoint ?(wait = "none") ~delegate client =
+  spawn_command
+    ?endpoint
+    client
+    (["--wait"; wait] @ ["register"; "key"; delegate; "as"; "delegate"])
 
-let register_delegate ?endpoint ~delegate client =
-  spawn_register_delegate ?endpoint ~delegate client
+let register_delegate ?endpoint ?wait ~delegate client =
+  spawn_register_delegate ?endpoint ?wait ~delegate client
   |> Process.check_and_read_stdout
 
 let spawn_get_delegate ?endpoint ~src client =
