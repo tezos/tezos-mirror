@@ -569,15 +569,21 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    state
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
-        Peer.Set.fold
-          (fun trusted_peer seq ->
-            if View.Connections.mem trusted_peer gstate_view.View.connections
-            then seq
-            else Seq.cons trusted_peer seq)
-          state.trusted_peers
-          Seq.empty
-        |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
-               Connect {px = trusted_peer; origin = Trusted}) ;
+        (* Once every 15 hearbreat ticks, try to reconnect to trusted peers if
+           they are disconnected. *)
+        if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6636
+
+             Put the value [15L] as a parameter. *)
+          Peer.Set.fold
+            (fun trusted_peer seq ->
+              if View.Connections.mem trusted_peer gstate_view.View.connections
+              then seq
+              else Seq.cons trusted_peer seq)
+            state.trusted_peers
+            Seq.empty
+          |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
+                 Connect {px = trusted_peer; origin = Trusted}) ;
         state
 
   let update_gossip_state state (gossip_state, output) =
