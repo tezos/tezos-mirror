@@ -279,20 +279,19 @@ let get_selected_distribution = Selected_distribution_for_cycle.get
 
 let find_selected_distribution = Selected_distribution_for_cycle.find
 
+let get_selected_distribution_as_map ctxt cycle =
+  let open Lwt_result_syntax in
+  let+ stakes = Selected_distribution_for_cycle.get ctxt cycle in
+  List.fold_left
+    (fun map (pkh, stake) -> Signature.Public_key_hash.Map.add pkh stake map)
+    Signature.Public_key_hash.Map.empty
+    stakes
+
 let prepare_stake_distribution ctxt =
   let open Lwt_result_syntax in
   let level = Level_storage.current ctxt in
-  let* stakes = Selected_distribution_for_cycle.get ctxt level.cycle in
-  let stake_distribution =
-    List.fold_left
-      (fun map (pkh, stake) -> Signature.Public_key_hash.Map.add pkh stake map)
-      Signature.Public_key_hash.Map.empty
-      stakes
-  in
-  return
-    (Raw_context.init_stake_distribution_for_current_cycle
-       ctxt
-       stake_distribution)
+  let+ stake_distribution = get_selected_distribution_as_map ctxt level.cycle in
+  Raw_context.init_stake_distribution_for_current_cycle ctxt stake_distribution
 
 let get_total_active_stake = Storage.Stake.Total_active_stake.get
 
