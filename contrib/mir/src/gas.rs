@@ -257,6 +257,7 @@ pub mod interpret_cost {
         const ADDRESS_SIZE: usize = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
         const CMP_KEY: u32 = 92; // hard-coded in the protocol
+        const CMP_SIGNATURE: u32 = 92; // hard-coded in the protocol
         let cmp_or = Checked::from(10u32);
         #[track_caller]
         fn incomparable() -> ! {
@@ -310,6 +311,9 @@ pub mod interpret_cost {
 
             (V::Key(_), V::Key(_)) => CMP_KEY,
             (V::Key(_), _) => incomparable(),
+
+            (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
+            (V::Signature(_), _) => incomparable(),
 
             (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
                 (Or::Left(x), Or::Left(y)) => cmp_or + compare(x, y)?,

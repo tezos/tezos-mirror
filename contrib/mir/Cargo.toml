@@ -14,6 +14,8 @@ logos = "0.13"
 hex = "0.4"
 tezos_crypto_rs = "0.5"
 typed-arena = "2"
+base58="0.2"
+cryptoxide="0.4"
 
 [[bin]]
 name = "tzt_runner"

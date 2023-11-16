@@ -20,6 +20,7 @@ use crate::ast::micheline::{
 };
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::michelson_key::KeyError;
+use crate::ast::michelson_signature::SignatureError;
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas;
@@ -83,6 +84,8 @@ pub enum TcError {
     DuplicateEntrypoint(Entrypoint),
     #[error("invalid value for type key: {0}")]
     KeyError(#[from] KeyError),
+    #[error("invalid value for type signature: {0}")]
+    SignatureError(#[from] SignatureError),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -1076,6 +1079,14 @@ pub(crate) fn typecheck_value(
         (T::Key, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
             TV::Key(Key::from_bytes(bs)?)
+        }
+        (T::Signature, V::String(str)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
+            TV::Signature(Signature::from_base58_check(str)?)
+        }
+        (T::Signature, V::Bytes(bs)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            TV::Signature(Signature::from_bytes(bs)?)
         }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
@@ -3226,6 +3237,33 @@ mod typecheck_tests {
             .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Push(TypedValue::Key(
                 "sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD"
+                    .try_into()
+                    .unwrap()
+            )))
+        );
+    }
+
+    #[test]
+    fn push_signature() {
+        assert_eq!(
+            parse("PUSH signature \"p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v\"")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Signature(
+                "p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v"
+                    .try_into()
+                    .unwrap()
+            )))
+        );
+        // NB: bytes are always treated as a generic signature
+        assert_eq!(
+            parse(
+                "PUSH signature 0x22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Signature(
+                "sigSTJNiwaPuZXmU2FscxNy9scPjjwpbxpPD5rY1QRBbyb4gHXYU7jN9Wcbs9sE4GMzuiSSG5S2egeyJhUjW1uJEgw4AWAXj"
                     .try_into()
                     .unwrap()
             )))
