@@ -40,18 +40,36 @@ build:
       - archiver/main.exe
       - server/main.exe
 
-release:
-  stage: deploy
+.release:
   image: curlimages/curl
-  only:
-    - main
-  dependencies:
-    - build
+  only: main
   script:
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-amd64-v18.0.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-amd64-v18.0.zip"'
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-amd64-master.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-amd64-master.zip"'
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-arm64-v18.0.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-arm64-v18.0.zip"'
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./binaries-arm64-master.zip "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/binaries-arm64-master.zip"'
+    - 'zip ./${ARCHIVE} archiver/main.exe server/main.exe'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/${ARCHIVE}"'
+
+release:amd64:v18.0:
+  extends: .release
+  dependencies: ["build: [amd64, v18.0]"]
+  variables:
+    ARCHIVE: "binaries-amd64-v18.0.zip"
+
+release:amd64:master:
+  extends: .release
+  dependencies: ["build: [amd64, master]"]
+  variables:
+    ARCHIVE: "binaries-amd64-master.zip"
+
+release:arm64:v18.0:
+  extends: .release
+  dependencies: ["build: [arm64, v18.0]"]
+  variables:
+    ARCHIVE: "binaries-arm64-v18.0.zip"
+
+release:arm64:master:
+  extends: .release
+  dependencies: ["build: [arm64, master]"]
+  variables:
+    ARCHIVE: "binaries-arm64-master.zip"
 
 docker:
   stage: docker
