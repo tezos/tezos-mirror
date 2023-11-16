@@ -1,0 +1,7 @@
+rv64si-p-csr: fail
+rv64si-p-dirty: fail
+rv64si-p-icache-alias: fail
+rv64si-p-ma_fetch: fail
+rv64si-p-sbreak: fail
+rv64si-p-scall: fail
+rv64si-p-wfi: fail
