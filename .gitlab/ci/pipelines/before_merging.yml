@@ -24,7 +24,6 @@ include:
   - .gitlab/ci/jobs/test/check_precommit_hook.yml
   - .gitlab/ci/jobs/test/misc_checks.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
-  - .gitlab/ci/jobs/test/ometrics_code_quality.yml
   - .gitlab/ci/jobs/test/semgrep.yml
   - .gitlab/ci/jobs/test/unit.yml
   - .gitlab/ci/jobs/test/integration_compiler_rejections.yml

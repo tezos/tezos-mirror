@@ -26,7 +26,6 @@ DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
-CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
@@ -378,32 +377,6 @@ lint-tests-pkg:
 
 TEST_DIRS := $(shell find src -name "test" -type d -print -o -name "test-*" -type d -print)
 EXCLUDE_TEST_DIRS := $(addprefix --exclude-file ,$(addsuffix /,${TEST_DIRS}))
-
-.PHONY: lint-ometrics
-lint-ometrics:
-	@echo "Running ometrics analysis in your changes"
-	@ometrics check ${EXCLUDE_TEST_DIRS} \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
-        --exclude-file "tezt/tests/" \
-        --exclude-entry-re "pp\|pp_.+" \
-        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
-        --exclude-entry-re "compare\|compare_.+\|.+_compare"
-
-.PHONY: lint-ometrics-gitlab
-lint-ometrics-gitlab:
-	@echo "Running ometrics analysis in your changes."
-	@mkdir -p _reports
-	@ometrics check-clone ${OMETRICS_GIT} --branch ${OMETRICS_BRANCH} \
-        ${EXCLUDE_TEST_DIRS} \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
-        --exclude-file "tezt/tests/" \
-        --exclude-entry-re "pp\|pp_.+" \
-        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
-        --exclude-entry-re "compare\|compare_.+\|.+_compare" \
-        --gitlab --output ${CODE_QUALITY_REPORT}
-	@echo "Report should be available in file://$(shell pwd)/${CODE_QUALITY_REPORT}"
 
 .PHONY: test
 test: test-code

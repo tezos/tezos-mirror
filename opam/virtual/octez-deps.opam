@@ -62,7 +62,6 @@ depends: [
   "ocamlgraph"
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
-  "ometrics" { >= "0.2.1" }
   "ppx_deriving"
   "ppx_expect"
   "ppx_import"

@@ -227,8 +227,6 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
-let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
-
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.1.0")
@@ -2494,7 +2492,6 @@ let _octez_tooling =
         (* These next are only used in the CI, we add this dependency so that
            it is added to tezos/opam-repository. *)
         ocamlformat;
-        ometrics;
       ]
 
 let octez_tooling_opam_file_format =
