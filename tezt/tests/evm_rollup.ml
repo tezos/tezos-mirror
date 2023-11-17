@@ -2152,9 +2152,8 @@ let get_kernel_boot_wasm ~sc_rollup_client =
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
 let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
-    ?(from_ghostnet = false) ?(nonce = 2) ~base_installee ~installee
-    ?with_administrator ?expect_l1_failure ?(admin = Constant.bootstrap1)
-    ?(upgrador = admin) protocol =
+    ~base_installee ~installee ?with_administrator ?expect_l1_failure
+    ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
          node;
          client;
@@ -2193,17 +2192,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
           "Couldn't obtain the root hash of the preimages of the chunked \
            kernel."
   in
-  let upgrade_payload =
-    let payload =
-      (* TODO: remove this condition whenever the ghostnet kernel is upgraded
-         to the version without an upgrade nonce. *)
-      if from_ghostnet then
-        let upgrade_nonce_bytes = Helpers.u16_to_bytes nonce in
-        upgrade_nonce_bytes ^ preimage_root_hash_bytes
-      else preimage_root_hash_bytes
-    in
-    Hex.of_string payload |> Hex.show
-  in
+  let upgrade_payload = Hex.of_string preimage_root_hash_bytes |> Hex.show in
   let* kernel_boot_wasm_before_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
   in
@@ -2579,7 +2568,6 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   let next_kernel_installee = "evm_kernel" in
   let* _ =
     gen_test_kernel_upgrade
-      ~from_ghostnet:true
       ~evm_setup
       ~base_installee:next_kernel_base_installee
       ~installee:next_kernel_installee
@@ -2595,32 +2583,6 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   in
   (* Check the values after the upgrade with [sanity_check] results. *)
   scenario_after ~evm_setup ~sanity_check
-
-let test_genesis_parent_hash_migration =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "migration"; "upgrade"; "genesis"]
-    ~title:"Replace genesis.parent_hash"
-  @@ fun protocol ->
-  let previous_genesis_parent_hash =
-    "0x0000000000000000000000000000000000000000000000000000000000000000"
-  in
-  let new_genesis_parent_hash =
-    "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-  in
-  let check_genesis_parent_hash expected_parent_hash endpoint =
-    let* genesis_block = Eth_cli.get_block ~block_id:"0" ~endpoint in
-    Check.((genesis_block.parent = expected_parent_hash) string)
-      ~error_msg:"The genesis parent hash should be %R but got %L" ;
-    unit
-  in
-  let scenario_prior ~evm_setup =
-    check_genesis_parent_hash previous_genesis_parent_hash evm_setup.endpoint
-  in
-  let scenario_after ~evm_setup ~sanity_check:() =
-    check_genesis_parent_hash new_genesis_parent_hash evm_setup.endpoint
-  in
-  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
 
 let test_kernel_migration =
   Protocol.register_test
@@ -2926,7 +2888,7 @@ let tez_kernelVersion evm_node =
   in
   return JSON.(json |-> "result" |> as_string)
 
-let _test_kernel_upgrade_version_change =
+let test_kernel_upgrade_version_change =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "upgrade"; "version"]
@@ -2970,8 +2932,7 @@ let test_transaction_storage_before_and_after_migration =
   in
   gen_kernel_migration_test ~config ~scenario_prior ~scenario_after protocol
 
-let _register_evm_migration ~protocols =
-  test_genesis_parent_hash_migration protocols ;
+let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
@@ -3876,10 +3837,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_administrator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6591
-     The MVP will be re-originated on ghostnet, instead of maintaining the tests,
-     we will reactivate them when we have the new version. *)
-  (* test_kernel_upgrade_version_change protocols ; *)
+  test_kernel_upgrade_version_change protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
@@ -3905,9 +3863,6 @@ let register_evm_node ~protocols =
   test_log_index protocols ;
   test_tx_pool_replacing_transactions protocols
 
-let register ~protocols = register_evm_node ~protocols
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6591
-   The MVP will be re-originated on ghostnet, instead of maintaining the tests,
-   we will reactivate them when we have the new version. *)
-(* register_evm_migration
-   ~protocols *)
+let register ~protocols =
+  register_evm_node ~protocols ;
+  register_evm_migration ~protocols
