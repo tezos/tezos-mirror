@@ -54,7 +54,10 @@ let simulate_call base call =
         log_kernel_debug_file = Some "simulate_call";
       }
   in
-  Simulation.call_result r
+  let eval_result =
+    Data_encoding.Json.destruct Simulation.Encodings.eval_result r
+  in
+  Simulation.call_result eval_result.insights
 
 let estimate_gas base call =
   let open Lwt_result_syntax in
@@ -80,7 +83,10 @@ let estimate_gas base call =
         log_kernel_debug_file = Some "estimate_gas";
       }
   in
-  Simulation.gas_estimation r
+  let eval_result =
+    Data_encoding.Json.destruct Simulation.Encodings.eval_result r
+  in
+  Simulation.gas_estimation eval_result.insights
 
 let is_tx_valid base (Hex tx_raw) =
   let open Lwt_result_syntax in
@@ -104,7 +110,10 @@ let is_tx_valid base (Hex tx_raw) =
         log_kernel_debug_file = Some "tx_validity";
       }
   in
-  Simulation.is_tx_valid r
+  let eval_result =
+    Data_encoding.Json.destruct Simulation.Encodings.eval_result r
+  in
+  Simulation.is_tx_valid eval_result.insights
 
 module type S = sig
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t

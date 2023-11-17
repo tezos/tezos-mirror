@@ -232,32 +232,21 @@ module Encodings = struct
             ~description:"PVM state values requested after the simulation")
 end
 
-let parse_insights decode (r : Data_encoding.json) =
-  let s = Data_encoding.Json.destruct Encodings.eval_result r in
-  match decode s.insights with
-  | Some insight -> Lwt.return_ok insight
-  | None ->
-      Error_monad.failwith
-        "Couldn't parse insights: %s"
-        (Data_encoding.Json.to_string r)
-
-let decode_call_result bytes =
+let call_result bytes =
+  let open Lwt_result_syntax in
   match bytes with
   | Some b :: _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      Some (Hash (Hex v))
-  | _ -> None
+      return (Hash (Hex v))
+  | _ -> failwith "Insights of 'call_result' is not Some _ :: _"
 
-let call_result json = parse_insights decode_call_result json
-
-let decode_gas_estimation bytes =
-  match bytes with
-  | Some b :: _ -> b |> Bytes.to_string |> Z.of_bits |> Option.some
-  | _ -> None
-
-let gas_estimation json =
+let gas_estimation bytes =
   let open Lwt_result_syntax in
-  let* simulated_amount = parse_insights decode_gas_estimation json in
+  let* simulated_amount =
+    match bytes with
+    | Some b :: _ -> b |> Bytes.to_string |> Z.of_bits |> return
+    | _ -> failwith "Insights of 'gas_estimation' is not Some _ :: _"
+  in
   (* See EIP2200 for reference. But the tl;dr is: we cannot do the
      opcode SSTORE if we have less than 2300 gas available, even if we don't
      consume it. The simulated amount then gives an amount of gas insufficient
@@ -268,7 +257,8 @@ let gas_estimation json =
   let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
   return (quantity_of_z simulated_amount)
 
-let decode_is_valid bytes =
+let is_tx_valid bytes =
+  let open Lwt_result_syntax in
   match bytes with
   | [Some b; Some payload] ->
       let is_valid =
@@ -276,13 +266,8 @@ let decode_is_valid bytes =
       in
       if is_valid then
         let address = Ethereum_types.decode_address payload in
-        Some (Ok address)
+        return (Ok address)
       else
         let error_msg = Bytes.to_string payload in
-        Some (Error error_msg)
-  | _ -> None
-
-let is_tx_valid json =
-  let open Lwt_result_syntax in
-  let* result = parse_insights decode_is_valid json in
-  return result
+        return (Error error_msg)
+  | _ -> failwith "Insights of 'is_tx_valid' is not [Some _, Some _]"
