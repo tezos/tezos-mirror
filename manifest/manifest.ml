@@ -3001,10 +3001,10 @@ let as_opam_monorepo_opam_provided = function
   | _ -> None
 
 let dune_depend =
-  (* version 3.11 removes support for ctypes extension versions 0.1 and 0.2 *)
+  (* versions 3.11.1 contains a fix for running inline_tests in parallel *)
   {
     Opam.package = "dune";
-    version = Version.(at_least "3.0" && less_than "3.11");
+    version = Version.(at_least "3.11.1");
     with_test = Never;
     optional = false;
   }
