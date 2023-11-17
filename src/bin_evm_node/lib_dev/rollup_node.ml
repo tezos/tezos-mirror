@@ -30,91 +30,6 @@ open Ethereum_types
 open Rollup_node_services
 open Transaction_format
 
-let simulate_call base call =
-  let open Lwt_result_syntax in
-  let*? messages = Simulation.encode call in
-  let insight_requests =
-    [
-      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
-         for now the status is not used but it should be for error handling *)
-      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
-    ]
-  in
-  let* r =
-    call_service
-      ~base
-      simulation
-      ()
-      ()
-      {
-        messages;
-        reveal_pages = None;
-        insight_requests;
-        log_kernel_debug_file = Some "simulate_call";
-      }
-  in
-  let eval_result =
-    Data_encoding.Json.destruct Simulation.Encodings.eval_result r
-  in
-  Simulation.call_result eval_result.insights
-
-let estimate_gas base call =
-  let open Lwt_result_syntax in
-  let*? messages = Simulation.encode call in
-  let insight_requests =
-    [
-      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_gas"];
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5900
-         for now the status is not used but it should be for error handling *)
-      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
-    ]
-  in
-  let* r =
-    call_service
-      ~base
-      simulation
-      ()
-      ()
-      {
-        messages;
-        reveal_pages = None;
-        insight_requests;
-        log_kernel_debug_file = Some "estimate_gas";
-      }
-  in
-  let eval_result =
-    Data_encoding.Json.destruct Simulation.Encodings.eval_result r
-  in
-  Simulation.gas_estimation eval_result.insights
-
-let is_tx_valid base (Hex tx_raw) =
-  let open Lwt_result_syntax in
-  let*? messages = Simulation.encode_tx tx_raw in
-  let insight_requests =
-    [
-      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
-      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
-    ]
-  in
-  let* r =
-    call_service
-      ~base
-      simulation
-      ()
-      ()
-      {
-        messages;
-        reveal_pages = None;
-        insight_requests;
-        log_kernel_debug_file = Some "tx_validity";
-      }
-  in
-  let eval_result =
-    Data_encoding.Json.destruct Simulation.Encodings.eval_result r
-  in
-  Simulation.is_tx_valid eval_result.insights
-
 module type S = sig
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
@@ -196,9 +111,13 @@ end) : S = struct
           return_unit
       end)
 
-  let simulate_call = simulate_call Base.base
-
-  let estimate_gas = estimate_gas Base.base
-
-  let is_tx_valid = is_tx_valid Base.base
+  include Simulator.Make (struct
+    let simulate_and_read ~input =
+      let open Lwt_result_syntax in
+      let* json = call_service ~base:Base.base simulation () () input in
+      let eval_result =
+        Data_encoding.Json.destruct Simulation.Encodings.eval_result json
+      in
+      return eval_result.insights
+  end)
 end
