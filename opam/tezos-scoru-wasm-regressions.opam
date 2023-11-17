@@ -16,7 +16,7 @@ depends: [
   "octez-l2-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
-  "tezt" { >= "3.1.1" & < "4.0.0" }
+  "tezt" { >= "4.0.0" & < "5.0.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
