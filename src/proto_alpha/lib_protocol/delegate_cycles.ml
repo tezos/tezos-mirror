@@ -189,11 +189,9 @@ let cycle_end ctxt last_cycle =
       ~new_cycle
   in
   let* ctxt, autostake_balance_updates =
-    if
-      Raw_context.adaptive_issuance_enable ctxt
-      || not (Constants_storage.adaptive_issuance_autostaking_enable ctxt)
-    then return (ctxt, [])
-    else adjust_frozen_stakes ctxt
+    match Staking.staking_automation ctxt with
+    | Manual_staking -> return (ctxt, [])
+    | Auto_staking -> adjust_frozen_stakes ctxt
   in
   let* ctxt = Forbidden_delegates_storage.update_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in

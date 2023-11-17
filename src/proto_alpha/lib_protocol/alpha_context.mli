@@ -2450,6 +2450,10 @@ module Staking : sig
     the requested stake undergone in between. *)
   val finalize_unstake :
     context -> Contract.t -> (context * Receipt.balance_updates) tzresult Lwt.t
+
+  (** Staking can be either automated or manual. If Adaptive Issuance is
+      enabled, staking must be manual. *)
+  val check_manual_staking_allowed : context -> unit tzresult
 end
 
 (** This module re-exports definitions from {!Voting_period_repr} and

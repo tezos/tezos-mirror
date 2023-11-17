@@ -1063,6 +1063,7 @@ let apply_manager_operation :
                   (Script.is_unit parameters)
                   (Script_interpreter.Bad_contract_parameter source_contract)
               in
+              let*? () = Staking.check_manual_staking_allowed ctxt in
               apply_stake
                 ~ctxt
                 ~sender:source
@@ -1075,6 +1076,7 @@ let apply_manager_operation :
                   (Script.is_unit parameters)
                   (Script_interpreter.Bad_contract_parameter source_contract)
               in
+              let*? () = Staking.check_manual_staking_allowed ctxt in
               apply_unstake
                 ~ctxt
                 ~sender:source
