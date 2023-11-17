@@ -148,7 +148,8 @@ macro_rules! micheline_instructions {
                 | Prim::ITER
                 | Prim::CHAIN_ID
                 | Prim::SELF
-                | Prim::SWAP,
+                | Prim::SWAP
+                | Prim::CHECK_SIGNATURE,
             ..,
         )
     };

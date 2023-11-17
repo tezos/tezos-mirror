@@ -162,7 +162,7 @@ pub mod interpret_cost {
     use checked::Checked;
 
     use super::{AsGasCost, OutOfGas};
-    use crate::ast::{Or, TypedValue};
+    use crate::ast::{Key, Or, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -354,6 +354,17 @@ pub mod interpret_cost {
         // NB: 2 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead.
         (80 + 2 * lookup_cost).as_gas_cost()
+    }
+
+    pub fn check_signature(k: &Key, msg: &[u8]) -> Result<u32, OutOfGas> {
+        let len = Checked::from(msg.len());
+        match k {
+            Key::Ed25519(..) => 65800 + ((len >> 3) + len),
+            Key::Secp256k1(..) => 51600 + ((len >> 3) + len),
+            Key::P256(..) => 341000 + ((len >> 3) + len),
+            Key::Bls(..) => 1570000 + (len * 3),
+        }
+        .as_gas_cost()
     }
 }
 

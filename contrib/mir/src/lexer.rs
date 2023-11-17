@@ -116,6 +116,7 @@ defprim! {
     bytes,
     key,
     signature,
+    CHECK_SIGNATURE,
 }
 
 defprim! {

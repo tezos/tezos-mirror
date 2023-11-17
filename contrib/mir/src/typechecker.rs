@@ -937,6 +937,15 @@ pub(crate) fn typecheck_instruction(
         }
         (App(SELF, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(CHECK_SIGNATURE, [], _), [.., T::Bytes, T::Signature, T::Key]) => {
+            stack.drop_top(2);
+            stack[0] = T::Bool;
+            I::CheckSignature
+        }
+        (App(CHECK_SIGNATURE, [], _), [.., _, _, _]) => no_overload!(CHECK_SIGNATURE),
+        (App(CHECK_SIGNATURE, [], _), [] | [_] | [_, _]) => no_overload!(CHECK_SIGNATURE, len 3),
+        (App(CHECK_SIGNATURE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
 }
@@ -3268,5 +3277,38 @@ mod typecheck_tests {
                     .unwrap()
             )))
         );
+    }
+
+    #[test]
+    fn check_signature() {
+        assert_eq!(
+            parse("CHECK_SIGNATURE").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[app!(bytes), app!(signature), app!(key)]
+            ),
+            Ok(CheckSignature)
+        );
+    }
+
+    #[test]
+    fn check_signature_wrong_type() {
+        assert_eq!(
+            parse("CHECK_SIGNATURE").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[app!(bytes), app!(key), app!(key)]
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CHECK_SIGNATURE,
+                stack: stk![Type::Bytes, Type::Key, Type::Key],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn check_signature_too_short() {
+        too_short_test(&app!(CHECK_SIGNATURE), Prim::CHECK_SIGNATURE, 3)
     }
 }
