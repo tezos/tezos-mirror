@@ -108,27 +108,6 @@ let make_encoded_messages ~smart_rollup_address tx_raw =
   in
   return (tx_hash, messages)
 
-let smart_rollup_address base =
-  let open Lwt_result_syntax in
-  let*! answer =
-    call_service
-      ~base
-      ~media_types:[Media_type.octet_stream]
-      smart_rollup_address
-      ()
-      ()
-      ()
-  in
-  match answer with
-  | Ok address -> return (Bytes.to_string address)
-  | Error tztrace ->
-      failwith
-        "Failed to communicate with %a, because %a"
-        Uri.pp
-        base
-        pp_print_trace
-        tztrace
-
 let inject_raw_transaction base tx =
   let open Lwt_result_syntax in
   (* The injection's service returns a notion of L2 message hash (defined
@@ -223,8 +202,6 @@ let is_tx_valid base (Hex tx_raw) =
   Simulation.is_tx_valid r
 
 module type S = sig
-  val smart_rollup_address : string tzresult Lwt.t
-
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
   val nonce :
@@ -283,8 +260,6 @@ end) : S = struct
     let read path =
       call_service ~base:Base.base durable_state_value () {key = path} ()
   end)
-
-  let smart_rollup_address = smart_rollup_address Base.base
 
   let inject_raw_transaction = inject_raw_transaction Base.base
 
