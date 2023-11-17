@@ -8,6 +8,7 @@ all: build test check
 .PHONY: build
 build:
 	@cargo build --release --target=riscv64gc-unknown-none-elf
+	@cargo build --release --target=riscv64gc-unknown-hermit --no-default-features --features crypto
 
 .PHONY: build-deps
 build-deps:

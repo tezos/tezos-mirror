@@ -11,6 +11,11 @@ default-features = false
 version = "*"
 optional = true
 
+[dependencies.tezos_crypto_rs]
+version = "0.5.2"
+default-features = false
+optional = true
+
 [dependencies.tezos-smart-rollup-panic-hook]
 path = "../../kernel_sdk/panic-hook"
 version = "0.2.2"
@@ -25,3 +30,4 @@ features = ["debug_alloc", "proto-alpha-no-mock"]
 [features]
 default = ["bare-metal"]
 bare-metal = ["riscv-rt"]
+crypto = ["tezos_crypto_rs"]
