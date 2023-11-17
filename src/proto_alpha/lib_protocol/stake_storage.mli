@@ -133,6 +133,11 @@ val find_selected_distribution :
   Cycle_repr.t ->
   (Signature.Public_key_hash.t * Stake_repr.t) list option tzresult Lwt.t
 
+val get_selected_distribution_as_map :
+  Raw_context.t ->
+  Cycle_repr.t ->
+  Stake_repr.t Signature.Public_key_hash.Map.t tzresult Lwt.t
+
 (** Copy the stake distribution for the current cycle (from
    [Storage.Stake.Selected_distribution_for_cycle]) in the raw
    context. *)

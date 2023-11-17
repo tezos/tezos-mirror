@@ -41,7 +41,7 @@ module Consensus : sig
 
   (** Errors for preattestations and attestations. *)
   type error +=
-    | Zero_frozen_deposits of Signature.Public_key_hash.t
+    | Forbidden_delegate of Signature.Public_key_hash.t
     | Consensus_operation_not_allowed
     | Consensus_operation_for_old_level of {
         kind : consensus_operation_kind;

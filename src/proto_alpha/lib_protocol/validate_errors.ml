@@ -48,24 +48,24 @@ let operation_conflict_encoding =
           (req "new_operation" Operation_hash.encoding))
 
 module Consensus = struct
-  type error += Zero_frozen_deposits of Signature.Public_key_hash.t
+  type error += Forbidden_delegate of Signature.Public_key_hash.t
 
   let () =
     register_error_kind
       `Permanent
-      ~id:"validate.zero_frozen_deposits"
-      ~title:"Zero frozen deposits"
-      ~description:"The delegate has zero frozen deposits."
+      ~id:"validate.temporarily_forbidden_delegate"
+      ~title:"Temporarily forbidden delegate"
+      ~description:"The delegate has committed too many misbehaviours."
       ~pp:(fun ppf delegate ->
         Format.fprintf
           ppf
-          "Delegate %a has zero frozen deposits; it is not allowed to \
-           bake/preattest/attest."
+          "Delegate %a has committed too many misbehaviours; it is temporarily \
+           not allowed to bake/preattest/attest."
           Signature.Public_key_hash.pp
           delegate)
       Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-      (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
-      (fun delegate -> Zero_frozen_deposits delegate)
+      (function Forbidden_delegate delegate -> Some delegate | _ -> None)
+      (fun delegate -> Forbidden_delegate delegate)
 
   (** This type is only used in consensus operation errors to make
       them more informative. *)

@@ -17,19 +17,19 @@ let forbid ctxt delegate =
   Storage.Tenderbake.Forbidden_delegates.add ctxt new_forbidden_delegates
 
 let should_forbid ~current_cycle slash_history =
-  let slashed_this_cycle =
-    Storage.Slashed_deposits_history.get current_cycle slash_history
+  let since_cycle =
+    Cycle_repr.pred current_cycle |> Option.value ~default:Cycle_repr.root
   in
-  let slashed_previous_cycle =
-    match Cycle_repr.pred current_cycle with
-    | Some previous_cycle ->
-        Storage.Slashed_deposits_history.get previous_cycle slash_history
-    | None -> Int_percentage.p0
+  let slashed_since =
+    List.fold_left
+      (fun slashed_since (cycle, slashed) ->
+        if Cycle_repr.(cycle >= since_cycle) then
+          Int_percentage.add_bounded slashed_since slashed
+        else slashed_since)
+      Int_percentage.p0
+      slash_history
   in
-  let slashed_both_cycles =
-    Int_percentage.add_bounded slashed_this_cycle slashed_previous_cycle
-  in
-  Compare.Int.((slashed_both_cycles :> int) >= 100)
+  Compare.Int.((slashed_since :> int) >= 51)
 
 let may_forbid ctxt delegate ~current_cycle slash_history =
   let open Lwt_syntax in
@@ -64,32 +64,58 @@ let set_forbidden_delegates ctxt forbidden_delegates =
   in
   return ctxt
 
-let reset ctxt =
-  if
-    Signature.Public_key_hash.Set.is_empty
-      (Raw_context.Consensus.forbidden_delegates ctxt)
-  then Lwt.return ctxt
-  else set_forbidden_delegates ctxt Signature.Public_key_hash.Set.empty
-
 let update_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let*! ctxt = reset ctxt in
-  let* selection_for_new_cycle =
-    Stake_storage.get_selected_distribution ctxt new_cycle
-  in
-  List.fold_left_es
-    (fun ctxt (delegate, _stake) ->
-      let* current_deposits =
-        Delegate_storage.current_frozen_deposits ctxt delegate
-      in
-      if Tez_repr.(current_deposits = zero) then
-        (* If the delegate's current deposit remains at zero then we add it to
-           the forbidden set. *)
-        let*! ctxt = forbid ctxt delegate in
+  let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
+  if Signature.Public_key_hash.Set.is_empty forbidden_delegates then return ctxt
+  else
+    let* selection_for_new_cycle =
+      Stake_storage.get_selected_distribution_as_map ctxt new_cycle
+    in
+    let* forbidden_delegates =
+      Signature.Public_key_hash.Set.fold_es
+        (fun delegate acc ->
+          let* slash_history_opt =
+            Storage.Contract.Slashed_deposits.find ctxt (Implicit delegate)
+          in
+          let slash_history = Option.value slash_history_opt ~default:[] in
+          (* To be unforbidden in the new cycle, a delegate must not meet the
+             criterion used on denunciation anymore... *)
+          if should_forbid ~current_cycle:new_cycle slash_history then
+            return acc
+          else
+            (* ...and must have, either no rights (in which case there is no reason
+               to keep it forbidden), or have at least half the frozen deposits it
+               had when rights were computed (probably coming from autostaking). *)
+            let+ unforbid =
+              match
+                Signature.Public_key_hash.Map.find
+                  delegate
+                  selection_for_new_cycle
+              with
+              | None -> return_true
+              | Some {frozen; _} ->
+                  let+ current_deposits =
+                    Delegate_storage.current_frozen_deposits ctxt delegate
+                  in
+                  Tez_repr.(current_deposits >= div2 frozen)
+            in
+            if unforbid then
+              `Changed
+                (Signature.Public_key_hash.Set.remove
+                   delegate
+                   (match acc with
+                   | `Unchanged -> forbidden_delegates
+                   | `Changed forbidden_delegates -> forbidden_delegates))
+            else acc)
+        forbidden_delegates
+        `Unchanged
+    in
+    match forbidden_delegates with
+    | `Unchanged -> return ctxt
+    | `Changed forbidden_delegates ->
+        let*! ctxt = set_forbidden_delegates ctxt forbidden_delegates in
         return ctxt
-      else return ctxt)
-    ctxt
-    selection_for_new_cycle
 
 let init_for_genesis_and_oxford ctxt =
   Storage.Tenderbake.Forbidden_delegates.init

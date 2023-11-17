@@ -445,10 +445,10 @@ let get_initial_ctxt {info; _} = info.ctxt
 module Consensus = struct
   open Validate_errors.Consensus
 
-  let check_frozen_deposits_are_positive ctxt delegate_pkh =
+  let check_delegate_is_not_forbidden ctxt delegate_pkh =
     fail_when
       (Delegate.is_forbidden_delegate ctxt delegate_pkh)
-      (Zero_frozen_deposits delegate_pkh)
+      (Forbidden_delegate delegate_pkh)
 
   let get_delegate_details slot_map kind slot =
     let open Result_syntax in
@@ -519,9 +519,7 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
-    let* () =
-      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
-    in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   (** Preattestation checks for Construction mode.
@@ -550,9 +548,7 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
-    let* () =
-      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
-    in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   (** Preattestation/attestation checks for Mempool mode.
@@ -736,9 +732,7 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.attestation_slot_map kind slot
     in
-    let* () =
-      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
-    in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   let check_attestation vi ~check_signature
@@ -2418,7 +2412,7 @@ let begin_any_application ctxt chain_id ~predecessor_level
       ~expected_commitment:current_level.expected_commitment
   in
   let* () =
-    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+    Consensus.check_delegate_is_not_forbidden ctxt block_producer.delegate
   in
   let* ctxt, _slot, _payload_producer =
     (* We just make sure that this call will not fail in apply.ml *)
@@ -2490,7 +2484,7 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
   let* () =
-    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+    Consensus.check_delegate_is_not_forbidden ctxt block_producer.delegate
   in
   let* ctxt, _slot, _payload_producer =
     (* We just make sure that this call will not fail in apply.ml *)
