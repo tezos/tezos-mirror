@@ -186,6 +186,7 @@ pub mod interpret_cost {
     pub const PAIR: u32 = 10;
     pub const UNPAIR: u32 = 10;
     pub const SOME: u32 = 10;
+    pub const NONE: u32 = 10;
     pub const AMOUNT: u32 = 10;
     pub const NIL: u32 = 10;
     pub const CONS: u32 = 15;

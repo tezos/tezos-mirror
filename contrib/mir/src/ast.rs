@@ -247,6 +247,7 @@ pub enum Instruction {
     Pair,
     /// `ISome` because `Some` is already taken
     ISome,
+    None,
     Compare,
     Amount,
     Nil,
