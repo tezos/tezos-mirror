@@ -106,13 +106,13 @@ end
 
 module Types = struct
   type state = {
-    rollup_node : (module Rollup_node.S);
+    rollup_node : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable level : Ethereum_types.block_height;
     mutable pool : Pool.t;
   }
 
-  type parameters = (module Rollup_node.S) * string
+  type parameters = (module Services_backend_sig.S) * string
 end
 
 module Name = struct
@@ -371,7 +371,8 @@ let rec subscribe_l2_block worker =
         subscribe_l2_block worker
       else subscribe_l2_block worker
 
-let start ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
+let start
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   let open Lwt_result_syntax in
   let+ worker =
     Worker.launch

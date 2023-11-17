@@ -92,7 +92,8 @@ let rollup_node_config_dev ~rollup_node_endpoint =
   let* smart_rollup_address =
     Rollup_node_services.smart_rollup_address rollup_node_endpoint
   in
-  return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+  return
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
 let prod_directory config rollup_node_config =
   let open Lwt_result_syntax in

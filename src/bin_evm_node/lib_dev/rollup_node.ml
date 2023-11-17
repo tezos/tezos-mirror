@@ -26,92 +26,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Ethereum_types
 open Rollup_node_services
 open Transaction_format
 
-module type S = sig
-  val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
-
-  val nonce :
-    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t
-
-  val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
-
-  val inject_raw_transactions :
-    smart_rollup_address:string ->
-    transactions:hex list ->
-    hash list tzresult Lwt.t
-
-  val current_block :
-    full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
-
-  val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
-
-  val nth_block :
-    full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
-
-  val block_by_hash :
-    full_transaction_object:bool ->
-    Ethereum_types.block_hash ->
-    Ethereum_types.block tzresult Lwt.t
-
-  val transaction_receipt :
-    Ethereum_types.hash ->
-    Ethereum_types.transaction_receipt option tzresult Lwt.t
-
-  val transaction_object :
-    Ethereum_types.hash ->
-    Ethereum_types.transaction_object option tzresult Lwt.t
-
-  val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
-
-  val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
-
-  val kernel_version : unit -> string tzresult Lwt.t
-
-  val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
-
-  val estimate_gas :
-    Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
-
-  val is_tx_valid :
-    Ethereum_types.hex -> (Ethereum_types.address, string) result tzresult Lwt.t
-
-  val storage_at :
-    Ethereum_types.address ->
-    Ethereum_types.quantity ->
-    Ethereum_types.hex tzresult Lwt.t
-end
-
-module Make (Base : sig
+module MakeBackend (Base : sig
   val base : Uri.t
-end) : S = struct
-  include Durable_storage.Make (struct
+end) : Services_backend_sig.Backend = struct
+  module READER = struct
     let read path =
       call_service ~base:Base.base durable_state_value () {key = path} ()
-  end)
+  end
 
-  include
-    Publisher.Make
-      (struct
-        let encode_transaction ~smart_rollup_address ~transaction =
-          make_encoded_messages ~smart_rollup_address transaction
-      end)
-      (struct
-        let publish_messages ~messages =
-          let open Lwt_result_syntax in
-          (* The injection's service returns a notion of L2 message hash (defined
-             by the rollup node) used to track the message's injection in the batcher.
-             We do not wish to follow the message's inclusion, and thus, ignore
-             the resulted hash. *)
-          let* _answer =
-            call_service ~base:Base.base batcher_injection () () messages
-          in
-          return_unit
-      end)
+  module TxEncoder = struct
+    let encode_transaction ~smart_rollup_address ~transaction =
+      make_encoded_messages ~smart_rollup_address transaction
+  end
 
-  include Simulator.Make (struct
+  module Publisher = struct
+    let publish_messages ~messages =
+      let open Lwt_result_syntax in
+      (* The injection's service returns a notion of L2 message hash (defined
+         by the rollup node) used to track the message's injection in the batcher.
+         We do not wish to follow the message's inclusion, and thus, ignore
+         the resulted hash. *)
+      let* _answer =
+        call_service ~base:Base.base batcher_injection () () messages
+      in
+      return_unit
+  end
+
+  module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
       let* json = call_service ~base:Base.base simulation () () input in
@@ -119,5 +63,10 @@ end) : S = struct
         Data_encoding.Json.destruct Simulation.Encodings.eval_result json
       in
       return eval_result.insights
-  end)
+  end
 end
+
+module Make (Base : sig
+  val base : Uri.t
+end) =
+  Services_backend_sig.Make (MakeBackend (Base))

@@ -79,7 +79,7 @@ let dispatch_service =
     Path.(root)
 
 let get_block_by_number ~full_transaction_object block_param
-    (module Rollup_node_rpc : Rollup_node.S) =
+    (module Rollup_node_rpc : Services_backend_sig.S) =
   match block_param with
   | Ethereum_types.(Hash_param (Block_height n)) ->
       Rollup_node_rpc.nth_block ~full_transaction_object n
@@ -87,7 +87,7 @@ let get_block_by_number ~full_transaction_object block_param
       Rollup_node_rpc.current_block ~full_transaction_object
 
 let get_transaction_from_index block index
-    (module Rollup_node_rpc : Rollup_node.S) =
+    (module Rollup_node_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
   match block.Ethereum_types.transactions with
   | TxHash l -> (
@@ -104,7 +104,7 @@ let block_transaction_count block =
   | TxFull l -> List.length l
 
 let dispatch_input (config : Configuration.t)
-    ((module Rollup_node_rpc : Rollup_node.S), _) (input, id) =
+    ((module Rollup_node_rpc : Services_backend_sig.S), _) (input, id) =
   let open Lwt_result_syntax in
   let dispatch_input_aux : type w. w input -> w output tzresult Lwt.t = function
     (* INTERNAL RPCs *)
@@ -286,8 +286,8 @@ let dispatch config ctx dir =
           Batch outputs)
 
 let directory config
-    ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Directory.empty |> version
   |> dispatch
        config
-       ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
