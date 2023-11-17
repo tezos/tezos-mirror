@@ -137,8 +137,8 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       (module Plugin)
       node_ctxt
       rollup_ctxt
-      ~predecessor
-      head
+      ~predecessor:(Layer1.head_of_header predecessor)
+      (Layer1.head_of_header head)
       (inbox, messages)
   in
   let*! context_hash = Context.commit ctxt in
@@ -598,8 +598,8 @@ module Internal_for_tests = struct
         (module Plugin)
         node_ctxt
         ctxt
-        ~predecessor
-        head
+        ~predecessor:(Layer1.head_of_header predecessor)
+        (Layer1.head_of_header head)
         (inbox, messages)
     in
     let*! context_hash = Context.commit ctxt in

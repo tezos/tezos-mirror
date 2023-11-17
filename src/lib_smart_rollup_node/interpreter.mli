@@ -35,8 +35,8 @@ val process_head :
   (module Protocol_plugin_sig.PARTIAL) ->
   Node_context.rw ->
   'a Context.t ->
-  predecessor:Layer1.header ->
-  Layer1.header ->
+  predecessor:Layer1.head ->
+  Layer1.head ->
   Octez_smart_rollup.Inbox.t * string list ->
   ('a Context.t * int * int64 * Z.t) tzresult Lwt.t
 
