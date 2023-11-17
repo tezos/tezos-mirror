@@ -41,11 +41,12 @@ build:
       - server/main.exe
 
 .release:
-  image: curlimages/curl
+  image: alpine
   only:
     - main
   script:
     - 'apk add zip'
+    - 'apk add curl'
     - 'zip ./${ARCHIVE} archiver/main.exe server/main.exe'
     - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/${ARCHIVE}"'
 
