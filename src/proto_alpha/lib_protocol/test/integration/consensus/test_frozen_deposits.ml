@@ -618,7 +618,7 @@ let test_deposits_after_stake_removal () =
   in
   Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
 
-let test_deposits_not_unfrozen_after_deactivation () =
+let test_deposits_unfrozen_after_deactivation () =
   let open Lwt_result_syntax in
   let* genesis, contracts = Context.init_with_constants2 constants in
   let (_contract1, account1), (_contract2, account2) =
@@ -655,9 +655,12 @@ let test_deposits_not_unfrozen_after_deactivation () =
           is_deactivated
           (new_cycle > last_active_cycle)
       in
-      (* deposits are not automatically unfrozen *)
+      (* deposits are automatically unfrozen for deactivated delegates only *)
       let* () =
-        Assert.equal_tez ~loc:__LOC__ frozen_deposits initial_frozen_deposits
+        Assert.equal_tez
+          ~loc:__LOC__
+          frozen_deposits
+          (if is_deactivated then Tez.zero else initial_frozen_deposits)
       in
       loop b (pred n)
   in
@@ -1019,9 +1022,9 @@ let tests =
         `Quick
         test_deposits_after_stake_removal;
       tztest
-        "deposits are not unfrozen after deactivation"
+        "deposits are unfrozen after deactivation"
         `Quick
-        test_deposits_not_unfrozen_after_deactivation;
+        test_deposits_unfrozen_after_deactivation;
       tztest
         "frozen deposits with delegation"
         `Quick
