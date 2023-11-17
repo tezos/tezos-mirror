@@ -92,8 +92,10 @@ let () =
     ~pp:(fun ppf node ->
       Format.fprintf
         ppf
-        "Unexpected format for an item in a typed stack. Expected: Stack_elt \
-         <ty> <value>; got %a."
+        "%a,@ Unexpected format for an item in a typed stack. Expected: \
+         Stack_elt <ty> <value>; got %a."
+        print_localized_node_location
+        node
         print_localized_node
         node)
     localized_node_encoding
@@ -107,8 +109,10 @@ let () =
     ~pp:(fun ppf node ->
       Format.fprintf
         ppf
-        "Unexpected format for a typed stack. Expected a sequence of Stack_elt \
-         <ty> <value>; got %a."
+        "%a,@ Unexpected format for a typed stack. Expected a sequence of \
+         Stack_elt <ty> <value>; got %a."
+        print_localized_node_location
+        node
         print_localized_node
         node)
     localized_node_encoding
@@ -122,8 +126,10 @@ let () =
     ~pp:(fun ppf node ->
       Format.fprintf
         ppf
-        "Unexpected format for an item in a description of other contracts. \
-         Expected: Contract <address> <ty>; got %a."
+        "%a,@ Unexpected format for an item in a description of other \
+         contracts. Expected: Contract <address> <ty>; got %a."
+        print_localized_node_location
+        node
         print_localized_node
         node)
     localized_node_encoding
@@ -137,8 +143,10 @@ let () =
     ~pp:(fun ppf node ->
       Format.fprintf
         ppf
-        "Unexpected format for a description of other contracts. Expected a \
-         sequence of Contract <address> <ty>; got %a."
+        "%a,@ Unexpected format for a description of other contracts. Expected \
+         a sequence of Contract <address> <ty>; got %a."
+        print_localized_node_location
+        node
         print_localized_node
         node)
     localized_node_encoding
@@ -152,8 +160,11 @@ let () =
     ~pp:(fun ppf node ->
       Format.fprintf
         ppf
-        "Unexpected format for an item in a description of extra big maps. \
-         Expected: Big_map <index> <key_type> <value_type> <content>; got %a."
+        "%a,@ Unexpected format for an item in a description of extra big \
+         maps. Expected: Big_map <index> <key_type> <value_type> <content>; \
+         got %a."
+        print_localized_node_location
+        node
         print_localized_node
         node)
     localized_node_encoding
@@ -167,9 +178,11 @@ let () =
     ~pp:(fun ppf node ->
       Format.fprintf
         ppf
-        "Unexpected format for a description of extra big maps. Expected a \
-         sequence of Big_map <index> <key_type> <value_type> <content>; got \
+        "%a,@ Unexpected format for a description of extra big maps. Expected \
+         a sequence of Big_map <index> <key_type> <value_type> <content>; got \
          %a."
+        print_localized_node_location
+        node
         print_localized_node
         node)
     localized_node_encoding
