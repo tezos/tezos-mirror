@@ -2713,7 +2713,7 @@ module Slashing = struct
     |+ Tag "No AI"
        --> begin_test ~activate_ai:false constants ["delegate"; "baker"])
     --> unstake "delegate" (Amount Tez.one_mutez)
-    --> next_cycle
+    --> set_baker "baker" --> next_cycle
     --> ((Tag "7% slash" --> double_bake "delegate" --> make_denunciations ()
          |+ Tag "99% slash" --> next_cycle --> double_attest "delegate"
             --> loop 7 (double_bake "delegate")
