@@ -391,13 +391,11 @@ let commands () =
              extra_big_maps,
              legacy )
            program
-           (stack, stack_source)
+           stack
            cctxt ->
         let open Lwt_result_syntax in
         let*? program = Micheline_parser.no_parsing_error program in
-        let*? stack =
-          Michelson_v1_stack.parse_stack ~source:stack_source stack
-        in
+        let*? stack = Michelson_v1_stack.parse_stack stack in
         let*! res =
           run_instr
             cctxt
@@ -855,11 +853,9 @@ let commands () =
          other_contracts_arg
          extra_big_maps_arg)
       (prefixes ["normalize"; "stack"] @@ stack_param () @@ stop)
-      (fun (unparsing_mode, legacy, other_contracts, extra_big_maps)
-           (stack, source)
-           cctxt ->
+      (fun (unparsing_mode, legacy, other_contracts, extra_big_maps) stack cctxt ->
         let open Lwt_result_syntax in
-        let*? stack = Michelson_v1_stack.parse_stack ~source stack in
+        let*? stack = Michelson_v1_stack.parse_stack stack in
         let*! r =
           Plugin.RPC.Scripts.normalize_stack
             cctxt

@@ -245,14 +245,7 @@ let binary_encoded_parameter ~name encoding =
 
 let parse_micheline_parameter source =
   Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
-  @@
-  let tokens, lexing_errors =
-    Tezos_micheline.Micheline_parser.tokenize source
-  in
-  let ast, parsing_errors =
-    Tezos_micheline.Micheline_parser.parse_expression tokens
-  in
-  ((ast, source), lexing_errors @ parsing_errors)
+  @@ Michelson_v1_parser.expand_expression source
 
 let micheline_parameter =
   Tezos_clic.parameter (fun (_ : full) source ->
@@ -273,8 +266,8 @@ let init_arg =
 let other_contracts_parameter =
   Tezos_clic.parameter (fun _ source ->
       let open Lwt_result_syntax in
-      let* micheline, source = parse_micheline_parameter source in
-      let*? l = Michelson_v1_stack.parse_other_contracts ~source micheline in
+      let* parsed = parse_micheline_parameter source in
+      let*? l = Michelson_v1_stack.parse_other_contracts parsed in
       return l)
 
 let other_contracts_arg =
@@ -288,8 +281,8 @@ let other_contracts_arg =
 let extra_big_maps_parameter =
   Tezos_clic.parameter (fun _ source ->
       let open Lwt_result_syntax in
-      let* micheline, source = parse_micheline_parameter source in
-      let*? l = Michelson_v1_stack.parse_extra_big_maps ~source micheline in
+      let* parsed = parse_micheline_parameter source in
+      let*? l = Michelson_v1_stack.parse_extra_big_maps parsed in
       return l)
 
 let extra_big_maps_arg =

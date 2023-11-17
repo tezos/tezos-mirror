@@ -219,7 +219,7 @@ val raw_level_param :
   (Raw_level.t -> 'a, 'b) Tezos_clic.params
 
 val micheline_parameter :
-  (Tezos_micheline.Micheline_parser.node * string, full) Tezos_clic.parameter
+  (string Michelson_v1_parser.parser_result, full) Tezos_clic.parameter
 
 val unparsing_mode_arg :
   default:string -> (Script_ir_unparser.unparsing_mode, full) Tezos_clic.arg

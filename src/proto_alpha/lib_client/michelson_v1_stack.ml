@@ -28,50 +28,59 @@ open Protocol
 open Alpha_context
 
 type localized_node = {
-  loc : Micheline_parser.location;
-  node : Micheline_printer.node;
+  parser_loc : Micheline_parser.location option;
+  canonical_loc : Micheline.canonical_location;
+  node : string Micheline.canonical;
 }
 
 let print_localized_node_location fmt localized_node =
-  Format.fprintf
-    fmt
-    "%s"
-    (Format.kasprintf
-       String.capitalize_ascii
-       "%a"
-       Micheline_parser.print_location
-       localized_node.loc)
+  match localized_node.parser_loc with
+  | Some parser_loc ->
+      Format.fprintf
+        fmt
+        "%s"
+        (Format.kasprintf
+           String.capitalize_ascii
+           "%a"
+           Micheline_parser.print_location
+           parser_loc)
+  | None -> Format.fprintf fmt "At position %d" localized_node.canonical_loc
 
 let print_localized_node fmt localized_node =
-  Micheline_printer.print_expr_unwrapped fmt localized_node.node
+  Micheline_printer.print_expr_unwrapped
+    fmt
+    (Micheline_printer.printable Fun.id localized_node.node)
 
-let localize_node (n : (Micheline_parser.location, string) Micheline.node) :
-    localized_node =
-  {
-    loc = Micheline.location n;
-    node = Micheline_printer.printable Fun.id (Micheline.strip_locations n);
-  }
-
-let micheline_printer_location_encoding :
-    Micheline_printer.location Data_encoding.encoding =
-  let open Data_encoding in
-  conv
-    (fun loc -> loc.Micheline_printer.comment)
-    (fun comment -> {comment})
-    (option string)
+let localize_node ~(parsed : string Michelson_v1_parser.parser_result)
+    (n : (Micheline.canonical_location, string) Micheline.node) : localized_node
+    =
+  let canonical_loc = Micheline.location n in
+  let parser_loc =
+    let open Option_syntax in
+    let* oloc =
+      List.assoc ~equal:Int.equal canonical_loc parsed.unexpansion_table
+    in
+    let+ ploc, _ = List.assoc ~equal:Int.equal oloc parsed.expansion_table in
+    ploc
+  in
+  {parser_loc; canonical_loc; node = Micheline.strip_locations n}
 
 let localized_node_encoding : localized_node Data_encoding.t =
   Data_encoding.(
     conv
-      (fun {loc; node} -> (loc, node))
-      (fun (loc, node) -> {loc; node})
-      (obj2
-         (req "location" Micheline_parser.location_encoding)
+      (fun {parser_loc; canonical_loc; node} ->
+        (parser_loc, canonical_loc, node))
+      (fun (parser_loc, canonical_loc, node) ->
+        {parser_loc; canonical_loc; node})
+      (obj3
+         (req "parser_location" (option Micheline_parser.location_encoding))
+         (req
+            "canonical_location"
+            Micheline_encoding.canonical_location_encoding)
          (req
             "node"
-            (Micheline_encoding.table_encoding
-               ~variant:""
-               micheline_printer_location_encoding
+            (Micheline_encoding.canonical_encoding
+               ~variant:"alpha_client"
                Data_encoding.string))))
 
 type error +=
@@ -205,71 +214,76 @@ let () =
     (function Invalid_address_for_smart_contract str -> Some str | _ -> None)
     (fun str -> Invalid_address_for_smart_contract str)
 
-let parse_expression ~source (node : Micheline_parser.node) :
-    Script.expr tzresult =
-  let open Result_syntax in
-  let parsing_result =
-    Michelson_v1_parser.expand_all_and_recognize_prims ~source ~original:node
-  in
-  let* parsed = Micheline_parser.no_parsing_error parsing_result in
-  return parsed.expanded
+let parse_expression (node : (_, string) Micheline.node) =
+  Environment.wrap_tzresult
+  @@ Michelson_v1_primitives.prims_of_strings (Micheline.strip_locations node)
 
-let parse_stack_item ~source =
+let parse_stack_item ~parsed =
   let open Result_syntax in
   function
   | Micheline.Prim (_loc, "Stack_elt", [ty; v], _annot) ->
-      let* ty = parse_expression ~source ty in
-      let* v = parse_expression ~source v in
+      let* ty = parse_expression ty in
+      let* v = parse_expression v in
       return (ty, v)
-  | e -> tzfail (Wrong_stack_item (localize_node e))
+  | e -> tzfail (Wrong_stack_item (localize_node ~parsed e))
 
-let parse_other_contract_item ~source =
+let parse_other_contract_item ~parsed =
   let open Result_syntax in
   function
   | Micheline.Prim (_loc, "Contract", [address; ty], _annot) as e ->
-      let* address = parse_expression ~source address in
+      let* address = parse_expression address in
       let* address =
         match Micheline.root address with
         | Micheline.String (_loc, s) -> (
             match Environment.Base58.decode s with
             | Some (Contract_hash.Data h) -> return h
             | Some _ | None -> tzfail (Invalid_address_for_smart_contract s))
-        | _ -> tzfail (Wrong_other_contracts_item (localize_node e))
+        | _ -> tzfail (Wrong_other_contracts_item (localize_node ~parsed e))
       in
-      let* ty = parse_expression ~source ty in
+      let* ty = parse_expression ty in
       return RPC.Scripts.S.{address; ty}
-  | e -> tzfail (Wrong_other_contracts_item (localize_node e))
+  | e -> tzfail (Wrong_other_contracts_item (localize_node ~parsed e))
 
-let parse_extra_big_map_item ~source =
+let parse_extra_big_map_item ~parsed =
   let open Result_syntax in
   function
   | Micheline.Prim (_loc, "Big_map", [id; kty; vty; items], _annot) as e ->
-      let* id = parse_expression ~source id in
+      let* id = parse_expression id in
       let* id =
         match Micheline.root id with
         | Micheline.Int (_loc, id) -> return (Big_map.Id.parse_z id)
-        | _ -> tzfail (Wrong_other_contracts_item (localize_node e))
+        | _ -> tzfail (Wrong_other_contracts_item (localize_node ~parsed e))
       in
-      let* kty = parse_expression ~source kty in
-      let* vty = parse_expression ~source vty in
-      let* items = parse_expression ~source items in
+      let* kty = parse_expression kty in
+      let* vty = parse_expression vty in
+      let* items = parse_expression items in
       return RPC.Scripts.S.{id; kty; vty; items}
-  | e -> tzfail (Wrong_extra_big_maps_item (localize_node e))
+  | e -> tzfail (Wrong_extra_big_maps_item (localize_node ~parsed e))
 
-let parse_stack ~source = function
+let parse_stack ?node (parsed : string Michelson_v1_parser.parser_result) =
+  let node = Option.value ~default:(Micheline.root parsed.expanded) node in
+  match node with
   | Micheline.Seq (_loc, l) as e ->
-      record_trace_eval (fun () -> Wrong_stack (localize_node e))
-      @@ List.map_e (parse_stack_item ~source) l
-  | e -> Result_syntax.tzfail (Wrong_stack (localize_node e))
+      record_trace_eval (fun () -> Wrong_stack (localize_node ~parsed e))
+      @@ List.map_e (parse_stack_item ~parsed) l
+  | e -> Result_syntax.tzfail (Wrong_stack (localize_node ~parsed e))
 
-let parse_other_contracts ~source = function
+let parse_other_contracts ?node
+    (parsed : string Michelson_v1_parser.parser_result) =
+  let node = Option.value ~default:(Micheline.root parsed.expanded) node in
+  match node with
   | Micheline.Seq (_loc, l) as e ->
-      record_trace_eval (fun () -> Wrong_other_contracts (localize_node e))
-      @@ List.map_e (parse_other_contract_item ~source) l
-  | e -> Result_syntax.tzfail (Wrong_other_contracts (localize_node e))
+      record_trace_eval (fun () ->
+          Wrong_other_contracts (localize_node ~parsed e))
+      @@ List.map_e (parse_other_contract_item ~parsed) l
+  | e -> Result_syntax.tzfail (Wrong_other_contracts (localize_node ~parsed e))
 
-let parse_extra_big_maps ~source = function
+let parse_extra_big_maps ?node
+    (parsed : string Michelson_v1_parser.parser_result) =
+  let node = Option.value ~default:(Micheline.root parsed.expanded) node in
+  match node with
   | Micheline.Seq (_loc, l) as e ->
-      record_trace_eval (fun () -> Wrong_extra_big_maps (localize_node e))
-      @@ List.map_e (parse_extra_big_map_item ~source) l
-  | e -> Result_syntax.tzfail (Wrong_extra_big_maps (localize_node e))
+      record_trace_eval (fun () ->
+          Wrong_extra_big_maps (localize_node ~parsed e))
+      @@ List.map_e (parse_extra_big_map_item ~parsed) l
+  | e -> Result_syntax.tzfail (Wrong_extra_big_maps (localize_node ~parsed e))

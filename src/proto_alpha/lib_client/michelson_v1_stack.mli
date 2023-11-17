@@ -25,16 +25,16 @@ val print_localized_node_location : Format.formatter -> localized_node -> unit
 val print_localized_node : Format.formatter -> localized_node -> unit
 
 val parse_stack :
-  source:string ->
-  Micheline_parser.node ->
+  ?node:(Micheline.canonical_location, string) Micheline.node ->
+  string Michelson_v1_parser.parser_result ->
   (Script.expr * Script.expr) list tzresult
 
 val parse_other_contracts :
-  source:string ->
-  Micheline_parser.node ->
+  ?node:(Micheline.canonical_location, string) Micheline.node ->
+  string Michelson_v1_parser.parser_result ->
   RPC.Scripts.S.other_contract_description list tzresult
 
 val parse_extra_big_maps :
-  source:string ->
-  Micheline_parser.node ->
+  ?node:(Micheline.canonical_location, string) Micheline.node ->
+  string Michelson_v1_parser.parser_result ->
   RPC.Scripts.S.extra_big_map_description list tzresult
