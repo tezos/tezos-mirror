@@ -37,16 +37,13 @@ module type S = sig
   (** [code address] returns the [address]'s code. *)
   val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
 
-  (** [inject_raw_transaction ~smart_rollup_address tx_raw] crafts the hash of [tx_raw] and sends to
-        the injector a message consisting of:
-        - First 20 bytes: [smart_rollup_address].
-        - Following 32 bytes: crafted transaction hash.
-        - Remaining bytes: [tx_raw] in binary format.
-    *)
-  val inject_raw_transaction :
+  (** [inject_raw_transactions ~smart_rollup_address ~transactions] crafts the
+      hashes and chunks of each transaction of [transactions]. Injects the chunks
+      and returns the hashes of injected transactions. *)
+  val inject_raw_transactions :
     smart_rollup_address:string ->
-    Ethereum_types.hex ->
-    Ethereum_types.hash tzresult Lwt.t
+    transactions:Ethereum_types.hex list ->
+    Ethereum_types.hash list tzresult Lwt.t
 
   (** [current_block ~full_transaction_object] returns the most recent
         processed and stored block.
