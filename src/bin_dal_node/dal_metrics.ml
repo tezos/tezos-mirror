@@ -228,7 +228,7 @@ module GS = struct
     metric
       ~name:"count_received_iwants"
       ~help:"Count the number of received iwants by the node"
-      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_prunes)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_iwants)
 
   let count_sent_messages =
     metric
