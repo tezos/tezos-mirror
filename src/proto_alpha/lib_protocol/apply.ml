@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -581,105 +582,95 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
     transfer_from_any_address ctxt sender contract amount
   in
   let* ctxt, cache_key, script = Script_cache.find ctxt contract_hash in
-  match script with
-  | None -> tzfail (Contract.Non_existing_contract contract)
-  | Some (script, script_ir) ->
-      (* Token.transfer which is being called before already loads this value into
-         the Irmin cache, so no need to burn gas for it. *)
-      let* balance = Contract.get_balance ctxt contract in
-      let now = Script_timestamp.now ctxt in
-      let level =
-        (Level.current ctxt).level |> Raw_level.to_int32 |> Script_int.of_int32
-        |> Script_int.abs
-      in
-      let step_constants =
-        let open Script_interpreter in
-        {
-          sender;
-          payer;
-          self = contract_hash;
-          amount;
-          chain_id;
-          balance;
-          now;
-          level;
-        }
-      in
-      let execute =
-        match parameter with
-        | Untyped_arg parameter -> Script_interpreter.execute ~parameter
-        | Typed_arg (location, parameter_ty, parameter) ->
-            Script_interpreter.execute_with_typed_parameter
-              ~location
-              ~parameter_ty
-              ~parameter
-      in
-      let cached_script = Some script_ir in
-      let* ( {
-               script = updated_cached_script;
-               code_size = updated_size;
-               storage;
-               lazy_storage_diff;
-               operations;
-               ticket_diffs;
-               ticket_receipt;
-             },
-             ctxt ) =
-        execute
-          ctxt
-          ~cached_script
-          Optimized
-          step_constants
-          ~script
-          ~entrypoint
-          ~internal
-      in
-      let* ticket_table_size_diff, ctxt =
-        update_script_storage_and_ticket_balances
-          ctxt
-          ~self_contract:contract_hash
-          storage
-          lazy_storage_diff
-          ticket_diffs
-          operations
-      in
-      let* ticket_paid_storage_diff, ctxt =
-        Ticket_balance.adjust_storage_space
-          ctxt
-          ~storage_diff:ticket_table_size_diff
-      in
-      let* ctxt, new_size, contract_paid_storage_size_diff =
-        Fees.record_paid_storage_space ctxt contract_hash
-      in
-      let* originated_contracts =
-        Contract.originated_from_current_nonce
-          ~since:before_operation
-          ~until:ctxt
-      in
-      let*? ctxt =
-        Script_cache.update
-          ctxt
-          cache_key
-          ( {script with storage = Script.lazy_expr storage},
-            updated_cached_script )
-          updated_size
-      in
-      let result =
-        Transaction_to_contract_result
-          {
-            storage = Some storage;
-            lazy_storage_diff;
-            balance_updates;
-            ticket_receipt;
-            originated_contracts;
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            storage_size = new_size;
-            paid_storage_size_diff =
-              Z.add contract_paid_storage_size_diff ticket_paid_storage_diff;
-            allocated_destination_contract = false;
-          }
-      in
-      return (ctxt, result, operations)
+  let* script, script_ir =
+    match script with
+    | None -> tzfail (Contract.Non_existing_contract contract)
+    | Some (script, script_ir) -> return (script, script_ir)
+  in
+  (* Token.transfer which is being called before already loads this value into
+     the Irmin cache, so no need to burn gas for it. *)
+  let* balance = Contract.get_balance ctxt contract in
+  let now = Script_timestamp.now ctxt in
+  let level =
+    (Level.current ctxt).level |> Raw_level.to_int32 |> Script_int.of_int32
+    |> Script_int.abs
+  in
+  let step_constants =
+    let open Script_interpreter in
+    {sender; payer; self = contract_hash; amount; chain_id; balance; now; level}
+  in
+  let execute =
+    match parameter with
+    | Untyped_arg parameter -> Script_interpreter.execute ~parameter
+    | Typed_arg (location, parameter_ty, parameter) ->
+        Script_interpreter.execute_with_typed_parameter
+          ~location
+          ~parameter_ty
+          ~parameter
+  in
+  let cached_script = Some script_ir in
+  let* ( {
+           script = updated_cached_script;
+           code_size = updated_size;
+           storage;
+           lazy_storage_diff;
+           operations;
+           ticket_diffs;
+           ticket_receipt;
+         },
+         ctxt ) =
+    execute
+      ctxt
+      ~cached_script
+      Optimized
+      step_constants
+      ~script
+      ~entrypoint
+      ~internal
+  in
+  let* ticket_table_size_diff, ctxt =
+    update_script_storage_and_ticket_balances
+      ctxt
+      ~self_contract:contract_hash
+      storage
+      lazy_storage_diff
+      ticket_diffs
+      operations
+  in
+  let* ticket_paid_storage_diff, ctxt =
+    Ticket_balance.adjust_storage_space
+      ctxt
+      ~storage_diff:ticket_table_size_diff
+  in
+  let* ctxt, new_size, contract_paid_storage_size_diff =
+    Fees.record_paid_storage_space ctxt contract_hash
+  in
+  let* originated_contracts =
+    Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
+  in
+  let*? ctxt =
+    Script_cache.update
+      ctxt
+      cache_key
+      ({script with storage = Script.lazy_expr storage}, updated_cached_script)
+      updated_size
+  in
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = Some storage;
+        lazy_storage_diff;
+        balance_updates;
+        ticket_receipt;
+        originated_contracts;
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = new_size;
+        paid_storage_size_diff =
+          Z.add contract_paid_storage_size_diff ticket_paid_storage_diff;
+        allocated_destination_contract = false;
+      }
+  in
+  return (ctxt, result, operations)
 
 let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
     ~contract:contract_hash ~delegate ~sender ~credit ~before_operation =
