@@ -570,7 +570,8 @@ let apply_transaction_to_implicit_with_ticket ~sender ~destination ~ty ~ticket
 
 let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter ~script
-    ~script_ir ~cache_key =
+    ~script_ir ~cache_key ?(paid_storage_diff_acc = Z.zero)
+    ?(ticket_receipt_acc = []) () =
   let open Lwt_result_syntax in
   let contract = Contract.Originated contract_hash in
   (* We can assume the destination contract is already allocated at this point.
@@ -653,12 +654,19 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
         storage = Some storage;
         lazy_storage_diff;
         balance_updates;
-        ticket_receipt;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6639
+           Currently, if both [ticket_receipt_acc] and [ticket_receipt] contain updates
+           for the same ticket token, the token will appear in a non-optimal, but not wrong,
+           way in the ticket receipt. See description of #6639 for an example. *)
+        ticket_receipt = ticket_receipt_acc @ ticket_receipt;
         originated_contracts;
         consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
         storage_size = new_size;
         paid_storage_size_diff =
-          Z.add contract_paid_storage_size_diff ticket_paid_storage_diff;
+          Z.(
+            add
+              paid_storage_diff_acc
+              (add contract_paid_storage_size_diff ticket_paid_storage_diff));
         allocated_destination_contract = false;
       }
   in
@@ -836,6 +844,7 @@ let apply_internal_operation_contents :
             ~script
             ~script_ir
             ~cache_key
+            ()
         in
         (ctxt, ITransaction_result res, ops)
     | Transaction_to_sc_rollup
@@ -1126,6 +1135,7 @@ let apply_manager_operation :
               ~script
               ~script_ir
               ~cache_key
+              ()
           else
             let (Ex_script (Script {arg_type; entrypoints; _})) = script_ir in
             let*? res, ctxt =
@@ -1152,6 +1162,14 @@ let apply_manager_operation :
                 parameters_ty
                 (Micheline.root parameters)
             in
+            let* ctxt, ticket_receipt, paid_storage_diff =
+              Ticket_transfer.transfer_tickets_in_parameters
+                ctxt
+                typed_arg
+                parameters_ty
+                ~source:(Contract source_contract)
+                ~dst:(Contract (Originated contract_hash))
+            in
             apply_transaction_to_smart_contract
               ~ctxt
               ~sender:(Destination.Contract source_contract)
@@ -1167,6 +1185,9 @@ let apply_manager_operation :
               ~script
               ~script_ir
               ~cache_key
+              ~ticket_receipt_acc:ticket_receipt
+              ~paid_storage_diff_acc:paid_storage_diff
+              ()
         in
         (ctxt, Transaction_result res, ops)
     | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
