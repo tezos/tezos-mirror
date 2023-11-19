@@ -1001,6 +1001,20 @@ pub(crate) fn typecheck_instruction(
         (App(CHECK_SIGNATURE, [], _), [] | [_] | [_, _]) => no_overload!(CHECK_SIGNATURE, len 3),
         (App(CHECK_SIGNATURE, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(SLICE, [], _), [.., T::String, T::Nat, T::Nat]) => {
+            stack.drop_top(2);
+            stack[0] = T::new_option(T::String);
+            I::Slice(overloads::Slice::String)
+        }
+        (App(SLICE, [], _), [.., T::Bytes, T::Nat, T::Nat]) => {
+            stack.drop_top(2);
+            stack[0] = T::new_option(T::Bytes);
+            I::Slice(overloads::Slice::Bytes)
+        }
+        (App(SLICE, [], _), [.., _, _, _]) => no_overload!(SLICE),
+        (App(SLICE, [], _), _) => no_overload!(SLICE, len 3),
+        (App(SLICE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -3586,5 +3600,47 @@ mod typecheck_tests {
             Ok(Instruction::SetDelegate)
         );
         assert_eq!(stk, &tc_stk![Type::Operation]);
+    }
+
+    #[test]
+    fn slice_string() {
+        let stk = &mut tc_stk![Type::String, Type::Nat, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("SLICE").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Slice(overloads::Slice::String))
+        );
+        assert_eq!(stk, &tc_stk![Type::new_option(Type::String)]);
+    }
+
+    #[test]
+    fn slice_bytes() {
+        let stk = &mut tc_stk![Type::Bytes, Type::Nat, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("SLICE").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Slice(overloads::Slice::Bytes))
+        );
+        assert_eq!(stk, &tc_stk![Type::new_option(Type::Bytes)]);
+    }
+
+    #[test]
+    fn slice_too_short() {
+        too_short_test(&app!(SLICE), Prim::SLICE, 3);
+    }
+
+    #[test]
+    fn slice_wrong_type() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                &app!(SLICE),
+                &mut ctx,
+                &mut tc_stk![Type::Bool, Type::Nat, Type::Nat]
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::SLICE,
+                stack: stk![Type::Bool, Type::Nat, Type::Nat],
+                reason: None,
+            })
+        );
     }
 }

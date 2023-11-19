@@ -432,6 +432,51 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             let address = pop!(V::Contract);
             stack.push(V::Address(address));
         }
+        I::Slice(overload) => {
+            fn validate_bounds(
+                offset: u128,
+                length: u128,
+                actual_length: usize,
+            ) -> Option<std::ops::Range<usize>> {
+                // If `offset` or `offset + length` are greater than `usize::MAX`, `SLICE` will return `None`.
+                // But in reality, slicing a string of length greater than `usize::MAX` would
+                // exhaust the gas before execution gets here.
+                let start: usize = offset.try_into().ok()?;
+                let end: usize = start.checked_add(length.try_into().ok()?)?;
+
+                // `str::get` performs bounds checks, but Michelson's bounds checks
+                // are stricter than rust's.
+                // E.g. rust allows `String::from("").get(0..0)`, but michelson doesn't.
+                // For that reason, we have to perform this additional check here.
+                if start >= actual_length {
+                    None
+                } else {
+                    Some(start..end)
+                }
+            }
+
+            let offset = pop!(V::Nat);
+            let length = pop!(V::Nat);
+            let result = match overload {
+                overloads::Slice::String => {
+                    let str = pop!(V::String);
+
+                    ctx.gas.consume(interpret_cost::slice(str.len())?)?;
+                    validate_bounds(offset, length, str.len())
+                        .and_then(|range| str.get(range))
+                        .map(|str| V::String(str.to_string()))
+                }
+                overloads::Slice::Bytes => {
+                    let bytes = pop!(V::Bytes);
+
+                    ctx.gas.consume(interpret_cost::slice(bytes.len())?)?;
+                    validate_bounds(offset, length, bytes.len())
+                        .and_then(|range| bytes.get(range))
+                        .map(|bytes| V::Bytes(bytes.to_owned()))
+                }
+            };
+            stack.push(V::new_option(result));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -1573,5 +1618,49 @@ mod interpreter_tests {
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::ADDRESS - interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn slice_instr_string() {
+        fn test(str: &str, offset: u128, length: u128, expected: Option<&str>) {
+            let stk = &mut stk![V::String(str.to_string()), V::Nat(length), V::Nat(offset)];
+            let ctx = &mut Ctx::default();
+            let expected = expected.map(|str| V::String(str.to_string()));
+            assert_eq!(
+                interpret(&vec![Slice(overloads::Slice::String)], ctx, stk),
+                Ok(())
+            );
+            assert_eq!(stk, &stk![V::new_option(expected)]);
+        }
+
+        test("foobar", 0, 0, Some(""));
+        test("foobar", 0, 3, Some("foo"));
+        test("foobar", 3, 3, Some("bar"));
+        test("foobar", 3, 4, None);
+        test("foobar", 6, 0, None);
+        test("foobar", 7, 0, None);
+        test("", 0, 0, None);
+    }
+
+    #[test]
+    fn slice_instr_bytes() {
+        fn test(bytes: &[u8], offset: u128, length: u128, expected: Option<&[u8]>) {
+            let stk = &mut stk![V::Bytes(bytes.to_vec()), V::Nat(length), V::Nat(offset)];
+            let ctx = &mut Ctx::default();
+            let expected = expected.map(|bytes| V::Bytes(bytes.to_vec()));
+            assert_eq!(
+                interpret(&vec![Slice(overloads::Slice::Bytes)], ctx, stk),
+                Ok(())
+            );
+            assert_eq!(stk, &stk![V::new_option(expected)]);
+        }
+
+        test(b"foobar", 0, 0, Some(b""));
+        test(b"foobar", 0, 3, Some(b"foo"));
+        test(b"foobar", 3, 3, Some(b"bar"));
+        test(b"foobar", 3, 4, None);
+        test(b"foobar", 6, 0, None);
+        test(b"foobar", 7, 0, None);
+        test(b"", 0, 0, None);
     }
 }

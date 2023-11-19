@@ -444,6 +444,14 @@ pub mod interpret_cost {
         }
         .as_gas_cost()
     }
+
+    pub fn slice(length: usize) -> Result<u32, OutOfGas> {
+        // In the protocol, the gas costs for slicing strings and bytes are defined
+        // separately (see `cost_N_ISlice_bytes` and `cost_N_ISlice_string`).
+        //
+        // In practice, they both have the same cost.
+        ((Checked::from(length) >> 1) + 25).as_gas_cost()
+    }
 }
 
 #[cfg(test)]
