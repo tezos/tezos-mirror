@@ -31,7 +31,37 @@
    Subject:      Regression tests for tickets
 *)
 
+open Tezos_protocol_alpha.Protocol
+
 let hooks = Tezos_regression.hooks
+
+let setup_node protocol ~direct_ticket_spending_enable =
+  let base = Either.right (protocol, None) in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base
+      [(["direct_ticket_spending_enable"], `Bool direct_ticket_spending_enable)]
+  in
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* node, client =
+    Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
+  in
+  return (node, client)
+
+(* Return micheline encoding of ticket. *)
+let encode_ticket ~ticketer ~content ~amount =
+  let ticketer_contract =
+    Result.get_ok (Alpha_context.Contract.of_b58check ticketer)
+  in
+  let ticketer_bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Alpha_context.Contract.encoding
+      ticketer_contract
+  in
+  let encoded_ticketer = Hex.show (Hex.of_bytes ticketer_bytes) in
+  sf {|Pair 0x%s (Pair %S %d)|} encoded_ticketer content amount
 
 let test_create_and_remove_tickets =
   Protocol.register_regression_test
@@ -206,6 +236,96 @@ let test_send_tickets_to_implicit_account =
       ~expected:1
       client
   in
+  unit
+
+(* Tests that an implicit account can send a single ticket to originated
+   using the [Transfer] manager operation. *)
+let test_direct_transfer_tickets_from_implicit_account_to_originated =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Send tickets from implicit account to originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  let* _node, client =
+    setup_node protocol ~direct_ticket_spending_enable:true
+  in
+  (* Deposit tickets to the implicit account. *)
+  let* _alias, ticketer =
+    Client.originate_contract_at
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~init:"Unit"
+      ~burn_cap:Tez.one
+      client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:ticketer
+      ~arg:(sf "Pair %S 1" Constant.bootstrap1.public_key_hash)
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Assert that the implicit account holds the ticket. *)
+  let* () =
+    assert_ticket_balance
+      ~contract:Constant.bootstrap1.alias
+      ~ticketer
+      ~ty:"string"
+      ~contents:"\"Ticket\""
+      ~expected:1
+      client
+  in
+  (* Originate contract that stores tickets sent to it's "save" entrypoint.  *)
+  let* _alias, bag =
+    Client.originate_contract_at
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~init:"{}"
+      ~burn_cap:Tez.one
+      client
+      ["mini_scenarios"; "tickets_bag"]
+      protocol
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Transfer ticket from implicit to originated using the [Transaction] manager operation. *)
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:bag
+      ~entrypoint:"save"
+      ~arg:(encode_ticket ~ticketer ~content:"Ticket" ~amount:1)
+      ~hooks
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    assert_ticket_balance
+      ~contract:Constant.bootstrap1.alias
+      ~ticketer
+      ~ty:"string"
+      ~contents:"\"Ticket\""
+      ~expected:0
+      client
+  in
+  let* () =
+    assert_ticket_balance
+      ~contract:bag
+      ~ticketer
+      ~ty:"string"
+      ~contents:"\"Ticket\""
+      ~expected:1
+      client
+  in
+  unit
   unit
 
 (* This test originates one contract which mints and sends tickets to the address
@@ -1046,4 +1166,5 @@ let register ~protocols =
   test_ticket_of_wrong_type_rejection protocols ;
   test_originated_implicit_can_be_equipotent protocols ;
   test_send_tickets_to_sc_rollup protocols ;
-  test_send_tickets_from_storage_to_sc_rollup protocols
+  test_send_tickets_from_storage_to_sc_rollup protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated protocols
