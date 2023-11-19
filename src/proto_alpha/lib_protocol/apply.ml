@@ -1111,20 +1111,62 @@ let apply_manager_operation :
           find_contract_from_cache ctxt contract_hash
         in
         let+ ctxt, res, ops =
-          apply_transaction_to_smart_contract
-            ~ctxt
-            ~sender:(Destination.Contract source_contract)
-            ~contract_hash
-            ~amount
-            ~entrypoint
-            ~before_operation:ctxt_before_op
-            ~payer:source
-            ~chain_id
-            ~internal:false
-            ~parameter:(Untyped_arg parameters)
-            ~script
-            ~script_ir
-            ~cache_key
+          if not @@ Constants.direct_ticket_spending_enable ctxt then
+            apply_transaction_to_smart_contract
+              ~ctxt
+              ~sender:(Destination.Contract source_contract)
+              ~contract_hash
+              ~amount
+              ~entrypoint
+              ~before_operation:ctxt_before_op
+              ~payer:source
+              ~chain_id
+              ~internal:false
+              ~parameter:(Untyped_arg parameters)
+              ~script
+              ~script_ir
+              ~cache_key
+          else
+            let (Ex_script (Script {arg_type; entrypoints; _})) = script_ir in
+            let*? res, ctxt =
+              Gas_monad.run
+                ctxt
+                (Script_ir_translator.find_entrypoint
+                   ~error_details:(Informative ())
+                   arg_type
+                   entrypoints
+                   entrypoint)
+            in
+            let*? (Ex_ty_cstr {ty = parameters_ty; _}) = res in
+            let* typed_arg, ctxt =
+              Script_ir_translator.parse_data
+                ctxt
+                ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+                  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2964
+
+                     Setting [allow_forged] to [true] would also enable placing
+                     lazy storage ids in the parameter, which is something we should avoid.
+                     To prevent this, we should split [allow_forged] into something like
+                     [allow_tickets] and [allow_lazy_storage_id]. *)
+                ~allow_forged:true
+                parameters_ty
+                (Micheline.root parameters)
+            in
+            apply_transaction_to_smart_contract
+              ~ctxt
+              ~sender:(Destination.Contract source_contract)
+              ~contract_hash
+              ~amount
+              ~entrypoint
+              ~before_operation:ctxt_before_op
+              ~payer:source
+              ~chain_id
+              ~internal:false
+              ~parameter:
+                (Typed_arg (Micheline.dummy_location, parameters_ty, typed_arg))
+              ~script
+              ~script_ir
+              ~cache_key
         in
         (ctxt, Transaction_result res, ops)
     | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
