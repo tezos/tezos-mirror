@@ -1,8 +1,8 @@
 let
   opam-nix-integration = import (
     fetchTarball {
-      url = "https://github.com/vapourismo/opam-nix-integration/archive/ec0f82a78958461e9ab16eb87c4ae1873c4d9f77.tar.gz";
-      sha256 = "1kh6lz9cr5158m1mrl8hyj1brhi450hil65faqsrcw6nd3a1dang";
+      url = "https://github.com/vapourismo/opam-nix-integration/archive/567369e90513019423db3462b20a01333cee2a04.tar.gz";
+      sha256 = "0siwzi71bbjkzqdnpl8pqz8zyfzkyw908bbqjdmafm344p9vnckh";
     }
   );
 
