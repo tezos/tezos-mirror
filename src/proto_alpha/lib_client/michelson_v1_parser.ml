@@ -86,18 +86,24 @@ let expand_all source ast errors =
         },
         errors @ expansion_errors @ errs )
 
-let parse_toplevel ?check source =
+type micheline_parser = Toplevel | Expression
+
+let parse micheline_parser ?check source =
   let tokens, lexing_errors = Micheline_parser.tokenize source in
-  let asts, parsing_errors = Micheline_parser.parse_toplevel ?check tokens in
-  let ast =
-    let start = min_point asts and stop = max_point asts in
-    Seq ({start; stop}, asts)
+  let ast, parsing_errors =
+    match micheline_parser with
+    | Toplevel ->
+        let asts, parsing_errors =
+          Micheline_parser.parse_toplevel ?check tokens
+        in
+        let start = min_point asts and stop = max_point asts in
+        (Seq ({start; stop}, asts), parsing_errors)
+    | Expression -> Micheline_parser.parse_expression ?check tokens
   in
   expand_all source ast (lexing_errors @ parsing_errors)
 
-let parse_expression ?check source =
-  let tokens, lexing_errors = Micheline_parser.tokenize source in
-  let ast, parsing_errors = Micheline_parser.parse_expression ?check tokens in
-  expand_all source ast (lexing_errors @ parsing_errors)
+let parse_toplevel = parse Toplevel
+
+let parse_expression = parse Expression
 
 let expand_all ~source ~original = expand_all source original []
