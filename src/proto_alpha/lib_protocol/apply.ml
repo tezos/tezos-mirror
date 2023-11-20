@@ -569,23 +569,15 @@ let apply_transaction_to_implicit_with_ticket ~sender ~destination ~ty ~ticket
       [] )
 
 let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
+    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter ~script
+    ~script_ir ~cache_key =
   let open Lwt_result_syntax in
   let contract = Contract.Originated contract_hash in
-  (* Since the contract is originated, nothing will be allocated or this
-     transfer of tokens will fail.  [Token.transfer] will succeed even on
-     non-existing contracts, if the amount is zero.  Then if the destination
-     does not exist, [Script_cache.find] will signal that by returning [None]
-     and we'll fail.
-  *)
+  (* We can assume the destination contract is already allocated at this point.
+     If the destination contract does not exist, [Script_cache.find],
+     which is called earlier, would have failed. *)
   let* ctxt, balance_updates =
     transfer_from_any_address ctxt sender contract amount
-  in
-  let* ctxt, cache_key, script = Script_cache.find ctxt contract_hash in
-  let* script, script_ir =
-    match script with
-    | None -> tzfail (Contract.Non_existing_contract contract)
-    | Some (script, script_ir) -> return (script, script_ir)
   in
   (* Token.transfer which is being called before already loads this value into
      the Irmin cache, so no need to burn gas for it. *)
@@ -751,6 +743,13 @@ let assert_sender_is_contract =
   | Destination.Contract sender -> return sender
   | sender -> tzfail (Invalid_sender sender)
 
+let find_contract_from_cache ctxt contract_hash =
+  let open Lwt_result_syntax in
+  let* ctxt, cache_key, script = Script_cache.find ctxt contract_hash in
+  match script with
+  | None -> tzfail (Contract.Non_existing_contract (Originated contract_hash))
+  | Some (script, script_ir) -> return (ctxt, (cache_key, script, script_ir))
+
 let apply_internal_operation_contents :
     type kind.
     context ->
@@ -819,6 +818,9 @@ let apply_internal_operation_contents :
           parameters = typed_parameters;
           unparsed_parameters = _;
         } ->
+        let* ctxt, (cache_key, script, script_ir) =
+          find_contract_from_cache ctxt contract_hash
+        in
         let+ ctxt, res, ops =
           apply_transaction_to_smart_contract
             ~ctxt
@@ -831,6 +833,9 @@ let apply_internal_operation_contents :
             ~chain_id
             ~internal:true
             ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
+            ~script
+            ~script_ir
+            ~cache_key
         in
         (ctxt, ITransaction_result res, ops)
     | Transaction_to_sc_rollup
@@ -1102,6 +1107,9 @@ let apply_manager_operation :
             ctxt
             parameters
         in
+        let* ctxt, (cache_key, script, script_ir) =
+          find_contract_from_cache ctxt contract_hash
+        in
         let+ ctxt, res, ops =
           apply_transaction_to_smart_contract
             ~ctxt
@@ -1114,6 +1122,9 @@ let apply_manager_operation :
             ~chain_id
             ~internal:false
             ~parameter:(Untyped_arg parameters)
+            ~script
+            ~script_ir
+            ~cache_key
         in
         (ctxt, Transaction_result res, ops)
     | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
