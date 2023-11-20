@@ -299,7 +299,10 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         .expect("The kernel failed to create the temporary directory");
 
     let mut internal_storage = InternalStorage();
-    let mut host = SafeStorage(host, &mut internal_storage);
+    let mut host = SafeStorage {
+        host,
+        internal: &mut internal_storage,
+    };
     match main(&mut host) {
         Ok(()) => {
             host.promote_upgrade()
@@ -315,7 +318,7 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
                 host.fallback_backup_kernel()
                     .expect("Fallback mechanism failed");
             } else {
-                log_error(host.0, &e).expect("The kernel failed to write the error");
+                log_error(host.host, &e).expect("The kernel failed to write the error");
                 log!(host, Error, "The kernel produced an error: {:?}", e);
                 log!(
                     host,
@@ -441,7 +444,10 @@ mod tests {
         // init host
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
-        let mut host = SafeStorage(&mut mock_host, &mut internal);
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
 
         // sanity check: no current block
         assert!(
