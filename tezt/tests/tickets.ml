@@ -326,6 +326,155 @@ let test_direct_transfer_tickets_from_implicit_account_to_originated =
       client
   in
   unit
+
+(* Tests that an implicit account can send a tickets to originated
+   using the [Transfer] manager operation. The parameter of the
+   transfer is made complex to check that the [Transfer] properly
+   scans the parameter and transfers all included tickets. *)
+let test_direct_transfer_tickets_from_implicit_account_to_originated_complex =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Send tickets from implicit account to originated directly (with complex \
+       parameters)"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  let* _node, client =
+    setup_node protocol ~direct_ticket_spending_enable:true
+  in
+  (* Deposit tickets to the implicit account. *)
+  let* _alias, ticketer =
+    Client.originate_contract_at
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~init:"{}"
+      ~burn_cap:Tez.one
+      client
+      ["mini_scenarios"; "tickets_mint_and_store_complex_param"]
+      protocol
+  in
+  let* () = Client.bake_for_and_wait client in
+  let first_ticket_content = "Ticket1" in
+  let second_ticket_content = "Ticket2" in
+  let amount = 3 in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:ticketer
+      ~entrypoint:"mint_and_send"
+      ~arg:
+        (sf
+           "Pair %S (Pair %d %S)"
+           first_ticket_content
+           amount
+           Constant.bootstrap1.public_key_hash)
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:ticketer
+      ~entrypoint:"mint_and_send"
+      ~arg:
+        (sf
+           "Pair %S (Pair %d %S)"
+           second_ticket_content
+           amount
+           Constant.bootstrap1.public_key_hash)
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Assert that the implicit account holds the ticket. *)
+  let* () =
+    assert_ticket_balance
+      ~contract:Constant.bootstrap1.alias
+      ~ticketer
+      ~ty:"string"
+      ~contents:(sf "%S" first_ticket_content)
+      ~expected:amount
+      client
+  in
+  let* () =
+    assert_ticket_balance
+      ~contract:Constant.bootstrap1.alias
+      ~ticketer
+      ~ty:"string"
+      ~contents:(sf "%S" second_ticket_content)
+      ~expected:amount
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Send tickets from implicit to originated. *)
+  let first_ticket_sent = 1 in
+  let second_ticket_sent = 2 in
+  let complex_arg_with_tickets =
+    sf
+      {|Pair 99 {Pair "garbage" (%s) ; Pair "garbage" (%s)}|}
+      (encode_ticket
+         ~ticketer
+         ~content:first_ticket_content
+         ~amount:first_ticket_sent)
+      (encode_ticket
+         ~ticketer
+         ~content:second_ticket_content
+         ~amount:second_ticket_sent)
+  in
+  let* () =
+    Client.transfer
+      ~hooks
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~entrypoint:"store"
+      ~receiver:ticketer
+      ~arg:complex_arg_with_tickets
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Check that ticket balance is removed for implicit account. *)
+  let* () =
+    assert_ticket_balance
+      ~contract:Constant.bootstrap1.alias
+      ~ticketer
+      ~ty:"string"
+      ~contents:(sf "%S" first_ticket_content)
+      ~expected:(amount - first_ticket_sent)
+      client
+  in
+  let* () =
+    assert_ticket_balance
+      ~contract:Constant.bootstrap1.alias
+      ~ticketer
+      ~ty:"string"
+      ~contents:(sf "%S" second_ticket_content)
+      ~expected:(amount - second_ticket_sent)
+      client
+  in
+  (* Check that ticket balance is added for originated contract. *)
+  let* () =
+    assert_ticket_balance
+      ~contract:ticketer
+      ~ticketer
+      ~ty:"string"
+      ~contents:(sf "%S" first_ticket_content)
+      ~expected:first_ticket_sent
+      client
+  in
+  let* () =
+    assert_ticket_balance
+      ~contract:ticketer
+      ~ticketer
+      ~ty:"string"
+      ~contents:(sf "%S" second_ticket_content)
+      ~expected:second_ticket_sent
+      client
+  in
   unit
 
 (* This test originates one contract which mints and sends tickets to the address
@@ -1167,4 +1316,6 @@ let register ~protocols =
   test_originated_implicit_can_be_equipotent protocols ;
   test_send_tickets_to_sc_rollup protocols ;
   test_send_tickets_from_storage_to_sc_rollup protocols ;
-  test_direct_transfer_tickets_from_implicit_account_to_originated protocols
+  test_direct_transfer_tickets_from_implicit_account_to_originated protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+    protocols
