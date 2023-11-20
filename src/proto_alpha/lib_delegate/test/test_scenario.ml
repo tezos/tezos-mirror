@@ -80,6 +80,8 @@ let test_preattest_on_valid () =
 
     let pqc_noticed = ref false
 
+    let qc_noticed = ref false
+
     let stop_on_event = function
       | Baking_state.Prequorum_reached (candidate, _) ->
           (* Register the PQC notice. *)
@@ -90,11 +92,13 @@ let test_preattest_on_valid () =
           | _ -> ()) ;
           false
       | Baking_state.Quorum_reached (candidate, _) ->
-          (* Ensure that we never see a QC on the seen candidate. *)
+          (* Because attestations are sent regardless of whether
+             a head has been applied, we can expect a quorum to
+             be received regardless of a head not being produced. *)
           (match !seen_candidate with
           | Some seen_candidate
             when Block_hash.(candidate.hash = seen_candidate) ->
-              Stdlib.failwith "Quorum occured on the seen candidate"
+              qc_noticed := true
           | _ -> ()) ;
           false
       | New_head_proposal {block; _} ->
@@ -117,6 +121,7 @@ let test_preattest_on_valid () =
     let check_chain_on_success ~chain:_ =
       assert (!seen_candidate <> None) ;
       assert !pqc_noticed ;
+      assert !qc_noticed ;
       return_unit
   end in
   let config = {default_config with timeout = 10} in
