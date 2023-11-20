@@ -376,19 +376,13 @@ let tez_of (delegate_balances : delegate_balances) pseudotoken_amount =
   assert (
     Staking_pseudotoken_repr.(
       delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
-  let frozen_deposits_staked_tez_z =
-    Z.of_int64 (Tez_repr.to_mutez delegate_balances.frozen_deposits_staked_tez)
-  in
-  let frozen_deposits_pseudotokens_z =
-    Staking_pseudotoken_repr.to_z delegate_balances.frozen_deposits_pseudotokens
-  in
-  let pseudotoken_amount_z = Staking_pseudotoken_repr.to_z pseudotoken_amount in
-  let res_z =
-    Z.div
-      (Z.mul frozen_deposits_staked_tez_z pseudotoken_amount_z)
-      frozen_deposits_pseudotokens_z
-  in
-  Tez_repr.of_mutez_exn (Z.to_int64 res_z)
+  Tez_repr.mul_ratio
+    ~rounding:`Down
+    delegate_balances.frozen_deposits_staked_tez
+    ~num:(Staking_pseudotoken_repr.to_int64 pseudotoken_amount)
+    ~den:
+      (Staking_pseudotoken_repr.to_int64
+         delegate_balances.frozen_deposits_pseudotokens)
 
 (** [compute_pseudotoken_credit_for_tez_amount delegate_balances
     tez_amount] is a safe wrapper around [pseudotokens_of
@@ -456,20 +450,19 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
         then
           (* definitely a full unstake, make sure we can empty the staking
              balance *)
-          return
-            ( delegator_balances.pseudotoken_balance,
-              if
-                Staking_pseudotoken_repr.(
-                  delegate_balances.frozen_deposits_pseudotokens
-                  = delegator_balances.pseudotoken_balance)
-              then
-                (* ...and the frozen deposits if from last staker *)
-                delegate_balances.frozen_deposits_staked_tez
-              else
-                tez_of delegate_balances delegator_balances.pseudotoken_balance
-            )
+          let+ tez_to_unstake =
+            if
+              Staking_pseudotoken_repr.(
+                delegate_balances.frozen_deposits_pseudotokens
+                = delegator_balances.pseudotoken_balance)
+            then
+              (* ...and the frozen deposits if from last staker *)
+              Ok delegate_balances.frozen_deposits_staked_tez
+            else tez_of delegate_balances delegator_balances.pseudotoken_balance
+          in
+          (delegator_balances.pseudotoken_balance, tez_to_unstake)
         else
-          let+ requested_pseudotokens =
+          let* requested_pseudotokens =
             pseudotokens_of delegate_balances requested_amount
           in
           assert (Staking_pseudotoken_repr.(requested_pseudotokens <> zero)) ;
@@ -477,10 +470,12 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
           if
             Staking_pseudotoken_repr.(
               requested_pseudotokens < delegator_balances.pseudotoken_balance)
-          then (requested_pseudotokens, requested_amount)
+          then Ok (requested_pseudotokens, requested_amount)
           else
-            ( delegator_balances.pseudotoken_balance,
-              tez_of delegate_balances delegator_balances.pseudotoken_balance )
+            let+ tez_to_unstake =
+              tez_of delegate_balances delegator_balances.pseudotoken_balance
+            in
+            (delegator_balances.pseudotoken_balance, tez_to_unstake)
       in
       let+ ctxt, balance_updates =
         burn_pseudotokens ctxt delegator_balances pseudotokens_to_unstake
@@ -508,7 +503,8 @@ module For_RPC = struct
       Staking_pseudotoken_repr.(
         delegate_balances.frozen_deposits_pseudotokens <> zero)
     then
-      return @@ tez_of delegate_balances delegator_balances.pseudotoken_balance
+      Lwt.return
+      @@ tez_of delegate_balances delegator_balances.pseudotoken_balance
     else (
       assert (
         Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)) ;
