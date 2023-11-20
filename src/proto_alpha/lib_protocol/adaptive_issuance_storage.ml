@@ -141,9 +141,8 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio
     reward_params
   in
   let base_reward_coeff_ratio =
-    compute_reward_coeff_ratio
+    compute_reward_coeff_ratio_without_bonus
       ~stake_ratio
-      ~bonus:Issuance_bonus_repr.zero
       ~issuance_ratio_max
       ~issuance_ratio_min
   in
