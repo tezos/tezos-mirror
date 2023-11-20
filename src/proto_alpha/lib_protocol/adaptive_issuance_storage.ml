@@ -114,11 +114,11 @@ let compute_reward_coeff_ratio_without_bonus =
     (* f is truncated so that 0.05% <= f <= 5% *)
     truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
 
-let compute_bonus ~seconds_per_cycle ~stake_ratio
+let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
     ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
   let Constants_parametric_repr.
         {
-          issuance_ratio_min;
+          issuance_ratio_min = _;
           issuance_ratio_max;
           max_bonus;
           growth_rate;
@@ -126,12 +126,6 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio
           radius_dz;
         } =
     reward_params
-  in
-  let base_reward_coeff_ratio =
-    compute_reward_coeff_ratio_without_bonus
-      ~stake_ratio
-      ~issuance_ratio_max
-      ~issuance_ratio_min
   in
   let base_reward_coeff_dist_to_max =
     Q.(issuance_ratio_max - base_reward_coeff_ratio)
@@ -163,7 +157,7 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
   fun ~base_total_issued_per_minute
-      ~stake_ratio
+      ~base_reward_coeff_ratio
       ~q_total_supply
       ~(bonus : Issuance_bonus_repr.t)
       ~reward_params ->
@@ -175,12 +169,6 @@ let compute_coeff =
       in
       let q_base_total_issued_per_minute =
         Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
-      in
-      let base_reward_coeff_ratio =
-        compute_reward_coeff_ratio_without_bonus
-          ~stake_ratio
-          ~issuance_ratio_max
-          ~issuance_ratio_min
       in
       let f = Q.add base_reward_coeff_ratio (bonus :> Q.t) in
       let f = truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f in
@@ -220,17 +208,24 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let stake_ratio =
       Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
     in
+    let base_reward_coeff_ratio =
+      compute_reward_coeff_ratio_without_bonus
+        ~stake_ratio
+        ~issuance_ratio_max:reward_params.issuance_ratio_max
+        ~issuance_ratio_min:reward_params.issuance_ratio_min
+    in
     let*? bonus =
       compute_bonus
         ~seconds_per_cycle
         ~stake_ratio
+        ~base_reward_coeff_ratio
         ~previous_bonus
         ~reward_params
     in
     let coeff =
       compute_coeff
         ~base_total_issued_per_minute
-        ~stake_ratio
+        ~base_reward_coeff_ratio
         ~q_total_supply
         ~bonus
         ~reward_params
@@ -341,10 +336,24 @@ module Internal_for_tests = struct
 
   let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
       ~previous_bonus ~reward_params =
+    let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _} =
+      reward_params
+    in
     let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
     let q_total_frozen_stake =
       Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
     in
     let stake_ratio = Q.div q_total_frozen_stake q_total_supply in
-    compute_bonus ~seconds_per_cycle ~stake_ratio ~previous_bonus ~reward_params
+    let base_reward_coeff_ratio =
+      compute_reward_coeff_ratio_without_bonus
+        ~stake_ratio
+        ~issuance_ratio_max
+        ~issuance_ratio_min
+    in
+    compute_bonus
+      ~seconds_per_cycle
+      ~stake_ratio
+      ~base_reward_coeff_ratio
+      ~previous_bonus
+      ~reward_params
 end
