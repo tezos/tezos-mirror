@@ -449,17 +449,13 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
       assert (
         Staking_pseudotoken_repr.(
           delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
-      let*? pseudotokens_to_unstake =
-        let open Result_syntax in
-        let* requested_pseudotokens =
-          pseudotokens_of ~rounding:`Up delegate_balances requested_amount
-        in
-        let pseudotokens_to_unstake =
-          Staking_pseudotoken_repr.min
-            requested_pseudotokens
-            delegator_balances.pseudotoken_balance
-        in
-        return pseudotokens_to_unstake
+      let*? requested_pseudotokens =
+        pseudotokens_of ~rounding:`Up delegate_balances requested_amount
+      in
+      let pseudotokens_to_unstake =
+        Staking_pseudotoken_repr.min
+          requested_pseudotokens
+          delegator_balances.pseudotoken_balance
       in
       let*? tez_to_unstake =
         tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
