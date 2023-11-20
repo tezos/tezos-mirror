@@ -3,6 +3,18 @@
 Changelog
 '''''''''
 
+Version 18.1
+============
+
+Node
+----
+
+- **Breaking change** Bumped the snapshot version from ``6`` to ``7``, 
+  in order to address an issue which resulted in the export of corrupted tar rolling and full
+  snapshots. Octez v18.1 nodes can still import previous version ``6`` (and earlier) snapshots.
+  but snapshots in version 7 are not retro-compatible with previous
+  octez versions (MR :gl:`!10785`).
+
 Version 18.0
 ============
 

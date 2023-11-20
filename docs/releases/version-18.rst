@@ -1,4 +1,4 @@
-Version 18.0
+Version 18.1
 ============
 
 Version 18.0 contains a new version (v10) of the protocol environment,
@@ -11,7 +11,7 @@ Starting from Oxford, Endorsements have been renamed to Attestations.
 Thus, Octez now uses Attestations:
 
 - | RPCs now accept both endorsements and attestations as input and/or output. For now, these RPCs still output endorsement by default. For more information see the :doc:`OpenAPI specifications here <../api/openapi>`.
-  | Please note that the endorsement RPCs versions are considered as deprecated and will be removed in the next Octez major version (''v19.x'').
+  | Please note that the endorsement RPCs versions are considered as deprecated and may be removed in a future major version.
 - Client, baker, and accuser executables use ``attestation`` instead of ``endorsement`` in error messages and events.
 
 DAC node and client executables are released for experimental usage only.
@@ -30,6 +30,13 @@ v18 also fixes a concurrency issue in the logging infrastructure which can cause
 
 As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_alpha>` for more details.
 
+Version 18.1 fixes an issue that would result in corrupted full and rollup snapshots being exported.
+Thus, the snapshots version is bumped from ``6`` to ``7``.
+Note that snapshots exported by nodes running v18.1 are not retro-compatible. As a result, these cannot be imported by a node running earlier versions of Octez. However, a node running Octez v18.1 can still import v6 (and earlier) snapshots.
+
+.. warning::
+
+   Octez v18.0 nodes might export corrupted tar full and rolling snapshots. Consequently, we recommend that snapshots providers upgrade to Octez v18.1 as soon as possible, in order to ensure the availability of recent full and rolling snapshots.
 
 Oxford's feature activation vote
 --------------------------------
@@ -54,14 +61,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v18.0
+  git checkout v18.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v18.0`` Docker images of Octez.
+If you are using Docker instead, use the ``v18.1`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -89,9 +96,12 @@ You can also install Octez using Opam by running ``opam install octez``.
 
    For more details, see :doc:`the OCaml API <../api/api-inline>`.
 
+You can now download experimental Debian and Redhat packages on the `release page <https://gitlab.com/tezos/tezos/-/releases/v18.1>`_  and in the `package registry <https://gitlab.com/tezos/tezos/-/packages>`_.
+
 
 Changelog
 ---------
 
+- `Version 18.1 <../CHANGES.html#version-18-1>`_
 - `Version 18.0 <../CHANGES.html#version-18-0>`_
 - `Version 18.0~rc1 <../CHANGES.html#version-18-0-rc1>`_

@@ -57,12 +57,6 @@ Node
   was emitted every time a block was applied using an old protocol
   where its plugin was removed.
 
-- **Breaking change** Bumped the Octez snapshot version from ``6`` to
-  ``7`` which fixes the corrupted generation of tar rolling and full
-  snapshots. It is still possible to import previous version snapshots
-  but snapshots in version 7 are not retro-compatible with previous
-  Octez versions (MR :gl:`!10785`).
-
 Client
 ------
 
