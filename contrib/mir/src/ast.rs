@@ -268,6 +268,7 @@ pub enum Instruction {
     SetDelegate,
     Address,
     Slice(overloads::Slice),
+    Left,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
