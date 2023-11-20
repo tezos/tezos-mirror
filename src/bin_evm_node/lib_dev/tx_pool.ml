@@ -262,24 +262,21 @@ let on_head state block_height =
     |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
   in
   (* Send the txs to the rollup *)
-  let*! () =
-    Lwt_list.iter_s
-      (fun raw_tx ->
-        let open Lwt_syntax in
-        let+ hash_result =
-          Rollup_node.inject_raw_transaction ~smart_rollup_address raw_tx
-        in
-        match hash_result with
-        | Error _ ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-            Format.printf "[tx-pool] Error when sending transaction.\n%!"
-        | Ok _ ->
-            Format.printf
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-              "[tx-pool] Transaction %s sent to the rollup.\n%!"
-              (Ethereum_types.hex_to_string raw_tx))
-      txs
+  let*! hashes =
+    Rollup_node.inject_raw_transactions ~smart_rollup_address ~transactions:txs
   in
+  (match hashes with
+  | Error _ ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+      Format.printf "[tx-pool] Error when sending transaction.\n%!"
+  | Ok hashes ->
+      List.iter
+        (fun hash ->
+          Format.printf
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+            "[tx-pool] Transaction %s sent to the rollup.\n%!"
+            (Ethereum_types.hash_to_string hash))
+        hashes) ;
   (* update the pool *)
   state.level <- block_height ;
   state.pool <- pool ;

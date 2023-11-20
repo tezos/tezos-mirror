@@ -30,22 +30,29 @@ open Ethereum_types
 open Rollup_node_services
 open Transaction_format
 
-let inject_raw_transaction base tx =
+let inject_messages base txs =
   let open Lwt_result_syntax in
   (* The injection's service returns a notion of L2 message hash (defined
      by the rollup node) used to track the message's injection in the batcher.
      We do not wish to follow the message's inclusion, and thus, ignore
      the resulted hash. *)
-  let* _answer = call_service ~base batcher_injection () () [tx] in
+  let* _answer = call_service ~base batcher_injection () () txs in
   return_unit
 
-let inject_raw_transaction base ~smart_rollup_address tx_raw =
+let inject_raw_transactions base ~smart_rollup_address ~transactions =
   let open Lwt_result_syntax in
-  let*? tx_hash, messages =
-    make_encoded_messages ~smart_rollup_address tx_raw
+  let* rev_tx_hashes, to_publish =
+    List.fold_left_es
+      (fun (tx_hashes, to_publish) tx_raw ->
+        let*? tx_hash, messages =
+          make_encoded_messages ~smart_rollup_address tx_raw
+        in
+        return (tx_hash :: tx_hashes, to_publish @ messages))
+      ([], [])
+      transactions
   in
-  let* () = List.iter_es (inject_raw_transaction base) messages in
-  return (Ethereum_types.Hash Hex.(of_string tx_hash |> show |> hex_of_string))
+  let* () = inject_messages base to_publish in
+  return (List.rev rev_tx_hashes)
 
 let simulate_call base call =
   let open Lwt_result_syntax in
@@ -131,8 +138,10 @@ module type S = sig
 
   val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
 
-  val inject_raw_transaction :
-    smart_rollup_address:string -> hex -> hash tzresult Lwt.t
+  val inject_raw_transactions :
+    smart_rollup_address:string ->
+    transactions:hex list ->
+    hash list tzresult Lwt.t
 
   val current_block :
     full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
@@ -183,7 +192,7 @@ end) : S = struct
       call_service ~base:Base.base durable_state_value () {key = path} ()
   end)
 
-  let inject_raw_transaction = inject_raw_transaction Base.base
+  let inject_raw_transactions = inject_raw_transactions Base.base
 
   let simulate_call = simulate_call Base.base
 

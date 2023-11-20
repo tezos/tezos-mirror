@@ -81,6 +81,9 @@ let make_evm_inbox_transactions tx_raw =
 let make_encoded_messages ~smart_rollup_address tx_raw =
   let open Result_syntax in
   let* tx_hash, messages = make_evm_inbox_transactions tx_raw in
+  let tx_hash =
+    Ethereum_types.(Hash Hex.(of_string tx_hash |> show |> hex_of_string))
+  in
   let messages =
     List.map
       (fun x ->
