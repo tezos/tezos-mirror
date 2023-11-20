@@ -317,7 +317,7 @@ let make_dev_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
   let*? _, messages =
-    Rollup_node.make_encoded_messages
+    Transaction_format.make_encoded_messages
       ~smart_rollup_address
       (Evm_node_lib_dev_encoding.Ethereum_types.hex_of_string s)
   in
