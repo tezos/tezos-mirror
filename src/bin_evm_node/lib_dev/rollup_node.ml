@@ -108,84 +108,6 @@ let make_encoded_messages ~smart_rollup_address tx_raw =
   in
   return (tx_hash, messages)
 
-module Durable_storage_path = struct
-  module EVM = struct
-    let root = "/evm"
-
-    let make s = root ^ s
-  end
-
-  let chain_id = EVM.make "/chain_id"
-
-  let base_fee_per_gas = EVM.make "/base_fee_per_gas"
-
-  let kernel_version = EVM.make "/kernel_version"
-
-  module Accounts = struct
-    let accounts = EVM.make "/eth_accounts"
-
-    let balance = "/balance"
-
-    let nonce = "/nonce"
-
-    let code = "/code"
-
-    let storage = "/storage"
-
-    let account (Address (Hex s)) = accounts ^ "/" ^ s
-
-    let balance address = account address ^ balance
-
-    let nonce address = account address ^ nonce
-
-    let code address = account address ^ code
-
-    let storage address index = account address ^ storage ^ "/" ^ index
-  end
-
-  module Block = struct
-    type number = Current | Nth of Z.t
-
-    let blocks = EVM.make "/blocks"
-
-    let hash = "/hash"
-
-    let number = "/number"
-
-    let by_hash (Block_hash (Hex hash)) = blocks ^ "/" ^ hash
-
-    let current_number = blocks ^ "/current" ^ number
-
-    let _current_hash = blocks ^ "/current" ^ hash
-  end
-
-  module Indexes = struct
-    let indexes = EVM.make "/indexes"
-
-    let blocks = "/blocks"
-
-    let blocks = indexes ^ blocks
-
-    let number_to_string = function
-      | Block.Current -> "current"
-      | Nth i -> Z.to_string i
-
-    let blocks_by_number number = blocks ^ "/" ^ number_to_string number
-  end
-
-  module Transaction_receipt = struct
-    let receipts = EVM.make "/transactions_receipts"
-
-    let receipt tx_hash = receipts ^ "/" ^ tx_hash
-  end
-
-  module Transaction_object = struct
-    let objects = EVM.make "/transactions_objects"
-
-    let object_ tx_hash = objects ^ "/" ^ tx_hash
-  end
-end
-
 let inspect_durable_and_decode_opt base key decode =
   let open Lwt_result_syntax in
   let* bytes = call_service ~base durable_state_value () {key} () in
@@ -288,7 +210,7 @@ let current_block_number base () =
 
 let un_qty (Qty z) = z
 
-let transaction_receipt base (Hash (Hex tx_hash)) =
+let transaction_receipt base tx_hash =
   let open Lwt_result_syntax in
   (* We use a mock block hash to decode the rest of the receipt,
      so that we can get the number to query for the actual block
@@ -305,7 +227,7 @@ let transaction_receipt base (Hash (Hex tx_hash)) =
       let+ blockHash =
         inspect_durable_and_decode
           base
-          (Durable_storage_path.Indexes.blocks_by_number
+          (Durable_storage_path.Indexes.block_by_number
              (Nth (un_qty temp_receipt.blockNumber)))
           decode_block_hash
       in
@@ -317,7 +239,7 @@ let transaction_receipt base (Hash (Hex tx_hash)) =
       Some {temp_receipt with blockHash; logs}
   | None -> return_none
 
-let transaction_object base (Hash (Hex tx_hash)) =
+let transaction_object base tx_hash =
   let open Lwt_result_syntax in
   (* We use a mock block hash to decode the rest of the receipt,
      so that we can get the number to query for the actual block
@@ -334,14 +256,14 @@ let transaction_object base (Hash (Hex tx_hash)) =
       let+ blockHash =
         inspect_durable_and_decode
           base
-          (Durable_storage_path.Indexes.blocks_by_number
+          (Durable_storage_path.Indexes.block_by_number
              (Nth (un_qty temp_object.blockNumber)))
           decode_block_hash
       in
       Some {temp_object with blockHash}
   | None -> return_none
 
-let transaction_object_with_block_hash base block_hash (Hash (Hex tx_hash)) =
+let transaction_object_with_block_hash base block_hash tx_hash =
   inspect_durable_and_decode_opt
     base
     (Durable_storage_path.Transaction_object.object_ tx_hash)
@@ -372,7 +294,7 @@ let blocks_by_number ~full_transaction_object ~number base =
   let* block_hash_opt =
     inspect_durable_and_decode_opt
       base
-      (Durable_storage_path.Indexes.blocks_by_number (Nth level))
+      (Durable_storage_path.Indexes.block_by_number (Nth level))
       decode_block_hash
   in
   match block_hash_opt with
