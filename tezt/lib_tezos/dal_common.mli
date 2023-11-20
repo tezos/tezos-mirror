@@ -209,6 +209,10 @@ module RPC : sig
   val get_attestable_slots :
     attester:Account.key -> attested_level:int -> attestable_slots RPC_core.t
 
+  (**  Call RPC "DELETE /p2p/peers/disconnect" to disconnect the node whose
+       identity is given. *)
+  val delete_p2p_peer_disconnect : peer_id:string -> unit RPC_core.t
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
   module Remote : RPC_core.CALLERS with type uri_provider := remote_uri_provider
