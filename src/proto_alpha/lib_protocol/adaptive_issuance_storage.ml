@@ -101,6 +101,11 @@ let load_reward_coeff ctxt ~cycle =
   in
   return ctxt
 
+let truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f =
+  let f = Q.min f issuance_ratio_max in
+  let f = Q.max f issuance_ratio_min in
+  f
+
 let compute_reward_coeff_ratio =
   let q_1600 = Q.of_int 1600 in
   fun ~stake_ratio
@@ -111,9 +116,7 @@ let compute_reward_coeff_ratio =
     let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly issuance rate *) in
     let f = Q.add f (bonus :> Q.t) in
     (* f is truncated so that 0.05% <= f <= 5% *)
-    let f = Q.(min f issuance_ratio_max) in
-    let f = Q.(max f issuance_ratio_min) in
-    f
+    truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
 
 let compute_bonus ~seconds_per_cycle ~stake_ratio
     ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
