@@ -92,7 +92,7 @@ module GS = struct
 
     let input_events_stream_length = ref 0
 
-    let p2p_output_streams_length = ref 0
+    let p2p_output_stream_length = ref 0
 
     let app_output_stream_length = ref 0
 
@@ -152,7 +152,7 @@ module GS = struct
       gs_stats := W.stats gs_worker ;
       input_events_stream_length :=
         W.input_events_stream gs_worker |> W.Stream.length ;
-      p2p_output_streams_length :=
+      p2p_output_stream_length :=
         W.p2p_output_stream gs_worker |> W.Stream.length ;
       app_output_stream_length :=
         W.app_output_stream gs_worker |> W.Stream.length ;
@@ -228,7 +228,7 @@ module GS = struct
     metric
       ~name:"count_received_iwants"
       ~help:"Count the number of received iwants by the node"
-      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_prunes)
+      (fun () -> Int64.to_float !Stats.gs_stats.count_recv_iwants)
 
   let count_sent_messages =
     metric
@@ -270,13 +270,13 @@ module GS = struct
          events stream"
       (fun () -> float !Stats.input_events_stream_length)
 
-  let p2p_output_streams_length =
+  let p2p_output_stream_length =
     metric
-      ~name:"p2p_output_streams_length"
+      ~name:"p2p_output_stream_length"
       ~help:
         "The number of elements currently in the Gossipsub worker's P2P output \
          stream"
-      (fun () -> float !Stats.p2p_output_streams_length)
+      (fun () -> float !Stats.p2p_output_stream_length)
 
   let app_output_stream_length =
     metric
@@ -322,7 +322,7 @@ module GS = struct
       count_sent_iwants;
       (* Metrics about the worker's streams *)
       input_events_stream_length;
-      p2p_output_streams_length;
+      p2p_output_stream_length;
       app_output_stream_length;
       (* Other metrics about GS automaton's state *)
       count_peers_per_topic;
