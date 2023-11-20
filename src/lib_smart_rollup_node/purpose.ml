@@ -24,6 +24,11 @@ let all =
     Purpose Executing_outbox;
   ]
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6641
+
+   replace this map by a Gmap one so the gadt is exposed in the map
+   type.
+*)
 module Map = Map.Make (struct
   type nonrec t = ex_purpose
 
