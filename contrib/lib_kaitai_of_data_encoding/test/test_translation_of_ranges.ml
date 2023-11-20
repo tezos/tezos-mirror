@@ -101,6 +101,9 @@ let%expect_test "test small shifted range" =
         instances:
           value:
             value: (shifted_small_range_shifted_to_zero + 3)
+            doc: ! >-
+              The interval is represented shifted towards 0 for compactness, this instance
+              corrects the shift.
         seq:
         - id: shifted_small_range_shifted_to_zero
           type: u1
@@ -128,6 +131,9 @@ let%expect_test "test bigger shifted range" =
         instances:
           value:
             value: (shifted_big_range_shifted_to_zero + 103)
+            doc: ! >-
+              The interval is represented shifted towards 0 for compactness, this instance
+              corrects the shift.
         seq:
         - id: shifted_big_range_shifted_to_zero
           type: s4

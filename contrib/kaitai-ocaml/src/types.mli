@@ -23,6 +23,8 @@ module Ast : sig
 
   type typeId = {absolute : bool; names : string list; isArray : bool}
 
+  val empty_typeId : typeId
+
   type operator =
     | Add
     | Sub
@@ -97,6 +99,8 @@ type processExpr =
 
 module BitEndianness : sig
   type t = LittleBitEndian | BigBitEndian
+
+  val to_string : t -> string
 end
 
 module Endianness : sig
@@ -157,7 +161,7 @@ end
 
 (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumSpec.scala} see}.*)
 module EnumSpec : sig
-  type t = {path : string list; map : (int * EnumValueSpec.t) list}
+  type t = {map : (int * EnumValueSpec.t) list}
 end
 
 module MetaSpec : sig
@@ -165,7 +169,6 @@ module MetaSpec : sig
 
   (** [t] defines the meta section of Kaitai specification file. *)
   type t = {
-    path : string list;
     isOpaque : bool;
     id : string option;
     endian : Endianness.t option;
@@ -181,14 +184,15 @@ end
 (** [DataType] module defines AST for describing underlying data types.
 
     For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala} see. *)
-module rec DataType : sig
+module DataType : sig
   type data_type =
     | NumericType of numeric_type
-    | BooleanType
+    | BooleanType of boolean_type
     | BytesType of bytes_type
     | StrType of str_type
     | ComplexDataType of complex_data_type
     | AnyType
+    | Raw of string
 
   and int_width = W1 | W2 | W4 | W8
 
@@ -244,7 +248,12 @@ module rec DataType : sig
 
   and complex_data_type =
     | StructType
-    | UserType of ClassSpec.t
+    | UserType of string
+      (* Note that in Kaitai's reference implementation, the [UserType]
+         AST node carries a [ClassSpec]. However, for our use case, we
+         only need the [UserType]'s [id]. So we use the simpler [string]
+         payload which avoids the mutual recursion of [DataType] and
+         [ClassSpec]. *)
     | ArrayType of array_type
 
   and switch_type = {
@@ -260,14 +269,13 @@ module rec DataType : sig
 end
 
 (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/AttrSpec.scala} see}.*)
-and AttrSpec : sig
+module AttrSpec : sig
   module ConditionalSpec : sig
     type t = {ifExpr : Ast.expr option; repeat : RepeatSpec.t}
   end
 
   (** [t] is a single element inside [ClassSpec.t.seq]. *)
   type t = {
-    path : string list;
     id : Identifier.t;
     dataType : DataType.t;
     cond : ConditionalSpec.t;
@@ -278,7 +286,7 @@ and AttrSpec : sig
   }
 end
 
-and InstanceSpec : sig
+module InstanceSpec : sig
   (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/InstanceSpec.scala} see}. *)
 
   (** [t] defines a Kaitai instance.
@@ -289,7 +297,6 @@ and InstanceSpec : sig
   and descr =
     | ValueInstanceSpec of {
         id : InstanceIdentifier.t;
-        path : string list;
         value : Ast.expr;
         ifExpr : Ast.expr option;
         dataTypeOpt : DataType.t option;
@@ -298,24 +305,16 @@ and InstanceSpec : sig
 end
 
 (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ParamDefSpec.scala} see}. *)
-and ParamDefSpec : sig
-  type t = {
-    path : string list;
-    id : Identifier.t;
-    dataType : DataType.t;
-    doc : DocSpec.t;
-  }
+module ParamDefSpec : sig
+  type t = {id : Identifier.t; dataType : DataType.t; doc : DocSpec.t}
 end
 
-and ClassSpec : sig
+module ClassSpec : sig
   (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ClassSpec.scala} see}. *)
 
   (** [t] is an outermost type that describes Kaitai Struct specification files. *)
   type t = {
     fileName : string option;
-    path : string list;
-    isTopLevel : bool;
-        (** if [isTopLevel class_spec] is true, we have a corresponding meta section. *)
     meta : MetaSpec.t;
     doc : DocSpec.t;
     toStringExpr : Ast.expr option;
@@ -325,4 +324,5 @@ and ClassSpec : sig
     instances : (InstanceIdentifier.t * InstanceSpec.t) list;
     enums : (string * EnumSpec.t) list;
   }
+  [@@deriving sexp]
 end

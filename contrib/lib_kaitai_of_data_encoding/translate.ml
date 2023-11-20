@@ -62,7 +62,7 @@ let redirect types attrs fattr id =
     fattr
       {
         (Helpers.default_attr_spec ~id) with
-        dataType = DataType.(ComplexDataType (UserType user_type));
+        dataType = Helpers.usertype user_type;
       }
   in
   (types, attr)
@@ -175,7 +175,6 @@ let rec seq_field_of_data_encoding :
                       ValueInstanceSpec
                         {
                           id = "value";
-                          path = [];
                           value =
                             BinOp
                               {
@@ -200,8 +199,7 @@ let rec seq_field_of_data_encoding :
           [
             {
               (Helpers.default_attr_spec ~id) with
-              dataType =
-                DataType.(ComplexDataType (UserType represented_interval_class));
+              dataType = Helpers.usertype represented_interval_class;
             };
           ] )
   | Float -> (enums, types, mus, [Ground.Attr.float ~id])
@@ -325,7 +323,7 @@ let rec seq_field_of_data_encoding :
           let attr =
             {
               (Helpers.default_attr_spec ~id) with
-              dataType = DataType.(ComplexDataType (UserType described_class));
+              dataType = Helpers.usertype described_class;
             }
           in
           (enums, types, mus, [attr]))
@@ -347,11 +345,7 @@ let rec seq_field_of_data_encoding :
           [
             {
               (Helpers.default_attr_spec ~id) with
-              dataType =
-                (* We don't have the full type, we just put a dummy with the correct
-                   [id] which is all that gets printed *)
-                ComplexDataType
-                  (UserType (Helpers.default_class_spec ~id:name ()));
+              dataType = ComplexDataType (UserType name);
             };
           ] )
       else
@@ -456,12 +450,7 @@ and seq_field_of_field :
                         {
                           enumName = fst Ground.Enum.bool;
                           label = Ground.Enum.bool_true_name;
-                          inType =
-                            {
-                              absolute = true;
-                              names = [fst Ground.Enum.bool];
-                              isArray = false;
-                            };
+                          inType = Ast.empty_typeId;
                         };
                   });
         }
@@ -533,7 +522,7 @@ and seq_field_of_union :
             {name = id; doc = DocSpec.{refs = []; summary = description}} ))
       tagged_cases
   in
-  let tag_enum = EnumSpec.{path = []; map = tag_enum_map} in
+  let tag_enum = EnumSpec.{map = tag_enum_map} in
   let enums = Helpers.add_uniq_assoc enums (tag_id, tag_enum) in
   let tag_attr =
     {
@@ -573,12 +562,7 @@ and seq_field_of_union :
                                      {
                                        enumName = tag_id;
                                        label = case_id;
-                                       inType =
-                                         {
-                                           absolute = true;
-                                           names = [tag_id];
-                                           isArray = false;
-                                         };
+                                       inType = Ast.empty_typeId;
                                      };
                                });
                       };
@@ -695,7 +679,6 @@ let from_data_encoding :
         seq_field_of_data_encoding [] [] MuSet.empty encoding id
       in
       Helpers.class_spec_of_attrs
-        ~top_level:true
         ~id:encoding_name
         ?description
         ~enums
@@ -707,7 +690,6 @@ let from_data_encoding :
         seq_field_of_data_encoding [] [] MuSet.empty encoding encoding_name
       in
       Helpers.class_spec_of_attrs
-        ~top_level:true
         ~id:encoding_name
         ?description
         ~enums

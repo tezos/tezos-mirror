@@ -209,6 +209,12 @@ module Dune : sig
       that [parser.ml] and [parser.mli] can be obtained from [parser.mly] using ocamlyacc. *)
   val ocamlyacc : string -> s_expr
 
+  (** Make a [menhir] stanza.
+
+      Example: [menhir "parser"] results in [(menhir (modules parser))], which tells dune
+      that [parser.ml] and [parser.mli] can be obtained from [parser.mly] using menhir. *)
+  val menhir : string -> s_expr
+
   (** Make an [include] stanza.
 
       Example: [include_ "rules.inc"] results in [(include rules.inc)].

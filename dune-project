@@ -2,6 +2,7 @@
 (formatting (enabled_for ocaml))
 (cram enable)
 (using ctypes 0.3)
+(using menhir 2.1)
 (package (name bls12-381))
 (package (name internal-devtools))
 (package (name kaitai))

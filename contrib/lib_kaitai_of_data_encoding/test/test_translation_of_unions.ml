@@ -32,7 +32,9 @@ let%expect_test "test simple union" =
     enums:
       simple_union_tag:
         0: some
-        1: none
+        1:
+          id: none
+          doc: no data available
     seq:
     - id: simple_union_tag
       type: u1

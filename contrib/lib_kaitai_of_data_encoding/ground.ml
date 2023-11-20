@@ -19,7 +19,6 @@ module Enum = struct
     ( "bool",
       EnumSpec.
         {
-          path = [];
           map =
             [
               ( 0,
@@ -62,7 +61,7 @@ let n_chunk_type =
 let n_seq_attr =
   {
     (Helpers.default_attr_spec ~id:"n") with
-    dataType = DataType.(ComplexDataType (UserType n_chunk_type));
+    dataType = Helpers.usertype n_chunk_type;
     cond =
       {
         Helpers.cond_no_cond with
@@ -76,7 +75,7 @@ let n_seq_attr =
                      {
                        value = Attribute {value = Name "_"; attr = "has_more"};
                        typeName =
-                         {absolute = true; names = ["bool"]; isArray = false};
+                         {absolute = false; names = ["bool"]; isArray = false};
                      };
                });
       };
@@ -119,7 +118,7 @@ let z_type =
         };
         {
           (Helpers.default_attr_spec ~id:"tail") with
-          dataType = DataType.(ComplexDataType (UserType n_chunk_type));
+          dataType = Helpers.usertype n_chunk_type;
           cond =
             {
               ifExpr =
@@ -128,7 +127,7 @@ let z_type =
                      {
                        value = Name "has_tail";
                        typeName =
-                         {absolute = true; names = ["bool"]; isArray = false};
+                         {absolute = false; names = ["bool"]; isArray = false};
                      });
               repeat =
                 RepeatUntil
@@ -142,7 +141,7 @@ let z_type =
                                Attribute {value = Name "_"; attr = "has_more"};
                              typeName =
                                {
-                                 absolute = true;
+                                 absolute = false;
                                  names = ["bool"];
                                  isArray = false;
                                };
@@ -284,13 +283,13 @@ module Attr = struct
   let n ~id =
     {
       (Helpers.default_attr_spec ~id) with
-      dataType = DataType.(ComplexDataType (UserType (snd Type.n)));
+      dataType = Helpers.usertype (snd Type.n);
     }
 
   let z ~id =
     {
       (Helpers.default_attr_spec ~id) with
-      dataType = DataType.(ComplexDataType (UserType (snd Type.z)));
+      dataType = Helpers.usertype (snd Type.z);
     }
 
   let binary_length_kind ~id kind =
