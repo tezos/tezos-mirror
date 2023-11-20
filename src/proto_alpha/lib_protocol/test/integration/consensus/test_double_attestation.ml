@@ -255,7 +255,15 @@ let test_different_slots () =
    included. Then the delegate can no longer bake. *)
 let test_two_double_attestation_evidences_leadsto_no_bake () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let issuance_weights =
+    {
+      Default_parameters.constants_test.issuance_weights with
+      base_total_issued_per_minute = Tez.zero;
+    }
+  in
+  let* genesis, _contracts =
+    Context.init2 ~consensus_threshold:0 ~issuance_weights ()
+  in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
