@@ -176,8 +176,7 @@ let compute_coeff =
       ~total_frozen_stake
       ~bonus
       ~reward_params ->
-    if Compare.Int64.equal (Tez_repr.to_mutez base_total_issued_per_minute) 0L
-    then Q.one
+    if Tez_repr.(base_total_issued_per_minute = zero) then Q.one
     else
       let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _}
           =
