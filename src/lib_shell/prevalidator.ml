@@ -420,16 +420,21 @@ module Make_s
      operation is accumulated in the given [mempool].
 
      The function returns a tuple
-     [(validation_state, mempool, to_handle)], where:
+     [(validation_state, validated_operation, to_handle)],
+     where:
      - [validation_state] is the (possibly) updated validation_state,
-     - [mempool] is the (possibly) updated mempool,
+     - [validated_operation] is an (operation * bool) option set to [None] if
+     the operation has not been validated. If the operation has been validated
+     the function return [Some (operation,is_advertisable)]. [is_advertisable]
+     is true if the operation must be advertise.
      - [to_handle] contains the given operation and its classification, and all
        operations whose classes are changed/impacted by this classification
        (eg. in case of operation replacement).
   *)
-  let classify_operation shell ~config ~validation_state mempool op :
+  let classify_operation shell ~config ~validation_state
+      (status_and_priority : Pending_ops.status_and_priority) op :
       (prevalidation_t
-      * Mempool.t
+      * (Operation_hash.t * bool) option
       * (protocol_operation operation * Classification.classification) trace)
       Lwt.t =
     let open Lwt_syntax in
@@ -443,13 +448,23 @@ module Make_s
         replacements
     in
     let to_handle = (op, classification) :: to_replace in
-    let mempool =
+    let validated_operation =
       match classification with
-      | `Validated -> Mempool.cons_valid op.hash mempool
-      | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ ->
-          mempool
+      | `Validated ->
+          let is_advertisable =
+            match
+              (status_and_priority.status, status_and_priority.priority)
+            with
+            | Fresh, _ | Reclassified, High -> true
+            | Reclassified, Medium | Reclassified, Low _ ->
+                (* Reclassified operations with medium and low priority are not
+                   reclassified *)
+                false
+          in
+          Some (op.hash, is_advertisable)
+      | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ -> None
     in
-    return (v_state, mempool, to_handle)
+    return (v_state, validated_operation, to_handle)
 
   (* Classify pending operations into either:
      [Refused | Outdated | Branch_delayed | Branch_refused | Validated].
@@ -472,44 +487,68 @@ module Make_s
     let open Lwt_syntax in
     let* r =
       Pending_ops.fold_es
-        (fun _prio oph op (acc_validation_state, acc_mempool, limit) ->
+        (fun status_and_priority
+             oph
+             op
+             ( acc_validation_state,
+               advertisable_mempool,
+               validated_mempool,
+               limit ) ->
           if limit <= 0 then
             (* Using Error as an early-return mechanism *)
-            Lwt.return_error (acc_validation_state, acc_mempool)
+            Lwt.return_error
+              (acc_validation_state, advertisable_mempool, validated_mempool)
           else (
             shell.pending <- Pending_ops.remove oph shell.pending ;
-            let* new_validation_state, new_mempool, to_handle =
+            let* new_validation_state, validated_operation, to_handle =
               classify_operation
                 shell
                 ~config
                 ~validation_state:acc_validation_state
-                acc_mempool
+                status_and_priority
                 op
             in
             let+ () = Events.(emit operation_reclassified) oph in
             List.iter (handle_classification ~notifier shell) to_handle ;
-            Ok (new_validation_state, new_mempool, limit - 1)))
+            let advertisable_mempool, validated_mempool =
+              match validated_operation with
+              | None -> (advertisable_mempool, validated_mempool)
+              | Some (oph, true) ->
+                  ( Mempool.cons_valid oph advertisable_mempool,
+                    Mempool.cons_valid oph validated_mempool )
+              | Some (oph, false) ->
+                  ( advertisable_mempool,
+                    Mempool.cons_valid oph validated_mempool )
+            in
+            Ok
+              ( new_validation_state,
+                advertisable_mempool,
+                validated_mempool,
+                limit - 1 )))
         shell.pending
-        (state, Mempool.empty, shell.parameters.limits.operations_batch_size)
+        ( state,
+          Mempool.empty,
+          Mempool.empty,
+          shell.parameters.limits.operations_batch_size )
     in
     match r with
-    | Error (state, advertised_mempool) ->
+    | Error (state, advertisable_mempool, validated_mempool) ->
         (* Early return after iteration limit was reached *)
         let* (_was_pushed : bool) =
           shell.worker.push_request Request.Leftover
         in
-        Lwt.return (state, advertised_mempool)
-    | Ok (state, advertised_mempool, _) -> Lwt.return (state, advertised_mempool)
+        Lwt.return (state, advertisable_mempool, validated_mempool)
+    | Ok (state, advertisable_mempool, validated_mempool, _) ->
+        Lwt.return (state, advertisable_mempool, validated_mempool)
 
-  let update_advertised_mempool_fields pv_shell delta_mempool =
+  let update_advertised_mempool_fields pv_shell advertisable_mempool
+      validated_mempool =
     let open Lwt_syntax in
-    if Mempool.is_empty delta_mempool then Lwt.return_unit
-    else
+    if not (Mempool.is_empty advertisable_mempool) then
       (* We only advertise newly classified operations. *)
-      let mempool_to_advertise =
-        Mempool.{delta_mempool with known_valid = delta_mempool.known_valid}
-      in
-      advertise pv_shell mempool_to_advertise ;
+      advertise pv_shell advertisable_mempool ;
+    if Mempool.is_empty validated_mempool then Lwt.return_unit
+    else
       let our_mempool =
         let validated_hashes =
           Classification.Sized_map.fold
@@ -531,7 +570,7 @@ module Make_s
     if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
     else
       let* () = Events.(emit processing_operations) () in
-      let* validation_state, delta_mempool =
+      let* validation_state, advertisable_mempool, validated_mempool =
         classify_pending_operations
           ~notifier
           pv.shell
@@ -539,7 +578,10 @@ module Make_s
           pv.validation_state
       in
       pv.validation_state <- validation_state ;
-      update_advertised_mempool_fields pv.shell delta_mempool
+      update_advertised_mempool_fields
+        pv.shell
+        advertisable_mempool
+        validated_mempool
 
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
@@ -694,12 +736,12 @@ module Make_s
                 op.Operation.shell.branch
             else
               let notifier = mk_notifier pv.operation_stream in
-              let*! validation_state, delta_mempool, to_handle =
+              let*! validation_state, validated_operation, to_handle =
                 classify_operation
                   pv.shell
                   ~config:pv.config
                   ~validation_state:pv.validation_state
-                  Mempool.empty
+                  status_and_priority
                   parsed_op
               in
               let op_status =
@@ -728,11 +770,19 @@ module Make_s
                   pv.validation_state <- validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)
-                  let*! v =
-                    update_advertised_mempool_fields pv.shell delta_mempool
+                  let*! () =
+                    match validated_operation with
+                    | None -> Lwt.return_unit
+                    | Some (oph, is_advertisable) ->
+                        update_advertised_mempool_fields
+                          pv.shell
+                          (if is_advertisable then
+                           Mempool.cons_valid oph Mempool.empty
+                          else Mempool.empty)
+                          (Mempool.cons_valid oph Mempool.empty)
                   in
                   let*! () = Events.(emit operation_injected) oph in
-                  return v
+                  return_unit
               | Some
                   ( _h,
                     ( `Branch_delayed e
