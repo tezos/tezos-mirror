@@ -41,6 +41,7 @@ pub enum Type {
     Contract(Box<Type>),
     Address,
     ChainId,
+    Bytes,
 }
 
 impl Type {
@@ -49,7 +50,7 @@ impl Type {
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
         match self {
-            Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId => 1,
+            Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId | Bytes => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
         }

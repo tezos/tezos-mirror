@@ -113,6 +113,7 @@ defprim! {
     chain_id,
     CHAIN_ID,
     SELF,
+    bytes,
 }
 
 defprim! {

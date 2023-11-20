@@ -347,6 +347,9 @@ fn parse_ty_with_entrypoints(
         }
         App(map, ..) => unexpected()?,
 
+        App(bytes, [], _) => Type::Bytes,
+        App(bytes, ..) => unexpected()?,
+
         Seq(..)
         | micheline_fields!()
         | micheline_instructions!()
