@@ -115,7 +115,7 @@ let compute_reward_coeff_ratio =
     let f = Q.(max f issuance_ratio_min) in
     f
 
-let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
+let compute_bonus ~seconds_per_cycle ~stake_ratio
     ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
   let Constants_parametric_repr.
         {
@@ -127,13 +127,6 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
           radius_dz;
         } =
     reward_params
-  in
-  let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
-  let q_total_frozen_stake =
-    Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
-  in
-  let stake_ratio =
-    Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
   in
   let base_reward_coeff_ratio =
     compute_reward_coeff_ratio
@@ -172,8 +165,8 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
   fun ~base_total_issued_per_minute
-      ~total_supply
-      ~total_frozen_stake
+      ~stake_ratio
+      ~q_total_supply
       ~bonus
       ~reward_params ->
     if Tez_repr.(base_total_issued_per_minute = zero) then Q.one
@@ -181,15 +174,6 @@ let compute_coeff =
       let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _}
           =
         reward_params
-      in
-      let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
-      let q_total_frozen_stake =
-        Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
-      in
-      let stake_ratio =
-        Q.div
-          q_total_frozen_stake
-          q_total_supply (* = portion of frozen stake *)
       in
       let q_base_total_issued_per_minute =
         Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
@@ -230,19 +214,25 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
       Constants_storage.minimal_block_delay ctxt |> Period_repr.to_seconds
     in
     let seconds_per_cycle = Int64.mul blocks_per_cycle minimal_block_delay in
+    let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
+    let q_total_frozen_stake =
+      Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
+    in
+    let stake_ratio =
+      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
+    in
     let*? bonus =
       compute_bonus
         ~seconds_per_cycle
-        ~total_supply
-        ~total_frozen_stake
+        ~stake_ratio
         ~previous_bonus
         ~reward_params
     in
     let coeff =
       compute_coeff
         ~base_total_issued_per_minute
-        ~total_supply
-        ~total_frozen_stake
+        ~stake_ratio
+        ~q_total_supply
         ~bonus
         ~reward_params
     in
@@ -339,5 +329,12 @@ end
 module Internal_for_tests = struct
   let compute_reward_coeff_ratio = compute_reward_coeff_ratio
 
-  let compute_bonus = compute_bonus
+  let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
+      ~previous_bonus ~reward_params =
+    let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
+    let q_total_frozen_stake =
+      Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
+    in
+    let stake_ratio = Q.div q_total_frozen_stake q_total_supply in
+    compute_bonus ~seconds_per_cycle ~stake_ratio ~previous_bonus ~reward_params
 end
