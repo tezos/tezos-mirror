@@ -465,8 +465,7 @@ mod tick_model {
     }
 
     pub fn ticks_of_ecrecover() -> u64 {
-        // TODO: find out safe value
-        0
+        30_000_000
     }
 }
 
@@ -484,7 +483,7 @@ mod tests {
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_mock::MockHost;
 
-    const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000;
+    const DUMMY_ALLOCATED_TICKS: u64 = 100_000_000;
 
     fn set_balance(
         host: &mut MockHost,

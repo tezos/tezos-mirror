@@ -55,7 +55,7 @@ function parse_data(opcode, gas_and_result) {
 /// Parses the section and push the sample into the set of opcodes.
 function push_profiler_sections(output, opcodes, precompiles) {
     const section_regex = /\__wasm_debugger__::Section{ticks:(\d+);data:\((0x[0-9a-fA-F]*),0x([0-9a-fA-F]*)\)}/g;
-    let precompiled_address_set = new Set([2, 3, 4, 32]);
+    let precompiled_address_set = new Set([1, 2, 3, 4, 32]);
 
     for (const match of output.matchAll(section_regex)) {
         let is_opcode_data = match[2].length == 4;
