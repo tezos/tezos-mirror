@@ -451,23 +451,15 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
           delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
       let*? pseudotokens_to_unstake =
         let open Result_syntax in
-        if
-          Tez_repr.(
-            requested_amount >= delegate_balances.frozen_deposits_staked_tez)
-        then
-          (* definitely a full unstake, make sure we can empty the staking
-             balance *)
-          return delegator_balances.pseudotoken_balance
-        else
-          let* requested_pseudotokens =
-            pseudotokens_of ~rounding:`Up delegate_balances requested_amount
-          in
-          let pseudotokens_to_unstake =
-            Staking_pseudotoken_repr.min
-              requested_pseudotokens
-              delegator_balances.pseudotoken_balance
-          in
-          return pseudotokens_to_unstake
+        let* requested_pseudotokens =
+          pseudotokens_of ~rounding:`Up delegate_balances requested_amount
+        in
+        let pseudotokens_to_unstake =
+          Staking_pseudotoken_repr.min
+            requested_pseudotokens
+            delegator_balances.pseudotoken_balance
+        in
+        return pseudotokens_to_unstake
       in
       let*? tez_to_unstake =
         tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
