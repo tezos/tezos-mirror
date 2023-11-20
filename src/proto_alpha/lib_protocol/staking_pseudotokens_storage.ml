@@ -449,7 +449,7 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
       assert (
         Staking_pseudotoken_repr.(
           delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
-      let*? pseudotokens_to_unstake, tez_to_unstake =
+      let*? pseudotokens_to_unstake =
         let open Result_syntax in
         if
           Tez_repr.(
@@ -457,21 +457,7 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
         then
           (* definitely a full unstake, make sure we can empty the staking
              balance *)
-          let+ tez_to_unstake =
-            if
-              Staking_pseudotoken_repr.(
-                delegate_balances.frozen_deposits_pseudotokens
-                = delegator_balances.pseudotoken_balance)
-            then
-              (* ...and the frozen deposits if from last staker *)
-              Ok delegate_balances.frozen_deposits_staked_tez
-            else
-              tez_of
-                ~rounding:`Down
-                delegate_balances
-                delegator_balances.pseudotoken_balance
-          in
-          (delegator_balances.pseudotoken_balance, tez_to_unstake)
+          return delegator_balances.pseudotoken_balance
         else
           let* requested_pseudotokens =
             pseudotokens_of ~rounding:`Up delegate_balances requested_amount
@@ -481,10 +467,10 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
               requested_pseudotokens
               delegator_balances.pseudotoken_balance
           in
-          let* tez_to_unstake =
-            tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
-          in
-          return (pseudotokens_to_unstake, tez_to_unstake)
+          return pseudotokens_to_unstake
+      in
+      let*? tez_to_unstake =
+        tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
       in
       let*? pseudotokens_to_unstake, tez_to_unstake =
         let open Result_syntax in
