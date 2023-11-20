@@ -484,20 +484,24 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
           let* tez_to_unstake =
             tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
           in
-          if Tez_repr.(tez_to_unstake > requested_amount) then (
-            (* this may happen because of the rounding up of pseudotokens, in
-               this case we resort to unstaking a bit less *)
-            let pseudotokens_to_unstake =
-              match Staking_pseudotoken_repr.pred pseudotokens_to_unstake with
-              | None -> assert false (* by postcondition of pseudotokens_of *)
-              | Some pt -> pt
-            in
-            let* tez_to_unstake =
-              tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
-            in
-            assert (Tez_repr.(tez_to_unstake <= requested_amount)) ;
-            return (pseudotokens_to_unstake, tez_to_unstake))
-          else return (pseudotokens_to_unstake, tez_to_unstake)
+          return (pseudotokens_to_unstake, tez_to_unstake)
+      in
+      let*? pseudotokens_to_unstake, tez_to_unstake =
+        let open Result_syntax in
+        if Tez_repr.(tez_to_unstake > requested_amount) then (
+          (* this may happen because of the rounding up of pseudotokens, in
+             this case we resort to unstaking a bit less *)
+          let pseudotokens_to_unstake =
+            match Staking_pseudotoken_repr.pred pseudotokens_to_unstake with
+            | None -> assert false (* by postcondition of pseudotokens_of *)
+            | Some pt -> pt
+          in
+          let* tez_to_unstake =
+            tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
+          in
+          assert (Tez_repr.(tez_to_unstake <= requested_amount)) ;
+          return (pseudotokens_to_unstake, tez_to_unstake))
+        else return (pseudotokens_to_unstake, tez_to_unstake)
       in
       let+ ctxt, balance_updates =
         burn_pseudotokens ctxt delegator_balances pseudotokens_to_unstake
