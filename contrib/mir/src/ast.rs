@@ -45,6 +45,7 @@ pub enum Type {
     ChainId,
     Bytes,
     Key,
+    Signature,
 }
 
 impl Type {
@@ -54,7 +55,7 @@ impl Type {
         use Type::*;
         match self {
             Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId | Bytes
-            | Key => 1,
+            | Key | Signature => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
         }

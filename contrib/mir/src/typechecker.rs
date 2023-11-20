@@ -356,6 +356,9 @@ fn parse_ty_with_entrypoints(
         App(key, [], _) => Type::Key,
         App(key, ..) => unexpected()?,
 
+        App(signature, [], _) => Type::Signature,
+        App(signature, ..) => unexpected()?,
+
         Seq(..)
         | micheline_fields!()
         | micheline_instructions!()
