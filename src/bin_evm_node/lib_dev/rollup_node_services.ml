@@ -74,3 +74,26 @@ let simulation :
 
 let call_service ~base ?(media_types = Media_type.all_media_types) =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
+
+(** [smart_rollup_address base] asks for the smart rollup node's
+    address, using the endpoint [base]. *)
+let smart_rollup_address base =
+  let open Lwt_result_syntax in
+  let*! answer =
+    call_service
+      ~base
+      ~media_types:[Media_type.octet_stream]
+      smart_rollup_address
+      ()
+      ()
+      ()
+  in
+  match answer with
+  | Ok address -> return (Bytes.to_string address)
+  | Error tztrace ->
+      failwith
+        "Failed to communicate with %a, because %a"
+        Uri.pp
+        base
+        pp_print_trace
+        tztrace

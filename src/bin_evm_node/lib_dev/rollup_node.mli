@@ -39,9 +39,6 @@ val make_encoded_messages :
 
 (** List of services supported to communicate with a rollup node. *)
 module type S = sig
-  (** [smart_rollup_address] asks for the smart rollup node's address. *)
-  val smart_rollup_address : string tzresult Lwt.t
-
   (** [balance address] returns the [address]'s balance. *)
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 

@@ -89,7 +89,9 @@ let rollup_node_config_dev ~rollup_node_endpoint =
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
   end) in
-  let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+  let* smart_rollup_address =
+    Rollup_node_services.smart_rollup_address rollup_node_endpoint
+  in
   return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
 
 let prod_directory config rollup_node_config =
