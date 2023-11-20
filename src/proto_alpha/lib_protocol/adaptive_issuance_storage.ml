@@ -114,19 +114,6 @@ let compute_reward_coeff_ratio_without_bonus =
     (* f is truncated so that 0.05% <= f <= 5% *)
     truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
 
-let compute_reward_coeff_ratio ~stake_ratio ~(bonus : Issuance_bonus_repr.t)
-    ~issuance_ratio_max ~issuance_ratio_min =
-  let f =
-    compute_reward_coeff_ratio_without_bonus
-      ~stake_ratio
-      ~issuance_ratio_max
-      ~issuance_ratio_min
-  in
-  (* f is truncated twice, it's OK because the bonus is non-negative. *)
-  let f = Q.add f (bonus :> Q.t) in
-  (* f is truncated so that 0.05% <= f <= 5% *)
-  truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
-
 let compute_bonus ~seconds_per_cycle ~stake_ratio
     ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
   let Constants_parametric_repr.
@@ -178,7 +165,7 @@ let compute_coeff =
   fun ~base_total_issued_per_minute
       ~stake_ratio
       ~q_total_supply
-      ~bonus
+      ~(bonus : Issuance_bonus_repr.t)
       ~reward_params ->
     if Tez_repr.(base_total_issued_per_minute = zero) then Q.one
     else
@@ -189,13 +176,14 @@ let compute_coeff =
       let q_base_total_issued_per_minute =
         Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
       in
-      let f =
-        compute_reward_coeff_ratio
+      let base_reward_coeff_ratio =
+        compute_reward_coeff_ratio_without_bonus
           ~stake_ratio
-          ~bonus
           ~issuance_ratio_max
           ~issuance_ratio_min
       in
+      let f = Q.add base_reward_coeff_ratio (bonus :> Q.t) in
+      let f = truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f in
       let f = Q.div f q_min_per_year (* = issuance rate per minute *) in
       let f = Q.mul f q_total_supply (* = issuance per minute *) in
       Q.div f q_base_total_issued_per_minute
@@ -338,7 +326,18 @@ module For_RPC = struct
 end
 
 module Internal_for_tests = struct
-  let compute_reward_coeff_ratio = compute_reward_coeff_ratio
+  let compute_reward_coeff_ratio ~stake_ratio ~(bonus : Issuance_bonus_repr.t)
+      ~issuance_ratio_max ~issuance_ratio_min =
+    let f =
+      compute_reward_coeff_ratio_without_bonus
+        ~stake_ratio
+        ~issuance_ratio_max
+        ~issuance_ratio_min
+    in
+    (* f is truncated twice, it's OK because the bonus is non-negative. *)
+    let f = Q.add f (bonus :> Q.t) in
+    (* f is truncated so that 0.05% <= f <= 5% *)
+    truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
 
   let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
       ~previous_bonus ~reward_params =
