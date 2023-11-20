@@ -30,30 +30,6 @@ open Ethereum_types
 open Rollup_node_services
 open Transaction_format
 
-let inject_messages base txs =
-  let open Lwt_result_syntax in
-  (* The injection's service returns a notion of L2 message hash (defined
-     by the rollup node) used to track the message's injection in the batcher.
-     We do not wish to follow the message's inclusion, and thus, ignore
-     the resulted hash. *)
-  let* _answer = call_service ~base batcher_injection () () txs in
-  return_unit
-
-let inject_raw_transactions base ~smart_rollup_address ~transactions =
-  let open Lwt_result_syntax in
-  let* rev_tx_hashes, to_publish =
-    List.fold_left_es
-      (fun (tx_hashes, to_publish) tx_raw ->
-        let*? tx_hash, messages =
-          make_encoded_messages ~smart_rollup_address tx_raw
-        in
-        return (tx_hash :: tx_hashes, to_publish @ messages))
-      ([], [])
-      transactions
-  in
-  let* () = inject_messages base to_publish in
-  return (List.rev rev_tx_hashes)
-
 let simulate_call base call =
   let open Lwt_result_syntax in
   let*? messages = Simulation.encode call in
@@ -192,7 +168,24 @@ end) : S = struct
       call_service ~base:Base.base durable_state_value () {key = path} ()
   end)
 
-  let inject_raw_transactions = inject_raw_transactions Base.base
+  include
+    Publisher.Make
+      (struct
+        let encode_transaction ~smart_rollup_address ~transaction =
+          make_encoded_messages ~smart_rollup_address transaction
+      end)
+      (struct
+        let publish_messages ~messages =
+          let open Lwt_result_syntax in
+          (* The injection's service returns a notion of L2 message hash (defined
+             by the rollup node) used to track the message's injection in the batcher.
+             We do not wish to follow the message's inclusion, and thus, ignore
+             the resulted hash. *)
+          let* _answer =
+            call_service ~base:Base.base batcher_injection () () messages
+          in
+          return_unit
+      end)
 
   let simulate_call = simulate_call Base.base
 
