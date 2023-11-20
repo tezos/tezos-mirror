@@ -133,16 +133,21 @@ Global options (must come before the command):
 
 ./octez-client --mode mockup normalize stack 0
 Error:
+  At line 1 characters 0 to 1,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt}'
 Error:
+  At line 1 characters 0 to 11,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt }.
+  At line 1 characters 1 to 10,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat}'
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat }.
+  At line 1 characters 1 to 14,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt 0 nat}'
@@ -152,16 +157,21 @@ Fatal error:
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0 1}'
 Error:
+  At line 1 characters 0 to 19,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 1 }.
+  At line 1 characters 1 to 18,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat 0 1.
 
 ./octez-client --mode mockup normalize stack 'Stack_elt nat 0'
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got Stack_elt nat 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0; Stack_elt}'
 Error:
+  At line 1 characters 0 to 28,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 ; Stack_elt }.
+  At line 1 characters 18 to 27,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
 
 ./octez-client --mode mockup normalize stack  --unparsing-mode Readable
@@ -238,16 +248,21 @@ Global options (must come before the command):
 
 ./octez-client --mode mockup normalize stack 0 --unparsing-mode Readable
 Error:
+  At line 1 characters 0 to 1,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt}' --unparsing-mode Readable
 Error:
+  At line 1 characters 0 to 11,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt }.
+  At line 1 characters 1 to 10,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat}' --unparsing-mode Readable
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat }.
+  At line 1 characters 1 to 14,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt 0 nat}' --unparsing-mode Readable
@@ -257,16 +272,21 @@ Fatal error:
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0 1}' --unparsing-mode Readable
 Error:
+  At line 1 characters 0 to 19,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 1 }.
+  At line 1 characters 1 to 18,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat 0 1.
 
 ./octez-client --mode mockup normalize stack 'Stack_elt nat 0' --unparsing-mode Readable
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got Stack_elt nat 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0; Stack_elt}' --unparsing-mode Readable
 Error:
+  At line 1 characters 0 to 28,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 ; Stack_elt }.
+  At line 1 characters 18 to 27,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
 
 ./octez-client --mode mockup normalize stack  --unparsing-mode Optimized
@@ -343,16 +363,21 @@ Global options (must come before the command):
 
 ./octez-client --mode mockup normalize stack 0 --unparsing-mode Optimized
 Error:
+  At line 1 characters 0 to 1,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt}' --unparsing-mode Optimized
 Error:
+  At line 1 characters 0 to 11,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt }.
+  At line 1 characters 1 to 10,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat}' --unparsing-mode Optimized
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat }.
+  At line 1 characters 1 to 14,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt 0 nat}' --unparsing-mode Optimized
@@ -362,16 +387,21 @@ Fatal error:
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0 1}' --unparsing-mode Optimized
 Error:
+  At line 1 characters 0 to 19,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 1 }.
+  At line 1 characters 1 to 18,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat 0 1.
 
 ./octez-client --mode mockup normalize stack 'Stack_elt nat 0' --unparsing-mode Optimized
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got Stack_elt nat 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0; Stack_elt}' --unparsing-mode Optimized
 Error:
+  At line 1 characters 0 to 28,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 ; Stack_elt }.
+  At line 1 characters 18 to 27,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
 
 ./octez-client --mode mockup normalize stack  --unparsing-mode Optimized_legacy
@@ -448,16 +478,21 @@ Global options (must come before the command):
 
 ./octez-client --mode mockup normalize stack 0 --unparsing-mode Optimized_legacy
 Error:
+  At line 1 characters 0 to 1,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt}' --unparsing-mode Optimized_legacy
 Error:
+  At line 1 characters 0 to 11,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt }.
+  At line 1 characters 1 to 10,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat}' --unparsing-mode Optimized_legacy
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat }.
+  At line 1 characters 1 to 14,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt 0 nat}' --unparsing-mode Optimized_legacy
@@ -467,14 +502,19 @@ Fatal error:
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0 1}' --unparsing-mode Optimized_legacy
 Error:
+  At line 1 characters 0 to 19,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 1 }.
+  At line 1 characters 1 to 18,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt nat 0 1.
 
 ./octez-client --mode mockup normalize stack 'Stack_elt nat 0' --unparsing-mode Optimized_legacy
 Error:
+  At line 1 characters 0 to 15,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got Stack_elt nat 0.
 
 ./octez-client --mode mockup normalize stack '{Stack_elt nat 0; Stack_elt}' --unparsing-mode Optimized_legacy
 Error:
+  At line 1 characters 0 to 28,
   Unexpected format for a typed stack. Expected a sequence of Stack_elt <ty> <value>; got { Stack_elt nat 0 ; Stack_elt }.
+  At line 1 characters 18 to 27,
   Unexpected format for an item in a typed stack. Expected: Stack_elt <ty> <value>; got Stack_elt.
