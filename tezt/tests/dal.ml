@@ -3507,7 +3507,7 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
     [dal_node2] should connect to [dal_node1] at startup.
     [dal_node3] should also connect to [dal_node1] at startup.
     [dal_node2] and [dal_node3] should find each other via [dal_node1]. *)
-let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
+let connect_nodes_via_bootstrap_node _protocol _parameters _cryptobox node
     client dal_node1 =
   let* dal_node2 =
     make_dal_node
@@ -3537,7 +3537,25 @@ let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
   let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
   Log.info "Wait for dal_node2 and dal_node3 to find each other." ;
-  Lwt.join [check_conn_event_from_2_to_3; check_conn_event_from_3_to_2]
+
+  let* () =
+    Lwt.join [check_conn_event_from_2_to_3; check_conn_event_from_3_to_2]
+  in
+  Lwt.return (dal_node2, dal_node3)
+
+(** See {!connect_nodes_via_bootstrap_node} for the doc. *)
+let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
+    client dal_node1 =
+  let* _dal_node2, _dal_node3 =
+    connect_nodes_via_bootstrap_node
+      _protocol
+      _parameters
+      _cryptobox
+      node
+      client
+      dal_node1
+  in
+  unit
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
