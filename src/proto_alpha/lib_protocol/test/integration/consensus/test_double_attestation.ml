@@ -273,9 +273,6 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
-  let* (_full_balance : Tez.t) =
-    Context.Delegate.full_balance (B blk_a) baker
-  in
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_a) delegate
   in
