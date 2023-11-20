@@ -114,6 +114,7 @@ defprim! {
     CHAIN_ID,
     SELF,
     bytes,
+    key,
 }
 
 defprim! {

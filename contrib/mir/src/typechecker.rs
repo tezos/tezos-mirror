@@ -350,6 +350,9 @@ fn parse_ty_with_entrypoints(
         App(bytes, [], _) => Type::Bytes,
         App(bytes, ..) => unexpected()?,
 
+        App(key, [], _) => Type::Key,
+        App(key, ..) => unexpected()?,
+
         Seq(..)
         | micheline_fields!()
         | micheline_instructions!()
