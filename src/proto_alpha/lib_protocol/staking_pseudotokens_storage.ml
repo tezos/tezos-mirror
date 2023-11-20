@@ -389,6 +389,9 @@ let tez_of ~rounding (delegate_balances : delegate_balances) pseudotoken_amount
 (** [compute_pseudotoken_credit_for_tez_amount delegate_balances
     tez_amount] is a safe wrapper around [pseudotokens_of
     delegate_balances tez_amount].
+
+    Rounding disadvantages newcomer (gets less pseudotokens for the same tez
+    value).
 *)
 let compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount =
   let open Result_syntax in
@@ -429,6 +432,8 @@ let stake ctxt ~contract ~delegate tez_amount =
     Lwt_result_syntax.return (ctxt, [])
   else stake ctxt ~delegator:contract ~delegate tez_amount
 
+(*
+   Rounding disadvantages unstaker. *)
 let request_unstake ctxt ~delegator ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* delegate_balances = get_delegate_balances ctxt ~delegate in
@@ -469,7 +474,7 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
           (delegator_balances.pseudotoken_balance, tez_to_unstake)
         else
           let* requested_pseudotokens =
-            pseudotokens_of ~rounding:`Down delegate_balances requested_amount
+            pseudotokens_of ~rounding:`Up delegate_balances requested_amount
           in
           assert (Staking_pseudotoken_repr.(requested_pseudotokens <> zero)) ;
           (* by postcondition of pseudotokens_of *)
