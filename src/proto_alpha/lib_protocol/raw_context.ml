@@ -1029,7 +1029,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         let sc_rollup =
           Constants_parametric_repr.
             {
-              enable = c.sc_rollup.enable;
               arith_pvm_enable = c.sc_rollup.arith_pvm_enable;
               origination_size = c.sc_rollup.origination_size;
               challenge_window_in_blocks =

@@ -2043,9 +2043,6 @@ module Manager = struct
         && storage_limit >= Z.zero)
       Fees.Storage_limit_too_high
 
-  let assert_sc_rollup_feature_enabled vi =
-    error_unless (Constants.sc_rollup_enable vi.ctxt) Sc_rollup_feature_disabled
-
   let assert_pvm_kind_enabled vi kind =
     error_when
       ((not (Constants.sc_rollup_arith_pvm_enable vi.ctxt))
@@ -2124,22 +2121,17 @@ module Manager = struct
         let* remaining_gas = consume_decoding_gas remaining_gas contents in
         let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
         return_unit
-    | Sc_rollup_originate {kind; _} ->
-        let* () = assert_sc_rollup_feature_enabled vi in
-        assert_pvm_kind_enabled vi kind
+    | Sc_rollup_originate {kind; _} -> assert_pvm_kind_enabled vi kind
+    | Sc_rollup_add_messages {messages; _} -> assert_not_zero_messages messages
     | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_refute _
-    | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _ ->
-        assert_sc_rollup_feature_enabled vi
-    | Sc_rollup_add_messages {messages; _} ->
-        let* () = assert_sc_rollup_feature_enabled vi in
-        assert_not_zero_messages messages
+    | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _
     | Sc_rollup_recover_bond _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
            Should we successfully precheck Sc_rollup_recover_bond and any
            (simple) Sc rollup operation, or should we add some some checks to make
            the operations Branch_delayed if they cannot be successfully
            prechecked? *)
-        assert_sc_rollup_feature_enabled vi
+        return_unit
     | Dal_publish_slot_header slot_header ->
         Dal_apply.validate_publish_slot_header vi.ctxt slot_header
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->

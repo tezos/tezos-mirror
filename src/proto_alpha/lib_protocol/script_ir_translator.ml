@@ -1680,8 +1680,6 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
   let open Result_syntax in
   let destination_allowed loc {destination; entrypoint} ctxt =
     match destination with
-    | Destination.Sc_rollup _ when not (Constants.sc_rollup_enable ctxt) ->
-        tzfail @@ Sc_rollup_disabled loc
     | Destination.Zk_rollup _ when not (Constants.zk_rollup_enable ctxt) ->
         tzfail @@ Zk_rollup_disabled loc
     | _ -> Ok ({destination; entrypoint}, ctxt)

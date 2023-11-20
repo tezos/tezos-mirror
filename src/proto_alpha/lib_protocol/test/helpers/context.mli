@@ -341,7 +341,6 @@ type 'accounts init :=
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
-  ?sc_rollup_enable:bool ->
   ?sc_rollup_arith_pvm_enable:bool ->
   ?sc_rollup_private_enable:bool ->
   ?sc_rollup_riscv_pvm_enable:bool ->

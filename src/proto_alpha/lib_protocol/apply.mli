@@ -38,7 +38,6 @@ open Alpha_context
 type error +=
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
-  | Sc_rollup_feature_disabled
   | Empty_transaction of Contract.t
 
 type mode =

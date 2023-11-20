@@ -1113,7 +1113,6 @@ module Manager = struct
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
-    | Sc_rollup_feature_disabled
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
@@ -1209,16 +1208,6 @@ module Manager = struct
       Data_encoding.empty
       (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
       (fun () -> Gas_quota_exceeded_init_deserialize) ;
-    let scoru_disabled_description = "Smart rollups are disabled." in
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.smart_rollup_disabled"
-      ~title:"Smart rollups are disabled"
-      ~description:scoru_disabled_description
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" scoru_disabled_description)
-      Data_encoding.unit
-      (function Sc_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Sc_rollup_feature_disabled) ;
 
     let scoru_arith_pvm_disabled_description =
       "Arith PVM is disabled in this network."
