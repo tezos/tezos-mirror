@@ -78,10 +78,13 @@ let make_uri endpoint rpc =
     ~query:(List.map (fun (k, v) -> (k, [v])) rpc.query_string)
     ()
 
+type rpc_hooks = {on_request : string -> unit; on_response : string -> unit}
+
 module type CALLERS = sig
   type uri_provider
 
   val call :
+    ?rpc_hooks:rpc_hooks ->
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
@@ -90,6 +93,7 @@ module type CALLERS = sig
     'result Lwt.t
 
   val call_raw :
+    ?rpc_hooks:rpc_hooks ->
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
@@ -98,6 +102,7 @@ module type CALLERS = sig
     string response Lwt.t
 
   val call_json :
+    ?rpc_hooks:rpc_hooks ->
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
@@ -106,9 +111,15 @@ module type CALLERS = sig
     JSON.t response Lwt.t
 end
 
-let call_raw ?(log_request = true) ?(log_response_status = true)
+let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
     ?(log_response_body = true) endpoint rpc =
   let uri = make_uri endpoint rpc in
+  let () =
+    Option.iter
+      (fun {on_request; _} ->
+        on_request @@ sf "%s %s" (show_verb rpc.verb) (Uri.to_string uri))
+      rpc_hooks
+  in
   if log_request then
     Log.debug
       ~color:Log.Color.bold
@@ -139,14 +150,16 @@ let call_raw ?(log_request = true) ?(log_response_status = true)
       "RPC response: %s"
       (Cohttp.Code.string_of_status response.status) ;
   let* body = Cohttp_lwt.Body.to_string response_body in
+  let () = Option.iter (fun {on_response; _} -> on_response body) rpc_hooks in
   if log_response_body then Log.debug ~prefix:"RPC" "%s" body ;
   return {body; code = Cohttp.Code.code_of_status response.status}
 
-let call_json ?log_request ?log_response_status ?(log_response_body = true)
-    endpoint rpc =
+let call_json ?rpc_hooks ?log_request ?log_response_status
+    ?(log_response_body = true) endpoint rpc =
   let* response =
     call_raw
       endpoint
+      ?rpc_hooks
       ?log_request
       ?log_response_status
       ~log_response_body:false
@@ -168,9 +181,16 @@ let check_status_code node rpc code =
       (Uri.to_string (make_uri node rpc))
       (Cohttp.Code.string_of_status (Cohttp.Code.status_of_code code))
 
-let call ?log_request ?log_response_status ?log_response_body node rpc =
+let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body node
+    rpc =
   let* response =
-    call_json ?log_request ?log_response_status ?log_response_body node rpc
+    call_json
+      ?rpc_hooks
+      ?log_request
+      ?log_response_status
+      ?log_response_body
+      node
+      rpc
   in
   check_status_code node rpc response.code ;
   return (rpc.decode response.body)

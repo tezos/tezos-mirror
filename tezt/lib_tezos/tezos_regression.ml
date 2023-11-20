@@ -83,3 +83,8 @@ let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
   {Process.on_spawn; on_log}
 
 let hooks = hooks_custom ~scrubbed_global_options ~replace_variables ()
+
+let rpc_hooks : RPC_core.rpc_hooks =
+  let on_request input = replace_variables input |> Regression.capture in
+  let on_response output = replace_variables output |> Regression.capture in
+  {on_request; on_response}
