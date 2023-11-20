@@ -258,9 +258,6 @@ seq:
   type: s1
 - id: dal_parametric
   type: dal_parametric
-- id: smart_rollup_enable
-  type: u1
-  enum: bool
 - id: smart_rollup_arith_pvm_enable
   type: u1
   enum: bool
