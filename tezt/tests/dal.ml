@@ -3557,6 +3557,89 @@ let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
   in
   unit
 
+(** Connect two nodes [dal_node2] and [dal_node3] via a trusted bootstrap peer
+    [dal_node1]. Then, disconnect all the nodes and wait for reconnection. *)
+let test_peers_reconnection _protocol _parameters _cryptobox node client
+    dal_node1 =
+  (* Connect two nodes via bootstrap peer. *)
+  Log.info "Connect two nodes via bootstrap peer." ;
+  let* dal_node2, dal_node3 =
+    connect_nodes_via_bootstrap_node
+      _protocol
+      _parameters
+      _cryptobox
+      node
+      client
+      dal_node1
+  in
+  (* Get the nodes' identities. *)
+  let id dal_node =
+    JSON.(Dal_node.read_identity dal_node |-> "peer_id" |> as_string)
+  in
+  let id_dal_node1 = id dal_node1 in
+  let id_dal_node2 = id dal_node2 in
+  let id_dal_node3 = id dal_node3 in
+
+  (* Prepare disconnection events to observe. *)
+  let disconn_ev_in_node1_2 =
+    check_disconnection_event dal_node1 ~peer_id:id_dal_node2
+  in
+  let disconn_ev_in_node1_3 =
+    check_disconnection_event dal_node1 ~peer_id:id_dal_node3
+  in
+  let disconn_ev_in_node2_3 =
+    check_disconnection_event dal_node2 ~peer_id:id_dal_node3
+  in
+
+  (* Prepare reconnection events checks between node1 and node2 (resp. 3). *)
+  let check_conn_event_from_1_to_2 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node2
+      ~is_trusted:false
+  in
+  let check_conn_event_from_1_to_3 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node3
+      ~is_trusted:false
+  in
+  let check_conn_event_from_2_to_3 =
+    check_new_connection_event
+      ~main_node:dal_node2
+      ~other_node:dal_node3
+      ~is_trusted:false
+  in
+
+  (* Disconnect all the nodes. *)
+  let* () =
+    Lwt_list.iter_p
+      (fun peer_id ->
+        Lwt_list.iter_p
+          (fun dal_node ->
+            Dal_RPC.(call dal_node @@ delete_p2p_peer_disconnect ~peer_id))
+          [dal_node1; dal_node2; dal_node3])
+      [id_dal_node1; id_dal_node2; id_dal_node3]
+  in
+
+  (* Observe disconnection. *)
+  Log.info "Wait for disconnection" ;
+  let* () =
+    Lwt.join
+      [disconn_ev_in_node1_2; disconn_ev_in_node1_3; disconn_ev_in_node2_3]
+  in
+  Log.info "Disconnection done. Wait for reconnection." ;
+  let* () =
+    Lwt.join
+      [
+        check_conn_event_from_1_to_2;
+        check_conn_event_from_1_to_3;
+        check_conn_event_from_2_to_3;
+      ]
+  in
+  Log.info "Recconnection done." ;
+  unit
+
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
     ~migration_level ~scenario ~description () =
@@ -4082,6 +4165,13 @@ let register ~protocols =
     ~bootstrap_profile:true
     "peer discovery via bootstrap node"
     test_peer_discovery_via_bootstrap_node
+    protocols ;
+
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["bootstrap"; "trusted"; "connection"]
+    ~bootstrap_profile:true
+    "trusted peers reconnection"
+    test_peers_reconnection
     protocols ;
 
   (* Tests with all nodes *)
