@@ -79,7 +79,10 @@ let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
           slashing_cycle >= first_cycle_to_apply_slash
           && slashing_cycle <= last_cycle_to_apply_slash)
       then
-        Tez_repr.(sub_opt remain (mul_percentage amount slashing_percentage))
+        Tez_repr.(
+          sub_opt
+            remain
+            (mul_percentage ~rounding:`Up amount slashing_percentage))
         |> Option.value ~default:Tez_repr.zero
       else remain)
     amount

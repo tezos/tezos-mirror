@@ -40,8 +40,10 @@ let voting_weight {own_frozen; staked_frozen; delegated} =
 
 let apply_slashing ~percentage {own_frozen; staked_frozen; delegated} =
   let remaining_percentage = Int_percentage.neg percentage in
-  let own_frozen = Tez_repr.mul_percentage own_frozen remaining_percentage in
+  let own_frozen =
+    Tez_repr.mul_percentage ~rounding:`Down own_frozen remaining_percentage
+  in
   let staked_frozen =
-    Tez_repr.mul_percentage staked_frozen remaining_percentage
+    Tez_repr.mul_percentage ~rounding:`Down staked_frozen remaining_percentage
   in
   {own_frozen; staked_frozen; delegated}
