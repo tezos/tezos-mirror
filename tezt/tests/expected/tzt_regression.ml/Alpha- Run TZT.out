@@ -75,10 +75,6 @@ tzt_reference_test_suite/self_01.tzt:
 From line 5 character 19 to line 8 character 27, misaligned expression
 From line 5 character 19 to line 8 character 27, misaligned expression
 From line 5 character 7 to line 10 character 8, misaligned expression
-tzt_reference_test_suite/self_00.tzt:
-At (unshown) location 0, value "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
-is invalid for type contract int.
-At (unshown) location 0, invalid contract KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d.
 tzt_reference_test_suite/push_00.tc.tzt:
 At line 3 characters 0 to 21,
 Invalid format for TZT toplevel primitive output.
@@ -338,6 +334,6 @@ At line 3 characters 0 to 21,
 Invalid format for TZT toplevel primitive output.
 At line 3 characters 7 to 21,
 wrong syntax for stack, expecting a sequence of elements of the following shape: Stack_elt <ty> <val>; got StaticError _.
-Test results: Passed:479 Failed:57 Total:536
+Test results: Passed:480 Failed:56 Total:536
 Fatal error:
   Some tests have failed

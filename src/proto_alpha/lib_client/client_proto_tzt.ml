@@ -19,6 +19,15 @@ let run_unit_test (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ~(test : unit_test_with_source) () =
   let open Lwt_result_syntax in
   let*? ut = Michelson_v1_stack.parse_unit_test test.parsed in
+  let all_contracts =
+    let other_contracts =
+      Option.value ~default:[] ut.optional.other_contracts
+    in
+    match (ut.optional.self, ut.optional.parameter) with
+    | Some self, Some param ->
+        RPC.Scripts.S.{address = self; ty = param} :: other_contracts
+    | None, _ | Some _, None -> other_contracts
+  in
   let* chain_id =
     match ut.optional.chain_id with
     | Some chain_id -> return chain_id
@@ -32,7 +41,7 @@ let run_unit_test (cctxt : #Protocol_client_context.rpc_context)
       ~stack:ut.output
       ~unparsing_mode:Readable
       ~legacy:true
-      ~other_contracts:ut.optional.other_contracts
+      ~other_contracts:(Some all_contracts)
       ~extra_big_maps:ut.optional.extra_big_maps
   in
   let* output, _gas =
@@ -50,7 +59,7 @@ let run_unit_test (cctxt : #Protocol_client_context.rpc_context)
       ~parameter:ut.optional.parameter
       ~amount
       ~balance:ut.optional.balance
-      ~other_contracts:ut.optional.other_contracts
+      ~other_contracts:(Some all_contracts)
       ~extra_big_maps:ut.optional.extra_big_maps
       ~unparsing_mode:None
       cctxt
