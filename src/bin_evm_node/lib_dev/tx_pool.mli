@@ -7,7 +7,7 @@
 
 (** [start config] starts the tx-pool. The [config] represents the 
     Rollup_node rpc module and the address of the smart rollup. *)
-val start : (module Rollup_node.S) * string -> unit tzresult Lwt.t
+val start : (module Services_backend_sig.S) * string -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the tx-pool, waiting for the ongoing request
     to be processed. *)
