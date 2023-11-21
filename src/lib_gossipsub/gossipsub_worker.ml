@@ -185,7 +185,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | New_connection of {
         peer : Peer.t;
         direct : bool;
-        outbound : bool;
+        trusted : bool;
         bootstrap : bool;
       }
     | Disconnection of {peer : Peer.t}
@@ -195,11 +195,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Join of Topic.t
     | Leave of Topic.t
 
+  type peer_origin = PX of Peer.t | Trusted
+
   type p2p_output =
     | Out_message of {to_peer : Peer.t; p2p_message : p2p_message}
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
-    | Connect of {px : Peer.t; origin : Peer.t}
+    | Connect of {px : Peer.t; origin : peer_origin}
     | Forget of {px : Peer.t; origin : Peer.t}
 
   type app_output = message_with_header
@@ -213,6 +215,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type worker_state = {
     stats : Introspection.stats;
     gossip_state : GS.state;
+    trusted_peers : Peer.Set.t;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
     p2p_output_stream : p2p_output Stream.t;
@@ -359,7 +362,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
       to that peer for each topic the local peer tracks. *)
-  let handle_new_connection peer ~bootstrap = function
+  let handle_new_connection peer ~bootstrap ~trusted = function
     | state, GS.Peer_already_known -> state
     | state, Peer_added ->
         Introspection.update_count_connections state.stats `Incr ;
@@ -369,7 +372,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             Peer.Set.add peer state.connected_bootstrap_peers)
           else state.connected_bootstrap_peers
         in
-        let state = {state with connected_bootstrap_peers} in
+        let trusted_peers =
+          if trusted then Peer.Set.add peer state.trusted_peers
+          else state.trusted_peers
+        in
+        let state = {state with connected_bootstrap_peers; trusted_peers} in
         View.(view state.gossip_state |> get_our_topics)
         |> List.iter (fun topic ->
                emit_p2p_message state (Subscribe {topic}) (Seq.return peer)) ;
@@ -515,7 +522,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         Introspection.update_count_recv_prunes state.stats `Incr ;
         emit_p2p_output
           state
-          ~mk_output:(fun to_peer -> Connect {px = to_peer; origin = from_peer})
+          ~mk_output:(fun to_peer ->
+            Connect {px = to_peer; origin = PX from_peer})
           (Peer.Set.to_seq peers) ;
         (* Forget peers that were filtered out by the automaton. *)
         emit_p2p_output
@@ -533,6 +541,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let handle_heartheat = function
     | state, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
+        let gstate_view = View.view gstate in
         let iter pmap mk_msg =
           Peer.Map.iter
             (fun peer topicset ->
@@ -545,7 +554,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         (* Send Graft messages. *)
         iter to_graft (fun _peer topic -> Graft {topic}) ;
         (* Send Prune messages with adequate px. *)
-        let backoff = View.(view gstate |> limits).prune_backoff in
+        let backoff = View.(limits gstate_view).prune_backoff in
         iter to_prune (fun peer_to_prune topic ->
             let px =
               GS.select_px_peers gstate ~peer_to_prune topic ~noPX_peers
@@ -560,6 +569,21 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    state
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
+        (* Once every 15 hearbreat ticks, try to reconnect to trusted peers if
+           they are disconnected. *)
+        if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6636
+
+             Put the value [15L] as a parameter. *)
+          Peer.Set.fold
+            (fun trusted_peer seq ->
+              if View.Connections.mem trusted_peer gstate_view.View.connections
+              then seq
+              else Seq.cons trusted_peer seq)
+            state.trusted_peers
+            Seq.empty
+          |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
+                 Connect {px = trusted_peer; origin = Trusted}) ;
         state
 
   let update_gossip_state state (gossip_state, output) =
@@ -618,10 +642,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ({gossip_state; _} as state) = function
-    | New_connection {peer; direct; outbound; bootstrap} ->
-        GS.add_peer {direct; outbound; peer} gossip_state
+    | New_connection {peer; direct; trusted; bootstrap} ->
+        GS.add_peer {direct; outbound = trusted; peer} gossip_state
         |> update_gossip_state state
-        |> handle_new_connection peer ~bootstrap
+        |> handle_new_connection peer ~bootstrap ~trusted
     | Disconnection {peer} ->
         GS.remove_peer {peer} gossip_state
         |> update_gossip_state state |> handle_disconnection peer
@@ -744,6 +768,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         {
           stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
+          trusted_peers = Peer.Set.empty;
           connected_bootstrap_peers = Peer.Set.empty;
           events_stream = Stream.empty ();
           p2p_output_stream = Stream.empty ();
@@ -814,7 +839,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Disconnect {peer} -> Format.fprintf fmt "Disconnect{peer=%a}" Peer.pp peer
     | Kick {peer} -> Format.fprintf fmt "Kick{peer=%a}" Peer.pp peer
     | Connect {px; origin} ->
-        Format.fprintf fmt "Connect{px=%a; origin=%a}" Peer.pp px Peer.pp origin
+        Format.fprintf
+          fmt
+          "Connect{px=%a; origin=%a}"
+          Peer.pp
+          px
+          (fun fmt origin ->
+            match origin with
+            | PX peer -> Peer.pp fmt peer
+            | Trusted -> Format.fprintf fmt "(trusted)")
+          origin
     | Forget {px; origin} ->
         Format.fprintf fmt "Forget{px=%a; origin=%a}" Peer.pp px Peer.pp origin
     | Out_message {to_peer; p2p_message} ->

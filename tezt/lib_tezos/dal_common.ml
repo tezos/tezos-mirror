@@ -306,6 +306,9 @@ module Dal_RPC = struct
               Attestable_slots (json |> as_list |> List.map as_bool)
           | _ -> failwith "invalid case"))
 
+  let delete_p2p_peer_disconnect ~peer_id =
+    make DELETE ["p2p"; "peers"; "disconnect"; peer_id] as_empty_object_or_fail
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
     let call ?log_request ?log_response_status ?log_response_body node rpc =

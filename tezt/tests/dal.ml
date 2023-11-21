@@ -2777,14 +2777,14 @@ let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
 
-let check_new_connection_event ~main_node ~other_node ~is_outbound =
+let check_new_connection_event ~main_node ~other_node ~is_trusted =
   wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
       let*?? () =
         check_expected
           JSON.(Dal_node.read_identity other_node |-> "peer_id" |> as_string)
           JSON.(event |-> "peer" |> as_string)
       in
-      check_expected is_outbound JSON.(event |-> "outbound" |> as_bool))
+      check_expected is_trusted JSON.(event |-> "trusted" |> as_bool))
 
 let check_disconnection_event dal_node ~peer_id =
   wait_for_gossipsub_worker_event
@@ -3032,7 +3032,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     check_new_connection_event
       ~main_node:dal_node1
       ~other_node:dal_node2
-      ~is_outbound:false
+      ~is_trusted:false
   in
   let* () = Dal_node.run dal_node2 in
   conn_ev_in_node1
@@ -3507,7 +3507,7 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
     [dal_node2] should connect to [dal_node1] at startup.
     [dal_node3] should also connect to [dal_node1] at startup.
     [dal_node2] and [dal_node3] should find each other via [dal_node1]. *)
-let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
+let connect_nodes_via_bootstrap_node _protocol _parameters _cryptobox node
     client dal_node1 =
   let* dal_node2 =
     make_dal_node
@@ -3525,19 +3525,120 @@ let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
     check_new_connection_event
       ~main_node:dal_node2
       ~other_node:dal_node3
-      ~is_outbound:false
+      ~is_trusted:false
   in
   let check_conn_event_from_3_to_2 =
     check_new_connection_event
       ~main_node:dal_node3
       ~other_node:dal_node2
-      ~is_outbound:false
+      ~is_trusted:false
   in
   Log.info "Bake two times to finalize a block." ;
   let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
   Log.info "Wait for dal_node2 and dal_node3 to find each other." ;
-  Lwt.join [check_conn_event_from_2_to_3; check_conn_event_from_3_to_2]
+
+  let* () =
+    Lwt.join [check_conn_event_from_2_to_3; check_conn_event_from_3_to_2]
+  in
+  Lwt.return (dal_node2, dal_node3)
+
+(** See {!connect_nodes_via_bootstrap_node} for the doc. *)
+let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
+    client dal_node1 =
+  let* _dal_node2, _dal_node3 =
+    connect_nodes_via_bootstrap_node
+      _protocol
+      _parameters
+      _cryptobox
+      node
+      client
+      dal_node1
+  in
+  unit
+
+(** Connect two nodes [dal_node2] and [dal_node3] via a trusted bootstrap peer
+    [dal_node1]. Then, disconnect all the nodes and wait for reconnection. *)
+let test_peers_reconnection _protocol _parameters _cryptobox node client
+    dal_node1 =
+  (* Connect two nodes via bootstrap peer. *)
+  Log.info "Connect two nodes via bootstrap peer." ;
+  let* dal_node2, dal_node3 =
+    connect_nodes_via_bootstrap_node
+      _protocol
+      _parameters
+      _cryptobox
+      node
+      client
+      dal_node1
+  in
+  (* Get the nodes' identities. *)
+  let id dal_node =
+    JSON.(Dal_node.read_identity dal_node |-> "peer_id" |> as_string)
+  in
+  let id_dal_node1 = id dal_node1 in
+  let id_dal_node2 = id dal_node2 in
+  let id_dal_node3 = id dal_node3 in
+
+  (* Prepare disconnection events to observe. *)
+  let disconn_ev_in_node1_2 =
+    check_disconnection_event dal_node1 ~peer_id:id_dal_node2
+  in
+  let disconn_ev_in_node1_3 =
+    check_disconnection_event dal_node1 ~peer_id:id_dal_node3
+  in
+  let disconn_ev_in_node2_3 =
+    check_disconnection_event dal_node2 ~peer_id:id_dal_node3
+  in
+
+  (* Prepare reconnection events checks between node1 and node2 (resp. 3). *)
+  let check_conn_event_from_1_to_2 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node2
+      ~is_trusted:false
+  in
+  let check_conn_event_from_1_to_3 =
+    check_new_connection_event
+      ~main_node:dal_node1
+      ~other_node:dal_node3
+      ~is_trusted:false
+  in
+  let check_conn_event_from_2_to_3 =
+    check_new_connection_event
+      ~main_node:dal_node2
+      ~other_node:dal_node3
+      ~is_trusted:false
+  in
+
+  (* Disconnect all the nodes. *)
+  let* () =
+    Lwt_list.iter_p
+      (fun peer_id ->
+        Lwt_list.iter_p
+          (fun dal_node ->
+            Dal_RPC.(call dal_node @@ delete_p2p_peer_disconnect ~peer_id))
+          [dal_node1; dal_node2; dal_node3])
+      [id_dal_node1; id_dal_node2; id_dal_node3]
+  in
+
+  (* Observe disconnection. *)
+  Log.info "Wait for disconnection" ;
+  let* () =
+    Lwt.join
+      [disconn_ev_in_node1_2; disconn_ev_in_node1_3; disconn_ev_in_node2_3]
+  in
+  Log.info "Disconnection done. Wait for reconnection." ;
+  let* () =
+    Lwt.join
+      [
+        check_conn_event_from_1_to_2;
+        check_conn_event_from_1_to_3;
+        check_conn_event_from_2_to_3;
+      ]
+  in
+  Log.info "Recconnection done." ;
+  unit
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
@@ -4064,6 +4165,13 @@ let register ~protocols =
     ~bootstrap_profile:true
     "peer discovery via bootstrap node"
     test_peer_discovery_via_bootstrap_node
+    protocols ;
+
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["bootstrap"; "trusted"; "connection"]
+    ~bootstrap_profile:true
+    "trusted peers reconnection"
+    test_peers_reconnection
     protocols ;
 
   (* Tests with all nodes *)

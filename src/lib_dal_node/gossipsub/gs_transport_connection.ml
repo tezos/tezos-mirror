@@ -92,6 +92,8 @@ module PX_cache : sig
   (** The cache data structure for advertised alternative PXs. *)
   type t
 
+  type origin = Worker.peer_origin
+
   (** Create a new cache data structure. The [size] parameter is an indication
       on the size of internal table storing data. Its default value is
       [2048]. *)
@@ -100,23 +102,34 @@ module PX_cache : sig
   (** [insert t ~origin ~px point] associates the given [point] to [(origin,
       px)] pair of peers. If a point already exists for the pair, it is
       overwritten.  *)
-  val insert :
-    t -> origin:P2p_peer.Id.t -> px:P2p_peer.Id.t -> P2p_point.Id.t -> unit
+  val insert : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t -> unit
 
-  (** [drop t ~origin ~px] drops the entry [(origin, px)] from the cache and
-      returns the [point] being dropped, if any. *)
-  val drop :
-    t -> origin:P2p_peer.Id.t -> px:P2p_peer.Id.t -> P2p_point.Id.t option
+  (** [find_opt t ~origin ~px] returns the content associated to the entry
+      [(origin, px)] in the cache, if any. *)
+  val find_opt : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t option
+
+  (** [drop t ~origin ~px] drops the entry [(origin, px)] from the cache. *)
+  val drop : t -> origin:origin -> px:P2p_peer.Id.t -> unit
 end = struct
-  type key = {origin : P2p_peer.Id.t; px : P2p_peer.Id.t}
+  type origin = Worker.peer_origin
+
+  type key = {origin : origin; px : P2p_peer.Id.t}
 
   module Table = Hashtbl.Make (struct
     type t = key
 
     let equal {origin; px} k2 =
-      P2p_peer.Id.equal origin k2.origin && P2p_peer.Id.equal px k2.px
+      P2p_peer.Id.equal px k2.px
+      &&
+      match (origin, k2.origin) with
+      | PX peer1, PX peer2 -> P2p_peer.Id.equal peer1 peer2
+      | Trusted, Trusted -> true
+      | PX _, _ | Trusted, _ -> false
 
-    let hash {origin; px} = (P2p_peer.Id.hash origin * 3) + P2p_peer.Id.hash px
+    let hash {origin; px} =
+      match origin with
+      | PX peer -> (P2p_peer.Id.hash px * 31) + P2p_peer.Id.hash peer
+      | Trusted -> P2p_peer.Id.hash px * 17
   end)
 
   type t = P2p_point.Id.t Table.t
@@ -125,57 +138,10 @@ end = struct
 
   let insert table ~origin ~px point = Table.replace table {px; origin} point
 
-  let drop table ~origin ~px =
-    let key = {origin; px} in
-    let point_opt = Table.find_opt table key in
-    Table.remove table key ;
-    point_opt
+  let drop table ~origin ~px = Table.remove table {origin; px}
+
+  let find_opt table ~origin ~px = Table.find_opt table {origin; px}
 end
-
-(** This handler forwards information about connections established by the P2P
-    layer to the Gossipsub worker.
-
-    Note that, a connection is considered [outbound] only if we initiated it and
-    we trust the point or the peer we are connecting to. Consequently, PX peers
-    are not considered outgoing connections by default, as they are not trusted
-    unless explicitly specified otherwise.
-
-    Indeed, Gossipsub tries to maintain a threshold of outbound connections per
-    topic. So, we don't automatically set connections we initiate to PX peers as
-    outbound to avoid possible love bombing attacks. The Rust version also
-    implements a way to mitigate this risk, but not the Go implementation.
-*)
-let new_connections_handler gs_worker p2p_layer peer conn =
-  let P2p_connection.Info.{incoming; id_point = addr, port_opt; _} =
-    P2p.connection_info p2p_layer conn
-  in
-  let Types.P2P.Metadata.Connection.{is_bootstrap_peer = bootstrap; _} =
-    P2p.connection_remote_metadata p2p_layer conn
-  in
-  let pool_opt = P2p.pool p2p_layer in
-  let fold_pool_opt f arg =
-    Option.fold
-      pool_opt
-      ~none:true (* It doesn't matter in fake networks where pool is None *)
-      ~some:(fun pool -> f pool arg)
-  in
-  let trusted_peer = fold_pool_opt P2p_pool.Peers.get_trusted peer in
-  let trusted_point =
-    Option.fold port_opt ~none:false ~some:(fun port ->
-        fold_pool_opt P2p_pool.Points.get_trusted (addr, port))
-  in
-  let outbound = (not incoming) && (trusted_peer || trusted_point) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
-
-     Add the ability to have direct peers. *)
-  let direct = false in
-  Worker.(
-    New_connection {peer; direct; outbound; bootstrap} |> p2p_input gs_worker)
-
-(** This handler forwards information about P2P disconnections to the Gossipsub
-    worker. *)
-let disconnections_handler gs_worker peer =
-  Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
 (* [px_of_peer p2p_layer peer] returns the public IP address and port at which
    [peer] could be reached. For that, it first inspects information transmitted
@@ -206,6 +172,64 @@ let px_of_peer p2p_layer peer =
   let* port = Option.either advertised_net_port conn_port_opt in
   return {point = (addr, port); peer}
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/6637
+
+   When adding an RPC to trust peers/points. Use this function when trusting a peer
+   via an RPC. *)
+
+(* This function inserts the point of a trusted peer into the [px_cache]
+   table. *)
+let cache_point_of_trusted_peer p2p_layer px_cache peer =
+  px_of_peer p2p_layer peer
+  |> Option.iter (fun Transport_layer_interface.{point; peer} ->
+         PX_cache.insert px_cache ~origin:Trusted ~px:peer point)
+
+(** This handler forwards information about connections established by the P2P
+    layer to the Gossipsub worker.
+
+    Note that, a connection is considered [outbound] only if we initiated it and
+    we trust the point or the peer we are connecting to. Consequently, PX peers
+    are not considered outgoing connections by default, as they are not trusted
+    unless explicitly specified otherwise.
+
+    Indeed, Gossipsub tries to maintain a threshold of outbound connections per
+    topic. So, we don't automatically set connections we initiate to PX peers as
+    outbound to avoid possible love bombing attacks. The Rust version also
+    implements a way to mitigate this risk, but not the Go implementation.
+*)
+let new_connections_handler px_cache gs_worker p2p_layer peer conn =
+  let P2p_connection.Info.{id_point = addr, port_opt; _} =
+    P2p.connection_info p2p_layer conn
+  in
+  let Types.P2P.Metadata.Connection.{is_bootstrap_peer = bootstrap; _} =
+    P2p.connection_remote_metadata p2p_layer conn
+  in
+  let pool_opt = P2p.pool p2p_layer in
+  let fold_pool_opt f arg =
+    Option.fold
+      pool_opt
+      ~none:true (* It doesn't matter in fake networks where pool is None *)
+      ~some:(fun pool -> f pool arg)
+  in
+  let trusted_peer = fold_pool_opt P2p_pool.Peers.get_trusted peer in
+  let trusted_point =
+    Option.fold port_opt ~none:false ~some:(fun port ->
+        fold_pool_opt P2p_pool.Points.get_trusted (addr, port))
+  in
+  let trusted = trusted_peer || trusted_point in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
+
+     Add the ability to have direct peers. *)
+  let direct = false in
+  if trusted then cache_point_of_trusted_peer p2p_layer px_cache peer ;
+  Worker.(
+    New_connection {peer; direct; trusted; bootstrap} |> p2p_input gs_worker)
+
+(** This handler forwards information about P2P disconnections to the Gossipsub
+    worker. *)
+let disconnections_handler gs_worker peer =
+  Worker.(Disconnection {peer} |> p2p_input gs_worker)
+
 (* This function translates a Worker p2p_message to the type of messages sent
    via the P2P layer. The two types don't coincide because of Prune. *)
 let wrap_p2p_message p2p_layer =
@@ -235,7 +259,7 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
         Seq.map
           (fun I.{point; peer} ->
             if Option.is_none @@ P2p.find_connection_by_peer_id p2p_layer peer
-            then PX_cache.insert px_cache ~origin:from_peer ~px:peer point ;
+            then PX_cache.insert px_cache ~origin:(PX from_peer) ~px:peer point ;
             peer)
           px
       in
@@ -247,11 +271,11 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Message_with_header {message; topic; message_id} ->
       Message_with_header {message; topic; message_id}
 
-let try_connect p2p_layer px_cache ~px ~origin =
+let try_connect_to_peer p2p_layer px_cache ~px ~origin =
   let open Lwt_syntax in
   (* If there is some [point] associated to [px] and advertised by [origin]
      on the [px_cache], we will try to connect to it. *)
-  match PX_cache.drop px_cache ~px ~origin with
+  match PX_cache.find_opt px_cache ~px ~origin with
   | Some point ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5799
 
@@ -276,6 +300,9 @@ let try_connect p2p_layer px_cache ~px ~origin =
       let* (_ : _ P2p.connection tzresult) =
         P2p.connect ~expected_peer_id:px p2p_layer point
       in
+      (match origin with
+      | Trusted -> () (* Don't drop trusted points. *)
+      | PX _ -> PX_cache.drop px_cache ~px ~origin) ;
       return_unit
   | _ -> return_unit
 
@@ -313,9 +340,10 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
           P2p.find_connection_by_peer_id p2p_layer peer
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
-      | Connect {px; origin} -> try_connect p2p_layer px_cache ~px ~origin
+      | Connect {px; origin} ->
+          try_connect_to_peer p2p_layer px_cache ~px ~origin
       | Forget {px; origin} ->
-          let _p : P2p_point.Id.t option = PX_cache.drop px_cache ~px ~origin in
+          PX_cache.drop px_cache ~px ~origin:(PX origin) ;
           return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer
@@ -368,7 +396,7 @@ let activate gs_worker p2p_layer ~app_messages_callback =
   let px_cache = PX_cache.create () in
   (* Register a handler to notify new P2P connections to GS. *)
   let () =
-    new_connections_handler gs_worker p2p_layer
+    new_connections_handler px_cache gs_worker p2p_layer
     |> P2p.on_new_connection p2p_layer
   in
   (* Register a handler to notify P2P disconnections to GS. *)
