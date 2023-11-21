@@ -38,6 +38,9 @@ Node
 Client
 ------
 
+- Extended the support for the TZT format when using the ``run unit
+  tests`` client command. (MR :gl:`!4474`)
+
 Baker
 -----
 
