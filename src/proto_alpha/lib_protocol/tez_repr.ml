@@ -101,7 +101,7 @@ let pp ppf (Tez_tag amount) =
   let mult_int = 1_000_000L in
   let rec left ppf amount =
     let d, r = (Int64.div amount 1000L, Int64.rem amount 1000L) in
-    if d > 0L then Format.fprintf ppf "%a%03Ld" left d r
+    if Compare.Int64.(d > 0L) then Format.fprintf ppf "%a%03Ld" left d r
     else Format.fprintf ppf "%Ld" r
   in
   let right ppf amount =
