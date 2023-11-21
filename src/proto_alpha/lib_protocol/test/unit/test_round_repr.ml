@@ -379,6 +379,7 @@ let test_timestamp_of_round_perf () =
   List.iter_es timestamp_of_round_perf default_round_durations_list
 
 let test_error_is_triggered_for_too_high_timestamp () =
+  let open Result_wrap_syntax in
   let round_durations =
     Stdlib.Option.get
     @@ Round.Durations.create_opt
@@ -387,14 +388,13 @@ let test_error_is_triggered_for_too_high_timestamp () =
   in
 
   let predecessor_timestamp = Time.Protocol.epoch in
-  let res =
+  let@ res =
     Round.round_of_timestamp
       round_durations
       ~predecessor_timestamp
       ~predecessor_round:Round.zero
       ~timestamp:(Time_repr.of_seconds Int64.max_int)
   in
-  let res = Environment.wrap_tzresult res in
   match res with
   | Error _ ->
       Assert.proto_error_with_info ~loc:__LOC__ res "level offset too high"
@@ -605,11 +605,11 @@ let round_and_offset_oracle (round_durations : Round_repr.Durations.t)
                        (Period_repr.to_seconds current_level_offset));
               }
   in
-  Environment.wrap_tzresult @@ bin_search 0l right_bound
+  bin_search 0l right_bound
 
 (* Test whether the new version is equivalent to the old one *)
 let test_round_and_offset_correction =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   Tztest.tztest_qcheck2
     ~name:"round_and_offset is correct"
     QCheck2.(
@@ -630,7 +630,7 @@ let test_round_and_offset_correction =
              ~first_round_duration
              ~delay_increment_per_round)
       in
-      let expected = round_and_offset_oracle round_duration ~level_offset in
+      let@ expected = round_and_offset_oracle round_duration ~level_offset in
       let computed =
         Round_repr.Internals_for_test.round_and_offset
           round_duration

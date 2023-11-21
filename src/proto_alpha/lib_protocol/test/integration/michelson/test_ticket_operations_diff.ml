@@ -399,7 +399,7 @@ let make_tickets ts =
 
 let transfer_tickets_operation ~incr ~sender ~destination tickets =
   let open Lwt_result_wrap_syntax in
-  let*? parameters_ty = Environment.wrap_tzresult list_ticket_string_ty in
+  let*?@ parameters_ty = list_ticket_string_ty in
   let*@ parameters = make_tickets tickets in
   transfer_operation ~incr ~sender ~destination ~parameters_ty ~parameters
 
@@ -1144,13 +1144,8 @@ let test_transfer_big_map_with_tickets () =
       ~forges_tickets:false
   in
   let open Lwt_result_syntax in
-  let*? value_type =
-    Environment.wrap_tzresult @@ ticket_t Micheline.dummy_location string_t
-  in
-  let*? parameters_ty =
-    Environment.wrap_tzresult
-    @@ big_map_t Micheline.dummy_location int_t value_type
-  in
+  let*?@ value_type = ticket_t Micheline.dummy_location string_t in
+  let*?@ parameters_ty = big_map_t Micheline.dummy_location int_t value_type in
   let parameters =
     Big_map
       {

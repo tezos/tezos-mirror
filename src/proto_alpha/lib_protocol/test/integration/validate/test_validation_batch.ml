@@ -378,11 +378,11 @@ let batch_emptying_balance_in_the_middle infos kind1 kind2 =
 (** A batch that consumes all the balance for fees only at the end of
    the batch passes validate.*)
 let batch_empty_at_end infos kind1 kind2 =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let source = contract_of (get_source infos) in
   let* counter = Context.Contract.counter (B infos.ctxt.block) source in
   let* init_bal = Context.Contract.balance (B infos.ctxt.block) source in
-  let*? half_init_bal = Environment.wrap_tzresult @@ Tez.(init_bal /? 2L) in
+  let*?@ half_init_bal = Tez.(init_bal /? 2L) in
   let* reveal =
     mk_reveal
       {(operation_req_default K_Reveal) with counter = Some counter}

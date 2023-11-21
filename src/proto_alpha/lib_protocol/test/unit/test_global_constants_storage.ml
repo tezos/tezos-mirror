@@ -53,8 +53,7 @@ let test_get_on_nonexistent_fails =
        (Generators.canonical_without_constant_gen ()))
     (fun (context, expr) ->
       let*?@ hash = expr_to_hash expr in
-      let*! result = Global_constants_storage.get context hash in
-      let result = Environment.wrap_tzresult result in
+      let*!@ result = Global_constants_storage.get context hash in
       assert_proto_error_id __LOC__ "Nonexistent_global" result)
 
 (** If registering an expression yields a hash [h] and context [c],
@@ -76,7 +75,7 @@ let test_get_always_returns_registered_expr =
 (* Attempts to register an expression that contains references
    to expressions not already registered should fail. *)
 let test_register_fails_with_unregistered_references =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   tztest "register: fails with unregistered references" `Quick (fun () ->
       let prim_with_constant =
         Expr.from_string
@@ -84,16 +83,15 @@ let test_register_fails_with_unregistered_references =
           (constant "exprubuoE4JFvkSpxsZJXAvhTdozCNZpgfCnyg6WsiAYX79q4z3bXu")|}
       in
       let* context = create_context () in
-      let*! result =
+      let*!@ result =
         Global_constants_storage.register context prim_with_constant
       in
-      let result = Environment.wrap_tzresult result in
       assert_proto_error_id __LOC__ "Nonexistent_global" result)
 
 (** Same test as [test_register_fails_with_unregistered_references]
     but with random values. *)
 let test_register_fails_with_unregistered_references_pbt =
-  let open Lwt_syntax in
+  let open Lwt_result_wrap_syntax in
   tztest_qcheck2
     ~name:"register: fails with unregistered references pbt"
     (Gen.pair
@@ -101,8 +99,7 @@ let test_register_fails_with_unregistered_references_pbt =
        (Generators.canonical_with_constant_gen ()))
     (fun (context, (_, expr, _)) ->
       assume_expr_not_too_large expr ;
-      let* result = Global_constants_storage.register context expr in
-      let result = Environment.wrap_tzresult result in
+      let*!@ result = Global_constants_storage.register context expr in
       assert_proto_error_id __LOC__ "Nonexistent_global" result)
 
 let rec grow n node =
@@ -112,7 +109,7 @@ let rec grow n node =
    [Global_constants_storage.max_allowed_global_constant_depth]
    should be rejected. *)
 let test_register_fails_if_too_deep =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   tztest "register: fails if expression too deep" `Quick (fun () ->
       let vdeep_expr =
         grow
@@ -121,14 +118,13 @@ let test_register_fails_if_too_deep =
         |> Micheline.strip_locations
       in
       let* context = create_context () in
-      let*! result = Global_constants_storage.register context vdeep_expr in
-      let result = Environment.wrap_tzresult result in
+      let*!@ result = Global_constants_storage.register context vdeep_expr in
       assert_proto_error_id __LOC__ "Expression_too_deep" result)
 
 (** [expand] on an expression containing a nonexistent global
     constant returns an error. *)
 let test_expand_nonexistent_fails =
-  let open Lwt_syntax in
+  let open Lwt_result_wrap_syntax in
   tztest_qcheck2
     ~name:
       "expand on an expression containing a nonexistent global constant fails"
@@ -137,8 +133,7 @@ let test_expand_nonexistent_fails =
        (Generators.canonical_with_constant_gen ()))
   @@ fun (context, (_, expr, _)) ->
   assume_expr_not_too_large expr ;
-  let* result = Global_constants_storage.expand context expr in
-  let result = Environment.wrap_tzresult result in
+  let*!@ result = Global_constants_storage.expand context expr in
   assert_proto_error_id __LOC__ "Nonexistent_global" result
 
 (** Expanding an expression without constants should yield the same expression. *)
@@ -250,8 +245,7 @@ let test_expand_reject_ill_formed =
       let* () = assert_expr_equal __LOC__ some_expr result in
       let test expr =
         let expected = Expr.from_string expr in
-        let*! result = Global_constants_storage.expand context expected in
-        let result = Environment.wrap_tzresult result in
+        let*!@ result = Global_constants_storage.expand context expected in
         assert_proto_error_id __LOC__ "Badly_formed_constant_expression" result
       in
       (* constant with an argument other than String fails *)
@@ -299,13 +293,12 @@ let test_reject_use_of_inner_constant =
           (strip_locations (Micheline.String (-1, hash)))
       in
       let hash = Script_expr_hash.to_b58check hash in
-      let*! result =
+      let*!@ result =
         Global_constants_storage.expand
           context
           (Expr.from_string
           @@ Format.sprintf "{ constant (constant \"%s\") } " hash)
       in
-      let result = Environment.wrap_tzresult result in
       assert_proto_error_id __LOC__ "Badly_formed_constant_expression" result)
 
 (** [test_expand] accepts an expression [stored] to be

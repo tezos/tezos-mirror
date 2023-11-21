@@ -191,24 +191,18 @@ module Raw_context_tests = struct
             payload = [||];
           }
     in
-    let*! e = Zk_rollup_storage.add_to_pending ctx rollup [wrong_op] in
+    let*!@ e = Zk_rollup_storage.add_to_pending ctx rollup [wrong_op] in
     let* () =
-      Assert.proto_error_with_info
-        ~loc:__LOC__
-        (Environment.wrap_tzresult e)
-        "Invalid op code in append"
+      Assert.proto_error_with_info ~loc:__LOC__ e "Invalid op code in append"
     in
     (* Invalid rollup address *)
     let*?@ _ctx, nonce = Raw_context.increment_origination_nonce ctx in
     let*?@ address =
       Zk_rollup_repr.Address.from_nonce (Origination_nonce.incr nonce)
     in
-    let*! e = Zk_rollup_storage.add_to_pending ctx address [op] in
+    let*!@ e = Zk_rollup_storage.add_to_pending ctx address [op] in
     let expected_message = "Storage error (fatal internal error)" in
-    Assert.proto_error_with_info
-      ~loc:__LOC__
-      (Environment.wrap_tzresult e)
-      expected_message
+    Assert.proto_error_with_info ~loc:__LOC__ e expected_message
 
   (* Check that the [get_prefix] helper actually returns a list of the
      desired length. *)
@@ -251,19 +245,16 @@ module Raw_context_tests = struct
     (* Initialise the pending list with 2 operations *)
     let*@ ctx, _size = Zk_rollup_storage.add_to_pending ctx rollup [op; op] in
     (* Check that retrieving too many ops returns an error *)
-    let*! e = Zk_rollup_storage.get_prefix ctx rollup 3 in
+    let*!@ e = Zk_rollup_storage.get_prefix ctx rollup 3 in
     let* () =
-      Assert.proto_error_with_info
-        ~loc:__LOC__
-        (Environment.wrap_tzresult e)
-        "Pending list is too short"
+      Assert.proto_error_with_info ~loc:__LOC__ e "Pending list is too short"
     in
     (* Check that retrieving a negative number of ops returns an error *)
-    let*! e = Zk_rollup_storage.get_prefix ctx rollup (-1) in
+    let*!@ e = Zk_rollup_storage.get_prefix ctx rollup (-1) in
     let* () =
       Assert.proto_error_with_info
         ~loc:__LOC__
-        (Environment.wrap_tzresult e)
+        e
         "Negative length for pending list prefix"
     in
     (* Check that get prefix fails with invalid zkru address *)
@@ -271,10 +262,10 @@ module Raw_context_tests = struct
     let*?@ address =
       Zk_rollup_repr.Address.from_nonce (Origination_nonce.incr nonce)
     in
-    let*! e = Zk_rollup_storage.get_prefix ctx address (-1) in
+    let*!@ e = Zk_rollup_storage.get_prefix ctx address (-1) in
     Assert.proto_error_with_info
       ~loc:__LOC__
-      (Environment.wrap_tzresult e)
+      e
       "Storage error (fatal internal error)"
 
   (* Check that the [update] helper correctly removes a prefix of the
@@ -339,23 +330,20 @@ module Raw_context_tests = struct
     let*@ ctx, _size = Zk_rollup_storage.add_to_pending ctx rollup [op; op] in
     let*@ ctx, acc = Storage.Zk_rollup.Account.get ctx rollup in
     (* Processing too many ops *)
-    let*! e =
+    let*!@ e =
       Zk_rollup_storage.update ctx rollup ~pending_to_drop:3 ~new_account:acc
     in
     let* () =
-      Assert.proto_error_with_info
-        ~loc:__LOC__
-        (Environment.wrap_tzresult e)
-        "Pending list is too short"
+      Assert.proto_error_with_info ~loc:__LOC__ e "Pending list is too short"
     in
     (* Processing negative number of ops *)
-    let*! e =
+    let*!@ e =
       Zk_rollup_storage.update ctx rollup ~pending_to_drop:(-3) ~new_account:acc
     in
     let* () =
       Assert.proto_error_with_info
         ~loc:__LOC__
-        (Environment.wrap_tzresult e)
+        e
         "Negative length for pending list prefix"
     in
     (* Update with wrong address *)
@@ -363,12 +351,12 @@ module Raw_context_tests = struct
     let*?@ address =
       Zk_rollup_repr.Address.from_nonce (Origination_nonce.incr nonce)
     in
-    let*! e =
+    let*!@ e =
       Zk_rollup_storage.update ctx address ~pending_to_drop:1 ~new_account:acc
     in
     Assert.proto_error_with_info
       ~loc:__LOC__
-      (Environment.wrap_tzresult e)
+      e
       "Storage error (fatal internal error)"
 end
 

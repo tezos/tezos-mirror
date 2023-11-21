@@ -34,12 +34,12 @@ let assert_balance ctxt ~loc key expected =
   | None, None -> return_unit
 
 let string_ticket_token ticketer content =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
     @@ Script_string.of_string content
   in
-  let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
+  let*?@ ticketer = Contract.of_b58check ticketer in
   return
     (Ticket_token.Ex_token
        {ticketer; contents_type = Script_typed_ir.string_t; contents})

@@ -559,7 +559,7 @@ module State = struct
 
   (** Applies when baking the last block of a cycle *)
   let apply_end_cycle current_cycle block state : t tzresult Lwt.t =
-    let open Lwt_result_syntax in
+    let open Lwt_result_wrap_syntax in
     Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
     let* launch_cycle_opt =
       Context.get_adaptive_issuance_launch_cycle (B block)
@@ -576,19 +576,18 @@ module State = struct
        for "reasons" related to snapshoting and the way slashes are applied to it *)
     let state = apply_all_slashes_at_cycle_end current_cycle state in
     (* Apply autostaking *)
-    let*? state =
+    let*?@ state =
       if not state.constants.adaptive_issuance.autostaking_enable then ok state
       else
         match launch_cycle_opt with
         | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) ->
             ok state
         | None | Some _ ->
-            Environment.wrap_tzresult
-            @@ String.Map.fold_e
-                 (fun name account state ->
-                   apply_autostake ~name ~old_cycle:current_cycle account state)
-                 state.account_map
-                 state
+            String.Map.fold_e
+              (fun name account state ->
+                apply_autostake ~name ~old_cycle:current_cycle account state)
+              state.account_map
+              state
     in
     (* Apply parameter changes *)
     let state, param_requests =
@@ -835,7 +834,7 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
 (** Bake a block, with the given baker and the given operations. *)
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   Log.info
     ~color:time_color
     "Baking level %d"
@@ -882,13 +881,12 @@ let bake ?baker : t -> t tzresult Lwt.t =
       in
       let* block_rewards = Context.get_issuance_per_minute (B block') in
       let ctxt = Incremental.alpha_ctxt i in
-      let* context, _ =
-        Lwt_result_wrap_syntax.wrap
-          (Protocol.Alpha_context.Token.transfer
-             ctxt
-             (`Contract baker_contract)
-             `Burned
-             block_rewards)
+      let*@ context, _ =
+        Protocol.Alpha_context.Token.transfer
+          ctxt
+          (`Contract baker_contract)
+          `Burned
+          block_rewards
       in
       let i = Incremental.set_alpha_ctxt i context in
       let* i = List.fold_left_es Incremental.add_operation i operations in

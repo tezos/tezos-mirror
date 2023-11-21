@@ -428,34 +428,30 @@ let verify_execute_outbox_message_operations ctxt rollup ~loc ~operations
           | None -> failwith "Could not load script at %s" loc
         in
         (* Find the script parameters ty of the script. *)
-        let*? entrypoint_res, ctxt =
-          Environment.wrap_tzresult
-            (Gas_monad.run
-               ctxt
-               (Script_ir_translator.find_entrypoint
-                  ~error_details:(Informative ())
-                  arg_type
-                  entrypoints
-                  entrypoint))
+        let*?@ entrypoint_res, ctxt =
+          Gas_monad.run
+            ctxt
+            (Script_ir_translator.find_entrypoint
+               ~error_details:(Informative ())
+               arg_type
+               entrypoints
+               entrypoint)
         in
-        let*? (Ex_ty_cstr {ty = script_parameters_ty; _}) =
-          Environment.wrap_tzresult entrypoint_res
-        in
+        let*?@ (Ex_ty_cstr {ty = script_parameters_ty; _}) = entrypoint_res in
         (* Check that the script parameters type matches the one from the
            transaction. *)
-        let*? ctxt =
-          Environment.wrap_tzresult
-            (let open Result_syntax in
-            let* eq, ctxt =
-              Gas_monad.run
-                ctxt
-                (Script_ir_translator.ty_eq
-                   ~error_details:(Informative (-1))
-                   script_parameters_ty
-                   parameters_ty)
-            in
-            let+ Eq = eq in
-            ctxt)
+        let*?@ ctxt =
+          let open Result_syntax in
+          let* eq, ctxt =
+            Gas_monad.run
+              ctxt
+              (Script_ir_translator.ty_eq
+                 ~error_details:(Informative (-1))
+                 script_parameters_ty
+                 parameters_ty)
+          in
+          let+ Eq = eq in
+          ctxt
         in
         return (ctxt, (destination, entrypoint, unparsed_parameters))
     | _ ->
@@ -539,12 +535,12 @@ let make_whitelist_update_output ~outbox_level ~message_index
   @@ Sc_rollup.Outbox.Message.Whitelist_update whitelist_opt
 
 let string_ticket_token ticketer content =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
     @@ Script_string.of_string content
   in
-  let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
+  let*?@ ticketer = Contract.of_b58check ticketer in
   return
     (Ticket_token.Ex_token
        {ticketer; contents_type = Script_typed_ir.string_t; contents})
@@ -1006,12 +1002,11 @@ let test_originating_with_valid_type () =
     let ctxt = Incremental.alpha_ctxt incr in
     let*@ expr, _ctxt = Sc_rollup.parameters_type ctxt rollup in
     let expr = WithExceptions.Option.get ~loc:__LOC__ expr in
-    let*? expr, _ctxt =
-      Environment.wrap_tzresult
-      @@ Script.force_decode_in_context
-           ~consume_deserialization_gas:When_needed
-           ctxt
-           expr
+    let*?@ expr, _ctxt =
+      Script.force_decode_in_context
+        ~consume_deserialization_gas:When_needed
+        ctxt
+        expr
     in
     assert_equal_expr ~loc:__LOC__ (Expr.from_string parameters_ty) expr
   in
@@ -2669,9 +2664,8 @@ let input_included ~snapshot ~full_history_inbox (l, n) =
       history_proof
       (l, n)
   in
-  let*? inbox_message_verified =
+  let*?@ inbox_message_verified =
     Sc_rollup.Inbox.verify_proof (l, n) snapshot proof
-    |> Environment.wrap_tzresult
   in
   return
   @@ Option.map

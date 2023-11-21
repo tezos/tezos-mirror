@@ -365,14 +365,15 @@ let originate_zk_rollup block rollup_account =
 (** {2 Setting's context construction} *)
 
 let fund_account_op block bootstrap account fund counter =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* fund =
     match fund with
     | None -> return Tez.one
     | Some fund ->
         let* source_balance = Context.Contract.balance (B block) bootstrap in
         if Tez.(fund > source_balance) then
-          Lwt.return (Environment.wrap_tzresult Tez.(source_balance -? one))
+          let*?@ result = Tez.(source_balance -? one) in
+          return result
         else return fund
   in
   let+ op =
@@ -1159,7 +1160,7 @@ let expected_witness witness probes ~mode ctxt =
     In the [Application] mode, we do not perform any check on the
     available gas. *)
 let observe ~mode ~deallocated ctxt_pre ctxt_post op =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let check_deallocated ctxt contract =
     let* actxt =
       let+ i =
@@ -1169,8 +1170,8 @@ let observe ~mode ~deallocated ctxt_pre ctxt_post op =
       in
       Incremental.alpha_ctxt i
     in
-    let*! res = Contract.must_be_allocated actxt contract in
-    match Environment.wrap_tzresult res with
+    let*!@ res = Contract.must_be_allocated actxt contract in
+    match res with
     | Ok () ->
         failwith
           "%a should have been deallocated@."

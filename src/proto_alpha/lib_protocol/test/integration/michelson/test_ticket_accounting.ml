@@ -40,7 +40,7 @@ let assert_equal_string_list ~loc msg =
 
 let assert_fail_with ~loc ~msg f =
   let open Lwt_result_wrap_syntax in
-  let*! res = wrap @@ f () in
+  let*!@ res = f () in
   match res with
   | Error [x] ->
       let x = Format.asprintf "%a" Error_monad.pp x in
@@ -213,16 +213,11 @@ let setup ctxt ~key_type ~value_type entries =
       ~value_type
       (List.map (fun (k, v) -> (k, Some v)) entries)
   in
-  let*? key_type_node, ctxt =
-    Environment.wrap_tzresult
-    @@ Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt key_type
+  let*?@ key_type_node, ctxt =
+    Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt key_type
   in
-  let*? value_type_node, ctxt =
-    Environment.wrap_tzresult
-    @@ Script_ir_unparser.unparse_ty
-         ~loc:Micheline.dummy_location
-         ctxt
-         value_type
+  let*?@ value_type_node, ctxt =
+    Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt value_type
   in
   let key_type = Micheline.strip_locations key_type_node in
   let value_type = Micheline.strip_locations value_type_node in
@@ -431,19 +426,17 @@ let ticket_string_list_type =
 let boxed_list = Script_list.of_list
 
 let big_map_type ~key_type ~value_type =
-  Environment.wrap_tzresult
-  @@ Script_typed_ir.big_map_t (-1) key_type value_type
+  Script_typed_ir.big_map_t (-1) key_type value_type
 
-let type_has_tickets ctxt ty =
-  Environment.wrap_tzresult @@ Ticket_scanner.type_has_tickets ctxt ty
+let type_has_tickets ctxt ty = Ticket_scanner.type_has_tickets ctxt ty
 
 (** Test that adding a ticket to a lazy storage diff is picked up. *)
 let assert_ticket_diffs ctxt ~loc ~self_contract ~arg_type ~storage_type ~arg
     ~old_storage ~new_storage ~lazy_storage_diff ~expected_diff
     ~expected_receipt =
   let open Lwt_result_wrap_syntax in
-  let*? arg_type_has_tickets, ctxt = type_has_tickets ctxt arg_type in
-  let*? storage_type_has_tickets, ctxt = type_has_tickets ctxt storage_type in
+  let*?@ arg_type_has_tickets, ctxt = type_has_tickets ctxt arg_type in
+  let*?@ storage_type_has_tickets, ctxt = type_has_tickets ctxt storage_type in
   let*@ ticket_diff, ticket_receipt, ctxt =
     Ticket_accounting.ticket_diffs
       ctxt
@@ -455,9 +448,7 @@ let assert_ticket_diffs ctxt ~loc ~self_contract ~arg_type ~storage_type ~arg
       ~new_storage
       ~lazy_storage_diff
   in
-  let*? ticket_diffs, ctxt =
-    Environment.wrap_tzresult @@ Ticket_token_map.to_list ctxt ticket_diff
-  in
+  let*?@ ticket_diffs, ctxt = Ticket_token_map.to_list ctxt ticket_diff in
   let* () = assert_equal_ticket_diffs ~loc ctxt ticket_diffs expected_diff in
   let expected_receipt =
     List.map
@@ -492,10 +483,10 @@ let string_ticket ticketer contents amount =
 let string_ticket_token = Ticket_helpers.string_ticket_token
 
 let test_diffs_empty () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
   let* contract, ctxt = init () in
-  let*? int_ticket_big_map_ty =
+  let*?@ int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
@@ -655,10 +646,10 @@ let test_diffs_remove_from_storage () =
    - Positive diff
    - Receipt with positive update *)
 let test_diffs_lazy_storage_alloc () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
   let* contract, ctxt = init () in
-  let*? int_ticket_big_map_ty =
+  let*?@ int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
@@ -694,10 +685,10 @@ let test_diffs_lazy_storage_alloc () =
    - Negative diff
    - Receipt with negative update *)
 let test_diffs_remove_from_big_map () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
   let* contract, ctxt = init () in
-  let*? int_ticket_big_map_ty =
+  let*?@ int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
@@ -733,10 +724,10 @@ let test_diffs_remove_from_big_map () =
 
 (** Test copying a big-map. *)
 let test_diffs_copy_big_map () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
   let* contract, ctxt = init () in
-  let*? int_ticket_big_map_ty =
+  let*?@ int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
@@ -789,10 +780,10 @@ let test_diffs_copy_big_map () =
 (** Test that adding and removing items from an existing big-map results
       yield corresponding ticket-token diffs. *)
 let test_diffs_add_to_existing_big_map () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
   let* contract, ctxt = init () in
-  let*? int_ticket_big_map_ty =
+  let*?@ int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   let* old_storage, ctxt =
@@ -860,15 +851,14 @@ let test_diffs_add_to_existing_big_map () =
 
 (** Test a combination of updates. *)
 let test_diffs_args_storage_and_lazy_diffs () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
   let* contract, ctxt = init () in
-  let*? int_ticket_big_map_ty =
+  let*?@ int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
-  let*? (Ty_ex_c list_big_map_pair_type) =
-    Environment.wrap_tzresult
-    @@ pair_t (-1) ticket_string_list_type int_ticket_big_map_ty
+  let*?@ (Ty_ex_c list_big_map_pair_type) =
+    pair_t (-1) ticket_string_list_type int_ticket_big_map_ty
   in
   let* empty_big_map, ctxt =
     empty_big_map ctxt ~key_type:int_t ~value_type:ticket_string_type
@@ -1138,19 +1128,18 @@ let test_update_valid_transfer () =
     let arg = boxed_list [string_ticket ticketer "red" 1] in
     transfer_operation ctxt ~sender:(Contract self) ~destination ~arg_type ~arg
   in
-  let* _, ctxt =
-    let*@ ticket_diffs, ctxt =
-      Ticket_token_map.of_list
-        ctxt
-        ~merge_overlap:(fun _ -> assert false)
-        [(red_token, Z.of_int (-1))]
-    in
-    wrap
-      (Ticket_accounting.update_ticket_balances
-         ctxt
-         ~self_contract:self
-         ~ticket_diffs
-         [operation])
+  let*@ ticket_diffs, ctxt =
+    Ticket_token_map.of_list
+      ctxt
+      ~merge_overlap:(fun _ -> assert false)
+      [(red_token, Z.of_int (-1))]
+  in
+  let*@ _, ctxt =
+    Ticket_accounting.update_ticket_balances
+      ctxt
+      ~self_contract:self
+      ~ticket_diffs
+      [operation]
   in
   (* Once we're done with the update, we expect the balance to have been moved
      from [self] to [destination]. *)

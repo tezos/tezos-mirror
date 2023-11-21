@@ -99,7 +99,9 @@ let assert_equal_merkelized_payload ~__LOC__ ~found ~expected =
   assert_merkelized_payload ~__LOC__ ~payload_hash ~index found
 
 let assert_merkelized_payload_proof_error ~__LOC__ expected_msg result =
-  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult result) (function
+  let open Result_wrap_syntax in
+  let@ result in
+  Assert.error ~loc:__LOC__ result (function
       | Environment.Ecoproto_error
           (Sc_rollup_inbox_merkelized_payload_hashes_repr
            .Merkelized_payload_hashes_proof_error msg) ->
@@ -120,7 +122,9 @@ let assert_equal_history_proof ~__LOC__ found expected =
     found
 
 let assert_inbox_proof_error ~__LOC__ expected_msg result =
-  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult result) (function
+  let open Result_wrap_syntax in
+  let@ result in
+  Assert.error ~loc:__LOC__ result (function
       | Environment.Ecoproto_error (Sc_rollup_inbox_repr.Inbox_proof_error msg)
         ->
           expected_msg = msg
@@ -235,22 +239,23 @@ let gen_payloads_for_levels_and_two_levels_and_two_indexes ?inbox_creation_level
   return (payloads_for_levels, level, index, level', index')
 
 let fill_merkelized_payload history payloads =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* first, payloads =
     match payloads with
     | x :: xs -> return (x, xs)
     | [] -> failwith "empty payloads"
   in
-  let*? history, merkelized_payload =
-    Environment.wrap_tzresult @@ Merkelized_payload_hashes.genesis history first
+  let*?@ history, merkelized_payload =
+    Merkelized_payload_hashes.genesis history first
   in
-
-  Lwt.return @@ Environment.wrap_tzresult
-  @@ List.fold_left_e
-       (fun (history, payloads) payload ->
-         Merkelized_payload_hashes.add_payload history payloads payload)
-       (history, merkelized_payload)
-       payloads
+  let*?@ result =
+    List.fold_left_e
+      (fun (history, payloads) payload ->
+        Merkelized_payload_hashes.add_payload history payloads payload)
+      (history, merkelized_payload)
+      payloads
+  in
+  return result
 
 let construct_merkelized_payload_hashes payloads =
   let history = Merkelized_payload_hashes.History.empty ~capacity:1000L in
@@ -293,7 +298,7 @@ let test_merkelized_payload_hashes_history payloads =
 
 (** Produce a merkelized payload hashes proof and verify it's valid. *)
 let test_merkelized_payload_hashes_proof (payloads, index) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* history, merkelized_payload =
     construct_merkelized_payload_hashes payloads
   in
@@ -315,8 +320,8 @@ let test_merkelized_payload_hashes_proof (payloads, index) =
       ~payload_hash
       target_merkelized_payload
   in
-  let*? proof_ancestor_merkelized, proof_current_merkelized =
-    Environment.wrap_tzresult @@ Merkelized_payload_hashes.verify_proof proof
+  let*?@ proof_ancestor_merkelized, proof_current_merkelized =
+    Merkelized_payload_hashes.verify_proof proof
   in
   let* () =
     assert_equal_merkelized_payload
@@ -438,11 +443,8 @@ let test_inclusion_proof_production (payloads_for_levels, level) =
     Node_inbox.produce_inclusion_proof node_inbox node_inbox_snapshot level
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
-  let*? verified_old_levels_messages =
-    Environment.wrap_tzresult
-    @@ Inbox.Internal_for_tests.verify_inclusion_proof
-         proof
-         proto_inbox_snapshot
+  let*?@ verified_old_levels_messages =
+    Inbox.Internal_for_tests.verify_inclusion_proof proof proto_inbox_snapshot
   in
   assert_equal_history_proof
     ~__LOC__
@@ -491,7 +493,7 @@ let test_empty_inclusion_proof_fails payloads =
 (** A node produces an inbox payloads proof and the protocol verify it. *)
 let test_payloads_proof_production
     ((payloads : payloads_per_level), message_counter) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let payloads_for_levels = [payloads] in
   let exp_message =
     first_after payloads_for_levels payloads.level message_counter |> function
@@ -513,12 +515,11 @@ let test_payloads_proof_production
   in
   (* Verify the produced proof using the {!Protocol_inbox}. *)
   let proto_head_cell_hash = latest_level_proof_hash proto_inbox in
-  let*? verified_input =
-    Environment.wrap_tzresult
-    @@ Inbox.Internal_for_tests.verify_payloads_proof
-         proof
-         proto_head_cell_hash
-         message_counter
+  let*?@ verified_input =
+    Inbox.Internal_for_tests.verify_payloads_proof
+      proof
+      proto_head_cell_hash
+      message_counter
   in
   let* () = assert_equal_payload_option ~__LOC__ proof_input verified_input in
   assert_equal_payload_option ~__LOC__ exp_message verified_input
@@ -727,9 +728,8 @@ let test_inbox_proof_production (payloads_for_levels, level, message_counter) =
   let* () =
     assert_equal_history_proof ~__LOC__ node_inbox_snapshot proto_inbox_snapshot
   in
-  let*? input_in_proof =
-    Environment.wrap_tzresult
-    @@ Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
+  let*?@ input_in_proof =
+    Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
   in
   let* () =
     assert_inbox_message ~__LOC__ input_of_produced_proof input_in_proof
@@ -789,25 +789,22 @@ let test_invalid_inbox_proof_fails
     {!Inbox.add_all_messages}. *)
 let test_messages_are_correctly_added_in_history
     {predecessor_timestamp; predecessor; messages; _} =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let inbox = dumb_init Raw_level.root in
   let messages = List.map (fun message -> Message.External message) messages in
-  let*? payloads_history, _history, _inbox, witness, messages =
-    Environment.wrap_tzresult
-    @@ Inbox.add_all_messages
-         ~first_block:false
-         ~predecessor_timestamp
-         ~predecessor
-         (Inbox.History.empty ~capacity:0L)
-         inbox
-         messages
+  let*?@ payloads_history, _history, _inbox, witness, messages =
+    Inbox.add_all_messages
+      ~first_block:false
+      ~predecessor_timestamp
+      ~predecessor
+      (Inbox.History.empty ~capacity:0L)
+      inbox
+      messages
   in
   List.iteri_es
     (fun i message ->
       let index = Z.of_int i in
-      let*? expected_payload =
-        Environment.wrap_tzresult @@ Message.serialize message
-      in
+      let*?@ expected_payload = Message.serialize message in
       let expected_hash = Message.hash_serialized_message expected_payload in
       let found_merkelized_opt =
         Sc_rollup.Inbox_merkelized_payload_hashes.Internal_for_tests

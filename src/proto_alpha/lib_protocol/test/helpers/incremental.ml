@@ -203,12 +203,12 @@ let check_operation_size ?(check_size = true) op =
               Constants_repr.max_operation_data_length))
 
 let validate_operation ?expect_failure ?check_size st op =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   check_operation_size ?check_size op ;
   let validation_state, application_state = st.state in
   let oph = Operation.hash_packed op in
-  let*! res = validate_operation validation_state oph op in
-  match (expect_failure, Environment.wrap_tzresult res) with
+  let*!@ res = validate_operation validation_state oph op in
+  match (expect_failure, res) with
   | Some _, Ok _ -> failwith "Error expected while validating operation"
   | Some f, Error err ->
       let* () = f err in

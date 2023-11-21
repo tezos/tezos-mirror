@@ -567,7 +567,7 @@ let test_initial_state_hash_arith_pvm () =
       hash
 
 let dummy_internal_transfer address =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Alpha_context.Sc_rollup in
   let* ctxt =
     let* block, _baker, _contract, _src2 = Contract_helpers.init () in
@@ -591,14 +591,12 @@ let dummy_internal_transfer address =
       Bytes_t
       payload
   in
-  let*? payload, _ctxt = Environment.wrap_tzresult result in
+  let*?@ payload, _ctxt = result in
   let transfer =
     Inbox_message.Internal
       (Transfer {payload; sender; source; destination = address})
   in
-  let*? serialized_transfer =
-    Environment.wrap_tzresult (Inbox_message.serialize transfer)
-  in
+  let*?@ serialized_transfer = Inbox_message.serialize transfer in
   return serialized_transfer
 
 let test_filter_internal_message () =

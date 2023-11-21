@@ -97,9 +97,9 @@ let test_consensus_operation_preattestation_for_old_level () =
 
 (** Consensus operation for future round : apply a preattestation with a round in the future *)
 let test_consensus_operation_preattestation_for_future_round () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* _genesis, pred = init_genesis () in
-  let*? round = Environment.wrap_tzresult (Round.of_int 21) in
+  let*?@ round = Round.of_int 21 in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
@@ -109,9 +109,9 @@ let test_consensus_operation_preattestation_for_future_round () =
 
 (** Consensus operation for old round : apply a preattestation with a round in the past *)
 let test_consensus_operation_preattestation_for_old_round () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* _genesis, pred = init_genesis ~policy:(By_round 10) () in
-  let*? round = Environment.wrap_tzresult (Round.of_int 0) in
+  let*?@ round = Round.of_int 0 in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
@@ -145,11 +145,11 @@ let test_unexpected_preattestations_in_blocks () =
 
 (** Round too high : apply a preattestation with a too high round *)
 let test_too_high_round () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* _genesis, pred = init_genesis () in
   let raw_level = Raw_level.of_int32 (Int32.of_int 2) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  let*? round = Environment.wrap_tzresult (Round.of_int 1) in
+  let*?@ round = Round.of_int 1 in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
