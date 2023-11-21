@@ -36,7 +36,8 @@ let octez_codec = "./octez-codec"
 
 let octez_snoop = "./octez-snoop"
 
-let octez_protocol_compiler = "./octez-protocol-compiler"
+let octez_protocol_compiler =
+  Uses.make ~tag:"protocol_compiler" ~path:"./octez-protocol-compiler"
 
 let octez_dal_node = "./octez-dal-node"
 
