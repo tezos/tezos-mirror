@@ -145,6 +145,8 @@ module Parameters = struct
     net_addr : string option;
     mutable net_port : int;
     advertised_net_port : int option;
+    metrics_addr : string option;
+    metrics_port : int;
     rpc_local : bool;
     rpc_host : string;
     rpc_port : int;
@@ -692,9 +694,9 @@ let wait_for_disconnections node disconnections =
   waiter
 
 let create ?runner ?(path = Constant.octez_node) ?name ?color ?data_dir
-    ?event_pipe ?net_addr ?net_port ?advertised_net_port ?(rpc_local = false)
-    ?(rpc_host = "localhost") ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
-    arguments =
+    ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
+    ?metrics_port ?(rpc_local = false) ?(rpc_host = "localhost") ?rpc_port
+    ?rpc_tls ?(allow_all_rpc = true) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -704,6 +706,9 @@ let create ?runner ?(path = Constant.octez_node) ?name ?color ?data_dir
   in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
+  in
+  let metrics_port =
+    match metrics_port with None -> Port.fresh () | Some port -> port
   in
   let arguments = add_default_arguments arguments in
   let default_expected_pow =
@@ -726,6 +731,8 @@ let create ?runner ?(path = Constant.octez_node) ?name ?color ?data_dir
         rpc_host;
         rpc_port;
         rpc_tls;
+        metrics_addr;
+        metrics_port;
         allow_all_rpc;
         default_arguments = arguments;
         arguments;
@@ -787,14 +794,16 @@ let remove_peers_json_file node =
     line arguments needed to spawn a [command] like [run]
     or [replay] for the given [node] and extra [arguments]. *)
 let runlike_command_arguments node command arguments =
-  let net_addr, rpc_addr =
+  let net_addr, rpc_addr, metrics_addr =
     match node.persistent_state.runner with
     | None ->
         ( Option.value ~default:"127.0.0.1" node.persistent_state.net_addr ^ ":",
-          node.persistent_state.rpc_host ^ ":" )
+          node.persistent_state.rpc_host ^ ":",
+          Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
+          ^ ":" )
     | Some _ ->
         (* FIXME spawn an ssh tunnel in case of remote host *)
-        ("0.0.0.0:", "0.0.0.0:")
+        ("0.0.0.0:", "0.0.0.0:", "0.0.0.0:")
   in
   let arguments =
     List.fold_left
@@ -823,6 +832,8 @@ let runlike_command_arguments node command arguments =
   in
   command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
   :: (net_addr ^ string_of_int node.persistent_state.net_port)
+  :: "--metrics-addr"
+  :: (metrics_addr ^ string_of_int node.persistent_state.metrics_port)
   :: (if node.persistent_state.rpc_local then "--local-rpc-addr"
      else "--rpc-addr")
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
@@ -885,8 +896,9 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?rpc_local ?rpc_host ?rpc_port ?rpc_tls ?event_level
-    ?event_sections_levels ?patch_config ?snapshot arguments =
+    ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_local ?rpc_host
+    ?rpc_port ?rpc_tls ?event_level ?event_sections_levels ?patch_config
+    ?snapshot arguments =
   (* The single process argument does not exist in the configuration
      file of the node. It is only known as a command-line option. As a
      consequence, we filter Singleprocess from the list of arguments
@@ -903,6 +915,8 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?event_pipe
       ?net_port
       ?advertised_net_port
+      ?metrics_addr
+      ?metrics_port
       ?rpc_local
       ?rpc_host
       ?rpc_port

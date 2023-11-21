@@ -72,27 +72,61 @@ let dal_parameters () =
 
 (** Start a layer 1 node on the given network, with the given data-dir and
     rpc-port if any. *)
-let start_layer_1_node ~network ?data_dir ?rpc_port ?net_port () =
+let start_layer_1_node ~network ?data_dir ?net_addr ?rpc_addr ?metrics_addr
+    ?net_port ?rpc_port ?metrics_port () =
   let arguments =
     [Node.Network network; Synchronisation_threshold 1; Expected_pow 26]
   in
-  let node = Node.create ?data_dir ?rpc_port ?net_port arguments in
+  let node =
+    Node.create
+      ?data_dir
+      ?rpc_host:rpc_addr
+      ?rpc_port
+      ?net_port
+      ?net_addr
+      ?metrics_addr
+      ?metrics_port
+      arguments
+  in
   let* () = Node.config_reset node arguments in
   let* () = Node.run node arguments in
   let* () = Node.wait_for_ready node in
   return node
 
 (** Start a DAL node with the given information and wait until it's ready. *)
-let start_dal_node ~peers ?data_dir ?rpc_port ?net_port ?public_ip_addr
-    ?producer_profiles ?attester_profiles ?bootstrap_profile node =
-  let listen_addr = Option.map (sf "0.0.0.0:%d") net_port in
+let start_dal_node ~peers ?data_dir ?net_addr ?net_port ?rpc_addr ?rpc_port
+    ?metrics_addr ?metrics_port ?public_ip_addr ?producer_profiles
+    ?attester_profiles ?bootstrap_profile node =
+  let listen_addr =
+    match (net_addr, net_port) with
+    | None, None -> None
+    | Some addr, None -> Some (sf "%s:%d" addr @@ Port.fresh ())
+    | None, Some port -> Some (sf "127.0.0.1:%d" port)
+    | Some addr, Some port -> Some (sf "%s:%d" addr port)
+  in
   let public_addr =
     Option.map
       (fun ip -> Option.fold net_port ~none:ip ~some:(sf "%s:%d" ip))
       public_ip_addr
   in
+  let metrics_addr =
+    match (metrics_addr, metrics_port) with
+    | None, None -> None
+    | Some addr, None -> Some (sf "%s:%d" addr @@ Port.fresh ())
+    | None, Some port -> Some (sf "127.0.0.1:%d" port)
+    | Some addr, Some port -> Some (sf "%s:%d" addr port)
+  in
+
   let dal_node =
-    Dal_node.create ?data_dir ?rpc_port ?listen_addr ?public_addr ~node ()
+    Dal_node.create
+      ?data_dir
+      ?rpc_port
+      ?rpc_host:rpc_addr
+      ?listen_addr
+      ?public_addr
+      ?metrics_addr
+      ~node
+      ()
   in
   let* () =
     Dal_node.init_config
@@ -159,10 +193,26 @@ let scenario_on_teztnet =
     let working_dir = Cli.get_string_opt "working-dir" in
     let public_ip_addr = Cli.get_string_opt "public-ip-addr" in
     let teztnet_network_day = Cli.get_string_opt "teztnet-network-day" in
+
+    (* L1 ports *)
     let net_port = Cli.get_int_opt "net-port" in
-    let dal_net_port = Cli.get_int_opt "dal-net-port" in
     let rpc_port = Cli.get_int_opt "rpc-port" in
+    let metrics_port = Cli.get_int_opt "metrics-port" in
+
+    (* DAL ports *)
+    let dal_net_port = Cli.get_int_opt "dal-net-port" in
     let dal_rpc_port = Cli.get_int_opt "dal-rpc-port" in
+    let dal_metrics_port = Cli.get_int_opt "dal-metrics-port" in
+
+    (* L1 addresses *)
+    let net_addr = Cli.get_string_opt "net-addr" in
+    let rpc_addr = Cli.get_string_opt "rpc-addr" in
+    let metrics_addr = Cli.get_string_opt "metrics-addr" in
+
+    (* DAL addresses *)
+    let dal_net_addr = Cli.get_string_opt "dal-net-addr" in
+    let dal_rpc_addr = Cli.get_string_opt "dal-rpc-addr" in
+    let dal_metrics_addr = Cli.get_string_opt "dal-metrics-addr" in
 
     (* Determine the right network day *)
     let teztnet_network_day =
@@ -179,7 +229,16 @@ let scenario_on_teztnet =
       let network =
         sf "https://teztnets.xyz/%s-%s" network teztnet_network_day
       in
-      start_layer_1_node ~network ?data_dir:data_l1 ?net_port ?rpc_port ()
+      start_layer_1_node
+        ~network
+        ?data_dir:data_l1
+        ?net_addr
+        ?rpc_addr
+        ?metrics_addr
+        ?net_port
+        ?rpc_port
+        ?metrics_port
+        ()
     in
     let client =
       Client.create
@@ -199,8 +258,12 @@ let scenario_on_teztnet =
         ?producer_profiles
         ?attester_profiles
         ?public_ip_addr
+        ?net_addr:dal_net_addr
         ?net_port:dal_net_port
+        ?rpc_addr:dal_rpc_addr
         ?rpc_port:dal_rpc_port
+        ?metrics_addr:dal_metrics_addr
+        ?metrics_port:dal_metrics_port
         l1_node
     in
     (* Prepare airdropper account. Secret key of
