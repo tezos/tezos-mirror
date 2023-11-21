@@ -72,11 +72,22 @@ let dal_parameters () =
 
 (** Start a layer 1 node on the given network, with the given data-dir and
     rpc-port if any. *)
-let start_layer_1_node ~network ?data_dir ?rpc_port ?net_port () =
+let start_layer_1_node ~network ?data_dir ?net_addr ?rpc_addr ?metrics_addr
+    ?net_port ?rpc_port ?metrics_port () =
   let arguments =
     [Node.Network network; Synchronisation_threshold 1; Expected_pow 26]
   in
-  let node = Node.create ?data_dir ?rpc_port ?net_port arguments in
+  let node =
+    Node.create
+      ?data_dir
+      ?rpc_host:rpc_addr
+      ?rpc_port
+      ?net_port
+      ?net_addr
+      ?metrics_addr
+      ?metrics_port
+      arguments
+  in
   let* () = Node.config_reset node arguments in
   let* () = Node.run node arguments in
   let* () = Node.wait_for_ready node in
@@ -163,6 +174,11 @@ let scenario_on_teztnet =
     let dal_net_port = Cli.get_int_opt "dal-net-port" in
     let rpc_port = Cli.get_int_opt "rpc-port" in
     let dal_rpc_port = Cli.get_int_opt "dal-rpc-port" in
+    let metrics_port = Cli.get_int_opt "metrics-port" in
+
+    let net_addr = Cli.get_string_opt "net-addr" in
+    let rpc_addr = Cli.get_string_opt "rpc-addr" in
+    let metrics_addr = Cli.get_string_opt "metrics-addr" in
 
     (* Determine the right network day *)
     let teztnet_network_day =
@@ -179,7 +195,16 @@ let scenario_on_teztnet =
       let network =
         sf "https://teztnets.xyz/%s-%s" network teztnet_network_day
       in
-      start_layer_1_node ~network ?data_dir:data_l1 ?net_port ?rpc_port ()
+      start_layer_1_node
+        ~network
+        ?data_dir:data_l1
+        ?net_addr
+        ?rpc_addr
+        ?metrics_addr
+        ?net_port
+        ?rpc_port
+        ?metrics_port
+        ()
     in
     let client =
       Client.create
