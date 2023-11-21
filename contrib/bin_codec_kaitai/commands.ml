@@ -463,30 +463,43 @@ let commands () =
       @@ stop)
       (fun () dir (cctxt : #Client_context.printer) ->
         let open Lwt_syntax in
-        let* () =
-          List.iter_s
+        let all = Data_encoding.Registration.list () in
+        let all =
+          List.map
             (fun (id, _registered) ->
               (* TODO: avoid this lookup by exporting `t -> introspectable` *)
               match Data_encoding.Registration.find_introspectable id with
               | None ->
                   (* [id] is from iterating over the list of registered encodings *)
                   assert false
-              | Some (Any e) -> (
-                  match
-                    Kaitai_of_data_encoding.Translate.from_data_encoding ~id e
-                  with
-                  | exception _ ->
-                      (* TODO: offer a [result] variant of conversion function *)
-                      cctxt#warning "Failed to generate ksy file for %s" id
-                  | spec ->
-                      let yml = Kaitai.Print.print spec in
+              | Some e -> (id, e))
+            all
+        in
+        let name_of_id id = Kaitai_of_data_encoding.Translate.escape_id id in
+        let* () =
+          List.iter_s
+            (fun (id, Data_encoding.Registration.Any e) ->
+              match
+                Kaitai_of_data_encoding.Translate.from_data_encoding ~id e
+              with
+              | exception e ->
+                  cctxt#warning
+                    "Failed to generate ksy file for %s (%s)"
+                    id
+                    (Printexc.to_string e)
+              | spec -> (
+                  match Kaitai.Print.print spec with
+                  | exception e ->
+                      cctxt#warning
+                        "Failed to print ksy file for %s (%s)"
+                        id
+                        (Printexc.to_string e)
+                  | yml ->
                       Lwt_io.with_file
                         ~mode:Output
-                        (dir ^ "/"
-                        ^ Kaitai_of_data_encoding.Translate.escape_id id
-                        ^ ".ksy")
+                        (dir ^ "/" ^ name_of_id id ^ ".ksy")
                         (fun oc -> Lwt_io.write oc yml)))
-            (Data_encoding.Registration.list ())
+            all
         in
         return_ok_unit);
   ]
