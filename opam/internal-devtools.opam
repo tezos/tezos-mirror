@@ -12,8 +12,11 @@ depends: [
   "ocaml" { >= "4.14" }
   "num"
   "re" { >= "1.9.0" }
-  "octez-protocol-compiler"
   "octez-libs"
+  "octez-shell-libs"
+  "tezos-protocol-alpha"
+  "octez-protocol-alpha-libs"
+  "octez-protocol-compiler"
 ]
 depopts: [
   "utop"
@@ -26,4 +29,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Internal dev tools"
+synopsis: "A script to print protocol context disk usage"
