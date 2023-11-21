@@ -252,7 +252,7 @@ let raw_level_offset_of_round round_durations ~round =
         round_durations
       in
       let roundz = Int64.of_int32 round in
-      let m = Z.of_int64 Int64.(div (mul roundz (pred roundz)) (of_int 2)) in
+      let m = Z.of_int64 Int64.(div (mul roundz (pred roundz)) 2L) in
       Z.(
         add
           (mul
@@ -262,9 +262,8 @@ let raw_level_offset_of_round round_durations ~round =
              (Z.of_int32 round)
              (Z.of_int64 @@ Period_repr.to_seconds first_round_duration)))
     in
-    if Compare.Z.(sum_durations > Z.of_int64 Int64.max_int) then
-      tzfail (Round_too_high round)
-    else return (Z.to_int64 sum_durations)
+    if Z.fits_int64 sum_durations then return (Z.to_int64 sum_durations)
+    else tzfail (Round_too_high round)
 
 type error += Level_offset_too_high of Period_repr.t
 

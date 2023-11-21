@@ -18,8 +18,11 @@
     context where the total supply of the network is in the order of magnitude
     of 2^50 mutez (10^15 mutez)
 *)
+
+(** An issuance bonus is a rational between zero and some [max_bonus]. *)
 type t = private Q.t
 
+(** A [max_bonus] is a value between zero and one. *)
 type max_bonus = private t
 
 val zero : t

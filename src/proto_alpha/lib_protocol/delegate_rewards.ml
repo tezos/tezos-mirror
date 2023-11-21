@@ -110,7 +110,9 @@ module M = struct
     in
     let mutez_base_rewards = Tez_repr.to_mutez base_rewards |> Z.of_int64 in
     let mutez_rewards = Z.(div (mul mutez_base_rewards coeff.num) coeff.den) in
-    Tez_repr.of_mutez_exn (Z.to_int64 mutez_rewards)
+    if Z.fits_int64 mutez_rewards then
+      Tez_repr.of_mutez_exn (Z.to_int64 mutez_rewards)
+    else Tez_repr.max_mutez
 end
 
 open M
