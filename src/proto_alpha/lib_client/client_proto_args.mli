@@ -64,7 +64,7 @@ val delegate_arg : (Signature.Public_key_hash.t option, full) Tezos_clic.arg
 
 val max_priority_arg : (int option, full) Tezos_clic.arg
 
-val minimal_fees_arg : (Tez.tez, full) Tezos_clic.arg
+val minimal_fees_arg : (Tez.t, full) Tezos_clic.arg
 
 val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Tezos_clic.arg
 

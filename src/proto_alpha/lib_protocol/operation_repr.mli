@@ -325,7 +325,7 @@ and _ contents =
      smart). *)
   | Manager_operation : {
       source : Signature.Public_key_hash.t;
-      fee : Tez_repr.tez;
+      fee : Tez_repr.t;
       counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
       gas_limit : Gas_limit_repr.Arith.integral;
@@ -343,7 +343,7 @@ and _ manager_operation =
   (* [Transaction] of some amount to some destination contract. It can
      also be used to execute/call smart-contracts. *)
   | Transaction : {
-      amount : Tez_repr.tez;
+      amount : Tez_repr.t;
       parameters : Script_repr.lazy_expr;
       entrypoint : Entrypoint_repr.t;
       destination : Contract_repr.t;
@@ -354,7 +354,7 @@ and _ manager_operation =
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       script : Script_repr.t;
-      credit : Tez_repr.tez;
+      credit : Tez_repr.t;
     }
       -> Kind.origination manager_operation
   (* [Delegation] to some staking contract (designated by its public

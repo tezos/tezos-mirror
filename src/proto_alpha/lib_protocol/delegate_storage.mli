@@ -128,7 +128,7 @@ val set_frozen_deposits_limit :
   Raw_context.t Lwt.t
 
 val spendable_balance :
-  Raw_context.t -> Signature.public_key_hash -> Tez_repr.tez tzresult Lwt.t
+  Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
 
 val drain :
   Raw_context.t ->

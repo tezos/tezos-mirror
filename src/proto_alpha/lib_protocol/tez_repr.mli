@@ -45,8 +45,6 @@ type error +=
   | Negative_multiplicator of t * int64 (* `Temporary *)
   | Invalid_divisor of t * int64 (* `Temporary *)
 
-type tez = t
-
 val zero : t
 
 val one_mutez : t

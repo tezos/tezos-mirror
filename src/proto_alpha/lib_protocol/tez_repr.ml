@@ -301,8 +301,6 @@ let () =
     (function Invalid_divisor (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Invalid_divisor (a, b))
 
-type tez = t
-
 let compare (Tez_tag x) (Tez_tag y) = compare x y
 
 let ( = ) (Tez_tag x) (Tez_tag y) = x = y
