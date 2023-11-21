@@ -17,7 +17,7 @@ build:
   parallel:
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v18.0", "master"]
+        OCTEZ_BRANCH: ["v18.1", "master"]
   tags:
     - ${ARCH}
   variables:
@@ -29,7 +29,6 @@ build:
     - sudo apt update
   script:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
-    - opam-2.1 pin add -n dune 3.10.0 # workaround! to be erased when octez v18.0 is out
     - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
     - opam-2.1 install -y caqti-lwt caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass --criteria="-changed,-removed"
     - dune build archiver/main.exe server/main.exe
@@ -50,12 +49,12 @@ build:
     - 'zip ./${ARCHIVE} archiver/main.exe server/main.exe'
     - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/${ARCHIVE}"'
 
-release:amd64:v18.0:
+release:amd64:v18.1:
   stage: deploy
   extends: .release
-  dependencies: ["build: [amd64, v18.0]"]
+  dependencies: ["build: [amd64, v18.1]"]
   variables:
-    ARCHIVE: "binaries-amd64-v18.0.zip"
+    ARCHIVE: "binaries-amd64-v18.1.zip"
 
 release:amd64:master:
   stage: deploy
@@ -64,12 +63,12 @@ release:amd64:master:
   variables:
     ARCHIVE: "binaries-amd64-master.zip"
 
-release:arm64:v18.0:
+release:arm64:v18.1:
   stage: deploy
   extends: .release
-  dependencies: ["build: [arm64, v18.0]"]
+  dependencies: ["build: [arm64, v18.1]"]
   variables:
-    ARCHIVE: "binaries-arm64-v18.0.zip"
+    ARCHIVE: "binaries-arm64-v18.1.zip"
 
 release:arm64:master:
   stage: deploy
@@ -84,7 +83,7 @@ docker:
   parallel:
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v18.0", "master"]
+        OCTEZ_BRANCH: ["v18.1", "master"]
         TARGET: ["server", "archiver"]
   needs:
     - job: "build"
@@ -115,7 +114,7 @@ manifest:
   image: docker
   parallel:
     matrix:
-      - OCTEZ_BRANCH: ["v18.0", "master"]
+      - OCTEZ_BRANCH: ["v18.1", "master"]
         TARGET: ["server", "archiver"]
   variables:
     ARCH: "amd64 arm64"
