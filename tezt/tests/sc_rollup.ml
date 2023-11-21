@@ -5074,7 +5074,12 @@ let test_multiple_batcher_key ~kind =
     ~kind
     {
       variant = None;
-      tags = ["node"; "mode"; "batcher"];
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3014
+
+         Test is flaky and it seems to be related to this issue. When
+         investigating it seems that the sink used by the octez node
+         has a race condition in between events. *)
+      tags = [Tag.flaky; "node"; "mode"; "batcher"];
       description = "multiple keys set for batcher";
     }
   @@ fun protocol sc_rollup tezos_node client ->
