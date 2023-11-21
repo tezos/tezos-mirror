@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -41,7 +42,7 @@ let call_contract ~source ~contract ?entrypoint ~arg block =
   in
   Block.bake ~operation block
 
-let assert_ticket_balance ~ticketer ~expected_balance owner block =
+let assert_ticket_balance ~loc ~ticketer ~expected_balance owner block =
   let open Lwt_result_wrap_syntax in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
@@ -52,7 +53,7 @@ let assert_ticket_balance ~ticketer ~expected_balance owner block =
   let*@ key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
   let*@ balance_opt, _ctxt = Ticket_balance.get_balance ctxt key_hash in
   let balance = Option.value ~default:Z.zero balance_opt in
-  Assert.equal_z ~loc:__LOC__ balance (Z.of_int expected_balance)
+  Assert.equal_z ~loc balance (Z.of_int expected_balance)
 
 let ticket_boomerang_script =
   {|
@@ -127,6 +128,7 @@ let test_spending ~direct_ticket_spending_enable () =
   in
   let* () =
     assert_ticket_balance
+      ~loc:__LOC__
       ~ticketer:boomerang
       ~expected_balance:0
       (Destination.Contract implicit)
@@ -137,34 +139,35 @@ let test_spending ~direct_ticket_spending_enable () =
   in
   let* () =
     assert_ticket_balance
+      ~loc:__LOC__
       ~ticketer:boomerang
       ~expected_balance:1
       (Destination.Contract implicit)
       block
   in
-  let* block =
-    let arg = Printf.sprintf "Pair %S Unit 1" boomerang_str in
-    call_contract ~source:implicit ~contract:consumer ~arg block
-  in
-  let _destinations contract_hash rollup_addr =
-    Destination.
-      [
-        Contract implicit;
-        Contract (Originated contract_hash);
-        Sc_rollup rollup_addr;
-      ]
-  in
-  let (_ : Block.t) = block in
-  return_unit
+  let arg = sf "Pair %S Unit 1" boomerang_str in
+  if direct_ticket_spending_enable then
+    let* block = call_contract ~source:implicit ~contract:consumer ~arg block in
+    assert_ticket_balance
+      ~loc:__LOC__
+      ~ticketer:boomerang
+      ~expected_balance:0
+      (Destination.Contract implicit)
+      block
+  else
+    let*! res = call_contract ~source:implicit ~contract:consumer ~arg block in
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Script_interpreter.Bad_contract_parameter _ -> true
+        | _ -> false)
 
 let tests =
   [
     Tztest.tztest
-      "Test ticket spending from implicit accounts (feature enabled)."
+      "Test ticket spending from implicit accounts (feature enabled)"
       `Quick
       (test_spending ~direct_ticket_spending_enable:true);
     Tztest.tztest
-      "Test ticket spending from implicit accounts (feature disabled)."
+      "Test ticket spending from implicit accounts (feature disabled)"
       `Quick
       (test_spending ~direct_ticket_spending_enable:false);
   ]
