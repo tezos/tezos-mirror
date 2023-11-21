@@ -34,6 +34,8 @@ type repr = t
 
 type t = Tez_tag of repr [@@ocaml.unboxed]
 
+let wrap t = Tez_tag t [@@ocaml.inline always]
+
 type error +=
   | Addition_overflow of t * t (* `Temporary *)
   | Subtraction_underflow of t * t (* `Temporary *)
@@ -79,7 +81,7 @@ let of_string s =
       String.init 6 (fun i -> if Compare.Int.(i < len) then s.[i] else '0')
     in
     let prepared = remove_commas left ^ pad_to_six (remove_commas right) in
-    Option.map (fun i -> Tez_tag i) (Int64.of_string_opt prepared)
+    Option.map wrap (Int64.of_string_opt prepared)
   in
   match String.split_on_char '.' s with
   | [left; right] ->
