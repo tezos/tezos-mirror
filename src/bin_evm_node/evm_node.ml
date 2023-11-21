@@ -268,7 +268,7 @@ let proxy_command =
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting () in
       let* config =
-        Cli.create_or_read_config
+        Cli.create_or_read_proxy_config
           ~data_dir
           ~devmode
           ?rpc_addr
@@ -279,7 +279,7 @@ let proxy_command =
           ~verbose
           ()
       in
-      let* () = Configuration.save ~force:true ~data_dir config in
+      let* () = Configuration.save_proxy ~force:true ~data_dir config in
       let* () =
         if not config.devmode then
           let* rollup_config = rollup_node_config_prod ~rollup_node_endpoint in
