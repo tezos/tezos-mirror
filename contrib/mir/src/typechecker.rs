@@ -1286,7 +1286,49 @@ pub(crate) fn typecheck_value<'a>(
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::KeyHash(KeyHash::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::KeyHash, e))?)
         }
+        (
+            T::Lambda(tys),
+            raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
+        ) => {
+            let (in_ty, out_ty) = tys.as_ref();
+            TV::Lambda(typecheck_lambda(
+                instrs,
+                ctx,
+                in_ty.clone(),
+                out_ty.clone(),
+                matches!(raw, V::App(Prim::Lambda_rec, ..)),
+            )?)
+        }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
+    })
+}
+
+fn typecheck_lambda<'a>(
+    instrs: &'a [Micheline<'a>],
+    ctx: &mut Ctx,
+    in_ty: Type,
+    out_ty: Type,
+    recursive: bool,
+) -> Result<Lambda<'a>, TcError> {
+    let stk = &mut if recursive {
+        let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
+        tc_stk![self_ty, in_ty]
+    } else {
+        tc_stk![in_ty]
+    };
+    let code = typecheck(instrs, ctx, None, stk)?;
+    unify_stacks(ctx, stk, tc_stk![out_ty])?;
+    let micheline_code = Micheline::Seq(instrs);
+    Ok(if recursive {
+        Lambda::LambdaRec {
+            micheline_code,
+            code,
+        }
+    } else {
+        Lambda::Lambda {
+            micheline_code,
+            code,
+        }
     })
 }
 
@@ -4114,6 +4156,108 @@ mod typecheck_tests {
                 "App(Unit, [], [])".to_owned(),
                 Type::new_lambda(Type::Unit, Type::Unit)
             ))
+        );
+    }
+
+    #[test]
+    fn push_lambda() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) { DROP ; UNIT }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Lambda(Lambda::Lambda {
+                micheline_code: seq! { app!(DROP); app!(UNIT) },
+                code: vec![Drop(None), Unit]
+            })))
+        );
+    }
+
+    #[test]
+    fn push_lambda_bad_result() {
+        assert_eq!(
+            parse("PUSH (lambda unit int) { DROP ; UNIT }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::StacksNotEqual(
+                stk![Type::Unit],
+                stk![Type::Int],
+                TypesNotEqual(Type::Unit, Type::Int).into()
+            ))
+        );
+    }
+
+    #[test]
+    fn push_lambda_bad_input() {
+        assert_eq!(
+            parse("PUSH (lambda int unit) { IF { UNIT } { UNIT } }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF,
+                stack: stk![Type::Int],
+                reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
+            })
+        );
+    }
+
+    #[test]
+    fn push_lambda_with_self() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) { SELF }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+            Err(TcError::SelfForbidden)
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec_with_self() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) (Lambda_rec { SELF })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+            Err(TcError::SelfForbidden)
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) (Lambda_rec { DIP { DROP } })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Lambda(Lambda::LambdaRec {
+                micheline_code: seq! { app!(DIP[seq! { app!(DROP) } ]) },
+                code: vec![Dip(None, vec![Drop(None)])]
+            })))
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec_bad_result() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) (Lambda_rec { DROP })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::StacksNotEqual(
+                stk![Type::new_lambda(Type::Unit, Type::Unit)],
+                stk![Type::Unit],
+                TypesNotEqual(Type::new_lambda(Type::Unit, Type::Unit), Type::Unit).into()
+            ))
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec_bad_input() {
+        assert_eq!(
+            parse("PUSH (lambda int unit) (Lambda_rec { IF { UNIT } { UNIT }; DIP { DROP } })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF,
+                stack: stk![Type::new_lambda(Type::Int, Type::Unit), Type::Int],
+                reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
+            })
         );
     }
 }
