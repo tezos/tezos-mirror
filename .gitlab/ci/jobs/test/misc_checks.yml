@@ -27,6 +27,27 @@ kaitai_checks:
   script:
     - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files` and commit the resulting diff.' ; false)
 
+kaitai_e2e_checks:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_client_libs_dependencies
+  # These tests are not flaky at all so we overwrite the retry value
+  retry: 0
+  needs: [kaitai_checks]
+  script:
+    - . ./scripts/version.sh
+    # TODO: https://gitlab.com/tezos/tezos/-/issues/5026
+    #       As observed for the `unit:js_components` running `npm i`
+    #       everytime we run a job is inefficient.
+    #
+    #       The benefit of this approach is that we specify node version
+    #       and npm dependencies (package.json) in one place, and that the local
+    #       environment is then the same as CI environment.
+    - . ./scripts/install_build_deps.js.sh
+    - ./contrib/kaitai-struct-files/kaitai_e2e.sh
+      contrib/kaitai-struct-files
+      contrib/kaitai-struct-files/input
+
 check_lift_limits_patch:
   extends:
     - .test_template
