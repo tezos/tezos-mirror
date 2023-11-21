@@ -27,6 +27,6 @@ The Octez Node daemons
 
 %post 
 getent group tezos >/dev/null 2>&1 || groupadd tezos
-getent passwd tezos >/dev/null 2>&1 || useradd -g tezos tezos
+getent passwd tezos >/dev/null 2>&1 || useradd -g tezos -d /var/tezos tezos
 /usr/bin/systemctl daemon-reload
 
