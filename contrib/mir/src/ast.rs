@@ -12,6 +12,7 @@ pub mod micheline;
 pub mod michelson_address;
 pub mod michelson_key;
 pub mod michelson_key_hash;
+pub mod michelson_lambda;
 pub mod michelson_list;
 pub mod michelson_signature;
 pub mod or;
@@ -29,6 +30,7 @@ pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use michelson_address::*;
 pub use michelson_key::Key;
 pub use michelson_key_hash::KeyHash;
+pub use michelson_lambda::Lambda;
 pub use michelson_list::MichelsonList;
 pub use michelson_signature::Signature;
 pub use or::Or;
@@ -147,6 +149,7 @@ pub enum TypedValue {
     Bytes(Vec<u8>),
     Key(Key),
     Signature(Signature),
+    Lambda(Lambda),
     KeyHash(KeyHash),
     Operation(Box<OperationInfo>),
 }
@@ -194,6 +197,7 @@ pub fn typed_value_to_value_optimized_legacy<'a>(
         TV::Bytes(x) => V::Bytes(x),
         TV::Key(k) => V::Bytes(k.to_bytes_vec()),
         TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
+        TV::Lambda(_) => todo!(),
         TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
         TV::Contract(x) => go(TV::Address(x)),
         TV::Operation(operation_info) => match operation_info.operation {

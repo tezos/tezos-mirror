@@ -371,9 +371,15 @@ pub mod interpret_cost {
             .as_gas_cost()?,
             (V::Or(..), _) => incomparable(),
 
-            (V::List(..) | V::Set(..) | V::Map(..) | V::Contract(_) | V::Operation(_), _) => {
-                incomparable()
-            }
+            (
+                V::List(..)
+                | V::Set(..)
+                | V::Map(..)
+                | V::Contract(_)
+                | V::Operation(_)
+                | V::Lambda(_),
+                _,
+            ) => incomparable(),
         })
     }
 
