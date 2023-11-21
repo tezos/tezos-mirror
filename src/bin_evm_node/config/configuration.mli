@@ -16,6 +16,14 @@ type log_filter_config = {
 
 type proxy = {rollup_node_endpoint : Uri.t}
 
+type sequencer = {
+  rollup_node_endpoint : Uri.t;
+      (** Rollup node endpoint used to make blueprints available and
+          monitor the delayed inbox. *)
+  kernel : string;  (** Path to the kernel to execute. *)
+  preimages : string;  (** Path to the preimages directory. *)
+}
+
 type 'a t = {
   rpc_addr : string;
   rpc_port : int;
@@ -40,8 +48,15 @@ val config_filename : data_dir:string -> string
     overwritten. *)
 val save_proxy : force:bool -> data_dir:string -> proxy t -> unit tzresult Lwt.t
 
+(** Same as {!save_proxy} but for the sequencer configuration. *)
+val save_sequencer :
+  force:bool -> data_dir:string -> sequencer t -> unit tzresult Lwt.t
+
 (** [load_proxy ~data_dir] loads a proxy configuration stored in [data_dir]. *)
 val load_proxy : data_dir:string -> proxy t tzresult Lwt.t
+
+(** Same as {!load_proxy} but for the sequencer configuration. *)
+val load_sequencer : data_dir:string -> sequencer t tzresult Lwt.t
 
 module Cli : sig
   val create_proxy :
@@ -57,6 +72,21 @@ module Cli : sig
     unit ->
     proxy t
 
+  val create_sequencer :
+    devmode:bool ->
+    ?rpc_addr:string ->
+    ?rpc_port:int ->
+    ?debug:bool ->
+    ?cors_origins:string trace ->
+    ?cors_headers:string trace ->
+    ?log_filter:log_filter_config ->
+    verbose:bool ->
+    ?rollup_node_endpoint:Uri.t ->
+    ?kernel:string ->
+    ?preimages:string ->
+    unit ->
+    sequencer t
+
   val create_or_read_proxy_config :
     data_dir:string ->
     devmode:bool ->
@@ -70,4 +100,20 @@ module Cli : sig
     rollup_node_endpoint:Uri.t ->
     unit ->
     proxy t tzresult Lwt.t
+
+  val create_or_read_sequencer_config :
+    data_dir:string ->
+    devmode:bool ->
+    ?rpc_addr:string ->
+    ?rpc_port:int ->
+    ?debug:bool ->
+    ?cors_origins:string trace ->
+    ?cors_headers:string trace ->
+    ?log_filter:log_filter_config ->
+    verbose:bool ->
+    ?rollup_node_endpoint:Uri.t ->
+    ?kernel:string ->
+    ?preimages:string ->
+    unit ->
+    sequencer t tzresult Lwt.t
 end

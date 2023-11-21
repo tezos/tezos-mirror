@@ -13,6 +13,12 @@ type log_filter_config = {
 
 type proxy = {rollup_node_endpoint : Uri.t}
 
+type sequencer = {
+  rollup_node_endpoint : Uri.t;
+  kernel : string;
+  preimages : string;
+}
+
 type 'a t = {
   rpc_addr : string;
   rpc_port : int;
@@ -51,6 +57,13 @@ let default default_mode =
 
 let default_proxy = {rollup_node_endpoint = Uri.empty}
 
+let default_sequencer =
+  {
+    kernel = "sequencer.wasm";
+    preimages = "_evm_installer_preimages";
+    rollup_node_endpoint = Uri.empty;
+  }
+
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
   conv
@@ -66,10 +79,29 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
 let encoding_proxy =
   let open Data_encoding in
   conv
-    (fun {rollup_node_endpoint} -> Uri.to_string rollup_node_endpoint)
+    (fun ({rollup_node_endpoint} : proxy) -> Uri.to_string rollup_node_endpoint)
     (fun rollup_node_endpoint ->
       {rollup_node_endpoint = Uri.of_string rollup_node_endpoint})
     (obj1
+       (dft
+          "rollup_node_endpoint"
+          string
+          (Uri.to_string default_proxy.rollup_node_endpoint)))
+
+let encoding_sequencer =
+  let open Data_encoding in
+  conv
+    (fun {kernel; preimages; rollup_node_endpoint} ->
+      (kernel, preimages, Uri.to_string rollup_node_endpoint))
+    (fun (kernel, preimages, rollup_node_endpoint) ->
+      {
+        kernel;
+        preimages;
+        rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
+      })
+    (obj3
+       (dft "kernel" string default_sequencer.kernel)
+       (dft "preimages" string default_sequencer.preimages)
        (dft
           "rollup_node_endpoint"
           string
@@ -148,6 +180,10 @@ let save_proxy ~force ~data_dir config =
   let encoding = encoding ~default_mode:default_proxy encoding_proxy in
   save ~force ~data_dir encoding config
 
+let save_sequencer ~force ~data_dir config =
+  let encoding = encoding ~default_mode:default_sequencer encoding_sequencer in
+  save ~force ~data_dir encoding config
+
 let load ~data_dir encoding =
   let open Lwt_result_syntax in
   let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
@@ -156,6 +192,10 @@ let load ~data_dir encoding =
 
 let load_proxy ~data_dir =
   let encoding = encoding ~default_mode:default_proxy encoding_proxy in
+  load ~data_dir encoding
+
+let load_sequencer ~data_dir =
+  let encoding = encoding ~default_mode:default_sequencer encoding_sequencer in
   load ~data_dir encoding
 
 module Cli = struct
@@ -187,6 +227,30 @@ module Cli = struct
       ~verbose
       ~mode:{rollup_node_endpoint}
 
+  let create_sequencer ~devmode ?rpc_addr ?rpc_port ?debug ?cors_origins
+      ?cors_headers ?log_filter ~verbose ?rollup_node_endpoint ?kernel
+      ?preimages =
+    let mode =
+      {
+        rollup_node_endpoint =
+          Option.value
+            ~default:default_sequencer.rollup_node_endpoint
+            rollup_node_endpoint;
+        kernel = Option.value ~default:default_sequencer.kernel kernel;
+        preimages = Option.value ~default:default_sequencer.preimages preimages;
+      }
+    in
+    create
+      ~devmode
+      ?rpc_addr
+      ?rpc_port
+      ?debug
+      ?cors_origins
+      ?cors_headers
+      ?log_filter
+      ~verbose
+      ~mode
+
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?debug
       ?cors_origins ?cors_headers ?log_filter ~verbose ~mode configuration =
     {
@@ -210,6 +274,31 @@ module Cli = struct
       match rollup_node_endpoint with
       | Some rollup_node_endpoint -> {rollup_node_endpoint}
       | None -> configuration.mode
+    in
+    patch_configuration_from_args
+      ~devmode
+      ?rpc_addr
+      ?rpc_port
+      ?debug
+      ?cors_origins
+      ?cors_headers
+      ?log_filter
+      ~verbose
+      ~mode
+      configuration
+
+  let patch_sequencer_configuration_from_args ~devmode ?rpc_addr ?rpc_port
+      ?debug ?cors_origins ?cors_headers ?log_filter ~verbose
+      ?rollup_node_endpoint ?kernel ?preimages configuration =
+    let mode =
+      {
+        rollup_node_endpoint =
+          Option.value
+            ~default:configuration.mode.rollup_node_endpoint
+            rollup_node_endpoint;
+        kernel = Option.value ~default:configuration.mode.kernel kernel;
+        preimages = Option.value ~default:configuration.mode.preimages preimages;
+      }
     in
     patch_configuration_from_args
       ~devmode
@@ -291,5 +380,27 @@ module Cli = struct
       ~patch_configuration_from_args:
         (patch_proxy_configuration_from_args ~rollup_node_endpoint)
       ~create:(create_proxy ~rollup_node_endpoint)
+      ()
+
+  let create_or_read_sequencer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
+      ?debug ?cors_origins ?cors_headers ?log_filter ~verbose
+      ?rollup_node_endpoint ?kernel ?preimages () =
+    create_or_read_config
+      ~data_dir
+      ~devmode
+      ?rpc_addr
+      ?rpc_port
+      ?debug
+      ?cors_origins
+      ?cors_headers
+      ?log_filter
+      ~verbose
+      ~load:load_sequencer
+      ~patch_configuration_from_args:
+        (patch_sequencer_configuration_from_args
+           ?rollup_node_endpoint
+           ?kernel
+           ?preimages)
+      ~create:(create_sequencer ?rollup_node_endpoint ?kernel ?preimages)
       ()
 end
