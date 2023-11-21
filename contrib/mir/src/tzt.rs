@@ -75,7 +75,7 @@ fn typecheck_stack(stk: Vec<(Micheline, Micheline)>) -> Result<Vec<(Type, TypedV
     stk.into_iter()
         .map(|(t, v)| {
             let t = parse_ty(&mut Ctx::default(), &t)?;
-            let tc_val = typecheck_value(&mut Default::default(), &t, &v)?;
+            let tc_val = typecheck_value(&v, &mut Default::default(), &t)?;
             Ok((t, tc_val))
         })
         .collect()
@@ -143,7 +143,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             chain_id: m_chain_id
                 .map(|v| {
                     Ok::<_, TcError>(irrefutable_match!(
-                        typecheck_value(&mut Ctx::default(), &Type::ChainId, &v)?;
+                        typecheck_value(&v, &mut Ctx::default(), &Type::ChainId)?;
                         TypedValue::ChainId
                     ))
                 })
@@ -155,7 +155,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 .map(|v| {
                     Ok::<_, TcError>(
                         irrefutable_match!(
-                            typecheck_value(&mut Ctx::default(), &Type::Address, &v)?;
+                            typecheck_value(&v, &mut Ctx::default(), &Type::Address)?;
                             TypedValue::Address
                         )
                         .hash,

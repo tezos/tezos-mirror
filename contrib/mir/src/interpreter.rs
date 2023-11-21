@@ -44,7 +44,7 @@ impl ContractScript {
         let in_ty = Type::new_pair(self.parameter.clone(), self.storage.clone());
         let in_val = &[parameter, storage];
         let in_val = Micheline::App(Prim::Pair, in_val, vec![]);
-        let tc_val = typecheck_value(ctx, &in_ty, &in_val)?;
+        let tc_val = typecheck_value(&in_val, ctx, &in_ty)?;
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, &mut stack)?;
         use TypedValue as V;

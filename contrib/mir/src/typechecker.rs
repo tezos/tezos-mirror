@@ -135,7 +135,7 @@ impl Micheline<'_> {
         value_type: &Micheline,
     ) -> Result<TypedValue, TcError> {
         let ty = parse_ty(ctx, value_type)?;
-        typecheck_value(ctx, &ty, self)
+        typecheck_value(self, ctx, &ty)
     }
 
     /// Typechecks `Micheline` as an instruction (or a sequence of instruction),
@@ -702,7 +702,7 @@ pub(crate) fn typecheck_instruction(
         (App(PUSH, [t, v], _), ..) => {
             let t = parse_ty(ctx, t)?;
             t.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
-            let v = typecheck_value(ctx, &t, v)?;
+            let v = typecheck_value(v, ctx, &t)?;
             stack.push(t);
             I::Push(v)
         }
@@ -863,9 +863,9 @@ pub(crate) fn typecheck_instruction(
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
 /// illegal types like `set operation` or `contract operation`.
 pub(crate) fn typecheck_value(
+    v: &Micheline,
     ctx: &mut Ctx,
     t: &Type,
-    v: &Micheline,
 ) -> Result<TypedValue, TcError> {
     use Micheline as V;
     use Type as T;
@@ -881,30 +881,30 @@ pub(crate) fn typecheck_value(
         (T::Unit, V::App(Prim::Unit, [], _)) => TV::Unit,
         (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _)) if !rest.is_empty() => {
             let (tl, tr) = pt.as_ref();
-            let l = typecheck_value(ctx, tl, vl)?;
+            let l = typecheck_value(vl, ctx, tl)?;
             let r = match rest {
-                [vr] => typecheck_value(ctx, tr, vr)?,
-                vrs => typecheck_value(ctx, tr, &V::App(Prim::Pair, vrs, vec![]))?,
+                [vr] => typecheck_value(vr, ctx, tr)?,
+                vrs => typecheck_value(&V::App(Prim::Pair, vrs, vec![]), ctx, tr)?,
             };
             TV::new_pair(l, r)
         }
         (T::Or(ot), V::App(prim @ (Prim::Left | Prim::Right), [val], _)) => {
             let (tl, tr) = ot.as_ref();
             let typed_val = match prim {
-                Prim::Left => crate::ast::Or::Left(typecheck_value(ctx, tl, val)?),
-                Prim::Right => crate::ast::Or::Right(typecheck_value(ctx, tr, val)?),
+                Prim::Left => crate::ast::Or::Left(typecheck_value(val, ctx, tl)?),
+                Prim::Right => crate::ast::Or::Right(typecheck_value(val, ctx, tr)?),
                 _ => unreachable!(),
             };
             TV::new_or(typed_val)
         }
         (T::Option(ty), V::App(Prim::Some, [v], _)) => {
-            let v = typecheck_value(ctx, ty, v)?;
+            let v = typecheck_value(v, ctx, ty)?;
             TV::new_option(Some(v))
         }
         (T::Option(_), V::App(Prim::None, [], _)) => TV::new_option(None),
         (T::List(ty), V::Seq(vs)) => TV::List(
             vs.iter()
-                .map(|v| typecheck_value(ctx, ty, v))
+                .map(|v| typecheck_value(v, ctx, ty))
                 .collect::<Result<_, TcError>>()?,
         ),
         (T::Map(m), V::Seq(vs)) => {
@@ -912,8 +912,8 @@ pub(crate) fn typecheck_value(
             let tc_elt = |v: &Micheline| -> Result<(TypedValue, TypedValue), TcError> {
                 match v {
                     Micheline::App(Prim::Elt, [k, v], _) => {
-                        let k = typecheck_value(ctx, tk, k)?;
-                        let v = typecheck_value(ctx, tv, v)?;
+                        let k = typecheck_value(k, ctx, tk)?;
+                        let v = typecheck_value(v, ctx, tv)?;
                         Ok((k, v))
                     }
                     _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), t.clone())),
@@ -955,7 +955,7 @@ pub(crate) fn typecheck_value(
             TV::Address(Address::from_bytes(bs)?)
         }
         (T::Contract(ty), addr) => {
-            let t_addr = irrefutable_match!(typecheck_value(ctx, &T::Address, addr)?; TV::Address);
+            let t_addr = irrefutable_match!(typecheck_value(addr, ctx, &T::Address)?; TV::Address);
             match t_addr.hash {
                 AddressHash::Tz1(_)
                 | AddressHash::Tz2(_)
@@ -1421,7 +1421,7 @@ mod typecheck_tests {
     #[test]
     fn string_values() {
         assert_eq!(
-            typecheck_value(&mut Ctx::default(), &Type::String, &"foo".into()),
+            typecheck_value(&"foo".into(), &mut Ctx::default(), &Type::String),
             Ok(TypedValue::String("foo".to_owned()))
         )
     }
