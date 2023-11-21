@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start/stop the Octez Bakers and Accusers
+# Start/stop the Octez VDF daemon
 #
 ### BEGIN INIT INFO
 # Provides:          octez-vdf
@@ -13,8 +13,6 @@
 # Description:       The Octez VDF service inserts calculations into the
 #		     blockchain to improve randomness.
 ### END INIT INFO
-
-set -ue
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
 export DESC="octez vdf"
