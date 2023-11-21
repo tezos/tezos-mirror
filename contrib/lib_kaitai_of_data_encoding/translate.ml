@@ -220,6 +220,19 @@ let rec seq_field_of_data_encoding :
       let size_id = "len_" ^ id in
       let size_attr = Ground.Attr.binary_length_kind ~id:size_id kind in
       (state, [size_attr; Ground.Attr.string ~id (Dynamic size_id)])
+  | Padded (encoding, pad) ->
+      let state, attrs = seq_field_of_data_encoding state encoding id in
+      let pad_attr =
+        let id = id ^ "_padding" in
+        let doc =
+          {
+            Helpers.default_doc_spec with
+            summary = Some "This field is for padding, ignore";
+          }
+        in
+        {(Ground.Attr.bytes ~id (Fixed pad)) with doc}
+      in
+      (state, attrs @ [pad_attr])
   | N ->
       let state = add_type state Ground.Type.n_chunk in
       let state = add_type state Ground.Type.n in
@@ -333,7 +346,6 @@ let rec seq_field_of_data_encoding :
         in
         (state, [attr])
   | String_enum _ -> failwith "String_enum not implemented"
-  | Padded _ -> failwith "Padded not implemented"
 
 and seq_field_of_tups :
     type a.
