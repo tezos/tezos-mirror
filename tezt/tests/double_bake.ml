@@ -136,6 +136,7 @@ let double_bake =
     ~__FILE__
     ~title:"double baking with accuser"
     ~tags:["double"; "baking"; "accuser"; "node"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let log_step counter msg =
     let color = Log.Color.(bold ++ FG.blue) in

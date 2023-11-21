@@ -68,7 +68,7 @@ let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner
   in
   let accuser =
     create
-      ~path:(Protocol.accuser protocol)
+      ~path:(Uses.path (Protocol.accuser protocol))
       ?name:(Some name)
       ?color
       ?event_pipe

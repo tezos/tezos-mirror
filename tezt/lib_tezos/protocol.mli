@@ -83,7 +83,7 @@ val protocol_zero_hash : string
 val parameter_file : ?constants:constants -> t -> string
 
 (** Get the path of the accuser of a protocol, such as ["./octez-accuser-alpha"]. *)
-val accuser : t -> string
+val accuser : t -> Uses.t
 
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
 val baker : t -> string

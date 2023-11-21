@@ -73,7 +73,11 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
 
-let accuser proto = "./octez-accuser-" ^ daemon_name proto
+let protocol_dependent_uses ~tag ~path protocol =
+  let protocol = daemon_name protocol in
+  Uses.make ~tag:(tag ^ String.lowercase_ascii protocol) ~path:(path ^ protocol)
+
+let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
 let baker proto = "./octez-baker-" ^ daemon_name proto
 
