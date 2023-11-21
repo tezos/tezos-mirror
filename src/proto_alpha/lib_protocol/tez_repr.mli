@@ -72,9 +72,6 @@ val ( /? ) : t -> int64 -> t tzresult
 
 val div2 : t -> t
 
-(** [div2_sub tez] returns [(⌊tez / 2⌋, tez - ⌊tez / 2⌋)]. *)
-val div2_sub : t -> t * t
-
 (** [mul_ratio ~rounding tez ~num ~den] returns [tez * num / den] without failing
     when [tez * num] overflows.
     [rounding] controls the rounding of the division. *)
