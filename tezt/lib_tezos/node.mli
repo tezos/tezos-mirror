@@ -144,6 +144,8 @@ val create :
   ?net_addr:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
   ?rpc_local:bool ->
   ?rpc_host:string ->
   ?rpc_port:int ->
@@ -565,6 +567,8 @@ val init :
   ?event_pipe:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
   ?rpc_local:bool ->
   ?rpc_host:string ->
   ?rpc_port:int ->
