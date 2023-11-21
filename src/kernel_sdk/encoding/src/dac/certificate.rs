@@ -18,7 +18,9 @@ use super::SlicePageError;
 use super::V0SliceContentPage;
 use super::V0SliceHashPage;
 use super::MAX_PAGE_SIZE;
-use tezos_crypto_rs::hash::{BlsSignature, PublicKeyBls};
+use tezos_crypto_rs::hash::BlsSignature;
+#[cfg(feature = "bls")]
+use tezos_crypto_rs::hash::PublicKeyBls;
 use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::encoding::HasEncoding;
@@ -99,6 +101,7 @@ impl Certificate {
     /// For a [`V0Certificate`], the aggregated signature is verified against the public keys
     /// of the committee members that have signed the root hash.
     /// This set is determined by the witness field of the certificate.
+    #[cfg(feature = "bls")]
     pub fn verify(
         &self,
         committee_members_pks: &[PublicKeyBls],

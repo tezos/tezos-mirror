@@ -18,12 +18,13 @@ path = "../core"
 version = "0.2.1"
 
 [dependencies.tezos_crypto_rs]
-version = "0.5"
+version = "0.5.2"
 default-features = false
 optional = true
 
 [dependencies.tezos_data_encoding]
-version = "0.5"
+version = "0.5.2"
+default-features = false
 optional = true
 
 [dependencies.thiserror]
