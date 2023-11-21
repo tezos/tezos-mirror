@@ -225,9 +225,10 @@ module Dune = struct
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
       ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false) ?ppx_kind
-      ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
-      ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
-      ?modules ?modules_without_implementation ?modes
+      ?(ppx_runtime_libraries = []) ?(preprocess = Stdlib.List.[])
+      ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
+      ?default_implementation ?implements ?modules
+      ?modules_without_implementation ?modes
       ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
       ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
       (names : string list) =
@@ -289,6 +290,9 @@ module Dune = struct
           | None -> E
           | Some Ppx_rewriter -> [S "kind"; S "ppx_rewriter"]
           | Some Ppx_deriver -> [S "kind"; S "ppx_deriver"]);
+          (match ppx_runtime_libraries with
+          | [] -> E
+          | _ -> [V (S "ppx_runtime_libraries" :: ppx_runtime_libraries)]);
           (match preprocess with
           | [] -> E
           | _ :: _ -> S "preprocess" :: of_list preprocess);
@@ -1221,6 +1225,7 @@ module Target = struct
     opens : string list;
     path : string;
     ppx_kind : Dune.ppx_kind option;
+    ppx_runtime_libraries : t list;
     preprocess : preprocessor list;
     preprocessor_deps : preprocessor_dep list;
     private_modules : string list;
@@ -1405,6 +1410,7 @@ module Target = struct
     ?opam_with_test:with_test ->
     ?optional:bool ->
     ?ppx_kind:Dune.ppx_kind ->
+    ?ppx_runtime_libraries:t option list ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
@@ -1483,16 +1489,17 @@ module Target = struct
       ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
       ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
       ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
-      ?(optional = false) ?ppx_kind ?(preprocess = []) ?(preprocessor_deps = [])
-      ?(private_modules = []) ?profile ?(opam_only_deps = [])
-      ?(release_status = Auto_opam) ?static ?synopsis ?description
-      ?(time_measurement_ppx = false) ?(available : available = Always)
-      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
-      ?(extra_authors = []) ?(with_macos_security_framework = false) ~path names
-      =
+      ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
+      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
+      ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
+      ?synopsis ?description ?(time_measurement_ppx = false)
+      ?(available : available = Always) ?(virtual_modules = [])
+      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
+      ?(with_macos_security_framework = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
+    let ppx_runtime_libraries = List.filter_map Fun.id ppx_runtime_libraries in
     let implements =
       match implements with
       | None -> None
@@ -1703,7 +1710,14 @@ module Target = struct
                 "Argument ~ppx_kind is only allowed for libraries; target %s \
                  is not a library"
                 (kind_name_for_errors kind))
-      | None -> ()
+      | None -> (
+          match ppx_runtime_libraries with
+          | [] -> ()
+          | _ :: _ ->
+              error
+                "Argument ~ppx_runtime_libraries is only allowed when \
+                 ~ppx_kind is also specified; target %s does not qualify"
+                (kind_name_for_errors kind))
     in
     let static =
       match (static, kind) with
@@ -1849,6 +1863,7 @@ module Target = struct
         opens;
         path;
         ppx_kind;
+        ppx_runtime_libraries;
         preprocess;
         preprocessor_deps;
         private_modules;
@@ -2069,7 +2084,7 @@ module Target = struct
       | PPS targets | Staged_PPS targets -> targets
     in
     List.concat_map extract_targets internal.preprocess
-    @ internal.deps @ internal.opam_only_deps
+    @ internal.deps @ internal.opam_only_deps @ internal.ppx_runtime_libraries
 end
 
 type target = Target.t option
@@ -2359,6 +2374,7 @@ module Sub_lib = struct
        ?opam_with_test
        ?optional
        ?ppx_kind
+       ?ppx_runtime_libraries
        ?preprocess
        ?preprocessor_deps
        ?private_modules
@@ -2440,6 +2456,7 @@ module Sub_lib = struct
       ?opam_with_test
       ?optional
       ?ppx_kind
+      ?ppx_runtime_libraries
       ?preprocess
       ?preprocessor_deps
       ?private_modules
@@ -2499,7 +2516,7 @@ let write filename f =
   write_raw filename f
 
 let generate_dune (internal : Target.internal) =
-  let libraries, empty_files_to_create =
+  let libraries, ppx_runtime_libraries, empty_files_to_create =
     let empty_files_to_create = ref [] in
     let rec get_library (dep : Target.t) =
       let name =
@@ -2542,7 +2559,10 @@ let generate_dune (internal : Target.internal) =
       | Open (target, _) -> get_library target
     in
     let libraries = List.map get_library internal.deps |> Dune.of_list in
-    (libraries, List.rev !empty_files_to_create)
+    let ppx_runtime_libraries =
+      List.map get_library internal.ppx_runtime_libraries |> Dune.of_list
+    in
+    (libraries, ppx_runtime_libraries, List.rev !empty_files_to_create)
   in
   let is_lib =
     match internal.kind with
@@ -2723,6 +2743,7 @@ let generate_dune (internal : Target.internal) =
       ?inline_tests_deps:internal.inline_tests_deps
       ~optional:internal.optional
       ?ppx_kind:internal.ppx_kind
+      ~ppx_runtime_libraries
       ~preprocess
       ~preprocessor_deps
       ~virtual_modules:internal.virtual_modules

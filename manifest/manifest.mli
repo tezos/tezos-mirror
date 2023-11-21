@@ -767,6 +767,10 @@ type bisect_ppx = No | Yes | With_sigterm
       stanza for the [dune] target. Must be set when the library is intended
       to be used as a PPX rewriter or a [@@deriving ...] plugin.
 
+    - [ppx_runtime_libraries]: adds a [(ppx_runtime_libraries ...)]
+      stanza to the [dune] target, allowing to specify runtime
+      dependencies when the library is a [ppx_rewriter] or a [ppx_deriver].
+
     - [preprocess]: preprocessor directives to add using the [(preprocess ...)] stanza.
       Those preprocessors are also added as dependencies in the [.opam] file.
 
@@ -860,6 +864,7 @@ type 'a maker =
   ?opam_with_test:with_test ->
   ?optional:bool ->
   ?ppx_kind:Dune.ppx_kind ->
+  ?ppx_runtime_libraries:target list ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
