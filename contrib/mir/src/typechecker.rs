@@ -334,6 +334,9 @@ fn parse_ty_with_entrypoints(
         App(list, [t], _) => Type::new_list(parse_ty(ctx, t)?),
         App(list, ..) => unexpected()?,
 
+        App(lambda, [ty1, ty2], _) => Type::new_lambda(parse_ty(ctx, ty1)?, parse_ty(ctx, ty2)?),
+        App(lambda, ..) => unexpected()?,
+
         App(contract, [t], _) => {
             let t = parse_ty(ctx, t)?;
             // NB: despite `contract` type being duplicable and packable, its
@@ -4098,6 +4101,19 @@ mod typecheck_tests {
                 stack: stk![Type::Bool, Type::Nat, Type::Nat],
                 reason: None,
             })
+        );
+    }
+
+    #[test]
+    fn push_lambda_wrong_type() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) Unit")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::InvalidValueForType(
+                "App(Unit, [], [])".to_owned(),
+                Type::new_lambda(Type::Unit, Type::Unit)
+            ))
         );
     }
 }

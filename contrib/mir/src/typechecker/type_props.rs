@@ -91,6 +91,15 @@ impl Type {
                 | TypeProperty::Pushable
                 | TypeProperty::BigMapValue => return invalid_type_prop(),
             },
+            Lambda(_) => match prop {
+                TypeProperty::Comparable => return invalid_type_prop(),
+                TypeProperty::Passable
+                | TypeProperty::Storable
+                | TypeProperty::Pushable
+                | TypeProperty::Packable
+                | TypeProperty::BigMapValue
+                | TypeProperty::Duplicable => (),
+            },
         }
         Ok(())
     }
