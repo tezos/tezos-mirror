@@ -503,6 +503,9 @@ let octez_l2_lib : Sub_lib.maker =
     ~container:registered_octez_l2_libs
     ~package:"octez-l2-libs"
 
+let tezt_wrapper =
+  octez_lib "tezt-wrapper" ~path:"tezt/lib_wrapper" ~deps:[tezt_lib]
+
 let octez_test_helpers =
   octez_lib
     "test-helpers"
@@ -2555,7 +2558,7 @@ let tezt_performance_regression =
     ~path:"tezt/lib_performance_regression"
     ~opam:"tezt-tezos"
     ~bisect_ppx:No
-    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
+    ~deps:[tezt_wrapper |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
 
 let tezt_tezos =
   public_lib
@@ -2566,7 +2569,7 @@ let tezt_tezos =
     ~bisect_ppx:No
     ~deps:
       [
-        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         uri;
         hex;
@@ -8685,7 +8688,7 @@ let () =
     let deps =
       [
         octez_test_helpers |> open_;
-        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
         str;
         bls12_381;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";

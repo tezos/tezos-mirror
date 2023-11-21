@@ -10,6 +10,7 @@ license: "Apache-2.0"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14.1" & < "4.15" }
+  "tezt" { >= "4.0.0" & < "5.0.0" }
   "uri" { >= "3.1.0" }
   "fmt" { >= "0.8.7" }
   "qcheck-alcotest" { >= "0.20" }
@@ -53,7 +54,6 @@ depends: [
   "conf-libev"
   "uutf"
   "ringo" { >= "1.0.0" }
-  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "qcheck-core" {with-test}
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
