@@ -54,7 +54,7 @@ def compute_version_bytes(prefix, length, maximal_base58_size=1000):
         # The first bytes in base58 must be the given target. lo is the version
         # byte we want to compute.
         lo = target * 58**m
-        lo = (lo >> shift)
+        lo = lo >> shift
         # (a >> b) << b == a iff a = 2**b. Then this line is equivalent to add 1
         # if lo is not a power of 2.
         lo += (0 if lo == ((lo >> shift) << shift) else 1)

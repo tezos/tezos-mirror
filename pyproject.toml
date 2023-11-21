@@ -17,13 +17,13 @@ keywords = ["tezos"]
 
 
 [tool.poetry.dependencies]
-python = "~3.10"
+python = "~3.11"
 
 # developer tools
 mypy = "0.942"
 mypy-extensions = "0.4.3"
 pycodestyle = "2.7.0"
-pylint = "2.11.1"
+pylint = "3.0.2"
 black = "22.3.0"
 
 # pytest is used by scripts/ci/coverage.py and scripts/b58_prefix
