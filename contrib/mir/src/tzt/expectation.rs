@@ -10,7 +10,7 @@ use super::*;
 fn check_error_expectation<'a>(
     ctx: &mut Ctx,
     err_exp: ErrorExpectation<'a>,
-    err: TestError,
+    err: TestError<'a>,
 ) -> Result<(), TztTestError<'a>> {
     use ErrorExpectation as Ex;
     use TestError as Er;
@@ -71,7 +71,7 @@ fn unify_interpreter_error(
 pub fn check_expectation<'a>(
     ctx: &mut Ctx,
     expected: TestExpectation<'a>,
-    real: Result<(FailingTypeStack, IStack), TestError>,
+    real: Result<(FailingTypeStack, IStack<'a>), TestError<'a>>,
 ) -> Result<(), TztTestError<'a>> {
     use TestExpectation::*;
     use TztTestError::*;

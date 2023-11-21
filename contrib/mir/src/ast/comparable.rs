@@ -1,6 +1,6 @@
 use super::TypedValue;
 
-impl PartialOrd for TypedValue {
+impl PartialOrd for TypedValue<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use TypedValue::*;
         match (self, other) {
@@ -55,7 +55,7 @@ impl PartialOrd for TypedValue {
     }
 }
 
-impl Ord for TypedValue {
+impl Ord for TypedValue<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other)
             .expect("Comparing incomparable values in TypedValue")

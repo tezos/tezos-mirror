@@ -23,14 +23,17 @@ use crate::syntax::tztTestEntitiesParser;
 use crate::typechecker::*;
 use crate::tzt::expectation::*;
 
-pub type TestStack = Vec<(Type, TypedValue)>;
+pub type TestStack<'a> = Vec<(Type, TypedValue<'a>)>;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum TztTestError<'a> {
-    StackMismatch((FailingTypeStack, IStack), (FailingTypeStack, IStack)),
-    UnexpectedError(TestError),
-    UnexpectedSuccess(ErrorExpectation<'a>, IStack),
-    ExpectedDifferentError(ErrorExpectation<'a>, TestError),
+    StackMismatch(
+        (FailingTypeStack, IStack<'a>),
+        (FailingTypeStack, IStack<'a>),
+    ),
+    UnexpectedError(TestError<'a>),
+    UnexpectedSuccess(ErrorExpectation<'a>, IStack<'a>),
+    ExpectedDifferentError(ErrorExpectation<'a>, TestError<'a>),
 }
 
 impl fmt::Display for TztTestError<'_> {
@@ -65,7 +68,7 @@ impl fmt::Display for TztTestError<'_> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TztTest<'a> {
     pub code: Micheline<'a>,
-    pub input: TestStack,
+    pub input: TestStack<'a>,
     pub output: TestExpectation<'a>,
     pub amount: Option<i64>,
     pub chain_id: Option<ChainId>,
@@ -73,7 +76,9 @@ pub struct TztTest<'a> {
     pub self_addr: Option<AddressHash>,
 }
 
-fn typecheck_stack(stk: Vec<(Micheline, Micheline)>) -> Result<Vec<(Type, TypedValue)>, TcError> {
+fn typecheck_stack<'a>(
+    stk: Vec<(Micheline<'a>, Micheline<'a>)>,
+) -> Result<Vec<(Type, TypedValue<'a>)>, TcError> {
     stk.into_iter()
         .map(|(t, v)| {
             let t = parse_ty(&mut Ctx::default(), &t)?;
@@ -169,18 +174,24 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
 /// This represents possibilities in which the execution of
 /// the code in a test can fail.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-pub enum TestError {
+pub enum TestError<'a> {
     #[error(transparent)]
     TypecheckerError(#[from] TcError),
     #[error(transparent)]
-    InterpreterError(#[from] InterpretError),
+    InterpreterError(InterpretError<'a>),
+}
+
+impl<'a> From<InterpretError<'a>> for TestError<'a> {
+    fn from(x: InterpretError<'a>) -> Self {
+        Self::InterpreterError(x)
+    }
 }
 
 /// This represents the outcome that we expect from interpreting
 /// the code in a test.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TestExpectation<'a> {
-    ExpectSuccess(Vec<(Type, TypedValue)>),
+    ExpectSuccess(Vec<(Type, TypedValue<'a>)>),
     ExpectError(ErrorExpectation<'a>),
 }
 
@@ -237,12 +248,12 @@ pub enum TztOutput<'a> {
     TztError(ErrorExpectation<'a>),
 }
 
-fn execute_tzt_test_code(
-    code: Micheline,
+fn execute_tzt_test_code<'a>(
+    code: Micheline<'a>,
     ctx: &mut Ctx,
     parameter: Option<&Micheline>,
-    input: Vec<(Type, TypedValue)>,
-) -> Result<(FailingTypeStack, IStack), TestError> {
+    input: Vec<(Type, TypedValue<'a>)>,
+) -> Result<(FailingTypeStack, IStack<'a>), TestError<'a>> {
     // Build initial stacks (type and value) for running the test from the test input
     // stack.
     let (typs, vals): (Vec<Type>, Vec<TypedValue>) = input.into_iter().unzip();

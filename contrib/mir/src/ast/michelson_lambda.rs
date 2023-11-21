@@ -5,10 +5,16 @@
 /*                                                                            */
 /******************************************************************************/
 
-use super::Instruction;
+use super::{Instruction, Micheline};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Lambda {
-    Lambda { code: Vec<Instruction> },
-    LambdaRec { code: Vec<Instruction> },
+pub enum Lambda<'a> {
+    Lambda {
+        micheline_code: Micheline<'a>,
+        code: Vec<Instruction<'a>>,
+    },
+    LambdaRec {
+        micheline_code: Micheline<'a>,
+        code: Vec<Instruction<'a>>,
+    },
 }

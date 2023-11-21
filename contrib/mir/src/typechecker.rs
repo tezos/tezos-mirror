@@ -137,14 +137,14 @@ pub struct TypesNotEqual(Type, Type);
 
 pub type Entrypoints = HashMap<Entrypoint, Type>;
 
-impl Micheline<'_> {
+impl<'a> Micheline<'a> {
     /// Typechecks `Micheline` as a value, given its type (also as `Micheline`).
     /// Validates the type.
     pub fn typecheck_value(
         &self,
         ctx: &mut Ctx,
         value_type: &Micheline,
-    ) -> Result<TypedValue, TcError> {
+    ) -> Result<TypedValue<'a>, TcError> {
         let ty = parse_ty(ctx, value_type)?;
         typecheck_value(self, ctx, &ty)
     }
@@ -161,7 +161,7 @@ impl Micheline<'_> {
         ctx: &mut Ctx,
         self_type: Option<&Micheline>,
         stack: &[Micheline],
-    ) -> Result<Instruction, TcError> {
+    ) -> Result<Instruction<'a>, TcError> {
         let entrypoints = self_type
             .map(|ty| {
                 let (entrypoints, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
@@ -191,7 +191,7 @@ impl Micheline<'_> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
-    pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript, TcError> {
+    pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
             Micheline::Seq([Micheline::Seq(seq)]) => seq,
@@ -424,12 +424,12 @@ fn parse_parameter_ty_with_entrypoints(
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
-fn typecheck(
-    ast: &[Micheline],
+fn typecheck<'a>(
+    ast: &[Micheline<'a>],
     ctx: &mut Ctx,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
-) -> Result<Vec<Instruction>, TcError> {
+) -> Result<Vec<Instruction<'a>>, TcError> {
     ast.iter()
         .map(|i| typecheck_instruction(i, ctx, self_entrypoints, opt_stack))
         .collect()
@@ -452,12 +452,12 @@ macro_rules! nothing_to_none {
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
-pub(crate) fn typecheck_instruction(
-    i: &Micheline,
+pub(crate) fn typecheck_instruction<'a>(
+    i: &Micheline<'a>,
     ctx: &mut Ctx,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
-) -> Result<Instruction, TcError> {
+) -> Result<Instruction<'a>, TcError> {
     use Instruction as I;
     use NoMatchingOverloadReason as NMOR;
     use Type as T;
@@ -1115,11 +1115,11 @@ pub(crate) fn typecheck_instruction(
 
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
 /// illegal types like `set operation` or `contract operation`.
-pub(crate) fn typecheck_value(
-    v: &Micheline,
+pub(crate) fn typecheck_value<'a>(
+    v: &Micheline<'a>,
     ctx: &mut Ctx,
     t: &Type,
-) -> Result<TypedValue, TcError> {
+) -> Result<TypedValue<'a>, TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
@@ -1183,7 +1183,7 @@ pub(crate) fn typecheck_value(
                 .consume(gas::tc_cost::construct_map(tk.size_for_gas(), vs.len())?)?;
             let ctx_cell = std::cell::RefCell::new(ctx);
             let tc_elt =
-                |v: &Micheline, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
+                |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
                     match v {
                         Micheline::App(Prim::Elt, [k, v], _) => {
                             let k = typecheck_value(k, ctx, tk)?;
@@ -1416,11 +1416,11 @@ mod typecheck_tests {
     use Option::None;
 
     /// hack to simplify syntax in tests
-    fn typecheck_instruction(
-        i: &Micheline,
+    fn typecheck_instruction<'a>(
+        i: &Micheline<'a>,
         ctx: &mut Ctx,
         opt_stack: &mut FailingTypeStack,
-    ) -> Result<Instruction, TcError> {
+    ) -> Result<Instruction<'a>, TcError> {
         super::typecheck_instruction(i, ctx, None, opt_stack)
     }
 
