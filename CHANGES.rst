@@ -78,6 +78,11 @@ Client
   instructions have been deprecated. Using them now displays a warning
   message on stderr.
 
+- Added a ``run unit tests`` client command allowing to run one or
+  several Michelson unit tests in `TZT format
+  <http://tezos.gitlab.io/active/michelson.html#tzt-a-syntax-extension-for-writing-unit-tests>`__. (MR
+  :gl:`!10898`)
+
 Baker
 -----
 
