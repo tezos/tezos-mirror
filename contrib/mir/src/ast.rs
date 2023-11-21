@@ -172,12 +172,30 @@ pub fn typed_value_to_value_optimized<'a>(
         },
         TV::Address(x) => V::Bytes(x.to_bytes_vec()),
         TV::ChainId(x) => V::Bytes(x.into()),
-        TV::Contract(x) => go(TV::Address(x)),
         TV::Bytes(x) => V::Bytes(x),
         TV::Key(k) => V::Bytes(k.to_bytes_vec()),
         TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
         TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
-        TV::Operation(..) => todo!(),
+        TV::Contract(x) => go(TV::Address(x)),
+        TV::Operation(operation_info) => match operation_info.operation {
+            Operation::TransferTokens(tt) => Micheline::App(
+                Prim::Transfer_tokens,
+                arena.alloc_extend([
+                    go(tt.param),
+                    go(TV::Address(tt.destination_address)),
+                    go(TV::Mutez(tt.amount)),
+                ]),
+                annotations::NO_ANNS,
+            ),
+            Operation::SetDelegate(sd) => Micheline::App(
+                Prim::Set_delegate,
+                arena.alloc_extend([match sd.0 {
+                    Some(kh) => V::prim1(arena, Prim::Some, go(TV::KeyHash(kh))),
+                    None => V::prim0(Prim::None),
+                }]),
+                annotations::NO_ANNS,
+            ),
+        },
     }
 }
 

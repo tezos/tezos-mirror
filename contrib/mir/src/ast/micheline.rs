@@ -173,7 +173,9 @@ macro_rules! micheline_values {
                 | Prim::Some
                 | Prim::Elt
                 | Prim::Left
-                | Prim::Right,
+                | Prim::Right
+                | Prim::Transfer_tokens
+                | Prim::Set_delegate,
             ..,
         )
     };

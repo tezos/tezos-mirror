@@ -4,6 +4,7 @@
 /* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
 /*                                                                            */
 /******************************************************************************/
+#![warn(clippy::redundant_clone)]
 
 pub mod ast;
 pub mod context;
