@@ -98,7 +98,7 @@ let of_string s =
 let pp ppf (Tez_tag amount) =
   let mult_int = 1_000_000L in
   let rec left ppf amount =
-    let d, r = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
+    let d, r = (Int64.div amount 1000L, Int64.rem amount 1000L) in
     if d > 0L then Format.fprintf ppf "%a%03Ld" left d r
     else Format.fprintf ppf "%Ld" r
   in
@@ -113,7 +113,7 @@ let pp ppf (Tez_tag amount) =
     else Format.fprintf ppf "%03d%a" hi triplet lo
   in
   let ints, decs =
-    (Int64.(div amount mult_int), Int64.(to_int (rem amount mult_int)))
+    (Int64.div amount mult_int, Int64.(to_int (rem amount mult_int)))
   in
   left ppf ints ;
   if Compare.Int.(decs > 0) then Format.fprintf ppf ".%a" right decs
@@ -155,14 +155,10 @@ let ( /? ) tez d =
 let div2 (Tez_tag t) = Tez_tag (Int64.div t 2L)
 
 let mul_exn t m =
-  match t *? Int64.(of_int m) with
-  | Ok v -> v
-  | Error _ -> invalid_arg "mul_exn"
+  match t *? Int64.of_int m with Ok v -> v | Error _ -> invalid_arg "mul_exn"
 
 let div_exn t d =
-  match t /? Int64.(of_int d) with
-  | Ok v -> v
-  | Error _ -> invalid_arg "div_exn"
+  match t /? Int64.of_int d with Ok v -> v | Error _ -> invalid_arg "div_exn"
 
 let mul_ratio ~rounding tez ~num ~den =
   let open Result_syntax in
