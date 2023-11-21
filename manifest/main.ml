@@ -906,12 +906,14 @@ let octez_risc_v_pvm =
           [S "file"; S "build.rs"];
           [S "file"; S "Cargo.toml"];
           [S "file"; S "Cargo.lock"];
-          (* For the interpreter crate, these patterns only include files
-           * directly contained in [../interpreter], as well as the [src]
+          (* For the local dependent crates, these patterns only include files
+           * directly contained in the crate's directory, as well as the [src]
            * directory, excluding all other directories in order to avoid
            * copying any build artifacts. *)
           [S "glob_files"; S "../interpreter/*"];
           [S "source_tree"; S "../interpreter/src"];
+          [S "glob_files"; S "../machine_state/*"];
+          [S "source_tree"; S "../machine_state/src"];
         ];
         [
           S "action";
@@ -921,6 +923,17 @@ let octez_risc_v_pvm =
               S "progn";
               [S "run"; S "cargo"; S "build"; S "--release"];
               [S "copy"; S archive_output_file; S archive_file];
+              [
+                S "run";
+                S "sed";
+                S "-i";
+                (* XXX: https://gitlab.com/tezos/tezos/-/issues/6630
+                   Rename ___rdl_oom because it would conflict with other
+                   Rust staticlibs (e.g. libwasmer, librustzcash) when linking
+                   everything together into one artifact. *)
+                S "s/___rdl_oom/tz_rdl_oo0/";
+                S "liboctez_risc_v_pvm.a";
+              ];
             ];
           ];
         ];

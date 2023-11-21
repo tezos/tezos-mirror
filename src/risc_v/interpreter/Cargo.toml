@@ -3,6 +3,5 @@ name = "risc-v-interpreter"
 version = "0.0.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+[dependencies.risc-v-machine-state]
+path = "../machine_state"

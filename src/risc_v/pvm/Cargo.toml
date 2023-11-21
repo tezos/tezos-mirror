@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies.risc-v-interpreter]
-path = "../interpreter/"
+path = "../interpreter"
 
 [build-dependencies]
 cbindgen = "*"
