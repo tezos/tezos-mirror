@@ -327,6 +327,11 @@ module Make (Parameters : PARAMETERS) = struct
       =
     let open Lwt_result_syntax in
     let* signers = List.map_ep (get_signer cctxt) signers in
+    let* () =
+      Tezos_signer_backends.Encrypted.decrypt_list
+        cctxt
+        (List.map (fun k -> k.alias) signers)
+    in
     let data_dir = Filename.concat data_dir "injector" in
     let*! () = Lwt_utils_unix.create_dir data_dir in
     let filter op_proj op =
