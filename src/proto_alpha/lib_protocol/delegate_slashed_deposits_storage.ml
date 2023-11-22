@@ -174,7 +174,10 @@ let apply_and_clear_current_cycle_denunciations ctxt =
       (frozen_deposits : Deposits_repr.t) =
     let open Result_syntax in
     let punish_value =
-      Tez_repr.mul_percentage frozen_deposits.initial_amount slashing_percentage
+      Tez_repr.mul_percentage
+        ~rounding:`Down
+        frozen_deposits.initial_amount
+        slashing_percentage
     in
     let punishing_amount =
       Tez_repr.min punish_value frozen_deposits.current_amount

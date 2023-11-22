@@ -83,7 +83,7 @@ val mul_ratio :
 
 (** [mul_percentage tez percentage] returns [tez * percentage / 100].
     No errors can happen. *)
-val mul_percentage : t -> Int_percentage.t -> t
+val mul_percentage : rounding:[`Down | `Up] -> t -> Int_percentage.t -> t
 
 val to_mutez : t -> int64
 
