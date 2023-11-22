@@ -269,6 +269,7 @@ pub enum Instruction {
     Address,
     Slice(overloads::Slice),
     Left,
+    Right,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
