@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(*let mainnet_cycle_of_level level =*)
-(*if level < 1_589_248 then level / 4096 else 388 + ((level - 1_589_248) / 8192)*)
-
 let method_not_allowed_respond meths =
   let headers =
     Cohttp.Header.add_multi
