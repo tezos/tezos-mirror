@@ -8379,6 +8379,9 @@ let evm_node_lib_dev =
         evm_node_lib_dev_encoding |> open_;
         lwt_exit;
         evm_node_config |> open_;
+        octez_context_sigs;
+        octez_context_disk;
+        octez_context_encoding;
       ]
 
 let _octez_evm_node_tests =
@@ -8387,6 +8390,7 @@ let _octez_evm_node_tests =
     ~path:"src/bin_evm_node/test"
     ~opam:"octez-evm-node-tests"
     ~synopsis:"Tests for the EVM Node"
+    ~with_macos_security_framework:true
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -8409,6 +8413,7 @@ let _evm_node =
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup"
     ~release_status:Experimental
+    ~with_macos_security_framework:true
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";

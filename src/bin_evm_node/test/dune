@@ -31,6 +31,9 @@
  (libraries
   src_bin_evm_node_test_tezt_lib
   tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main))
 
 (rule
