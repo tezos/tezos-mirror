@@ -1,5 +1,5 @@
 Protocol Oxford
-==============
+===============
 
 This page documents the changes brought by protocol Oxford with respect
 to Nairobi (see :ref:`naming_convention`).
