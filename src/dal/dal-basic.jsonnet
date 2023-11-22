@@ -27,10 +27,13 @@ local row = grafana.row;
 
 // We reuse Octez-p2p for p2p pannels
 local p2p = import '../p2p.jsonnet';
+local gossipsub = import './gossipsub.jsonnet';
 
 local boardtitle = 'Octez DAL Node Dashboard';
 
-local p2p_y = 1;
+local gossipsub_y = 1;
+local p2p_y = gossipsub_y + 24;
+
 
 //###
 // Grafana main stuffs
@@ -58,6 +61,27 @@ dashboard.new(
 .addPanels(
   [
 
+    //# Gossipsub row
+    row.new(
+      title="Gossipsub worker's stats",
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 0, w: 24, x: 0, y: gossipsub_y } },
+
+    // ## First line of pannels
+    gossipsub.scoresOfPeers { gridPos: { h: 8, w: 12, x: 0, y: gossipsub_y } },
+    gossipsub.peersOfTopics { gridPos: { h: 8, w: 12, x: 12, y: gossipsub_y } },
+
+    // ## Second line of pannels
+    gossipsub.countTopics { gridPos: { h: 8, w: 8, x: 0, y: gossipsub_y + 8 } },
+    gossipsub.countConnections { gridPos: { h: 8, w: 8, x: 8, y: gossipsub_y + 8 } },
+    gossipsub.workerStreams { gridPos: { h: 8, w: 8, x: 16, y: gossipsub_y + 8 } },
+
+    // ## Third line of pannels
+    gossipsub.appMessagesDeriv { gridPos: { h: 8, w: 8, x: 0, y: gossipsub_y + 16 } },
+    gossipsub.sentOtherMessagesDeriv { gridPos: { h: 8, w: 8, x: 8, y: gossipsub_y + 16 } },
+    gossipsub.receivedOtherMessagesDeriv { gridPos: { h: 8, w: 8, x: 16, y: gossipsub_y + 16 } },
+
     //# P2P row
     row.new(
       title='P2P stats',
@@ -67,7 +91,7 @@ dashboard.new(
 
     // ## First line of pannels
     p2p.exchangedData { gridPos: { h: 8, w: 12, x: 0, y: p2p_y } },
-    p2p.totalConnections { gridPos: { h: 8, w: 12, x: 12, y: p2p_y + 8 } },
+    p2p.totalConnections { gridPos: { h: 8, w: 12, x: 12, y: p2p_y } },
 
     // ## Second line of pannels
     p2p.peersLegendBottom { gridPos: { h: 10, w: 12, x: 0, y: p2p_y + 8 } },
