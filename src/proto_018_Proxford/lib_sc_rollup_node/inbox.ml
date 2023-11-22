@@ -265,6 +265,32 @@ let payloads_history_of_messages ~is_first_block ~predecessor
   in
   payloads_history
 
+let payloads_history_of_all_messages messages =
+  let open Result_syntax in
+  let payloads_history =
+    let capacity = List.length messages |> Int64.of_int in
+    Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity
+  in
+  match List.map Sc_rollup.Inbox_message.unsafe_of_string messages with
+  | [] -> assert false
+  | first :: messages ->
+      Environment.wrap_tzresult
+      @@ let* payloads_history, witness =
+           Sc_rollup.Inbox_merkelized_payload_hashes.genesis
+             payloads_history
+             first
+         in
+         let* payloads_history, _witness =
+           List.fold_left_e
+             (fun (payloads_history, witness) ->
+               Sc_rollup.Inbox_merkelized_payload_hashes.add_payload
+                 payloads_history
+                 witness)
+             (payloads_history, witness)
+             messages
+         in
+         return payloads_history
+
 let serialize_external_message msg =
   Environment.wrap_tzresult
   @@
