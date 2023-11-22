@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmark_type_inference_018_Proxford)
- (public_name tezos-benchmark-type-inference-018-Proxford)
+ (name tezos_benchmark_type_inference_alpha)
+ (public_name tezos-benchmark-type-inference-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.stdlib
@@ -11,7 +11,7 @@
   octez-libs.crypto
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-018-Proxford.protocol
+  tezos-protocol-alpha.protocol
   hashcons)
  (flags
   (:standard)
@@ -20,4 +20,4 @@
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_micheline_rewriting
-  -open Tezos_protocol_018_Proxford))
+  -open Tezos_protocol_alpha))

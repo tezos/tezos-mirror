@@ -345,6 +345,7 @@ let estimated_gas_single (type kind)
         | Reveal_result {consumed_gas}
         | Delegation_result {consumed_gas; _}
         | Register_global_constant_result {consumed_gas; _}
+        | Set_deposits_limit_result {consumed_gas}
         | Update_consensus_key_result {consumed_gas; _}
         | Increase_paid_storage_result {consumed_gas; _}
         | Transfer_ticket_result {consumed_gas; _}
@@ -421,8 +422,9 @@ let estimated_storage_single (type kind) ~origination_size
         | Sc_rollup_originate_result {size; _} -> Ok size
         | Zk_rollup_origination_result {storage_size; _} -> Ok storage_size
         | Transaction_result (Transaction_to_sc_rollup_result _)
-        | Reveal_result _ | Delegation_result _ | Increase_paid_storage_result _
-        | Dal_publish_slot_header_result _ | Sc_rollup_add_messages_result _
+        | Reveal_result _ | Delegation_result _ | Set_deposits_limit_result _
+        | Increase_paid_storage_result _ | Dal_publish_slot_header_result _
+        | Sc_rollup_add_messages_result _
         (* The following Sc_rollup operations have zero storage cost because we
            consider them to be paid in the stake deposit.
 
@@ -502,12 +504,13 @@ let originated_contracts_single (type kind)
             ( Transaction_to_sc_rollup_result _
             | Transaction_to_zk_rollup_result _ )
         | Register_global_constant_result _ | Reveal_result _
-        | Delegation_result _ | Update_consensus_key_result _
-        | Increase_paid_storage_result _ | Transfer_ticket_result _
-        | Dal_publish_slot_header_result _ | Sc_rollup_originate_result _
-        | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
-        | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
-        | Sc_rollup_timeout_result _ | Sc_rollup_execute_outbox_message_result _
+        | Delegation_result _ | Set_deposits_limit_result _
+        | Update_consensus_key_result _ | Increase_paid_storage_result _
+        | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+        | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+        | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
+        | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
+        | Sc_rollup_execute_outbox_message_result _
         | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
         | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
             return_nil)
@@ -866,7 +869,8 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                   let safety_guard =
                     match c.operation with
                     | Transaction {destination = Implicit _; _}
-                    | Reveal _ | Delegation _ | Increase_paid_storage _ ->
+                    | Reveal _ | Delegation _ | Set_deposits_limit _
+                    | Increase_paid_storage _ ->
                         Gas.Arith.zero
                     | _ -> safety_guard
                   in

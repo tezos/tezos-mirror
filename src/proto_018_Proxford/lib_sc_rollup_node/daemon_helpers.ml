@@ -122,15 +122,18 @@ let maybe_recover_bond node_ctxt =
             operating_pkh
         in
         match staked_on_commitment with
-        | None -> Publisher.recover_bond node_ctxt
+        | None ->
+            (* the operator is no longer stake on any commitment then recover its bond *)
+            Publisher.recover_bond node_ctxt
         | Some _ (* operator still staked on something *) -> return_unit)
   else return_unit
 
 (** Process an L1 SCORU operation (for the node's rollup) which is included
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
-let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
-    (head : Layer1.header) ~source (operation : kind manager_operation)
+let process_included_l1_operation (type kind) ~catching_up
+    (node_ctxt : Node_context.rw) (head : Layer1.header) ~source
+    (operation : kind manager_operation)
     (result : kind successful_manager_operation_result) =
   let open Lwt_result_syntax in
   match (operation, result) with
@@ -208,6 +211,9 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
           {commitment = proto_commitment_hash; level = inbox_level}
       in
       let* () = maybe_recover_bond node_ctxt in
+      let* () =
+        Outbox_execution.publish_execute_whitelist_update_message node_ctxt
+      in
       return_unit
   | ( Sc_rollup_refute _,
       Sc_rollup_refute_result {game_status = Ended end_status; _} )
@@ -255,12 +261,54 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
             Signature.Public_key_hash.(operating_pkh = staker)
             Sc_rollup_node_errors.Exit_bond_recovered_bailout_mode
       | _ -> return_unit)
+  | ( Sc_rollup_execute_outbox_message {output_proof; _},
+      Sc_rollup_execute_outbox_message_result
+        {whitelist_update = Some whitelist_update; _} ) -> (
+      match whitelist_update with
+      | Public ->
+          let () = Reference.set node_ctxt.private_info None in
+          return_unit
+      | Private whitelist_update ->
+          let () =
+            Reference.map
+              (Option.map (fun private_info ->
+                   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
+                   let output_proof =
+                     Data_encoding.Binary.of_string_exn
+                       PVM.output_proof_encoding
+                       output_proof
+                   in
+                   let Sc_rollup.{outbox_level; message_index; _} =
+                     PVM.output_of_output_proof output_proof
+                   in
+                   Node_context.
+                     {
+                       private_info with
+                       last_whitelist_update =
+                         {
+                           outbox_level = Raw_level.to_int32 outbox_level;
+                           message_index = Z.to_int message_index;
+                         };
+                     }))
+              node_ctxt.private_info
+          in
+          if
+            catching_up
+            (* No need to check whitelist updates for historical data. *)
+          then return_unit
+          else
+            let*? () =
+              Node_context.check_op_in_whitelist_or_bailout_mode
+                node_ctxt
+                whitelist_update
+            in
+            return_unit)
   | _, _ ->
       (* Other manager operations *)
       return_unit
 
-let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
-    (operation : kind manager_operation)
+let process_l1_operation (type kind) ~catching_up node_ctxt
+    (head : Layer1.header) ~source (operation : kind manager_operation)
     (result : kind Apply_results.manager_operation_result) =
   let open Lwt_result_syntax in
   let is_for_my_rollup : type kind. kind manager_operation -> bool = function
@@ -275,7 +323,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
           rollup = node_ctxt.Node_context.config.sc_rollup_address)
     | Dal_publish_slot_header _ -> true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
-    | Update_consensus_key _ | Register_global_constant _
+    | Update_consensus_key _ | Register_global_constant _ | Set_deposits_limit _
     | Increase_paid_storage _ | Transfer_ticket _ | Sc_rollup_originate _
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         false
@@ -303,6 +351,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
     match result with
     | Applied success_result ->
         process_included_l1_operation
+          ~catching_up
           node_ctxt
           head
           ~source
@@ -312,8 +361,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
         (* No action for non successful operations  *)
         return_unit
 
-let process_l1_block_operations ~catching_up:_ node_ctxt (head : Layer1.header)
-    =
+let process_l1_block_operations ~catching_up node_ctxt (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* block =
     Layer1_helpers.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash
@@ -322,7 +370,7 @@ let process_l1_block_operations ~catching_up:_ node_ctxt (head : Layer1.header)
       =
     let open Lwt_result_syntax in
     let* () = accu in
-    process_l1_operation node_ctxt head ~source operation result
+    process_l1_operation ~catching_up node_ctxt head ~source operation result
   in
   let apply_internal (type kind) accu ~source:_
       (_operation : kind Apply_internal_results.internal_operation)

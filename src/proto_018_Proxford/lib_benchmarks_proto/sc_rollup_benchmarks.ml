@@ -71,8 +71,8 @@ module Pvm_state_generator = struct
       match Context.Tree.kinded_key tree with
       | Some k ->
           let* p = Context.produce_tree_proof index k step in
-          return (Some p)
-      | None -> return None
+          return_some p
+      | None -> return_none
 
     let kinded_hash_to_state_hash = function
       | `Value hash | `Node hash ->
@@ -293,7 +293,7 @@ module Sc_rollup_verify_output_proof_benchmark = struct
 
   let purpose = Benchmark.Generate_code "sc_rollup"
 
-  let group = Benchmarks_proto.Benchmark.Standalone
+  let group = Benchmarks_proto.Benchmark.Group "sc_rollup"
 
   let tags = ["sc_rollup"]
 
@@ -505,7 +505,7 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
 
   let purpose = Benchmark.Generate_code "sc_rollup"
 
-  let group = Benchmark.Standalone
+  let group = Benchmarks_proto.Benchmark.Group "sc_rollup"
 
   let tags = ["sc_rollup"]
 
@@ -645,7 +645,7 @@ module Sc_rollup_install_boot_sector_benchmark = struct
 
   let name = ns "Sc_rollup_install_boot_sector_benchmark"
 
-  let group = Benchmarks_proto.Benchmark.Standalone
+  let group = Benchmarks_proto.Benchmark.Group "sc_rollup"
 
   let info = "Estimating the cost of installing a boot sector."
 

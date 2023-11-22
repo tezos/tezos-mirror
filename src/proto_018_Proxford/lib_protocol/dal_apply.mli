@@ -28,15 +28,20 @@
 
 open Alpha_context
 
-(** [validate_attestation ctxt op] ensures that [op.attestation] is
-   valid and prevents an operation containing [op.attestation]
-   to be refused on top of [ctxt]. If an [Error _] is returned, the
-   [op.attestation] is not valid. *)
-val validate_attestation : t -> Dal.Attestation.operation -> unit tzresult
+(** [validate_attestation ctxt get_consensus_key op] checks whether the DAL
+    attestation [op] is valid, assuming the delegate returned by
+    [get_consensus_key ()] issued those attestations. If an [Error _] is
+    returned, the [op] is not valid. *)
+val validate_attestation :
+  t ->
+  (unit -> Consensus_key.pk tzresult Lwt.t) ->
+  Dal.Attestation.operation ->
+  Consensus_key.pk tzresult Lwt.t
 
-(** [apply_attestation ctxt op] applies [op.attestation] into the
-   [ctxt] assuming [op.attestor] issued those attestations. *)
-val apply_attestation : t -> Dal.Attestation.operation -> t tzresult
+(** [apply_attestation ctxt consensus_key op] applies [op.attestation] into the
+   [ctxt] assuming [consensus_key.delegate] issued those attestations. *)
+val apply_attestation :
+  t -> Consensus_key.pk -> Dal.Attestation.operation -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
    valid and prevents an operation containing [slot_header] to be

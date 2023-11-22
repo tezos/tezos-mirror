@@ -1,7 +1,5 @@
-:orphan:
-
 Protocol Oxford
-===============
+==============
 
 This page documents the changes brought by protocol Oxford with respect
 to Nairobi (see :ref:`naming_convention`).
@@ -14,8 +12,9 @@ branch of Octez.
 Environment Version
 -------------------
 
+
 This protocol requires a different protocol environment version than Nairobi.
-It requires protocol environment V10, compared to V9 for Nairobi.
+It requires protocol environment V11, compared to V9 for Nairobi.
 
 - Simplify the timelock ``opening_result`` type in the environment as we do not deal with ``Bogus_cipher`` any longer. (MR :gl:`!8404`)
 
@@ -51,6 +50,22 @@ Smart Rollups
 
 - Reduce cost for internal transaction to smart rollup (MR :gl:`!9284`)
 
+- The ``smart_rollup_originate`` operation now also takes an optional
+  whitelist of public key hashes. This whitelist cannot be used yet
+  (the ``sc_rollup.private_enable`` flag has to be set to true). (MR :gl:`!9401`)
+
+- The ``transferring`` parameter from smart rollup client command
+  ``get proof for message <index> of outbox at level <level>`` is now optional. (MR :gl:`!9461`)
+
+- Enable the latest version of the WASM PVM (``2.0.0-r3``). Existing smart
+  rollups will see their PVM automatically upgrade, and newly originated smart
+  rollups will use this version directly (MR :gl:`!9735`)
+
+- Added the updated whitelist for private rollups in the receipt of
+  the outbox message execution receipt. (MR :gl:`!10095`)
+
+- Add private rollups: smart rollup with an updatable whitelist stakers. Only stakers on the whitelist can publish commitment and participate in a refutation game. (MRs :gl:`!9823`, :gl:`!10104`, :gl:`!9823`, :gl:`!9572`, :gl:`!9427`, :gl:`!9472`, :gl:`!9439`, :gl:`!9401`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
@@ -59,6 +74,12 @@ Data Availability Layer (ongoing)
 
 Adaptive Issuance (ongoing)
 ----------------------------
+
+
+- Adaptive Issuance is locked behind a feature flag and cannot be activated for
+  this proposal. The voting mechanism for Adaptive Issuance remains accessible,
+  but is ignored and can never activate the feature. Moreover, the vote EMA will
+  be reset before reactivating the feature flag. (MR :gl:`!10371`)
 
 - This protocol asks the bakers to set their votes for the adoption of
   the adaptive issuance feature. They may use the per-block votes
@@ -70,7 +91,7 @@ Adaptive Issuance (ongoing)
 
 - Add parameter ``limit_of_staking_over_baking`` as the limit of co-staked tokens over the baked tokens for a given baker. (MR :gl:`!8744`)
 
-When the feature flag is enabled, the following extra changes happen:
+When the feature flag is enabled (testnets only), the following extra changes happen:
 
 - Most rewards (baking rewards, baking bonuses, attestation rewards, revelation
   rewards) are paid on the frozen deposits balance rather than the spendable
@@ -90,15 +111,31 @@ When the feature flag is enabled, the following extra changes happen:
 - New RPCs introduced: total supply, total frozen stake, launch cycle.
   (MRs :gl:`!8982`, :gl:`!8995`, :gl:`!8997`, :gl:`!9057`)
 
+- The ``stake`` and ``unstake`` operations are currently deactivated, calls to
+  these operations will fail. Staking and unstaking transfers are still used
+  internally, and may appear in balance receipts. (MR :gl:`!10849`)
+
+- The ``unstake`` client command uses the ``amount`` field instead of an extra parameter. (MRs :gl:`!10377`, :gl:`!10429`)
+
+- The ``set deposits limit`` operation has been brought back. (MR :gl:`!10449`)
+
+- Balance updates now include more information related to staking in general,
+  including slashing and rewards. (MRs :gl:`!10485`, :gl:`!10486`, :gl:`!10487`,
+  :gl:`!10488`, :gl:`!10496`, :gl:`!10526`, :gl:`!10766`, :gl:`!10853`)
+
+- The new staking mechanism is used internally to freeze deposits automatically
+  at cycle ends, and mimic Nairobi's behavior. (MR :gl:`!10562`)
+
+- Unstaked frozen deposits, i.e recently unstaked funds, can be used by bakers
+  to be staked again (unless the baker has been slashed). They are used in
+  addition to liquid funds for staking, prioritizing the most recent unstake
+  requests. (MR :gl:`!10781`)
+
 Gas improvements
 ----------------
 
-- Gas model improved for origination function. (MR :gl:`!9020`)
-
 Breaking Changes
 ----------------
-
-- Operation ``Set_deposits_limit`` removed. (MR :gl:`!8831`)
 
 - Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement``
   is converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
@@ -114,11 +151,6 @@ Breaking Changes
   ``frozen_deposits_percentage`` (whose value is 10%) representing the minimal percentage
   of frozen deposit. We convert it from a percentage to a factor named
   ``limit_of_delegation_over_baking`` whose value is 9. (MR :gl:`!8884`)
-
-- The frozen deposits are not computed automatically from the baker's total stake
-  (own tokens and delegated ones). Hence there are no automatic transfers of the
-  baker's spendable balance to their frozen deposits. Bakers need to use the
-  ``stake`` pseudo-operation to increase their frozen deposits. (MR :gl:`!8087`)
 
 - Receipts involving the ``Deposits`` kind of balance are updated in a
   non-backward-compatible manner. It allows non-delegates, and
@@ -139,8 +171,12 @@ Breaking Changes
   encoding has been renamed ``preattestations_seen``, ``attestation_seen`` and
   ``double_attesting_evidences_seen``. (MR :gl:`!9440`)
 
+- A DAL attestation operation now contains a new ``slot`` field, while the
+  ``attestor`` field is removed. (MRs :gl:`!10183`, :gl:`!10294`, :gl:`!10317`)
+
 RPC Changes
 -----------
+
 
 - Split duplicated argument ``pkh`` in RPC ``smart_rollups/smart_rollup/<address>/staker1/<pkh>/staker2/<pkh>/timeout``
   and ``smart_rollups/smart_rollup/<address>/staker1/<pkh>/staker2/<pkh>/timeout_reached`` into ``/staker1/<staker1_pkh>/staker2/<staker2_pkh>``.
@@ -173,7 +209,7 @@ RPC Changes
 Operation receipts
 ------------------
 
-- To handle the new staking pseudo-operations, the following changes
+- To handle the new staking mechanism, the following changes
   to receipts have been made:
 
   - the ``Deposits`` kind of balance, which used to be associated to
@@ -192,6 +228,12 @@ Operation receipts
     with a ``Single`` delegator or ``Shared`` between a delegate and
     its delegators. (MR :gl:`!9498`)
 
+Protocol parameters
+-------------------
+
+- The protocol constant ``max_slashing_period`` has been moved from parametric
+  constants to fixed constants. (MR :gl:`!10451`)
+
 Bug Fixes
 ---------
 
@@ -199,8 +241,11 @@ Bug Fixes
   encoding. This constant field was wrongfully set for the
   ``metadata`` and ``request_dal_page`` case. (MR :gl:`!9307`)
 
+- Fix reporting of gas in traced execution of Michelson scripts. (MR :gl:`!6558`)
+
 Minor Changes
 -------------
+
 
 - Improve the error for implicit account type check. (MR :gl:`!7714`)
 
@@ -216,8 +261,16 @@ Minor Changes
 
 - Rename ``endorsement`` into ``attestation`` in protocol errors (MR :gl:`!9192`)
 
+- Arithmetic errors on Michelson ``mutez`` type have been exported so
+  they can now be caught outside of the protocol. (MR :gl:`!9934`)
+
+- Slashing penalties for double-signing are now applied at the end of the cycle where denunciations were included, rather than immediately. The same applies for rewards allocated from denunciations. (MR :gl:`!10389`)
+
+- Double baking penalty is now 7% of the offending baker's stake -- instead of 10%. (MR :gl:`!10431`)
+
 Internal
 --------
+
 
 - Fail earlier when a smart rollup commitment is in conflict when cementing.
   (MR :gl:`!8128`)
@@ -294,3 +347,10 @@ Internal
   ``balance_update_encoding_with_legacy_attestation_name`` has been added and
   output legacy ``endorsing rewards`` and ``lost endorsing rewards``. (MR
   :gl:`!9251`)
+
+- Register an error's encoding: ``WASM_proof_verification_failed``. It was
+  previously not registered, making the error message a bit obscure. (MR :gl:`!9603`)
+
+- The semantics of forbidden delegates has been adjusted: a delegate becomes
+  forbidden if it has been slashed for more than 51% of its frozen stake over
+  the last 2 cycles. (MRs :gl:`!10382`, :gl:`!10844`)

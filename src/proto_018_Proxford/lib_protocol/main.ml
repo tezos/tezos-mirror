@@ -122,6 +122,19 @@ type mode =
       timestamp : Time.t;
     }
 
+let can_contain_preattestations mode =
+  let open Result_syntax in
+  match mode with
+  | Construction _ | Partial_construction _ -> return_true
+  | Application block_header | Partial_validation block_header ->
+      (* A preexisting block, which has a complete and correct block
+         header, can only contain preattestations when the locked
+         round in the fitness has an actual value. *)
+      let* locked_round =
+        Alpha_context.Fitness.locked_round_from_raw block_header.shell.fitness
+      in
+      return (Option.is_some locked_round)
+
 (** Initialize the consensus rights by first slot for modes that are
     about the validation/application of a block: application, partial
     validation, and full construction.
@@ -134,19 +147,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let* ctxt, attestations_map =
     Baking.attesting_rights_by_first_slot ctxt predecessor_level
   in
-  let*? can_contain_preattestations =
-    match mode with
-    | Construction _ | Partial_construction _ -> ok true
-    | Application block_header | Partial_validation block_header ->
-        (* A preexisting block, which has a complete and correct block
-           header, can only contain preattestations when the locked
-           round in the fitness has an actual value. *)
-        let open Result_syntax in
-        let* locked_round =
-          Fitness.locked_round_from_raw block_header.shell.fitness
-        in
-        return (Option.is_some locked_round)
-  in
+  let*? can_contain_preattestations = can_contain_preattestations mode in
   let* ctxt, allowed_preattestations =
     if can_contain_preattestations then
       let* ctxt, preattestations_map =
@@ -222,7 +223,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
     | Partial_construction _ ->
         init_consensus_rights_for_mempool ctxt ~predecessor_level
   in
-  Dal_apply.initialisation ~level:predecessor_level ctxt >>=? fun ctxt ->
+  let* ctxt = Dal_apply.initialisation ~level:predecessor_level ctxt in
   return
     ( ctxt,
       migration_balance_updates,
@@ -360,6 +361,7 @@ let compare_operations (oph1, op1) (oph2, op2) =
   Alpha_context.Operation.compare (oph1, op1) (oph2, op2)
 
 let init chain_id ctxt block_header =
+  let open Lwt_result_syntax in
   let level = block_header.Block_header.level in
   let timestamp = block_header.timestamp in
   let predecessor = block_header.predecessor in
@@ -369,49 +371,54 @@ let init chain_id ctxt block_header =
       false
       (* There should be no forged value in bootstrap contracts. *)
     in
-    Script_ir_translator.parse_script
-      ctxt
-      ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-      ~allow_forged_in_storage
-      script
-    >>=? fun (Ex_script (Script parsed_script), ctxt) ->
-    Script_ir_translator.extract_lazy_storage_diff
-      ctxt
-      Optimized
-      parsed_script.storage_type
-      parsed_script.storage
-      ~to_duplicate:Script_ir_translator.no_lazy_storage_id
-      ~to_update:Script_ir_translator.no_lazy_storage_id
-      ~temporary:false
-    >>=? fun (storage, lazy_storage_diff, ctxt) ->
-    Script_ir_translator.unparse_data
-      ctxt
-      Optimized
-      parsed_script.storage_type
-      storage
-    >|=? fun (storage, ctxt) ->
+    let* Ex_script (Script parsed_script), ctxt =
+      Script_ir_translator.parse_script
+        ctxt
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
+        ~allow_forged_in_storage
+        script
+    in
+    let* storage, lazy_storage_diff, ctxt =
+      Script_ir_translator.extract_lazy_storage_diff
+        ctxt
+        Optimized
+        parsed_script.storage_type
+        parsed_script.storage
+        ~to_duplicate:Script_ir_translator.no_lazy_storage_id
+        ~to_update:Script_ir_translator.no_lazy_storage_id
+        ~temporary:false
+    in
+    let+ storage, ctxt =
+      Script_ir_translator.unparse_data
+        ctxt
+        Optimized
+        parsed_script.storage_type
+        storage
+    in
     let storage = Alpha_context.Script.lazy_expr storage in
     (({script with storage}, lazy_storage_diff), ctxt)
   in
   (* The cache must be synced at the end of block validation, so we do
      so here for the first block in a protocol where `finalize_block`
      is not called. *)
-  Alpha_context.Raw_level.of_int32 level >>?= fun raw_level ->
+  let*? raw_level = Alpha_context.Raw_level.of_int32 level in
   let init_fitness =
     Alpha_context.Fitness.create_without_locked_round
       ~level:raw_level
       ~round:Alpha_context.Round.zero
       ~predecessor_round:Alpha_context.Round.zero
   in
-  Alpha_context.prepare_first_block
-    chain_id
-    ~typecheck_smart_contract
-    ~typecheck_smart_rollup:Sc_rollup_operations.validate_untyped_parameters_ty
-    ~level
-    ~timestamp
-    ~predecessor
-    ctxt
-  >>=? fun ctxt ->
+  let* ctxt =
+    Alpha_context.prepare_first_block
+      chain_id
+      ~typecheck_smart_contract
+      ~typecheck_smart_rollup:
+        Sc_rollup_operations.validate_untyped_parameters_ty
+      ~level
+      ~timestamp
+      ~predecessor
+      ctxt
+  in
   let cache_nonce =
     Alpha_context.Cache.cache_nonce_from_block_header
       block_header
@@ -431,16 +438,19 @@ let init chain_id ctxt block_header =
        }
         : Alpha_context.Block_header.contents)
   in
-  Alpha_context.Cache.Admin.sync ctxt cache_nonce >>= fun ctxt ->
+  let*! ctxt = Alpha_context.Cache.Admin.sync ctxt cache_nonce in
   return
     (Alpha_context.finalize ctxt (Alpha_context.Fitness.to_raw init_fitness))
 
 let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
     ~predecessor_level:pred_level ~predecessor_fitness:_ ~predecessor:_
     ~timestamp =
+  let open Lwt_result_syntax in
   let level = Int32.succ pred_level in
-  Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
-  >>=? fun (ctxt, _, _) -> return (Apply.value_of_key ctxt)
+  let* ctxt, _, _ =
+    Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
+  in
+  return (Apply.value_of_key ctxt)
 
 module Mempool = struct
   include Mempool_validation
@@ -469,4 +479,4 @@ module Mempool = struct
          ~predecessor_hash:head_hash)
 end
 
-(* Vanity nonce: 3664855949856264 *)
+(* Vanity nonce: 7127690117134510 *)

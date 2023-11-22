@@ -41,6 +41,8 @@ type simulation_params = {
   sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
+  other_contracts : RPC.Scripts.S.other_contract_description list option;
+  extra_big_maps : RPC.Scripts.S.extra_big_map_description list option;
 }
 
 (* Parameters specific to simulations of TZIP4 views *)
@@ -67,6 +69,17 @@ type run_params = {
   storage : Michelson_v1_parser.parsed;
   entrypoint : Entrypoint.t option;
   self : Contract_hash.t option;
+}
+
+(* Parameters specific to simulations of single steps *)
+type run_instr_params = {
+  shared_params : simulation_params;
+  amount : Tez.t;
+  balance : Tez.t option;
+  stack : (Script.expr * Script.expr) list;
+  self : Contract_hash.t option;
+  parameter : Script.expr option;
+  legacy : bool;
 }
 
 (** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_tzip4_view} *)
@@ -113,13 +126,21 @@ val trace :
   tzresult
   Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_instr} *)
+val run_instr :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  run_instr_params ->
+  ((Script.expr * Script.expr) list * Gas.t) tzresult Lwt.t
+
 val print_view_result :
   #Protocol_client_context.full ->
   Script_repr.expr tzresult ->
   unit tzresult Lwt.t
 
 val print_run_result :
-  #Protocol_client_context.full ->
+  Protocol_client_context.full ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr
@@ -139,13 +160,20 @@ val print_trace_result :
   tzresult ->
   unit tzresult Lwt.t
 
+val print_run_instr_result :
+  #Protocol_client_context.full ->
+  show_source:bool ->
+  parsed:Michelson_v1_parser.parsed ->
+  ((Script.expr * Script.expr) list * Gas.t) tzresult ->
+  unit tzresult Lwt.t
+
 (** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.typecheck_data} *)
 val typecheck_data :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Gas.Arith.integral ->
-  ?legacy:bool ->
+  gas:Gas.Arith.integral option ->
+  legacy:bool ->
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
   unit ->
@@ -156,8 +184,8 @@ val typecheck_program :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Gas.Arith.integral ->
-  ?legacy:bool ->
+  gas:Gas.Arith.integral option ->
+  legacy:bool ->
   show_types:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t
@@ -178,8 +206,8 @@ val script_size :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Gas.Arith.integral ->
-  ?legacy:bool ->
+  gas:Gas.Arith.integral option ->
+  legacy:bool ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
   unit ->

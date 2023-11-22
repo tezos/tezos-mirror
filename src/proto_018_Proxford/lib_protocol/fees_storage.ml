@@ -79,14 +79,17 @@ let record_global_constant_storage_space context size =
   (context, to_be_paid)
 
 let record_paid_storage_space ctxt contract_hash =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Originated contract_hash in
   (* Get the new size of the contract's storage. *)
-  Contract_storage.used_storage_space ctxt contract >>=? fun new_storage_size ->
-  Contract_storage.set_paid_storage_space_and_return_fees_to_pay
-    ctxt
-    contract
-    new_storage_size
-  >>=? fun (to_be_paid, c) -> return (c, new_storage_size, to_be_paid)
+  let* new_storage_size = Contract_storage.used_storage_space ctxt contract in
+  let+ to_be_paid, c =
+    Contract_storage.set_paid_storage_space_and_return_fees_to_pay
+      ctxt
+      contract
+      new_storage_size
+  in
+  (c, new_storage_size, to_be_paid)
 
 let source_must_exist c src =
   match src with
@@ -95,11 +98,12 @@ let source_must_exist c src =
 
 let burn_storage_fees ?(origin = Receipt_repr.Block_application) c
     ~storage_limit ~payer consumed =
+  let open Lwt_result_syntax in
   let remaining = Z.sub storage_limit consumed in
   if Compare.Z.(remaining < Z.zero) then tzfail Operation_quota_exceeded
   else
     let cost_per_byte = Constants_storage.cost_per_byte c in
-    Tez_repr.(cost_per_byte *? Z.to_int64 consumed) >>?= fun to_burn ->
+    let*? to_burn = Tez_repr.(cost_per_byte *? Z.to_int64 consumed) in
     (* Burning the fees... *)
     if Tez_repr.(to_burn = Tez_repr.zero) then
       (* If the payer was deleted by transferring all its balance, and no space
@@ -108,22 +112,24 @@ let burn_storage_fees ?(origin = Receipt_repr.Block_application) c
     else
       trace
         Cannot_pay_storage_fee
-        ( source_must_exist c payer >>=? fun () ->
-          Token.transfer ~origin c payer `Storage_fees to_burn
-          >>=? fun (ctxt, balance_updates) ->
-          return (ctxt, remaining, balance_updates) )
+        (let* () = source_must_exist c payer in
+         let+ ctxt, balance_updates =
+           Token.transfer ~origin c payer `Storage_fees to_burn
+         in
+         (ctxt, remaining, balance_updates))
 
 let burn_storage_increase_fees ?(origin = Receipt_repr.Block_application) c
     ~payer amount_in_bytes =
+  let open Lwt_result_syntax in
   if Compare.Z.(amount_in_bytes <= Z.zero) then tzfail Negative_storage_input
   else
     let cost_per_byte = Constants_storage.cost_per_byte c in
-    Tez_repr.(cost_per_byte *? Z.to_int64 amount_in_bytes) >>?= fun to_burn ->
+    let*? to_burn = Tez_repr.(cost_per_byte *? Z.to_int64 amount_in_bytes) in
     (* Burning the fees... *)
     trace
       Cannot_pay_storage_fee
-      ( source_must_exist c payer >>=? fun () ->
-        Token.transfer ~origin c payer `Storage_fees to_burn )
+      (let* () = source_must_exist c payer in
+       Token.transfer ~origin c payer `Storage_fees to_burn)
 
 let burn_origination_fees ?(origin = Receipt_repr.Block_application) c
     ~storage_limit ~payer =
@@ -139,9 +145,10 @@ let burn_zk_rollup_origination_fees ?(origin = Receipt_repr.Block_application) c
   burn_storage_fees ~origin c ~storage_limit ~payer consumed
 
 let check_storage_limit c ~storage_limit =
+  let open Result_syntax in
   if
     Compare.Z.(
       storage_limit > (Raw_context.constants c).hard_storage_limit_per_operation)
     || Compare.Z.(storage_limit < Z.zero)
-  then error Storage_limit_too_high
-  else Result.return_unit
+  then tzfail Storage_limit_too_high
+  else return_unit

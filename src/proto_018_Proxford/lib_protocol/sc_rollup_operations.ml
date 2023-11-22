@@ -26,16 +26,62 @@
 
 open Alpha_context
 
+type ('a, 'b) error_container = {given : 'a; last_update : 'b}
+
+type outdated_whitelist_update =
+  | Outdated_message_index of
+      (Z.t, Sc_rollup.Whitelist.last_whitelist_update) error_container
+  | Outdated_outbox_level of
+      (Raw_level.t, Sc_rollup.Whitelist.last_whitelist_update) error_container
+
+let outdated_whitelist_update_encoding =
+  Data_encoding.(
+    union
+      [
+        case
+          ~title:"outdated_message_index"
+          (Tag 0)
+          (obj2
+             (req "message_index" n)
+             (req
+                "last_whitelist_update"
+                Sc_rollup.Whitelist.last_whitelist_update_encoding))
+          (function
+            | Outdated_message_index {given; last_update} ->
+                Some (given, last_update)
+            | _ -> None)
+          (fun (given, last_update) ->
+            Outdated_message_index {given; last_update});
+        case
+          ~title:"outdated_outbox_level"
+          (Tag 1)
+          (obj2
+             (req "outbox_level" Raw_level.encoding)
+             (req
+                "last_whitelist_update"
+                Sc_rollup.Whitelist.last_whitelist_update_encoding))
+          (function
+            | Outdated_outbox_level {given; last_update} ->
+                Some (given, last_update)
+            | _ -> None)
+          (fun (given, last_update) ->
+            Outdated_outbox_level {given; last_update});
+      ])
+
 type error +=
   | (* Permanent *) Sc_rollup_invalid_parameters_type
   | (* Permanent *) Sc_rollup_invalid_last_cemented_commitment
   | (* Permanent *) Sc_rollup_invalid_output_proof
   | (* Permanent *) Sc_rollup_invalid_outbox_level
+  | (* Permanent *)
+      Sc_rollup_outdated_whitelist_update of
+      outdated_whitelist_update
 
 type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
   ticket_receipt : Ticket_receipt.t;
   operations : Script_typed_ir.packed_internal_operation list;
+  whitelist_update : Sc_rollup.Whitelist.update option;
 }
 
 let () =
@@ -79,7 +125,42 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
     (function Sc_rollup_invalid_outbox_level -> Some () | _ -> None)
-    (fun () -> Sc_rollup_invalid_outbox_level)
+    (fun () -> Sc_rollup_invalid_outbox_level) ;
+  let description = "Outdated whitelist update" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_outdated_whitelist_update"
+    ~title:description
+    ~description
+    ~pp:
+      (fun ppf -> function
+        | Outdated_message_index {given; last_update} ->
+            Format.fprintf
+              ppf
+              "%s: got message index %a at outbox level %a, while the lastest \
+               whitelist update occurred with message index %a."
+              description
+              Z.pp_print
+              given
+              Z.pp_print
+              last_update.message_index
+              Raw_level.pp
+              last_update.outbox_level
+        | Outdated_outbox_level {given; last_update} ->
+            Format.fprintf
+              ppf
+              "%s: got outbox level %a, while the current outbox level is %a \
+               with message index %a."
+              description
+              Raw_level.pp
+              given
+              Raw_level.pp
+              last_update.outbox_level
+              Z.pp_print
+              last_update.message_index)
+    outdated_whitelist_update_encoding
+    (function Sc_rollup_outdated_whitelist_update e -> Some e | _ -> None)
+    (fun e -> Sc_rollup_outdated_whitelist_update e)
 
 type origination_result = {
   address : Sc_rollup.Address.t;
@@ -97,82 +178,84 @@ let rec validate_ty :
     a Script_typed_ir.entrypoints_node ->
     ret continuation ->
     ret tzresult =
- fun ty {nested = nested_entrypoints; at_node} k ->
-  let open Script_typed_ir in
-  match at_node with
-  | Some {name = _; original_type_expr = _} ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
-         We currently don't support entrypoints as the entrypoint information
-         for L1 to L2 messages is not propagated to the rollup. *)
-      error Sc_rollup_invalid_parameters_type
-  | None -> (
-      match ty with
-      (* Valid primitive types. *)
-      | Unit_t -> (k [@ocaml.tailcall]) ()
-      | Int_t -> (k [@ocaml.tailcall]) ()
-      | Nat_t -> (k [@ocaml.tailcall]) ()
-      | Signature_t -> (k [@ocaml.tailcall]) ()
-      | String_t -> (k [@ocaml.tailcall]) ()
-      | Bytes_t -> (k [@ocaml.tailcall]) ()
-      | Key_hash_t -> (k [@ocaml.tailcall]) ()
-      | Key_t -> (k [@ocaml.tailcall]) ()
-      | Timestamp_t -> (k [@ocaml.tailcall]) ()
-      | Address_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
-      | Bool_t -> (k [@ocaml.tailcall]) ()
-      | Never_t -> (k [@ocaml.tailcall]) ()
-      | Chain_id_t -> (k [@ocaml.tailcall]) ()
-      (* Valid collection types. *)
-      | Ticket_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Option_t (ty, _, _) ->
-          (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Pair_t (ty1, ty2, _, _) ->
-          (* Entrypoints may not be nested in pairs, hence the no_entrypoints
-             value. *)
-          (validate_two_tys [@ocaml.tailcall])
-            ty1
-            ty2
-            no_entrypoints
-            no_entrypoints
-            k
-      | Or_t (ty1, ty2, _, _) ->
-          let entrypoints_l, entrypoints_r =
-            match nested_entrypoints with
-            | Entrypoints_None -> (no_entrypoints, no_entrypoints)
-            | Entrypoints_Or {left; right} -> (left, right)
-          in
-          (validate_two_tys [@ocaml.tailcall])
-            ty1
-            ty2
-            entrypoints_l
-            entrypoints_r
-            k
-      | Map_t (key_ty, val_ty, _) ->
-          (* Entrypoints may not be nested in maps, hence the no_entrypoints
-             value. *)
-          (validate_two_tys [@ocaml.tailcall])
-            key_ty
-            val_ty
-            no_entrypoints
-            no_entrypoints
-            k
-      (* Invalid types. *)
-      | Mutez_t -> error Sc_rollup_invalid_parameters_type
-      | Big_map_t (_key_ty, _val_ty, _) ->
-          error Sc_rollup_invalid_parameters_type
-      | Contract_t _ -> error Sc_rollup_invalid_parameters_type
-      | Sapling_transaction_t _ -> error Sc_rollup_invalid_parameters_type
-      | Sapling_transaction_deprecated_t _ ->
-          error Sc_rollup_invalid_parameters_type
-      | Sapling_state_t _ -> error Sc_rollup_invalid_parameters_type
-      | Operation_t -> error Sc_rollup_invalid_parameters_type
-      | Chest_t -> error Sc_rollup_invalid_parameters_type
-      | Chest_key_t -> error Sc_rollup_invalid_parameters_type
-      | Lambda_t (_, _, _) -> error Sc_rollup_invalid_parameters_type)
+  let open Result_syntax in
+  fun ty {nested = nested_entrypoints; at_node} k ->
+    let open Script_typed_ir in
+    match at_node with
+    | Some {name = _; original_type_expr = _} ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
+           We currently don't support entrypoints as the entrypoint information
+           for L1 to L2 messages is not propagated to the rollup. *)
+        tzfail Sc_rollup_invalid_parameters_type
+    | None -> (
+        match ty with
+        (* Valid primitive types. *)
+        | Unit_t -> (k [@ocaml.tailcall]) ()
+        | Int_t -> (k [@ocaml.tailcall]) ()
+        | Nat_t -> (k [@ocaml.tailcall]) ()
+        | Signature_t -> (k [@ocaml.tailcall]) ()
+        | String_t -> (k [@ocaml.tailcall]) ()
+        | Bytes_t -> (k [@ocaml.tailcall]) ()
+        | Key_hash_t -> (k [@ocaml.tailcall]) ()
+        | Key_t -> (k [@ocaml.tailcall]) ()
+        | Timestamp_t -> (k [@ocaml.tailcall]) ()
+        | Address_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
+        | Bool_t -> (k [@ocaml.tailcall]) ()
+        | Never_t -> (k [@ocaml.tailcall]) ()
+        | Chain_id_t -> (k [@ocaml.tailcall]) ()
+        (* Valid collection types. *)
+        | Ticket_t (ty, _) ->
+            (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Option_t (ty, _, _) ->
+            (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Pair_t (ty1, ty2, _, _) ->
+            (* Entrypoints may not be nested in pairs, hence the no_entrypoints
+               value. *)
+            (validate_two_tys [@ocaml.tailcall])
+              ty1
+              ty2
+              no_entrypoints
+              no_entrypoints
+              k
+        | Or_t (ty1, ty2, _, _) ->
+            let entrypoints_l, entrypoints_r =
+              match nested_entrypoints with
+              | Entrypoints_None -> (no_entrypoints, no_entrypoints)
+              | Entrypoints_Or {left; right} -> (left, right)
+            in
+            (validate_two_tys [@ocaml.tailcall])
+              ty1
+              ty2
+              entrypoints_l
+              entrypoints_r
+              k
+        | Map_t (key_ty, val_ty, _) ->
+            (* Entrypoints may not be nested in maps, hence the no_entrypoints
+               value. *)
+            (validate_two_tys [@ocaml.tailcall])
+              key_ty
+              val_ty
+              no_entrypoints
+              no_entrypoints
+              k
+        (* Invalid types. *)
+        | Mutez_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Big_map_t (_key_ty, _val_ty, _) ->
+            tzfail Sc_rollup_invalid_parameters_type
+        | Contract_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_transaction_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_transaction_deprecated_t _ ->
+            tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_state_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Operation_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Chest_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Chest_key_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Lambda_t (_, _, _) -> tzfail Sc_rollup_invalid_parameters_type)
 
 and validate_two_tys :
     type a ac b bc ret.
@@ -192,16 +275,16 @@ let validate_parameters_ty :
     (a, ac) Script_typed_ir.ty ->
     a Script_typed_ir.entrypoints_node ->
     context tzresult =
- fun ctxt parameters_ty entrypoints ->
   let open Result_syntax in
-  let* ctxt =
-    Gas.consume
-      ctxt
-      (Sc_rollup_costs.is_valid_parameters_ty_cost
-         ~ty_size:Script_typed_ir.(ty_size parameters_ty |> Type_size.to_int))
-  in
-  let+ () = validate_ty parameters_ty entrypoints ok in
-  ctxt
+  fun ctxt parameters_ty entrypoints ->
+    let* ctxt =
+      Gas.consume
+        ctxt
+        (Sc_rollup_costs.is_valid_parameters_ty_cost
+           ~ty_size:Script_typed_ir.(ty_size parameters_ty |> Type_size.to_int))
+    in
+    let+ () = validate_ty parameters_ty entrypoints return in
+    ctxt
 
 let validate_untyped_parameters_ty ctxt parameters_ty =
   let open Result_syntax in
@@ -226,7 +309,7 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
      for L1 to L2 messages is not propagated to the rollup. *)
   validate_parameters_ty ctxt arg_type entrypoint
 
-let originate ctxt ~kind ~boot_sector ~parameters_ty =
+let originate ?whitelist ctxt ~kind ~boot_sector ~parameters_ty =
   let open Lwt_result_syntax in
   let*? ctxt =
     let open Result_syntax in
@@ -241,7 +324,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
   let boot_sector_size_in_bytes = String.length boot_sector in
   let*? ctxt =
     match kind with
-    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith ->
+    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith | Riscv ->
         (*
 
            We do not really care about the precision of the gas model
@@ -264,7 +347,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
       ~origination_level:(Level.current ctxt).level
   in
   let+ address, size, genesis_commitment_hash, ctxt =
-    Sc_rollup.originate ctxt ~kind ~parameters_ty ~genesis_commitment
+    Sc_rollup.originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
   in
   ({address; size; genesis_commitment_hash}, ctxt)
 
@@ -341,8 +424,8 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     match
       Data_encoding.Binary.of_string_opt PVM.output_proof_encoding output_proof
     with
-    | Some x -> ok x
-    | None -> error Sc_rollup_invalid_output_proof
+    | Some x -> Ok x
+    | None -> Result_syntax.tzfail Sc_rollup_invalid_output_proof
   in
   (* Verify that the states match. *)
   let* {Sc_rollup.Commitment.compressed_state; _}, ctxt =
@@ -387,6 +470,151 @@ let validate_outbox_level ctxt ~outbox_level ~lcc_level =
     (Raw_level.(outbox_level <= lcc_level) && outbox_level_is_active)
     Sc_rollup_invalid_outbox_level
 
+let execute_outbox_message_transaction ctxt ~transactions ~rollup =
+  let open Lwt_result_syntax in
+  (* Turn the transaction batch into a list of operations. *)
+  let*? ctxt, operations =
+    List.fold_left_map_e
+      (fun ctxt transaction ->
+        let open Result_syntax in
+        let+ op, ctxt = to_transaction_operation ctxt rollup transaction in
+        (ctxt, op))
+      ctxt
+      transactions
+  in
+  (* Extract the ticket-token diffs from the operations. We here make sure that
+     there are no tickets with amount zero. Zero-amount tickets are not allowed
+     as they cannot be tracked by the ticket-balance table.
+  *)
+  let* ticket_token_diffs, ctxt =
+    Ticket_operations_diff.ticket_diffs_of_operations ctxt operations
+  in
+  (* Update the ticket-balance table by transferring ticket-tokens to new
+     destinations for each transaction. This fails in case the rollup does not
+     hold a sufficient amount of any of the ticket-tokens transferred.
+
+     The updates must happen before any of the operations are executed to avoid
+     a case where ticket-transfers are funded as a result of prior operations
+     depositing new tickets to the rollup.
+  *)
+  let* paid_storage_size_diff, ctxt =
+    let source_destination = Destination.Sc_rollup rollup in
+    List.fold_left_es
+      (fun (acc_storage_diff, ctxt) ticket_token_diff ->
+        transfer_ticket_tokens
+          ctxt
+          ~source_destination
+          ~acc_storage_diff
+          ticket_token_diff)
+      (Z.zero, ctxt)
+      ticket_token_diffs
+  in
+  let* ctxt, ticket_receipt =
+    List.fold_left_map_es
+      (fun ctxt
+           Ticket_operations_diff.
+             {ticket_token = ex_token; total_amount; destinations = _} ->
+        let+ ticket_token, ctxt = Ticket_token_unparser.unparse ctxt ex_token in
+        (* Here we only show the outgoing (negative) balance wrt to the rollup
+           address. The positive balances for the receiving contracts are
+           contained in the ticket updates for the internal operations. *)
+        let item =
+          Ticket_receipt.
+            {
+              ticket_token;
+              updates =
+                [
+                  {
+                    account = Destination.Sc_rollup rollup;
+                    amount = Z.neg (Script_int.to_zint total_amount);
+                  };
+                ];
+            }
+        in
+        (ctxt, item))
+      ctxt
+      ticket_token_diffs
+  in
+  return
+    ( {
+        paid_storage_size_diff;
+        ticket_receipt;
+        operations;
+        whitelist_update = None;
+      },
+      ctxt )
+
+let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
+    ~outbox_level ~message_index =
+  let open Lwt_result_syntax in
+  let* ctxt, is_private = Sc_rollup.Whitelist.is_private ctxt rollup in
+  if is_private then
+    match whitelist with
+    | Some whitelist ->
+        (* The whitelist update fails with an empty list. *)
+        let*? () =
+          error_when
+            (List.is_empty whitelist)
+            Sc_rollup_errors.Sc_rollup_empty_whitelist
+        in
+        let* ( ctxt,
+               (Sc_rollup.Whitelist.
+                  {
+                    message_index = latest_message_index;
+                    outbox_level = latest_outbox_level;
+                  } as last_update) ) =
+          Sc_rollup.Whitelist.get_last_whitelist_update ctxt rollup
+        in
+        (* Do not apply whitelist update if a previous whitelist update
+           occurred with a greater message index for a given outbox level,
+           or with a greater outbox level. *)
+        let* () =
+          fail_when
+            (Raw_level.(latest_outbox_level = outbox_level)
+            && Compare.Z.(latest_message_index >= message_index))
+            (Sc_rollup_outdated_whitelist_update
+               (Outdated_message_index {given = message_index; last_update}))
+        in
+        let* () =
+          fail_when
+            Raw_level.(outbox_level < latest_outbox_level)
+            (Sc_rollup_outdated_whitelist_update
+               (Outdated_outbox_level {given = outbox_level; last_update}))
+        in
+        let* ctxt, new_storage_size =
+          Sc_rollup.Whitelist.replace ctxt rollup ~whitelist
+        in
+        let* ctxt, size_diff =
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6186
+             Do not consider storage diffs for small updates to the storage. *)
+          Sc_rollup.Whitelist.set_last_whitelist_update
+            ctxt
+            rollup
+            {outbox_level; message_index}
+        in
+        let* ctxt, paid_storage_size_diff =
+          Sc_rollup.Whitelist.adjust_storage_space ctxt rollup ~new_storage_size
+        in
+        return
+          ( {
+              paid_storage_size_diff = Z.add paid_storage_size_diff size_diff;
+              ticket_receipt = [];
+              operations = [];
+              whitelist_update = Some (Private whitelist);
+            },
+            ctxt )
+    | None ->
+        let* ctxt, _freed_size = Sc_rollup.Whitelist.make_public ctxt rollup in
+        return
+          ( {
+              paid_storage_size_diff = Z.zero;
+              ticket_receipt = [];
+              operations = [];
+              whitelist_update = Some Public;
+            },
+            ctxt )
+  else tzfail Sc_rollup_errors.Sc_rollup_is_public
+
 let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
     ~cemented_commitment ~output_proof =
   let open Lwt_result_syntax in
@@ -421,21 +649,25 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
   in
   (* Validate that the outbox level is within valid bounds. *)
   let* () = validate_outbox_level ctxt ~outbox_level ~lcc_level in
-  let* ( Sc_rollup_management_protocol.Atomic_transaction_batch {transactions},
-         ctxt ) =
+  let* decoded_outbox_msg, ctxt =
     Sc_rollup_management_protocol.outbox_message_of_outbox_message_repr
       ctxt
       message
   in
-  (* Turn the transaction batch into a list of operations. *)
-  let*? ctxt, operations =
-    List.fold_left_map_e
-      (fun ctxt transaction ->
-        let open Result_syntax in
-        let+ op, ctxt = to_transaction_operation ctxt rollup transaction in
-        (ctxt, op))
-      ctxt
-      transactions
+  let* receipt, ctxt =
+    match decoded_outbox_msg with
+    | Sc_rollup_management_protocol.Atomic_transaction_batch {transactions} ->
+        execute_outbox_message_transaction ctxt ~transactions ~rollup
+    | Sc_rollup_management_protocol.Whitelist_update whitelist ->
+        let is_enabled = Constants.sc_rollup_private_enable ctxt in
+        if is_enabled then
+          execute_outbox_message_whitelist_update
+            ctxt
+            ~rollup
+            ~whitelist
+            ~outbox_level
+            ~message_index
+        else tzfail Sc_rollup_errors.Sc_rollup_whitelist_disabled
   in
   (* Record that the message for the given level has been applied. This fails
      in case a message for the rollup, outbox-level and message index has
@@ -448,66 +680,19 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
       outbox_level
       ~message_index:(Z.to_int message_index)
   in
-  (* TODO: #3121
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3121
      Implement a more refined model. For instance a water-mark based one.
      For now we only charge for positive contributions. It means that over time
      we are overcharging for storage space.
   *)
-  let paid_storage_size_diff = Z.max Z.zero applied_msg_size_diff in
-  (* Extract the ticket-token diffs from the operations. We here make sure that
-     there are no tickets with amount zero. Zero-amount tickets are not allowed
-     as they cannot be tracked by the ticket-balance table.
-  *)
-  let* ticket_token_diffs, ctxt =
-    Ticket_operations_diff.ticket_diffs_of_operations ctxt operations
-  in
-  (* Update the ticket-balance table by transferring ticket-tokens to new
-     destinations for each transaction. This fails in case the rollup does not
-     hold a sufficient amount of any of the ticket-tokens transferred.
-
-     The updates must happen before any of the operations are executed to avoid
-     a case where ticket-transfers are funded as a result of prior operations
-     depositing new tickets to the rollup.
-  *)
-  let* paid_storage_size_diff, ctxt =
-    let source_destination = Destination.Sc_rollup rollup in
-    List.fold_left_es
-      (fun (acc_storage_diff, ctxt) ticket_token_diff ->
-        transfer_ticket_tokens
-          ctxt
-          ~source_destination
-          ~acc_storage_diff
-          ticket_token_diff)
-      (paid_storage_size_diff, ctxt)
-      ticket_token_diffs
-  in
-  let* ctxt, ticket_receipt =
-    List.fold_left_map_es
-      (fun ctxt
-           Ticket_operations_diff.
-             {ticket_token = ex_token; total_amount; destinations = _} ->
-        let+ ticket_token, ctxt = Ticket_token_unparser.unparse ctxt ex_token in
-        (* Here we only show the outgoing (negative) balance wrt to the rollup
-           address. The positive balances for the receiving contracts are
-           contained in the ticket updates for the internal operations. *)
-        let item =
-          Ticket_receipt.
-            {
-              ticket_token;
-              updates =
-                [
-                  {
-                    account = Destination.Sc_rollup rollup;
-                    amount = Z.neg (Script_int.to_zint total_amount);
-                  };
-                ];
-            }
-        in
-        (ctxt, item))
-      ctxt
-      ticket_token_diffs
-  in
-  return ({paid_storage_size_diff; ticket_receipt; operations}, ctxt)
+  let applied_msg_size_diff = Z.max Z.zero applied_msg_size_diff in
+  return
+    ( {
+        receipt with
+        paid_storage_size_diff =
+          Z.add receipt.paid_storage_size_diff applied_msg_size_diff;
+      },
+      ctxt )
 
 module Internal_for_tests = struct
   let execute_outbox_message = execute_outbox_message

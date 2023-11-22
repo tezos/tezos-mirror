@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -102,7 +102,9 @@ module Proto_client = struct
           storage_limit = Z.zero;
         }
     in
-    Data_encoding.Binary.length Operation.contents_encoding (Contents contents)
+    Data_encoding.Binary.length
+      Operation.contents_encoding_with_legacy_attestation_name
+      (Contents contents)
 
   let operation_size op = manager_operation_size (to_manager_operation op)
 
@@ -132,7 +134,7 @@ module Proto_client = struct
     in
     let dummy_size =
       Data_encoding.Binary.length
-        Operation.contents_encoding
+        Operation.contents_encoding_with_legacy_attestation_name
         (Contents dummy_contents)
     in
     dummy_size - manager_operation_size (Manager dummy_operation)
@@ -189,6 +191,8 @@ module Proto_client = struct
         error_with "Cannot find operation status because metadata is missing"
     | Operation_metadata {contents} -> operation_contents_status contents ~index
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6339 *)
+  (* Don't make multiple calls to [operations_in_pass] RPC *)
   let get_block_operations =
     let ops_cache = Block_cache.create 32 in
     fun cctxt block_hash ->
@@ -327,7 +331,9 @@ module Proto_client = struct
       ((shell, Contents_list contents) as unsigned_op) =
     let open Lwt_result_syntax in
     let unsigned_bytes =
-      Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding_with_legacy_attestation_name
+        unsigned_op
     in
     let cctxt =
       new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
@@ -345,7 +351,9 @@ module Proto_client = struct
         protocol_data = Operation_data {contents; signature = Some signature};
       }
     in
-    Data_encoding.Binary.to_bytes_exn Operation.encoding op
+    Data_encoding.Binary.to_bytes_exn
+      Operation.encoding_with_legacy_attestation_name
+      op
 
   let time_until_next_block {minimal_block_delay; delay_increment_per_round; _}
       (header : Tezos_base.Block_header.shell_header option) =

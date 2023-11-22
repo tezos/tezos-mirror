@@ -2,37 +2,37 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_plugin_018_Proxford)
- (public_name octez-protocol-018-Proxford-libs.plugin)
+ (name tezos_protocol_plugin_alpha)
+ (public_name octez-protocol-alpha-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-018-Proxford.protocol
-  octez-protocol-018-Proxford-libs.smart-rollup)
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_018_Proxford
-  -open Tezos_smart_rollup_018_Proxford)
+  -open Tezos_protocol_alpha
+  -open Tezos_smart_rollup_alpha)
  (modules (:standard \ Plugin_registerer)))
 
-(documentation (package octez-protocol-018-Proxford-libs))
+(documentation (package octez-protocol-alpha-libs))
 
 (library
- (name tezos_protocol_plugin_018_Proxford_registerer)
- (public_name octez-protocol-018-Proxford-libs.plugin-registerer)
+ (name tezos_protocol_plugin_alpha_registerer)
+ (public_name octez-protocol-alpha-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-018-Proxford.embedded-protocol
-  octez-protocol-018-Proxford-libs.plugin
+  tezos-protocol-alpha.embedded-protocol
+  octez-protocol-alpha-libs.plugin
   octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_embedded_protocol_018_Proxford
-  -open Tezos_protocol_plugin_018_Proxford
+  -open Tezos_embedded_protocol_alpha
+  -open Tezos_protocol_plugin_alpha
   -open Tezos_validation)
  (modules Plugin_registerer))

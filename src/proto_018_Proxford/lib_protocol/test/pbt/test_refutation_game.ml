@@ -90,7 +90,7 @@ let assert_fails_with ~__LOC__ (res : unit Environment.Error_monad.tzresult)
       let expected_trace =
         Environment.Error_monad.trace_of_error expected_err
       in
-      if expected_trace = trace then Lwt.return true
+      if expected_trace = trace then Lwt.return_true
       else
         let pp = Environment.Error_monad.pp_trace in
         QCheck2.Test.fail_reportf
@@ -99,7 +99,7 @@ let assert_fails_with ~__LOC__ (res : unit Environment.Error_monad.tzresult)
           expected_trace
           pp
           trace
-  | Ok () -> Lwt.return false
+  | Ok () -> Lwt.return_false
 
 let initial_of_dissection dissection =
   List.hd dissection |> WithExceptions.Option.get ~loc:__LOC__
@@ -229,7 +229,6 @@ let create_ctxt () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3) =
     Context.init3
-      ~sc_rollup_enable:true
       ~sc_rollup_arith_pvm_enable:true
       ~consensus_threshold:0
       ~bootstrap_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
@@ -751,8 +750,7 @@ module Dissection = struct
         (* The test is not general enough to support all kind of number of
            sections. *)
         let number_of_sections =
-          Tezos_protocol_018_Proxford_parameters.Default_parameters
-          .constants_mainnet
+          Tezos_protocol_018_Proxford_parameters.Default_parameters.constants_mainnet
             .sc_rollup
             .number_of_sections_in_dissection
         in

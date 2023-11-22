@@ -40,38 +40,46 @@ open Test_tez
 let ten_tez = of_int 10
 
 let test_simple_reveal () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation"
-   | false -> ())
-  >>=? fun () ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then Stdlib.failwith "Unexpected revelation"
+  in
   (* Reveal the contract *)
-  Op.revelation (B blk) new_c.pk >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-  | true -> ()
-  | false -> Stdlib.failwith "New contract revelation failed."
+  let* operation = Op.revelation (B blk) new_c.pk in
+  let* blk = Block.bake blk ~operation in
+  let+ is_revealed =
+    Context.Contract.is_manager_key_revealed (B blk) new_contract
+  in
+  if not is_revealed then Stdlib.failwith "New contract revelation failed."
 
 let test_empty_account_on_reveal () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   let amount = Tez.one_mutez in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract amount >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expecting fresh pkh"
-   | false -> ())
-  >>=? fun () ->
+  let* operation = Op.transaction (B blk) c new_contract amount in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expecting fresh pkh"
+  in
   (* Reveal the contract *)
-  Op.revelation ~fee:amount (B blk) new_c.pk >>=? fun operation ->
-  Incremental.begin_construction blk >>=? fun inc ->
+  let* operation = Op.revelation ~fee:amount (B blk) new_c.pk in
+  let* inc = Incremental.begin_construction blk in
   let expect_apply_failure = function
     | [
         Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
@@ -80,43 +88,51 @@ let test_empty_account_on_reveal () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_apply_failure inc operation >>=? fun inc ->
-  Context.Contract.balance (I inc) new_contract >>=? fun balance ->
-  Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
-  Context.Contract.is_manager_key_revealed (I inc) new_contract >|=? function
-  | false -> ()
-  | true -> Stdlib.failwith "Empty account still exists and is revealed."
+  let* inc = Incremental.add_operation ~expect_apply_failure inc operation in
+  let* balance = Context.Contract.balance (I inc) new_contract in
+  let* () = Assert.equal_tez ~loc:__LOC__ balance Tez.zero in
+  let+ is_revealed =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
+  if is_revealed then
+    Stdlib.failwith "Empty account still exists and is revealed."
 
 let test_not_enough_funds_for_reveal () =
-  Context.init1 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 () in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one_mutez >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation"
-   | false -> ())
-  >>=? fun () ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one_mutez in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then Stdlib.failwith "Unexpected revelation"
+  in
   (* Reveal the contract *)
-  Op.revelation ~fee:Tez.fifty_cents (B blk) new_c.pk >>=? fun operation ->
-  Block.bake blk ~operation >>= fun res ->
+  let* operation = Op.revelation ~fee:Tez.fifty_cents (B blk) new_c.pk in
+  let*! res = Block.bake blk ~operation in
   Assert.proto_error_with_info ~loc:__LOC__ res "Balance too low"
 
 let test_transfer_fees_emptying_after_reveal_batched () =
-  Context.init1 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 () in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  Incremental.begin_construction blk >>=? fun inc ->
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun reveal ->
-  Incremental.add_operation inc reveal >>=? fun tmp_inc ->
-  Op.transaction ~fee:Tez.one (I tmp_inc) new_contract c Tez.one
-  >>=? fun transaction ->
-  Op.batch_operations ~source:new_contract (I inc) [reveal; transaction]
-  >>=? fun op ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* inc = Incremental.begin_construction blk in
+  let* reveal = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* tmp_inc = Incremental.add_operation inc reveal in
+  let* transaction =
+    Op.transaction ~fee:Tez.one (I tmp_inc) new_contract c Tez.one
+  in
+  let* op =
+    Op.batch_operations ~source:new_contract (I inc) [reveal; transaction]
+  in
   let expect_apply_failure = function
     | [
         Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
@@ -125,14 +141,17 @@ let test_transfer_fees_emptying_after_reveal_batched () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_apply_failure inc op
-  >>=? fun (_inc : Incremental.t) -> return_unit
+  let* (_inc : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure inc op
+  in
+  return_unit
 
 (* We assert that the changes introduced in !5182, splitting the
    application of Reveal operations into a pre-checking and
    an application phase, do not allow to forge dishonest revelations. *)
 let test_reveal_with_fake_account () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, bootstrap) ->
+  let open Lwt_result_syntax in
+  let* blk, bootstrap = Context.init1 ~consensus_threshold:0 () in
   (* Create two fresh, unrevealed, accounts a and b. *)
   let account_a = Account.new_account () in
   let a_pkh = account_a.pkh in
@@ -145,33 +164,41 @@ let test_reveal_with_fake_account () =
 
      These preambles are too verbose and boilerplate. We should factor
      out revealing fresh unrevealed accounts. *)
-  when_ (Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
-      failwith
-        "Expected different pkhs: got %a %a"
-        Signature.Public_key_hash.pp
-        a_pkh
-        Signature.Public_key_hash.pp
-        b_pkh)
-  >>=? fun () ->
-  Op.transaction (B blk) bootstrap a_contract Tez.one >>=? fun oa ->
-  Op.transaction (B blk) bootstrap b_contract Tez.one >>=? fun ob ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:bootstrap
-    (B blk)
-    [oa; ob]
-  >>=? fun batch ->
-  Block.bake blk ~operation:batch >>=? fun b ->
-  (Context.Contract.is_manager_key_revealed (B blk) a_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
-  (Context.Contract.is_manager_key_revealed (B blk) b_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
+  let* () =
+    when_ (Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
+        failwith
+          "Expected different pkhs: got %a %a"
+          Signature.Public_key_hash.pp
+          a_pkh
+          Signature.Public_key_hash.pp
+          b_pkh)
+  in
+  let* oa = Op.transaction (B blk) bootstrap a_contract Tez.one in
+  let* ob = Op.transaction (B blk) bootstrap b_contract Tez.one in
+  let* batch =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:bootstrap
+      (B blk)
+      [oa; ob]
+  in
+  let* b = Block.bake blk ~operation:batch in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) a_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) b_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
   (* get initial balance of account_a *)
-  Context.Contract.balance (B b) a_contract >>=? fun a_balance_before ->
+  let* a_balance_before = Context.Contract.balance (B b) a_contract in
   (* We will attempt to forge a reveal with a fake account that
      impersonates account_a but uses account_b's public and secret
      keys, e.g.
@@ -182,26 +209,28 @@ let test_reveal_with_fake_account () =
      and we will attempt to reveal the public key of b with a's
      pkh. This operation should fail without updating account_a's
      balance *)
-  Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
-  >>=? fun operation ->
-  Incremental.begin_construction b >>=? fun i ->
-  Incremental.add_operation
-    ~expect_failure:(function
-      | [
-          Environment.Ecoproto_error
-            (Contract_manager_storage.Inconsistent_hash _);
-        ] ->
-          return_unit
-      | errs ->
-          failwith
-            "Expected an Contract_manager_storage.Inconsistent_hash error but \
-             got %a"
-            Error_monad.pp_print_trace
-            errs)
-    i
-    operation
-  >>=? fun i ->
-  Context.Contract.balance (I i) a_contract >>=? fun a_balance_after ->
+  let* operation =
+    Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
+  in
+  let* i = Incremental.begin_construction b in
+  let* i =
+    Incremental.add_operation
+      ~expect_failure:(function
+        | [
+            Environment.Ecoproto_error
+              (Contract_manager_storage.Inconsistent_hash _);
+          ] ->
+            return_unit
+        | errs ->
+            failwith
+              "Expected an Contract_manager_storage.Inconsistent_hash error \
+               but got %a"
+              Error_monad.pp_print_trace
+              errs)
+      i
+      operation
+  in
+  let* a_balance_after = Context.Contract.balance (I i) a_contract in
   unless (Tez.equal a_balance_after a_balance_before) (fun () ->
       failwith
         "Balance of contract_a should have not changed: expected %atz, got %atz"
@@ -214,7 +243,8 @@ let test_reveal_with_fake_account () =
    and get its balance. Then we attempt to forge a reveal for another
    account b, using a's pkh. *)
 let test_reveal_with_fake_account_already_revealed () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, bootstrap) ->
+  let open Lwt_result_syntax in
+  let* blk, bootstrap = Context.init1 ~consensus_threshold:0 () in
   (* Create two fresh, unrevealed, accounts a and b. *)
   let account_a = Account.new_account () in
   let a_pkh = account_a.pkh in
@@ -227,56 +257,66 @@ let test_reveal_with_fake_account_already_revealed () =
 
      These preambles are too verbose and boilerplate. We should factor
      out revealing fresh unrevealed accounts. *)
-  when_ (Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
-      failwith
-        "Expected different pkhs: got %a %a"
-        Signature.Public_key_hash.pp
-        a_pkh
-        Signature.Public_key_hash.pp
-        b_pkh)
-  >>=? fun () ->
-  Op.transaction (B blk) bootstrap a_contract Tez.one >>=? fun oa ->
-  Op.transaction (B blk) bootstrap b_contract Tez.one >>=? fun ob ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:bootstrap
-    (B blk)
-    [oa; ob]
-  >>=? fun batch ->
-  Block.bake blk ~operation:batch >>=? fun b ->
-  (Context.Contract.is_manager_key_revealed (B blk) a_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
-  (Context.Contract.is_manager_key_revealed (B blk) b_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
+  let* () =
+    when_ (Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
+        failwith
+          "Expected different pkhs: got %a %a"
+          Signature.Public_key_hash.pp
+          a_pkh
+          Signature.Public_key_hash.pp
+          b_pkh)
+  in
+  let* oa = Op.transaction (B blk) bootstrap a_contract Tez.one in
+  let* ob = Op.transaction (B blk) bootstrap b_contract Tez.one in
+  let* batch =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:bootstrap
+      (B blk)
+      [oa; ob]
+  in
+  let* b = Block.bake blk ~operation:batch in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) a_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) b_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
   (* We first reveal a in a block *)
-  Op.revelation ~fee:Tez.one_mutez (B b) account_a.pk >>=? fun operation ->
-  Block.bake ~operation b >>=? fun b ->
-  Context.Contract.balance (B b) a_contract >>=? fun a_balance_before ->
+  let* operation = Op.revelation ~fee:Tez.one_mutez (B b) account_a.pk in
+  let* b = Block.bake ~operation b in
+  let* a_balance_before = Context.Contract.balance (B b) a_contract in
   (* Reveal the public key of b while impersonating account_a. This
      operation should fail without updating account_a's balance *)
-  Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
-  >>=? fun operation ->
-  Incremental.begin_construction b >>=? fun i ->
-  Incremental.add_operation
-    ~expect_failure:(function
-      | [
-          Environment.Ecoproto_error
-            (Contract_manager_storage.Inconsistent_hash _);
-        ] ->
-          return_unit
-      | errs ->
-          failwith
-            "Expected a Previously_revealed_key error but got %a"
-            Error_monad.pp_print_trace
-            errs)
-    i
-    operation
-  >>=? fun i ->
-  Context.Contract.balance (I i) a_contract >>=? fun a_balance_after ->
+  let* operation =
+    Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
+  in
+  let* i = Incremental.begin_construction b in
+  let* i =
+    Incremental.add_operation
+      ~expect_failure:(function
+        | [
+            Environment.Ecoproto_error
+              (Contract_manager_storage.Inconsistent_hash _);
+          ] ->
+            return_unit
+        | errs ->
+            failwith
+              "Expected a Previously_revealed_key error but got %a"
+              Error_monad.pp_print_trace
+              errs)
+      i
+      operation
+  in
+  let* a_balance_after = Context.Contract.balance (I i) a_contract in
   unless (Tez.equal a_balance_after a_balance_before) (fun () ->
       failwith
         "Balance of contract_a should have not changed: expected %atz, got %atz"
@@ -294,32 +334,38 @@ let test_reveal_with_fake_account_already_revealed () =
 
    We test that backtracked reveals stay backtracked. *)
 let test_backtracked_reveal_in_batch () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
-  Incremental.begin_construction blk >>=? fun inc ->
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_reveal ->
-  Op.transaction
-    ~force_reveal:false
-    ~fee:Tez.zero
-    (I inc)
-    new_contract
-    new_contract
-    (Tez.of_mutez_exn 1_000_001L)
-  >>=? fun op_transfer ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:new_contract
-    (I inc)
-    [op_reveal; op_transfer]
-  >>=? fun batched_operation ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
+  let* inc = Incremental.begin_construction blk in
+  let* op_reveal = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* op_transfer =
+    Op.transaction
+      ~force_reveal:false
+      ~fee:Tez.zero
+      (I inc)
+      new_contract
+      new_contract
+      (Tez.of_mutez_exn 1_000_001L)
+  in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (I inc)
+      [op_reveal; op_transfer]
+  in
   let expect_apply_failure = function
     | [
         Environment.Ecoproto_error (Contract_storage.Balance_too_low _);
@@ -332,47 +378,55 @@ let test_backtracked_reveal_in_batch () =
           Error_monad.pp_print_trace
           err
   in
-  Incremental.add_operation ~expect_apply_failure inc batched_operation
-  >>=? fun inc ->
+  let* inc =
+    Incremental.add_operation ~expect_apply_failure inc batched_operation
+  in
   (* We assert the manager key is still unrevealed, as the batch has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
+  let* revelead =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
   when_ revelead (fun () ->
       failwith "Unexpected contract revelation: reveal was expected to fail")
 
 (* Asserts that re-revealing an already revealed manager will make the
    whole batch fail. *)
 let test_already_revealed_manager_in_batch () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expecting fresh pkh"
-   | false -> ())
-  >>=? fun () ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expecting fresh pkh"
+  in
   (* Reveal the contract *)
-  Op.revelation (B blk) new_c.pk >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
+  let* operation = Op.revelation (B blk) new_c.pk in
+  let* blk = Block.bake blk ~operation in
   (* We pack a correct batch of operations attempting to re-reveal the contract *)
-  Incremental.begin_construction blk >>=? fun inc ->
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_reveal ->
-  Op.transaction
-    ~force_reveal:false
-    ~fee:Tez.zero
-    (I inc)
-    new_contract
-    new_contract
-    (Tez.of_mutez_exn 1_000_001L)
-  >>=? fun op_transfer ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:new_contract
-    (B blk)
-    [op_reveal; op_transfer]
-  >>=? fun batched_operation ->
+  let* inc = Incremental.begin_construction blk in
+  let* op_reveal = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* op_transfer =
+    Op.transaction
+      ~force_reveal:false
+      ~fee:Tez.zero
+      (I inc)
+      new_contract
+      new_contract
+      (Tez.of_mutez_exn 1_000_001L)
+  in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (B blk)
+      [op_reveal; op_transfer]
+  in
   let expect_apply_failure = function
     | [
         Environment.Ecoproto_error
@@ -381,11 +435,13 @@ let test_already_revealed_manager_in_batch () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_apply_failure inc batched_operation
-  >>=? fun inc ->
+  let* inc =
+    Incremental.add_operation ~expect_apply_failure inc batched_operation
+  in
   (* We assert the manager key is still revealed. *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
+  let* revelead =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
   unless revelead (fun () ->
       Stdlib.failwith
         "Unexpected unrevelation: failing batch shouldn't unreveal the manager")
@@ -422,22 +478,27 @@ let test_already_revealed_manager_in_batch () =
    reveal fails during application and we check that the contract is
    not revealed afterward. *)
 let test_no_reveal_when_gas_exhausted () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Fund the contract with a sufficient balance *)
-  Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 1_000L)
-  >>=? fun operation ->
+  let* operation =
+    Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 1_000L)
+  in
   (* Create the contract *)
-  Block.bake blk ~operation >>=? fun blk ->
+  let* blk = Block.bake blk ~operation in
   (* Assert that the account has not been revealed yet *)
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
   (* We craft a new (bad) reveal operation with a 0 gas_limit *)
-  Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk >>=? fun op ->
-  Incremental.begin_construction blk >>=? fun inc ->
+  let* op = Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk in
+  let* inc = Incremental.begin_construction blk in
   (* The application of this operation is expected to fail with a
      {! Protocol.Raw_context.Operation_quota_exceeded} error *)
   let expect_failure = function
@@ -449,10 +510,11 @@ let test_no_reveal_when_gas_exhausted () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_failure inc op >>=? fun inc ->
+  let* inc = Incremental.add_operation ~expect_failure inc op in
   (* We assert the manager key is still unrevealed, as the operation has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
+  let* revelead =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
   when_ revelead (fun () ->
       failwith "Unexpected revelation: reveal operation failed")
 
@@ -479,32 +541,38 @@ let test_no_reveal_when_gas_exhausted () =
    balance while revealing.
 *)
 let test_reveal_incorrect_position_in_batch () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
-  Incremental.begin_construction blk >>=? fun inc ->
-  Op.transaction
-    ~force_reveal:false
-    ~fee:Tez.zero
-    (I inc)
-    new_contract
-    new_contract
-    (Tez.of_mutez_exn 1L)
-  >>=? fun op_transfer ->
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_reveal ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:new_contract
-    (I inc)
-    [op_transfer; op_reveal]
-  >>=? fun batched_operation ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
+  let* inc = Incremental.begin_construction blk in
+  let* op_transfer =
+    Op.transaction
+      ~force_reveal:false
+      ~fee:Tez.zero
+      (I inc)
+      new_contract
+      new_contract
+      (Tez.of_mutez_exn 1L)
+  in
+  let* op_reveal = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (I inc)
+      [op_transfer; op_reveal]
+  in
   let expect_failure = function
     | [
         Environment.Ecoproto_error
@@ -513,11 +581,11 @@ let test_reveal_incorrect_position_in_batch () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_failure inc batched_operation
-  >>=? fun inc ->
+  let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the operation has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
+  let* revelead =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
   when_ revelead (fun () ->
       failwith "Unexpected revelation: reveal operation was expected to fail")
 
@@ -525,25 +593,30 @@ let test_reveal_incorrect_position_in_batch () =
    succeeds but the second one results in the second one failing, and
    then first reveal being backtracked. *)
 let test_duplicate_valid_reveals () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
-  Incremental.begin_construction blk >>=? fun inc ->
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_rev1 ->
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_rev2 ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:new_contract
-    (I inc)
-    [op_rev1; op_rev2]
-  >>=? fun batched_operation ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
+  let* inc = Incremental.begin_construction blk in
+  let* op_rev1 = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* op_rev2 = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (I inc)
+      [op_rev1; op_rev2]
+  in
   let expect_failure = function
     | [
         Environment.Ecoproto_error
@@ -552,11 +625,11 @@ let test_duplicate_valid_reveals () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_failure inc batched_operation
-  >>=? fun inc ->
+  let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the operation has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
+  let* revelead =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
   when_ revelead (fun () ->
       failwith "Unexpected contract revelation: backtracking expected")
 
@@ -565,28 +638,34 @@ let test_duplicate_valid_reveals () =
    failing due to not being well-placed at the beginnning of the
    batch. *)
 let test_valid_reveal_after_gas_exhausted_one () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
-  Incremental.begin_construction blk >>=? fun inc ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
+  let* inc = Incremental.begin_construction blk in
   (* We first craft a (bad) reveal operation with a 0 gas_limit *)
-  Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk
-  >>=? fun bad_reveal ->
+  let* bad_reveal =
+    Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk
+  in
   (* While the second is a valid one *)
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:new_contract
-    (I inc)
-    [bad_reveal; good_reveal]
-  >>=? fun batched_operation ->
+  let* good_reveal = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (I inc)
+      [bad_reveal; good_reveal]
+  in
   let expect_failure = function
     | [
         Environment.Ecoproto_error
@@ -595,13 +674,13 @@ let test_valid_reveal_after_gas_exhausted_one () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_failure inc batched_operation
-  >>=? fun inc ->
+  let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the batch has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
-  when_ revelead (fun () ->
-      failwith "Unexpected contract revelation: no valid reveal in batch")
+  let+ revealed =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
+  if revealed then
+    Stdlib.failwith "Unexpected contract revelation: no valid reveal in batch"
 
 (* Test that a batch [failed_reveal pk; reveal pk; transfer] where the
    first reveal fails with insufficient funds results in the second
@@ -611,29 +690,33 @@ let test_valid_reveal_after_gas_exhausted_one () =
    calling {!Apply.check_manager_signature} to verify the manager's pk
    while processing the second reveal. *)
 let test_valid_reveal_after_insolvent_one () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
-   | false -> ())
-  >>=? fun () ->
-  Incremental.begin_construction blk >>=? fun inc ->
+  let* operation = Op.transaction (B blk) c new_contract Tez.one in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then
+      Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+  in
+  let* inc = Incremental.begin_construction blk in
   (* We first craft an insolvent reveal operation *)
-  Op.revelation ~fee:ten_tez (B blk) new_c.pk >>=? fun bad_reveal ->
+  let* bad_reveal = Op.revelation ~fee:ten_tez (B blk) new_c.pk in
   (* While the second is a free valid one *)
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->
-  Op.transaction ~fee:Tez.zero (I inc) new_contract c Tez.one
-  >>=? fun transfer ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:new_contract
-    (I inc)
-    [bad_reveal; good_reveal; transfer]
-  >>=? fun batched_operation ->
+  let* good_reveal = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* transfer = Op.transaction ~fee:Tez.zero (I inc) new_contract c Tez.one in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (I inc)
+      [bad_reveal; good_reveal; transfer]
+  in
   let expect_failure = function
     | [
         Environment.Ecoproto_error
@@ -642,41 +725,45 @@ let test_valid_reveal_after_insolvent_one () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_failure inc batched_operation
-  >>=? fun inc ->
+  let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the batch has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
-  when_ revelead (fun () ->
-      failwith "Unexpected contract revelation: no valid reveal in batch")
+  let+ revealed =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
+  if revealed then
+    Stdlib.failwith "Unexpected contract revelation: no valid reveal in batch"
 
 (* Test that a batch [failed_reveal pk; reveal pk] where the first
    reveal fails with insufficient funds results in the second one
    failing due to not being well-placed at the beginnning of the
    batch. *)
 let test_valid_reveal_after_emptying_balance () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   let amount = Tez.one_mutez in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract amount >>=? fun operation ->
-  Block.bake blk ~operation >>=? fun blk ->
-  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation"
-   | false -> ())
-  >>=? fun () ->
-  Incremental.begin_construction blk >>=? fun inc ->
+  let* operation = Op.transaction (B blk) c new_contract amount in
+  let* blk = Block.bake blk ~operation in
+  let* () =
+    let+ is_revealed =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    if is_revealed then Stdlib.failwith "Unexpected revelation"
+  in
+  let* inc = Incremental.begin_construction blk in
   (* Reveal the contract, spending all its balance in fees *)
-  Op.revelation ~fee:amount (B blk) new_c.pk >>=? fun bad_reveal ->
+  let* bad_reveal = Op.revelation ~fee:amount (B blk) new_c.pk in
   (* While the second is a free valid one *)
-  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->
-  Op.batch_operations
-    ~recompute_counters:true
-    ~source:new_contract
-    (I inc)
-    [bad_reveal; good_reveal]
-  >>=? fun batched_operation ->
+  let* good_reveal = Op.revelation ~fee:Tez.zero (I inc) new_c.pk in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (I inc)
+      [bad_reveal; good_reveal]
+  in
   let expect_failure = function
     | [
         Environment.Ecoproto_error
@@ -685,13 +772,13 @@ let test_valid_reveal_after_emptying_balance () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_failure inc batched_operation
-  >>=? fun inc ->
+  let* inc = Incremental.add_operation ~expect_failure inc batched_operation in
   (* We assert the manager key is still unrevealed, as the batch has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract
-  >>=? fun revelead ->
-  when_ revelead (fun () ->
-      failwith "Unexpected contract revelation: no valid reveal in batch")
+  let+ revealed =
+    Context.Contract.is_manager_key_revealed (I inc) new_contract
+  in
+  if revealed then
+    Stdlib.failwith "Unexpected contract revelation: no valid reveal in batch"
 
 let tests =
   [

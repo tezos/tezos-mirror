@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Global_constants_costs_generated
+open S.Syntax
 
-let log2 x = S.safe_int (1 + S.numbits x)
-
-let ( + ) = S.add
-
-let ( lsr ) = S.shift_right
-
+(* generated code is not usable: the model lacks intercept *)
 (* model global_constants_storage/expr_to_address_in_context *)
 (* Approximating 200 + 1.266960 * number of bytes *)
+let cost_expr_to_address_in_context size =
+  let v0 = S.safe_int size in
+  S.safe_int 200 + (v0 + (v0 lsr 2))
+
 let expr_to_address_in_context_cost bytes =
-  let v0 = Bytes.length bytes |> S.safe_int in
-  S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
+  cost_expr_to_address_in_context (Bytes.length bytes)
+  |> Gas_limit_repr.atomic_step_cost
 
-(* model global_constants_storage/expand_constant_branch *)
 let expand_constants_branch_cost =
-  Gas_limit_repr.atomic_step_cost @@ S.safe_int 4095
+  cost_expand_constant_branch 1 |> Gas_limit_repr.atomic_step_cost
 
-(* model global_constants_storage/expand_no_constant_branch *)
-(* Approximating 100 + 4.639474 * n*log(n) *)
 let expand_no_constants_branch_cost node =
-  let v0 = Script_repr.micheline_nodes node |> S.safe_int in
-  let v0 = S.mul v0 (log2 v0) in
-  S.safe_int 100 + S.mul (S.safe_int 4) v0 + (v0 lsr 1) + (v0 lsr 3)
+  cost_expand_no_constant_branch (Script_repr.micheline_nodes node)
   |> Gas_limit_repr.atomic_step_cost

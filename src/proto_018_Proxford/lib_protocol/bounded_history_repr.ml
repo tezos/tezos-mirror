@@ -210,7 +210,7 @@ module Make (Name : NAME) (Key : KEY) (Value : VALUE) :
     else
       match Map.find key t.events with
       | Some value' when not (Value.equal value value') ->
-          error
+          tzfail
           @@ Key_bound_to_different_value
                {key; existing_value = value'; given_value = value}
       | _ -> (

@@ -55,8 +55,8 @@ module In_memory = struct
     | Some k ->
         let index = Context_binary.index context in
         let* p = Context_binary.produce_tree_proof index k step in
-        return (Some p)
-    | None -> return None
+        return_some p
+    | None -> return_none
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->

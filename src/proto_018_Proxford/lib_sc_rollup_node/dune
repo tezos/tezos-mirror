@@ -2,34 +2,34 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_smart_rollup_node_Proxford)
- (package octez-smart-rollup-node-Proxford)
+ (name octez_smart_rollup_node_alpha)
+ (package octez-smart-rollup-node-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  octez-protocol-018-Proxford-libs.client
+  octez-protocol-alpha-libs.client
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
-  tezos-protocol-018-Proxford.protocol
-  octez-protocol-018-Proxford-libs.plugin
-  tezos-protocol-018-Proxford.parameters
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.plugin
+  tezos-protocol-alpha.parameters
   octez-libs.rpc
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  octez-protocol-018-Proxford-libs.dac
+  octez-protocol-alpha-libs.dac
   tezos-dac-lib
   tezos-dac-client-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
-  octez-protocol-018-Proxford-libs.smart-rollup
-  octez-protocol-018-Proxford-libs.smart-rollup-layer2
-  octez-protocol-018-Proxford-libs.layer2-utils
+  octez-protocol-alpha-libs.smart-rollup
+  octez-protocol-alpha-libs.smart-rollup-layer2
+  octez-protocol-alpha-libs.layer2-utils
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tree-encoding
@@ -54,20 +54,20 @@
   -open Tezos_stdlib_unix
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Tezos_client_018_Proxford
-  -open Tezos_protocol_018_Proxford
-  -open Tezos_protocol_plugin_018_Proxford
-  -open Tezos_protocol_018_Proxford_parameters
+  -open Tezos_client_alpha
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_plugin_alpha
+  -open Tezos_protocol_alpha_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_018_Proxford
+  -open Tezos_dac_alpha
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
   -open Tezos_shell_services
   -open Octez_smart_rollup
-  -open Tezos_smart_rollup_018_Proxford
-  -open Tezos_smart_rollup_layer2_018_Proxford
-  -open Tezos_layer2_utils_018_Proxford
+  -open Tezos_smart_rollup_alpha
+  -open Tezos_smart_rollup_layer2_alpha
+  -open Tezos_layer2_utils_alpha
   -open Tezos_layer2_store
   -open Octez_crawler
   -open Octez_injector

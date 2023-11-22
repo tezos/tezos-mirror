@@ -62,6 +62,7 @@ type reveal_data =
   | Raw_data of string
   | Metadata of Sc_rollup_metadata_repr.t
   | Dal_page of Dal_slot_repr.Page.content option
+  | Dal_parameters of Sc_rollup_dal_parameters_repr.t
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -83,6 +84,8 @@ let pp_reveal_data fmt = function
         (fun fmt _a -> Format.fprintf fmt "<Some_dal_data>")
         fmt
         content_opt
+  | Dal_parameters dal_parameters ->
+      Sc_rollup_dal_parameters_repr.pp fmt dal_parameters
 
 let pp_input fmt = function
   | Inbox_message msg ->
@@ -136,7 +139,17 @@ let reveal_data_encoding =
       (function Dal_page p -> Some ((), p) | _ -> None)
       (fun ((), p) -> Dal_page p)
   in
-  union [case_raw_data; case_metadata; case_dal_page]
+  let case_dal_parameters =
+    case
+      ~title:"dal parameters"
+      (Tag 3)
+      (obj2
+         (kind "dal_parameters")
+         (req "dal_parameters" Sc_rollup_dal_parameters_repr.encoding))
+      (function Dal_parameters p -> Some ((), p) | _ -> None)
+      (fun ((), p) -> Dal_parameters p)
+  in
+  union [case_raw_data; case_metadata; case_dal_page; case_dal_parameters]
 
 let input_encoding =
   let open Data_encoding in
@@ -174,6 +187,9 @@ let reveal_data_equal a b =
   | Metadata _, _ -> false
   | Dal_page a, Dal_page b -> Option.equal Bytes.equal a b
   | Dal_page _, _ -> false
+  | Dal_parameters a, Dal_parameters b ->
+      Sc_rollup_dal_parameters_repr.equal a b
+  | Dal_parameters _, _ -> false
 
 let input_equal a b =
   match (a, b) with
@@ -196,10 +212,15 @@ module Input_hash =
       let size = Some 20
     end)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+   Consider supporting revealing historical DAL parameters. *)
 type reveal =
   | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata
   | Request_dal_page of Dal_slot_repr.Page.t
+  | Reveal_dal_parameters
+      (** Request DAL parameters that were used for the slots published at
+          the current inbox level. *)
 
 let reveal_encoding =
   let open Data_encoding in
@@ -231,7 +252,15 @@ let reveal_encoding =
       (function Request_dal_page s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Request_dal_page s)
   in
-  union [case_raw_data; case_metadata; case_dal_page]
+  let case_dal_parameters =
+    case
+      ~title:"Reveal_dal_parameters"
+      (Tag 3)
+      (obj1 (kind "reveal_dal_parameters"))
+      (function Reveal_dal_parameters -> Some () | _ -> None)
+      (fun () -> Reveal_dal_parameters)
+  in
+  union [case_raw_data; case_metadata; case_dal_page; case_dal_parameters]
 
 (** [is_reveal_enabled] is the type of a predicate that tells if a kind of
      reveal is activated at a certain block level. *)
@@ -248,6 +277,7 @@ let is_reveal_enabled_predicate
         | Blake2B -> t.raw_data.blake2B)
     | Reveal_metadata -> t.metadata
     | Request_dal_page _ -> t.dal_page
+    | Reveal_dal_parameters -> t.dal_parameters
   in
   Raw_level_repr.(current_block_level >= activation_level)
 
@@ -311,6 +341,7 @@ let pp_reveal fmt = function
   | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
   | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
+  | Reveal_dal_parameters -> Format.pp_print_string fmt "Reveal DAL parameters"
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -337,6 +368,8 @@ let reveal_equal p1 p2 =
   | Reveal_metadata, _ -> false
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | Request_dal_page _, _ -> false
+  | Reveal_dal_parameters, Reveal_dal_parameters -> true
+  | Reveal_dal_parameters, _ -> false
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =

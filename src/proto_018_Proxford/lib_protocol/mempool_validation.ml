@@ -147,12 +147,12 @@ let add_operation ?(check_signature = true)
           | None -> Lwt.return_error (Add_conflict x)))
 
 let merge ?conflict_handler existing_mempool new_mempool =
+  let open Result_syntax in
   if
     Block_hash.(
       existing_mempool.predecessor_hash <> new_mempool.predecessor_hash)
   then Error Incompatible_mempool
   else
-    let open Result_syntax in
     let unique_new_operations =
       (* only retain unique operations that are in new_mempool *)
       Operation_hash.Map.(

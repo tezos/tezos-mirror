@@ -96,14 +96,14 @@ let commitment_secret =
   |> WithExceptions.Option.get ~loc:__LOC__
 
 let new_commitment ?seed () =
+  let open Lwt_result_wrap_syntax in
   let pkh, pk, sk = Signature.generate_key ?seed ~algo:Ed25519 () in
   let unactivated_account = {pkh; pk; sk} in
   let open Commitment in
   let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
   let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
-  Lwt.return
-    ( (Environment.wrap_tzresult @@ Tez.(one *? 4_000L)) >|? fun amount ->
-      (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )
+  let*?@ amount = Tez.(one *? 4_000L) in
+  return (unactivated_account, {blinded_public_key_hash = bpkh; amount})
 
 let pkh_of_contract_exn = function
   | Contract.Implicit pkh -> pkh

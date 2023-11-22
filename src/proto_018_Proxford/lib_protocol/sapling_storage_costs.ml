@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2023 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,17 +24,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val ( >>=?? ) :
-  ('a, Environment.Error_monad.error Environment.Error_monad.trace) result Lwt.t ->
-  ('a -> ('b, error trace) result Lwt.t) ->
-  ('b, error trace) result Lwt.t
-
-val ( >|=?? ) :
-  ('a, Environment.Error_monad.error Environment.Error_monad.trace) result Lwt.t ->
-  ('a -> 'b) ->
-  ('b, error trace) result Lwt.t
-
-val ( >>??= ) :
-  ('a, Environment.Error_monad.error Environment.Error_monad.trace) result ->
-  ('a -> ('b, error trace) result Lwt.t) ->
-  ('b, error trace) result Lwt.t
+include Sapling_storage_costs_generated

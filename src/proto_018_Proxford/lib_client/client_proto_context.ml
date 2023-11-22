@@ -100,6 +100,9 @@ let get_contract_all_ticket_balances (rpc : #rpc_context) ~chain ~block contract
 
 let ticket_balances_encoding = Plugin.RPC.Contract.ticket_balances_encoding
 
+let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
+  Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error
@@ -451,6 +454,41 @@ let drain_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
   in
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Drain_delegate _ as op), result) ->
+      return (oph, op, result)
+
+let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee contract ~src_pk ~manager_sk
+    ~fee_parameter limit_opt =
+  let open Lwt_result_syntax in
+  let operation = Set_deposits_limit limit_opt in
+  let operation =
+    Injection.prepare_manager_operation
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      operation
+  in
+  let operation = Annotated_manager_operation.Single_manager operation in
+  let* oph, _, op, result =
+    Injection.inject_manager_operation
+      cctxt
+      ~chain
+      ~block
+      ?confirmations
+      ?dry_run
+      ?verbose_signing
+      ?simulation
+      ~source:contract
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      ~src_pk
+      ~src_sk:manager_sk
+      ~fee_parameter
+      operation
+  in
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
 let increase_paid_storage cctxt ~chain ~block ?force ?dry_run ?verbose_signing
@@ -1012,8 +1050,9 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter
+    ?whitelist ~source ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk
+    ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1021,7 +1060,7 @@ let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_originate {kind; boot_sector; parameters_ty}))
+         (Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist}))
   in
   let* oph, _, op, result =
     Injection.inject_manager_operation

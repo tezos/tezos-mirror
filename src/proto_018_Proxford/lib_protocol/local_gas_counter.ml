@@ -78,8 +78,10 @@ let local_gas_counter_and_outdated_context ctxt =
   [@@ocaml.inline always]
 
 let use_gas_counter_in_context ctxt gas_counter f =
+  let open Lwt_result_syntax in
   let ctxt = update_context gas_counter ctxt in
-  f ctxt >|=? fun (y, ctxt) -> (y, outdated_context ctxt, local_gas_counter ctxt)
+  let+ y, ctxt = f ctxt in
+  (y, outdated_context ctxt, local_gas_counter ctxt)
   [@@ocaml.inline always]
 
 let consume_opt (Local_gas_counter gas_counter) (cost : Gas.cost) =
@@ -89,7 +91,8 @@ let consume_opt (Local_gas_counter gas_counter) (cost : Gas.cost) =
   [@@ocaml.inline always]
 
 let consume local_gas_counter cost =
+  let open Result_syntax in
   match consume_opt local_gas_counter cost with
-  | None -> error Gas.Operation_quota_exceeded
-  | Some local_gas_counter -> Ok local_gas_counter
+  | None -> tzfail Gas.Operation_quota_exceeded
+  | Some local_gas_counter -> return local_gas_counter
   [@@ocaml.inline always]

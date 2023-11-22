@@ -163,14 +163,18 @@ let rec register_indexed_subcontext :
     type r a b.
     r t -> list:(r -> a list tzresult Lwt.t) -> (r, a, b) args -> b t =
  fun desc ~list path ->
+  let open Lwt_result_syntax in
   match path with
   | Pair (left, right) ->
       let compare_left = compare left in
       let equal_left x y = Compare.Int.(compare_left x y = 0) in
-      let list_left r = list r >|=? fun l -> destutter equal_left l in
+      let list_left r =
+        let+ l = list r in
+        destutter equal_left l
+      in
       let list_right r =
         let a, k = unpack left r in
-        list a >|=? fun l ->
+        let+ l = list a in
         List.map snd (List.filter (fun (x, _) -> equal_left x k) l)
       in
       register_indexed_subcontext
@@ -255,7 +259,9 @@ type _ opt_handler =
     }
       -> 'key opt_handler
 
-let rec combine_object = function
+let rec combine_object =
+  let open Lwt_result_syntax in
+  function
   | [] ->
       Handler {encoding = Data_encoding.unit; get = (fun _ _ -> return_unit)}
   | (name, Opt_handler handler) :: fields ->
@@ -268,8 +274,9 @@ let rec combine_object = function
               handlers.encoding;
           get =
             (fun k i ->
-              handler.get k i >>=? fun v1 ->
-              handlers.get k i >|=? fun v2 -> (v1, v2));
+              let* v1 = handler.get k i in
+              let* v2 = handlers.get k i in
+              return (v1, v2));
         }
 
 type query = {depth : int}
@@ -296,85 +303,93 @@ let build_directory : type key. key t -> key RPC_directory.t =
   in
   let rec build_handler :
       type ikey. ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
-   fun desc path ->
-    match desc.dir with
-    | Empty ->
-        Opt_handler
-          {encoding = Data_encoding.unit; get = (fun _ _ -> return_none)}
-    | Value {get; encoding} ->
-        let handler =
+    let open Lwt_result_syntax in
+    fun desc path ->
+      match desc.dir with
+      | Empty ->
           Opt_handler
-            {
-              encoding;
-              get =
-                (fun k i -> if Compare.Int.(i < 0) then return_none else get k);
-            }
-        in
-        register ~chunked:true path handler ;
-        handler
-    | NamedDir map ->
-        let fields = StringMap.bindings map in
-        let fields =
-          List.map
-            (fun (name, dir) ->
-              (name, build_handler dir RPC_path.(path / name)))
-            fields
-        in
-        let (Handler handler) = combine_object fields in
-        let handler =
-          Opt_handler
-            {
-              encoding = handler.encoding;
-              get =
-                (fun k i ->
-                  if Compare.Int.(i < 0) then return_none
-                  else handler.get k (i - 1) >>=? fun v -> return_some v);
-            }
-        in
-        register ~chunked:true path handler ;
-        handler
-    | IndexedDir {arg; arg_encoding; list; subdir} ->
-        let (Opt_handler handler) =
-          build_handler subdir RPC_path.(path /: arg)
-        in
-        let encoding =
-          let open Data_encoding in
-          union
-            [
-              case
-                (Tag 0)
-                ~title:"Leaf"
-                (dynamic_size arg_encoding)
-                (function key, None -> Some key | _ -> None)
-                (fun key -> (key, None));
-              case
-                (Tag 1)
-                ~title:"Dir"
-                (tup2
-                   (dynamic_size arg_encoding)
-                   (dynamic_size handler.encoding))
-                (function key, Some value -> Some (key, value) | _ -> None)
-                (fun (key, value) -> (key, Some value));
-            ]
-        in
-        let get k i =
-          if Compare.Int.(i < 0) then return_none
-          else if Compare.Int.(i = 0) then return_some []
-          else
-            list k >>=? fun keys ->
-            List.map_es
-              (fun key ->
-                if Compare.Int.(i = 1) then return (key, None)
-                else handler.get (k, key) (i - 1) >|=? fun value -> (key, value))
-              keys
-            >>=? fun values -> return_some values
-        in
-        let handler =
-          Opt_handler
-            {encoding = Data_encoding.(list (dynamic_size encoding)); get}
-        in
-        register ~chunked:true path handler ;
-        handler
+            {encoding = Data_encoding.unit; get = (fun _ _ -> return_none)}
+      | Value {get; encoding} ->
+          let handler =
+            Opt_handler
+              {
+                encoding;
+                get =
+                  (fun k i ->
+                    if Compare.Int.(i < 0) then return_none else get k);
+              }
+          in
+          register ~chunked:true path handler ;
+          handler
+      | NamedDir map ->
+          let fields = StringMap.bindings map in
+          let fields =
+            List.map
+              (fun (name, dir) ->
+                (name, build_handler dir RPC_path.(path / name)))
+              fields
+          in
+          let (Handler handler) = combine_object fields in
+          let handler =
+            Opt_handler
+              {
+                encoding = handler.encoding;
+                get =
+                  (fun k i ->
+                    if Compare.Int.(i < 0) then return_none
+                    else
+                      let* v = handler.get k (i - 1) in
+                      return_some v);
+              }
+          in
+          register ~chunked:true path handler ;
+          handler
+      | IndexedDir {arg; arg_encoding; list; subdir} ->
+          let (Opt_handler handler) =
+            build_handler subdir RPC_path.(path /: arg)
+          in
+          let encoding =
+            let open Data_encoding in
+            union
+              [
+                case
+                  (Tag 0)
+                  ~title:"Leaf"
+                  (dynamic_size arg_encoding)
+                  (function key, None -> Some key | _ -> None)
+                  (fun key -> (key, None));
+                case
+                  (Tag 1)
+                  ~title:"Dir"
+                  (tup2
+                     (dynamic_size arg_encoding)
+                     (dynamic_size handler.encoding))
+                  (function key, Some value -> Some (key, value) | _ -> None)
+                  (fun (key, value) -> (key, Some value));
+              ]
+          in
+          let get k i =
+            if Compare.Int.(i < 0) then return_none
+            else if Compare.Int.(i = 0) then return_some []
+            else
+              let* keys = list k in
+              let* values =
+                List.map_es
+                  (fun key ->
+                    if Compare.Int.(i = 1) then return (key, None)
+                    else
+                      let+ value = handler.get (k, key) (i - 1) in
+                      (key, value))
+                  keys
+              in
+              return_some values
+          in
+          let handler =
+            Opt_handler
+              {encoding = Data_encoding.(list (dynamic_size encoding)); get}
+          in
+          register ~chunked:true path handler ;
+          handler
   in
   ignore (build_handler dir RPC_path.open_root : key opt_handler) ;
   !rpc_dir

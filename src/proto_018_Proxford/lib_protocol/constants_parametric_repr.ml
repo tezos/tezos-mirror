@@ -89,6 +89,7 @@ type sc_rollup_reveal_activation_level = {
   raw_data : sc_rollup_reveal_hashing_schemes;
   metadata : Raw_level_repr.t;
   dal_page : Raw_level_repr.t;
+  dal_parameters : Raw_level_repr.t;
 }
 
 let sc_rollup_reveal_hashing_schemes_encoding =
@@ -102,15 +103,16 @@ let sc_rollup_reveal_activation_level_encoding :
     sc_rollup_reveal_activation_level Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun t -> (t.raw_data, t.metadata, t.dal_page))
-    (fun (raw_data, metadata, dal_page) -> {raw_data; metadata; dal_page})
-    (obj3
+    (fun t -> (t.raw_data, t.metadata, t.dal_page, t.dal_parameters))
+    (fun (raw_data, metadata, dal_page, dal_parameters) ->
+      {raw_data; metadata; dal_page; dal_parameters})
+    (obj4
        (req "raw_data" sc_rollup_reveal_hashing_schemes_encoding)
        (req "metadata" Raw_level_repr.encoding)
-       (req "dal_page" Raw_level_repr.encoding))
+       (req "dal_page" Raw_level_repr.encoding)
+       (req "dal_parameters" Raw_level_repr.encoding))
 
 type sc_rollup = {
-  enable : bool;
   arith_pvm_enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;
@@ -124,6 +126,8 @@ type sc_rollup = {
   max_number_of_stored_cemented_commitments : int;
   max_number_of_parallel_games : int;
   reveal_activation_level : sc_rollup_reveal_activation_level;
+  private_enable : bool;
+  riscv_pvm_enable : bool;
 }
 
 type zk_rollup = {
@@ -136,8 +140,8 @@ type zk_rollup = {
 type adaptive_rewards_params = {
   issuance_ratio_min : Q.t;
   issuance_ratio_max : Q.t;
-  max_bonus : int64;
-  growth_rate : int64;
+  max_bonus : Issuance_bonus_repr.max_bonus;
+  growth_rate : Q.t;
   center_dz : Q.t;
   radius_dz : Q.t;
 }
@@ -147,6 +151,8 @@ type adaptive_issuance = {
   edge_of_staking_over_delegation : int;
   launch_ema_threshold : int32;
   adaptive_rewards_params : adaptive_rewards_params;
+  activation_vote_enable : bool;
+  autostaking_enable : bool;
 }
 
 type issuance_weights = {
@@ -186,10 +192,10 @@ type t = {
   minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   consensus_threshold : int;
-  max_slashing_period : int;
   limit_of_delegation_over_baking : int;
-  percentage_of_frozen_deposits_slashed_per_double_baking : int;
-  percentage_of_frozen_deposits_slashed_per_double_attestation : int;
+  percentage_of_frozen_deposits_slashed_per_double_baking : Int_percentage.t;
+  percentage_of_frozen_deposits_slashed_per_double_attestation :
+    Int_percentage.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
@@ -207,8 +213,7 @@ let sc_rollup_encoding =
   let open Data_encoding in
   conv
     (fun (c : sc_rollup) ->
-      ( ( c.enable,
-          c.arith_pvm_enable,
+      ( ( c.arith_pvm_enable,
           c.origination_size,
           c.challenge_window_in_blocks,
           c.stake_amount,
@@ -220,9 +225,10 @@ let sc_rollup_encoding =
           c.timeout_period_in_blocks,
           c.max_number_of_stored_cemented_commitments,
           c.max_number_of_parallel_games,
-          c.reveal_activation_level ) ))
-    (fun ( ( sc_rollup_enable,
-             sc_rollup_arith_pvm_enable,
+          c.reveal_activation_level,
+          c.private_enable,
+          c.riscv_pvm_enable ) ))
+    (fun ( ( sc_rollup_arith_pvm_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
              sc_rollup_stake_amount,
@@ -234,9 +240,10 @@ let sc_rollup_encoding =
              sc_rollup_timeout_period_in_blocks,
              sc_rollup_max_number_of_cemented_commitments,
              sc_rollup_max_number_of_parallel_games,
-             sc_rollup_reveal_activation_level ) ) ->
+             sc_rollup_reveal_activation_level,
+             sc_rollup_private_enable,
+             sc_rollup_riscv_pvm_enable ) ) ->
       {
-        enable = sc_rollup_enable;
         arith_pvm_enable = sc_rollup_arith_pvm_enable;
         origination_size = sc_rollup_origination_size;
         challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
@@ -252,10 +259,11 @@ let sc_rollup_encoding =
           sc_rollup_max_number_of_cemented_commitments;
         max_number_of_parallel_games = sc_rollup_max_number_of_parallel_games;
         reveal_activation_level = sc_rollup_reveal_activation_level;
+        private_enable = sc_rollup_private_enable;
+        riscv_pvm_enable = sc_rollup_riscv_pvm_enable;
       })
     (merge_objs
-       (obj9
-          (req "smart_rollup_enable" bool)
+       (obj8
           (req "smart_rollup_arith_pvm_enable" bool)
           (req "smart_rollup_origination_size" int31)
           (req "smart_rollup_challenge_window_in_blocks" int31)
@@ -264,14 +272,16 @@ let sc_rollup_encoding =
           (req "smart_rollup_max_lookahead_in_blocks" int32)
           (req "smart_rollup_max_active_outbox_levels" int32)
           (req "smart_rollup_max_outbox_messages_per_level" int31))
-       (obj5
+       (obj7
           (req "smart_rollup_number_of_sections_in_dissection" uint8)
           (req "smart_rollup_timeout_period_in_blocks" int31)
           (req "smart_rollup_max_number_of_cemented_commitments" int31)
           (req "smart_rollup_max_number_of_parallel_games" int31)
           (req
              "smart_rollup_reveal_activation_level"
-             sc_rollup_reveal_activation_level_encoding)))
+             sc_rollup_reveal_activation_level_encoding)
+          (req "smart_rollup_private_enable" bool)
+          (req "smart_rollup_riscv_pvm_enable" bool)))
 
 let zk_rollup_encoding =
   let open Data_encoding in
@@ -335,6 +345,15 @@ let radius_encoding =
             "Invalid Reward Parameter: dead zone radius must be non-negative")
       (obj2 (req "numerator" z) (req "denominator" z)))
 
+let growth_rate_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
+        else Error "Invalid Reward Parameter: growth rate must be non-negative")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
 let adaptive_rewards_params_encoding =
   let open Data_encoding in
   conv
@@ -369,8 +388,8 @@ let adaptive_rewards_params_encoding =
     (obj6
        (req "issuance_ratio_min" extremum_encoding)
        (req "issuance_ratio_max" extremum_encoding)
-       (req "max_bonus" int64)
-       (req "growth_rate" int64)
+       (req "max_bonus" Issuance_bonus_repr.max_bonus_encoding)
+       (req "growth_rate" growth_rate_encoding)
        (req "center_dz" center_encoding)
        (req "radius_dz" radius_encoding))
 
@@ -382,26 +401,36 @@ let adaptive_issuance_encoding =
            edge_of_staking_over_delegation;
            launch_ema_threshold;
            adaptive_rewards_params;
+           activation_vote_enable;
+           autostaking_enable;
          } ->
       ( global_limit_of_staking_over_baking,
         edge_of_staking_over_delegation,
         launch_ema_threshold,
-        adaptive_rewards_params ))
+        adaptive_rewards_params,
+        activation_vote_enable,
+        autostaking_enable ))
     (fun ( global_limit_of_staking_over_baking,
            edge_of_staking_over_delegation,
            launch_ema_threshold,
-           adaptive_rewards_params ) ->
+           adaptive_rewards_params,
+           activation_vote_enable,
+           autostaking_enable ) ->
       {
         global_limit_of_staking_over_baking;
         edge_of_staking_over_delegation;
         launch_ema_threshold;
         adaptive_rewards_params;
+        activation_vote_enable;
+        autostaking_enable;
       })
-    (obj4
+    (obj6
        (req "global_limit_of_staking_over_baking" uint8)
        (req "edge_of_staking_over_delegation" uint8)
        (req "adaptive_issuance_launch_ema_threshold" int32)
-       (req "adaptive_rewards_params" adaptive_rewards_params_encoding))
+       (req "adaptive_rewards_params" adaptive_rewards_params_encoding)
+       (req "adaptive_issuance_activation_vote_enable" bool)
+       (req "autostaking_enable" bool))
 
 let issuance_weights_encoding =
   let open Data_encoding in
@@ -478,7 +507,6 @@ let encoding =
               c.consensus_committee_size,
               c.consensus_threshold ),
             ( ( c.minimal_participation_ratio,
-                c.max_slashing_period,
                 c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_attestation,
@@ -515,7 +543,6 @@ let encoding =
                  consensus_committee_size,
                  consensus_threshold ),
                ( ( minimal_participation_ratio,
-                   max_slashing_period,
                    limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
                    percentage_of_frozen_deposits_slashed_per_double_attestation,
@@ -550,7 +577,6 @@ let encoding =
         minimal_block_delay;
         delay_increment_per_round;
         minimal_participation_ratio;
-        max_slashing_period;
         consensus_committee_size;
         consensus_threshold;
         limit_of_delegation_over_baking;
@@ -602,16 +628,15 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj7
+                (obj6
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
-                   (req "max_slashing_period" int31)
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
-                      uint8)
+                      Int_percentage.encoding)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_attestation"
-                      uint8)
+                      Int_percentage.encoding)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs

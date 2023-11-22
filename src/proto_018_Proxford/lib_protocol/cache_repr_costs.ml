@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( >>=?? ) x y =
-  x >>= function
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+include Cache_repr_costs_generated
 
-let ( >|=?? ) m f = m >>=?? fun x -> return (f x)
-
-let ( >>??= ) x y =
-  match x with
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+let cache_update_cost size =
+  cost_CACHE_UPDATE size |> Gas_limit_repr.atomic_step_cost

@@ -30,22 +30,24 @@ type context = Alpha_context.context * Script_interpreter.step_constants
 let initial_balance = 4_000_000_000_000L
 
 let context_init_memory ?dal ~rng_state () =
+  let open Lwt_result_wrap_syntax in
   let dal_enable = Option.is_some dal in
-  Context.init_n
-    ~rng_state
-    ~dal_enable
-    ?dal
-    ~bootstrap_balances:
-      [
-        initial_balance;
-        initial_balance;
-        initial_balance;
-        initial_balance;
-        initial_balance;
-      ]
-    5
-    ()
-  >>=? fun (block, accounts) ->
+  let* block, accounts =
+    Context.init_n
+      ~rng_state
+      ~dal_enable
+      ?dal
+      ~bootstrap_balances:
+        [
+          initial_balance;
+          initial_balance;
+          initial_balance;
+          initial_balance;
+          initial_balance;
+        ]
+      5
+      ()
+  in
   match accounts with
   | [bs1; bs2; bs3; bs4; bs5] ->
       return (`Mem_block (block, (bs1, bs2, bs3, bs4, bs5)))
@@ -54,40 +56,43 @@ let context_init_memory ?dal ~rng_state () =
 let context_init ?dal ~rng_state () = context_init_memory ?dal ~rng_state ()
 
 let make ?dal ~rng_state () =
-  context_init_memory ?dal ~rng_state () >>=? fun context ->
+  let open Lwt_result_wrap_syntax in
+  let* context = context_init_memory ?dal ~rng_state () in
   let amount = Alpha_context.Tez.one in
   let chain_id = Tezos_crypto.Hashed.Chain_id.zero in
   let now = Script_timestamp.of_zint Z.zero in
   let level = Script_int.zero_n in
   let open Script_interpreter in
-  (match context with
-  | `Mem_block (block, (bs1, _, _, _, _)) ->
-      let sender = Alpha_context.Destination.Contract bs1 in
-      let payer = Contract_helpers.default_payer in
-      let self = Contract_helpers.default_self in
-      let step_constants =
-        {
-          sender;
-          payer;
-          self;
-          amount;
-          balance = Alpha_context.Tez.of_mutez_exn initial_balance;
-          chain_id;
-          now;
-          level;
-        }
-      in
-      return (block, step_constants))
-  >>=? fun (block, step_constants) ->
-  Context.get_constants (B block) >>=? fun csts ->
+  let* block, step_constants =
+    match context with
+    | `Mem_block (block, (bs1, _, _, _, _)) ->
+        let sender = Alpha_context.Destination.Contract bs1 in
+        let payer = Contract_helpers.default_payer in
+        let self = Contract_helpers.default_self in
+        let step_constants =
+          {
+            sender;
+            payer;
+            self;
+            amount;
+            balance = Alpha_context.Tez.of_mutez_exn initial_balance;
+            chain_id;
+            now;
+            level;
+          }
+        in
+        return (block, step_constants)
+  in
+  let* csts = Context.get_constants (B block) in
   let minimal_block_delay =
     Protocol.Alpha_context.Period.to_seconds csts.parametric.minimal_block_delay
   in
-  Incremental.begin_construction
-    ~timestamp:
-      (Time.Protocol.add block.header.shell.timestamp minimal_block_delay)
-    block
-  >>=? fun vs ->
+  let* vs =
+    Incremental.begin_construction
+      ~timestamp:
+        (Time.Protocol.add block.header.shell.timestamp minimal_block_delay)
+      block
+  in
   let ctxt = Incremental.alpha_ctxt vs in
   let ctxt =
     (* Required for eg Create_contract *)

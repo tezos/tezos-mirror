@@ -90,7 +90,8 @@ let () =
     (fun l -> Unexpected_level l)
 
 let of_int32 l =
-  if Compare.Int32.(l >= 0l) then ok l else error (Unexpected_level l)
+  let open Result_syntax in
+  if Compare.Int32.(l >= 0l) then return l else tzfail (Unexpected_level l)
 
 let of_int32_exn l =
   match of_int32 l with
@@ -104,6 +105,7 @@ let of_int32_non_negative l =
 
 let encoding =
   Data_encoding.conv_with_guard
+    ~schema:Data_encoding.positive_int32_schema
     to_int32
     (fun l ->
       match of_int32 l with

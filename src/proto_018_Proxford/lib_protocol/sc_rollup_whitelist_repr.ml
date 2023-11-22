@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,35 +23,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Simple abstraction from low-level storage to handle frozen deposits.
+type t = Signature.Public_key_hash.t list
 
-    This module is responsible for maintaining the
-    {!Storage.Contract.Frozen_deposits} table. *)
+let encoding =
+  let open Data_encoding in
+  (* The whitelist size is checked to forbid the origination of a
+     whitelist that is bigger than any subsequent whitelist
+     update. This check is valid because the binary outbox message
+     encoding size is only two bytes longer than the maximum whitelist
+     update size (encoded in binary), where the encoding of a key is
+     20 bytes long. *)
+  check_size (Constants_repr.sc_rollup_message_size_limit - 2)
+  @@ list Signature.Public_key_hash.encoding
 
-(** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt].
-    It returns zero if there is no such value. *)
-val get : Raw_context.t -> Contract_repr.t -> Deposits_repr.t tzresult Lwt.t
+let pp ppf =
+  let open Format in
+  fprintf
+    ppf
+    "@[<hv>@[<hv 2>[@,%a@]@,]@]"
+    (pp_print_list
+       ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+       Signature.Public_key_hash.pp_short)
 
-(** [credit_only_call_from_token ctxt staker tez] returns a new
-    context from [ctxt] where the amount of frozen deposits for the
-    given [staker] increases by [tez]. *)
-val credit_only_call_from_token :
-  Raw_context.t ->
-  Stake_repr.staker ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+type last_whitelist_update = {
+  message_index : Z.t;
+  outbox_level : Raw_level_repr.t;
+}
 
-(** [spend_only_call_from_token ctxt delegate tez] returns a new context from
-   [ctxt] where the amount of frozen deposits for the implicit contract
-   represented by [delegate] decreases by [tez].*)
-val spend_only_call_from_token :
-  Raw_context.t ->
-  Stake_repr.staker ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+let last_whitelist_update_encoding =
+  Data_encoding.(
+    conv
+      (fun {message_index; outbox_level} -> (message_index, outbox_level))
+      (fun (message_index, outbox_level) -> {message_index; outbox_level})
+      (obj2
+         (req "message_index" n)
+         (req "outbox_level" Raw_level_repr.encoding)))
 
-(** [update_initial_amount ctxt contract tez] returns a new context from [ctxt]
-   where the initial_amount of the frozen deposits for [contract] is set to
-   [tez]. *)
-val update_initial_amount :
-  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+type update = Public | Private of t
+
+let update_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Public"
+        (obj1 (req "kind" (constant "public")))
+        (function Public -> Some () | _ -> None)
+        (fun () -> Public);
+      case
+        (Tag 1)
+        ~title:"Private"
+        (obj2 (req "kind" (constant "update")) (req "whitelist" encoding))
+        (function Private whitelist -> Some ((), whitelist) | _ -> None)
+        (fun ((), whitelist) -> Private whitelist);
+    ]

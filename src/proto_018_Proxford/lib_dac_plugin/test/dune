@@ -2,15 +2,15 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_018_Proxford_lib_dac_plugin_test_tezt_lib)
+ (name src_proto_alpha_lib_dac_plugin_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-libs.base
-  octez-protocol-018-Proxford-libs.dac
-  tezos-protocol-018-Proxford.protocol
+  octez-protocol-alpha-libs.dac
+  tezos-protocol-alpha.protocol
   octez-libs.base-test-helpers
-  octez-protocol-018-Proxford-libs.test-helpers
+  octez-protocol-alpha-libs.test-helpers
   tezos-dac-lib
   tezos_dac_node_lib
   octez-alcotezt)
@@ -21,10 +21,10 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_dac_018_Proxford
-  -open Tezos_protocol_018_Proxford
+  -open Tezos_dac_alpha
+  -open Tezos_protocol_alpha
   -open Tezos_base_test_helpers
-  -open Tezos_018_Proxford_test_helpers
+  -open Tezos_alpha_test_helpers
   -open Tezos_dac_lib
   -open Tezos_dac_node_lib
   -open Octez_alcotezt)
@@ -34,7 +34,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_018_Proxford_lib_dac_plugin_test_tezt_lib
+  src_proto_alpha_lib_dac_plugin_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -43,7 +43,7 @@
 
 (rule
  (alias runtest)
- (package octez-protocol-018-Proxford-libs)
+ (package octez-protocol-alpha-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

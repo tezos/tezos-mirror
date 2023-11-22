@@ -127,45 +127,49 @@ module Make_builder (C : COMPARABLE) = struct
         ~size
 
     let find ctxt key {map; size} =
-      G.consume ctxt (find_cost ~key ~size) >|? fun ctxt ->
+      let open Result_syntax in
+      let+ ctxt = G.consume ctxt (find_cost ~key ~size) in
       (M.find key map, ctxt)
 
     let update ctxt key f {map; size} =
+      let open Result_syntax in
       let find_cost = find_cost ~key ~size in
       let update_cost = update_cost ~key ~size in
       (* Consume gas for looking up the old value *)
-      G.consume ctxt find_cost >>? fun ctxt ->
+      let* ctxt = G.consume ctxt find_cost in
       let old_val_opt = M.find key map in
       (* The call to [f] must also account for gas *)
-      f ctxt old_val_opt >>? fun (new_val_opt, ctxt) ->
+      let* new_val_opt, ctxt = f ctxt old_val_opt in
       match (old_val_opt, new_val_opt) with
       | Some _, Some new_val ->
           (* Consume gas for adding to the map *)
-          G.consume ctxt update_cost >|? fun ctxt ->
+          let+ ctxt = G.consume ctxt update_cost in
           ({map = M.add key new_val map; size}, ctxt)
       | Some _, None ->
           (* Consume gas for removing from the map *)
-          G.consume ctxt update_cost >|? fun ctxt ->
+          let+ ctxt = G.consume ctxt update_cost in
           ({map = M.remove key map; size = size - 1}, ctxt)
       | None, Some new_val ->
           (* Consume gas for adding to the map *)
-          G.consume ctxt update_cost >|? fun ctxt ->
+          let+ ctxt = G.consume ctxt update_cost in
           ({map = M.add key new_val map; size = size + 1}, ctxt)
-      | None, None -> ok ({map; size}, ctxt)
+      | None, None -> return ({map; size}, ctxt)
 
     let to_list ctxt {map; size} =
-      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >|? fun ctxt ->
+      let open Result_syntax in
+      let+ ctxt = G.consume ctxt (Carbonated_map_costs.fold_cost ~size) in
       (M.bindings map, ctxt)
 
     let add ctxt ~merge_overlap key value {map; size} =
+      let open Result_syntax in
       (* Consume gas for looking up the element *)
-      G.consume ctxt (find_cost ~key ~size) >>? fun ctxt ->
+      let* ctxt = G.consume ctxt (find_cost ~key ~size) in
       (* Consume gas for adding the element *)
-      G.consume ctxt (update_cost ~key ~size) >>? fun ctxt ->
+      let* ctxt = G.consume ctxt (update_cost ~key ~size) in
       match M.find key map with
       | Some old_val ->
           (* Invoking [merge_overlap] must also account for gas *)
-          merge_overlap ctxt old_val value >|? fun (new_value, ctxt) ->
+          let+ new_value, ctxt = merge_overlap ctxt old_val value in
           ({map = M.add key new_value map; size}, ctxt)
       | None -> Ok ({map = M.add key value map; size = size + 1}, ctxt)
 
@@ -180,17 +184,19 @@ module Make_builder (C : COMPARABLE) = struct
       add_key_values_to_map ctxt ~merge_overlap empty
 
     let merge ctxt ~merge_overlap map1 {map; size} =
+      let open Result_syntax in
       (* To be on the safe side, pay an upfront gas cost for traversing the
          map. Each step of the fold is accounted for separately.
       *)
-      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
+      let* ctxt = G.consume ctxt (Carbonated_map_costs.fold_cost ~size) in
       M.fold_e
         (fun key value (map, ctxt) -> add ctxt ~merge_overlap key value map)
         map
         (map1, ctxt)
 
     let fold_e ctxt f empty {map; size} =
-      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
+      let open Result_syntax in
+      let* ctxt = G.consume ctxt (Carbonated_map_costs.fold_cost ~size) in
       M.fold_e
         (fun key value (acc, ctxt) ->
           (* Invoking [f] must also account for gas. *)
@@ -199,7 +205,8 @@ module Make_builder (C : COMPARABLE) = struct
         (empty, ctxt)
 
     let fold_es ctxt f empty {map; size} =
-      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>?= fun ctxt ->
+      let open Lwt_result_syntax in
+      let*? ctxt = G.consume ctxt (Carbonated_map_costs.fold_cost ~size) in
       M.fold_es
         (fun key value (acc, ctxt) ->
           (* Invoking [f] must also account for gas. *)
@@ -208,19 +215,22 @@ module Make_builder (C : COMPARABLE) = struct
         (empty, ctxt)
 
     let map_e ctxt f {map; size} =
+      let open Result_syntax in
       (* We cannot use the standard map function because [f] also meters the gas
          cost at each invocation. *)
-      fold_e
-        ctxt
-        (fun ctxt map key value ->
-          (* Invoking [f] must also account for gas. *)
-          f ctxt key value >>? fun (value, ctxt) ->
-          (* Consume gas for adding the element. *)
-          G.consume ctxt (update_cost ~key ~size) >|? fun ctxt ->
-          (M.add key value map, ctxt))
-        M.empty
-        {map; size}
-      >|? fun (map, ctxt) -> ({map; size}, ctxt)
+      let+ map, ctxt =
+        fold_e
+          ctxt
+          (fun ctxt map key value ->
+            (* Invoking [f] must also account for gas. *)
+            let* value, ctxt = f ctxt key value in
+            (* Consume gas for adding the element. *)
+            let+ ctxt = G.consume ctxt (update_cost ~key ~size) in
+            (M.add key value map, ctxt))
+          M.empty
+          {map; size}
+      in
+      ({map; size}, ctxt)
   end
 end
 

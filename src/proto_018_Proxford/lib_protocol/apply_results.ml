@@ -58,6 +58,10 @@ type _ successful_manager_operation_result =
       global_address : Script_expr_hash.t;
     }
       -> Kind.register_global_constant successful_manager_operation_result
+  | Set_deposits_limit_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.set_deposits_limit successful_manager_operation_result
   | Increase_paid_storage_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
@@ -119,6 +123,7 @@ type _ successful_manager_operation_result =
   | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
       ticket_receipt : Ticket_receipt.t;
+      whitelist_update : Sc_rollup.Whitelist.update option;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
@@ -484,6 +489,21 @@ module Manager_result = struct
         | Update_consensus_key_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> Update_consensus_key_result {consumed_gas})
 
+  let set_deposits_limit_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.set_deposits_limit_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Set_deposits_limit_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~kind:Kind.Set_deposits_limit_manager_kind
+      ~proj:(function
+        | Set_deposits_limit_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Set_deposits_limit_result {consumed_gas})
+
   let increase_paid_storage_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.increase_paid_storage_case
@@ -795,11 +815,12 @@ module Manager_result = struct
         .sc_rollup_execute_outbox_message_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj5
             (req
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name)
             (req "ticket_updates" Ticket_receipt.encoding)
+            (opt "whitelist_update" Sc_rollup.Whitelist.update_encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -813,22 +834,26 @@ module Manager_result = struct
             {
               balance_updates;
               ticket_receipt;
+              whitelist_update;
               consumed_gas;
               paid_storage_size_diff;
             } ->
             ( balance_updates,
               ticket_receipt,
+              whitelist_update,
               consumed_gas,
               paid_storage_size_diff ))
       ~inj:
         (fun ( balance_updates,
                ticket_receipt,
+               whitelist_update,
                consumed_gas,
                paid_storage_size_diff ) ->
         Sc_rollup_execute_outbox_message_result
           {
             balance_updates;
             ticket_receipt;
+            whitelist_update;
             consumed_gas;
             paid_storage_size_diff;
           })
@@ -880,6 +905,7 @@ let successful_manager_operation_result_encoding :
          make Manager_result.origination_case;
          make Manager_result.delegation_case;
          make Manager_result.update_consensus_key_case;
+         make Manager_result.set_deposits_limit_case;
          make Manager_result.increase_paid_storage_case;
          make Manager_result.sc_rollup_originate_case;
        ]
@@ -909,14 +935,20 @@ type 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_attestation_evidence_result :
-      Receipt.balance_updates
+  | Double_attestation_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_attestation_evidence contents_result
-  | Double_preattestation_evidence_result :
-      Receipt.balance_updates
+  | Double_preattestation_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_preattestation_evidence contents_result
-  | Double_baking_evidence_result :
-      Receipt.balance_updates
+  | Double_baking_evidence_result : {
+      forbidden_delegate : Signature.public_key_hash option;
+      balance_updates : Receipt.balance_updates;
+    }
       -> Kind.double_baking_evidence contents_result
   | Activate_account_result :
       Receipt.balance_updates
@@ -967,6 +999,10 @@ let equal_manager_kind :
   | Kind.Event_manager_kind, Kind.Event_manager_kind -> Some Eq
   | Kind.Event_manager_kind, _ -> None
   | Kind.Register_global_constant_manager_kind, _ -> None
+  | Kind.Set_deposits_limit_manager_kind, Kind.Set_deposits_limit_manager_kind
+    ->
+      Some Eq
+  | Kind.Set_deposits_limit_manager_kind, _ -> None
   | ( Kind.Increase_paid_storage_manager_kind,
       Kind.Increase_paid_storage_manager_kind ) ->
       Some Eq
@@ -1218,7 +1254,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_endorsement_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1233,8 +1270,14 @@ module Encoding = struct
           | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_attestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_attestation_evidence_result bus);
+        proj =
+          (fun (Double_attestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_attestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_attestation_evidence_case =
@@ -1242,7 +1285,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_attestation_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1257,8 +1301,14 @@ module Encoding = struct
           | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_attestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_attestation_evidence_result bus);
+        proj =
+          (fun (Double_attestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_attestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_preendorsement_evidence_case =
@@ -1266,7 +1316,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_preendorsement_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1282,8 +1333,14 @@ module Encoding = struct
             ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_preattestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_preattestation_evidence_result bus);
+        proj =
+          (fun (Double_preattestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_preattestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_preattestation_evidence_case =
@@ -1291,7 +1348,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_preattestation_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1307,8 +1365,14 @@ module Encoding = struct
             ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_preattestation_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_preattestation_evidence_result bus);
+        proj =
+          (fun (Double_preattestation_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_preattestation_evidence_result
+              {forbidden_delegate; balance_updates});
       }
 
   let double_baking_evidence_case =
@@ -1316,7 +1380,8 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_baking_evidence_case;
         encoding =
-          obj1
+          obj2
+            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft
                "balance_updates"
                Receipt.balance_updates_encoding_with_legacy_attestation_name
@@ -1330,8 +1395,13 @@ module Encoding = struct
           | Contents_and_result ((Double_baking_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_baking_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_baking_evidence_result bus);
+        proj =
+          (fun (Double_baking_evidence_result
+                 {forbidden_delegate; balance_updates}) ->
+            (forbidden_delegate, balance_updates));
+        inj =
+          (fun (forbidden_delegate, balance_updates) ->
+            Double_baking_evidence_result {forbidden_delegate; balance_updates});
       }
 
   let activate_account_case =
@@ -1570,6 +1640,17 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
+  let set_deposits_limit_case =
+    make_manager_case
+      Operation.Encoding.set_deposits_limit_case
+      Manager_result.set_deposits_limit_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Set_deposits_limit _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
+
   let increase_paid_storage_case =
     make_manager_case
       Operation.Encoding.increase_paid_storage_case
@@ -1743,6 +1824,7 @@ let common_cases =
     origination_case;
     delegation_case;
     register_global_constant_case;
+    set_deposits_limit_case;
     increase_paid_storage_case;
     update_consensus_key_case;
     transfer_ticket_case;
@@ -2146,6 +2228,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Register_global_constant _; _}, _ -> None
+  | ( Manager_operation {operation = Set_deposits_limit _; _},
+      Manager_operation_result
+        {operation_result = Applied (Set_deposits_limit_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Set_deposits_limit _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Set_deposits_limit_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Set_deposits_limit _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Set_deposits_limit_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Set_deposits_limit _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Set_deposits_limit_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Set_deposits_limit _; _}, _ -> None
   | ( Manager_operation {operation = Increase_paid_storage _; _},
       Manager_operation_result
         {operation_result = Applied (Increase_paid_storage_result _); _} ) ->

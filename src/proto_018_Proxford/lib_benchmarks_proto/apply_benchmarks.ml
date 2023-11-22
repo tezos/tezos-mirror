@@ -41,15 +41,16 @@ let make_context ~rng_state =
       ~bootstrap_balances:[initial_balance; initial_balance; initial_balance]
       ()
   in
-  Context.get_constants (B block) >>=? fun csts ->
+  let* csts = Context.get_constants (B block) in
   let minimal_block_delay =
     Protocol.Alpha_context.Period.to_seconds csts.parametric.minimal_block_delay
   in
-  Incremental.begin_construction
-    ~timestamp:
-      (Time.Protocol.add block.header.shell.timestamp minimal_block_delay)
-    block
-  >>=? fun vs ->
+  let* vs =
+    Incremental.begin_construction
+      ~timestamp:
+        (Time.Protocol.add block.header.shell.timestamp minimal_block_delay)
+      block
+  in
   let ctxt = Incremental.alpha_ctxt vs in
   let ctxt =
     (* Required for eg Create_contract *)

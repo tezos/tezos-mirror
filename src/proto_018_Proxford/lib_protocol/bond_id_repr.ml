@@ -73,9 +73,9 @@ let destruct id =
   in
   if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
     match Sc_rollup_repr.Address.of_b58check_opt id with
-    | Some id -> Result.ok (Sc_rollup_bond_id id)
-    | None -> Result.error "Cannot parse smart rollup id"
-  else Result.error "Cannot parse rollup id"
+    | Some id -> Ok (Sc_rollup_bond_id id)
+    | None -> Error "Cannot parse smart rollup id"
+  else Error "Cannot parse rollup id"
 
 let construct = function
   | Sc_rollup_bond_id id -> Sc_rollup_repr.Address.to_b58check id

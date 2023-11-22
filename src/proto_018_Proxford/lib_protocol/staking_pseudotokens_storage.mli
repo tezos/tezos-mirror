@@ -29,19 +29,19 @@
 
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
     staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
-    an amount of pseudotokens corresponding to [amount] using [delegate]'s 
+    an amount of pseudotokens corresponding to [amount] using [delegate]'s
     staked frozen deposits pseudotokens/tez rate.
-    
+
     This function must be called on "stake" **before** transferring tez to
-    [delegate]'s frozen deposits. 
-    
+    [delegate]'s frozen deposits.
+
     [delegate] must be [contract]'s delegate. *)
 val stake :
   Raw_context.t ->
   contract:Contract_repr.t ->
   delegate:Signature.Public_key_hash.t ->
   Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** [request_unstake ctxt ~contract ~delegate amount] debits the [contract]'s
     staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
@@ -58,7 +58,7 @@ val request_unstake :
   contract:Contract_repr.t ->
   delegate:Signature.Public_key_hash.t ->
   Tez_repr.t ->
-  (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+  (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 module For_RPC : sig
   (** [staked_balance ctxt ~contract ~delegate] returns [contract]'s
@@ -66,12 +66,27 @@ module For_RPC : sig
     For delegate, it is their own frozen deposits.
     For delegators, their staking balance in pseudotokens is converted into tez
     using [delegate]'s staked frozen deposits tez/pseudotokens rate.
-    
+
     The given [delegate] should be [contract]'s delegate. Otherwise the given
     [Tez.t] amount will not make sense. *)
   val staked_balance :
     Raw_context.t ->
     contract:Contract_repr.t ->
     delegate:Signature.Public_key_hash.t ->
+    Tez_repr.t tzresult Lwt.t
+
+  val staking_pseudotokens_balance :
+    Raw_context.t ->
+    delegator:Contract_repr.t ->
+    Staking_pseudotoken_repr.t tzresult Lwt.t
+
+  val get_frozen_deposits_pseudotokens :
+    Raw_context.t ->
+    delegate:Signature.public_key_hash ->
+    Staking_pseudotoken_repr.t tzresult Lwt.t
+
+  val get_frozen_deposits_staked_tez :
+    Raw_context.t ->
+    delegate:Signature.public_key_hash ->
     Tez_repr.t tzresult Lwt.t
 end

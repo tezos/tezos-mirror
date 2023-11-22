@@ -40,31 +40,34 @@ let () =
     (function Failed_to_hash_node -> Some () | _ -> None)
     (fun () -> Failed_to_hash_node)
 
-let hash_bytes_cost bytes =
-  let module S = Saturation_repr in
-  let ( + ) = S.add in
-  let v0 = S.safe_int @@ Bytes.length bytes in
-  let ( lsr ) = S.shift_right in
-  S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
+(* No model is given. The original definition was a copy of
+   Global_constants_costs.expr_to_address_in_context_cost.
+*)
+let hash_bytes_cost = Global_constants_costs.expr_to_address_in_context_cost
 
 let hash_of_node ctxt node =
-  Raw_context.consume_gas ctxt (Script_repr.strip_locations_cost node)
-  >>? fun ctxt ->
+  let open Result_syntax in
+  let* ctxt =
+    Raw_context.consume_gas ctxt (Script_repr.strip_locations_cost node)
+  in
   let node = Micheline.strip_locations node in
-  Result.of_option
-    ~error:(Error_monad.trace_of_error Failed_to_hash_node)
-    (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
-  >>? fun bytes ->
-  Raw_context.consume_gas ctxt (hash_bytes_cost bytes) >|? fun ctxt ->
+  let* bytes =
+    Result.of_option
+      ~error:(Error_monad.trace_of_error Failed_to_hash_node)
+      (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
+  in
+  let+ ctxt = Raw_context.consume_gas ctxt (hash_bytes_cost bytes) in
   ( Ticket_hash_repr.of_script_expr_hash @@ Script_expr_hash.hash_bytes [bytes],
     ctxt )
 
 let hash_of_node_uncarbonated node =
+  let open Result_syntax in
   let node = Micheline.strip_locations node in
-  Result.of_option
-    ~error:(Error_monad.trace_of_error Failed_to_hash_node)
-    (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
-  >|? fun bytes ->
+  let+ bytes =
+    Result.of_option
+      ~error:(Error_monad.trace_of_error Failed_to_hash_node)
+      (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
+  in
   Ticket_hash_repr.of_script_expr_hash @@ Script_expr_hash.hash_bytes [bytes]
 
 let make ctxt ~ticketer ~ty ~contents ~owner =

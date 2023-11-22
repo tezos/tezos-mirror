@@ -63,6 +63,12 @@ val staked_balance :
   Contract.t ->
   Tez.t option shell_tzresult Lwt.t
 
+val staking_numerator :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Staking_pseudotoken.t shell_tzresult Lwt.t
+
 val unstaked_frozen_balance :
   'a #RPC_context.simple ->
   'a ->

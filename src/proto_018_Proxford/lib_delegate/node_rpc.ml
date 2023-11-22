@@ -291,11 +291,11 @@ let await_protocol_activation cctxt ~chain () =
   stop () ;
   return_unit
 
-let get_attestable_slots dal_node_rpc_ctxt pkh ~level =
+let get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level =
   Tezos_rpc.Context.make_call
     Tezos_dal_node_services.Services.get_attestable_slots
     dal_node_rpc_ctxt
-    (((), pkh), level)
+    (((), pkh), attested_level)
     ()
     ()
 

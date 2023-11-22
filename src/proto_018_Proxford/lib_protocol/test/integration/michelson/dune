@@ -2,8 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name
-  src_proto_018_Proxford_lib_protocol_test_integration_michelson_tezt_lib)
+ (name src_proto_alpha_lib_protocol_test_integration_michelson_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -15,8 +14,8 @@
   octez-protocol-018-Proxford-libs.client
   tezos-benchmark
   octez-libs.micheline
-  tezos-benchmark-018-Proxford
-  tezos-benchmark-type-inference-018-Proxford
+  tezos-benchmark-alpha
+  tezos-benchmark-type-inference-alpha
   octez-protocol-018-Proxford-libs.plugin
   tezos-protocol-018-Proxford.parameters)
  (library_flags (:standard -linkall))
@@ -28,13 +27,13 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_018_Proxford
-  -open Tezos_018_Proxford_test_helpers
+  -open Tezos_alpha_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_client_018_Proxford
+  -open Tezos_client_alpha
   -open Tezos_micheline
-  -open Tezos_benchmark_018_Proxford
-  -open Tezos_benchmark_type_inference_018_Proxford
-  -open Tezos_protocol_plugin_018_Proxford)
+  -open Tezos_benchmark_alpha
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_protocol_plugin_alpha)
  (modules
   test_annotations
   test_block_time_instructions
@@ -62,7 +61,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_018_Proxford_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_alpha_lib_protocol_test_integration_michelson_tezt_lib
   tezt)
  (link_flags
   (:standard)

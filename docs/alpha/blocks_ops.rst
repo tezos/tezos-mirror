@@ -32,7 +32,7 @@ operations<manager_operations_alpha>`. This order also specifies the
 of each of these classes. Consensus operations are considered the
 highest priority ones, and manager operations the lowest.
 
-Each kind of operation belongs to exactly one validation pass, except for the :ref:`failing_noop` which belongs to no validation pass and therefore cannot be :ref:`applied<operation_validity_alpha>`.
+Each kind of operation belongs to exactly one validation pass, except for the :ref:`failing_noop_alpha` which belongs to no validation pass and therefore cannot be :ref:`applied<operation_validity_alpha>`.
 
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
@@ -250,7 +250,7 @@ Batches satisfy the following properties:
   interleaving other operations. Either all the operations in the
   batch succeed, or none is applied.
 
-.. _failing_noop:
+.. _failing_noop_alpha:
 
 Failing_noop operation
 ~~~~~~~~~~~~~~~~~~~~~~

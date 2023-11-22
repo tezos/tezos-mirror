@@ -84,6 +84,7 @@ let () =
    current context and that a nonce has not been already revealed for that level.
    Also checks that we are not past the nonce revelation period. *)
 let get_unrevealed ctxt (level : Level_repr.t) =
+  let open Lwt_result_syntax in
   let current_level = Level_storage.current ctxt in
   match Cycle_repr.pred current_level.cycle with
   | None -> tzfail Too_early_revelation (* no revelations during cycle 0 *)
@@ -97,7 +98,8 @@ let get_unrevealed ctxt (level : Level_repr.t) =
              >= Constants_storage.nonce_revelation_threshold ctxt)
       then tzfail Too_late_revelation
       else
-        Storage.Seed.Nonce.get ctxt level >>=? function
+        let* status = Storage.Seed.Nonce.get ctxt level in
+        match status with
         | Revealed _ -> tzfail Already_revealed_nonce
         | Unrevealed status -> return status)
 
@@ -106,7 +108,8 @@ let record_hash ctxt unrevealed =
   Storage.Seed.Nonce.init ctxt level (Unrevealed unrevealed)
 
 let check_unrevealed ctxt (level : Level_repr.t) nonce =
-  get_unrevealed ctxt level >>=? fun unrevealed ->
+  let open Lwt_result_syntax in
+  let* unrevealed = get_unrevealed ctxt level in
   fail_unless
     (Seed_repr.check_hash nonce unrevealed.nonce_hash)
     Inconsistent_nonce
@@ -128,9 +131,11 @@ let get = Storage.Seed.Nonce.get
 type nonce_presence = No_nonce_expected | Nonce_expected of status
 
 let check ctxt level =
-  Storage.Seed.Nonce.find ctxt level >>=? function
-  | None -> return No_nonce_expected
-  | Some status -> return (Nonce_expected status)
+  let open Lwt_result_syntax in
+  let+ status_opt = Storage.Seed.Nonce.find ctxt level in
+  match status_opt with
+  | None -> No_nonce_expected
+  | Some status -> Nonce_expected status
 
 let of_bytes = Seed_repr.make_nonce
 

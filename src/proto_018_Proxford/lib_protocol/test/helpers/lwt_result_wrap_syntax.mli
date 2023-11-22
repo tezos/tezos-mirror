@@ -38,6 +38,9 @@ include module type of Tezos_base.TzPervasives.Lwt_result_syntax
     value. *)
 val wrap : 'a Environment.Error_monad.tzresult Lwt.t -> 'a tzresult Lwt.t
 
+(** [let@ x = m in f x] is equivalent to [let x = Environment.wrap_tzresult m in f x] *)
+val ( let@ ) : 'a Environment.Error_monad.tzresult -> ('a tzresult -> 'b) -> 'b
+
 (** [let*@ x = m in f x] is equivalent to [let* x = wrap m in f x].
 
     Mnemonic: [@] "wraps" a protocol error in a shell error. *)
@@ -54,6 +57,14 @@ val ( let*?@ ) :
   'a Environment.Error_monad.tzresult ->
   ('a -> 'b tzresult Lwt.t) ->
   'b tzresult Lwt.t
+
+(** [let*!@ x = m in f x] is equivalent to [let*! x = wrap m in f x].
+
+      Mnemonic: [@] "wraps" a protocol error in a shell error. *)
+val ( let*!@ ) :
+  'a Environment.Error_monad.tzresult Lwt.t ->
+  ('a tzresult -> 'b Lwt.t) ->
+  'b Lwt.t
 
 (** [let+@ x = m in f x] is equivalent to [let+ x = wrap m in f x].
 

@@ -78,6 +78,16 @@ let () =
     unit
     (function WASM_proof_production_failed -> Some () | _ -> None)
     (fun () -> WASM_proof_production_failed) ;
+  let msg = "Proof verification failed" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_wasm_proof_verification_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function WASM_proof_verification_failed -> Some () | _ -> None)
+    (fun () -> WASM_proof_verification_failed) ;
   let msg =
     "Invalid dissection distribution: not all ticks are a multiplier of the \
      maximum number of ticks of a snapshot"
@@ -93,7 +103,7 @@ let () =
     (fun () -> WASM_invalid_dissection_distribution)
 
 module V2_0_0 = struct
-  let current_version = Wasm_2_0_0.v2
+  let current_version = Wasm_2_0_0.v3
 
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
@@ -105,6 +115,19 @@ module V2_0_0 = struct
     Sc_rollup_reveal_hash.well_known_reveal_preimage
 
   let well_known_reveal_hash = Sc_rollup_reveal_hash.well_known_reveal_hash
+
+  let decode_reveal (Wasm_2_0_0.Reveal_raw payload) =
+    match
+      Data_encoding.Binary.of_string_opt
+        Sc_rollup_PVM_sig.reveal_encoding
+        payload
+    with
+    | Some reveal -> reveal
+    | None ->
+        (* If the kernel has tried to submit an incorrect reveal request,
+           we don’t stuck the rollup. Instead, we fallback to the
+           requesting the [well_known_reveal_hash] preimage *)
+        Reveal_raw_data well_known_reveal_hash
 
   (*
     This is the state hash of reference that both the prover of the
@@ -131,7 +154,7 @@ module V2_0_0 = struct
   *)
   let reference_initial_state_hash =
     Sc_rollup_repr.State_hash.of_b58check_exn
-      "srs11qkRe5cbDBixB2fuumn4tfkvQcxUSuFXa94Lv5c6kdzzfpM9UF"
+      "srs127FAyj2NkJYtN8RE8yPieBGpakvAH8MgwzRPUM4UnsCKB24rrA"
 
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig
@@ -325,20 +348,7 @@ module V2_0_0 = struct
       match info.input_request with
       | No_input_required -> Computing
       | Input_required -> Waiting_for_input_message
-      | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
-          match
-            Data_encoding.Binary.of_string_opt
-              Sc_rollup_reveal_hash.encoding
-              hash
-          with
-          | Some hash -> try_return_reveal (Reveal_raw_data hash)
-          | None ->
-              (* We do not put the machine in a stuck condition if a kind of reveal
-                 happens to not be supported. Insteadn we wait for the well known
-                 preimage. *)
-              Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash))
-      | Reveal_required Wasm_2_0_0.Reveal_metadata ->
-          try_return_reveal Reveal_metadata
+      | Reveal_required req -> try_return_reveal (decode_reveal req)
 
     let is_input_state ~is_reveal_enabled =
       let open Monad.Syntax in
@@ -359,10 +369,10 @@ module V2_0_0 = struct
       result_of (get_status ~is_reveal_enabled)
 
     let get_outbox outbox_level state =
+      let open Lwt_syntax in
       let outbox_level_int32 =
         Raw_level_repr.to_int32_non_negative outbox_level
       in
-      let open Lwt_syntax in
       let rec aux outbox message_index =
         let output =
           Wasm_2_0_0.{outbox_level = outbox_level_int32; message_index}
@@ -421,10 +431,30 @@ module V2_0_0 = struct
           let* s = get in
           let* s = lift (WASM_machine.reveal_step metadata_bytes s) in
           set s
-      | PS.Reveal (PS.Dal_page _content_opt) ->
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3927.
-             Handle DAL pages in wasm PVM. *)
-          assert false
+      | PS.Reveal (PS.Dal_page content_bytes) ->
+          let content_bytes =
+            Option.value ~default:Bytes.empty content_bytes
+            (* [content_opt] is [None] when the slot was not confirmed in the L1.
+               In this case, we return empty bytes.
+
+               Note that the kernel can identify this unconfirmed slot scenario because
+               all confirmed pages have a size of 4KiB. Thus, a page can only be considered
+               empty (0KiB) if it is unconfirmed. *)
+          in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step content_bytes s) in
+          set s
+      | PS.Reveal (PS.Dal_parameters dal_parameters) ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6544
+             reveal_dal_parameters result for slow execution PVM. *)
+          let dal_parameters_bytes =
+            Data_encoding.Binary.to_bytes_exn
+              Sc_rollup_dal_parameters_repr.encoding
+              dal_parameters
+          in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step dal_parameters_bytes s) in
+          set s
 
     let set_input input = state_of @@ set_input_state input
 
@@ -677,8 +707,8 @@ module V2_0_0 = struct
 
     module Internal_for_tests = struct
       let insert_failure state =
-        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
         let open Lwt_syntax in
+        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
         let* n = Tree.length state ["failures"] in
         add n
     end
@@ -713,7 +743,7 @@ module V2_0_0 = struct
 
         let produce_proof _context _state _f =
           (* Can't produce proof without full context*)
-          Lwt.return None
+          Lwt.return_none
 
         let kinded_hash_to_state_hash = function
           | `Value hash | `Node hash ->

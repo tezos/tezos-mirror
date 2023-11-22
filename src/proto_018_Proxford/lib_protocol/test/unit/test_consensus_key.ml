@@ -42,25 +42,34 @@ let create () =
 
 module Consensus_key = struct
   let active_key ctxt pkh =
-    Delegate_consensus_key.active_key ctxt pkh >|= Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    let*@ result = Delegate_consensus_key.active_key ctxt pkh in
+    return result
 
   let active_pubkey ctxt pkh =
-    Delegate_consensus_key.active_pubkey ctxt pkh >|= Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    let*@ result = Delegate_consensus_key.active_pubkey ctxt pkh in
+    return result
 
   let active_pubkey_for_cycle ctxt pkh cycle =
-    Delegate_consensus_key.active_pubkey_for_cycle
-      ctxt
-      pkh
-      (Cycle_repr.of_int32_exn (Int32.of_int cycle))
-    >|= Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    let*@ result =
+      Delegate_consensus_key.active_pubkey_for_cycle
+        ctxt
+        pkh
+        (Cycle_repr.of_int32_exn (Int32.of_int cycle))
+    in
+    return result
 
   let pending_updates ctxt pkh =
-    Delegate_consensus_key.pending_updates ctxt pkh
-    >|= Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    let*@ result = Delegate_consensus_key.pending_updates ctxt pkh in
+    return result
 
   let register_update ctxt pkh pk =
-    Delegate_consensus_key.register_update ctxt pkh pk
-    >|= Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    let*@ result = Delegate_consensus_key.register_update ctxt pkh pk in
+    return result
 
   let activate ctxt ~new_cycle = Delegate_consensus_key.activate ctxt ~new_cycle
 end
@@ -231,7 +240,7 @@ let test_consensus_key_storage () =
     let* active_pkh = Consensus_key.active_key ctxt del1.pkh in
     Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh a1.pkh
   in
-  return ()
+  return_unit
 
 let tests =
   [Tztest.tztest "consensus_key_storage" `Quick test_consensus_key_storage]

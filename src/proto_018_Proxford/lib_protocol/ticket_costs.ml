@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,41 +25,28 @@
 (*****************************************************************************)
 
 open Alpha_context
-module S = Saturation_repr
+include Ticket_costs_generated
 
 module Constants = struct
-  (* model tickets/COLLECT_TICKETS_STEP *)
-  let cost_collect_tickets_step = S.safe_int 80
+  let cost_collect_tickets_step = cost_COLLECT_TICKETS_STEP 1
 
-  (* model tickets/TYPE_HAS_TICKETS *)
-  let cost_has_tickets_of_ty type_size =
-    S.add (S.safe_int 10) (S.mul (S.safe_int 6) type_size)
+  let cost_compare_ticket_hash = cost_COMPARE_TICKET_HASH
 
-  (* model tickets/COMPARE_TICKET_HASH *)
-  let cost_compare_ticket_hash = S.safe_int 10
-
-  (* model tickets/COMPARE_CONTRACT *)
-  let cost_compare_key_contract = S.safe_int 10
+  let cost_compare_key_contract = cost_COMPARE_CONTRACT
 end
 
-let consume_gas_steps ctxt ~step_cost ~num_steps =
-  let ( * ) = S.mul in
+let consume_gas_steps ctxt ~num_steps =
   if Compare.Int.(num_steps <= 0) then Ok ctxt
   else
-    let gas =
-      Gas.atomic_step_cost (step_cost * Saturation_repr.safe_int num_steps)
-    in
+    let gas = Gas.atomic_step_cost (cost_COLLECT_TICKETS_STEP num_steps) in
     Gas.consume ctxt gas
 
 let has_tickets_of_ty_cost ty =
-  Constants.cost_has_tickets_of_ty
-    Script_typed_ir.(ty_size ty |> Type_size.to_int)
+  cost_TYPE_HAS_TICKETS Script_typed_ir.(ty_size ty |> Type_size.to_int)
 
-(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg]
-    Approximating 0.066076 x term *)
+(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg] *)
 let negate_cost z =
-  let size = (7 + Z.numbits z) / 8 in
-  Gas.(S.safe_int 25 +@ S.shift_right (S.safe_int size) 4)
+  Michelson_v1_gas.Cost_of.Interpreter.neg (Script_int.of_zint z)
 
 (** Reusing the gas model from [Michelson_v1_gas.Cost_of.add] *)
 let add_int_cost = Michelson_v1_gas.Cost_of.Interpreter.add_int

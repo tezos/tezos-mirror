@@ -23,109 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type staker =
-  | Single of Contract_repr.t * Signature.public_key_hash
-  | Shared of Signature.public_key_hash
+type t = {frozen : Tez_repr.t; weighted_delegated : Tez_repr.t}
 
-let staker_encoding =
-  let open Data_encoding in
-  let single_tag = 0 in
-  let single_encoding =
-    obj2
-      (req "contract" Contract_repr.encoding)
-      (req "delegate" Signature.Public_key_hash.encoding)
-  in
-  let shared_tag = 1 in
-  let shared_encoding =
-    obj1 (req "delegate" Signature.Public_key_hash.encoding)
-  in
-  def
-    ~title:"staker"
-    ~description:
-      "Abstract notion of staker used in operation receipts, either a single \
-       staker or all the stakers delegating to some delegate."
-    "staker"
-  @@ matching
-       (function
-         | Single (contract, delegate) ->
-             matched single_tag single_encoding (contract, delegate)
-         | Shared delegate -> matched shared_tag shared_encoding delegate)
-       [
-         case
-           ~title:"Single"
-           (Tag single_tag)
-           single_encoding
-           (function
-             | Single (contract, delegate) -> Some (contract, delegate)
-             | _ -> None)
-           (fun (contract, delegate) -> Single (contract, delegate));
-         case
-           ~title:"Shared"
-           (Tag shared_tag)
-           shared_encoding
-           (function Shared delegate -> Some delegate | _ -> None)
-           (fun delegate -> Shared delegate);
-       ]
-
-let compare_staker sa sb =
-  match (sa, sb) with
-  | Single (ca, da), Single (cb, db) ->
-      Compare.or_else (Contract_repr.compare ca cb) (fun () ->
-          Signature.Public_key_hash.compare da db)
-  | Shared da, Shared db -> Signature.Public_key_hash.compare da db
-  | Single _, Shared _ -> -1
-  | Shared _, Single _ -> 1
-
-let staker_delegate = function
-  | Single (_contract, delegate) -> delegate
-  | Shared delegate -> delegate
-
-type t = {frozen : Tez_repr.t; delegated : Tez_repr.t}
-
-let make ~frozen ~delegated = {frozen; delegated}
+let make ~frozen ~weighted_delegated = {frozen; weighted_delegated}
 
 let get_frozen {frozen; _} = frozen
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {frozen; delegated} -> (frozen, delegated))
-    (fun (frozen, delegated) -> {frozen; delegated})
+    (fun {frozen; weighted_delegated} -> (frozen, weighted_delegated))
+    (fun (frozen, weighted_delegated) -> {frozen; weighted_delegated})
     (obj2 (req "frozen" Tez_repr.encoding) (req "delegated" Tez_repr.encoding))
 
-let zero = make ~frozen:Tez_repr.zero ~delegated:Tez_repr.zero
+let zero = make ~frozen:Tez_repr.zero ~weighted_delegated:Tez_repr.zero
 
-let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
+let ( +? ) {frozen = f1; weighted_delegated = d1}
+    {frozen = f2; weighted_delegated = d2} =
   let open Result_syntax in
   let* frozen = Tez_repr.(f1 +? f2) in
-  let+ delegated = Tez_repr.(d1 +? d2) in
-  {frozen; delegated}
+  let+ weighted_delegated = Tez_repr.(d1 +? d2) in
+  {frozen; weighted_delegated}
 
-module Full = struct
-  type t = {
-    own_frozen : Tez_repr.t;
-    staked_frozen : Tez_repr.t;
-    delegated : Tez_repr.t;
-  }
+let staking_weight {frozen; weighted_delegated} =
+  let frozen = Tez_repr.to_mutez frozen in
+  let weighted_delegated = Tez_repr.to_mutez weighted_delegated in
+  Int64.add frozen weighted_delegated
 
-  let make ~own_frozen ~staked_frozen ~delegated =
-    {own_frozen; staked_frozen; delegated}
-
-  let zero =
-    make
-      ~own_frozen:Tez_repr.zero
-      ~staked_frozen:Tez_repr.zero
-      ~delegated:Tez_repr.zero
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {own_frozen; staked_frozen; delegated} ->
-        (own_frozen, staked_frozen, delegated))
-      (fun (own_frozen, staked_frozen, delegated) ->
-        {own_frozen; staked_frozen; delegated})
-      (obj3
-         (req "own_frozen" Tez_repr.encoding)
-         (req "staked_frozen" Tez_repr.encoding)
-         (req "delegated" Tez_repr.encoding))
-end
+let compare s1 s2 = Int64.compare (staking_weight s1) (staking_weight s2)

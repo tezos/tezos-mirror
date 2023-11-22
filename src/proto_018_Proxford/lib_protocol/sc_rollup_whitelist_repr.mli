@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,45 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ frozen_deposits_opt =
-    Storage.Contract.Frozen_deposits.find ctxt delegate
-  in
-  Option.value ~default:Deposits_repr.zero frozen_deposits_opt
+type t = Signature.Public_key_hash.t list
 
-let update_balance ctxt delegate f amount =
-  let open Lwt_result_syntax in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*? new_amount = f frozen_deposits.current_amount amount in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with current_amount = new_amount}
-  in
-  return ctxt
+val encoding : t Data_encoding.t
 
-let credit_only_call_from_token ctxt staker amount =
-  let open Lwt_result_syntax in
-  let delegate = Stake_repr.staker_delegate staker in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( +? ) amount in
-  Stake_storage.add_frozen_stake ctxt staker amount
+val pp : Format.formatter -> t -> unit
 
-let spend_only_call_from_token ctxt staker amount =
-  let open Lwt_result_syntax in
-  let delegate = Stake_repr.staker_delegate staker in
-  let* ctxt = update_balance ctxt delegate Tez_repr.( -? ) amount in
-  Stake_storage.remove_frozen_stake ctxt staker amount
+(** This type is used in the `Storage.Last_whitelist_update. It is the
+    latest whitelist update message executed in the L1. It is used to
+    prevent user to execute whitelist update in unchronological
+    order. *)
+type last_whitelist_update = {
+  message_index : Z.t;
+  outbox_level : Raw_level_repr.t;
+}
 
-let update_initial_amount ctxt delegate_contract deposits_cap =
-  let open Lwt_result_syntax in
-  let* frozen_deposits = get ctxt delegate_contract in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits.add
-      ctxt
-      delegate_contract
-      {frozen_deposits with initial_amount = deposits_cap}
-  in
-  return ctxt
+val last_whitelist_update_encoding : last_whitelist_update Data_encoding.t
+
+type update = Public | Private of t
+
+val update_encoding : update Data_encoding.t

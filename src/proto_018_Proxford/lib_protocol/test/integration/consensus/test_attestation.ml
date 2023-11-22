@@ -37,8 +37,10 @@ open Protocol
 open Alpha_context
 
 let init_genesis ?policy () =
-  Context.init_n ~consensus_threshold:0 5 () >>=? fun (genesis, _contracts) ->
-  Block.bake ?policy genesis >>=? fun b -> return (genesis, b)
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* b = Block.bake ?policy genesis in
+  return (genesis, b)
 
 (** {1 Positive tests} *)
 
@@ -154,16 +156,18 @@ let test_mempool_second_slot () =
 
 (** Apply an attestation with a negative slot. *)
 let test_negative_slot () =
-  Context.init_n 5 () >>=? fun (genesis, _contracts) ->
-  Block.bake genesis >>=? fun b ->
-  Context.get_attester (B b) >>=? fun (delegate, _slots) ->
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init_n 5 () in
+  let* b = Block.bake genesis in
+  let* delegate, _slots = Context.get_attester (B b) in
   Lwt.catch
     (fun () ->
-      Op.attestation
-        ~delegate
-        ~slot:(Slot.of_int_do_not_use_except_for_parameters (-1))
-        b
-      >>=? fun (_ : packed_operation) ->
+      let* (_ : packed_operation) =
+        Op.attestation
+          ~delegate
+          ~slot:(Slot.of_int_do_not_use_except_for_parameters (-1))
+          b
+      in
       failwith "negative slot should not be accepted by the binary format")
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.reraise e)
@@ -447,8 +451,8 @@ let test_conflict () =
   let* op_different_branch = Op.attestation ~branch:Block_hash.zero b in
   (* Test in application and construction (aka baking) modes *)
   let assert_conflict loc baking_mode tested_op =
-    Block.bake ~baking_mode ~operations:[op; tested_op] b
-    >>= assert_conflict_error ~loc
+    let*! block = Block.bake ~baking_mode ~operations:[op; tested_op] b in
+    assert_conflict_error ~loc block
   in
   let* () = assert_conflict __LOC__ Application op in
   let* () = assert_conflict __LOC__ Application op_different_branch in
@@ -458,7 +462,8 @@ let test_conflict () =
   let* inc = Incremental.begin_construction ~mempool_mode:true b in
   let* inc = Incremental.validate_operation inc op in
   let assert_mempool_conflict loc tested_op =
-    Incremental.validate_operation inc tested_op >>= assert_conflict_error ~loc
+    let*! result = Incremental.validate_operation inc tested_op in
+    assert_conflict_error ~loc result
   in
   let* () = assert_mempool_conflict __LOC__ op in
   let* () = assert_mempool_conflict __LOC__ op_different_branch in
@@ -490,7 +495,8 @@ let test_grandparent_conflict () =
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
   let* inc = Incremental.validate_operation inc op in
   let assert_conflict loc tested_op =
-    Incremental.validate_operation inc tested_op >>= assert_conflict_error ~loc
+    let*! result = Incremental.validate_operation inc tested_op in
+    assert_conflict_error ~loc result
   in
   let* () = assert_conflict __LOC__ op in
   let* () = assert_conflict __LOC__ op_different_branch in
@@ -514,7 +520,8 @@ let test_future_level_conflict () =
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
   let* inc = Incremental.validate_operation inc op in
   let assert_conflict loc tested_op =
-    Incremental.validate_operation inc tested_op >>= assert_conflict_error ~loc
+    let*! result = Incremental.validate_operation inc tested_op in
+    assert_conflict_error ~loc result
   in
   let* () = assert_conflict __LOC__ op in
   let* () = assert_conflict __LOC__ op_different_branch in
@@ -605,31 +612,34 @@ let test_no_conflict_various_levels_and_rounds () =
     - a block with not enough attestation cannot be baked;
     - a block with enough attestation is baked. *)
 let test_attestation_threshold ~sufficient_threshold () =
+  let open Lwt_result_wrap_syntax in
   (* We choose a relative large number of accounts so that the probability that
      any delegate has [consensus_threshold] slots is low and most delegates have
      about 1 slot so we can get closer to the limit of [consensus_threshold]: we
      check that a block with attesting power [consensus_threshold - 1] won't be
      baked. *)
-  Context.init_n 10 () >>=? fun (genesis, _contracts) ->
-  Block.bake genesis >>=? fun b ->
-  Context.get_constants (B b)
-  >>=? fun {parametric = {consensus_threshold; _}; _} ->
-  Context.get_attesters (B b) >>=? fun attesters_list ->
-  Block.get_round b >>?= fun round ->
-  List.fold_left_es
-    (fun (counter, attestations) {Plugin.RPC.Validators.delegate; slots; _} ->
-      let new_counter = counter + List.length slots in
-      if
-        (sufficient_threshold && counter < consensus_threshold)
-        || ((not sufficient_threshold) && new_counter < consensus_threshold)
-      then
-        Op.attestation ~round ~delegate b >>=? fun attestation ->
-        return (new_counter, attestation :: attestations)
-      else return (counter, attestations))
-    (0, [])
-    attesters_list
-  >>=? fun (_, attestations) ->
-  Block.bake ~operations:attestations b >>= fun b ->
+  let* genesis, _contracts = Context.init_n 10 () in
+  let* b = Block.bake genesis in
+  let* {parametric = {consensus_threshold; _}; _} =
+    Context.get_constants (B b)
+  in
+  let* attesters_list = Context.get_attesters (B b) in
+  let*?@ round = Block.get_round b in
+  let* _, attestations =
+    List.fold_left_es
+      (fun (counter, attestations) {Plugin.RPC.Validators.delegate; slots; _} ->
+        let new_counter = counter + List.length slots in
+        if
+          (sufficient_threshold && counter < consensus_threshold)
+          || ((not sufficient_threshold) && new_counter < consensus_threshold)
+        then
+          let* attestation = Op.attestation ~round ~delegate b in
+          return (new_counter, attestation :: attestations)
+        else return (counter, attestations))
+      (0, [])
+      attesters_list
+  in
+  let*! b = Block.bake ~operations:attestations b in
   if sufficient_threshold then return_unit
   else
     Assert.proto_error ~loc:__LOC__ b (function

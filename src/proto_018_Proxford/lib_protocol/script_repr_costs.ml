@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +24,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Simple = struct
-  include Internal_event.Simple
+include Script_repr_costs_generated
 
-  let section = [Protocol.name; "sc_rollup_node"; "layer_1"]
+(* Cost of running [strip_locations] on a term with [size] nodes.
+    Note that [strip_locations] will reallocate a fresh Micheline tree.
+    This only depends on the total number of nodes (not the size of
+    the leaves).
 
-  let starting =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_layer_1_starting"
-      ~msg:"Starting layer 1 tracker of the smart rollup node"
-      ~level:Notice
-      ()
+   let cost_strip_locations_micheline = cost_strip_locations_micheline
+*)
 
-  let stopping =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_layer_1_stopping"
-      ~msg:"Stopping layer 1 tracker of the smart rollup node"
-      ~level:Notice
-      ()
+(* Cost of running [strip_annotations] on a term with [size] nodes.
+   Note that [strip_annotations] will reallocate a fresh Micheline tree.
+   This only depends on the total number of nodes (not the size of
+   the leaves).
 
-  let switched_new_head =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_layer_1_new_head"
-      ~msg:"Layer 1 node has switched to head {hash} at level {level}"
-      ~level:Notice
-      ("hash", Block_hash.encoding)
-      ("level", Data_encoding.int32)
-end
-
-let starting = Simple.(emit starting)
-
-let stopping = Simple.(emit stopping)
-
-let switched_new_head hash level = Simple.(emit switched_new_head (hash, level))
+   let cost_strip_annotations = cost_strip_annotations
+*)

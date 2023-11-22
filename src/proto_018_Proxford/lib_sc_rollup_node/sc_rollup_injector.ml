@@ -213,6 +213,8 @@ module Proto_client = struct
         error_with "Cannot find operation status because metadata is missing"
     | Operation_metadata {contents} -> operation_contents_status contents ~index
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6339 *)
+  (* Don't make multiple calls to [operations_in_pass] RPC *)
   let get_block_operations =
     let ops_cache = Block_cache.create 32 in
     fun cctxt block_hash ->
@@ -412,13 +414,14 @@ module Proto_client = struct
           (Time.System.now ())
 
   let check_fee_parameters Injector.{fee_parameters; _} =
-    let check_value purpose name compare to_string mempool_default value =
+    let check_value operation_kind name compare to_string mempool_default value
+        =
       if compare mempool_default value > 0 then
         error_with
           "Bad configuration fee_parameter.%s for %s. It must be at least %s \
            for operations of the injector to be propagated."
           name
-          (Operation_kind.to_string purpose)
+          (Operation_kind.to_string operation_kind)
           (to_string mempool_default)
       else Ok ()
     in

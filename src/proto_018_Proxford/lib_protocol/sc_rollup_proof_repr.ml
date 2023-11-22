@@ -56,6 +56,7 @@ type reveal_proof =
       page_id : Dal_slot_repr.Page.t;
       proof : Dal_slot_repr.History.proof;
     }
+  | Dal_parameters_proof
 
 let reveal_proof_encoding =
   let open Data_encoding in
@@ -95,7 +96,15 @@ let reveal_proof_encoding =
         | _ -> None)
       (fun ((), page_id, proof) -> Dal_page_proof {page_id; proof})
   in
-  union [case_raw_data; case_metadata_proof; case_dal_page]
+  let case_dal_parameters =
+    case
+      ~title:"dal parameters proof"
+      (Tag 3)
+      (obj1 (req "reveal_proof_kind" (constant "dal_parameters_proof")))
+      (function Dal_parameters_proof -> Some () | _ -> None)
+      (fun () -> Dal_parameters_proof)
+  in
+  union [case_raw_data; case_metadata_proof; case_dal_page; case_dal_parameters]
 
 type input_proof =
   | Inbox_proof of {
@@ -156,7 +165,7 @@ let serialize_pvm_step (type state proof output)
   let (module PVM) = pvm in
   match Data_encoding.Binary.to_string_opt PVM.proof_encoding proof with
   | Some p -> return p
-  | None -> error (Sc_rollup_proof_check "Cannot serialize proof")
+  | None -> tzfail (Sc_rollup_proof_check "Cannot serialize proof")
 
 let unserialize_pvm_step (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation)
@@ -165,7 +174,7 @@ let unserialize_pvm_step (type state proof output)
   let (module PVM) = pvm in
   match Data_encoding.Binary.of_string_opt PVM.proof_encoding proof with
   | Some p -> return p
-  | None -> error (Sc_rollup_proof_check "Cannot unserialize proof")
+  | None -> tzfail (Sc_rollup_proof_check "Cannot unserialize proof")
 
 let serialized_encoding = Data_encoding.string Hex
 
@@ -216,11 +225,11 @@ let proof_error reason =
 
 let check p reason =
   let open Lwt_result_syntax in
-  if p then return () else proof_error reason
+  if p then return_unit else proof_error reason
 
 let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
-  | None -> error Sc_rollup_invalid_serialized_inbox_proof
+  | None -> Result_syntax.tzfail Sc_rollup_invalid_serialized_inbox_proof
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
@@ -233,15 +242,15 @@ module Dal_proofs = struct
       is in the following boundaries:
       - page_published_level > origination_level: this means that the slot
         of the page was published after the rollup origination ;
-      - page_published_level + dal_attestation_lag < commit_level: this
-        means that the slot of the page has been confirmed before the
+      - page_published_level + dal_attestation_lag <= commit_level: this
+        means that the slot of the page has been confirmed before or at the
         [commit_level]. According to the definition in
         {!Sc_rollup_commitment_repr}, [commit_level] (aka inbox_level
-        in that module) is the level (excluded) up to which the PVM consumed
+        in that module) is the level (included) up to which the PVM consumed
         all messages and DAL/DAC inputs before producing the related commitment.
   *)
-  let page_level_is_valid ~dal_attestation_lag ~origination_level ~commit_level
-      page_id =
+  let page_level_is_valid ~dal_attestation_lag ~origination_level
+      ~commit_inbox_level page_id =
     (* [dal_attestation_lag] is supposed to be positive. *)
     let page_published_level =
       Dal_slot_repr.(page_id.Page.slot_id.Header.published_level)
@@ -249,18 +258,18 @@ module Dal_proofs = struct
     let open Raw_level_repr in
     let not_too_old = page_published_level > origination_level in
     let not_too_recent =
-      add page_published_level dal_attestation_lag < commit_level
+      add page_published_level dal_attestation_lag <= commit_inbox_level
     in
     not_too_old && not_too_recent
 
-  let verify ~metadata ~dal_attestation_lag ~commit_level dal_parameters page_id
-      dal_snapshot proof =
+  let verify ~metadata ~dal_attestation_lag ~commit_inbox_level dal_parameters
+      page_id dal_snapshot proof =
     let open Result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
         ~dal_attestation_lag
-        ~commit_level
+        ~commit_inbox_level
         page_id
     then
       let* input =
@@ -273,14 +282,14 @@ module Dal_proofs = struct
       return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input))
     else return_none
 
-  let produce ~metadata ~dal_attestation_lag ~commit_level dal_parameters
+  let produce ~metadata ~dal_attestation_lag ~commit_inbox_level dal_parameters
       page_id ~page_info ~get_history confirmed_slots_history =
     let open Lwt_result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
         ~dal_attestation_lag
-        ~commit_level
+        ~commit_inbox_level
         page_id
     then
       let* proof, content_opt =
@@ -300,7 +309,7 @@ end
 let valid (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation) ~metadata
     snapshot commit_inbox_level dal_snapshot dal_parameters ~dal_attestation_lag
-    ~is_reveal_enabled (proof : proof t) =
+    ~dal_number_of_slots ~is_reveal_enabled (proof : proof t) =
   let open Lwt_result_syntax in
   let (module P) = pvm in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
@@ -331,11 +340,27 @@ let valid (type state proof output)
           ~metadata
           dal_parameters
           ~dal_attestation_lag
-          ~commit_level:commit_inbox_level
+          ~commit_inbox_level
           page_id
           dal_snapshot
           proof
         |> Lwt.return
+    | Some (Reveal_proof Dal_parameters_proof) ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
+           Support revealing historical DAL parameters.
+
+           Currently, we do not support revealing DAL parameters for the past.
+           We ignore the given [published_level] and use the DAL parameters. *)
+        return_some
+          (Sc_rollup_PVM_sig.Reveal
+             (Dal_parameters
+                Sc_rollup_dal_parameters_repr.
+                  {
+                    number_of_slots = Int64.of_int dal_number_of_slots;
+                    attestation_lag = Int64.of_int dal_attestation_lag;
+                    slot_size = Int64.of_int dal_parameters.slot_size;
+                    page_size = Int64.of_int dal_parameters.page_size;
+                  }))
   in
   let input =
     Option.bind input (cut_at_level ~origination_level ~commit_inbox_level)
@@ -371,6 +396,9 @@ let valid (type state proof output)
         check
           (Dal_slot_repr.Page.equal page_id pid)
           "Dal proof's page ID is not the one expected in input request."
+    | ( Some (Reveal_proof Dal_parameters_proof),
+        Needs_reveal Reveal_dal_parameters ) ->
+        return_unit
     | None, (Initial | First_after _ | Needs_reveal _)
     | Some _, No_input_required
     | Some (Inbox_proof _), Needs_reveal _
@@ -414,6 +442,8 @@ module type PVM_with_context_and_state = sig
     val dal_parameters : Dal_slot_repr.parameters
 
     val dal_attestation_lag : int
+
+    val dal_number_of_slots : int
   end
 end
 
@@ -482,11 +512,26 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~metadata
           dal_parameters
           ~dal_attestation_lag
-          ~commit_level:commit_inbox_level
+          ~commit_inbox_level
           page_id
           ~page_info
           ~get_history
           confirmed_slots_history
+    | Needs_reveal Reveal_dal_parameters ->
+        let open Dal_with_history in
+        return
+          ( Some (Reveal_proof Dal_parameters_proof),
+            Some
+              Sc_rollup_PVM_sig.(
+                Reveal
+                  (Dal_parameters
+                     Sc_rollup_dal_parameters_repr.
+                       {
+                         number_of_slots = Int64.of_int dal_number_of_slots;
+                         attestation_lag = Int64.of_int dal_attestation_lag;
+                         slot_size = Int64.of_int dal_parameters.slot_size;
+                         page_size = Int64.of_int dal_parameters.page_size;
+                       })) )
   in
   let input_given =
     Option.bind

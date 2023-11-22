@@ -360,20 +360,21 @@ let secrets =
 (** {3 Context Manipulations } *)
 
 let pick_two_attesters ctxt =
+  let open Lwt_result_syntax in
   let module V = Plugin.RPC.Validators in
-  Context.get_attesters ctxt >>=? function
+  let* attesters = Context.get_attesters ctxt in
+  match attesters with
   | a :: b :: _ -> return (a.V.consensus_key, b.V.consensus_key)
   | _ -> assert false
 
 let pick_addr_attester ctxt =
+  let open Lwt_result_syntax in
   let module V = Plugin.RPC.Validators in
-  Context.get_attesters ctxt >>=? function
-  | a :: _ -> return a.V.consensus_key
-  | _ -> assert false
+  let* attesters = Context.get_attesters ctxt in
+  match attesters with a :: _ -> return a.V.consensus_key | _ -> assert false
 
 let init_params =
-  Tezos_protocol_018_Proxford_parameters.Default_parameters
-  .parameters_of_constants
+  Tezos_protocol_018_Proxford_parameters.Default_parameters.parameters_of_constants
     {Context.default_test_constants with consensus_threshold = 0}
 
 let delegates_of_block block =

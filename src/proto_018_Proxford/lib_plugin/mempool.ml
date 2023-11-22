@@ -416,8 +416,10 @@ let () =
       expected timestamp, [op_earliest_ts] is below the current clock with an
       accepted drift for the clock given by a configuration.  *)
 let acceptable ~drift ~op_earliest_ts ~now_timestamp =
+  let open Result_syntax in
   Timestamp.(
-    now_timestamp +? drift >|? fun now_drifted -> op_earliest_ts <= now_drifted)
+    let+ now_drifted = now_timestamp +? drift in
+    op_earliest_ts <= now_drifted)
 
 (** Check that an operation with the given [op_round], at level [op_level]
       is likely to be correct, meaning it could have been produced before
@@ -452,6 +454,7 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
     ~proposal_round ~proposal_timestamp
     ~(proposal_predecessor_level_start : Timestamp.t) ~op_level ~op_round
     ~now_timestamp =
+  let open Result_syntax in
   if
     Raw_level.(succ op_level < proposal_level)
     || (op_level = proposal_level && op_round <= proposal_round)
@@ -472,25 +475,27 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
        since the previous level. *)
     (* Invariant: [op_level + 1 >= proposal_level] *)
     let level_offset = Raw_level.(diff (succ op_level) proposal_level) in
-    Period.mult level_offset round_zero_duration >>? fun time_shift ->
-    Timestamp.(proposal_predecessor_level_start +? time_shift)
-    >>? fun earliest_op_level_start ->
+    let* time_shift = Period.mult level_offset round_zero_duration in
+    let* earliest_op_level_start =
+      Timestamp.(proposal_predecessor_level_start +? time_shift)
+    in
     (* computing the operations's round start from it's earliest
        possible level start *)
-    Round.timestamp_of_another_round_same_level
-      round_durations
-      ~current_round:Round.zero
-      ~current_timestamp:earliest_op_level_start
-      ~considered_round:op_round
-    >>? fun op_earliest_ts ->
+    let* op_earliest_ts =
+      Round.timestamp_of_another_round_same_level
+        round_durations
+        ~current_round:Round.zero
+        ~current_timestamp:earliest_op_level_start
+        ~considered_round:op_round
+    in
     (* We finally check that the expected time of the operation is
        acceptable *)
     acceptable ~drift ~op_earliest_ts ~now_timestamp
 
 let pre_filter_far_future_consensus_ops info config
     ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t =
+  let open Result_syntax in
   let res =
-    let open Result_syntax in
     let now_timestamp = Time.System.now () |> Time.System.to_protocol in
     let* proposal_level = Raw_level.of_int32 info.head.level in
     acceptable_op
@@ -519,8 +524,9 @@ let pre_filter_far_future_consensus_ops info config
 let pre_filter info config
     ({shell = _; protocol_data = Operation_data {contents; _} as op} :
       Main.operation) =
+  let open Lwt_syntax in
   let prefilter_manager_op manager_op =
-    Lwt.return
+    return
     @@
     match pre_filter_manager info config op manager_op with
     | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
@@ -530,14 +536,15 @@ let pre_filter info config
   in
   match contents with
   | Single (Failing_noop _) ->
-      Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
+      return (`Refused [Environment.wrap_tzerror Wrong_operation])
   | Single (Preattestation consensus_content)
   | Single (Attestation consensus_content) ->
-      pre_filter_far_future_consensus_ops info config consensus_content
-      >>= fun keep ->
-      if keep then Lwt.return @@ `Passed_prefilter consensus_prio
+      let* keep =
+        pre_filter_far_future_consensus_ops info config consensus_content
+      in
+      if keep then return (`Passed_prefilter consensus_prio)
       else
-        Lwt.return
+        return
           (`Branch_refused
             [Environment.wrap_tzerror Consensus_operation_in_far_future])
   | Single (Dal_attestation _)
@@ -550,7 +557,7 @@ let pre_filter info config
   | Single (Vdf_revelation _)
   | Single (Drain_delegate _)
   | Single (Ballot _) ->
-      Lwt.return @@ `Passed_prefilter other_prio
+      return (`Passed_prefilter other_prio)
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 
@@ -604,27 +611,27 @@ let better_fees_and_ratio config old_gas old_fee new_gas new_fee =
     Precondition: both operations must be individually valid (because
     of the call to {!Operation.compare}). *)
 let conflict_handler config : Mempool.conflict_handler =
- fun ~existing_operation ~new_operation ->
-  let (_ : Operation_hash.t), old_op = existing_operation in
-  let (_ : Operation_hash.t), new_op = new_operation in
-  if is_manager_operation old_op && is_manager_operation new_op then
-    let new_op_is_better =
-      let open Result_syntax in
-      let* old_fee, old_gas_limit = compute_fee_and_gas_limit old_op in
-      let* new_fee, new_gas_limit = compute_fee_and_gas_limit new_op in
-      return
-        (better_fees_and_ratio
-           config
-           old_gas_limit
-           old_fee
-           new_gas_limit
-           new_fee)
-    in
-    match new_op_is_better with
-    | Ok b when b -> `Replace
-    | Ok _ | Error _ -> `Keep
-  else if Operation.compare existing_operation new_operation < 0 then `Replace
-  else `Keep
+  let open Result_syntax in
+  fun ~existing_operation ~new_operation ->
+    let (_ : Operation_hash.t), old_op = existing_operation in
+    let (_ : Operation_hash.t), new_op = new_operation in
+    if is_manager_operation old_op && is_manager_operation new_op then
+      let new_op_is_better =
+        let* old_fee, old_gas_limit = compute_fee_and_gas_limit old_op in
+        let* new_fee, new_gas_limit = compute_fee_and_gas_limit new_op in
+        return
+          (better_fees_and_ratio
+             config
+             old_gas_limit
+             old_fee
+             new_gas_limit
+             new_fee)
+      in
+      match new_op_is_better with
+      | Ok b when b -> `Replace
+      | Ok _ | Error _ -> `Keep
+    else if Operation.compare existing_operation new_operation < 0 then `Replace
+    else `Keep
 
 let int64_ceil_of_q q =
   let n = Q.to_int64 q in
@@ -648,28 +655,28 @@ let int64_ceil_of_q q =
    that this cannot happen when both manager operations have been
    successfully validated by the protocol. *)
 let fee_needed_to_replace_by_fee config ~op_to_replace ~candidate_op =
+  let open Result_syntax in
   if is_manager_operation candidate_op && is_manager_operation op_to_replace
   then
-    (let open Result_syntax in
-    let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
-    let* old_fee, old_gas = compute_fee_and_gas_limit op_to_replace in
-    if Gas.Arith.(old_gas = zero || candidate_gas = zero) then
-      (* This should not happen when both operations are valid. *)
-      Result.return_none
-    else
-      let candidate_gas = gas_as_q candidate_gas in
-      let bumped_old_fee, bumped_old_ratio =
-        bumped_fee_and_ratio_as_q config old_fee old_gas
-      in
-      (* The new operation needs to exceed both the bumped fee and the
-         bumped ratio to make {!better_fees_and_ratio} return [true].
-         (Having fee or ratio equal to its bumped counterpart is ok too,
-         hence the [ceil] in [int64_ceil_of_q].) *)
-      let fee_needed_for_fee = int64_ceil_of_q bumped_old_fee in
-      let fee_needed_for_ratio =
-        int64_ceil_of_q Q.(bumped_old_ratio * candidate_gas)
-      in
-      Result.return_some (max fee_needed_for_fee fee_needed_for_ratio))
+    (let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
+     let* old_fee, old_gas = compute_fee_and_gas_limit op_to_replace in
+     if Gas.Arith.(old_gas = zero || candidate_gas = zero) then
+       (* This should not happen when both operations are valid. *)
+       return_none
+     else
+       let candidate_gas = gas_as_q candidate_gas in
+       let bumped_old_fee, bumped_old_ratio =
+         bumped_fee_and_ratio_as_q config old_fee old_gas
+       in
+       (* The new operation needs to exceed both the bumped fee and the
+          bumped ratio to make {!better_fees_and_ratio} return [true].
+          (Having fee or ratio equal to its bumped counterpart is ok too,
+          hence the [ceil] in [int64_ceil_of_q].) *)
+       let fee_needed_for_fee = int64_ceil_of_q bumped_old_fee in
+       let fee_needed_for_ratio =
+         int64_ceil_of_q Q.(bumped_old_ratio * candidate_gas)
+       in
+       return_some (max fee_needed_for_fee fee_needed_for_ratio))
     |> Option.of_result |> Option.join
   else None
 
@@ -744,26 +751,27 @@ module Conflict_map = struct
 end
 
 let fee_needed_to_overtake ~op_to_overtake ~candidate_op =
+  let open Result_syntax in
   if is_manager_operation candidate_op && is_manager_operation op_to_overtake
   then
-    (let open Result_syntax in
-    let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
-    let* target_fee, target_gas = compute_fee_and_gas_limit op_to_overtake in
-    if Gas.Arith.(target_gas = zero || candidate_gas = zero) then
-      (* This should not happen when both operations are valid. *)
-      Result.return_none
-    else
-      (* Compute the target ratio as in {!Operation_repr.weight_manager}.
-         We purposefully don't use {!fee_and_ratio_as_q} because the code
-         here needs to stay in sync with {!Operation_repr.weight_manager}
-         rather than {!better_fees_and_ratio}. *)
-      let target_fee = Q.of_int64 (Tez.to_mutez target_fee) in
-      let target_gas = Q.of_bigint (Gas.Arith.integral_to_z target_gas) in
-      let target_ratio = Q.(target_fee / target_gas) in
-      (* Compute the minimal fee needed to have a strictly greater ratio. *)
-      let candidate_gas = Q.of_bigint (Gas.Arith.integral_to_z candidate_gas) in
-      Result.return_some
-        (Int64.succ Q.(to_int64 (target_ratio * candidate_gas))))
+    (let* _fee, candidate_gas = compute_fee_and_gas_limit candidate_op in
+     let* target_fee, target_gas = compute_fee_and_gas_limit op_to_overtake in
+     if Gas.Arith.(target_gas = zero || candidate_gas = zero) then
+       (* This should not happen when both operations are valid. *)
+       return_none
+     else
+       (* Compute the target ratio as in {!Operation_repr.weight_manager}.
+          We purposefully don't use {!fee_and_ratio_as_q} because the code
+          here needs to stay in sync with {!Operation_repr.weight_manager}
+          rather than {!better_fees_and_ratio}. *)
+       let target_fee = Q.of_int64 (Tez.to_mutez target_fee) in
+       let target_gas = Q.of_bigint (Gas.Arith.integral_to_z target_gas) in
+       let target_ratio = Q.(target_fee / target_gas) in
+       (* Compute the minimal fee needed to have a strictly greater ratio. *)
+       let candidate_gas =
+         Q.of_bigint (Gas.Arith.integral_to_z candidate_gas)
+       in
+       return_some (Int64.succ Q.(to_int64 (target_ratio * candidate_gas))))
     |> Option.of_result |> Option.join
   else None
 

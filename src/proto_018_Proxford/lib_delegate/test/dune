@@ -2,18 +2,18 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_018_Proxford_lib_delegate_test_tezt_lib)
+ (name src_proto_alpha_lib_delegate_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-libs.base
   octez-libs.micheline
-  octez-protocol-018-Proxford-libs.client
-  tezos-protocol-018-Proxford.protocol
+  octez-protocol-alpha-libs.client
+  tezos-protocol-alpha.protocol
   octez-libs.base-test-helpers
-  octez-protocol-018-Proxford-libs.bakings.mockup-simulator
-  octez-protocol-018-Proxford-libs.baking
-  tezos-protocol-018-Proxford.parameters
+  octez-protocol-alpha-libs.bakings.mockup-simulator
+  octez-protocol-alpha-libs.baking
+  tezos-protocol-alpha.parameters
   octez-libs.crypto
   octez-alcotezt
   uri)
@@ -25,11 +25,11 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_micheline
-  -open Tezos_client_018_Proxford
-  -open Tezos_protocol_018_Proxford
+  -open Tezos_client_alpha
+  -open Tezos_protocol_alpha
   -open Tezos_base_test_helpers
-  -open Tezos_018_Proxford_mockup_simulator
-  -open Tezos_baking_018_Proxford
+  -open Tezos_alpha_mockup_simulator
+  -open Tezos_baking_alpha
   -open Octez_alcotezt)
  (modules test_scenario))
 
@@ -37,7 +37,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_018_Proxford_lib_delegate_test_tezt_lib
+  src_proto_alpha_lib_delegate_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -46,7 +46,7 @@
 
 (rule
  (alias runtest)
- (package octez-protocol-018-Proxford-libs)
+ (package octez-protocol-alpha-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

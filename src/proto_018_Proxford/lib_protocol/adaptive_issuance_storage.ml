@@ -28,13 +28,7 @@
 let default_reward = Q.one
 
 (* Default bonus value *)
-let default_bonus = 0L
-
-(* Order of magnitude of the total supply in mutez
-   Approximately 2^50 *)
-let bonus_unit = 1_000_000_000_000_000L
-
-let ratio_to_bonus q = Q.(q * of_int64 bonus_unit |> to_int64)
+let default_bonus = Issuance_bonus_repr.zero
 
 type error += Undetermined_issuance_coeff_for_cycle of Cycle_repr.t
 
@@ -105,18 +99,20 @@ let load_reward_coeff ctxt ~cycle =
 
 let compute_reward_coeff_ratio =
   let q_1600 = Q.of_int 1600 in
-  fun ~stake_ratio ~bonus ~issuance_ratio_max ~issuance_ratio_min ->
-    let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
+  fun ~stake_ratio
+      ~(bonus : Issuance_bonus_repr.t)
+      ~issuance_ratio_max
+      ~issuance_ratio_min ->
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
     let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly issuance rate *) in
-    let f = Q.add f q_bonus in
+    let f = Q.add f (bonus :> Q.t) in
     (* f is truncated so that 0.05% <= f <= 5% *)
     let f = Q.(min f issuance_ratio_max) in
     let f = Q.(max f issuance_ratio_min) in
     f
 
 let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
-    ~previous_bonus ~reward_params =
+    ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
   let Constants_parametric_repr.
         {
           issuance_ratio_min;
@@ -138,32 +134,36 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
   let base_reward_coeff_ratio =
     compute_reward_coeff_ratio
       ~stake_ratio
-      ~bonus:0L
+      ~bonus:Issuance_bonus_repr.zero
       ~issuance_ratio_max
       ~issuance_ratio_min
   in
   let base_reward_coeff_dist_to_max =
-    ratio_to_bonus Q.(issuance_ratio_max - base_reward_coeff_ratio)
+    Q.(issuance_ratio_max - base_reward_coeff_ratio)
   in
   (* The bonus reward is truncated between [0] and [max_bonus] *)
   (* It is done in a way that the bonus does not increase if the coeff
      would already be above the [reward_pct_max] *)
-  let max_bonus = Compare.Int64.min base_reward_coeff_dist_to_max max_bonus in
+  let max_new_bonus =
+    Compare.Q.min base_reward_coeff_dist_to_max (max_bonus :> Q.t)
+  in
   (* [dist] is the distance from [stake_ratio] to [48%,52%] *)
   let unsigned_dist =
     Q.(max zero (abs (stake_ratio - center_dz) - radius_dz))
   in
-  let dist_q =
+  let q_dist =
     if Compare.Q.(stake_ratio >= center_dz) then Q.neg unsigned_dist
     else unsigned_dist
   in
-  let dist = ratio_to_bonus dist_q in
+  let q_seconds_per_cycle = Q.of_int64 seconds_per_cycle in
+  let q_days_per_cycle = Q.div q_seconds_per_cycle (Q.of_int 86_400) in
+  let q_previous_bonus = (previous_bonus :> Q.t) in
   let new_bonus =
-    Int64.(add previous_bonus (mul dist (mul growth_rate seconds_per_cycle)))
+    Q.(add q_previous_bonus (mul q_dist (mul growth_rate q_days_per_cycle)))
   in
-  let new_bonus = Compare.Int64.max new_bonus 0L in
-  let new_bonus = Compare.Int64.min new_bonus max_bonus in
-  new_bonus
+  let new_bonus = Q.max new_bonus Q.zero in
+  let new_bonus = Q.min new_bonus max_new_bonus in
+  Issuance_bonus_repr.of_Q ~max_bonus new_bonus
 
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
@@ -227,7 +227,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
       Constants_storage.minimal_block_delay ctxt |> Period_repr.to_seconds
     in
     let seconds_per_cycle = Int64.mul blocks_per_cycle minimal_block_delay in
-    let bonus =
+    let*? bonus =
       compute_bonus
         ~seconds_per_cycle
         ~total_supply
@@ -287,37 +287,54 @@ let set_adaptive_issuance_enable ctxt =
   if enable then Raw_context.set_adaptive_issuance_enable ctxt else ctxt
 
 let update_ema ctxt ~vote =
-  Storage.Adaptive_issuance.Launch_ema.get ctxt >>=? fun old_ema ->
-  Per_block_votes_repr.Adaptive_issuance_launch_EMA.of_int32 old_ema
-  >>=? fun old_ema ->
+  let open Lwt_result_syntax in
+  let* old_ema = Storage.Adaptive_issuance.Launch_ema.get ctxt in
+  let* old_ema =
+    Per_block_votes_repr.Adaptive_issuance_launch_EMA.of_int32 old_ema
+  in
   let new_ema =
     Per_block_votes_repr.compute_new_adaptive_issuance_ema
       ~per_block_vote:vote
       old_ema
   in
-  Storage.Adaptive_issuance.Launch_ema.update
-    ctxt
-    (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
-  >>=? fun ctxt ->
-  launch_cycle ctxt >>=? fun launch_cycle ->
+  let* ctxt =
+    Storage.Adaptive_issuance.Launch_ema.update
+      ctxt
+      (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
+  in
+  let* launch_cycle = launch_cycle ctxt in
   let open Constants_storage in
-  (if
-   Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
-     new_ema < adaptive_issuance_launch_ema_threshold ctxt)
-  then return (ctxt, launch_cycle)
-  else
-    match launch_cycle with
-    | Some _ ->
-        (* the feature is already set to launch, do nothing to avoid postponing it. *)
-        return (ctxt, launch_cycle)
-    | None ->
-        (* set the feature to activate in a few cycles *)
-        let current_cycle = (Level_storage.current ctxt).cycle in
-        let delay = 1 + preserved_cycles ctxt + max_slashing_period ctxt in
-        let cycle = Cycle_repr.add current_cycle delay in
-        activate ctxt ~cycle >|=? fun ctxt -> (ctxt, Some cycle))
-  >|=? fun (ctxt, launch_cycle) -> (ctxt, launch_cycle, new_ema)
+  let+ ctxt, launch_cycle =
+    if
+      (not (Constants_storage.adaptive_issuance_activation_vote_enable ctxt))
+      || Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
+           new_ema < adaptive_issuance_launch_ema_threshold ctxt)
+    then return (ctxt, launch_cycle)
+    else
+      match launch_cycle with
+      | Some _ ->
+          (* the feature is already set to launch, do nothing to avoid postponing it. *)
+          return (ctxt, launch_cycle)
+      | None ->
+          (* set the feature to activate in a few cycles *)
+          let current_cycle = (Level_storage.current ctxt).cycle in
+          let delay =
+            1 + preserved_cycles ctxt + Constants_repr.max_slashing_period
+          in
+          let cycle = Cycle_repr.add current_cycle delay in
+          let+ ctxt = activate ctxt ~cycle in
+          (ctxt, Some cycle)
+  in
+  (ctxt, launch_cycle, new_ema)
 
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
+
+  let get_reward_bonus = get_reward_bonus
+end
+
+module Internal_for_tests = struct
+  let compute_reward_coeff_ratio = compute_reward_coeff_ratio
+
+  let compute_bonus = compute_bonus
 end

@@ -6,24 +6,24 @@
  (libraries
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-benchmark-type-inference-018-Proxford
-  tezos-protocol-018-Proxford.protocol
+  tezos-benchmark-type-inference-alpha
+  tezos-protocol-alpha.protocol
   octez-libs.error-monad
-  octez-protocol-018-Proxford-libs.client)
+  octez-protocol-alpha-libs.client)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_benchmark_type_inference_018_Proxford))
+  -open Tezos_benchmark_type_inference_alpha))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-018-Proxford)
+ (package tezos-benchmark-type-inference-alpha)
  (action (run %{dep:./test_uf.exe})))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-018-Proxford)
+ (package tezos-benchmark-type-inference-alpha)
  (action (run %{dep:./test_inference.exe})))

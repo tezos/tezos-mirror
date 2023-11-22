@@ -112,34 +112,39 @@ let test_fa12_init_storage manager =
             [] )))
 
 let originate ctxt address_hash ~balance script =
-  Contract_storage.raw_originate
-    ctxt
-    ~prepaid_bootstrap_storage:true
-    address_hash
-    ~script
-  >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ctxt =
+    Contract_storage.raw_originate
+      ctxt
+      ~prepaid_bootstrap_storage:true
+      address_hash
+      ~script
+  in
   let address = Contract_repr.Originated address_hash in
-  Contract_storage.used_storage_space ctxt address >>=? fun size ->
-  Fees_storage.burn_origination_fees
-    ~origin:Protocol_migration
-    ctxt
-    ~storage_limit:(Z.of_int64 Int64.max_int)
-    ~payer:`Liquidity_baking_subsidies
-  >>=? fun (ctxt, _, origination_updates) ->
-  Fees_storage.burn_storage_fees
-    ~origin:Protocol_migration
-    ctxt
-    ~storage_limit:(Z.of_int64 Int64.max_int)
-    ~payer:`Liquidity_baking_subsidies
-    size
-  >>=? fun (ctxt, _, storage_updates) ->
-  Token.transfer
-    ~origin:Protocol_migration
-    ctxt
-    `Liquidity_baking_subsidies
-    (`Contract address)
-    balance
-  >>=? fun (ctxt, transfer_updates) ->
+  let* size = Contract_storage.used_storage_space ctxt address in
+  let* ctxt, _, origination_updates =
+    Fees_storage.burn_origination_fees
+      ~origin:Protocol_migration
+      ctxt
+      ~storage_limit:(Z.of_int64 Int64.max_int)
+      ~payer:`Liquidity_baking_subsidies
+  in
+  let* ctxt, _, storage_updates =
+    Fees_storage.burn_storage_fees
+      ~origin:Protocol_migration
+      ctxt
+      ~storage_limit:(Z.of_int64 Int64.max_int)
+      ~payer:`Liquidity_baking_subsidies
+      size
+  in
+  let* ctxt, transfer_updates =
+    Token.transfer
+      ~origin:Protocol_migration
+      ctxt
+      `Liquidity_baking_subsidies
+      (`Contract address)
+      balance
+  in
   let balance_updates =
     origination_updates @ storage_updates @ transfer_updates
   in
@@ -154,8 +159,10 @@ let originate ctxt address_hash ~balance script =
   return (ctxt, result)
 
 let originate_test_fa12 ~typecheck ctxt admin =
-  Contract_storage.fresh_contract_from_current_nonce ctxt
-  >>?= fun (ctxt, fa12_address) ->
+  let open Lwt_result_syntax in
+  let*? ctxt, fa12_address =
+    Contract_storage.fresh_contract_from_current_nonce ctxt
+  in
   let script =
     Script_repr.
       {
@@ -164,9 +171,14 @@ let originate_test_fa12 ~typecheck ctxt admin =
           test_fa12_init_storage (Signature.Public_key_hash.to_b58check admin);
       }
   in
-  typecheck ctxt script >>=? fun (script, ctxt) ->
-  originate ctxt fa12_address ~balance:(Tez_repr.of_mutez_exn 1_000_000L) script
-  >|=? fun (ctxt, origination_result) ->
+  let* script, ctxt = typecheck ctxt script in
+  let+ ctxt, origination_result =
+    originate
+      ctxt
+      fa12_address
+      ~balance:(Tez_repr.of_mutez_exn 1_000_000L)
+      script
+  in
   (ctxt, fa12_address, [origination_result])
 
 (* hardcoded from lib_parameters *)
@@ -176,37 +188,46 @@ let first_bootstrap_account =
        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")
 
 let check_tzBTC ~typecheck current_level ctxt f =
-  Contract_storage.exists ctxt (Contract_repr.Originated mainnet_tzBTC_address)
-  >>= function
-  | true ->
-      (* If tzBTC exists, we're on mainnet and we use it as the token address in the CPMM. *)
-      f ctxt mainnet_tzBTC_address []
-  | false ->
-      (* If the tzBTC contract does not exist, we originate a test FA1.2 contract using the same script as the LQT. This is so that we can test the contracts after performing the same protocol migration that will be done on mainnet.
+  let open Lwt_result_syntax in
+  let*! exists =
+    Contract_storage.exists
+      ctxt
+      (Contract_repr.Originated mainnet_tzBTC_address)
+  in
+  if exists then
+    (* If tzBTC exists, we're on mainnet and we use it as the token address in the CPMM. *)
+    f ctxt mainnet_tzBTC_address []
+  else if
+    (* If the tzBTC contract does not exist, we originate a test FA1.2 contract using the same script as the LQT. This is so that we can test the contracts after performing the same protocol migration that will be done on mainnet.
 
-         First, we check current level is below mainnet level roughly around 010 injection so we do not accidentally originate the test token contract on mainnet. *)
-      if Compare.Int32.(current_level < 1_437_862l) then
-        originate_test_fa12 ~typecheck ctxt first_bootstrap_account
-        (* Token contract admin *)
-        >>=? fun (ctxt, token_address, token_result) ->
-        f ctxt token_address token_result
-      else
-        (* If we accidentally entered the tzBTC address incorrectly, but current level indicates this could be mainnet, we do not originate any contracts *)
-        return (ctxt, [])
+       First, we check current level is below mainnet level roughly around 010 injection so we do not accidentally originate the test token contract on mainnet. *)
+    Compare.Int32.(current_level < 1_437_862l)
+  then
+    let* ctxt, token_address, token_result =
+      originate_test_fa12 ~typecheck ctxt first_bootstrap_account
+      (* Token contract admin *)
+    in
+    f ctxt token_address token_result
+  else
+    (* If we accidentally entered the tzBTC address incorrectly, but current level indicates this could be mainnet, we do not originate any contracts *)
+    return (ctxt, [])
 
 let init ctxt ~typecheck =
+  let open Lwt_result_syntax in
   (* We use a custom origination nonce because it is unset when stitching from 009 *)
   let nonce = Operation_hash.hash_string ["Drip, drip, drip."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  Storage.Liquidity_baking.Toggle_ema.init ctxt 0l >>=? fun ctxt ->
+  let* ctxt = Storage.Liquidity_baking.Toggle_ema.init ctxt 0l in
   let current_level =
     Raw_level_repr.to_int32 (Level_storage.current ctxt).level
   in
-  Contract_storage.fresh_contract_from_current_nonce ctxt
-  >>?= fun (ctxt, cpmm_address) ->
-  Contract_storage.fresh_contract_from_current_nonce ctxt
-  >>?= fun (ctxt, lqt_address) ->
-  Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address >>=? fun ctxt ->
+  let*? ctxt, cpmm_address =
+    Contract_storage.fresh_contract_from_current_nonce ctxt
+  in
+  let*? ctxt, lqt_address =
+    Contract_storage.fresh_contract_from_current_nonce ctxt
+  in
+  let* ctxt = Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address in
   check_tzBTC
     ~typecheck
     current_level
@@ -222,7 +243,7 @@ let init ctxt ~typecheck =
                 ~lqt_address:(Contract_hash.to_b58check lqt_address);
           }
       in
-      typecheck ctxt cpmm_script >>=? fun (cpmm_script, ctxt) ->
+      let* cpmm_script, ctxt = typecheck ctxt cpmm_script in
       let lqt_script =
         Script_repr.
           {
@@ -230,15 +251,17 @@ let init ctxt ~typecheck =
             storage = lqt_init_storage (Contract_hash.to_b58check cpmm_address);
           }
       in
-      typecheck ctxt lqt_script >>=? fun (lqt_script, ctxt) ->
-      originate
-        ctxt
-        cpmm_address
-        ~balance:(Tez_repr.of_mutez_exn 100L)
-        cpmm_script
-      >>=? fun (ctxt, cpmm_result) ->
-      originate ctxt lqt_address ~balance:Tez_repr.zero lqt_script
-      >|=? fun (ctxt, lqt_result) ->
+      let* lqt_script, ctxt = typecheck ctxt lqt_script in
+      let* ctxt, cpmm_result =
+        originate
+          ctxt
+          cpmm_address
+          ~balance:(Tez_repr.of_mutez_exn 100L)
+          cpmm_script
+      in
+      let+ ctxt, lqt_result =
+        originate ctxt lqt_address ~balance:Tez_repr.zero lqt_script
+      in
       (* Unsets the origination nonce, which is okay because this is called after other originations in stitching. *)
       let ctxt = Raw_context.unset_origination_nonce ctxt in
       (ctxt, [cpmm_result; lqt_result] @ token_result))

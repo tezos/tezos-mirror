@@ -161,9 +161,7 @@ module Missed_attestations_info = struct
 end
 
 module Slashed_deposits_history = struct
-  type slashed_percentage = int
-
-  let slashed_percentage_encoding = Data_encoding.uint8
+  type slashed_percentage = Int_percentage.t
 
   (* invariant: sorted list *)
   type t = (Cycle_repr.t * slashed_percentage) list
@@ -173,12 +171,12 @@ module Slashed_deposits_history = struct
     list
       (obj2
          (req "cycle" Cycle_repr.encoding)
-         (req "slashed_percentage" slashed_percentage_encoding))
+         (req "slashed_percentage" Int_percentage.encoding))
 
   let add cycle percentage history =
     let rec loop rev_prefix = function
       | (c, p) :: tl when Cycle_repr.(cycle = c) ->
-          let p = Compare.Int.min 100 (p + percentage) in
+          let p = Int_percentage.add_bounded p percentage in
           (* cycle found, do not change the order *)
           List.rev_append rev_prefix ((c, p) :: tl)
       | ((c, _) as hd) :: tl when Cycle_repr.(cycle > c) ->
@@ -189,6 +187,11 @@ module Slashed_deposits_history = struct
           List.rev_append rev_prefix ((cycle, percentage) :: suffix)
     in
     loop [] history
+
+  let rec get cycle = function
+    | (c, p) :: _ when Cycle_repr.(cycle = c) -> p
+    | (c, _) :: tl when Cycle_repr.(cycle > c) -> get cycle tl
+    | _ -> Int_percentage.p0
 end
 
 module Unstake_request = struct
@@ -216,9 +219,8 @@ module Unstake_request = struct
          (req "requests" requests_encoding))
 
   let add cycle amount requests =
-    let rec loop rev_prefix =
-      let open Result_syntax in
-      function
+    let open Result_syntax in
+    let rec loop rev_prefix = function
       | [] ->
           (* cycle does not exist -> add at the head *)
           Ok ((cycle, amount) :: requests)
@@ -386,36 +388,41 @@ module Contract = struct
       Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost value)
 
     let get ctxt contract =
-      I.get ctxt contract >>=? fun (ctxt, value) ->
-      Lwt.return
-        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
+      let open Lwt_result_syntax in
+      let* ctxt, value = I.get ctxt contract in
+      let*? ctxt = consume_deserialize_gas ctxt value in
+      return (ctxt, value)
 
     let find ctxt contract =
-      I.find ctxt contract >>=? fun (ctxt, value_opt) ->
-      Lwt.return
-      @@
+      let open Lwt_result_syntax in
+      let* ctxt, value_opt = I.find ctxt contract in
       match value_opt with
-      | None -> ok (ctxt, None)
+      | None -> return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
+          let*? ctxt = consume_deserialize_gas ctxt value in
+          return (ctxt, value_opt)
 
     let update ctxt contract value =
-      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      let open Lwt_result_syntax in
+      let*? ctxt = consume_serialize_gas ctxt value in
       I.update ctxt contract value
 
     let add_or_remove ctxt contract value_opt =
+      let open Lwt_result_syntax in
       match value_opt with
       | None -> I.add_or_remove ctxt contract None
       | Some value ->
-          consume_serialize_gas ctxt value >>?= fun ctxt ->
+          let*? ctxt = consume_serialize_gas ctxt value in
           I.add_or_remove ctxt contract value_opt
 
     let init ctxt contract value =
-      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      let open Lwt_result_syntax in
+      let*? ctxt = consume_serialize_gas ctxt value in
       I.init ctxt contract value
 
     let add ctxt contract value =
-      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      let open Lwt_result_syntax in
+      let*? ctxt = consume_serialize_gas ctxt value in
       I.add ctxt contract value
 
     let keys_unaccounted = I.keys_unaccounted
@@ -445,7 +452,8 @@ module Contract = struct
       end)
       (Encoding.Z)
 
-  module Frozen_deposits =
+  (* Remove me in P. *)
+  module Frozen_deposits_up_to_Nairobi =
     Indexed_context.Make_map
       (Registered)
       (struct
@@ -582,9 +590,10 @@ module Big_map = struct
         (Lazy_storage_kind.Big_map.Id)
 
     let incr ctxt =
-      Storage.get ctxt >>=? fun i ->
-      Storage.update ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt ->
-      (ctxt, i)
+      let open Lwt_result_syntax in
+      let* i = Storage.get ctxt in
+      let* ctxt = Storage.update ctxt (Lazy_storage_kind.Big_map.Id.next i) in
+      return (ctxt, i)
 
     let init ctxt = Storage.init ctxt Lazy_storage_kind.Big_map.Id.init
   end
@@ -683,18 +692,19 @@ module Big_map = struct
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
 
     let get ctxt contract =
-      I.get ctxt contract >>=? fun (ctxt, value) ->
-      Lwt.return
-        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
+      let open Lwt_result_syntax in
+      let* ctxt, value = I.get ctxt contract in
+      let*? ctxt = consume_deserialize_gas ctxt value in
+      return (ctxt, value)
 
     let find ctxt contract =
-      I.find ctxt contract >>=? fun (ctxt, value_opt) ->
-      Lwt.return
-      @@
+      let open Lwt_result_syntax in
+      let* ctxt, value_opt = I.find ctxt contract in
       match value_opt with
-      | None -> ok (ctxt, None)
+      | None -> return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
+          let*? ctxt = consume_deserialize_gas ctxt value in
+          return (ctxt, value_opt)
 
     let keys_unaccounted = I.keys_unaccounted
   end
@@ -718,9 +728,12 @@ module Sapling = struct
         (Lazy_storage_kind.Sapling_state.Id)
 
     let incr ctxt =
-      Storage.get ctxt >>=? fun i ->
-      Storage.update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
-      >|=? fun ctxt -> (ctxt, i)
+      let open Lwt_result_syntax in
+      let* i = Storage.get ctxt in
+      let* ctxt =
+        Storage.update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
+      in
+      return (ctxt, i)
 
     let init ctxt = Storage.init ctxt Lazy_storage_kind.Sapling_state.Id.init
   end
@@ -808,8 +821,11 @@ module Sapling = struct
       (Sapling.Hash)
 
   let commitments_init ctx id =
-    Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
-    >|= fun (ctx, _id) -> ctx
+    let open Lwt_syntax in
+    let+ ctx, (_id : id) =
+      Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
+    in
+    ctx
 
   module Ciphertexts :
     Non_iterable_indexed_carbonated_data_storage
@@ -855,8 +871,11 @@ module Sapling = struct
       (Sapling.Ciphertext)
 
   let ciphertexts_init ctx id =
-    Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
-    >|= fun (ctx, _id) -> ctx
+    let open Lwt_syntax in
+    let+ ctx, (_id : id) =
+      Indexed_context.Raw_context.remove (ctx, id) ["ciphertexts"]
+    in
+    ctx
 
   module Nullifiers_size =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
@@ -952,11 +971,15 @@ module Sapling = struct
          end))
 
   let nullifiers_init ctx id =
-    Nullifiers_size.add (ctx, id) Int64.zero >>= fun ctx ->
-    Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_ordered"]
-    >>= fun (ctx, id) ->
-    Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
-    >|= fun (ctx, _id) -> ctx
+    let open Lwt_syntax in
+    let* ctx = Nullifiers_size.add (ctx, id) Int64.zero in
+    let* ctx, id =
+      Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_ordered"]
+    in
+    let+ ctx, (_id : id) =
+      Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
+    in
+    ctx
 
   module Roots :
     Non_iterable_indexed_data_storage
@@ -1082,6 +1105,15 @@ module Consensus_keys =
        end))
        (Public_key_hash_index)
 
+module Current_cycle_denunciations =
+  Make_indexed_data_storage
+    (Make_subcontext (Registered) (Raw_context)
+       (struct
+         let name = ["denunciations"]
+       end))
+       (Public_key_hash_index)
+    (Denunciations_repr)
+
 (** Per cycle storage *)
 
 type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
@@ -1184,14 +1216,13 @@ module Cycle = struct
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
-  (* Unit = 1_000_000_000_000_000L, defined in [adaptive_issuance_storage.ml] *)
   module Issuance_bonus =
     Indexed_context.Make_map
       (Registered)
       (struct
         let name = ["issuance_bonus"]
       end)
-      (Encoding.Int64)
+      (Issuance_bonus_repr)
 
   module Issuance_coeff =
     Indexed_context.Make_map
@@ -1311,7 +1342,7 @@ module Stake = struct
          end))
          (Int31_index)
       (Public_key_hash_index)
-      (Stake_repr.Full)
+      (Full_staking_balance_repr)
 
   module Active_delegates_with_minimal_stake =
     Make_indexed_data_snapshotable_storage
@@ -1563,7 +1594,8 @@ module Seed = struct
     let get = Cycle.Seed.get
 
     let update ctxt cycle seed status =
-      Cycle.Seed.update ctxt cycle seed >>=? fun ctxt ->
+      let open Lwt_result_syntax in
+      let* ctxt = Cycle.Seed.update ctxt cycle seed in
       Seed_status.update ctxt status
 
     let remove_existing = Cycle.Seed.remove_existing
@@ -1653,10 +1685,12 @@ module Pending_migration = struct
       end)
 
   let remove ctxt =
+    let open Lwt_result_syntax in
     let balance_updates ctxt =
-      Balance_updates.find ctxt >>=? function
+      let* balance_updates_opt = Balance_updates.find ctxt in
+      match balance_updates_opt with
       | Some balance_updates ->
-          Balance_updates.remove ctxt >>= fun ctxt ->
+          let*! ctxt = Balance_updates.remove ctxt in
           (* When applying balance updates in a migration, we must attach receipts.
              The balance updates returned from here will be applied in the first
              block of the new protocol. *)
@@ -1664,14 +1698,15 @@ module Pending_migration = struct
       | None -> return (ctxt, [])
     in
     let operation_results ctxt =
-      Operation_results.find ctxt >>=? function
+      let* operation_results_opt = Operation_results.find ctxt in
+      match operation_results_opt with
       | Some operation_results ->
-          Operation_results.remove ctxt >>= fun ctxt ->
+          let*! ctxt = Operation_results.remove ctxt in
           return (ctxt, operation_results)
       | None -> return (ctxt, [])
     in
-    balance_updates ctxt >>=? fun (ctxt, balance_updates) ->
-    operation_results ctxt >>=? fun (ctxt, operation_results) ->
+    let* ctxt, balance_updates = balance_updates ctxt in
+    let* ctxt, operation_results = operation_results ctxt in
     return (ctxt, balance_updates, operation_results)
 end
 
@@ -2115,6 +2150,42 @@ module Sc_rollup = struct
         let name = ["applied_outbox_messages"]
       end)
       (Bitset_and_level)
+
+  module Whitelist =
+    Make_carbonated_data_set_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["whitelist"]
+         end))
+         (Public_key_hash_index)
+
+  module Whitelist_paid_storage_space =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["whitelist_paid_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Whitelist_used_storage_space =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["whitelist_use_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Last_whitelist_update =
+    Indexed_context.Make_carbonated_map
+      (Registered)
+      (struct
+        let name = ["last_whitelist_update"]
+      end)
+      (struct
+        type t = Sc_rollup_whitelist_repr.last_whitelist_update
+
+        let encoding = Sc_rollup_whitelist_repr.last_whitelist_update_encoding
+      end)
 end
 
 module Dal = struct

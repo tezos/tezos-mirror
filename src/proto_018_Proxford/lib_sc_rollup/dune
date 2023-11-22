@@ -2,16 +2,16 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_smart_rollup_018_Proxford)
- (public_name octez-protocol-018-Proxford-libs.smart-rollup)
+ (name tezos_smart_rollup_alpha)
+ (public_name octez-protocol-alpha-libs.smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-018-Proxford.protocol)
+  tezos-protocol-alpha.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_018_Proxford))
+  -open Tezos_protocol_alpha))
