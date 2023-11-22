@@ -7,32 +7,33 @@ let
 
   overlays = pkgs.callPackage ./nix/overlays.nix {};
 
-  kernelPackageSet = [
-    # Packages required to build & develop kernels
-    (pkgs.rust-bin.stable."1.71.1".default.override {
-      extensions = ["rust-src"];
-      targets = [
-        "wasm32-unknown-unknown"
-        "riscv64gc-unknown-linux-gnu"
-        "riscv64gc-unknown-none-elf"
-      ];
-    })
-    pkgs.rust-analyzer
-    pkgs.wabt
+  kernelPackageSet =
+    [
+      # Packages required to build & develop kernels
+      (pkgs.rust-bin.stable."1.71.1".default.override {
+        extensions = ["rust-src"];
+        targets = [
+          "wasm32-unknown-unknown"
+          "riscv64gc-unknown-linux-gnu"
+          "riscv64gc-unknown-none-elf"
+        ];
+      })
+      pkgs.rust-analyzer
+      pkgs.wabt
 
-    # Bring Clang into scope in case the stdenv doesn't come with it already.
-    pkgs.clang
+      # Bring Clang into scope in case the stdenv doesn't come with it already.
+      pkgs.clang_16
 
-    # This brings in things like llvm-ar which are needed for Rust WebAssembly
-    # compilation on Mac.
-    # It isn't used by default. Configure the AR environment variable to
-    # make rustc use it.
-    pkgs.llvmPackages.bintools
+      # This brings in things like llvm-ar which are needed for Rust WebAssembly
+      # compilation on Mac.
+      # It isn't used by default. Configure the AR environment variable to
+      # make rustc use it.
+      pkgs.llvmPackages_16.bintools
 
-    # Cross-compilation for RISC-V
-    sources.riscv64Pkgs.clangStdenv.cc
-  ]
-  ++ (pkgs.lib.optional pkgs.stdenv.isDarwin sources.riscv64Pkgs.libiconvReal);
+      # Cross-compilation for RISC-V
+      sources.riscv64Pkgs.clangStdenv.cc
+    ]
+    ++ (pkgs.lib.optional pkgs.stdenv.isDarwin sources.riscv64Pkgs.libiconvReal);
 
   mainPackage = (import ./default.nix).overrideAttrs (old: {
     # This makes the shell load faster.
@@ -96,8 +97,12 @@ let
         '';
       })
     else pkgs.clang;
+
+  mkShell = pkgs.mkShell.override {
+    stdenv = pkgs.clang16Stdenv;
+  };
 in
-  pkgs.mkShell {
+  mkShell {
     name = "tezos-shell";
 
     hardeningDisable = ["stackprotector"];
