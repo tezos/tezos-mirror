@@ -21,6 +21,7 @@ module type S = sig
 
   val initial_tree :
     version:Wasm_pvm_state.version ->
+    ?tree:tree ->
     ?ticks_per_snapshot:int64 ->
     ?max_reboots:Z.t ->
     ?from_binary:bool ->

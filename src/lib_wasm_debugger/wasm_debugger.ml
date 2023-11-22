@@ -77,7 +77,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
   (* Starting point of the module after reading the kernel file: parsing,
      typechecking and linking for safety before feeding kernel to the PVM, then
      installation into a tree for the PVM interpreter. *)
-  let handle_module ?installer_config version binary name module_ =
+  let handle_module ?installer_config ?tree version binary name module_ =
     let open Lwt_result_syntax in
     let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
     let* ast =
@@ -91,6 +91,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let*! tree =
       Wasm.initial_tree
         ~version
+        ?tree
         ~ticks_per_snapshot:(Z.to_int64 Wasm_2_0_0PVM.ticks_per_snapshot)
         ~outbox_validity_period:Wasm_2_0_0PVM.outbox_validity_period
         ~outbox_message_limit:Wasm_2_0_0PVM.outbox_message_limit
@@ -105,11 +106,11 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let*! tree = Wasm.eval_until_input_requested tree in
     return tree
 
-  let start ?installer_config version binary file =
+  let start ?installer_config ?tree version binary file =
     let open Lwt_result_syntax in
     let module_name = Filename.(file |> basename |> chop_extension) in
     let*! buffer = Repl_helpers.read_file file in
-    handle_module ?installer_config version binary module_name buffer
+    handle_module ?installer_config ?tree version binary module_name buffer
 
   (* REPL main loop: reads an input, does something out of it, then loops. *)
   let repl tree inboxes level config =
