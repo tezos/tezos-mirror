@@ -420,7 +420,9 @@ module Dune = struct
 
   let ocamlyacc name = [S "ocamlyacc"; S name]
 
-  let pps names = S "pps" :: of_atom_list names
+  let pps ?(args = Stdlib.List.[]) names =
+    let atoms = match args with [] -> names | _ :: _ -> names @ args in
+    S "pps" :: of_atom_list atoms
 
   let staged_pps names =
     let s_exprs = Stdlib.List.map (fun n -> S n) names in
@@ -1246,7 +1248,9 @@ module Target = struct
     with_macos_security_framework : bool;
   }
 
-  and preprocessor = PPS of t list | Staged_PPS of t list
+  and preprocessor =
+    | PPS of {targets : t list; args : string list}
+    | Staged_PPS of t list
 
   and inline_tests = Inline_tests_backend of t
 
@@ -1275,9 +1279,9 @@ module Target = struct
     | External _ -> None
     | Opam_only _ -> None
 
-  let pps = function
+  let pps ?(args = []) = function
     | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
-    | Some target -> PPS [target]
+    | Some target -> PPS {targets = [target]; args}
 
   let ppses targets =
     let targets =
@@ -1288,7 +1292,7 @@ module Target = struct
           | Some target -> target)
         targets
     in
-    PPS targets
+    PPS {targets; args = []}
 
   let staged_pps targets =
     Staged_PPS (Stdlib.List.concat_map Option.to_list targets)
@@ -1537,7 +1541,7 @@ module Target = struct
       | Some (Inline_tests_backend target), (Some _ | None) -> (
           match kind with
           | Public_library _ | Private_library _ ->
-              (PPS [target] :: preprocess, true)
+              (PPS {targets = [target]; args = []} :: preprocess, true)
           | Public_executable _ | Private_executable _ | Test_executable _ ->
               invalid_arg
                 "Target.internal: cannot specify `inline_tests` for \
@@ -2081,7 +2085,7 @@ module Target = struct
 
   let all_internal_deps internal =
     let extract_targets = function
-      | PPS targets | Staged_PPS targets -> targets
+      | PPS {targets; args = _} | Staged_PPS targets -> targets
     in
     List.concat_map extract_targets internal.preprocess
     @ internal.deps @ internal.opam_only_deps @ internal.ppx_runtime_libraries
@@ -2619,8 +2623,8 @@ let generate_dune (internal : Target.internal) =
             ^ String.concat ", " (hd :: tl))
     in
     let make_preprocessors = function
-      | (PPS targets : Target.preprocessor) ->
-          Dune.pps @@ List.map get_target_name targets
+      | (PPS {targets; args} : Target.preprocessor) ->
+          Dune.pps ~args @@ List.map get_target_name targets
       | Staged_PPS targets ->
           Dune.staged_pps @@ List.map get_target_name targets
     in

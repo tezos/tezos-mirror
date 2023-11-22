@@ -560,8 +560,11 @@ type preprocessor
 (** Make a preprocessor.
 
     [pps target] becomes a [(preprocess (pps target))] stanza in the [dune] file.
-    The target's package is also added as a dependency in the [.opam] file. *)
-val pps : target -> preprocessor
+    The target's package is also added as a dependency in the [.opam] file.
+
+    - [args]: provides extra arguments, e.g. [~args:["--"; "--lib";
+      "Type"]] produces [(preprocess (pps target -- --lib Type))]. *)
+val pps : ?args:string list -> target -> preprocessor
 
 (** Apply multiple preprocessors.
 
