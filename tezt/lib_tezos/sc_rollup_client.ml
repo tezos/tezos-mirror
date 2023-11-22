@@ -206,11 +206,3 @@ let rpc_get_rich ?hooks ?log_output sc_client path parameters =
   spawn_command ?hooks ?log_output sc_client ["rpc"; "get"; uri]
   |> Runnable.map @@ fun output ->
      JSON.parse ~origin:(Client.string_of_path path ^ " response") output
-
-let inject ?hooks sc_client messages =
-  let messages_json =
-    `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
-    |> JSON.annotate ~origin:"injection messages"
-  in
-  rpc_post ?hooks sc_client ["local"; "batcher"; "injection"] messages_json
-  |> Runnable.map @@ fun obj -> JSON.as_list obj |> List.map JSON.as_string
