@@ -28,7 +28,8 @@
   "tezos2": {
     "tags": [
       "dac",
-      "dac_node"
+      "dac_node",
+      "vdf"
     ],
     "path_patterns": [
       "^src/lib_aplonk",
