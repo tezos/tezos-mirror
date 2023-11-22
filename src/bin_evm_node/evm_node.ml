@@ -241,11 +241,25 @@ let data_parameter =
     ~desc:"Data to prepare and chunk with the EVM rollup format"
     Params.string
 
+let kernel_arg =
+  Tezos_clic.arg
+    ~long:"kernel"
+    ~doc:"Path to the EVM kernel"
+    ~placeholder:"_evm_installer_preimages"
+    Params.string
+
+let preimages_arg =
+  Tezos_clic.arg
+    ~long:"preimage-dir"
+    ~doc:"Path to the preimages directory"
+    ~placeholder:"evm_installer.wasm"
+    Params.string
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
-    ~desc:"Start the RPC server"
+    ~desc:"Start the EVM node in proxy mode"
     (args7
        data_dir_arg
        devmode_arg
@@ -304,6 +318,53 @@ let proxy_command =
       let* () = wait in
       return_unit)
 
+let sequencer_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:"Start the EVM node in sequencer mode"
+    (args8
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       cors_allowed_origins_arg
+       cors_allowed_headers_arg
+       verbose_arg
+       kernel_arg
+       preimages_arg)
+    (prefixes ["run"; "sequencer"; "with"; "endpoint"]
+    @@ rollup_node_endpoint_param @@ stop)
+    (fun ( data_dir,
+           rpc_addr,
+           rpc_port,
+           cors_origins,
+           cors_headers,
+           verbose,
+           kernel,
+           preimages )
+         rollup_node_endpoint
+         () ->
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () = Internal_event.Simple.emit Event.event_starting () in
+      let* config =
+        Cli.create_or_read_sequencer_config
+          ~data_dir
+          ~devmode:true
+          ?rpc_addr
+          ?rpc_port
+          ?cors_origins
+          ?cors_headers
+          ~rollup_node_endpoint
+          ~verbose
+          ?kernel
+          ?preimages
+          ()
+      in
+      let* () = Configuration.save_sequencer ~force:true ~data_dir config in
+      let wait, _resolve = Lwt.wait () in
+      let* () = wait in
+      return_unit)
+
 let make_prod_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_prod in
@@ -349,7 +410,7 @@ let chunker_command =
       print_chunks rollup_address data)
 
 (* List of program commands *)
-let commands = [proxy_command; chunker_command]
+let commands = [proxy_command; sequencer_command; chunker_command]
 
 let global_options = Tezos_clic.no_options
 
