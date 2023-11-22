@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use typed_arena::Arena;
+
 use crate::ast::annotations::NO_ANNS;
 use crate::ast::*;
 use crate::context::Ctx;
@@ -380,6 +382,14 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
                 hash: ctx.self_address.clone(),
                 entrypoint: entrypoint.clone(),
             }));
+        }
+        I::Pack => {
+            ctx.gas.consume(0)?; // TODO
+            let v = pop!();
+            let arena = Arena::new();
+            let mich = typed_value_to_value_optimized_legacy(&arena, v);
+            let encoded = mich.encode_for_pack();
+            stack.push(V::Bytes(encoded));
         }
         I::CheckSignature => {
             let key = pop!(V::Key);
@@ -1398,6 +1408,16 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::CHAIN_ID + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn pack_instr() {
+        let stack = &mut stk![TypedValue::new_pair(TypedValue::Int(12), TypedValue::Unit)];
+        assert_eq!(interpret(&vec![Pack], &mut Ctx::default(), stack), Ok(()));
+        assert_eq!(
+            stack,
+            &stk![TypedValue::Bytes(hex::decode("050707000c030b").unwrap())]
         );
     }
 

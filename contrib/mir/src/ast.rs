@@ -261,6 +261,7 @@ pub enum Instruction {
     ChainId,
     /// `ISelf` because `Self` is a reserved keyword
     ISelf(Entrypoint),
+    Pack,
     CheckSignature,
     TransferTokens,
     SetDelegate,

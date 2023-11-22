@@ -187,7 +187,7 @@ impl<'a> Micheline<'a> {
 
     /// Like [Value::encode], but allows specifying a prefix, useful for
     /// `PACK` implementation.
-    pub fn encode_starting_with(&self, start_bytes: &[u8]) -> Vec<u8> {
+    pub(crate) fn encode_starting_with(&self, start_bytes: &[u8]) -> Vec<u8> {
         let mut out = Vec::from(start_bytes);
         encode_micheline(self, &mut out);
         out
