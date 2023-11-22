@@ -12,11 +12,11 @@
 use crate::ast::*;
 use crate::ast::annotations::*;
 use crate::parser::ParserError;
-use crate::lexer::{Annotation, LexerError, Prim, PrimWithTzt, TztPrim as TzP, Tok};
+use crate::lexer::{Annotation, LexerError, Prim, Noun, TztPrim as TzP, Tok};
 use crate::typechecker as TC;
 use crate::tzt::*;
-use PrimWithTzt::*;
-use PrimWithTzt as PT;
+use Noun::*;
+use Noun as PT;
 use typed_arena::Arena;
 
 grammar<'a>(arena: &'a Arena<Micheline<'a>>);
@@ -26,31 +26,31 @@ extern {
     type Location = usize;
 
     enum Tok<'a> {
-        "stack_elt" => Tok::Prim(TztPrim(TzP::Stack_elt)),
-        "input" => Tok::Prim(TztPrim(TzP::input)),
-        "output" => Tok::Prim(TztPrim(TzP::output)),
-        "failed" => Tok::Prim(TztPrim(TzP::Failed)),
-        "mutezOverflow" => Tok::Prim(TztPrim(TzP::MutezOverflow)),
-        "generalOverflow" => Tok::Prim(TztPrim(TzP::GeneralOverflow)),
-        "StaticError" => Tok::Prim(TztPrim(TzP::StaticError)),
-        "amount" => Tok::Prim(TztPrim(TzP::amount)),
-        "self" => Tok::Prim(TztPrim(TzP::self_)),
+        "stack_elt" => Tok::Noun(TztPrim(TzP::Stack_elt)),
+        "input" => Tok::Noun(TztPrim(TzP::input)),
+        "output" => Tok::Noun(TztPrim(TzP::output)),
+        "failed" => Tok::Noun(TztPrim(TzP::Failed)),
+        "mutezOverflow" => Tok::Noun(TztPrim(TzP::MutezOverflow)),
+        "generalOverflow" => Tok::Noun(TztPrim(TzP::GeneralOverflow)),
+        "StaticError" => Tok::Noun(TztPrim(TzP::StaticError)),
+        "amount" => Tok::Noun(TztPrim(TzP::amount)),
+        "self" => Tok::Noun(TztPrim(TzP::self_)),
         number => Tok::Number(<i128>),
         string => Tok::String(<String>),
         bytes => Tok::Bytes(<Vec<u8>>),
         ann => Tok::Annotation(<Annotation<'a>>),
         // parameter, code and chain_id lexemes are special-cased because
         // they're also used in the tzt syntax
-        "parameter" => Tok::Prim(PT::Prim(Prim::parameter)),
-        "code" => Tok::Prim(PT::Prim(Prim::code)),
-        "chain_id" => Tok::Prim(PT::Prim(Prim::chain_id)),
-        prim => Tok::Prim(PT::Prim(<Prim>)),
+        "parameter" => Tok::Noun(PT::Prim(Prim::parameter)),
+        "code" => Tok::Noun(PT::Prim(Prim::code)),
+        "chain_id" => Tok::Noun(PT::Prim(Prim::chain_id)),
+        prim => Tok::Noun(PT::Prim(<Prim>)),
         "(" => Tok::LParen,
         ")" => Tok::RParen,
         "{" => Tok::LBrace,
         "}" => Tok::RBrace,
         ";" => Tok::Semi,
-        "_" => Tok::Prim(PT::Underscore)
+        "_" => Tok::Noun(PT::TztPrim(TzP::Underscore))
     }
 }
 

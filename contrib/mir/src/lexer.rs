@@ -133,16 +133,14 @@ defprim! {
     StaticError,
     #[token("self")]
     self_,
+    #[token("_")]
+    Underscore,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PrimWithTzt {
+pub enum Noun {
     Prim(Prim),
     TztPrim(TztPrim),
-    Underscore,
-    // Including underscore spearately from TztPrim because the `defprim` macro won't work if we
-    // used a literal underscore there. parsing for this variant is handled specially in the
-    // `lex_prim` function as well.
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -167,8 +165,8 @@ impl std::fmt::Display for Annotation<'_> {
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok<'a> {
-    #[regex(r"[A-Za-z_]+", lex_prim)]
-    Prim(PrimWithTzt),
+    #[regex(r"[A-Za-z_]+", lex_noun)]
+    Noun(Noun),
 
     #[regex("([+-]?)[0-9]+", lex_number)]
     Number(i128),
@@ -198,9 +196,8 @@ pub enum Tok<'a> {
 impl std::fmt::Display for Tok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Tok::Prim(PrimWithTzt::Prim(p)) => p.fmt(f),
-            Tok::Prim(PrimWithTzt::TztPrim(p)) => p.fmt(f),
-            Tok::Prim(PrimWithTzt::Underscore) => write!(f, "_"),
+            Tok::Noun(Noun::Prim(p)) => p.fmt(f),
+            Tok::Noun(Noun::TztPrim(p)) => p.fmt(f),
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
             Tok::Bytes(bs) => write!(f, "0x{}", hex::encode(bs)),
@@ -238,13 +235,13 @@ impl Default for LexerError {
 
 type Lexer<'a> = logos::Lexer<'a, Tok<'a>>;
 
-fn lex_prim(lex: &mut Lexer) -> Result<PrimWithTzt, LexerError> {
+fn lex_noun(lex: &mut Lexer) -> Result<Noun, LexerError> {
     lex.slice()
         .parse()
-        .map(PrimWithTzt::Prim)
-        .or_else(|_| lex.slice().parse().map(PrimWithTzt::TztPrim))
+        .map(Noun::Prim)
+        .or_else(|_| lex.slice().parse().map(Noun::TztPrim))
         .or_else(|_| match lex.slice() {
-            "_" => Ok(PrimWithTzt::Underscore),
+            "_" => Ok(Noun::TztPrim(TztPrim::Underscore)),
             s => Err(PrimError(s.to_owned())),
         })
         .map_err(LexerError::from)
