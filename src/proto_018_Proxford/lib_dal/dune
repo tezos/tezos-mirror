@@ -2,19 +2,19 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dal_alpha)
- (public_name octez-protocol-alpha-libs.dal)
+ (name tezos_dal_018_Proxford)
+ (public_name octez-protocol-018-Proxford-libs.dal)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-protocol-compiler.registerer
   octez-libs.stdlib-unix
   tezos-dal-node-lib
-  octez-protocol-alpha-libs.client
-  octez-protocol-alpha-libs.plugin
-  tezos-protocol-alpha.embedded-protocol
-  octez-protocol-alpha-libs.layer2-utils
-  tezos-protocol-alpha.protocol)
+  octez-protocol-018-Proxford-libs.client
+  octez-protocol-018-Proxford-libs.plugin
+  tezos-protocol-018-Proxford.embedded-protocol
+  octez-protocol-018-Proxford-libs.layer2-utils
+  tezos-protocol-018-Proxford.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -25,8 +25,8 @@
   -open Tezos_protocol_registerer
   -open Tezos_stdlib_unix
   -open Tezos_dal_node_lib
-  -open Tezos_client_alpha
-  -open Tezos_protocol_plugin_alpha
-  -open Tezos_embedded_protocol_alpha
-  -open Tezos_layer2_utils_alpha
-  -open Tezos_protocol_alpha))
+  -open Tezos_client_018_Proxford
+  -open Tezos_protocol_plugin_018_Proxford
+  -open Tezos_embedded_protocol_018_Proxford
+  -open Tezos_layer2_utils_018_Proxford
+  -open Tezos_protocol_018_Proxford))

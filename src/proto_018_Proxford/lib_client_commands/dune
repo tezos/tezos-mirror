@@ -2,14 +2,14 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_client_alpha_commands)
- (public_name octez-protocol-alpha-libs.client.commands)
+ (name tezos_client_018_Proxford_commands)
+ (public_name octez-protocol-018-Proxford-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
-  tezos-protocol-alpha.protocol
-  tezos-protocol-alpha.parameters
+  tezos-protocol-018-Proxford.protocol
+  tezos-protocol-018-Proxford.parameters
   octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
@@ -17,56 +17,56 @@
   octez-shell-libs.mockup-registration
   octez-shell-libs.mockup-commands
   octez-shell-libs.client-base
-  octez-protocol-alpha-libs.client
+  octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-commands
   octez-libs.rpc
   octez-shell-libs.client-base-unix
-  octez-protocol-alpha-libs.plugin
+  octez-protocol-018-Proxford-libs.plugin
   uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_protocol_018_Proxford_parameters
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_alpha
+  -open Tezos_client_018_Proxford
   -open Tezos_client_commands
   -open Tezos_client_base_unix
-  -open Tezos_protocol_plugin_alpha)
+  -open Tezos_protocol_plugin_018_Proxford)
  (modules (:standard \ alpha_commands_registration)))
 
 (library
- (name tezos_client_alpha_commands_registration)
- (public_name octez-protocol-alpha-libs.client.commands-registration)
+ (name tezos_client_018_Proxford_commands_registration)
+ (public_name octez-protocol-018-Proxford-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
-  tezos-protocol-alpha.protocol
-  tezos-protocol-alpha.parameters
+  tezos-protocol-018-Proxford.protocol
+  tezos-protocol-018-Proxford.parameters
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-alpha-libs.client
+  octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-alpha-libs.client.commands
-  octez-protocol-alpha-libs.client.sapling
+  octez-protocol-018-Proxford-libs.client.commands
+  octez-protocol-018-Proxford-libs.client.sapling
   octez-libs.rpc
-  octez-protocol-alpha-libs.plugin)
+  octez-protocol-018-Proxford-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_protocol_018_Proxford_parameters
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_alpha
+  -open Tezos_client_018_Proxford
   -open Tezos_client_commands
-  -open Tezos_client_alpha_commands
-  -open Tezos_client_sapling_alpha
-  -open Tezos_protocol_plugin_alpha)
+  -open Tezos_client_018_Proxford_commands
+  -open Tezos_client_sapling_018_Proxford
+  -open Tezos_protocol_plugin_018_Proxford)
  (modules alpha_commands_registration))

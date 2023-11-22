@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_alpha_test_helpers)
+ (name tezos_018_Proxford_test_helpers)
  (public_name octez-protocol-018-Proxford-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
@@ -27,9 +27,9 @@
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_018_Proxford
-  -open Tezos_client_alpha
+  -open Tezos_client_018_Proxford
   -open Tezos_protocol_018_Proxford_parameters
-  -open Tezos_protocol_plugin_alpha
+  -open Tezos_protocol_plugin_018_Proxford
   -open Tezos_shell_services
   -open Tezos_crypto_dal
-  -open Tezos_smart_rollup_alpha))
+  -open Tezos_smart_rollup_018_Proxford))

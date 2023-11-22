@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_protocol_test_pbt_tezt_lib)
+ (name src_proto_018_Proxford_lib_protocol_test_pbt_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -16,8 +16,8 @@
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
-  tezos-benchmark-alpha
-  tezos-benchmark-type-inference-alpha
+  tezos-benchmark-018-Proxford
+  tezos-benchmark-type-inference-018-Proxford
   octez-protocol-018-Proxford-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
@@ -29,14 +29,14 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
-  -open Tezos_client_alpha
+  -open Tezos_client_018_Proxford
   -open Tezos_protocol_018_Proxford
   -open Tezos_test_helpers
-  -open Tezos_alpha_test_helpers
+  -open Tezos_018_Proxford_test_helpers
   -open Octez_alcotezt
-  -open Tezos_benchmark_alpha
-  -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_smart_rollup_alpha
+  -open Tezos_benchmark_018_Proxford
+  -open Tezos_benchmark_type_inference_018_Proxford
+  -open Tezos_smart_rollup_018_Proxford
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
   -open Tezos_protocol_018_Proxford_parameters)
@@ -47,7 +47,6 @@
   test_gas_properties
   test_sampler
   test_script_comparison
-  test_script_roundtrip
   test_tez_repr
   test_bitset
   test_sc_rollup_tick_repr
@@ -66,7 +65,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_protocol_test_pbt_tezt_lib
+  src_proto_018_Proxford_lib_protocol_test_pbt_tezt_lib
   tezt)
  (link_flags
   (:standard)

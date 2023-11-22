@@ -1,17 +1,17 @@
-{0 Octez-protocol-alpha-libs: octez protocol alpha libraries}
+{0 Octez-protocol-018-Proxford-libs: octez protocol 018-Proxford libraries}
 
-This is a package containing some libraries related to the Tezos alpha protocol.
+This is a package containing some libraries related to the Tezos 018-Proxford protocol.
 
 It contains the following libraries:
 
-- {{!module-Tezos_alpha_test_helpers}Tezos_alpha_test_helpers}: Protocol testing framework
-- {{!module-Tezos_baking_alpha}Tezos_baking_alpha}: Base library for `tezos-baker/accuser`
-- {{!module-Tezos_baking_alpha_commands}Tezos_baking_alpha_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_alpha}Tezos_client_alpha}: Protocol specific library for `tezos-client`
-- {{!module-Tezos_dac_alpha}Tezos_dac_alpha}: Protocol specific library for the Data availability Committee
-- {{!module-Tezos_dal_alpha}Tezos_dal_alpha}: Protocol specific library for the Data availability Layer
-- {{!module-Tezos_layer2_utils_alpha}Tezos_layer2_utils_alpha}: Protocol specific library for Layer 2 utils
-- {{!module-Tezos_protocol_plugin_alpha}Tezos_protocol_plugin_alpha}: Protocol plugin
-- {{!module-Tezos_protocol_plugin_alpha_registerer}Tezos_protocol_plugin_alpha_registerer}: Protocol plugin registerer
-- {{!module-Tezos_smart_rollup_alpha}Tezos_smart_rollup_alpha}: Protocol specific library of helpers for `tezos-smart-rollup`
-- {{!module-Tezos_smart_rollup_layer2_alpha}Tezos_smart_rollup_layer2_alpha}: Protocol specific library for `tezos-smart-rollup`
+- {{!module-Tezos_018_Proxford_test_helpers}Tezos_018_Proxford_test_helpers}: Protocol testing framework
+- {{!module-Tezos_baking_018_Proxford}Tezos_baking_018_Proxford}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_018_Proxford_commands}Tezos_baking_018_Proxford_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_018_Proxford}Tezos_client_018_Proxford}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_dac_018_Proxford}Tezos_dac_018_Proxford}: Protocol specific library for the Data availability Committee
+- {{!module-Tezos_dal_018_Proxford}Tezos_dal_018_Proxford}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_018_Proxford}Tezos_layer2_utils_018_Proxford}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_018_Proxford}Tezos_protocol_plugin_018_Proxford}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_018_Proxford_registerer}Tezos_protocol_plugin_018_Proxford_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_018_Proxford}Tezos_smart_rollup_018_Proxford}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_018_Proxford}Tezos_smart_rollup_layer2_018_Proxford}: Protocol specific library for `tezos-smart-rollup`

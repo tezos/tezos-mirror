@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_plugin_test_tezt_lib)
+ (name src_proto_018_Proxford_lib_plugin_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -14,10 +14,10 @@
   qcheck-alcotest
   octez-libs.stdlib-unix
   octez-libs.micheline
-  octez-protocol-alpha-libs.plugin
-  tezos-protocol-alpha.protocol
-  tezos-protocol-alpha.parameters
-  octez-protocol-alpha-libs.test-helpers)
+  octez-protocol-018-Proxford-libs.plugin
+  tezos-protocol-018-Proxford.protocol
+  tezos-protocol-018-Proxford.parameters
+  octez-protocol-018-Proxford-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -29,11 +29,11 @@
   -open Octez_alcotezt
   -open Tezos_test_helpers
   -open Tezos_micheline
-  -open Tezos_protocol_plugin_alpha
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_alpha.Protocol
-  -open Tezos_protocol_alpha_parameters
-  -open Tezos_alpha_test_helpers)
+  -open Tezos_protocol_plugin_018_Proxford
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_protocol_018_Proxford.Protocol
+  -open Tezos_protocol_018_Proxford_parameters
+  -open Tezos_018_Proxford_test_helpers)
  (modules
   helpers
   test_conflict_handler
@@ -45,7 +45,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_plugin_test_tezt_lib
+  src_proto_018_Proxford_lib_plugin_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -54,7 +54,7 @@
 
 (rule
  (alias runtest)
- (package octez-protocol-alpha-libs)
+ (package octez-protocol-018-Proxford-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

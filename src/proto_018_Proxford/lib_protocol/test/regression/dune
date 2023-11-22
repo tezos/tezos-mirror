@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_protocol_test_regression_tezt_lib)
+ (name src_proto_018_Proxford_lib_protocol_test_regression_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -21,9 +21,9 @@
   -open Tezos_base.TzPervasives
   -open Tezt_tezos
   -open Tezos_protocol_018_Proxford
-  -open Tezos_client_alpha
-  -open Tezos_protocol_plugin_alpha
-  -open Tezos_alpha_test_helpers
+  -open Tezos_client_018_Proxford
+  -open Tezos_protocol_plugin_018_Proxford
+  -open Tezos_018_Proxford_test_helpers
   -open Tezos_micheline)
  (modules test_logging))
 
@@ -31,7 +31,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_protocol_test_regression_tezt_lib
+  src_proto_018_Proxford_lib_protocol_test_regression_tezt_lib
   tezt)
  (link_flags
   (:standard)
