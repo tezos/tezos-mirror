@@ -15,7 +15,8 @@
   octez-shell-libs.client-base
   octez-libs.tezos-workers
   octez-shell-libs.shell
-  octez-crawler)
+  octez-crawler
+  octez-shell-libs.signer-backends)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

@@ -4529,6 +4529,7 @@ let octez_injector_lib =
         octez_workers |> open_;
         octez_shell;
         octez_crawler |> open_;
+        octez_signer_backends;
       ]
 
 let octez_smart_rollup_lib =
