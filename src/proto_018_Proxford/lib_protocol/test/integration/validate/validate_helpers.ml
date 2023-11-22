@@ -374,7 +374,8 @@ let pick_addr_attester ctxt =
   match attesters with a :: _ -> return a.V.consensus_key | _ -> assert false
 
 let init_params =
-  Tezos_protocol_018_Proxford_parameters.Default_parameters.parameters_of_constants
+  Tezos_protocol_018_Proxford_parameters.Default_parameters
+  .parameters_of_constants
     {Context.default_test_constants with consensus_threshold = 0}
 
 let delegates_of_block block =
