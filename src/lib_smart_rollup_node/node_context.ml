@@ -27,7 +27,10 @@
 
 type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
 
-type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
+type genesis_info = Metadata.genesis_info = {
+  level : int32;
+  commitment_hash : Commitment.Hash.t;
+}
 
 type 'a store = 'a Store.t
 
@@ -185,6 +188,38 @@ let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
   | Some Full, Archive ->
       failwith "Cannot transform a full rollup node into an archive one."
 
+let update_metadata rollup_address kind genesis_info ~data_dir =
+  let open Lwt_result_syntax in
+  let* metadata = Metadata.Versioned.read_metadata_file ~dir:data_dir in
+  match metadata with
+  | Some (V1 {rollup_address = saved_address; context_version; _}) ->
+      let*? () = Context.Version.check context_version in
+      fail_unless Address.(rollup_address = saved_address)
+      @@ Rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
+  | Some (V0 {rollup_address = saved_address; context_version}) ->
+      let*? () = Context.Version.check context_version in
+      let*? () =
+        error_unless Address.(rollup_address = saved_address)
+        @@ Rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
+      in
+      Metadata.write_metadata_file
+        ~dir:data_dir
+        {
+          rollup_address;
+          context_version = Context.Version.version;
+          kind;
+          genesis_info;
+        }
+  | None ->
+      Metadata.write_metadata_file
+        ~dir:data_dir
+        {
+          rollup_address;
+          context_version = Context.Version.version;
+          kind;
+          genesis_info;
+        }
+
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
     l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
@@ -197,22 +232,11 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       } as configuration) =
   let open Lwt_result_syntax in
   let* lockfile = lock ~data_dir in
+  let* () = update_metadata rollup_address kind genesis_info ~data_dir in
   let* () =
     Store_migration.maybe_run_migration
       ~storage_dir:(Configuration.default_storage_dir data_dir)
       ~index_buffer_size:Configuration.default_index_buffer_size
-  in
-  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
-  let* () =
-    match metadata with
-    | Some {rollup_address = saved_address; context_version} ->
-        let*? () = Context.Version.check context_version in
-        fail_unless Address.(rollup_address = saved_address)
-        @@ Rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
-    | None ->
-        Metadata.write_metadata_file
-          ~dir:data_dir
-          {rollup_address; context_version = Context.Version.version}
   in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
