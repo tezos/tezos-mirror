@@ -384,10 +384,14 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             }));
         }
         I::Pack => {
-            ctx.gas.consume(0)?; // TODO
+            ctx.gas.consume(interpret_cost::PACK)?;
             let v = pop!();
             let arena = Arena::new();
+            // In the Tezos implementation they also charge gas for the pass
+            // that strips locations. We don't have it.
             let mich = typed_value_to_value_optimized_legacy(&arena, v);
+            ctx.gas
+                .consume(interpret_cost::micheline_encoding(&mich)?)?;
             let encoded = mich.encode_for_pack();
             stack.push(V::Bytes(encoded));
         }

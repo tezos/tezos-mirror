@@ -88,3 +88,13 @@ impl<'a> FromIterator<Annotation<'a>> for Annotations<'a> {
         Annotations(Vec::from_iter(iter))
     }
 }
+
+/// Returns all annotations in the same order in which they were given
+/// initially.
+impl<'a> IntoIterator for &'a Annotations<'a> {
+    type Item = &'a Annotation<'a>;
+    type IntoIter = std::slice::Iter<'a, Annotation<'a>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}

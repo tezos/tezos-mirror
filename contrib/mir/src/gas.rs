@@ -162,7 +162,7 @@ pub mod interpret_cost {
     use checked::Checked;
 
     use super::{AsGasCost, OutOfGas};
-    use crate::ast::{Key, KeyHash, Or, TypedValue};
+    use crate::ast::{Key, Micheline, KeyHash, Or, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -190,6 +190,7 @@ pub mod interpret_cost {
     pub const NIL: u32 = 10;
     pub const CONS: u32 = 15;
     pub const CHAIN_ID: u32 = 15;
+    pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 60;
@@ -362,6 +363,73 @@ pub mod interpret_cost {
         // NB: 2 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead.
         (80 + 2 * lookup_cost).as_gas_cost()
+    }
+
+    /// Measures size of Michelson using several metrics.
+    pub struct MichelineSize {
+        /// Total number of nodes (including leaves).
+        nodes_num: Checked<usize>,
+
+        /// Total size of string and bytes literals.
+        str_byte: Checked<usize>,
+
+        /// Total size of zarith numbers, in bytes.
+        zariths: Checked<usize>,
+    }
+
+    impl Default for MichelineSize {
+        fn default() -> Self {
+            MichelineSize {
+                nodes_num: Checked::from(0),
+                str_byte: Checked::from(0),
+                zariths: Checked::from(0),
+            }
+        }
+    }
+
+    pub fn micheline_encoding<'a>(mich: &'a Micheline<'a>) -> Result<u32, OutOfGas> {
+        let mut size = MichelineSize::default();
+        collect_micheline_size(mich, &mut size);
+        micheline_encoding_by_size(size)
+    }
+
+    fn micheline_encoding_by_size(size: MichelineSize) -> Result<u32, OutOfGas> {
+        (size.nodes_num * 100 + size.zariths * 25 + size.str_byte * 10).as_gas_cost()
+    }
+
+    fn collect_micheline_size<'a>(mich: &'a Micheline<'a>, size: &mut MichelineSize) {
+        size.nodes_num += 1;
+        match mich {
+            Micheline::String(s) => size.str_byte += s.len(),
+            Micheline::Bytes(bs) => size.str_byte += bs.len(),
+            Micheline::Int(i) => {
+                // NB: eventually when using BigInts, use BigInt::bits() &c
+                let bits = std::mem::size_of_val(i);
+                let bytes = (bits + 7) / 8;
+                size.zariths += bytes;
+            }
+            Micheline::Seq(ms) => {
+                for m in *ms {
+                    collect_micheline_size(m, size)
+                }
+            }
+            Micheline::App(_prim, args, annots) => {
+                for arg in *args {
+                    collect_micheline_size(arg, size)
+                }
+                for annot in annots {
+                    // Annotations are accounted as simple string literals
+                    use crate::lexer::Annotation as Ann;
+                    size.str_byte += match annot {
+                        // Including annotation prefix into the size too
+                        Ann::Field(a) => a.len() + 1,
+                        Ann::Variable(a) => a.len() + 1,
+                        Ann::Type(a) => a.len() + 1,
+                        Ann::Special(a) => a.len(),
+                    }
+                }
+            }
+        }
     }
 
     pub fn check_signature(k: &Key, msg: &[u8]) -> Result<u32, OutOfGas> {
