@@ -96,11 +96,11 @@ pub fn decode_array(
     Ok(())
 }
 
-pub fn append_option<T: Encodable>(
-    stream: &mut RlpStream,
-    data: Option<T>,
-) -> &mut RlpStream {
-    append_option_explicit(stream, &data, |s, v| s.append(v))
+pub fn append_option<'a, T: Encodable>(
+    stream: &'a mut RlpStream,
+    data: &Option<T>,
+) -> &'a mut RlpStream {
+    append_option_explicit(stream, data, |s, v| s.append(v))
 }
 
 // Combinator for encoding an optional value using an explicit
