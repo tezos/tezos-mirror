@@ -57,12 +57,12 @@ module Event = struct
   let section = ["evm_node"]
 
   let event_starting =
-    Internal_event.Simple.declare_0
+    Internal_event.Simple.declare_1
       ~section
       ~name:"start_evm_node"
-      ~msg:"starting the EVM node"
+      ~msg:"starting the EVM node ({mode})"
       ~level:Notice
-      ()
+      ("mode", Data_encoding.string)
 
   let event_is_ready =
     Internal_event.Simple.declare_2
@@ -280,7 +280,7 @@ let proxy_command =
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let*! () = Internal_event.Simple.emit Event.event_starting () in
+      let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
       let* config =
         Cli.create_or_read_proxy_config
           ~data_dir
@@ -345,7 +345,7 @@ let sequencer_command =
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let*! () = Internal_event.Simple.emit Event.event_starting () in
+      let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       let* config =
         Cli.create_or_read_sequencer_config
           ~data_dir
