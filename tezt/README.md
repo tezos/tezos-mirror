@@ -95,8 +95,8 @@ In pseudo-TypeScript, the schema of `TESTOWNERS.json` is:
 ```typescript
 type TESTOWNERS = [PRODUCT_NAME: string]: PRODUCT_SPEC;
 type PRODUCT_SPEC = {
-  tags: string[];
-  path_prefixes: string[];
+  tags?: string[];
+  path_patterns?: string[];
 };
 ```
 
@@ -104,12 +104,14 @@ where the top-level element of `TESTOWNERS.json` has the type `TESTOWNERS`.
                                    
 Semantically, each `PRODUCT_NAME` - `PRODUCT_SPEC` association in
 `TESTOWNERS` corresponds to a product and a set of Tezt test tags and
-path prefixes to associated with the product. Path prefixes are
-interpreted such that a prefix `F` matches all tests for which `F` is
-a prefix of its `~__FILE__`. Tags match all the tests with the given
-tag. The full set of tests associated to a product is the union of all
-tests matched by any of the tags or the path prefixes associated to
-the test.
+path patterns to associated with the product. Path patterns are
+interpreted as Perl-style regular expressions such that a pattern `P`
+matches all tests with a `~__FILE__` that matches `P`. Tags match
+all the tests with the given tag. The full set of tests associated to
+a product is the union of all tests matched by any of the tags or the
+path patterns associated to the test. Each of the fields `tags` and
+`path_patterns` are optional, and their absence is interpreted as the
+empty list.
 
 
 For instance, a valid `TESTOWNERS.json` is:
@@ -118,8 +120,8 @@ For instance, a valid `TESTOWNERS.json` is:
 {
     "layer1": {
         "tags": ["michelson"],
-        "path_prefixes": [
-            "src/proto_alpha/lib_protocol/"
+        "path_patterns": [
+            "^src/proto_alpha/lib_protocol/"
         ]
     }
 }

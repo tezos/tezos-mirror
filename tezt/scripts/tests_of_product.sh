@@ -57,13 +57,11 @@ while [ "$#" -gt 0 ]; do
         exit 1
     fi
 
-    # For each tag
-    jq -r --arg product "$product" '.[$product].tags[]' < "$testowners" | while read -r tag; do
-        tezt --list-tsv "${tag}" | sed "s/^/${product}\t/"
-    done
-
-    # For each file
-    jq -r --arg product "$product" '.[$product].path_prefixes[]' < "$testowners" | while read -r file; do
-        tezt --list-tsv --match "^${file}" | sed "s/^/${product}\t/"
-    done
+    # Translate selected tags and path_patterns to a Tezt TSL expression:
+    tsl_expr=$(
+        jq -r --arg product "$product" \
+           '((.[$product].tags // []) + ((.[$product].path_patterns // [])|map("file =~ \"" + . + "\"")))|join(" || ")' \
+           < "$testowners")
+    # Prepend the product name to each row
+    tezt --list-tsv "${tsl_expr}" | sed "s/^/${product}\t/"
 done
