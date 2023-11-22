@@ -239,6 +239,7 @@ val register_test :
   __FILE__:string ->
   title:string ->
   tags:string list ->
+  ?uses:(t -> Uses.t list) ->
   ?supports:supported_protocols ->
   (t -> unit Lwt.t) ->
   t list ->
@@ -252,6 +253,7 @@ val register_long_test :
   __FILE__:string ->
   title:string ->
   tags:string list ->
+  ?uses:(t -> Uses.t list) ->
   ?supports:supported_protocols ->
   ?team:string ->
   executors:Long_test.executor list ->
@@ -269,6 +271,7 @@ val register_regression_test :
   __FILE__:string ->
   title:string ->
   tags:string list ->
+  ?uses:(t -> Uses.t list) ->
   ?supports:supported_protocols ->
   (t -> unit Lwt.t) ->
   t list ->
