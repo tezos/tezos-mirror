@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
-use crate::lexer::Prim;
+use crate::{ast::annotations::NO_ANNS, lexer::Prim};
 
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use micheline::IntoMicheline;
@@ -127,6 +127,88 @@ impl Type {
 
     pub fn new_lambda(ty1: Self, ty2: Self) -> Self {
         Self::Lambda(Box::new((ty1, ty2)))
+    }
+}
+
+impl<'a> IntoMicheline<'a> for &'_ Type {
+    fn into_micheline_optimized_legacy(self, arena: &'a Arena<Micheline<'a>>) -> Micheline<'a> {
+        use Type::*;
+
+        struct LinearizePairIter<'a>(std::option::Option<&'a Type>);
+
+        impl<'a> std::iter::Iterator for LinearizePairIter<'a> {
+            type Item = &'a Type;
+            fn next(&mut self) -> std::option::Option<Self::Item> {
+                match self.0 {
+                    Some(Type::Pair(x)) => {
+                        self.0 = Some(&x.1);
+                        Some(&x.0)
+                    }
+                    ty => {
+                        self.0 = None;
+                        ty
+                    }
+                }
+            }
+        }
+
+        match self {
+            Nat => Micheline::prim0(Prim::nat),
+            Int => Micheline::prim0(Prim::int),
+            Bool => Micheline::prim0(Prim::bool),
+            Mutez => Micheline::prim0(Prim::mutez),
+            String => Micheline::prim0(Prim::string),
+            Unit => Micheline::prim0(Prim::unit),
+            Operation => Micheline::prim0(Prim::operation),
+            Address => Micheline::prim0(Prim::address),
+            ChainId => Micheline::prim0(Prim::chain_id),
+            Bytes => Micheline::prim0(Prim::bytes),
+            Key => Micheline::prim0(Prim::key),
+            Signature => Micheline::prim0(Prim::signature),
+            KeyHash => Micheline::prim0(Prim::key_hash),
+            Never => Micheline::prim0(Prim::never),
+
+            Option(x) => Micheline::prim1(
+                arena,
+                Prim::option,
+                x.into_micheline_optimized_legacy(arena),
+            ),
+            List(x) => {
+                Micheline::prim1(arena, Prim::list, x.into_micheline_optimized_legacy(arena))
+            }
+            Set(x) => Micheline::prim1(arena, Prim::set, x.into_micheline_optimized_legacy(arena)),
+            Contract(x) => Micheline::prim1(
+                arena,
+                Prim::contract,
+                x.into_micheline_optimized_legacy(arena),
+            ),
+
+            Pair(_) => Micheline::App(
+                Prim::pair,
+                arena.alloc_extend(
+                    LinearizePairIter(Some(self)).map(|x| x.into_micheline_optimized_legacy(arena)),
+                ),
+                NO_ANNS,
+            ),
+            Map(x) => Micheline::prim2(
+                arena,
+                Prim::map,
+                x.0.into_micheline_optimized_legacy(arena),
+                x.1.into_micheline_optimized_legacy(arena),
+            ),
+            Or(x) => Micheline::prim2(
+                arena,
+                Prim::or,
+                x.0.into_micheline_optimized_legacy(arena),
+                x.1.into_micheline_optimized_legacy(arena),
+            ),
+            Lambda(x) => Micheline::prim2(
+                arena,
+                Prim::lambda,
+                x.0.into_micheline_optimized_legacy(arena),
+                x.1.into_micheline_optimized_legacy(arena),
+            ),
+        }
     }
 }
 
