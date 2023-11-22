@@ -16,7 +16,7 @@
 export ocaml_version=4.14.1
 export opam_version=2
 export recommended_rust_version=1.71.1
-export recommended_node_version=16.18.1
+export recommended_node_version=18.18.2
 
 # The Alpine minor version used to build the opam-repository images
 # and used to run the `trigger` job in the CI. This value SHOULD
