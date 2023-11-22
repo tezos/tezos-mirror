@@ -542,6 +542,10 @@ fn interpret_one<'a>(
             let right = pop!();
             stack.push(V::new_or(Or::Right(right)));
         }
+        I::Lambda(lam) => {
+            ctx.gas.consume(interpret_cost::LAMBDA)?;
+            stack.push(V::Lambda(lam.clone()));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())

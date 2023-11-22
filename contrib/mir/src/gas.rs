@@ -239,6 +239,7 @@ pub mod interpret_cost {
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 60;
     pub const SET_DELEGATE: u32 = 60;
+    pub const LAMBDA: u32 = 10;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
