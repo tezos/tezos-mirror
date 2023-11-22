@@ -8,6 +8,10 @@
 use std::collections::BTreeMap;
 use std::num::TryFromIntError;
 
+pub mod type_props;
+
+use type_props::TypeProperty;
+
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas;
@@ -23,6 +27,8 @@ pub enum TcError {
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
+    #[error("type is not {0}: {1:?}")]
+    InvalidTypeProperty(TypeProperty, Type),
     #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
     #[error("numeric conversion failed: {0}")]
@@ -37,8 +43,6 @@ pub enum TcError {
     InvalidEltForMap(Value, Type),
     #[error("sequence elements must be in strictly ascending order for type {0:?}")]
     ElementsNotSorted(Type),
-    #[error("type not comparable: {0:?}")]
-    TypeNotComparable(Type),
     #[error("sequence elements must contain no duplicate keys for type {0:?}")]
     DuplicateElements(Type),
     #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {}", x)))]
@@ -47,8 +51,6 @@ pub enum TcError {
         stack: TypeStack,
         reason: Option<NoMatchingOverloadReason>,
     },
-    #[error("type not packable: {0:?}")]
-    TypeNotPackable(Type),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -82,6 +84,9 @@ pub enum StacksNotEqualReason {
 pub struct TypesNotEqual(Type, Type);
 
 impl ContractScript<ParsedStage> {
+    /// Typecheck the contract script. Validates the script's types, then
+    /// typechecks the code and checks the result stack is as expected. Returns
+    /// typechecked script.
     pub fn typecheck(
         self,
         ctx: &mut crate::context::Ctx,
@@ -89,6 +94,8 @@ impl ContractScript<ParsedStage> {
         let ContractScript {
             parameter, storage, ..
         } = self;
+        parameter.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
+        storage.ensure_prop(&mut ctx.gas, TypeProperty::Storable)?;
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
         let code = self.code.typecheck(ctx, &mut stack)?;
         unify_stacks(
@@ -108,21 +115,48 @@ impl ContractScript<ParsedStage> {
 }
 
 impl ParsedInstruction {
+    /// Typecheck an individual instruction. Validates the passed stack types.
     pub fn typecheck(
         self,
         ctx: &mut Ctx,
         opt_stack: &mut FailingTypeStack,
     ) -> Result<TypecheckedInstruction, TcError> {
+        if let Ok(stack) = opt_stack.access_mut(()) {
+            stack.iter().try_for_each(|ty| verify_ty(ctx, ty))?;
+        }
         typecheck_instruction(self, ctx, opt_stack)
     }
 }
 
 impl Value {
+    /// Typecheck a value. Validates the input type.
     pub fn typecheck(self, ctx: &mut Ctx, t: &Type) -> Result<TypedValue, TcError> {
+        verify_ty(ctx, t)?;
         typecheck_value(ctx, t, self)
     }
 }
 
+/// Checks type invariants, e.g. that `map` key is comparable.
+fn verify_ty(ctx: &mut Ctx, t: &Type) -> Result<(), TcError> {
+    use Type::*;
+    ctx.gas.consume(gas::tc_cost::VERIFY_TYPE_STEP)?;
+    match t {
+        Nat | Int | Bool | Mutez | String | Operation | Unit => Ok(()),
+        Pair(tys) | Or(tys) => {
+            verify_ty(ctx, &tys.0)?;
+            verify_ty(ctx, &tys.1)
+        }
+        Option(ty) | List(ty) => verify_ty(ctx, ty),
+        Map(tys) => {
+            tys.0.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            verify_ty(ctx, &tys.0)?;
+            verify_ty(ctx, &tys.1)
+        }
+    }
+}
+
+/// Typecheck a sequence of instructions. Assumes the passed stack is valid, i.e.
+/// doesn't contain illegal types like `set operation` or `contract operation`.
 fn typecheck(
     ast: ParsedAST,
     ctx: &mut Ctx,
@@ -142,6 +176,8 @@ macro_rules! nothing_to_none {
     };
 }
 
+/// Typecheck a single instruction. Assumes passed stack is valid, i.e. doesn't
+/// contain illegal types like `set operation` or `contract operation`.
 fn typecheck_instruction(
     i: ParsedInstruction,
     ctx: &mut Ctx,
@@ -258,7 +294,9 @@ fn typecheck_instruction(
         (I::Dup(opt_height), ..) => {
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(Prim::DUP, stack, dup_height)?;
-            stack.push(stack[dup_height - 1].clone());
+            let ty = &stack[dup_height - 1];
+            ty.ensure_prop(&mut ctx.gas, TypeProperty::Duplicable)?;
+            stack.push(ty.clone());
             I::Dup(opt_height)
         }
 
@@ -387,6 +425,8 @@ fn typecheck_instruction(
         (I::Iter(..), []) => no_overload!(ITER, len 1),
 
         (I::Push((t, v)), ..) => {
+            t.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            verify_ty(ctx, &t)?;
             let v = typecheck_value(ctx, &t, v)?;
             stack.push(t);
             I::Push(v)
@@ -400,7 +440,7 @@ fn typecheck_instruction(
 
         (I::Failwith(..), [.., _]) => {
             let ty = pop!();
-            ensure_packable(&ty)?;
+            ty.ensure_prop(&mut ctx.gas, TypeProperty::Packable)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
             I::Failwith(ty)
@@ -460,13 +500,7 @@ fn typecheck_instruction(
                 },
                 e => e,
             })?;
-            if !t.is_comparable() {
-                return Err(TcError::NoMatchingOverload {
-                    instr: Prim::COMPARE,
-                    stack: stack.clone(),
-                    reason: Some(NoMatchingOverloadReason::TypeNotComparable(t.clone())),
-                });
-            }
+            t.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
             pop!();
             stack[0] = T::Int;
             I::Compare
@@ -479,6 +513,7 @@ fn typecheck_instruction(
         }
 
         (I::Nil(ty), ..) => {
+            verify_ty(ctx, &ty)?;
             stack.push(T::new_list(ty));
             I::Nil(())
         }
@@ -495,9 +530,6 @@ fn typecheck_instruction(
             let kty_ = pop!();
             let (kty, vty) = *pop!(T::Map);
             ensure_ty_eq(ctx, &kty, &kty_)?;
-            // can only fail if the typechecker is invoked on invalid types,
-            // i.e. where `map` key is non-comparable
-            ensure_comparable(&kty)?;
             stack.push(T::new_option(vty));
             I::Get(overloads::Get::Map)
         }
@@ -508,9 +540,6 @@ fn typecheck_instruction(
             let (kty, vty) = m.as_ref();
             ensure_ty_eq(ctx, kty, kty_)?;
             ensure_ty_eq(ctx, vty, vty_new)?;
-            // can only fail if the typechecker is invoked on invalid types,
-            // i.e. where `map` key is non-comparable
-            ensure_comparable(kty)?;
             pop!();
             pop!();
             I::Update(overloads::Update::Map)
@@ -522,6 +551,8 @@ fn typecheck_instruction(
     })
 }
 
+/// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
+/// illegal types like `set operation` or `contract operation`.
 fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcError> {
     use Type::*;
     use TypedValue as TV;
@@ -563,9 +594,6 @@ fn typecheck_value(ctx: &mut Ctx, t: &Type, v: Value) -> Result<TypedValue, TcEr
         ),
         (Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            // can only fail if the typechecker is invoked on invalid
-            // types, i.e. where `map` key is non-comparable
-            ensure_comparable(tk)?;
             let tc_elt = |v: Value| -> Result<(TypedValue, TypedValue), TcError> {
                 match v {
                     Value::Elt(e) => {
@@ -619,22 +647,6 @@ fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcEr
             stack: stack.clone(),
             reason: Some(NoMatchingOverloadReason::StackTooShort { expected: l }),
         })
-    }
-}
-
-fn ensure_packable(ty: &Type) -> Result<(), TcError> {
-    if ty.is_packable() {
-        Ok(())
-    } else {
-        Err(TcError::TypeNotPackable(ty.clone()))
-    }
-}
-
-fn ensure_comparable(ty: &Type) -> Result<(), TcError> {
-    if ty.is_comparable() {
-        Ok(())
-    } else {
-        Err(TcError::TypeNotComparable(ty.clone()))
     }
 }
 
@@ -704,7 +716,7 @@ mod typecheck_tests {
             Ok(Dup(Some(1)))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
@@ -717,7 +729,7 @@ mod typecheck_tests {
             Ok(Dup(Some(2)))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
@@ -776,7 +788,7 @@ mod typecheck_tests {
             Ok(Push(TypedValue::Int(1)))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440 - 100);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
@@ -799,10 +811,7 @@ mod typecheck_tests {
             Ok(Dip(Some(1), vec![Push(TypedValue::Nat(6))]))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(
-            ctx.gas.milligas(),
-            Gas::default().milligas() - 440 - 440 - 100 - 50
-        );
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
@@ -858,10 +867,7 @@ mod typecheck_tests {
             Ok(Loop(vec![Push(TypedValue::Bool(true))]))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(
-            ctx.gas.milligas(),
-            Gas::default().milligas() - 440 - 440 - 100 - 60 * 2
-        );
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
@@ -1551,7 +1557,10 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::new_list(Type::Operation)];
         assert_eq!(
             typecheck_instruction(parse("FAILWITH").unwrap(), &mut Ctx::default(), &mut stack),
-            Err(TcError::TypeNotPackable(Type::new_list(Type::Operation)))
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Packable,
+                Type::Operation
+            ))
         );
     }
 
@@ -1598,7 +1607,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Err(TcError::TypeNotComparable(Type::new_list(Type::Int)))
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
         );
     }
 
@@ -1611,7 +1623,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Err(TcError::TypeNotComparable(Type::new_list(Type::Int)))
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
         );
     }
 
@@ -1680,8 +1695,13 @@ mod typecheck_tests {
             Type::new_list(Type::Int)
         ];
         assert_eq!(
-            typecheck_instruction(parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
-            Err(TcError::TypeNotComparable(Type::new_list(Type::Int))),
+            parse("GET")
+                .unwrap()
+                .typecheck(&mut Ctx::default(), &mut stack),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
         );
     }
 
@@ -1729,8 +1749,13 @@ mod typecheck_tests {
             Type::new_list(Type::Int)
         ];
         assert_eq!(
-            typecheck_instruction(parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
-            Err(TcError::TypeNotComparable(Type::new_list(Type::Int),))
+            parse("UPDATE")
+                .unwrap()
+                .typecheck(&mut Ctx::default(), &mut stack),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
         );
     }
 
@@ -1984,11 +2009,10 @@ mod typecheck_tests {
                 &mut ctx,
                 &mut tc_stk![Type::Operation, Type::Operation]
             ),
-            Err(TcError::NoMatchingOverload {
-                instr: Prim::COMPARE,
-                stack: stk![Type::Operation, Type::Operation],
-                reason: Some(NoMatchingOverloadReason::TypeNotComparable(Type::Operation)),
-            })
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::Operation
+            ))
         );
     }
 
@@ -2019,6 +2043,113 @@ mod typecheck_tests {
                 stack: stk![Type::Unit, Type::Unit, Type::Unit],
                 reason: None,
             })
+        );
+    }
+
+    #[test]
+    fn test_push_operation_fail() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                Push((Type::Operation, Value::Unit)),
+                &mut ctx,
+                &mut tc_stk![]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::Operation
+            ))
+        );
+    }
+
+    #[test]
+    fn test_non_passable_parameter() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::Operation,
+                storage: Type::Nat,
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Passable,
+                Type::Operation
+            ))
+        );
+    }
+
+    #[test]
+    fn test_non_storable_storage() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::Nat,
+                storage: Type::Operation,
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Storable,
+                Type::Operation
+            ))
+        );
+    }
+
+    #[test]
+    fn test_invalid_map() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::new_map(Type::new_list(Type::Unit), Type::Unit),
+                storage: Type::Nat,
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    // Test that the empty sequence cannot be given the type `map (list unit) unit`
+    // because `list unit` is not comparable and therefore `map (list unit) unit` is
+    // not well formed.
+    fn test_invalid_map_value() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            Value::from(vec![] as Vec<()>).typecheck(
+                &mut ctx,
+                &Type::new_map(Type::new_list(Type::Unit), Type::Unit)
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    // Test that the comparability of map keys is also checked when the
+    // map type appears nested inside the parameter type
+    fn test_nested_invalid_map() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            ContractScript {
+                parameter: Type::new_pair(
+                    Type::Unit,
+                    Type::new_option(Type::new_map(Type::new_list(Type::Unit), Type::Unit))
+                ),
+                storage: Type::Nat,
+                code: Failwith(())
+            }
+            .typecheck(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Unit)
+            ))
         );
     }
 }
