@@ -45,6 +45,26 @@ Data Availability Layer (ongoing)
 Adaptive Issuance (ongoing)
 ----------------------------
 
+- Adaptive Issuance is locked behind a feature flag and cannot be activated for this proposal. The voting mechanism for Adaptive Issuance remains accessible, but is ignored and can never activate the feature. Moreover, the vote EMA will be reset before reactivating the feature flag. (MR :gl:`!10371`)
+
+- The ``stake`` and ``unstake`` operations are currently deactivated, calls to these operations will fail. Staking and unstaking transfers are still used internally, and may appear in balance receipts. (MR :gl:`!10849`)
+
+- The ``unstake`` client command uses the ``amount`` field instead of an extra parameter. (MRs :gl:`!10377`, :gl:`!10429`)
+
+- The semantics of forbidden delegates has been adjusted: a delegate becomes forbidden if it has been slashed for more than 51% of its frozen stake over the last 2 cycles. (MRs :gl:`!10382`, :gl:`!10844`)
+
+- Slashing penalties for double-signing are now applied at the end of the cycle where denunciations were included, rather than immediately. The same applies for rewards allocated from denunciations. (MR :gl:`!10389`)
+
+- Double baking penalty is now 7% of the offending baker's stake -- instead of 10%. (MR :gl:`!10431`)
+
+- The ``set deposits limit`` operation has been brought back. (MR :gl:`!10449`)
+
+- Balance updates now include more information related to staking in general, including slashing and rewards. (MRs :gl:`!10485`, :gl:`!10486`, :gl:`!10487`, :gl:`!10488`, :gl:`!10496`, :gl:`!10526`, :gl:`!10766`, :gl:`!10853`)
+
+- The new staking mechanism is used internally to freeze deposits automatically at cycle ends, and mimic Nairobi's behavior. (MR :gl:`!10562`)
+
+- Unstaked frozen deposits, i.e recently unstaked funds, can be used by bakers to be staked again (unless the baker has been slashed). They are used in addition to liquid funds for staking, prioritizing the most recent unstake requests. (MR :gl:`!10781`)
+
 Gas improvements
 ----------------
 
