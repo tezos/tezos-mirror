@@ -489,11 +489,11 @@ module Simple = struct
      explicitly splitting the place where the partial application
      takes place. Indeed, it is important that events are declared
      only once. *)
-  type 'a t = 'a -> unit tzresult Lwt.t
+  type 'a t = {name : string; emit : 'a -> unit tzresult Lwt.t}
 
   let emit simple_event parameters =
     Lwt.try_bind
-      (fun () -> simple_event parameters)
+      (fun () -> simple_event.emit parameters)
       (function
         | Ok () -> Lwt.return_unit
         | Error trace ->
@@ -507,14 +507,16 @@ module Simple = struct
                  clean the temporary directories.
                Instead we just print the error on stderr. *)
             Format.eprintf
-              "@[<hv 2>Failed to send event:@ %a@]@."
+              "@[<hv 2>Failed to send event '%s':@ %a@]@."
+              simple_event.name
               Error_monad.pp_print_trace
               trace ;
             Lwt.return_unit)
       (fun exc ->
         (* For the same reason we also just print exceptions *)
         Format.eprintf
-          "@[<hv 2>Failed to send event:@ %s@]@."
+          "@[<hv 2>Failed to send event '%s':@ %s@]@."
+          simple_event.name
           (Printexc.to_string exc) ;
         Lwt.return_unit)
 
@@ -786,7 +788,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun () -> Event.emit ?section ()
+    {name; emit = (fun () -> Event.emit ?section ())}
 
   let declare_1 (type a) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) =
@@ -814,7 +816,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameter -> Event.emit ?section parameter
+    {name; emit = (fun parameter -> Event.emit ?section parameter)}
 
   let declare_2 (type a b) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -850,7 +852,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section parameters
+    {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
   let declare_3 (type a b c) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -889,7 +891,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section parameters
+    {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
   let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -932,7 +934,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section parameters
+    {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
   let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -980,7 +982,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section parameters
+    {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
   let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1031,7 +1033,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section parameters
+    {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
   let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1087,7 +1089,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section parameters
+    {name; emit = (fun parameters -> Event.emit ?section parameters)}
 
   let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1146,7 +1148,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section parameters
+    {name; emit = (fun parameters -> Event.emit ?section parameters)}
 end
 
 module Lwt_worker_logger = struct
