@@ -555,23 +555,6 @@ let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
   let* () = if wait_ready then wait_for_ready node else unit in
   return ()
 
-let run_sequencer ?event_level ?event_sections_levels ?(allow_degraded = false)
-    ?(wait_ready = true) node rollup_address extra_arguments =
-  let cmd =
-    ["run"; "for"; rollup_address; "with"; "operator"]
-    @ operators_params node
-    @ common_node_args
-        ~loser_mode:None
-        ~allow_degraded
-        node
-        ~gc_frequency:None
-        ~history_mode:None
-    @ extra_arguments
-  in
-  let* () = do_runlike_command ?event_level ?event_sections_levels node cmd in
-  let* () = if wait_ready then wait_for_ready node else unit in
-  return ()
-
 let spawn_run ?loser_mode ?(allow_degraded = false)
     ?(gc_frequency = 1 (* Make GC run more frequently for tests *))
     ?(history_mode = Full) node rollup_address extra_arguments =
