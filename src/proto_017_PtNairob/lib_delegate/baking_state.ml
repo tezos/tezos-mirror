@@ -303,8 +303,8 @@ type level_state = {
 type phase =
   | Idle
   | Awaiting_preendorsements
-  | Awaiting_application
   | Awaiting_endorsements
+  | Awaiting_application
 
 let phase_encoding =
   let open Data_encoding in
@@ -340,8 +340,7 @@ let phase_encoding =
 type round_state = {
   current_round : Round.t;
   current_phase : phase;
-  delayed_prequorum :
-    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+  delayed_quorum : Kind.endorsement operation list option;
 }
 
 type state = {
@@ -864,15 +863,16 @@ let pp_phase fmt = function
   | Awaiting_application -> Format.fprintf fmt "awaiting application"
   | Awaiting_endorsements -> Format.fprintf fmt "awaiting endorsements"
 
-let pp_round_state fmt {current_round; current_phase; delayed_prequorum} =
+let pp_round_state fmt {current_round; current_phase; delayed_quorum} =
   Format.fprintf
     fmt
-    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed prequorum: %b@]"
+    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed quorum: %a@]"
     Round.pp
     current_round
     pp_phase
     current_phase
-    (Option.is_some delayed_prequorum)
+    (pp_option Format.pp_print_int)
+    (Option.map List.length delayed_quorum)
 
 let pp fmt {global_state; level_state; round_state} =
   Format.fprintf

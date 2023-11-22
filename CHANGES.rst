@@ -73,6 +73,10 @@ Client
 Baker
 -----
 
+- Made the baker attest as soon as the pre-attestation quorum is
+  reached instead of waiting for the chain's head to be fully
+  applied (MR :gl:`!10554`)
+
 Accuser
 -------
 

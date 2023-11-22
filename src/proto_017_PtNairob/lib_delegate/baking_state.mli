@@ -141,16 +141,15 @@ type level_state = {
 type phase =
   | Idle
   | Awaiting_preendorsements
-  | Awaiting_application
   | Awaiting_endorsements
+  | Awaiting_application
 
 val phase_encoding : phase Data_encoding.t
 
 type round_state = {
   current_round : Round.t;
   current_phase : phase;
-  delayed_prequorum :
-    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+  delayed_quorum : Kind.endorsement operation list option;
 }
 
 type state = {
