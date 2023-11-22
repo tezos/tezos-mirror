@@ -119,6 +119,7 @@ tx_kernel_dal.wasm
 tx-demo-collector
 dal_echo_kernel.wasm
 risc-v-dummy.elf
+sequencer.wasm
 
 # Terraform
 
