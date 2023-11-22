@@ -551,10 +551,6 @@ let create ?(monitor_node_operations = true)
     match result with
     | Error err -> Events.(emit loop_failed err)
     | Ok (head, operation_stream, op_stream_stopper) ->
-        (* request distant mempools (note: the node might not have
-           received the full mempools, but just the deltas with respect
-           to the last time the mempools where sent) *)
-        let* _ = Alpha_block_services.Mempool.request_operations cctxt () in
         let* () = Events.(emit starting_new_monitoring ()) in
         state.canceler <- Lwt_canceler.create () ;
         Lwt_canceler.on_cancel state.canceler (fun () ->
