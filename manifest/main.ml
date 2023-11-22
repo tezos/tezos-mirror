@@ -8382,6 +8382,9 @@ let evm_node_lib_dev =
         octez_context_sigs;
         octez_context_disk;
         octez_context_encoding;
+        octez_scoru_wasm;
+        octez_scoru_wasm_helpers |> open_;
+        octez_scoru_wasm_debugger_lib |> open_;
       ]
 
 let _octez_evm_node_tests =
