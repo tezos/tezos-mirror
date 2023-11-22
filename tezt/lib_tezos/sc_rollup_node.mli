@@ -183,22 +183,6 @@ val run :
   string list ->
   unit Lwt.t
 
-(** [run_sequencer ?event_level ?event_sections_levels ?allow_degraded
-    ?wait_ready node rollup_address arguments] launches the sequencer node for
-    the rollup at [rollup_address] with the given extra arguments.
-    [event_level] and [event_sections_levels] allow to select which events we
-    want the node to emit (see {!Daemon}).  If [wait_ready] is [false], tezt
-    does not wait for the node to be ready. *)
-val run_sequencer :
-  ?event_level:Daemon.Level.default_level ->
-  ?event_sections_levels:(string * Daemon.Level.level) list ->
-  ?allow_degraded:bool ->
-  ?wait_ready:bool ->
-  t ->
-  string ->
-  string list ->
-  unit Lwt.t
-
 (** [spawn_run ?loser_mode ?allow_degraded node ?gc_frequency ?history_mode
     rollup_address arguments] is a lightweight version of {!run} that spawns a
     process. *)
