@@ -153,7 +153,13 @@ let process node =
   | Running {process; _} -> Some process
   | Not_running -> None
 
-let name sc_node = sc_node.name
+let write_in_stdin rollup_node str =
+  match rollup_node.status with
+  | Running {stdin; _} -> Lwt_io.write stdin Format.(sprintf "%s\n%!" str)
+  | Not_running ->
+      Test.fail
+        "Smart rollup node %s is not running, cannot write in stdin"
+        (name rollup_node)
 
 let color sc_node = sc_node.color
 
@@ -501,8 +507,8 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     ~on_terminate
 
 let run ?(legacy = false) ?(restart = false) ?mode ?event_level
-    ?event_sections_levels ~loser_mode ~allow_degraded ~gc_frequency
-    ~history_mode node rollup_address extra_arguments =
+    ?event_sections_levels ?password_file ~loser_mode ~allow_degraded
+    ~gc_frequency ~history_mode node rollup_address extra_arguments =
   let* () = if restart then terminate node else return () in
   let cmd =
     if legacy then
@@ -529,14 +535,16 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
       let final_mode =
         match mode with Some m -> string_of_mode m | None -> default_mode
       in
-      ["run"; final_mode] @ args @ extra_arguments
+      Cli_arg.optional_arg "password-filename" Fun.id password_file
+      @ ["run"; final_mode] @ args @ extra_arguments
   in
   do_runlike_command ?event_level ?event_sections_levels node cmd
 
 let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
     ?(allow_degraded = false)
     ?(gc_frequency = 1 (* Make GC run more frequently for tests *))
-    ?(history_mode = Full) ?(wait_ready = true) node rollup_address arguments =
+    ?(history_mode = Full) ?(wait_ready = true) ?password_file node
+    rollup_address arguments =
   let* () =
     run
       ?legacy
@@ -544,6 +552,7 @@ let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
       ?mode
       ?event_level
       ?event_sections_levels
+      ?password_file
       ~loser_mode
       ~allow_degraded
       ~gc_frequency:(Some gc_frequency)
