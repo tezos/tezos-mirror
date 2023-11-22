@@ -175,15 +175,19 @@ fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) {
 }
 
 impl<'a> Micheline<'a> {
-    /// Serialize value.
-    #[allow(dead_code)] // Until we add PACK
-    fn encode(&self) -> Vec<u8> {
+    /// Serialize a value.
+    pub fn encode(&self) -> Vec<u8> {
         self.encode_starting_with(&[])
+    }
+
+    /// Serialize a value like PACK does.
+    pub fn encode_for_pack(&self) -> Vec<u8> {
+        self.encode_starting_with(&[0x05])
     }
 
     /// Like [Value::encode], but allows specifying a prefix, useful for
     /// `PACK` implementation.
-    fn encode_starting_with(&self, start_bytes: &[u8]) -> Vec<u8> {
+    pub fn encode_starting_with(&self, start_bytes: &[u8]) -> Vec<u8> {
         let mut out = Vec::from(start_bytes);
         encode_micheline(self, &mut out);
         out
