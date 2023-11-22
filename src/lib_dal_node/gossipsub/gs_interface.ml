@@ -87,7 +87,7 @@ module Worker_config :
      and type GS.Span.t = Types.Span.t
      and type GS.Time.t = Types.Time.t
      and type 'a Monad.t = 'a Lwt.t = struct
-  module GS = Tezos_gossipsub.Make (Automaton_config)
+  module GS = Tezos_gossipsub.Automaton (Automaton_config)
   module Monad = Monad
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5596

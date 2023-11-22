@@ -25,7 +25,7 @@
 
 module Gossipsub_intf = Gossipsub_intf
 
-module Make (C : Gossipsub_intf.AUTOMATON_CONFIG) :
+module Automaton (C : Gossipsub_intf.AUTOMATON_CONFIG) :
   Gossipsub_intf.AUTOMATON
     with type Time.t = C.Time.t
      and type Span.t = C.Time.span

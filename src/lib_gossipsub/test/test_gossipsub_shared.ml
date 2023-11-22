@@ -170,7 +170,7 @@ module Automaton_config :
 end
 
 module C = Automaton_config
-module GS = Tezos_gossipsub.Make (C)
+module GS = Tezos_gossipsub.Automaton (C)
 
 let pp_per_topic_score_limits =
   Fmt.Dump.record
