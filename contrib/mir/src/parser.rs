@@ -23,12 +23,10 @@ pub enum ParserError {
     DuplicateField(Prim),
 }
 
-#[allow(dead_code)]
-pub fn parse(src: &str) -> Result<ParsedInstructionBlock, ParseError<usize, Tok, ParserError>> {
-    syntax::InstructionBlockParser::new().parse(spanned_lexer(src))
+pub fn parse(src: &str) -> Result<ParsedInstruction, ParseError<usize, Tok, ParserError>> {
+    syntax::InstructionParser::new().parse(spanned_lexer(src))
 }
 
-#[allow(dead_code)]
 pub fn parse_contract_script(
     src: &str,
 ) -> Result<ContractScript<ParsedStage>, ParseError<usize, Tok, ParserError>> {
@@ -101,36 +99,30 @@ mod tests {
     #[test]
     fn pair_type() {
         assert_eq!(
-            parse("{ PUSH (pair int nat) Unit }").unwrap(),
-            vec![Instruction::Push((
-                Type::new_pair(Type::Int, Type::Nat),
-                Value::Unit
-            ))]
+            parse("PUSH (pair int nat) Unit").unwrap(),
+            Instruction::Push((Type::new_pair(Type::Int, Type::Nat), Value::Unit))
         );
         assert_eq!(
-            parse("{ PUSH (pair int nat unit) Unit }").unwrap(),
-            vec![Instruction::Push((
+            parse("PUSH (pair int nat unit) Unit").unwrap(),
+            Instruction::Push((
                 Type::new_pair(Type::Int, Type::new_pair(Type::Nat, Type::Unit)),
                 Value::Unit
-            ))]
+            ))
         );
         assert_eq!(
-            parse("{ PUSH (pair (pair int nat) unit) Unit }").unwrap(),
-            vec![Instruction::Push((
+            parse("PUSH (pair (pair int nat) unit) Unit").unwrap(),
+            Instruction::Push((
                 Type::new_pair(Type::new_pair(Type::Int, Type::Nat), Type::Unit),
                 Value::Unit
-            ))]
+            ))
         );
     }
 
     #[test]
     fn or_type() {
         assert_eq!(
-            parse("{ PUSH (or int nat) Unit }").unwrap(),
-            vec![Instruction::Push((
-                Type::new_or(Type::Int, Type::Nat),
-                Value::Unit
-            ))]
+            parse("PUSH (or int nat) Unit").unwrap(),
+            Instruction::Push((Type::new_or(Type::Int, Type::Nat), Value::Unit))
         );
         // unlike for pairs, there's no linearized syntax for `or`
         assert_eq!(
@@ -144,31 +136,31 @@ mod tests {
     #[test]
     fn pair_value() {
         assert_eq!(
-            parse("{ PUSH unit (Pair 3 4) }").unwrap(),
-            vec![Instruction::Push((
+            parse("PUSH unit (Pair 3 4)").unwrap(),
+            Instruction::Push((
                 Type::Unit,
                 Value::new_pair(Value::Number(3), Value::Number(4)),
-            ))]
+            ))
         );
         assert_eq!(
-            parse("{ PUSH unit (Pair 3 4 5) }").unwrap(),
-            vec![Instruction::Push((
+            parse("PUSH unit (Pair 3 4 5)").unwrap(),
+            Instruction::Push((
                 Type::Unit,
                 Value::new_pair(
                     Value::Number(3),
                     Value::new_pair(Value::Number(4), Value::Number(5)),
                 ),
-            ))]
+            ))
         );
         assert_eq!(
-            parse("{ PUSH unit (Pair (Pair 3 4) 5) }").unwrap(),
-            vec![Instruction::Push((
+            parse("PUSH unit (Pair (Pair 3 4) 5)").unwrap(),
+            Instruction::Push((
                 Type::Unit,
                 Value::new_pair(
                     Value::new_pair(Value::Number(3), Value::Number(4)),
                     Value::Number(5),
                 ),
-            ))]
+            ))
         );
         assert!(parse("{ PUSH pair unit unit Pair Unit Unit }")
             .unwrap_err()
@@ -183,19 +175,19 @@ mod tests {
     #[test]
     fn or_value() {
         assert_eq!(
-            parse("{ PUSH (or int unit) (Left 3) }").unwrap(),
-            vec![Instruction::Push((
+            parse("PUSH (or int unit) (Left 3)").unwrap(),
+            Instruction::Push((
                 Type::new_or(Type::Int, Type::Unit),
                 Value::new_or(Or::Left(Value::Number(3))),
-            ))]
+            ))
         );
     }
 
     #[test]
     fn value_parens() {
         assert_eq!(
-            parse("{ PUSH unit (Unit) }").unwrap(),
-            vec![Instruction::Push((Type::Unit, Value::Unit))]
+            parse("PUSH unit (Unit)").unwrap(),
+            Instruction::Push((Type::Unit, Value::Unit))
         );
     }
 
@@ -239,12 +231,12 @@ mod tests {
         use Type as T;
         use Value as V;
         assert_eq!(
-            parse("{PUSH @var :ty %field int 1}").unwrap(),
-            vec![Push((T::Int, V::Number(1)))],
+            parse("PUSH @var :ty %field int 1").unwrap(),
+            Push((T::Int, V::Number(1))),
         );
         assert_eq!(
-            parse("{CAR @var :ty %field :ty.2 @var.2 %field.2}").unwrap(),
-            vec![Car],
+            parse("CAR @var :ty %field :ty.2 @var.2 %field.2").unwrap(),
+            Car,
         );
     }
 
