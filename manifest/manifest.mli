@@ -1233,6 +1233,11 @@ val open_ : ?m:string -> target -> target
     Example: [tezos_base |> open_if protocol_is_recent_enough] *)
 val open_if : ?m:string -> bool -> target -> target
 
+(** Selectively makes a dependency available to the library's users:
+    extends to [(re_export <target's name>)] inside a dependency
+    stanza. *)
+val re_export : target -> target
+
 (** Add a dependency to a profile.
 
     See the documentation of the [?profile] argument of target makers for

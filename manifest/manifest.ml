@@ -1267,14 +1267,14 @@ module Target = struct
     | External of external_
     | Opam_only of opam_only
     | Optional of t
+    | Re_export of t  (** Stanza [(re_export <t>)] *)
     | Select of select
     | Open of t * string
 
   let rec get_internal = function
     | Internal i -> Some i
-    | Optional t -> get_internal t
-    | Open (t, _) -> get_internal t
-    | Select {package; _} -> get_internal package
+    | Optional t | Re_export t | Open (t, _) | Select {package = t; _} ->
+        get_internal t
     | Vendored _ -> None
     | External _ -> None
     | Opam_only _ -> None
@@ -1349,13 +1349,19 @@ module Target = struct
   (* Note: this function is redefined below for the version with optional targets. *)
   let rec name_for_errors = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         name_for_errors target
     | Internal {kind; _} -> kind_name_for_errors kind
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         names_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -1367,7 +1373,10 @@ module Target = struct
 
   let rec library_name_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> Ok name
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         library_name_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -1471,10 +1480,12 @@ module Target = struct
               | Vendored {npm_deps; _} ->
                   let seen = String_set.add name seen in
                   (seen, List.map Npm.node_preload npm_deps @ acc)
-              | Select {package; _} -> loop (seen, acc) package
               | Opam_only _ -> (seen, acc)
-              | Optional t -> loop (seen, acc) t
-              | Open (t, _) -> loop (seen, acc) t)
+              | Optional target
+              | Re_export target
+              | Select {package = target; _}
+              | Open (target, _) ->
+                  loop (seen, acc) target)
       and loops (seen, acc) deps =
         List.fold_left
           (fun (seen, acc) x -> loop (seen, acc) x)
@@ -1514,7 +1525,8 @@ module Target = struct
     let opens =
       let rec get_opens acc = function
         | Internal _ | Vendored _ | External _ | Opam_only _ -> acc
-        | Optional target | Select {package = target; _} -> get_opens acc target
+        | Optional target | Re_export target | Select {package = target; _} ->
+            get_opens acc target
         | Open (target, module_name) -> get_opens (module_name :: acc) target
       in
       List.flatten (List.map (get_opens []) deps)
@@ -2015,6 +2027,10 @@ module Target = struct
         invalid_arg
           "Target.external_sublib: Optional should be used in dependency \
            lists, not when registering"
+    | Re_export _ ->
+        invalid_arg
+          "Target.external_sublib: Re_export should be used in dependency \
+           lists, not when registering"
     | Select _ ->
         invalid_arg
           "Target.external_sublib: Select should be used in dependency lists, \
@@ -2044,7 +2060,10 @@ module Target = struct
                 "Manifest.open_: cannot be used on executable and test targets \
                  (such as %s)"
                 (name_for_errors target))
-      | Optional target | Select {package = target; _} | Open (target, _) ->
+      | Optional target
+      | Re_export target
+      | Select {package = target; _}
+      | Open (target, _) ->
           main_module_name target
       | Vendored {main_module = Some main_module; _}
       | External {main_module = Some main_module; _} ->
@@ -2076,6 +2095,10 @@ module Target = struct
 
   let open_if ?m condition target =
     if condition then open_ ?m target else target
+
+  let re_export = function
+    | None -> None
+    | Some target -> Some (Re_export target)
 
   let select ~package ~source_if_present ~source_if_absent ~target =
     match package with
@@ -2553,6 +2576,7 @@ let generate_dune (internal : Target.internal) =
               [H [S name; S "->"; S empty_name]];
               [H [S "->"; S empty_name]];
             ]
+      | Re_export _ -> Dune.[G [S "re_export"; S name]]
       | Select {package = _; source_if_present; source_if_absent; target} ->
           Dune.
             [
@@ -3037,7 +3061,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
            ~with_test
            ~optional
            target)
-  | Open (target, _) ->
+  | Re_export target | Open (target, _) ->
       as_opam_dependency
         ~for_release
         ~for_conflicts
@@ -3429,8 +3453,11 @@ let generate_package_json_file () =
     | External {npm_deps; _} | Vendored {npm_deps; _} | Internal {npm_deps; _}
       ->
         List.iter add npm_deps
-    | Optional internal -> collect internal
-    | Select {package; _} | Open (package, _) -> collect package
+    | Optional package
+    | Re_export package
+    | Select {package; _}
+    | Open (package, _) ->
+        collect package
     | Opam_only _ -> ()
   in
   Target.iter_internal_by_path (fun _path internals ->
@@ -3620,8 +3647,11 @@ let check_js_of_ocaml () =
     | Internal ({js_compatible; _} as internal) ->
         if not js_compatible then
           missing_jsoo_for_target ~used_by (internal_name internal)
-    | Optional internal -> check_target ~used_by internal
-    | Select {package; _} | Open (package, _) -> check_target ~used_by package
+    | Optional package
+    | Re_export package
+    | Select {package; _}
+    | Open (package, _) ->
+        check_target ~used_by package
     | Opam_only _ -> (* irrelevent to this check *) ()
   in
   let check_internal (internal : Target.internal) =
@@ -3963,7 +3993,10 @@ let generate_profiles ~default_profile =
         (* This corresponds to libs from the stdlib, like dynlink, compiler-libs etc.
            There is no opam package to add to the lock file. *)
         ()
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         add_target_to deps profile target
   in
   String_map.iter
