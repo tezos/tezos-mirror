@@ -93,7 +93,10 @@ end
 
 module type S = sig
   val migrate :
-    storage_dir:string -> index_buffer_size:int -> unit tzresult Lwt.t
+    Metadata.t ->
+    storage_dir:string ->
+    index_buffer_size:int ->
+    unit tzresult Lwt.t
 end
 
 let migrations = Stdlib.Hashtbl.create 7
@@ -113,7 +116,7 @@ module Make
          Store_version.pp
          S_dest.version
 
-  let migrate ~storage_dir ~index_buffer_size =
+  let migrate metadata ~storage_dir ~index_buffer_size =
     let open Lwt_result_syntax in
     let* source_store =
       S_from.load
@@ -151,6 +154,14 @@ module Make
     let run_migration () =
       let* () =
         S_from.iter_l2_blocks
+          ~progress:
+            (Format.asprintf
+               "Migrating store from %a to %a"
+               Store_version.pp
+               S_from.version
+               Store_version.pp
+               S_dest.version)
+          metadata
           source_store
           (Actions.migrate_block_action source_store dest_store)
       in
@@ -182,8 +193,7 @@ let migration_path ~from ~dest =
       (* Recursively look for migration sub-paths *)
       let paths =
         List.filter_map
-          (fun (step, migration) ->
-            path ((from, step, migration) :: acc) step dest)
+          (fun (step, migration) -> path (migration :: acc) step dest)
           first_steps
       in
       (* Choose shortest migration path *)
@@ -191,7 +201,7 @@ let migration_path ~from ~dest =
   in
   path [] from dest
 
-let maybe_run_migration ~storage_dir ~index_buffer_size =
+let maybe_run_migration metadata ~storage_dir ~index_buffer_size =
   let open Lwt_result_syntax in
   let* current_version = version_of_store ~storage_dir ~index_buffer_size in
   let last_version = Store.version in
@@ -221,14 +231,7 @@ let maybe_run_migration ~storage_dir ~index_buffer_size =
           Format.printf "Starting store migration@." ;
           let+ () =
             List.iter_es
-              (fun (vx, vy, migrate) ->
-                Format.printf
-                  "- Migrating store from %a to %a@."
-                  Store_version.pp
-                  vx
-                  Store_version.pp
-                  vy ;
-                migrate ~storage_dir ~index_buffer_size)
+              (fun migrate -> migrate metadata ~storage_dir ~index_buffer_size)
               migrations
           in
           Format.printf "Store migration completed@.")

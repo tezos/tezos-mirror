@@ -60,10 +60,16 @@ module type S = sig
   (** [readonly store] returns a read-only version of [store]. *)
   val readonly : _ t -> ro
 
-  (** [iter_l2_blocks store f] iterates [f] on all L2 blocks reachable from the
-      head, from newest to oldest.  *)
+  (** [iter_l2_blocks ?progress metadata store f] iterates [f] on all L2 blocks
+      reachable from the head, from newest to oldest. If [progress] is provided,
+      a progress bar is displayed with the progress messages during the
+      iteration. *)
   val iter_l2_blocks :
-    _ t -> (Sc_rollup_block.t -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+    ?progress:string ->
+    Metadata.t ->
+    _ t ->
+    (Sc_rollup_block.t -> unit tzresult Lwt.t) ->
+    unit tzresult Lwt.t
 
   (** [gc store ~level] asynchronously garbage collects everything from the
       store that concerns blocks for levels below [level]. *)

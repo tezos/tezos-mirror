@@ -466,7 +466,14 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     history_mode;
   }
 
-let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
+let first_available_level metadata store =
+  let open Lwt_result_syntax in
+  let* gc_levels = Gc_levels.read store.gc_levels in
+  match gc_levels with
+  | Some {first_available_level; _} -> return first_available_level
+  | None -> return metadata.Metadata.genesis_info.level
+
+let iter_l2_blocks ?progress metadata ({l2_blocks; l2_head; _} as store) f =
   let open Lwt_result_syntax in
   let* head = L2_head.read l2_head in
   match head with
@@ -474,6 +481,20 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
       (* No reachable head, nothing to do *)
       return_unit
   | Some head ->
+      let* track_progress =
+        match progress with
+        | None -> return (fun f -> f (fun _ -> Lwt.return_unit))
+        | Some message ->
+            let+ first_level = first_available_level metadata store in
+            let progress_bar =
+              let total =
+                Int32.sub head.header.level first_level |> Int32.to_int
+              in
+              Progress_bar.progress_bar ~counter:`Int ~message total
+            in
+            fun f -> Progress_bar.Lwt.with_reporter progress_bar f
+      in
+      track_progress @@ fun count_progress ->
       let rec loop hash =
         let* block = L2_blocks.read l2_blocks hash in
         match block with
@@ -482,6 +503,7 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
             return_unit
         | Some (block, header) ->
             let* () = f {block with header} in
+            let*! () = count_progress 1 in
             loop header.predecessor
       in
       loop head.header.block_hash
