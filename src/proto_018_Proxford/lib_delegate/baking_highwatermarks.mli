@@ -49,20 +49,18 @@ val may_sign_block :
   bool tzresult Lwt.t
 
 val may_sign_preattestation :
-  #Protocol_client_context.full ->
-  [`Highwatermarks] Baking_files.location ->
+  t ->
   delegate:Signature.public_key_hash ->
   level:int32 ->
   round:Round.t ->
-  bool tzresult Lwt.t
+  bool
 
 val may_sign_attestation :
-  #Protocol_client_context.full ->
-  [`Highwatermarks] Baking_files.location ->
+  t ->
   delegate:Signature.public_key_hash ->
   level:int32 ->
   round:Round.t ->
-  bool tzresult Lwt.t
+  bool
 
 val record_block :
   #Protocol_client_context.full ->
@@ -84,6 +82,24 @@ val record_attestation :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
   delegate:Signature.public_key_hash ->
+  level:int32 ->
+  round:Round.t ->
+  unit tzresult Lwt.t
+
+val record_all_preattestations :
+  t ->
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegates:public_key_hash list ->
+  level:int32 ->
+  round:Round.t ->
+  unit tzresult Lwt.t
+
+val record_all_attestations :
+  t ->
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegates:public_key_hash list ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t

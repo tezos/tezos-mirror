@@ -370,7 +370,8 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     emit block_injected (bh, signed_block_header.shell.level, round, delegate))
   >>= fun () -> return updated_state
 
-let inject_preendorsements state ~preendorsements =
+let sign_consensus_votes state operations kind =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   (* N.b. signing a lot of operations may take some time *)
@@ -379,140 +380,163 @@ let inject_preendorsements state ~preendorsements =
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
-  List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
-      Events.(emit signing_preendorsement delegate) >>= fun () ->
-      let shell =
-        (* The branch is the latest finalized block. *)
-        {
-          Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.shell.predecessor;
-        }
-      in
-      let contents = Single (Preendorsement consensus_content) in
+  (* Hypothesis: all consensus votes have the same round and level *)
+  match operations with
+  | [] -> return_nil
+  | (_, (consensus_content : consensus_content)) :: _ ->
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
-      let sk_uri = consensus_key.secret_key_uri in
-      cctxt#with_lock (fun () ->
-          Baking_highwatermarks.may_sign_preendorsement
+      (* Filter all operations that don't satisfy the highwatermark *)
+      let* authorized_consensus_votes =
+        cctxt#with_lock @@ fun () ->
+        let* highwatermarks = Baking_highwatermarks.load cctxt block_location in
+        let may_sign_consensus_vote =
+          match kind with
+          | `Preendorsement -> Baking_highwatermarks.may_sign_preendorsement
+          | `Endorsement -> Baking_highwatermarks.may_sign_endorsement
+        in
+        let*! authorized_operations =
+          List.filter_s
+            (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
+              let may_sign =
+                may_sign_consensus_vote
+                  highwatermarks
+                  ~delegate:consensus_key.public_key_hash
+                  ~level
+                  ~round
+              in
+              if may_sign || state.global_state.config.force then
+                Lwt.return_true
+              else
+                let*! () =
+                  match kind with
+                  | `Preendorsement ->
+                      Events.(
+                        emit
+                          skipping_preendorsement
+                          ( delegate,
+                            [
+                              Baking_highwatermarks.Block_previously_preendorsed
+                                {round; level};
+                            ] ))
+                  | `Endorsement ->
+                      Events.(
+                        emit
+                          skipping_endorsement
+                          ( delegate,
+                            [
+                              Baking_highwatermarks.Block_previously_endorsed
+                                {round; level};
+                            ] ))
+                in
+                Lwt.return_false)
+            operations
+        in
+        (* Record all consensus votes new highwatermarks as one batch *)
+        let* () =
+          let delegates =
+            List.map
+              (fun ((ck, _), _) -> ck.public_key_hash)
+              authorized_operations
+          in
+          let record_all_consensus_vote =
+            match kind with
+            | `Preendorsement ->
+                Baking_highwatermarks.record_all_preendorsements
+            | `Endorsement -> Baking_highwatermarks.record_all_endorsements
+          in
+          record_all_consensus_vote
+            highwatermarks
             cctxt
             block_location
-            ~delegate:consensus_key.public_key_hash
+            ~delegates
             ~level
             ~round
-          >>=? function
-          | true ->
-              Baking_highwatermarks.record_preendorsement
-                cctxt
-                block_location
-                ~delegate:consensus_key.public_key_hash
-                ~level
-                ~round
-              >>=? fun () -> return_true
-          | false -> return state.global_state.config.force)
-      >>=? fun may_sign ->
-      (if may_sign then
-       let unsigned_operation = (shell, Contents_list contents) in
-       let watermark = Operation.(to_watermark (Preendorsement chain_id)) in
-       let unsigned_operation_bytes =
-         Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
-           unsigned_operation
-       in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-      else
-        fail (Baking_highwatermarks.Block_previously_preendorsed {round; level}))
-      >>= function
-      | Error err ->
-          Events.(emit skipping_preendorsement (delegate, err)) >>= fun () ->
-          return_none
-      | Ok signature ->
-          let protocol_data =
-            Operation_data {contents; signature = Some signature}
+        in
+        return authorized_operations
+      in
+      let forge_and_sign_consensus_vote : type a. _ -> a contents_list -> _ =
+       fun ((consensus_key, _) as delegate) contents ->
+        let shell =
+          (* The branch is the latest finalized block. *)
+          {
+            Tezos_base.Operation.branch =
+              state.level_state.latest_proposal.predecessor.shell.predecessor;
+          }
+        in
+        let watermark =
+          match kind with
+          | `Preendorsement ->
+              Operation.(to_watermark (Preendorsement chain_id))
+          | `Endorsement -> Operation.(to_watermark (Endorsement chain_id))
+        in
+        let unsigned_operation = (shell, Contents_list contents) in
+        let unsigned_operation_bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Operation.unsigned_encoding
+            unsigned_operation
+        in
+        let level = Raw_level.to_int32 consensus_content.level in
+        let round = consensus_content.round in
+        let sk_uri = consensus_key.secret_key_uri in
+        Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+        >>= function
+        | Error err ->
+            (match kind with
+            | `Preendorsement ->
+                Events.(emit skipping_preendorsement (delegate, err))
+            | `Endorsement -> Events.(emit skipping_endorsement (delegate, err)))
+            >>= fun () -> return_none
+        | Ok signature ->
+            let protocol_data =
+              Operation_data {contents; signature = Some signature}
+            in
+            let operation : Operation.packed = {shell; protocol_data} in
+            return_some (delegate, operation, level, round)
+      in
+      List.filter_map_es
+        (fun (delegate, consensus_content) ->
+          let event =
+            match kind with
+            | `Preendorsement -> Events.signing_preendorsement
+            | `Endorsement -> Events.signing_endorsement
           in
-          let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation, level, round))
-    preendorsements
-  >>=? fun signed_operations ->
+          Events.(emit event delegate) >>= fun () ->
+          match kind with
+          | `Endorsement ->
+              forge_and_sign_consensus_vote
+                delegate
+                (Single (Endorsement consensus_content))
+          | `Preendorsement ->
+              forge_and_sign_consensus_vote
+                delegate
+                (Single (Preendorsement consensus_content)))
+        authorized_consensus_votes
+
+let inject_consensus_vote state preendorsements kind =
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  sign_consensus_votes state preendorsements kind >>=? fun signed_operations ->
   (* TODO: add a RPC to inject multiple operations *)
+  let fail_inject_event, injected_event =
+    match kind with
+    | `Preendorsement ->
+        (Events.failed_to_inject_preendorsement, Events.preendorsement_injected)
+    | `Endorsement ->
+        (Events.failed_to_inject_endorsement, Events.endorsement_injected)
+  in
   List.iter_ep
     (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
-          Events.(emit failed_to_inject_preendorsement (delegate, err))
-          >>= fun () -> return_unit)
+          Events.(emit fail_inject_event (delegate, err)) >>= fun () ->
+          return_unit)
         (fun () ->
           Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           >>=? fun oph ->
-          Events.(emit preendorsement_injected (oph, delegate, level, round))
+          Events.(emit injected_event (oph, delegate, level, round))
           >>= fun () -> return_unit))
     signed_operations
-
-let sign_endorsements state endorsements =
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  (* N.b. signing a lot of operations may take some time *)
-  (* Don't parallelize signatures: the signer might not be able to
-     handle concurrent requests *)
-  let block_location =
-    Baking_files.resolve_location ~chain_id `Highwatermarks
-  in
-  List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
-      Events.(emit signing_endorsement delegate) >>= fun () ->
-      let shell =
-        (* The branch is the latest finalized block. *)
-        {
-          Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.shell.predecessor;
-        }
-      in
-      let contents =
-        (* No preendorsements are included *)
-        Single (Endorsement consensus_content)
-      in
-      let level = Raw_level.to_int32 consensus_content.level in
-      let round = consensus_content.round in
-      let sk_uri = consensus_key.secret_key_uri in
-      cctxt#with_lock (fun () ->
-          Baking_highwatermarks.may_sign_endorsement
-            cctxt
-            block_location
-            ~delegate:consensus_key.public_key_hash
-            ~level
-            ~round
-          >>=? function
-          | true ->
-              Baking_highwatermarks.record_endorsement
-                cctxt
-                block_location
-                ~delegate:consensus_key.public_key_hash
-                ~level
-                ~round
-              >>=? fun () -> return_true
-          | false -> return state.global_state.config.force)
-      >>=? fun may_sign ->
-      (if may_sign then
-       let watermark = Operation.(to_watermark (Endorsement chain_id)) in
-       let unsigned_operation = (shell, Contents_list contents) in
-       let unsigned_operation_bytes =
-         Data_encoding.Binary.to_bytes_exn
-           Operation.unsigned_encoding
-           unsigned_operation
-       in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-      else fail (Baking_highwatermarks.Block_previously_endorsed {round; level}))
-      >>= function
-      | Error err ->
-          Events.(emit skipping_endorsement (delegate, err)) >>= fun () ->
-          return_none
-      | Ok signature ->
-          let protocol_data =
-            Operation_data {contents; signature = Some signature}
-          in
-          let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation, level, round))
-    endorsements
 
 let sign_dal_attestations state attestations =
   let cctxt = state.global_state.cctxt in
@@ -553,24 +577,6 @@ let sign_dal_attestations state attestations =
           return_some
             (delegate, operation, consensus_content.Dal.Attestation.attestation))
     attestations
-
-let inject_endorsements state ~endorsements =
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  sign_endorsements state endorsements >>=? fun signed_operations ->
-  (* TODO: add a RPC to inject multiple operations *)
-  List.iter_ep
-    (fun (delegate, operation, level, round) ->
-      protect
-        ~on_error:(fun err ->
-          Events.(emit failed_to_inject_endorsement (delegate, err))
-          >>= fun () -> return_unit)
-        (fun () ->
-          Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
-          >>=? fun oph ->
-          Events.(emit endorsement_injected (oph, delegate, level, round))
-          >>= fun () -> return_unit))
-    signed_operations
 
 let inject_dal_attestations state attestations =
   let cctxt = state.global_state.cctxt in
@@ -779,11 +785,11 @@ let rec perform_action ~state_recorder state (action : action) =
   | Inject_block {block_to_bake; updated_state} ->
       inject_block state ~state_recorder block_to_bake ~updated_state
   | Inject_preendorsements {preendorsements} ->
-      inject_preendorsements state ~preendorsements >>=? fun () ->
+      inject_consensus_vote state preendorsements `Preendorsement >>=? fun () ->
       perform_action ~state_recorder state Watch_proposal
   | Inject_endorsements {endorsements} ->
       state_recorder ~new_state:state >>=? fun () ->
-      inject_endorsements state ~endorsements >>=? fun () ->
+      inject_consensus_vote state endorsements `Endorsement >>=? fun () ->
       (* We wait for endorsements to trigger the [Quorum_reached]
          event *)
       start_waiting_for_endorsement_quorum state >>= fun () ->
