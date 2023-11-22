@@ -138,13 +138,18 @@ pub enum TypedValue {
     Operation(Box<OperationInfo>),
 }
 
-pub fn typed_value_to_value_optimized<'a>(
+/// Untypes a value using optimized representation in legacy mode.
+///
+/// This differs from plain optimized representation in that it always
+/// represents tuples as nested binary pairs (right combs). This is, for
+/// instance, what `PACK` uses.
+pub fn typed_value_to_value_optimized_legacy<'a>(
     arena: &'a Arena<Micheline<'a>>,
     tv: TypedValue,
 ) -> Micheline<'a> {
     use Micheline as V;
     use TypedValue as TV;
-    let go = |x| typed_value_to_value_optimized(arena, x);
+    let go = |x| typed_value_to_value_optimized_legacy(arena, x);
     match tv {
         TV::Int(i) => V::Int(i),
         TV::Nat(u) => V::Int(u.try_into().unwrap()),
