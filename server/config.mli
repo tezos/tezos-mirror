@@ -34,6 +34,7 @@ type t = {
   admins : (string * string) list;
   users : (string * string) list;
   max_batch_size : int32;
+  with_transaction : bool;
 }
 
 (** Encoding driver for a structure with two required fields: "login" and "password" *)

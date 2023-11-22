@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let maybe_with_transaction (c : Config.t) (module D : Caqti_lwt.CONNECTION) f =
+  if c.with_transaction then D.with_transaction f else f ()
+
 let method_not_allowed_respond meths =
   let headers =
     Cohttp.Header.add_multi
@@ -507,13 +510,14 @@ let block_callback =
           ~body:"Block registered"
           ())
 
-let operations_callback db_pool g source operations =
+let operations_callback conf db_pool g source operations =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         let* () =
+          maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, _) ->
               may_insert_delegate
@@ -522,6 +526,7 @@ let operations_callback db_pool g source operations =
             operations
         in
         let* () =
+          maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, ops) ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -534,6 +539,7 @@ let operations_callback db_pool g source operations =
                 ops)
             operations
         in
+        maybe_with_transaction conf (module Db) @@ fun () ->
         Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
           (fun (right, ops) ->
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -737,12 +743,12 @@ let routes :
               body
               (block_callback db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
-      fun g ~conf:_ ~admins:_ ~users db_pool header meth body ->
+      fun g ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
               Teztale_lib.Consensus_ops.delegate_ops_encoding
               body
-              (operations_callback db_pool g source)) );
+              (operations_callback conf db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/import"],
       fun g ~conf:_ ~admins ~users:_ db_pool header meth body ->
         post_only_endpoint admins header meth (fun _source ->

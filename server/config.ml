@@ -34,6 +34,7 @@ type t = {
   admins : (string * string) list;
   users : (string * string) list;
   max_batch_size : int32;
+  with_transaction : bool;
 }
 
 let tls_conf_encoding =
@@ -73,19 +74,22 @@ let encoding =
            admins;
            users;
            max_batch_size;
+           with_transaction;
          } ->
       ( db_uri,
         network_interfaces,
         public_directory,
         admins,
         users,
-        max_batch_size ))
+        max_batch_size,
+        with_transaction ))
     (fun ( db_uri,
            network_interfaces,
            public_directory,
            admins,
            users,
-           max_batch_size ) ->
+           max_batch_size,
+           with_transaction ) ->
       {
         db_uri;
         network_interfaces;
@@ -93,8 +97,9 @@ let encoding =
         admins;
         users;
         max_batch_size;
+        with_transaction;
       })
-    (obj6
+    (obj7
        (req
           ~description:
             "Uri to reach the database: sqlite3:path or postgresql://host:port"
@@ -110,4 +115,5 @@ let encoding =
           string)
        (req "admins" (list login_encoding))
        (req "users" (list login_encoding))
-       (dft "max_batch_size" int32 0l))
+       (dft "max_batch_size" int32 0l)
+       (dft "with_transaction" bool false))
