@@ -356,14 +356,15 @@ let burn_pseudotokens ctxt (delegator_balances_before : delegator_balances)
     Postcondition:
       result <> 0.
 *)
-let pseudotokens_of (delegate_balances : delegate_balances) tez_amount =
+let pseudotokens_of ~rounding (delegate_balances : delegate_balances) tez_amount
+    =
   assert (
     Staking_pseudotoken_repr.(
       delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
   assert (Tez_repr.(delegate_balances.frozen_deposits_staked_tez <> zero)) ;
   assert (Tez_repr.(tez_amount <> zero)) ;
   Staking_pseudotoken_repr.mul_ratio
-    ~rounding:`Down
+    ~rounding
     delegate_balances.frozen_deposits_pseudotokens
     ~num:(Tez_repr.to_mutez tez_amount)
     ~den:(Tez_repr.to_mutez delegate_balances.frozen_deposits_staked_tez)
@@ -372,12 +373,13 @@ let pseudotokens_of (delegate_balances : delegate_balances) tez_amount =
     Precondition:
       delegate_balances.frozen_deposits_pseudotokens <> 0.
 *)
-let tez_of (delegate_balances : delegate_balances) pseudotoken_amount =
+let tez_of ~rounding (delegate_balances : delegate_balances) pseudotoken_amount
+    =
   assert (
     Staking_pseudotoken_repr.(
       delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
   Tez_repr.mul_ratio
-    ~rounding:`Down
+    ~rounding
     delegate_balances.frozen_deposits_staked_tez
     ~num:(Staking_pseudotoken_repr.to_int64 pseudotoken_amount)
     ~den:
@@ -387,6 +389,9 @@ let tez_of (delegate_balances : delegate_balances) pseudotoken_amount =
 (** [compute_pseudotoken_credit_for_tez_amount delegate_balances
     tez_amount] is a safe wrapper around [pseudotokens_of
     delegate_balances tez_amount].
+
+    Rounding disadvantages newcomer (gets less pseudotokens for the same tez
+    value).
 *)
 let compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount =
   let open Result_syntax in
@@ -407,7 +412,7 @@ let compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount =
        slashing. We forbid this case to avoid having to iterate over
        all stakers to reset their pseudotoken balances. *)
     tzfail Cannot_stake_on_fully_slashed_delegate
-  else pseudotokens_of delegate_balances tez_amount
+  else pseudotokens_of ~rounding:`Down delegate_balances tez_amount
 
 let stake ctxt ~delegator ~delegate tez_amount =
   let open Lwt_result_syntax in
@@ -427,6 +432,8 @@ let stake ctxt ~contract ~delegate tez_amount =
     Lwt_result_syntax.return (ctxt, [])
   else stake ctxt ~delegator:contract ~delegate tez_amount
 
+(*
+   Rounding disadvantages unstaker. *)
 let request_unstake ctxt ~delegator ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* delegate_balances = get_delegate_balances ctxt ~delegate in
@@ -442,40 +449,33 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
       assert (
         Staking_pseudotoken_repr.(
           delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
+      let*? requested_pseudotokens =
+        pseudotokens_of ~rounding:`Up delegate_balances requested_amount
+      in
+      let pseudotokens_to_unstake =
+        Staking_pseudotoken_repr.min
+          requested_pseudotokens
+          delegator_balances.pseudotoken_balance
+      in
+      let*? tez_to_unstake =
+        tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
+      in
       let*? pseudotokens_to_unstake, tez_to_unstake =
         let open Result_syntax in
-        if
-          Tez_repr.(
-            requested_amount >= delegate_balances.frozen_deposits_staked_tez)
-        then
-          (* definitely a full unstake, make sure we can empty the staking
-             balance *)
-          let+ tez_to_unstake =
-            if
-              Staking_pseudotoken_repr.(
-                delegate_balances.frozen_deposits_pseudotokens
-                = delegator_balances.pseudotoken_balance)
-            then
-              (* ...and the frozen deposits if from last staker *)
-              Ok delegate_balances.frozen_deposits_staked_tez
-            else tez_of delegate_balances delegator_balances.pseudotoken_balance
+        if Tez_repr.(tez_to_unstake > requested_amount) then (
+          (* this may happen because of the rounding up of pseudotokens, in
+             this case we resort to unstaking a bit less *)
+          let pseudotokens_to_unstake =
+            match Staking_pseudotoken_repr.pred pseudotokens_to_unstake with
+            | None -> assert false (* by postcondition of pseudotokens_of *)
+            | Some pt -> pt
           in
-          (delegator_balances.pseudotoken_balance, tez_to_unstake)
-        else
-          let* requested_pseudotokens =
-            pseudotokens_of delegate_balances requested_amount
+          let* tez_to_unstake =
+            tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
           in
-          assert (Staking_pseudotoken_repr.(requested_pseudotokens <> zero)) ;
-          (* by postcondition of pseudotokens_of *)
-          if
-            Staking_pseudotoken_repr.(
-              requested_pseudotokens < delegator_balances.pseudotoken_balance)
-          then Ok (requested_pseudotokens, requested_amount)
-          else
-            let+ tez_to_unstake =
-              tez_of delegate_balances delegator_balances.pseudotoken_balance
-            in
-            (delegator_balances.pseudotoken_balance, tez_to_unstake)
+          assert (Tez_repr.(tez_to_unstake <= requested_amount)) ;
+          return (pseudotokens_to_unstake, tez_to_unstake))
+        else return (pseudotokens_to_unstake, tez_to_unstake)
       in
       let+ ctxt, balance_updates =
         burn_pseudotokens ctxt delegator_balances pseudotokens_to_unstake
@@ -504,7 +504,10 @@ module For_RPC = struct
         delegate_balances.frozen_deposits_pseudotokens <> zero)
     then
       Lwt.return
-      @@ tez_of delegate_balances delegator_balances.pseudotoken_balance
+      @@ tez_of
+           ~rounding:`Down
+           delegate_balances
+           delegator_balances.pseudotoken_balance
     else (
       assert (
         Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)) ;

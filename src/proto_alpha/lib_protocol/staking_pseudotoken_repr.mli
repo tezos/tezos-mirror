@@ -45,6 +45,8 @@ val ( +? ) : t -> t -> t tzresult
 
 val ( -? ) : t -> t -> t tzresult
 
+val pred : t -> t option
+
 (** See {!Tez_repr.mul_ratio}. *)
 val mul_ratio :
   rounding:[`Down | `Up] -> t -> num:int64 -> den:int64 -> t tzresult
