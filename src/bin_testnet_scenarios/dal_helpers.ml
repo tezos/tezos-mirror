@@ -32,10 +32,14 @@ let wait_for_sync node =
   Node.wait_for node "synchronisation_status.v0" filter
 
 module Network = struct
-  type network = Dailynet | Mondaynet
+  type network = Dailynet | Weeklynet
 
-  let short_name = function Dailynet -> "dailynet" | Mondaynet -> "mondaynet"
+  let short_name = function Dailynet -> "dailynet" | Weeklynet -> "weeklynet"
 
+  (* The network name is <kind>-yyyy-mm-dd, where <kind> is
+     "dailynet"/"weeklynet". This function thus extracts the date of the last
+     start of Dailynet/Weeklynet. Currently, Weeklynet is started on
+     Wednesdays. *)
   let name = function
     | Dailynet -> (
         match
@@ -43,22 +47,21 @@ module Network = struct
         with
         | None ->
             let year, month, day = Ptime_clock.now () |> Ptime.to_date in
-            (* Format of the day should be: yyyy-mm-dd *)
             Format.sprintf "dailynet-%d-%02d-%02d" year month day
         | Some network -> network)
-    | Mondaynet -> (
+    | Weeklynet -> (
         match
           Cli.get ~default:None (fun name -> Some (Some name)) "network"
         with
         | None ->
             let now = Ptime_clock.now () in
-            let weekday = (6 + Ptime.weekday_num now) mod 7 in
-            (* Monday is day 0 (not 1)! *)
-            let offset = Ptime.Span.of_d_ps (weekday, 0L) |> Option.get in
-            let monday = Ptime.sub_span now offset |> Option.get in
-            let year, month, day = monday |> Ptime.to_date in
-            (* Format of the day should be: yyyy-mm-dd *)
-            Format.sprintf "mondaynet-%d-%02d-%02d" year month day
+            (* offset of the current day wrt to Wednesday *)
+            let day_offset = (4 + Ptime.weekday_num now) mod 7 in
+            let year, month, day =
+              Ptime.Span.of_d_ps (day_offset, 0L)
+              |> Option.get |> Ptime.sub_span now |> Option.get |> Ptime.to_date
+            in
+            Format.sprintf "weeklynet-%d-%02d-%02d" year month day
         | Some network -> network)
 end
 
