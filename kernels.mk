@@ -81,6 +81,10 @@ evm_benchmark_installer.wasm::
 evm_installer_dev.wasm::
 	@${MAKE} -f kernels.mk EVM_CONFIG=src/kernel_evm/config/dev.yaml evm_installer.wasm
 
+sequencer.wasm::
+	@${MAKE} -f kernels.mk EVM_CONFIG=src/kernel_evm/config/sequencer.yaml evm_installer.wasm
+	@cp evm_installer.wasm sequencer.wasm
+
 sequenced_kernel.wasm:
 	@make -C src/kernel_sequencer build
 	@cp src/kernel_sequencer/target/wasm32-unknown-unknown/release/examples/sequenced_kernel.wasm $@
