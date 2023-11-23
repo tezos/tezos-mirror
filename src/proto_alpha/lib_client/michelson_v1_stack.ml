@@ -260,30 +260,32 @@ let parse_extra_big_map_item ~parsed =
       return RPC.Scripts.S.{id; kty; vty; items}
   | e -> tzfail (Wrong_extra_big_maps_item (localize_node ~parsed e))
 
-let parse_stack ?node (parsed : string Michelson_v1_parser.parser_result) =
+let parse_sequence ?node ~(parsed : string Michelson_v1_parser.parser_result)
+    ~error parse_item =
   let node = Option.value ~default:(Micheline.root parsed.expanded) node in
+  let error () = error (localize_node ~parsed node) in
   match node with
-  | Micheline.Seq (_loc, l) as e ->
-      record_trace_eval (fun () -> Wrong_stack (localize_node ~parsed e))
-      @@ List.map_e (parse_stack_item ~parsed) l
-  | e -> Result_syntax.tzfail (Wrong_stack (localize_node ~parsed e))
+  | Micheline.Seq (_loc, l) ->
+      record_trace_eval error @@ List.map_e (parse_item ~parsed) l
+  | _ -> Result_syntax.tzfail (error ())
 
-let parse_other_contracts ?node
-    (parsed : string Michelson_v1_parser.parser_result) =
-  let node = Option.value ~default:(Micheline.root parsed.expanded) node in
-  match node with
-  | Micheline.Seq (_loc, l) as e ->
-      record_trace_eval (fun () ->
-          Wrong_other_contracts (localize_node ~parsed e))
-      @@ List.map_e (parse_other_contract_item ~parsed) l
-  | e -> Result_syntax.tzfail (Wrong_other_contracts (localize_node ~parsed e))
+let parse_stack ?node parsed =
+  parse_sequence
+    ?node
+    ~parsed
+    ~error:(fun node -> Wrong_stack node)
+    parse_stack_item
 
-let parse_extra_big_maps ?node
-    (parsed : string Michelson_v1_parser.parser_result) =
-  let node = Option.value ~default:(Micheline.root parsed.expanded) node in
-  match node with
-  | Micheline.Seq (_loc, l) as e ->
-      record_trace_eval (fun () ->
-          Wrong_extra_big_maps (localize_node ~parsed e))
-      @@ List.map_e (parse_extra_big_map_item ~parsed) l
-  | e -> Result_syntax.tzfail (Wrong_extra_big_maps (localize_node ~parsed e))
+let parse_other_contracts ?node parsed =
+  parse_sequence
+    ?node
+    ~parsed
+    ~error:(fun node -> Wrong_other_contracts node)
+    parse_other_contract_item
+
+let parse_extra_big_maps ?node parsed =
+  parse_sequence
+    ?node
+    ~parsed
+    ~error:(fun node -> Wrong_extra_big_maps node)
+    parse_extra_big_map_item
