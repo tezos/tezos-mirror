@@ -1,0 +1,1032 @@
+
+./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/packunpack_rev_cty.tz on storage Unit and input '(Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" (Pair Unit (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" (Pair None (Pair {  }  (Pair {  }  (Pair (Pair 40 -10) (Pair (Right "2019-09-09T08:35:33Z") (Pair {  }  { DUP ; DROP ; PACK } )))))))))' --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 28 (just consumed gas: 246.017)
+    [ (Pair (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+                  Unit
+                  "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+                  None
+                  {}
+                  {}
+                  (Pair 40 -10)
+                  (Right "2019-09-09T08:35:33Z")
+                  {}
+                  { DUP ; DROP ; PACK })
+            Unit) ]
+  - location: 28 (just consumed gas: 0.010)
+    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+            Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 29 (just consumed gas: 0.010)
+    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+            Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK })
+      (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+            Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 30 (just consumed gas: 0.010)
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+            Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 31 (just consumed gas: 0.010)
+    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+            Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 33 (just consumed gas: 0.010)
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 31 (just consumed gas: 0.035)
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 34 (just consumed gas: 1.001)
+    [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
+      "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 35 (just consumed gas: 0.010)
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 37 (just consumed gas: 1.001)
+    [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 38 (just consumed gas: 75.159)
+    [ (Some "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 41 (just consumed gas: 0.010)
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 41 (just consumed gas: 0.025)
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 47 (just consumed gas: 1.001)
+    [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 35 (just consumed gas: 0.035)
+    [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
+      0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 50 (just consumed gas: 0.035)
+    [ 0
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 51 (just consumed gas: 0.010)
+    [ True
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 52 (just consumed gas: 0.010)
+    [ (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 52 (just consumed gas: 0.025)
+    [ (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 58 (just consumed gas: 0.010)
+    [ (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK })
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 59 (just consumed gas: 0.010)
+    [ Unit
+      (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 60 (just consumed gas: 0.010)
+    [ (Pair Unit
+            "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 62 (just consumed gas: 0.010)
+    [ Unit
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 60 (just consumed gas: 0.035)
+    [ Unit
+      Unit
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 63 (just consumed gas: 0.216)
+    [ 0x05030b
+      Unit
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 64 (just consumed gas: 0.010)
+    [ Unit
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 66 (just consumed gas: 0.216)
+    [ 0x05030b
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 67 (just consumed gas: 0.421)
+    [ (Some Unit)
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 70 (just consumed gas: 0.010)
+    [ Unit
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 70 (just consumed gas: 0.025)
+    [ Unit
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 76 (just consumed gas: 0.216)
+    [ 0x05030b
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 64 (just consumed gas: 0.035)
+    [ 0x05030b
+      0x05030b
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 79 (just consumed gas: 0.035)
+    [ 0
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 80 (just consumed gas: 0.010)
+    [ True
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 81 (just consumed gas: 0.010)
+    [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 81 (just consumed gas: 0.025)
+    [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 87 (just consumed gas: 0.010)
+    [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK })
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 88 (just consumed gas: 0.010)
+    [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+      (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 89 (just consumed gas: 0.010)
+    [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+            None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 91 (just consumed gas: 0.010)
+    [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 89 (just consumed gas: 0.035)
+    [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+      "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 92 (just consumed gas: 0.911)
+    [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
+      "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 93 (just consumed gas: 0.010)
+    [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 95 (just consumed gas: 0.911)
+    [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 96 (just consumed gas: 1.835)
+    [ (Some "sigXeXB5JD5TaLb3xgTPKjgf9W45judiCmNP9UBdZBdmtHSGBxL1M8ZSUb6LpjGP2MdfUBTB4WHs5APnvyRV1LooU6QHJuDe")
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 99 (just consumed gas: 0.010)
+    [ "sigXeXB5JD5TaLb3xgTPKjgf9W45judiCmNP9UBdZBdmtHSGBxL1M8ZSUb6LpjGP2MdfUBTB4WHs5APnvyRV1LooU6QHJuDe"
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 99 (just consumed gas: 0.025)
+    [ "sigXeXB5JD5TaLb3xgTPKjgf9W45judiCmNP9UBdZBdmtHSGBxL1M8ZSUb6LpjGP2MdfUBTB4WHs5APnvyRV1LooU6QHJuDe"
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 105 (just consumed gas: 0.911)
+    [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 93 (just consumed gas: 0.035)
+    [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
+      0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 108 (just consumed gas: 0.036)
+    [ 0
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 109 (just consumed gas: 0.010)
+    [ True
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 110 (just consumed gas: 0.010)
+    [ (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 110 (just consumed gas: 0.025)
+    [ (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 116 (just consumed gas: 0.010)
+    [ (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK })
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 117 (just consumed gas: 0.010)
+    [ None
+      (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 118 (just consumed gas: 0.010)
+    [ (Pair None
+            {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 120 (just consumed gas: 0.010)
+    [ None
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 118 (just consumed gas: 0.035)
+    [ None
+      None
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 121 (just consumed gas: 0.216)
+    [ 0x050306
+      None
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 122 (just consumed gas: 0.010)
+    [ None
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 124 (just consumed gas: 0.216)
+    [ 0x050306
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 125 (just consumed gas: 0.421)
+    [ (Some None)
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 129 (just consumed gas: 0.010)
+    [ None
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 129 (just consumed gas: 0.025)
+    [ None
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 135 (just consumed gas: 0.216)
+    [ 0x050306
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 122 (just consumed gas: 0.035)
+    [ 0x050306
+      0x050306
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 138 (just consumed gas: 0.035)
+    [ 0
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 139 (just consumed gas: 0.010)
+    [ True
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 140 (just consumed gas: 0.010)
+    [ (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 140 (just consumed gas: 0.025)
+    [ (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 146 (just consumed gas: 0.010)
+    [ (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK })
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 147 (just consumed gas: 0.010)
+    [ {}
+      (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 148 (just consumed gas: 0.010)
+    [ (Pair {}
+            {}
+            (Pair 40 -10)
+            (Right "2019-09-09T08:35:33Z")
+            {}
+            { DUP ; DROP ; PACK }) ]
+  - location: 150 (just consumed gas: 0.010)
+    [ {}
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 148 (just consumed gas: 0.035)
+    [ {}
+      {}
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 151 (just consumed gas: 0.216)
+    [ 0x050200000000
+      {}
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 152 (just consumed gas: 0.010)
+    [ {}
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 154 (just consumed gas: 0.216)
+    [ 0x050200000000
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 155 (just consumed gas: 0.483)
+    [ (Some {})
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 159 (just consumed gas: 0.010)
+    [ {}
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 159 (just consumed gas: 0.025)
+    [ {}
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 165 (just consumed gas: 0.216)
+    [ 0x050200000000
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 152 (just consumed gas: 0.035)
+    [ 0x050200000000
+      0x050200000000
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 168 (just consumed gas: 0.035)
+    [ 0
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 169 (just consumed gas: 0.010)
+    [ True
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 170 (just consumed gas: 0.010)
+    [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 170 (just consumed gas: 0.025)
+    [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 176 (just consumed gas: 0.010)
+    [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK })
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 177 (just consumed gas: 0.010)
+    [ {}
+      (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 178 (just consumed gas: 0.010)
+    [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 180 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 178 (just consumed gas: 0.035)
+    [ {}
+      {}
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 181 (just consumed gas: 0.216)
+    [ 0x050200000000
+      {}
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 182 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 184 (just consumed gas: 0.216)
+    [ 0x050200000000
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 185 (just consumed gas: 0.483)
+    [ (Some {})
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 189 (just consumed gas: 0.010)
+    [ {}
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 189 (just consumed gas: 0.025)
+    [ {}
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 195 (just consumed gas: 0.216)
+    [ 0x050200000000
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 182 (just consumed gas: 0.035)
+    [ 0x050200000000
+      0x050200000000
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 198 (just consumed gas: 0.035)
+    [ 0
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 199 (just consumed gas: 0.010)
+    [ True
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 200 (just consumed gas: 0.010)
+    [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 200 (just consumed gas: 0.025)
+    [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 206 (just consumed gas: 0.010)
+    [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK })
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 207 (just consumed gas: 0.010)
+    [ (Pair 40 -10)
+      (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 208 (just consumed gas: 0.010)
+    [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 210 (just consumed gas: 0.010)
+    [ (Pair 40 -10)
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 208 (just consumed gas: 0.035)
+    [ (Pair 40 -10)
+      (Pair 40 -10)
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 211 (just consumed gas: 0.698)
+    [ 0x0507070028004a
+      (Pair 40 -10)
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 212 (just consumed gas: 0.010)
+    [ (Pair 40 -10)
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 214 (just consumed gas: 0.698)
+    [ 0x0507070028004a
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 215 (just consumed gas: 0.703)
+    [ (Some (Pair 40 -10))
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 220 (just consumed gas: 0.010)
+    [ (Pair 40 -10)
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 220 (just consumed gas: 0.025)
+    [ (Pair 40 -10)
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 226 (just consumed gas: 0.698)
+    [ 0x0507070028004a
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 212 (just consumed gas: 0.035)
+    [ 0x0507070028004a
+      0x0507070028004a
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 229 (just consumed gas: 0.035)
+    [ 0
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 230 (just consumed gas: 0.010)
+    [ True
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 231 (just consumed gas: 0.010)
+    [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 231 (just consumed gas: 0.025)
+    [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 237 (just consumed gas: 0.010)
+    [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK })
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 238 (just consumed gas: 0.010)
+    [ (Right "2019-09-09T08:35:33Z")
+      (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 239 (just consumed gas: 0.010)
+    [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
+  - location: 241 (just consumed gas: 0.010)
+    [ (Right "2019-09-09T08:35:33Z")
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 239 (just consumed gas: 0.035)
+    [ (Right "2019-09-09T08:35:33Z")
+      (Right "2019-09-09T08:35:33Z")
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 242 (just consumed gas: 0.532)
+    [ 0x0505080095bbb0d70b
+      (Right "2019-09-09T08:35:33Z")
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 243 (just consumed gas: 0.010)
+    [ (Right "2019-09-09T08:35:33Z")
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 245 (just consumed gas: 0.532)
+    [ 0x0505080095bbb0d70b
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 246 (just consumed gas: 0.644)
+    [ (Some (Right "2019-09-09T08:35:33Z"))
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 251 (just consumed gas: 0.010)
+    [ (Right "2019-09-09T08:35:33Z")
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 251 (just consumed gas: 0.025)
+    [ (Right "2019-09-09T08:35:33Z")
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 257 (just consumed gas: 0.532)
+    [ 0x0505080095bbb0d70b
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 243 (just consumed gas: 0.035)
+    [ 0x0505080095bbb0d70b
+      0x0505080095bbb0d70b
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 260 (just consumed gas: 0.035)
+    [ 0
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 261 (just consumed gas: 0.010)
+    [ True
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 262 (just consumed gas: 0.010)
+    [ (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 262 (just consumed gas: 0.025)
+    [ (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 268 (just consumed gas: 0.010)
+    [ (Pair {} { DUP ; DROP ; PACK })
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 269 (just consumed gas: 0.010)
+    [ {}
+      (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 270 (just consumed gas: 0.010)
+    [ (Pair {} { DUP ; DROP ; PACK }) ]
+  - location: 272 (just consumed gas: 0.010)
+    [ {}
+      { DUP ; DROP ; PACK } ]
+  - location: 270 (just consumed gas: 0.035)
+    [ {}
+      {}
+      { DUP ; DROP ; PACK } ]
+  - location: 273 (just consumed gas: 0.216)
+    [ 0x050200000000
+      {}
+      { DUP ; DROP ; PACK } ]
+  - location: 274 (just consumed gas: 0.010)
+    [ {}
+      { DUP ; DROP ; PACK } ]
+  - location: 276 (just consumed gas: 0.216)
+    [ 0x050200000000
+      { DUP ; DROP ; PACK } ]
+  - location: 277 (just consumed gas: 0.483)
+    [ (Some {})
+      { DUP ; DROP ; PACK } ]
+  - location: 282 (just consumed gas: 0.010)
+    [ {}
+      { DUP ; DROP ; PACK } ]
+  - location: 282 (just consumed gas: 0.025)
+    [ {}
+      { DUP ; DROP ; PACK } ]
+  - location: 288 (just consumed gas: 0.216)
+    [ 0x050200000000
+      { DUP ; DROP ; PACK } ]
+  - location: 274 (just consumed gas: 0.035)
+    [ 0x050200000000
+      0x050200000000
+      { DUP ; DROP ; PACK } ]
+  - location: 291 (just consumed gas: 0.035)
+    [ 0
+      { DUP ; DROP ; PACK } ]
+  - location: 292 (just consumed gas: 0.010)
+    [ True
+      { DUP ; DROP ; PACK } ]
+  - location: 293 (just consumed gas: 0.010)
+    [ { DUP ; DROP ; PACK } ]
+  - location: 293 (just consumed gas: 0.025)
+    [ { DUP ; DROP ; PACK } ]
+  - location: 299 (just consumed gas: 0.010)
+    [ { DUP ; DROP ; PACK }
+      { DUP ; DROP ; PACK } ]
+  - location: 300 (just consumed gas: 1.129)
+    [ 0x05020000000603210320030c
+      { DUP ; DROP ; PACK } ]
+  - location: 301 (just consumed gas: 0.010)
+    [ { DUP ; DROP ; PACK } ]
+  - location: 303 (just consumed gas: 1.129)
+    [ 0x05020000000603210320030c ]
+  - location: 304 (just consumed gas: 3.147)
+    [ (Some { DUP ; DROP ; PACK }) ]
+  - location: 309 (just consumed gas: 0.010)
+    [ { DUP ; DROP ; PACK } ]
+  - location: 309 (just consumed gas: 0.025)
+    [ { DUP ; DROP ; PACK } ]
+  - location: 315 (just consumed gas: 1.129)
+    [ 0x05020000000603210320030c ]
+  - location: 301 (just consumed gas: 0.035)
+    [ 0x05020000000603210320030c
+      0x05020000000603210320030c ]
+  - location: 318 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 319 (just consumed gas: 0.010)
+    [ True ]
+  - location: 320 (just consumed gas: 0.010)
+    [  ]
+  - location: 320 (just consumed gas: 0.025)
+    [  ]
+  - location: 326 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 327 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 329 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

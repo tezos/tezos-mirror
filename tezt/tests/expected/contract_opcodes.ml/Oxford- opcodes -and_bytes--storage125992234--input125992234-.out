@@ -1,0 +1,75 @@
+
+./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/and_bytes_016.tz on storage Unit and input Unit --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 27.915)
+    [ (Pair Unit Unit) ]
+  - location: 7 (just consumed gas: 0.010)
+    [  ]
+  - location: 8 (just consumed gas: 0.010)
+    [ 0x05 ]
+  - location: 11 (just consumed gas: 0.010)
+    [ 0x06
+      0x05 ]
+  - location: 14 (just consumed gas: 0.035)
+    [ 0x04 ]
+  - location: 15 (just consumed gas: 0.010)
+    [ 0x04
+      0x04 ]
+  - location: 20 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 21 (just consumed gas: 0.010)
+    [ True ]
+  - location: 22 (just consumed gas: 0.010)
+    [  ]
+  - location: 22 (just consumed gas: 0.025)
+    [  ]
+  - location: 28 (just consumed gas: 0.010)
+    [ 0x0005 ]
+  - location: 31 (just consumed gas: 0.010)
+    [ 0x0106
+      0x0005 ]
+  - location: 34 (just consumed gas: 0.036)
+    [ 0x0004 ]
+  - location: 35 (just consumed gas: 0.010)
+    [ 0x0004
+      0x0004 ]
+  - location: 40 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 41 (just consumed gas: 0.010)
+    [ True ]
+  - location: 42 (just consumed gas: 0.010)
+    [  ]
+  - location: 42 (just consumed gas: 0.025)
+    [  ]
+  - location: 48 (just consumed gas: 0.010)
+    [ 0x05 ]
+  - location: 51 (just consumed gas: 0.010)
+    [ 0x0106
+      0x05 ]
+  - location: 54 (just consumed gas: 0.035)
+    [ 0x04 ]
+  - location: 55 (just consumed gas: 0.010)
+    [ 0x04
+      0x04 ]
+  - location: 60 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 61 (just consumed gas: 0.010)
+    [ True ]
+  - location: 62 (just consumed gas: 0.010)
+    [  ]
+  - location: 62 (just consumed gas: 0.025)
+    [  ]
+  - location: 68 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 69 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 71 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

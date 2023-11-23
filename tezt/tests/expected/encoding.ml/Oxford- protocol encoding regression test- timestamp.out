@@ -1,0 +1,6 @@
+
+./octez-codec encode 018-Proxford.timestamp from '"2020-04-20T16:19:59Z"'
+000000005e9dcbaf
+
+./octez-codec decode 018-Proxford.timestamp from 000000005e9dcbaf
+"2020-04-20T16:19:59Z"

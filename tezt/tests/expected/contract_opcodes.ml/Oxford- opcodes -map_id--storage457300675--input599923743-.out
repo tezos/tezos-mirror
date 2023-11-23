@@ -1,0 +1,19 @@
+
+./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/map_id.tz on storage '{}' and input '{ Elt 0 1 }' --level 1 --trace-stack
+storage
+  { Elt 0 1 }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (just consumed gas: 4.579)
+    [ (Pair { Elt 0 1 } {}) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ { Elt 0 1 } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ {}
+      { Elt 0 1 } ]
+  - location: 14 (just consumed gas: 0.010)
+    [ (Pair {} { Elt 0 1 }) ]
+

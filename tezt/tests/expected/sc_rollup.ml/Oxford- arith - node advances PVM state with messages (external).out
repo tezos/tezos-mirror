@@ -1,0 +1,319 @@
+
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind arith of type bytes with kernel  --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1930.030 units (will add 100 for safety)
+Estimated storage: 6552 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000441
+    Expected counter: 1
+    Gas limit: 2031
+    Storage limit: 6572 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000441
+      payload fees(the block proposer) ....... +ꜩ0.000441
+    Smart rollup origination:
+      Kind: arith
+      Parameter type: bytes
+      Kernel Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
+      This smart rollup origination was successfully applied
+      Consumed gas: 1929.997
+      Storage size: 6552 bytes
+      Address: [SMART_ROLLUP_HASH]
+      Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.638
+        storage fees ........................... +ꜩ1.638
+
+Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
+
+./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
+{ "level": 2,
+  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+
+./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.597 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000271
+    Expected counter: 1
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000271
+      payload fees(the block proposer) ....... +ꜩ0.000271
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.530
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\007"
+
+./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.597 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000271
+    Expected counter: 2
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000271
+      payload fees(the block proposer) ....... +ꜩ0.000271
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.530
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\n"
+
+./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 3
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\r"
+
+./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 4
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\016"
+
+./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 5
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\019"
+
+./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 6
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\022"
+
+./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 7
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\025"
+
+./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 8
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\028"
+
+./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 9
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\031"
+
+./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.673 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000273
+    Expected counter: 10
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000273
+      payload fees(the block proposer) ....... +ꜩ0.000273
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.607
+
+
+./octez-smart-rollup-client-Proxford get state value for vars/value --block head
+"\000\000\000\""

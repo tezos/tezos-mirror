@@ -1,0 +1,12 @@
+
+./octez-codec encode 018-Proxford.gas.cost from '"8920392083423078"'
+a6fd9d9694c3d81f
+
+./octez-codec decode 018-Proxford.gas.cost from a6fd9d9694c3d81f
+"8920392083423078"
+
+./octez-codec encode 018-Proxford.gas.cost from '"0"'
+00
+
+./octez-codec decode 018-Proxford.gas.cost from 00
+"0"
