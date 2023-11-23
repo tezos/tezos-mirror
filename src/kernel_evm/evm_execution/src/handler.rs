@@ -2595,4 +2595,51 @@ mod test {
             "Contract call was expected to fail and run out of ticks: \n"
         );
     }
+
+    #[test]
+    fn store_after_offset_1024() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        let address = H160::from_low_u64_be(210_u64);
+        let input = vec![0_u8];
+        let transaction_context = TransactionContext::new(caller, address, U256::zero());
+        let transfer: Option<Transfer> = None;
+
+        let code: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(), // push value 0xff
+            0xff,
+            Opcode::PUSH2.as_u8(), // push offset 0x401 == 1025
+            0x04,
+            0x01,
+            Opcode::MSTORE8.as_u8(), // Store 0xff at offset 1025 in memory
+        ];
+
+        set_code(&mut handler, &address, code);
+        set_balance(&mut handler, &caller, U256::from(99_u32));
+
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
+
+        assert_eq!(
+            Ok((ExitReason::Succeed(ExitSucceed::Stopped), None, vec![])),
+            result,
+            "Writing at offset 1025 in the memory doesn't work"
+        )
+    }
 }
