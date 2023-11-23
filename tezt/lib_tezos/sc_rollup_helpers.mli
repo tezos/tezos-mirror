@@ -110,6 +110,7 @@ val setup_l1 :
   ?challenge_window:int ->
   ?timeout:int ->
   ?whitelist_enable:bool ->
+  ?rpc_local:bool ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 

@@ -2404,6 +2404,7 @@ val init_with_node :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
   ?keys:Account.key list ->
+  ?rpc_local:bool ->
   [`Client | `Light | `Proxy] ->
   unit ->
   (Node.t * t) Lwt.t
@@ -2437,6 +2438,7 @@ val init_with_protocol :
   ?parameter_file:string ->
   ?timestamp:timestamp ->
   ?keys:Account.key list ->
+  ?rpc_local:bool ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->

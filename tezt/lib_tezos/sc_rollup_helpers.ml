@@ -214,7 +214,7 @@ let make_bool_parameter name = function
   | Some value -> [([name], `Bool value)]
 
 let setup_l1 ?bootstrap_smart_rollups ?bootstrap_contracts ?commitment_period
-    ?challenge_window ?timeout ?whitelist_enable protocol =
+    ?challenge_window ?timeout ?whitelist_enable ?rpc_local protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
@@ -235,7 +235,13 @@ let setup_l1 ?bootstrap_smart_rollups ?bootstrap_contracts ?commitment_period
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
   in
-  Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
+  Client.init_with_protocol
+    ~parameter_file
+    `Client
+    ~protocol
+    ~nodes_args
+    ?rpc_local
+    ()
 
 (** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
