@@ -36,7 +36,22 @@ let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
      twice, we explicitly clone the underlying [Lwt_stream.t]. *)
   let body_stream = Cohttp_lwt.Body.to_stream body in
   let* answer =
-    callback conn req (Cohttp_lwt.Body.of_stream (Lwt_stream.clone body_stream))
+    (* We need to catch non-lwt errors to handle them through the same
+       Lwt workflow. *)
+    Lwt.catch
+      (fun () ->
+        callback
+          conn
+          req
+          (Cohttp_lwt.Body.of_stream (Lwt_stream.clone body_stream)))
+      (function
+        | Not_found ->
+            (* Not_found exception are handled and forwarded as a "not
+               found response" to allow a potential redirection to the
+               node. *)
+            let* nf = Cohttp_lwt_unix.Server.respond_not_found () in
+            Lwt.return (`Response nf)
+        | exn -> Lwt.fail exn)
   in
   let answer_has_not_found_status = function
     | `Expert (response, _) | `Response (response, _) ->
