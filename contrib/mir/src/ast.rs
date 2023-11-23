@@ -33,6 +33,28 @@ pub use michelson_signature::Signature;
 pub use or::Or;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TransferTokens {
+    pub param: TypedValue,
+    pub destination_address: Address,
+    pub amount: i64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SetDelegate(pub Option<KeyHash>);
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Operation {
+    TransferTokens(TransferTokens),
+    SetDelegate(SetDelegate),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct OperationInfo {
+    pub operation: Operation,
+    pub counter: u64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
     Nat,
     Int,
@@ -113,6 +135,7 @@ pub enum TypedValue {
     Key(Key),
     Signature(Signature),
     KeyHash(KeyHash),
+    Operation(Box<OperationInfo>),
 }
 
 pub fn typed_value_to_value_optimized<'a>(
@@ -154,6 +177,7 @@ pub fn typed_value_to_value_optimized<'a>(
         TV::Key(k) => V::Bytes(k.to_bytes_vec()),
         TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
         TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
+        TV::Operation(..) => todo!(),
     }
 }
 
@@ -168,6 +192,13 @@ impl TypedValue {
 
     pub fn new_or(x: Or<Self, Self>) -> Self {
         Self::Or(Box::new(x))
+    }
+
+    pub fn new_operation(o: Operation, c: u64) -> Self {
+        Self::Operation(Box::new(OperationInfo {
+            operation: o,
+            counter: c,
+        }))
     }
 }
 
@@ -208,6 +239,8 @@ pub enum Instruction {
     /// `ISelf` because `Self` is a reserved keyword
     ISelf(Entrypoint),
     CheckSignature,
+    TransferTokens,
+    SetDelegate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

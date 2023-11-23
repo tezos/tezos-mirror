@@ -274,6 +274,7 @@ pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
         amount: test.amount.unwrap_or_default(),
         chain_id: test.chain_id.unwrap_or(Ctx::default().chain_id),
         self_address: test.self_addr.unwrap_or(Ctx::default().self_address),
+        counter: 0,
     };
     let execution_result =
         execute_tzt_test_code(test.code, &mut ctx, test.parameter.as_ref(), test.input);

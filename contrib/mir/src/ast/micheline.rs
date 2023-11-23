@@ -152,7 +152,9 @@ macro_rules! micheline_instructions {
                 | Prim::CHAIN_ID
                 | Prim::SELF
                 | Prim::SWAP
-                | Prim::CHECK_SIGNATURE,
+                | Prim::CHECK_SIGNATURE
+                | Prim::SET_DELEGATE
+                | Prim::TRANSFER_TOKENS,
             ..,
         )
     };

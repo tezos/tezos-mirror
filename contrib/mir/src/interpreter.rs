@@ -385,6 +385,30 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
                 .consume(interpret_cost::check_signature(&key, &msg)?)?;
             stack.push(V::Bool(sig.check(&key, &msg)));
         }
+        I::TransferTokens => {
+            let param = pop!();
+            let mutez_amount = pop!(V::Mutez);
+            let contract_address = pop!(V::Contract);
+            let counter: u64 = ctx.counter;
+            ctx.gas.consume(interpret_cost::TRANSFER_TOKENS)?;
+            stack.push(TypedValue::new_operation(
+                Operation::TransferTokens(TransferTokens {
+                    param,
+                    amount: mutez_amount,
+                    destination_address: contract_address,
+                }),
+                counter,
+            ));
+        }
+        I::SetDelegate => {
+            let opt_keyhash = pop!(V::Option).map(|kh| irrefutable_match!(*kh; V::KeyHash));
+            let counter: u64 = ctx.counter;
+            ctx.gas.consume(interpret_cost::SET_DELEGATE)?;
+            stack.push(TypedValue::new_operation(
+                Operation::SetDelegate(SetDelegate(opt_keyhash)),
+                counter,
+            ))
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -1393,6 +1417,58 @@ mod interpreter_tests {
             &stk![TypedValue::Contract(
                 "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap()
             )]
+        );
+    }
+
+    #[test]
+    fn transfer_tokens() {
+        let tt = super::TransferTokens {
+            param: TypedValue::Nat(42),
+            destination_address: Address::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap(),
+            amount: 0,
+        };
+        let stk = &mut stk![
+            TypedValue::Contract(tt.destination_address.clone()),
+            TypedValue::Mutez(tt.amount),
+            tt.param.clone()
+        ];
+        let ctx = &mut Ctx::default();
+        ctx.counter = 100;
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&vec![TransferTokens], ctx, stk), Ok(()));
+        assert_eq!(
+            stk,
+            &stk![TypedValue::new_operation(
+                Operation::TransferTokens(tt),
+                100
+            )]
+        );
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::TRANSFER_TOKENS + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn set_delegate() {
+        use Instruction as I;
+        let sd = super::SetDelegate(Some(
+            KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
+        ));
+        let stk = &mut stk![TypedValue::new_option(Some(TypedValue::KeyHash(
+            sd.0.clone().unwrap()
+        )))];
+        let ctx = &mut Ctx::default();
+        ctx.counter = 100;
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&vec![I::SetDelegate], ctx, stk), Ok(()));
+        assert_eq!(
+            stk,
+            &stk![TypedValue::new_operation(Operation::SetDelegate(sd), 100)]
+        );
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::SET_DELEGATE + interpret_cost::INTERPRET_RET
         );
     }
 
