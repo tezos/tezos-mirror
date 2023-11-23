@@ -237,13 +237,13 @@ let parse_extra_big_map_item ~source =
 
 let parse_stack ~source = function
   | Micheline.Seq (loc, l) as e ->
-      record_trace (Wrong_stack (loc, printable e))
+      record_trace_eval (fun () -> Wrong_stack (loc, printable e))
       @@ List.map_e (parse_stack_item ~source) l
   | e -> Result_syntax.tzfail (Wrong_stack (Micheline.location e, printable e))
 
 let parse_other_contracts ~source = function
   | Micheline.Seq (loc, l) as e ->
-      record_trace (Wrong_other_contracts (loc, printable e))
+      record_trace_eval (fun () -> Wrong_other_contracts (loc, printable e))
       @@ List.map_e (parse_other_contract_item ~source) l
   | e ->
       Result_syntax.tzfail
@@ -251,7 +251,7 @@ let parse_other_contracts ~source = function
 
 let parse_extra_big_maps ~source = function
   | Micheline.Seq (loc, l) as e ->
-      record_trace (Wrong_extra_big_maps (loc, printable e))
+      record_trace_eval (fun () -> Wrong_extra_big_maps (loc, printable e))
       @@ List.map_e (parse_extra_big_map_item ~source) l
   | e ->
       Result_syntax.tzfail
