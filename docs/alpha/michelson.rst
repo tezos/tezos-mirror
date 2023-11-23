@@ -2311,14 +2311,13 @@ but the following test does pass:
    code {};
    output {Stack_elt _ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"}
 
-.. _syntax_of_errors:
 .. _syntax_of_errors_alpha:
 
 Syntax of errors
 ~~~~~~~~~~~~~~~~
 
 To test that the execution of an instruction fails, the following
-syntaxes can be used instead of the output stack as the argument of the 
+syntaxes can be used instead of the output stack as the argument of the
 ``output`` toplevel primitive to specify which error the instruction is expected to
 raise:
 
@@ -2473,4 +2472,3 @@ instruction in the `big_map
    input { Stack_elt (big_map string nat) 4 };
    code { PUSH string "foo"; GET };
    output { Stack_elt (option nat) None }
-
