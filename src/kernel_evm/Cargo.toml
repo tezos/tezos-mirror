@@ -52,7 +52,6 @@ tezos-smart-rollup-core = { path = "../kernel_sdk/core", features = [
 ] }
 tezos-smart-rollup-host = { path = "../kernel_sdk/host", features = [
   "proto-nairobi",
-  "std",
 ] }
 tezos-smart-rollup-panic-hook = { path = "../kernel_sdk/panic-hook" }
 tezos-smart-rollup-entrypoint = { path = "../kernel_sdk/entrypoint" }
