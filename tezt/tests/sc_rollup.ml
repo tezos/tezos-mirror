@@ -3016,7 +3016,6 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
   let operator = Constant.bootstrap1.public_key_hash in
   let commitment_period = 5 in
   let challenge_window = 5 in
-  Log.info "Start the rollup in Operator mode" ;
   test_full_scenario
     ~kind
     {
@@ -3034,6 +3033,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
              sc_rollup
              tezos_node
              tezos_client ->
+  let () = Log.info "Start the rollup in Operator mode" in
   let* () =
     Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
   in
