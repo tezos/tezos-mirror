@@ -120,12 +120,13 @@ let test_coherent_add =
     (prop_binop ( +? ) Z.( + ))
 
 let test_coherent_div =
+  let ( /! ) a b = Ok (a /! b) in
   QCheck2.Test.make
-    ~name:"Tez.(/?) is coherent w.r.t. Z.(/)"
+    ~name:"Tez.( /! ) is coherent w.r.t. Z.(/)"
     QCheck2.Gen.(pair gen_tez_sizes gen_ui64_sizes)
     (fun (a, b) ->
       QCheck2.assume (b > 0L) ;
-      prop_binop64 ( /? ) Z.( / ) (a, b))
+      prop_binop64 ( /! ) Z.( / ) (a, b))
 
 let tests =
   [test_coherent_mul; test_coherent_sub; test_coherent_add; test_coherent_div]
