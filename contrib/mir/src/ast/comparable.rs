@@ -50,7 +50,10 @@ impl PartialOrd for TypedValue<'_> {
             (KeyHash(..), _) => None,
 
             // non-comparable types
-            (List(..) | Set(..) | Map(..) | Contract(..) | Operation(_) | Lambda(..), _) => None,
+            (
+                List(..) | Set(..) | Map(..) | Contract(..) | Operation(_) | Ticket(_) | Lambda(..),
+                _,
+            ) => None,
         }
     }
 }

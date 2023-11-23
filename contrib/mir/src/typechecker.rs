@@ -1445,6 +1445,24 @@ pub(crate) fn typecheck_value<'a>(
                 matches!(raw, V::App(Prim::Lambda_rec, ..)),
             )?))
         }
+        (T::Ticket(c), m) => {
+            match typecheck_value(
+                m,
+                ctx,
+                &Type::new_pair(Type::Address, Type::new_pair(c.as_ref().clone(), Type::Nat)),
+            ) {
+                Ok(TV::Pair(b)) => {
+                    let address = irrefutable_match!(b.0; TV::Address);
+                    let c = irrefutable_match!(b.1; TV::Pair);
+                    TV::new_ticket(Ticket {
+                        ticketer: address.hash,
+                        content: c.0,
+                        amount: irrefutable_match!(c.1; TV::Nat),
+                    })
+                }
+                _ => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
+            }
+        }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
 }
@@ -4657,6 +4675,24 @@ mod typecheck_tests {
                 stack: stk![Type::new_lambda(Type::Int, Type::Unit), Type::Int],
                 reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
             })
+        );
+    }
+
+    #[test]
+    fn typecheck_forged_ticket() {
+        let mut ctx = Ctx::default();
+        let ticket: super::Ticket = super::Ticket {
+            ticketer: AddressHash::try_from("tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h").unwrap(),
+            content: TypedValue::Unit,
+            amount: 5u32.into(),
+        };
+        assert_eq!(
+            typecheck_value(
+                &parse("Pair \"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\" (Pair Unit 5)").unwrap(),
+                &mut ctx,
+                &Type::new_ticket(Type::Unit)
+            ),
+            Ok(TypedValue::new_ticket(ticket))
         );
     }
 

@@ -62,6 +62,13 @@ pub struct OperationInfo<'a> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Ticket<'a> {
+    pub ticketer: AddressHash,
+    pub content: TypedValue<'a>,
+    pub amount: BigUint,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
     Nat,
     Int,
@@ -85,7 +92,7 @@ pub enum Type {
     Signature,
     KeyHash,
     Lambda(Rc<(Type, Type)>),
-    Ticket(Box<Type>),
+    Ticket(Rc<Type>),
 }
 
 impl Type {
@@ -130,7 +137,7 @@ impl Type {
     }
 
     pub fn new_ticket(ty: Self) -> Self {
-        Self::Ticket(Box::new(ty))
+        Self::Ticket(Rc::new(ty))
     }
 
     pub fn new_lambda(ty1: Self, ty2: Self) -> Self {
@@ -190,6 +197,11 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
                 Prim::contract,
                 x.into_micheline_optimized_legacy(arena),
             ),
+            Ticket(x) => Micheline::prim1(
+                arena,
+                Prim::ticket,
+                x.into_micheline_optimized_legacy(arena),
+            ),
 
             Pair(_) => Micheline::App(
                 Prim::pair,
@@ -243,6 +255,7 @@ pub enum TypedValue<'a> {
     Lambda(Closure<'a>),
     KeyHash(KeyHash),
     Operation(Box<OperationInfo<'a>>),
+    Ticket(Box<Ticket<'a>>),
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
@@ -303,8 +316,20 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     annotations::NO_ANNS,
                 ),
             },
+            TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone())),
         }
     }
+}
+
+pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
+    use TypedValue as TV;
+    TV::new_pair(
+        TV::Address(Address {
+            hash: t.ticketer,
+            entrypoint: Entrypoint::default(),
+        }),
+        TV::new_pair(t.content, TV::Nat(t.amount)),
+    )
 }
 
 impl<'a> TypedValue<'a> {
@@ -337,6 +362,10 @@ impl<'a> TypedValue<'a> {
     /// useful in tests.
     pub fn nat(n: u32) -> Self {
         Self::Nat(n.into())
+    }
+
+    pub fn new_ticket(t: Ticket<'a>) -> Self {
+        Self::Ticket(Box::new(t))
     }
 }
 

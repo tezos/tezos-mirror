@@ -433,6 +433,7 @@ pub mod interpret_cost {
                 | V::Map(..)
                 | V::Contract(_)
                 | V::Operation(_)
+                | V::Ticket(_)
                 | V::Lambda(_),
                 _,
             ) => incomparable(),
