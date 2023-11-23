@@ -634,7 +634,7 @@ module Stake_storage_tests = struct
              min_expected_balance = stake;
            })
     in
-    let staker_balance = Tez_repr.div_exn stake 2 in
+    let*?@ staker_balance = Tez_repr.(stake /? 2L) in
     let staker_contract = Contract_repr.Implicit staker in
     let*@ ctxt, _ =
       Token.transfer ctxt `Minted (`Contract staker_contract) staker_balance
@@ -687,7 +687,8 @@ module Stake_storage_tests = struct
         rollup2
         staker
     in
-    assert_frozen_balance ctxt staker (Tez_repr.mul_exn stake 2)
+    let*?@ stake_times_2 = Tez_repr.(stake *? 2L) in
+    assert_frozen_balance ctxt staker stake_times_2
 
   (** Test that deposit twice on the same rollup fails. *)
   let test_deposit_twice_fails () =
