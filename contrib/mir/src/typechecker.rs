@@ -845,6 +845,25 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LOOP, [Seq(_)], _), []) => no_overload!(LOOP, len 1),
         (App(LOOP, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
+        (App(LOOP_LEFT, [Seq(nested)], _), [.., T::Or(_)]) => {
+            // copy current stack to unify with later
+            let opt_copy = FailingTypeStack::Ok(stack.clone());
+            let (l_ty, r_ty) = pop!(T::Or).as_ref().clone();
+            // loop body consumes left leaf and returns `or` again
+            stack.push(l_ty);
+            let nested = typecheck(nested, ctx, self_entrypoints, opt_stack)?;
+            unify_stacks(ctx, opt_stack, opt_copy)?;
+            // the loop leaves the right leaf of `or` on the stack at the end
+            // this FailNotInTail should be impossible to get
+            opt_stack.access_mut(TcError::FailNotInTail)?[0] = r_ty;
+            I::LoopLeft(nested)
+        }
+        (App(LOOP_LEFT, [Seq(_)], _), [.., ty]) => {
+            no_overload!(LOOP_LEFT, NMOR::ExpectedOr(ty.clone()))
+        }
+        (App(LOOP_LEFT, [Seq(_)], _), []) => no_overload!(LOOP_LEFT, len 1),
+        (App(LOOP_LEFT, expect_args!(1 seq), _), _) => unexpected_micheline!(),
+
         (App(ITER, [Seq(nested)], ..), [.., T::List(..)]) => {
             // get the list element type
             let ty = pop!(T::List);
@@ -1659,7 +1678,7 @@ fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
 
 #[cfg(test)]
 mod typecheck_tests {
-    use super::Lambda;
+    use super::{Lambda, Or};
     use crate::ast::micheline::test_helpers::*;
     use crate::ast::michelson_address as addr;
     use crate::gas::Gas;
@@ -2033,6 +2052,69 @@ mod typecheck_tests {
                 TypesNotEqual(Type::Bool, Type::Int).into()
             )
         );
+    }
+
+    #[test]
+    fn test_loop_left() {
+        let mut stack = tc_stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)];
+        let expected_stack = tc_stk![Type::Int, Type::Nat];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                &parse("LOOP_LEFT {DROP; PUSH (or unit nat) (Right 123)}").unwrap(),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(LoopLeft(vec![
+                Drop(None),
+                Push(TypedValue::new_or(Or::Right(TypedValue::nat(123))))
+            ]))
+        );
+        assert_eq!(stack, expected_stack);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
+    }
+
+    #[test]
+    fn test_loop_left_stacks_not_equal_length() {
+        let mut stack = tc_stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                &parse("LOOP_LEFT {PUSH (or unit nat) (Right 123)}").unwrap(),
+                &mut ctx,
+                &mut stack
+            )
+            .unwrap_err(),
+            TcError::StacksNotEqual(
+                stk![Type::Int, Type::Unit, Type::new_or(Type::Unit, Type::Nat)],
+                stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)],
+                StacksNotEqualReason::LengthsDiffer(3, 2)
+            )
+        );
+    }
+
+    #[test]
+    fn test_loop_left_stacks_not_equal_types() {
+        let mut stack = tc_stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(
+                &parse("LOOP_LEFT {DROP; PUSH bool True}").unwrap(),
+                &mut ctx,
+                &mut stack
+            )
+            .unwrap_err(),
+            TcError::StacksNotEqual(
+                stk![Type::Int, Type::Bool],
+                stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)],
+                TypesNotEqual(Type::Bool, Type::new_or(Type::Unit, Type::Nat)).into()
+            )
+        );
+    }
+
+    #[test]
+    fn test_loop_left_too_short() {
+        too_short_test(&app!(LOOP_LEFT[seq! {app!(FAILWITH)}]), Prim::LOOP_LEFT, 1);
     }
 
     #[test]

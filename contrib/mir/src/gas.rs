@@ -256,6 +256,7 @@ pub mod interpret_cost {
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
+    pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;
 
     pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, OutOfGas> {
