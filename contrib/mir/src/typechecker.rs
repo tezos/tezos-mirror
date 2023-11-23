@@ -319,6 +319,15 @@ fn parse_ty_with_entrypoints(
         App(chain_id, [], _) => Type::ChainId,
         App(chain_id, ..) => unexpected()?,
 
+        App(ticket, [t], _) => {
+            let t = parse_ty(ctx, t)?;
+            // NB: The inner type of ticket only needs to be comparable.
+            // See https://tezos.gitlab.io/michelson-reference/#type-ticket
+            t.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            Type::new_ticket(t)
+        }
+        App(ticket, ..) => unexpected()?,
+
         App(pair, [ty1, ty2, rest @ ..], _) => make_pair(ctx, (ty1, ty2, rest))?,
         App(pair, ..) => unexpected()?,
 
