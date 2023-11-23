@@ -103,6 +103,9 @@ pub const WORD_SIZE: usize = 32usize;
 // Path to the queue left at end of previous reboot
 const QUEUE_IN_PROGRESS: RefPath = RefPath::assert_from(b"/queue");
 
+// Path to the flag denoting whether the kernel is in sequencer mode or not.
+const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
+
 // This function should be used when it makes sense that the value
 // stored under [path] can be empty.
 fn store_read_empty_safe<Host: Runtime>(
@@ -900,6 +903,10 @@ pub(crate) mod internal_for_tests {
         let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
         Ok(receipt)
     }
+}
+
+pub fn is_sequencer<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
+    Ok(host.store_has(&SEQUENCER)?.is_some())
 }
 
 #[cfg(test)]
