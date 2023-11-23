@@ -97,6 +97,16 @@ pub mod tc_cost {
     // Taken to be the same as VERIFY_TYPE_STEP, but that's a guess
     pub const TYPE_PROP_STEP: u32 = 60;
 
+    // corresponds to cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls in the
+    // protocol. the protocol computes cost as
+    // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
+    pub const KEY_HASH_READABLE: u32 = 3200;
+
+    // corresponds to cost_ENCODING_PUBLIC_KEY_HASH_bls in the
+    // protocol. the protocol computes cost as
+    // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
+    pub const KEY_HASH_OPTIMIZED: u32 = 80;
+
     fn variadic(depth: u16) -> Result<u32, OutOfGas> {
         let depth = Checked::from(depth as u32);
         (depth * 50).as_gas_cost()
@@ -226,6 +236,7 @@ pub mod interpret_cost {
             (c + compare(&l.0, &r.0)? + compare(&l.1, &r.1)?).as_gas_cost()
         };
         let cmp_option = Checked::from(10u32);
+        const ADDRESS_SIZE: usize = 20 + 31; // hash size + max entrypoint size
         Ok(match (v1, v2) {
             (V::Nat(l), V::Nat(r)) => {
                 // NB: eventually when using BigInts, use BigInt::bits() &c
@@ -247,6 +258,7 @@ pub mod interpret_cost {
                 (Some(l), Some(r)) => cmp_option + compare(l, r)?,
             }
             .as_gas_cost()?,
+            (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
             _ => unreachable!("Comparison of incomparable values"),
         })
     }

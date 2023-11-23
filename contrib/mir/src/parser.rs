@@ -11,7 +11,7 @@ use crate::syntax;
 use lalrpop_util::ParseError;
 use logos::Logos;
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
     #[error("expected a natural from 0 to 1023 inclusive, but got {0}")]
     ExpectedU10(i128),
@@ -318,6 +318,25 @@ mod tests {
         assert_eq!(
             parse("PUSH (contract :ct %foo unit) Unit").unwrap(),
             Instruction::Push((Type::new_contract(Type::Unit), Value::Unit))
+        );
+    }
+
+    #[test]
+    fn bytes_push() {
+        assert_eq!(
+            parse("PUSH unit 0xdeadf00d").unwrap(),
+            Instruction::Push((Type::Unit, Value::Bytes(vec![0xde, 0xad, 0xf0, 0x0d])))
+        );
+    }
+
+    #[test]
+    fn address_ty_push() {
+        assert_eq!(
+            parse("PUSH address \"tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw\"").unwrap(),
+            Instruction::Push((
+                Type::Address,
+                Value::String("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".to_owned())
+            ))
         );
     }
 }

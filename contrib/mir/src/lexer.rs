@@ -95,6 +95,7 @@ defprim! {
     Right,
     IF_LEFT,
     contract,
+    address,
 }
 
 defprim! {
@@ -131,6 +132,9 @@ pub enum Tok {
     #[regex(r#""(\\.|[^\\"])*""#, lex_string)]
     String(String),
 
+    #[regex(r#"0x[0-9a-fA-F]*"#, lex_bytes)]
+    Bytes(Vec<u8>),
+
     // regex as per https://tezos.gitlab.io/active/michelson.html#syntax
     #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*")]
     Annotation,
@@ -149,12 +153,13 @@ pub enum Tok {
 
 impl std::fmt::Display for Tok {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
+        match self {
             Tok::Prim(PrimWithTzt::Prim(p)) => p.fmt(f),
             Tok::Prim(PrimWithTzt::TztPrim(p)) => p.fmt(f),
             Tok::Prim(PrimWithTzt::Underscore) => write!(f, "_"),
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
+            Tok::Bytes(bs) => write!(f, "0x{}", hex::encode(bs)),
             Tok::Annotation => write!(f, "<ann>"),
             Tok::LParen => write!(f, "("),
             Tok::RParen => write!(f, ")"),
@@ -165,7 +170,7 @@ impl std::fmt::Display for Tok {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Clone, thiserror::Error)]
 pub enum LexerError {
     #[error("unknown token")]
     UnknownToken,
@@ -177,6 +182,8 @@ pub enum LexerError {
     UndefinedEscape(char),
     #[error(transparent)]
     PrimError(#[from] PrimError),
+    #[error("invalid hex sequence: {0}")]
+    InvalidHex(#[from] hex::FromHexError),
 }
 
 impl Default for LexerError {
@@ -245,6 +252,12 @@ fn lex_string(lex: &mut Lexer) -> Result<String, LexerError> {
     Ok(res)
 }
 
+/// Takes a lexed slice of hexadecimal digits prefixed by `0x`, removes the
+/// prefix and converts the digits pairwise to `u8`.
+fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
+    Ok(hex::decode(&lex.slice()[2..])?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,5 +301,24 @@ mod tests {
             Tok::lexer("foo").next().unwrap().unwrap_err().to_string(),
             "unknown primitive: foo"
         )
+    }
+
+    #[test]
+    fn lex_bytes_test() {
+        #[track_caller]
+        fn assert_parse<const N: usize>(s: &str, e: Result<[u8; N], &str>) {
+            assert_eq!(
+                Tok::lexer(s).map(|i| i.map_err(|x| x.to_string())).last(),
+                Some(e.map(|v| Tok::Bytes(v.to_vec())).map_err(|e| e.to_owned()))
+            )
+        }
+        assert_parse("0x01", Ok([0x01]));
+        assert_parse("0x010203", Ok([0x01, 0x02, 0x03]));
+        assert_parse("0xfffe", Ok([0xff, 0xfe]));
+        assert_parse("0x0000", Ok([0x00, 0x00]));
+        assert_parse("0xabcd", Ok([0xab, 0xcd]));
+        assert_parse("0x", Ok([]));
+        assert_parse::<0>("0x1", Err("invalid hex sequence: Odd number of digits"));
+        assert_parse::<0>("0xzz", Err("unknown primitive: zz"));
     }
 }

@@ -6,6 +6,7 @@
 /******************************************************************************/
 
 pub mod comparable;
+pub mod michelson_address;
 pub mod michelson_list;
 pub mod or;
 pub mod parsed;
@@ -13,6 +14,7 @@ pub mod typechecked;
 
 use std::collections::BTreeMap;
 
+pub use michelson_address::*;
 pub use michelson_list::MichelsonList;
 pub use or::Or;
 pub use parsed::{ParsedInstruction, ParsedStage};
@@ -33,6 +35,7 @@ pub enum Type {
     Map(Box<(Type, Type)>),
     Or(Box<(Type, Type)>),
     Contract(Box<Type>),
+    Address,
 }
 
 impl Type {
@@ -41,7 +44,7 @@ impl Type {
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
         match self {
-            Nat | Int | Bool | Mutez | String | Unit | Operation => 1,
+            Nat | Int | Bool | Mutez | String | Unit | Operation | Address => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
         }
@@ -83,6 +86,7 @@ pub enum Value {
     Seq(Vec<Value>),
     Elt(Box<(Value, Value)>),
     Or(Box<Or<Value, Value>>),
+    Bytes(Vec<u8>),
 }
 
 impl Value {
@@ -127,6 +131,7 @@ valuefrom! {
   <> bool, Value::Boolean;
   <> String, Value::String;
   <> (), |_| Value::Unit;
+  <> Vec<u8>, Value::Bytes;
   <L, R> (L, R), |(l, r): (L, R)| Value::new_pair(l.into(), r.into());
   <L, R> Elt<L, R>, |Elt(l, r): Elt<L, R>| Value::new_elt(l.into(), r.into());
   <T> Option<T>, |x: Option<T>| Value::new_option(x.map(Into::into));
@@ -153,6 +158,7 @@ pub enum TypedValue {
     List(MichelsonList<TypedValue>),
     Map(BTreeMap<TypedValue, TypedValue>),
     Or(Box<Or<TypedValue, TypedValue>>),
+    Address(Address),
 }
 
 pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
@@ -186,6 +192,7 @@ pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
         TV::Option(None) => V::Option(None),
         TV::Option(Some(r)) => V::new_option(Some(typed_value_to_value_optimized(*r))),
         TV::Or(x) => V::new_or(x.map(typed_value_to_value_optimized)),
+        TV::Address(x) => V::Bytes(x.to_bytes_vec()),
     }
 }
 

@@ -34,6 +34,7 @@ extern {
         "amount" => Tok::Prim(TztPrim(TzP::amount)),
         number => Tok::Number(<i128>),
         string => Tok::String(<String>),
+        bytes => Tok::Bytes(<Vec<u8>>),
         ann => Tok::Annotation,
         "parameter" => Tok::Prim(PT::Prim(Prim::parameter)),
         "storage" => Tok::Prim(PT::Prim(Prim::storage)),
@@ -51,6 +52,7 @@ extern {
         "map" => Tok::Prim(PT::Prim(Prim::map)),
         "or" => Tok::Prim(PT::Prim(Prim::or)),
         "contract" => Tok::Prim(PT::Prim(Prim::contract)),
+        "address" => Tok::Prim(PT::Prim(Prim::address)),
         "True" => Tok::Prim(PT::Prim(Prim::True)),
         "False" => Tok::Prim(PT::Prim(Prim::False)),
         "Unit" => Tok::Prim(PT::Prim(Prim::Unit)),
@@ -108,6 +110,7 @@ atomic_type: Type = {
   "string" => Type::String,
   "unit" => Type::Unit,
   "operation" => Type::Operation,
+  "address" => Type::Address,
 }
 
 pair_args: Type = {
@@ -139,7 +142,8 @@ boolean: bool = {
 atomic_value: Value = {
   <n:number> => Value::Number(n),
   <b:boolean> => Value::Boolean(b),
-  <string> => Value::String(<>),
+  string => Value::String(<>),
+  bytes => Value::Bytes(<>),
   "Unit" => Value::Unit,
   "None" => Value::Option(None),
 }
