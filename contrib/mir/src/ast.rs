@@ -20,7 +20,10 @@ pub mod overloads;
 
 pub use micheline::Micheline;
 use num_bigint::{BigInt, BigUint};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+};
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
@@ -67,21 +70,21 @@ pub enum Type {
     String,
     Unit,
     Never,
-    Pair(Box<(Type, Type)>),
-    Option(Box<Type>),
-    List(Box<Type>),
+    Pair(Rc<(Type, Type)>),
+    Option(Rc<Type>),
+    List(Rc<Type>),
     Operation,
-    Set(Box<Type>),
-    Map(Box<(Type, Type)>),
-    Or(Box<(Type, Type)>),
-    Contract(Box<Type>),
+    Set(Rc<Type>),
+    Map(Rc<(Type, Type)>),
+    Or(Rc<(Type, Type)>),
+    Contract(Rc<Type>),
     Address,
     ChainId,
     Bytes,
     Key,
     Signature,
     KeyHash,
-    Lambda(Box<(Type, Type)>),
+    Lambda(Rc<(Type, Type)>),
 }
 
 impl Type {
@@ -98,35 +101,35 @@ impl Type {
     }
 
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Box::new((l, r)))
+        Self::Pair(Rc::new((l, r)))
     }
 
     pub fn new_option(x: Self) -> Self {
-        Self::Option(Box::new(x))
+        Self::Option(Rc::new(x))
     }
 
     pub fn new_list(x: Self) -> Self {
-        Self::List(Box::new(x))
+        Self::List(Rc::new(x))
     }
 
     pub fn new_set(v: Self) -> Self {
-        Self::Set(Box::new(v))
+        Self::Set(Rc::new(v))
     }
 
     pub fn new_map(k: Self, v: Self) -> Self {
-        Self::Map(Box::new((k, v)))
+        Self::Map(Rc::new((k, v)))
     }
 
     pub fn new_or(l: Self, r: Self) -> Self {
-        Self::Or(Box::new((l, r)))
+        Self::Or(Rc::new((l, r)))
     }
 
     pub fn new_contract(ty: Self) -> Self {
-        Self::Contract(Box::new(ty))
+        Self::Contract(Rc::new(ty))
     }
 
     pub fn new_lambda(ty1: Self, ty2: Self) -> Self {
-        Self::Lambda(Box::new((ty1, ty2)))
+        Self::Lambda(Rc::new((ty1, ty2)))
     }
 }
 
