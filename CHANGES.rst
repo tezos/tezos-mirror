@@ -66,7 +66,7 @@ Client
 - Added options to temporarily extend the context with other contracts
   and extra big maps in Michelson commands. (MR :gl:`!9946`)
 
-- Added a ``run_step`` RPC in the plugin and a ``run michelson code``
+- Added a ``run_instruction`` RPC in the plugin and a ``run michelson code``
   client command allowing to run a single Michelson instruction or a
   sequence of Michelson instructions on a given stack. (MR :gl:`!9935`)
 
