@@ -113,16 +113,14 @@ let assert_balance_changed op ctxt ctxt' account amount =
   let open Lwt_result_wrap_syntax in
   let*@ _, balance = Token.Internal_for_tests.balance ctxt account in
   let*@ _, balance' = Token.Internal_for_tests.balance ctxt' account in
-  let*@ balance_op_amount = op balance amount in
+  let*?@ balance_op_amount = op balance amount in
   equal_tez balance' ~loc:__LOC__ balance_op_amount
 
 let assert_balance_increased ctxt ctxt' account amount =
-  let ( +? ) t1 t2 = Lwt.return Tez_repr.(t1 +? t2) in
-  assert_balance_changed ( +? ) ctxt ctxt' account amount
+  assert_balance_changed Tez_repr.( +? ) ctxt ctxt' account amount
 
 let assert_balance_decreased ctxt ctxt' account amount =
-  let ( -? ) t1 t2 = Lwt.return Tez_repr.(t1 -? t2) in
-  assert_balance_changed ( -? ) ctxt ctxt' account amount
+  assert_balance_changed Tez_repr.( -? ) ctxt ctxt' account amount
 
 let perform_staking_action_and_check ctxt rollup staker do_and_check =
   let staker_contract = Contract_repr.Implicit staker in
