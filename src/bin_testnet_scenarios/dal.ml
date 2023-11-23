@@ -195,7 +195,7 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
   return (num_published, num_attested)
 
 (* This scenario starts a L1 node and a DAL node on the given testnet (Dailynet
-   or Mondaynet), and it publishes slots for a number of levels and a number of
+   or Weeklynet), and it publishes slots for a number of levels and a number of
    slot producers (both given as arguments to the test). At the end of the test,
    the average number of published respectively attested slots are shown (with
    Log.info).
@@ -369,7 +369,7 @@ let scenario_with_rollup_node node dal_node client network_name proto_parameters
   in
   let rollup_client =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6531
-       Mondaynet starts with [Protocol.(previous_protocol Alpha)]. *)
+       Weeklynet starts with [Protocol.(previous_protocol Alpha)]. *)
     Sc_rollup_client.create ~protocol:Protocol.Alpha rollup_node
   in
 
@@ -564,7 +564,7 @@ let run_scenario network kind scenario =
   let network_url = Format.sprintf "https://teztnets.xyz/%s" network_name in
   let network_arg = Node.Network network_url in
   let network_baker =
-    (* a bootstrap delegate for both Dailynet and Mondaynet *)
+    (* a bootstrap delegate for both Dailynet and Weeklynet *)
     "tz1foXHgRzdYdaLgX6XhpZGxbBv42LZ6ubvE"
   in
 
@@ -619,6 +619,6 @@ let run_scenario network kind scenario =
 
 let register () =
   run_scenario Dailynet `Simple scenario_without_rollup_node ;
-  run_scenario Mondaynet `Simple scenario_without_rollup_node ;
+  run_scenario Weeklynet `Simple scenario_without_rollup_node ;
   run_scenario Dailynet `With_rollup scenario_with_rollup_node ;
-  run_scenario Mondaynet `With_rollup scenario_with_rollup_node
+  run_scenario Weeklynet `With_rollup scenario_with_rollup_node
