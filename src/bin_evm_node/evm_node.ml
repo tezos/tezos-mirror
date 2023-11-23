@@ -361,6 +361,22 @@ let sequencer_command =
           ()
       in
       let* () = Configuration.save_sequencer ~force:true ~data_dir config in
+      let open Evm_node_lib_dev in
+      let* ctxt, loaded =
+        Sequencer_context.init
+          ~data_dir
+          ~kernel:config.mode.kernel
+          ~preimages:config.mode.preimages
+      in
+      let* ctxt = if loaded then return ctxt else Sequencer_state.init ctxt in
+      let module Sequencer = Sequencer.Make (struct
+        let ctxt = ctxt
+      end) in
+      (* Ignore the smart rollup address for now. *)
+      let* () = Tx_pool.start ((module Sequencer), "") in
+      let* directory = dev_directory config ((module Sequencer), "") in
+      let* server = start config ~directory in
+      let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_dev server in
       let wait, _resolve = Lwt.wait () in
       let* () = wait in
       return_unit)
