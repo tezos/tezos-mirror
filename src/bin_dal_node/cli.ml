@@ -42,7 +42,7 @@ module Term = struct
     let open Cmdliner in
     let doc =
       Format.sprintf
-        "The directory where the octez DAL node will store all its data. \
+        "The directory where the Octez DAL node will store all its data. \
          Parent directories are created if necessary."
     in
     Arg.(
@@ -55,8 +55,8 @@ module Term = struct
     let default_port = Configuration_file.default.rpc_addr |> snd in
     let doc =
       Format.asprintf
-        "The TCP socket point at which this RPC server of this instance can be \
-         reached."
+        "The TCP address and port at which the RPC server of this instance can \
+         be reached."
     in
     Arg.(
       value
@@ -65,7 +65,9 @@ module Term = struct
 
   let expected_pow =
     let open Cmdliner in
-    let doc = "Expected level of proof-of-work for peers identity." in
+    let doc =
+      "The expected proof-of-work difficulty level for the peers' identity."
+    in
     Arg.(
       value
       & opt (some float) None
@@ -76,9 +78,9 @@ module Term = struct
     let default_port = Configuration_file.default.listen_addr |> snd in
     let doc =
       Format.asprintf
-        "The TCP address and port at which the socket is bound. If \
-         [public_addr] is not set, this is also the address and port at which \
-         this instance can be reached by other P2P nodes."
+        "The TCP address and port bound by the DAL node. If --public-addr is \
+         not provided, this is also the address and port at which this \
+         instance can be reached by other P2P nodes."
     in
     Arg.(
       value
@@ -168,7 +170,7 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
-       cannot also be an attester/slot producer"
+       cannot also be an attester or a slot producer"
     in
     Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"])
 
@@ -176,8 +178,8 @@ module Term = struct
     let open Cmdliner in
     let default_list = Configuration_file.default.peers in
     let doc =
-      "An additional peer list to expand the bootstrap peers from \
-       dal_config.bootstrap_peers."
+      "An additional peer list to expand the bootstrap peers from the Octez \
+       node's configuration parameter dal_config.bootstrap_peers."
     in
     Arg.(
       value
@@ -186,7 +188,7 @@ module Term = struct
 
   let metrics_addr =
     let open Cmdliner in
-    let doc = "Address on which to provide metrics over HTTP." in
+    let doc = "The TCP address and port of the node's metrics server." in
     let default_port = Configuration_file.default.metrics_addr |> snd in
     Arg.(
       value
@@ -209,13 +211,13 @@ end
 
 module Run = struct
   let description =
-    [`S "DESCRIPTION"; `P "This command allows to run a DAL node."]
+    [`S "DESCRIPTION"; `P "This command runs an Octez DAL node."]
 
   let man = description
 
   let info =
     let version = Tezos_version_value.Bin_version.version_string in
-    Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~man ~version "run"
+    Cmdliner.Cmd.info ~doc:"Run the Octez DAL node" ~man ~version "run"
 
   let cmd run = Cmdliner.Cmd.v info (Term.term run)
 end
@@ -236,9 +238,12 @@ module Config = struct
       [
         `S "DESCRIPTION";
         `P
-          "This commands creates a configuration file with the default \
-           parameters and the one provided on the command-line. This \
-           configuration is then used by the run command.";
+          "This commands creates a configuration file with the parameters \
+           provided on the command-line, if no configuration file exists \
+           already in the specified or default location. Otherwise, the \
+           command-line parameters override the existing ones, and old \
+           parameters are lost. This configuration is then used by the run \
+           command.";
       ]
 
     let info =
@@ -252,7 +257,11 @@ module Config = struct
     let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
     let info =
       let version = Tezos_version_value.Bin_version.version_string in
-      Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~man ~version "config"
+      Cmdliner.Cmd.info
+        ~doc:"Manage the Octez DAL node configuration"
+        ~man
+        ~version
+        "config"
     in
     Cmdliner.Cmd.group ~default info [Init.cmd run]
 end
@@ -295,7 +304,8 @@ let make ~run =
     | false, operator_profiles -> run @@ Some (Operator operator_profiles)
     | true, _ :: _ ->
         `Error
-          (false, "A bootstrap node cannot also be an attester/slot producer.")
+          ( false,
+            "A bootstrap node cannot also be an attester or a slot producer." )
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
