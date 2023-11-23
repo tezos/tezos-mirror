@@ -30,7 +30,7 @@
   "consensus_threshold": 0,
   "minimal_participation_ratio": { "numerator": 2, "denominator": 3 },
   "limit_of_delegation_over_baking": 19,
-  "percentage_of_frozen_deposits_slashed_per_double_baking": 7,
+  "percentage_of_frozen_deposits_slashed_per_double_baking": 5,
   "percentage_of_frozen_deposits_slashed_per_double_attestation": 50,
   "cache_script_size": 100000000, "cache_stake_distribution_cycles": 8,
   "cache_sampler_state_cycles": 8,
