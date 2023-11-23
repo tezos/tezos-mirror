@@ -141,7 +141,7 @@ let test_forward =
   let* () = test_rpc Handle RPC.get_config ~rpc_prefix:"/config" in
   let* () =
     test_rpc
-      Forward
+      Handle
       (RPC.get_chain_chain_id ())
       ~rpc_prefix:"/chains/main/chain_id"
   in
@@ -154,27 +154,29 @@ let test_forward =
   in
   let* () =
     test_rpc
-      Forward
+      Handle
       (RPC.get_chain_chain_id ~chain:"nonexistent" ())
       ~rpc_prefix:"/chains/nonexistent/chain_id"
       ~error:"Cannot parse chain identifier"
   in
   let* () =
     test_rpc
-      Forward
+      Forward (* Only the node deals with the mempool. *)
       (RPC.post_chain_mempool_filter ~data:(Data (Ezjsonm.from_string "{}")) ())
       ~rpc_prefix:"/chains/main/mempool/filter"
   in
   let* () =
     test_rpc
       Forward
+      (* The path is unknown by the RPC process, we try to
+         forward it to the node. *)
       RPC.nonexistent_path
       ~rpc_prefix:"/nonexistent/path"
       ~error:"No service found at this URL"
   in
-  let test_streaming_rpc ~rpc_prefix rpc =
+  let test_streaming_rpc expected_behavior ~rpc_prefix rpc =
     Log.info "Test streaming RPC: %s" rpc_prefix ;
-    let waiter = wait_for Forward ~rpc_prefix in
+    let waiter = wait_for expected_behavior ~rpc_prefix in
     let url =
       RPC_core.make_uri (Node.as_rpc_endpoint node) rpc |> Uri.to_string
     in
@@ -183,25 +185,32 @@ let test_forward =
   in
   let* () =
     test_streaming_rpc
+      Forward (* Only the node deals with the mempool. *)
       (RPC.get_chain_mempool_monitor_operations ())
       ~rpc_prefix:"/chains/main/mempool/monitor_operations"
   in
   let* () =
     test_streaming_rpc
+      Handle
       (RPC.get_monitor_heads_chain ())
       ~rpc_prefix:"/monitor/heads/main"
   in
   let* () =
     test_streaming_rpc
+      Forward
+      (* The path is unknown by the RPC process, we try to
+         forward it to the node. *)
       (RPC.get_monitor_heads_chain ~chain:"test" ())
       ~rpc_prefix:"/monitor/heads/test"
   in
   let* () =
     test_streaming_rpc
+      Forward (* FIXME/TODO: Not handled by the RPC process for now. *)
       RPC.get_monitor_validated_blocks
       ~rpc_prefix:"/monitor/validated_blocks"
   in
   test_streaming_rpc
+    Handle
     RPC.get_monitor_applied_blocks
     ~rpc_prefix:"/monitor/applied_blocks"
 
