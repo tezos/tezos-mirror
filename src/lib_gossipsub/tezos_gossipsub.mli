@@ -37,5 +37,7 @@ module Automaton (C : Gossipsub_intf.AUTOMATON_CONFIG) :
 module Worker (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   Gossipsub_intf.WORKER
     with module GS = C.GS
+     and module GS.Topic = C.GS.Topic
+     and module GS.Peer = C.GS.Peer
      and module Monad = C.Monad
      and module Stream = C.Stream
