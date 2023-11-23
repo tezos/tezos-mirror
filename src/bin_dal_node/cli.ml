@@ -297,13 +297,7 @@ let make ~run =
         `Error
           (false, "A bootstrap node cannot also be an attester/slot producer.")
   in
-  let default =
-    Cmdliner.Term.(
-      ret
-        (const (fun _ _ _ _ _ -> `Help (`Pager, None))
-        $ Term.data_dir $ Term.rpc_addr $ Term.expected_pow $ Term.net_addr
-        $ Term.endpoint))
-  in
+  let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
     let version = Tezos_version_value.Bin_version.version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
