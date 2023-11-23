@@ -73,7 +73,7 @@ let ten_tez = of_int 10
 let two_over_n_of_balance ctxt contract n =
   let open Lwt_result_syntax in
   let* balance = Context.Contract.balance ctxt contract in
-  let*? res = balance /? n in
+  let res = balance /! n in
   let res = res *? 2L in
   Lwt.return res
 
@@ -525,7 +525,7 @@ let test_balance_too_low_two_transfers fee () =
   in
   let* i = Incremental.begin_construction b in
   let* balance = Context.Contract.balance (I i) contract_1 in
-  let*? res = balance /? 3L in
+  let res = balance /! 3L in
   let*? two_third_of_balance = res *? 2L in
   let* i, _ =
     transfer_and_check_balances

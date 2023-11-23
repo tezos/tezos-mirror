@@ -382,7 +382,7 @@ let batch_empty_at_end infos kind1 kind2 =
   let source = contract_of (get_source infos) in
   let* counter = Context.Contract.counter (B infos.ctxt.block) source in
   let* init_bal = Context.Contract.balance (B infos.ctxt.block) source in
-  let*?@ half_init_bal = Tez.(init_bal /? 2L) in
+  let half_init_bal = Test_tez.(init_bal /! 2L) in
   let* reveal =
     mk_reveal
       {(operation_req_default K_Reveal) with counter = Some counter}
