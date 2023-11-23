@@ -1098,7 +1098,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         in
 
         let percentage_of_frozen_deposits_slashed_per_double_baking =
-          Int_percentage.p7
+          Int_percentage.p5
         in
         let percentage_of_frozen_deposits_slashed_per_double_attestation =
           Int_percentage.of_ratio_bounded

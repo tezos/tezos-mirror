@@ -28,18 +28,18 @@ let f = Tez_repr.mul_percentage
 
 let test_constant_values () =
   let open Lwt_result_syntax in
-  let* () = assert_equal ~loc:__LOC__ 7 Int_percentage.p7 in
+  let* () = assert_equal ~loc:__LOC__ 5 Int_percentage.p5 in
   let* () = assert_equal ~loc:__LOC__ 50 Int_percentage.p50 in
   return_unit
 
 let test_neg () =
   let open Lwt_result_syntax in
   let open Int_percentage in
-  let* () = assert_equal ~loc:__LOC__ 93 (neg p7) in
+  let* () = assert_equal ~loc:__LOC__ 95 (neg p5) in
   let* () = assert_equal ~loc:__LOC__ 50 (neg p50) in
   let* () = assert_equal ~loc:__LOC__ 31 (neg (pct_of_int 69)) in
   let* () = assert_equal ~loc:__LOC__ 100 (neg (pct_of_int 0)) in
-  let* () = assert_equal ~loc:__LOC__ 7 (neg (neg p7)) in
+  let* () = assert_equal ~loc:__LOC__ 5 (neg (neg p5)) in
   return_unit
 
 let test_bounded () =
@@ -48,7 +48,7 @@ let test_bounded () =
   let* () = assert_equal ~loc:__LOC__ 100 (pct_of_int 200) in
   let* () = assert_equal ~loc:__LOC__ 0 (pct_of_int (-100)) in
   let* () = assert_equal ~loc:__LOC__ 100 (add_bounded p50 p50) in
-  let* () = assert_equal ~loc:__LOC__ 100 (add_bounded p50 (neg p7)) in
+  let* () = assert_equal ~loc:__LOC__ 100 (add_bounded p50 (neg p5)) in
   return_unit
 
 let test_mul_percentage () =
@@ -64,8 +64,8 @@ let test_mul_percentage () =
   let* () =
     assert_equal_tez
       ~loc:__LOC__
-      (of_mutez_exn 7L)
-      (mul_percentage ~rounding (of_mutez_exn 100L) Int_percentage.p7)
+      (of_mutez_exn 5L)
+      (mul_percentage ~rounding (of_mutez_exn 100L) Int_percentage.p5)
   in
   (* round down *)
   let* () =
