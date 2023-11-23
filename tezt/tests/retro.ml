@@ -68,41 +68,32 @@ let test_encoding_retrocompatible name operation =
     | Some proto ->
         let* c = init_client proto in
         return (Some c)
-  and* client_next =
-    match Protocol.next_protocol protocol with
-    | None -> return None
-    | Some proto ->
-        let* c = init_client proto in
-        return (Some c)
   in
   let* operation = Operation_core.Manager.operation operation client.client in
-  let do_pair current next =
+  let do_pair previous current =
     Log.info
       "Checking that unsigned %s encoded in protocol %s can be decoded by \
        protocol %s"
       name
-      (Protocol.name next.proto)
-      (Protocol.name current.proto) ;
-    let* hex_unsigned_next =
-      encode next.proto "operation.unsigned" (Operation_core.json operation)
+      (Protocol.name current.proto)
+      (Protocol.name previous.proto) ;
+    let* hex_unsigned_current =
+      encode current.proto "operation.unsigned" (Operation_core.json operation)
     in
-    let* _ = decode current.proto "operation.unsigned" hex_unsigned_next in
+    let* _ = decode previous.proto "operation.unsigned" hex_unsigned_current in
     Log.info
       "Checking that signed %s encoded in protocol %s can be decoded by \
        protocol %s"
       name
-      (Protocol.name current.proto)
-      (Protocol.name next.proto) ;
-    let* hex_signed_current =
-      encode_and_sign_operation current.proto current.client operation
+      (Protocol.name previous.proto)
+      (Protocol.name current.proto) ;
+    let* hex_signed_previous =
+      encode_and_sign_operation previous.proto previous.client operation
     in
-    let* _ = decode next.proto "operation" hex_signed_current in
+    let* _ = decode current.proto "operation" hex_signed_previous in
     unit
   in
-  let* () =
-    match client_prev with None -> unit | Some prev -> do_pair prev client
-  in
-  match client_next with None -> unit | Some next -> do_pair client next
+  match client_prev with None -> unit | Some prev -> do_pair prev client
 
 let simple_transfer =
   test_encoding_retrocompatible "transfer"
