@@ -80,6 +80,8 @@ module type S = sig
     ('file, 'key, 'value) t ->
     ('file * 'key) Seq.t ->
     ('file * 'key * 'value tzresult) Seq_s.t
+
+  val remove_file : ('file, 'key, 'value) t -> 'file -> unit tzresult Lwt.t
 end
 
 let value_size = 1
@@ -113,6 +115,12 @@ module R : S = struct
     |> Seq_s.S.map (fun (file, key) ->
            let* value = read_value t file key in
            Lwt.return (file, key, value))
+
+  let remove_file t file =
+    Stdlib.Hashtbl.filter_map_inplace
+      (fun (file', _) value -> if file = file' then None else Some value)
+      t ;
+    Lwt.return (Ok ())
 end
 
 module Helpers = struct
@@ -149,6 +157,7 @@ module Helpers = struct
     | Write_value of write_payload
     | Read_value of key
     | Read_values of key Seq.t
+    | Remove_file of string
 
   let seq_gen ~size_seq value_gen =
     let open QCheck2.Gen in
@@ -170,6 +179,10 @@ module Helpers = struct
       key_gen ~number_of_files ~number_of_keys_per_file
       |> map (fun x -> Read_value x)
     in
+    let remove_file =
+      key_gen ~number_of_files ~number_of_keys_per_file
+      |> map (fun (file, _) -> Remove_file file)
+    in
     let read_values =
       key_seq_gen
         ~size_seq:read_values_seq_size
@@ -177,7 +190,7 @@ module Helpers = struct
         ~number_of_keys_per_file
       |> map (fun x -> Read_values x)
     in
-    oneof [write_value; read_value; read_values]
+    oneof [write_value; read_value; read_values; remove_file]
 
   let pp_action fmt = function
     | Write_value payload -> Format.fprintf fmt "W%a" pp_write_payload payload
@@ -191,16 +204,18 @@ module Helpers = struct
             )
         in
         Format.fprintf fmt "R[%s]" str_keys
+    | Remove_file file -> Format.fprintf fmt "REMOVE[file=%s]" file
 
   type bind = Sequential | Parallel
 
   let bind_gen = QCheck2.Gen.oneofa [|Sequential; Parallel|]
 
   type parameters = {
+    mutable uid : int;
     number_of_files : int;
     number_of_keys_per_file : int;
     read_values_seq_size : int;
-    pool_size : int;
+    lru_size : int;
     value_size : int; (* in bytes *)
     values : (key, value) Stdlib.Hashtbl.t;
     overwritten : (key, value) Stdlib.Hashtbl.t;
@@ -211,20 +226,30 @@ module Helpers = struct
         Stdlib.List.init keys_max (fun key -> (make_file file, key)))
     |> List.flatten |> Array.of_list
 
+  (* Because a scenario creates files onto the disk, we need a way to
+     generate unique names. For debugging purpose, and because of the
+     shrinking of QCheck2, it is easier to track tries with a simple
+     counter. *)
+  let cpt = ref 0
+
   let parameters_gen =
     let open QCheck2.Gen in
     (* A small set of different values is enough to get interesting
        scenarios. *)
-    let files_max = 2 in
-    let keys_max = 3 in
+    let files_max = 3 in
+    let keys_max = 4 in
     let number_of_files = pure files_max in
     let number_of_keys_per_file = pure files_max in
     let key_max = files_max * keys_max in
     let read_values_seq_size = int_range 1 key_max in
-    let pool_size = int_range 0 key_max in
+    let lru_size =
+      let+ number_of_files in
+      max 0 @@ (number_of_files - 2)
+    in
     let char =
       int_range (Char.code 'a') (Char.code 'z') |> map (fun x -> Char.chr x)
     in
+    let uid = pure 0 in
     let keys = keys files_max keys_max in
     let values =
       array_repeat key_max (bytes_size ~gen:char (return value_size))
@@ -234,28 +259,31 @@ module Helpers = struct
     (* same generator *)
     let overwritten = values in
     let tup_gen =
-      tup7
+      tup8
+        uid
         number_of_files
         number_of_keys_per_file
         read_values_seq_size
-        pool_size
+        lru_size
         (return value_size)
         values
         overwritten
     in
     map
-      (fun ( number_of_files,
+      (fun ( uid,
+             number_of_files,
              number_of_keys_per_file,
              read_values_seq_size,
-             pool_size,
+             lru_size,
              value_size,
              values,
              overwritten ) ->
         {
+          uid;
           number_of_files;
           number_of_keys_per_file;
           read_values_seq_size;
-          pool_size;
+          lru_size;
           value_size;
           values;
           overwritten;
@@ -264,10 +292,11 @@ module Helpers = struct
 
   let pp_parameters fmt
       {
+        uid;
         number_of_files;
         number_of_keys_per_file;
         read_values_seq_size;
-        pool_size;
+        lru_size;
         value_size;
         values;
         overwritten;
@@ -282,10 +311,11 @@ module Helpers = struct
                (Bytes.to_string value))
       |> String.concat " "
     in
+    Format.fprintf fmt "UID = %d@." uid ;
     Format.fprintf fmt "number of files = %d@." number_of_files ;
     Format.fprintf fmt "number of keys per file = %d@." number_of_keys_per_file ;
     Format.fprintf fmt "sequence length for reads  = %d@." read_values_seq_size ;
-    Format.fprintf fmt "pool size = %d@." pool_size ;
+    Format.fprintf fmt "lru size = %d@." lru_size ;
     Format.fprintf fmt "value size = %d (in bytes)@." value_size ;
     Format.fprintf fmt "default values = %s@." (string_of_values values) ;
     Format.fprintf fmt "override values = %s@." (string_of_values overwritten)
@@ -363,29 +393,23 @@ end
 
 include Helpers
 
-(* Because a scenario creates files onto the disk, we need a way to
-   generate unique names. For debugging purpose, and because of the
-   shrinking of QCheck2, it is easier to track tries with a simple
-   counter. *)
-let uid = ref 0
-
 let run_scenario
-    {
-      pool_size = _;
-      values;
-      overwritten;
-      number_of_files;
-      number_of_keys_per_file;
-      _;
-    } scenario =
+    ({
+       lru_size;
+       values;
+       overwritten;
+       number_of_files;
+       number_of_keys_per_file;
+       _;
+     } as t) scenario =
   let open Lwt_result_syntax in
-  incr uid ;
-
+  incr cpt ;
+  if t.uid = 0 then t.uid <- !cpt ;
   let pid = Unix.getpid () in
   let tmp_dir = Filename.get_temp_dir_name () in
   (* To avoid any conflict with previous runs of this test. *)
   let dir_path =
-    Format.asprintf "key-value-store-test-key-%d-%d" pid !uid
+    Format.asprintf "key-value-store-test-key-%d-%d" pid t.uid
     |> Filename.concat "tezos-pbt-tests"
     |> Filename.concat tmp_dir
   in
@@ -399,20 +423,14 @@ let run_scenario
       ~index_of:Fun.id
       ()
   in
-  (* If the [lru_size] is strictly smaller than the number of files,
-     then the property tested is not true in general. For example,
-     with an [lru_size=1], if the operations are [W(1);R(0);R(1)] then
-     we could start to read the value for key [1] before having
-     written it since it was removed from the [lru]. *)
-  let left = L.init ~lru_size:number_of_files layout_of in
-  let right = R.init ~lru_size:number_of_files layout_of in
+  let left = L.init ~lru_size layout_of in
+  let right = R.init ~lru_size layout_of in
   let action, next_actions = scenario in
   let n = ref 0 in
   let compare_result ~finalization (file, key) left_result right_result =
     let finalization = if finalization then "(finalization) " else "" in
     match (left_result, right_result) with
     | Ok left_value, Ok right_value ->
-        Log.info "CC: %b" (left_value = right_value) ;
         if left_value = right_value then return_unit
         else
           failwith
@@ -427,7 +445,6 @@ let run_scenario
             (Bytes.to_string left_value)
     | Error _, Error _ -> return_unit
     | Ok value, Error err ->
-        Log.info "CC: OK/ERROR" ;
         failwith
           "%s Unexpected different result while reading key %s/%d.@. For run \
            %d at %s:@.Expected: %a@.Got: %s"
@@ -440,7 +457,6 @@ let run_scenario
           err
           (Bytes.to_string value)
     | Error err, Ok value ->
-        Log.info "CC: ERROR/OK" ;
         failwith
           "%s Unexpected different result while reading key %s/%d.@. For run \
            %d at %s:@.Expected: %s@.Got: %a"
@@ -465,9 +481,7 @@ let run_scenario
       | Write_value {override; default; key = file, key} ->
           let value = value_of_key ~default file key in
           let left_promise =
-            Log.info "WB" ;
             let* r = L.write_value ~override left file key value in
-            Log.info "WA" ;
             return r
           in
           let right_promise = R.write_value ~override right file key value in
@@ -491,6 +505,12 @@ let run_scenario
             let seq_s = R.read_values right seq in
             Seq_s.E.iter (fun _ -> Ok ()) seq_s
           in
+          tzjoin [left_promise; right_promise]
+      | Remove_file file ->
+          let left_promise = L.remove_file left file in
+
+          let right_promise = R.remove_file right file in
+
           tzjoin [left_promise; right_promise]
     in
     let finalize () =
@@ -533,10 +553,8 @@ let run_scenario
         let promises_running_seq = Seq_s.cons_s promise promises_running_seq in
         run_actions action next_actions promises_running_seq
   in
-  Log.info "START" ;
   let* result = run_actions action next_actions Seq_s.empty in
   let*! () = L.close left in
-  Log.info "ALMOST END" ;
   return result
 
 let print (parameters, scenario) =
@@ -559,7 +577,7 @@ let sequential_test =
   Test.make
     ~print
     ~name:"key-value store sequential writes/reads"
-    ~count:1_000
+    ~count:10_000
     ~max_fail:1 (*to stop shrinking after [max_fail] failures. *)
     ~retries:1
     test_gen
@@ -585,14 +603,13 @@ let parallel_test =
   Test.make
     ~print
     ~name:"key-value store concurrent writes/reads"
-    ~count:1_000
+    ~count:10_000
     ~max_fail:1 (*to stop shrinking after [max_fail] failures. *)
     ~retries:1
     test_gen
     (fun (parameters, scenario) ->
       let promise =
         let* _ = run_scenario parameters scenario in
-        Log.info "END" ;
         return_true
       in
       match Lwt_main.run promise with
