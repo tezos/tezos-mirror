@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use crate::ast::IntoMicheline;
+
 use super::*;
 
 fn check_error_expectation<'a>(
@@ -56,8 +58,10 @@ fn unify_interpreter_error(
                     // This means that comb pairs given in different forms (tree / linear) will
                     // be considered distinct. This should be fine in most cases though.
                     let arena = typed_arena::Arena::new();
-                    typed_value_to_value_optimized_legacy(&arena, exp_typed_val)
-                        == typed_value_to_value_optimized_legacy(&arena, failed_typed_value.clone())
+                    exp_typed_val.into_micheline_optimized_legacy(&arena)
+                        == failed_typed_value
+                            .clone()
+                            .into_micheline_optimized_legacy(&arena)
                 }
                 Err(_) => false,
             }

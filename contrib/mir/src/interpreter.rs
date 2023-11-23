@@ -599,7 +599,7 @@ fn interpret_one<'a>(
             let arena = Arena::new();
             // In the Tezos implementation they also charge gas for the pass
             // that strips locations. We don't have it.
-            let mich = typed_value_to_value_optimized_legacy(&arena, v);
+            let mich = v.into_micheline_optimized_legacy(&arena);
             ctx.gas
                 .consume(interpret_cost::micheline_encoding(&mich)?)?;
             let encoded = mich.encode_for_pack();

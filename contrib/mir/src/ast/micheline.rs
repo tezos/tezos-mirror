@@ -97,6 +97,21 @@ impl<'a> From<&str> for Micheline<'a> {
     }
 }
 
+pub trait IntoMicheline<'a> {
+    /// Untypes a value using optimized representation in legacy mode.
+    ///
+    /// This differs from plain optimized representation in that it always
+    /// represents tuples as nested binary pairs (right combs). This is, for
+    /// instance, what `PACK` uses.
+    ///
+    /// However, note that a right-comb `pair` type is represented as a
+    /// sequence, for consistency with `PACK`.
+    fn into_micheline_optimized_legacy(
+        self,
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+    ) -> Micheline<'a>;
+}
+
 /// Pattern synonym matching all type primitive applications. Useful for total
 /// matches.
 macro_rules! micheline_types {
