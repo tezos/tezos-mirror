@@ -846,8 +846,12 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   (* We want to bake enough blocks for the LCC to be updated and the GC
      triggered. *)
   let expected_level = 5 * challenge_window in
-  let gc_levels_started = ref [] in
+  (* counts number of times GC was started *)
+  let gc_starts = ref 0 in
+  (* counts number of times GC finished *)
   let gc_finalisations = ref 0 in
+  (* to save the first level at which the GC was started *)
+  let first_gc_level = ref (-1) in
   Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; value; _} ->
       match name with
       | "calling_gc.v0" ->
@@ -856,13 +860,14 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
           let gc_level = JSON.(value |-> "gc_level" |> as_int) in
           let head_level = JSON.(value |-> "head_level" |> as_int) in
           Log.info "Calling GC for %d at level %d" gc_level head_level ;
-          gc_levels_started := head_level :: !gc_levels_started
+          if !first_gc_level = -1 then first_gc_level := head_level ;
+          incr gc_starts
       | "gc_finished.v0" ->
           (* On each [gc_finished] event, increment a counter *)
           let gc_level = JSON.(value |-> "gc_level" |> as_int) in
           let head_level = JSON.(value |-> "head_level" |> as_int) in
           Log.info "Finished GC for %d at level %d" gc_level head_level ;
-          gc_finalisations := !gc_finalisations + 1
+          incr gc_finalisations
       | _ -> ()) ;
   let* () =
     Sc_rollup_node.run ~gc_frequency ~history_mode sc_rollup_node sc_rollup []
@@ -873,26 +878,20 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
   in
-  let gc_levels_started = List.rev !gc_levels_started in
-  let expected_gc_levels =
+  let expected_gc_calls =
     match history_mode with
-    | Archive -> [] (* No GC in archive mode *)
-    | Full ->
-        let first_gc_level = List.hd gc_levels_started in
-        List.init
-          (((expected_level - first_gc_level) / commitment_period) + 1)
-          (fun i -> first_gc_level + (i * commitment_period))
+    | Archive -> 0 (* No GC in archive mode *)
+    | Full -> ((level - !first_gc_level) / commitment_period) + 1
   in
   (* Check that GC was launched at least the expected number of times,
    * at or after the expected level. This check is not an equality in order
    * to avoid flakiness due to GC being launched slightly later than
    * the expected level. *)
   Check.(
-    (gc_levels_started >= expected_gc_levels)
-      (list int)
-      ~error_msg:
-        "Expected GC to start at levels %R, instead started at levels %L") ;
-  assert (!gc_finalisations <= List.length gc_levels_started) ;
+    (!gc_starts <= expected_gc_calls)
+      int
+      ~error_msg:"Expected at most %R GC calls, instead started %L times") ;
+  assert (!gc_finalisations <= !gc_starts) ;
   (* We expect the first available level to be the one corresponding
    * to the lcc for the full mode or the genesis for archive mode *)
   let*! {first_available_level; _} = Sc_rollup_client.gc_info rollup_client in

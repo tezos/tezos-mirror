@@ -88,7 +88,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   let level = head.level in
-  let* () = Node_context.gc node_ctxt ~level in
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
@@ -214,6 +213,7 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       let*! () =
         Daemon_event.new_head_processed head.hash head.level process_time
       in
+      let* () = Node_context.gc node_ctxt ~level:head.level in
       return_unit
 
 let update_l2_chain state ~catching_up head =
