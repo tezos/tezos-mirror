@@ -25,7 +25,7 @@ kaitai_checks:
   before_script:
     - . ./scripts/version.sh
   script:
-    - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files
+    - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files` and commit the resulting diff.' ; false)
 
 check_lift_limits_patch:
   extends:
