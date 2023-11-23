@@ -258,8 +258,6 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let next_protocol = function Nairobi -> Some Alpha | Alpha -> None
-
 let previous_protocol = function Alpha -> Some Nairobi | Nairobi -> None
 
 let has_predecessor p = previous_protocol p <> None
