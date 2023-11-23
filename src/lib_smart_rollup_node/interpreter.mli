@@ -46,7 +46,7 @@ val process_head :
     from [start_state]. *)
 val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
-  _ Node_context.t ->
+  Node_context.rw ->
   ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
   int32 ->

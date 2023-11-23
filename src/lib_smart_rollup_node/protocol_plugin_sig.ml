@@ -255,7 +255,7 @@ module type REFUTATION_GAME_HELPERS = sig
     has [default_number_of_sections] if there are enough ticks. *)
   val make_dissection :
     (module PARTIAL) ->
-    _ Node_context.t ->
+    Node_context.rw ->
     start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->

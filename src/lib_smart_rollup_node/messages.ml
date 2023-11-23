@@ -48,6 +48,13 @@ let find node_ctxt messages_hash =
         (* The messages do not contain the internal protocol messages, we add
            them back. NOTE: this requires to potentially make L1 rpc calls. *)
         let* messages = add_all_messages node_ctxt ~messages ~pred_hash in
+        let* () =
+          Node_context.save_messages
+            node_ctxt
+            messages_hash
+            ~predecessor:pred_hash
+            messages
+        in
         return_some messages
 
 let get node_ctxt messages_hash =
