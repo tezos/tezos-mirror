@@ -113,28 +113,32 @@ path patterns associated to the test. Each of the fields `tags` and
 `path_patterns` are optional, and their absence is interpreted as the
 empty list.
 
-
-For instance, a valid `TESTOWNERS.json` is:
+Note that `path_patterns` should be acceptable by the `--match` option
+or the `=~` TSL operator in Tezt. For instance, a valid
+`TESTOWNERS.json` is:
 
 ```json
 {
     "layer1": {
         "tags": ["michelson"],
         "path_patterns": [
-            "^src/proto_alpha/lib_protocol/"
+            "^src/proto_.*/lib_protocol/"
         ]
     }
 }
 ```
 
-This file defines one product `layer1` and declares that all tests
+This example defines a product called `layer1` and declares that all tezts
 tagged `michelson` or which are registered with `~__FILE__` in
-`src/proto_alpha/lib_protocol/` belong to that product. Or in other
-words, the union of the results returned by:
+`src/proto_.*/lib_protocol/` (that is,
+`/src/proto_alpha/lib_protocol` but also similar tests for any other
+supported Tezos protocol) belong to the Layer 1 product.
+
+In other words, this TEZTOWNERS entry declares the Layer 1 product to
+be the owner of the union of the results returned by:
 
 ```
-tezt --match "^src/proto_alpha/lib_protocol/"
-tezt michelson
+tezt 'michelson || file =~ "^src/proto_.*\/lib_protocol/"'
 ```
 
 To see all the tests associated with a product, run:

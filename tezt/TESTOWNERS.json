@@ -9,26 +9,31 @@
   },
   "layer1": {
     "tags": [
+      "mempool",
+      "p2p",
       "protocol",
       "protocol_cache",
       "protocol_table",
+      "stresstest",
       "transaction",
       "transfer"
     ],
     "path_patterns": [
       "^src/lib_requester",
-      "^src/proto_alpha/lib_delegate",
+      "^src/proto_.*/lib_protocol",
+      "^src/proto_.*/lib_delegate",
       "^devtools/yes_wallet"
     ]
   },
   "tezos2": {
     "tags": [
       "dac",
-      "dac_node"
+      "dac_node",
+      "vdf"
     ],
     "path_patterns": [
       "^src/lib_aplonk",
-      "^src/lib_distributed_aplonk"
+      "^src/lib_distributed_plonk"
     ]
   },
   "etherlink": {
