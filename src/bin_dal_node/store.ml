@@ -128,12 +128,13 @@ module Shards = struct
     init ~lru_size:Constants.shards_store_lru_size (fun commitment ->
         let commitment_string = Cryptobox.Commitment.to_b58check commitment in
         let filepath = dir_path // commitment_string in
-        directory
+        layout
           ~encoded_value_size:(Value_size_hooks.share_size ())
-          Cryptobox.share_encoding
-          filepath
-          Stdlib.( = )
-          Fun.id)
+          ~encoding:Cryptobox.share_encoding
+          ~filepath
+          ~eq:Stdlib.( = )
+          ~index_of:Fun.id
+          ())
 end
 
 module Shard_proofs_cache =
