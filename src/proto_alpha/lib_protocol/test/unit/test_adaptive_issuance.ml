@@ -47,8 +47,7 @@ let test_reward_coefficient () =
         csts
         ~reward_kind:Baking_reward_fixed_portion)
   in
-  assert (Tez.(equal (mul_exn default 4) default_times_4)) ;
-  return_unit
+  Assert.equal_tez ~loc:__LOC__ (Tez.mul_exn default 4) default_times_4
 
 let test_reward_coeff_ratio () =
   let open Delegate.Rewards.Internal_for_tests in
