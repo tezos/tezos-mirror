@@ -57,6 +57,10 @@ Node
   was emitted every time a block was applied using an old protocol
   where its plugin was removed.
 
+- **Breaking change** Removed the deprecated ``/monitor/valid_blocks``
+  RPC. Instead, use the ``/monitor/applied_blocks`` RPC that has the
+  same behaviour.
+
 Client
 ------
 
