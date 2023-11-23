@@ -80,7 +80,7 @@ let test_balances ~amount =
   (* check that after the block has been baked, the source was debited of all
      the burned tez *)
   let* {parametric = {cost_per_byte; _}; _} = Context.get_constants (I inc) in
-  let burned_tez = Tez.mul_exn cost_per_byte (Z.to_int amount) in
+  let burned_tez = Test_tez.(cost_per_byte *! Z.to_int64 amount) in
   let* () =
     Assert.balance_was_debited
       ~loc:__LOC__

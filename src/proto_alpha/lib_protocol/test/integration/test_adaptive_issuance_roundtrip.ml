@@ -140,7 +140,7 @@ let quantity_to_tez all qty =
   | All -> all
   | All_but_one ->
       if Tez.(equal all zero) then Tez.zero else Tez.(all -! one_mutez)
-  | Half -> Tez.div_exn all 2
+  | Half -> Test_tez.(all /! 2L)
   | Max_tez -> Tez.max_mutez
   | Amount a -> a
 
@@ -300,11 +300,11 @@ module State = struct
     else
       let delta_time =
         Protocol.Alpha_context.Raw_level.diff current_level last_level_rewards
-        |> Int32.to_int
+        |> Int64.of_int32
       in
       let {parameters = _; pkh; _} = find_account baker state in
-      let delta_rewards = Tez.mul_exn rewards_per_block delta_time in
-      if delta_time = 1 then
+      let delta_rewards = Test_tez.(rewards_per_block *! delta_time) in
+      if delta_time = 1L then
         Log.info ~color:tez_color "+%aꜩ" Tez.pp rewards_per_block
       else assert false ;
       let* to_liquid =
