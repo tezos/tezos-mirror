@@ -444,36 +444,36 @@ let block_callback =
               return_unit
           in
           let* () =
-            (* This data is non-redondant: we always treat it. *)
-            Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-              (fun r ->
-                let open Teztale_lib.Data.Block in
-                Db.exec
-                  Sql_requests.insert_received_block
-                  (r.application_time, r.validation_time, hash, source))
-              reception_times
+            (* Validated blocks do not provide operations only applied
+               one does so we need a second cache *)
+            if Block_lru_cache.mem block_operations_cache hash then return_unit
+            else
+              let* () =
+                insert_operations_from_block
+                  (module Db)
+                  (Int32.pred level)
+                  hash
+                  endorsements
+              in
+              let* () =
+                insert_operations_from_block
+                  (module Db)
+                  level
+                  hash
+                  preendorsements
+              in
+              if endorsements <> [] then
+                Block_lru_cache.add block_operations_cache hash ;
+              return_unit
           in
-          (* Validated blocks do not provide operations only applied
-             one does so we need a second cache *)
-          if Block_lru_cache.mem block_operations_cache hash then return_unit
-          else
-            let* () =
-              insert_operations_from_block
-                (module Db)
-                (Int32.pred level)
-                hash
-                endorsements
-            in
-            let* () =
-              insert_operations_from_block
-                (module Db)
-                level
-                hash
-                preendorsements
-            in
-            if endorsements <> [] then
-              Block_lru_cache.add block_operations_cache hash ;
-            return_unit)
+          (* This data is non-redondant: we always treat it. *)
+          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+            (fun r ->
+              let open Teztale_lib.Data.Block in
+              Db.exec
+                Sql_requests.insert_received_block
+                (r.application_time, r.validation_time, hash, source))
+            reception_times)
         db_pool
     in
     with_caqti_error out (fun () ->
