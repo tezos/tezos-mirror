@@ -2906,10 +2906,12 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
 let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?(keys = Constant.all_secret_keys) tag () =
+    ?(keys = Constant.all_secret_keys) ?rpc_local tag () =
   match tag with
   | (`Client | `Proxy) as mode ->
-      let* node = Node.init ?event_level ?event_sections_levels nodes_args in
+      let* node =
+        Node.init ?event_level ?event_sections_levels ?rpc_local nodes_args
+      in
       let endpoint = Node node in
       let mode =
         match mode with
@@ -2930,7 +2932,7 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file ?timestamp ?keys tag ~protocol () =
+    ?parameter_file ?timestamp ?keys ?rpc_local tag ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -2942,6 +2944,7 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       ?event_sections_levels
       ?nodes_args
       ?keys
+      ?rpc_local
       tag
       ()
   in

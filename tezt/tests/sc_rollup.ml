@@ -132,7 +132,8 @@ let wait_for_current_level node ?timeout sc_rollup_node =
 
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
-    ?(src = Constant.bootstrap1.alias) {variant; tags; description} scenario =
+    ?(src = Constant.bootstrap1.alias) ?rpc_local {variant; tags; description}
+    scenario =
   let tags = kind :: tags in
   register_test
     ?supports
@@ -147,6 +148,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
       ?challenge_window
       ?timeout
       ?whitelist_enable
+      ?rpc_local
       protocol
   in
   let* sc_rollup =
@@ -3014,7 +3016,6 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
   let operator = Constant.bootstrap1.public_key_hash in
   let commitment_period = 5 in
   let challenge_window = 5 in
-  Log.info "Start the rollup in Operator mode" ;
   test_full_scenario
     ~kind
     {
@@ -3032,6 +3033,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
              sc_rollup
              tezos_node
              tezos_client ->
+  let () = Log.info "Start the rollup in Operator mode" in
   let* () =
     Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
   in
@@ -5072,15 +5074,19 @@ let custom_mode_empty_operation_kinds ~kind =
    block. *)
 let test_multiple_batcher_key ~kind =
   test_l1_scenario
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6650
+
+     also might be related to https://gitlab.com/tezos/tezos/-/issues/3014
+
+     Test is flaky without rpc_local:true and it seems to be related to this issue. When
+     investigating it seems that the sink used by the octez node has a
+     race condition between process, it seems it due to the rpc server
+     being run in a separate process. *)
+    ~rpc_local:true
     ~kind
     {
       variant = None;
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3014
-
-         Test is flaky and it seems to be related to this issue. When
-         investigating it seems that the sink used by the octez node
-         has a race condition in between events. *)
-      tags = [Tag.flaky; "node"; "mode"; "batcher"];
+      tags = ["node"; "mode"; "batcher"];
       description = "multiple keys set for batcher";
     }
   @@ fun protocol sc_rollup tezos_node client ->
