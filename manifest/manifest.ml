@@ -1838,7 +1838,8 @@ module Target = struct
       if
         not
           (String.starts_with ~prefix:"src/" path
-          || String.starts_with ~prefix:"tezt/" path)
+          || String.starts_with ~prefix:"tezt/" path
+          || String.starts_with ~prefix:"etherlink/" path)
       then
         invalid_argf
           "A target has the release status %s but is located at %s which is \
