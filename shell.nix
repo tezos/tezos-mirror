@@ -10,15 +10,7 @@ let
   kernelPackageSet =
     [
       # Packages required to build & develop kernels
-      (pkgs.rust-bin.stable."1.71.1".default.override {
-        extensions = ["rust-src"];
-        targets = [
-          "wasm32-unknown-unknown"
-          "riscv64gc-unknown-linux-gnu"
-          "riscv64gc-unknown-none-elf"
-        ];
-      })
-      pkgs.rust-analyzer
+      pkgs.rustup
       pkgs.wabt
 
       # Bring Clang into scope in case the stdenv doesn't come with it already.
