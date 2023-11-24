@@ -21,6 +21,8 @@
 
 ### Installer client/kernel
 
+- Remove unused dependency on `blst` crate, to simplify installation.
+
 ## Version 0.2.1
 
 ### SDK

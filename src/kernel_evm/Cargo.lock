@@ -929,16 +929,6 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "nom"
-version = "6.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c5c51b9083a3c620fa67a2a635d1ce7d95b897e957d6b28ff9a5da960a103a6"
-dependencies = [
- "memchr",
- "version_check",
-]
-
-[[package]]
-name = "nom"
 version = "7.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
@@ -1617,7 +1607,7 @@ name = "tezos-smart-rollup-encoding"
 version = "0.2.1"
 dependencies = [
  "hex",
- "nom 7.1.3",
+ "nom",
  "num-bigint",
  "num-traits",
  "tezos-smart-rollup-core",
@@ -1655,7 +1645,7 @@ name = "tezos-smart-rollup-installer-config"
 version = "0.2.1"
 dependencies = [
  "hex",
- "nom 6.2.1",
+ "nom",
  "serde",
  "serde_yaml",
  "tezos-smart-rollup-core",
@@ -1730,7 +1720,7 @@ dependencies = [
  "bitvec",
  "hex",
  "lazy_static",
- "nom 7.1.3",
+ "nom",
  "num-bigint",
  "num-traits",
  "serde",

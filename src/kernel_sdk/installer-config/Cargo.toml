@@ -34,7 +34,7 @@ version = "0.2.1"
 default-features = false
 
 [dependencies.nom]
-version = "6.1"
+version = "7.1"
 default-features = false
 
 [dependencies.tezos_data_encoding]

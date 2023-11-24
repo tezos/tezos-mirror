@@ -848,7 +848,7 @@ mod tests {
         let expected = Message::new(
             level,
             id,
-            Box::new([byte; MAX_INPUT_MESSAGE_SIZE / FRACTION]).to_vec(),
+            [byte; MAX_INPUT_MESSAGE_SIZE / FRACTION].to_vec(),
         );
 
         assert_eq!(Ok(Some(expected)), outcome);
