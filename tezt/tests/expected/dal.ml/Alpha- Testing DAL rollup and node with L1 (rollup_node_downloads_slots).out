@@ -62,21 +62,3 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.875
 
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/processed_slots
-[ { "index": 0, "status": "unconfirmed" },
-  { "index": 1, "status": "confirmed" },
-  { "index": 2, "status": "confirmed" },
-  { "index": 3, "status": "unconfirmed" },
-  { "index": 4, "status": "unconfirmed" },
-  { "index": 5, "status": "unconfirmed" },
-  { "index": 6, "status": "unconfirmed" },
-  { "index": 7, "status": "unconfirmed" },
-  { "index": 8, "status": "unconfirmed" },
-  { "index": 9, "status": "unconfirmed" },
-  { "index": 10, "status": "unconfirmed" },
-  { "index": 11, "status": "unconfirmed" },
-  { "index": 12, "status": "unconfirmed" },
-  { "index": 13, "status": "unconfirmed" },
-  { "index": 14, "status": "unconfirmed" },
-  { "index": 15, "status": "unconfirmed" } ]
