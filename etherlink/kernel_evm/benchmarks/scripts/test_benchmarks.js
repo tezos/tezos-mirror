@@ -10,7 +10,7 @@
 // $ make -f kernels.mk evm_benchmark_installer.wasm
 
 // Then run this script using the following command
-// $ node src/kernel_evm/kernel_benchmark/scripts/test_benchmarks.js
+// $ node etherlink/kernel_evm/kernel_benchmark/scripts/test_benchmarks.js
 
 // There are two output files, one for the transactions and one for the kernel
 // runs.

@@ -6,10 +6,10 @@
 
 // Before running this script, run the following commands to build the debugger and the benchmark kernel
 // $ make
-// $ make -C src/kernel_evm/
+// $ make -C etherlink/kernel_evm/
 
 // Then run this script using the following command
-// $ node src/kernel_evm/kernel_benchmark/scripts/run_benchmarks.js
+// $ node etherlink/kernel_evm/kernel_benchmark/scripts/run_benchmarks.js
 
 // Each row of the output file represents the processing of one message in the kernel
 // Each value represents a cost. "gas_cost" is the cost in gas in the EVM, and the other values are costs in ticks in the PVM
