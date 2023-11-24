@@ -5,11 +5,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent};
+use crate::{
+    inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent},
+    sequencer_blueprint::SequencerBlueprint,
+};
 use primitive_types::{H160, U256};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::{
+    rlp_helpers::FromRlpBytes,
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
     tx_common::EthereumTransactionCommon,
     wei::eth_from_mutez,
@@ -61,6 +65,8 @@ const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
 
 const TRANSACTION_CHUNK_TAG: u8 = 2;
 
+const SEQUENCER_BLUEPRINT_TAG: u8 = 3;
+
 pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 1 // ExternalMessageFrame tag
             - 20 // Smart rollup address size (ExternalMessageFrame::Targetted)
@@ -87,6 +93,7 @@ pub enum Input {
     },
     Simulation,
     Info(InfoPerLevel),
+    SequencerBlueprint(SequencerBlueprint),
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -196,6 +203,12 @@ impl InputResult {
         }
     }
 
+    fn parse_sequencer_blueprint_input(bytes: &[u8]) -> Self {
+        let seq_blueprint: SequencerBlueprint =
+            parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+        InputResult::Input(Input::SequencerBlueprint(seq_blueprint))
+    }
+
     // External message structure :
     // EXTERNAL_TAG 1B / FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
     fn parse_external(input: &[u8], smart_rollup_address: &[u8]) -> Self {
@@ -214,6 +227,7 @@ impl InputResult {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
             NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
             TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(remaining),
+            SEQUENCER_BLUEPRINT_TAG => Self::parse_sequencer_blueprint_input(remaining),
             _ => InputResult::Unparsable,
         }
     }
