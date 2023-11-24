@@ -252,6 +252,7 @@ pub mod interpret_cost {
     // make a lot of sense.
     pub const APPLY: u32 = 140;
     pub const TICKET: u32 = 10;
+    pub const READ_TICKET: u32 = 10;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol

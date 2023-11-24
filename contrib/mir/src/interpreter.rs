@@ -794,6 +794,12 @@ fn interpret_one<'a>(
                 stack.push(V::new_option(Some(V::new_ticket(ticket))));
             }
         }
+        I::ReadTicket => {
+            ctx.gas.consume(interpret_cost::READ_TICKET)?;
+            stack.push(unwrap_ticket(
+                irrefutable_match!(&stack[0]; V::Ticket).as_ref().clone(),
+            ));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -2576,6 +2582,38 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::TICKET + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn read_ticket() {
+        let mut ctx = Ctx::default();
+        let ticket = crate::ast::Ticket {
+            ticketer: ctx.self_address.clone(),
+            amount: 100u32.into(),
+            content: V::Unit,
+        };
+        let ticket_val = V::new_ticket(ticket.clone());
+        let mut stack = stk![ticket_val.clone()];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[ReadTicket], &mut ctx, &mut stack), Ok(()));
+        let ticketer_address = super::Address {
+            hash: ticket.ticketer,
+            entrypoint: Entrypoint::default(),
+        };
+        assert_eq!(
+            stack,
+            stk![
+                ticket_val,
+                V::new_pair(
+                    V::Address(ticketer_address),
+                    V::new_pair(V::Unit, V::nat(100))
+                ),
+            ]
+        );
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::READ_TICKET + interpret_cost::INTERPRET_RET
         );
     }
 

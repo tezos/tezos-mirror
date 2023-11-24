@@ -1261,6 +1261,17 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(TICKET, [], _), [] | [_]) => no_overload!(TICKET, len 2),
         (App(TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(READ_TICKET, [], _), [.., T::Ticket(t)]) => {
+            stack.push(T::new_pair(
+                T::Address,
+                T::new_pair(t.as_ref().clone(), T::Nat),
+            ));
+            I::ReadTicket
+        }
+        (App(READ_TICKET, [], _), [.., _]) => no_overload!(READ_TICKET),
+        (App(READ_TICKET, [], _), []) => no_overload!(READ_TICKET, len 1),
+        (App(READ_TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -4724,6 +4735,34 @@ mod typecheck_tests {
         assert_eq!(
             stk,
             &tc_stk![Type::new_option(Type::new_ticket(Type::Unit))]
+        );
+    }
+
+    #[test]
+    fn read_ticket() {
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("READ_TICKET").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::READ_TICKET,
+                stack: stk![Type::Nat],
+                reason: None
+            })
+        );
+
+        let test_ticket = Type::new_ticket(Type::Int);
+        let stk = &mut tc_stk![test_ticket.clone()];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("READ_TICKET").unwrap(), &mut ctx, stk),
+            Ok(ReadTicket)
+        );
+        assert_eq!(
+            stk,
+            &tc_stk![
+                test_ticket,
+                Type::new_pair(Type::Address, Type::new_pair(Type::Int, Type::Nat)),
+            ]
         );
     }
 

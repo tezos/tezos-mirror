@@ -429,6 +429,7 @@ pub enum Instruction<'a> {
     Apply {
         arg_ty: Type,
     },
+    ReadTicket,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
