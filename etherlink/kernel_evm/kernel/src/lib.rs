@@ -39,6 +39,7 @@ mod apply;
 mod block;
 mod block_in_progress;
 mod blueprint;
+mod blueprint_storage;
 mod error;
 mod inbox;
 mod indexable_storage;
@@ -454,7 +455,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&mut host).is_err(),
+            storage::read_current_block_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -498,7 +499,7 @@ mod tests {
 
         // test there is a new block
         assert!(
-            storage::read_current_block_number(&mut host)
+            storage::read_current_block_number(&host)
                 .expect("should have found a block number")
                 > U256::zero(),
             "There should have been multiple blocks registered"

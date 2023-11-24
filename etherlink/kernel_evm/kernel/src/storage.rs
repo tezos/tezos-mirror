@@ -124,7 +124,7 @@ fn store_read_empty_safe<Host: Runtime>(
 }
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
-    host: &mut Host,
+    host: &Host,
     path: &T,
     buffer: &mut [u8],
     expected_size: usize,
@@ -168,7 +168,7 @@ fn read_address(host: &impl Runtime, path: &OwnedPath) -> Result<H160, Error> {
     Ok(H160::from_slice(&bytes))
 }
 
-fn write_u256(
+pub fn write_u256(
     host: &mut impl Runtime,
     path: &OwnedPath,
     value: U256,
@@ -199,7 +199,7 @@ pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
 }
 
-pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+pub fn read_current_block_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_NUMBER)?;
     let mut buffer = [0_u8; 8];
     store_read_slice(host, &path, &mut buffer, 8)?;
@@ -222,7 +222,7 @@ pub fn store_rlp<T: Encodable, Host: Runtime>(
     host.store_write_all(path, &bytes).map_err(Error::from)
 }
 
-fn read_rlp<T: Decodable, Host: Runtime>(
+pub fn read_rlp<T: Decodable, Host: Runtime>(
     host: &Host,
     path: &impl Path,
 ) -> Result<T, Error> {
