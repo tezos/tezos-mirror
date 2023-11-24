@@ -24,7 +24,7 @@ ethbloom = { version = "0.13.0", default-features = false, features = ["rlp"] }
 # serialization
 hex = "0.4"
 hex-literal = "0.4.1"
-tezos_data_encoding = "0.5"
+tezos_data_encoding = "0.5.2"
 const-decoder = { version = "0.3.0" }
 rlp = "0.5.2"
 
@@ -35,7 +35,7 @@ evm = { version = "0.39.1", default-features = false }
 sha2 = { version = "0.10.6", default-features = false }
 sha3 = { version = "0.10.6", default-features = false }
 ripemd = { version = "0.1.3", default-features = false }
-tezos_crypto_rs = { version = "0.5", default-features = false }
+tezos_crypto_rs = { version = "0.5.2", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false, features = [
   "static-context",
   "hmac",
@@ -52,12 +52,15 @@ tezos-smart-rollup-core = { path = "../kernel_sdk/core", features = [
 ] }
 tezos-smart-rollup-host = { path = "../kernel_sdk/host", features = [
   "proto-nairobi",
-  "std",
 ] }
 tezos-smart-rollup-panic-hook = { path = "../kernel_sdk/panic-hook" }
 tezos-smart-rollup-entrypoint = { path = "../kernel_sdk/entrypoint" }
 tezos-smart-rollup-debug = { path = "../kernel_sdk/debug" }
-tezos-smart-rollup-encoding = { path = "../kernel_sdk/encoding" }
+tezos-smart-rollup-encoding = { path = "../kernel_sdk/encoding", default-features = false, features = [
+  "alloc",
+  "tezos-encoding",
+  "crypto",
+] }
 tezos-smart-rollup-installer-config = { path = "../kernel_sdk/installer-config" }
 tezos-smart-rollup-mock = { path = "../kernel_sdk/mock", features = [
   "proto-nairobi",

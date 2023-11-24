@@ -27,10 +27,10 @@ path = "../kernel_sdk/mock"
 version = "0.2.0"
 
 [dependencies.tezos_data_encoding]
-version = "0.5"
+version = "0.5.2"
 
 [dependencies.tezos_data_encoding_derive]
-version = "0.5"
+version = "0.5.2"
 
 [dependencies.nom]
 version = "7.1"
@@ -42,6 +42,8 @@ default-features = false
 [dependencies.tezos-smart-rollup-encoding]
 path = "../kernel_sdk/encoding"
 version = "0.2.0"
+default-features = false
+features = ["alloc", "tezos-encoding", "crypto"]
 
 [dependencies.tezos-smart-rollup-debug]
 path = "../kernel_sdk/debug"
@@ -51,7 +53,7 @@ version = "0.2.0"
 version = "0.4"
 
 [dev-dependencies.tezos_crypto_rs]
-version = "0.5.0"
+version = "0.5.2"
 default-features = false
 
 [dev-dependencies.hex]

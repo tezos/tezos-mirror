@@ -34,6 +34,8 @@ version = "0.2.1"
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
 version = "0.2.1"
+default-features = false
+features = ["alloc", "tezos-encoding", "crypto"]
 
 [dev-dependencies.tezos-smart-rollup-core]
 path = "../core"
