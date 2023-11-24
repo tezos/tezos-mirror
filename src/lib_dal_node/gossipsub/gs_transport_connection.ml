@@ -77,8 +77,9 @@ module Events = struct
       ("failure", trace_encoding)
 end
 
-(** This module implements a cache of alternative peers (alternative PX)
-    advertised by P2P neighbors within Prune messages.
+(** This module implements a cache of alternative peers (aka PX peers), that is,
+    peers we are not (yet) connected to, advertised by P2P neighbors within
+    Prune messages.
 
     The cache associates a P2P point to each pair made of the advertised peer
     and the peer that advertised it. In case of redundancy, the last advertised
@@ -99,57 +100,60 @@ module PX_cache : sig
       [2048]. *)
   val create : ?size:int -> unit -> t
 
-  (** [insert t ~origin ~px point] associates the given [point] to [(origin,
-      px)] pair of peers. If a point already exists for the pair, it is
-      overwritten.  *)
-  val insert : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t -> unit
+  (** [insert t ~origin ~px_peer point] associates the given [point] to
+      [(origin, px_peer)] pair of peers. If a point already exists for the pair,
+      it is overwritten.  *)
+  val insert :
+    t -> origin:origin -> px_peer:P2p_peer.Id.t -> P2p_point.Id.t -> unit
 
-  (** [find_opt t ~origin ~px] returns the content associated to the entry
+  (** [find_opt t ~origin ~px_peer] returns the content associated to the entry
       [(origin, px)] in the cache, if any. *)
-  val find_opt : t -> origin:origin -> px:P2p_peer.Id.t -> P2p_point.Id.t option
+  val find_opt :
+    t -> origin:origin -> px_peer:P2p_peer.Id.t -> P2p_point.Id.t option
 
-  (** [drop t ~origin ~px] drops the entry [(origin, px)] from the cache. *)
-  val drop : t -> origin:origin -> px:P2p_peer.Id.t -> unit
+  (** [drop t ~origin ~px_peer] drops the entry [(origin, px_peer)] from the cache. *)
+  val drop : t -> origin:origin -> px_peer:P2p_peer.Id.t -> unit
 end = struct
   type origin = Worker.peer_origin
 
-  type key = {origin : origin; px : P2p_peer.Id.t}
+  type key = {origin : origin; px_peer : P2p_peer.Id.t}
 
   module Table = Hashtbl.Make (struct
     type t = key
 
-    let equal {origin; px} k2 =
-      P2p_peer.Id.equal px k2.px
+    let equal {origin; px_peer} k2 =
+      P2p_peer.Id.equal px_peer k2.px_peer
       &&
       match (origin, k2.origin) with
       | PX peer1, PX peer2 -> P2p_peer.Id.equal peer1 peer2
       | Trusted, Trusted -> true
       | PX _, _ | Trusted, _ -> false
 
-    let hash {origin; px} =
+    let hash {origin; px_peer} =
       match origin with
-      | PX peer -> (P2p_peer.Id.hash px * 31) + P2p_peer.Id.hash peer
-      | Trusted -> P2p_peer.Id.hash px * 17
+      | PX peer -> (P2p_peer.Id.hash px_peer * 31) + P2p_peer.Id.hash peer
+      | Trusted -> P2p_peer.Id.hash px_peer * 17
   end)
 
   type t = P2p_point.Id.t Table.t
 
   let create ?(size = 2048) () = Table.create size
 
-  let insert table ~origin ~px point = Table.replace table {px; origin} point
+  let insert table ~origin ~px_peer point =
+    Table.replace table {px_peer; origin} point
 
-  let drop table ~origin ~px = Table.remove table {origin; px}
+  let drop table ~origin ~px_peer = Table.remove table {origin; px_peer}
 
-  let find_opt table ~origin ~px = Table.find_opt table {origin; px}
+  let find_opt table ~origin ~px_peer = Table.find_opt table {origin; px_peer}
 end
 
-(* [px_of_peer p2p_layer peer] returns the public IP address and port at which
+(* [px_peer_of_peer p2p_layer peer] returns the public IP address and port at which
    [peer] could be reached. For that, it first inspects information transmitted
    via connection metadata by the remote [peer]. If the address or port are
    missing from the connection's metadata, the function inspects the Internet
    connection link's information. It returns [None] if it does manage to get
    those information with both methods. *)
-let px_of_peer p2p_layer peer =
+let px_peer_of_peer p2p_layer peer =
   let open Option_syntax in
   let open Transport_layer_interface in
   let* conn = P2p.find_connection_by_peer_id p2p_layer peer in
@@ -180,9 +184,9 @@ let px_of_peer p2p_layer peer =
 (* This function inserts the point of a trusted peer into the [px_cache]
    table. *)
 let cache_point_of_trusted_peer p2p_layer px_cache peer =
-  px_of_peer p2p_layer peer
+  px_peer_of_peer p2p_layer peer
   |> Option.iter (fun Transport_layer_interface.{point; peer} ->
-         PX_cache.insert px_cache ~origin:Trusted ~px:peer point)
+         PX_cache.insert px_cache ~origin:Trusted ~px_peer:peer point)
 
 (** This handler forwards information about connections established by the P2P
     layer to the Gossipsub worker.
@@ -238,7 +242,7 @@ let wrap_p2p_message p2p_layer =
   function
   | W.Graft {topic} -> Graft {topic}
   | W.Prune {topic; px; backoff} ->
-      let px = Seq.filter_map (fun peer -> px_of_peer p2p_layer peer) px in
+      let px = Seq.filter_map (fun peer -> px_peer_of_peer p2p_layer peer) px in
       Prune {topic; px; backoff}
   | W.IHave {topic; message_ids} -> IHave {topic; message_ids}
   | W.IWant {message_ids} -> IWant {message_ids}
@@ -259,7 +263,12 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
         Seq.map
           (fun I.{point; peer} ->
             if Option.is_none @@ P2p.find_connection_by_peer_id p2p_layer peer
-            then PX_cache.insert px_cache ~origin:(PX from_peer) ~px:peer point ;
+            then
+              PX_cache.insert
+                px_cache
+                ~origin:(PX from_peer)
+                ~px_peer:peer
+                point ;
             peer)
           px
       in
@@ -271,18 +280,18 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Message_with_header {message; topic; message_id} ->
       Message_with_header {message; topic; message_id}
 
-let try_connect_to_peer p2p_layer px_cache ~px ~origin =
+let try_connect p2p_layer px_cache ~px_peer ~origin =
   let open Lwt_syntax in
-  (* If there is some [point] associated to [px] and advertised by [origin]
+  (* If there is some [point] associated to [px_peer] and advertised by [origin]
      on the [px_cache], we will try to connect to it. *)
-  match PX_cache.find_opt px_cache ~px ~origin with
+  match PX_cache.find_opt px_cache ~px_peer ~origin with
   | Some point ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5799
 
-         We may have an issues as described by the following scenario:
+         We may have an issue as described by the following scenario:
          - A legit pair [(point, peer)] is already known by P2P, but the remote
          peer is disconnected for some reason;
-         - Some (malicious) peer advertises a fake px [(point, peer')], where
+         - Some (malicious) peer advertises a fake px_peer [(point, peer')], where
          [peer'] is not the real peer id associated to the [point];
          - We try to connect to [point], setting at the same time that [peer']
          is the expected peer id for this point;
@@ -298,11 +307,11 @@ let try_connect_to_peer p2p_layer px_cache ~px ~origin =
          records" found, e.g., in Rust version, to check that the advertised
          (peer, point) pair alongside a timestamp are not faked. *)
       let* (_ : _ P2p.connection tzresult) =
-        P2p.connect ~expected_peer_id:px p2p_layer point
+        P2p.connect ~expected_peer_id:px_peer p2p_layer point
       in
       (match origin with
       | Trusted -> () (* Don't drop trusted points. *)
-      | PX _ -> PX_cache.drop px_cache ~px ~origin) ;
+      | PX _ -> PX_cache.drop px_cache ~px_peer ~origin) ;
       return_unit
   | _ -> return_unit
 
@@ -340,10 +349,10 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
           P2p.find_connection_by_peer_id p2p_layer peer
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
-      | Connect {px; origin} ->
-          try_connect_to_peer p2p_layer px_cache ~px ~origin
-      | Forget {px; origin} ->
-          PX_cache.drop px_cache ~px ~origin:(PX origin) ;
+      | Connect {peer; origin} ->
+          try_connect p2p_layer px_cache ~px_peer:peer ~origin
+      | Forget {peer; origin} ->
+          PX_cache.drop px_cache ~px_peer:peer ~origin:(PX origin) ;
           return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer

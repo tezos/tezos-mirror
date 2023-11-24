@@ -1125,12 +1125,12 @@ module type WORKER = sig
         (** End the connection with the peer [peer]. *)
     | Kick of {peer : GS.Peer.t}
         (** Kick the peer [peer]: the peer is disconnected and blacklisted.*)
-    | Connect of {px : GS.Peer.t; origin : peer_origin}
+    | Connect of {peer : GS.Peer.t; origin : peer_origin}
         (** Inform the p2p_output messages processor that we want to connect to
-            the peer [px] advertised by some other peer [origin]. *)
-    | Forget of {px : GS.Peer.t; origin : GS.Peer.t}
+            the peer [peer] advertised by some other peer [origin]. *)
+    | Forget of {peer : GS.Peer.t; origin : GS.Peer.t}
         (** Inform the p2p_output messages processor that we don't want to
-            connect to the peer [px] advertised by some other peer [origin]. *)
+            connect to the peer [peer] advertised by some other peer [origin]. *)
 
   (** The application layer will be advertised about full messages it's
       interested in. *)

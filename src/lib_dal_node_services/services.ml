@@ -111,8 +111,8 @@ let put_commitment_shards :
   Tezos_rpc.Service.put_service
     ~description:
       "Compute and save the shards of the slot associated to the given \
-       commitment. If the input's flag is true, the proofs associated with \
-       each given shards are also computed."
+       commitment. If the input's flag is true, the shard proofs are also \
+       computed."
     ~query:Tezos_rpc.Query.empty
     ~input:with_proof_encoding
     ~output:Data_encoding.unit
