@@ -232,6 +232,46 @@ let filter_valid_operations_up_to_quota inc (ops, quota) =
     return (inc, List.rev l)
   with Full (inc, l) -> return (inc, List.rev l)
 
+let filter_valid_managers_up_to_quota inc ~hard_gas_limit_per_block (ops, quota)
+    =
+  let open Lwt_syntax in
+  let {Tezos_protocol_environment.max_size; max_op} = quota in
+  let rec loop (inc, curr_size, nb_ops, remaining_gas, acc) = function
+    | [] -> return (inc, List.rev acc)
+    | {op; size = op_size; gas = op_gas; _} :: l -> (
+        match max_op with
+        | Some max_op when max_op = nb_ops + 1 -> return (inc, List.rev acc)
+        | None | Some _ -> (
+            if Gas.Arith.(remaining_gas < op_gas) then
+              (* If the remaining available gas is lower than the
+                 considered operation's gas, we ignore this operation. *)
+              loop (inc, curr_size, nb_ops, remaining_gas, acc) l
+            else
+              let new_size = curr_size + op_size in
+              if new_size > max_size then
+                (* We ignore the operation if summing its size to the
+                   size of managers operations already validated is
+                   greater than the quota. *)
+                loop (inc, curr_size, nb_ops, remaining_gas, acc) l
+              else
+                let packed_op = Prioritized_operation.packed op in
+                let* inc'_opt = validate_operation inc packed_op in
+                match inc'_opt with
+                | None -> loop (inc, curr_size, nb_ops, remaining_gas, acc) l
+                | Some inc' ->
+                    let new_remaining_gas =
+                      Gas.Arith.sub remaining_gas op_gas
+                    in
+                    loop
+                      ( inc',
+                        new_size,
+                        succ nb_ops,
+                        new_remaining_gas,
+                        packed_op :: acc )
+                      l))
+  in
+  loop (inc, 0, 0, hard_gas_limit_per_block, []) ops
+
 let filter_operations_with_simulation initial_inc fees_config
     ~hard_gas_limit_per_block {consensus; votes; anonymous; managers} =
   let open Lwt_result_syntax in
@@ -267,11 +307,10 @@ let filter_operations_with_simulation initial_inc fees_config
       managers
   in
   let*! inc, managers =
-    filter_valid_operations_up_to_quota
+    filter_valid_managers_up_to_quota
       inc
-      ( PrioritizedManagerSet.elements prioritized_managers
-        |> List.map (fun {op; _} -> Prioritized_operation.packed op),
-        managers_quota )
+      ~hard_gas_limit_per_block
+      (PrioritizedManagerSet.elements prioritized_managers, managers_quota)
   in
   let operations = [consensus; votes; anonymous; managers] in
   let operations_hash =
