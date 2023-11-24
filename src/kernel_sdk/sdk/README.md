@@ -60,6 +60,7 @@ export CC=clang
 | `panic-hook`    | ✅       |                                     | Print panics to debug log and abort           |
 | `dlmalloc`      | ✅       |                                     | Enables `dlmalloc` as default allocator       |
 | `crypto`        | ✅       | `tezos_crypto_rs`                   | Integration with `tezos_crypto_rs` types      |
+| `bls`           | ✅       | `tezos_crypto_rs/bls`               | Dac Certificate signature verification        |
 | `data-encoding` | ✅       | `tezos_data_encoding`               | Integration with `tezos_data_encoding` traits |
 | `testing`       | ❌       | `crypto`, `tezos_smart_rollup_mock` | Enables `MockHost` for writing tests          |
 
@@ -78,7 +79,7 @@ rust-version = "1.66"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tezos-smart-rollup = "0.2.1"
+tezos-smart-rollup = "0.2.2"
 tezos_data_encoding = "0.5"
 tezos_crypto_rs = { version = "0.5", default-features = false }
 nom = "7.1"

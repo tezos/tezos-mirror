@@ -9,12 +9,12 @@ optional = true
 
 [dependencies.tezos-smart-rollup-panic-hook]
 path = "../../kernel_sdk/panic-hook"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 
 [dependencies.tezos-smart-rollup]
 path = "../../kernel_sdk/sdk"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 features = ["debug_alloc", "proto-alpha-no-mock"]
 
