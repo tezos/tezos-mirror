@@ -946,7 +946,7 @@ val get_chain_block_context_smart_rollups_smart_rollup_commitment :
   sc_rollup:string ->
   hash:string ->
   unit ->
-  JSON.t t
+  Sc_rollup_rpc.commitment option t
 
 (** RPC: [GET: chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/staker/<staker>/staked_on_commitment] *)
 val get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment :

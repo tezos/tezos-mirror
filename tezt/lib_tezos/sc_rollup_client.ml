@@ -35,58 +35,6 @@ type t = {
   runner : Runner.t option;
 }
 
-type commitment = {
-  compressed_state : string;
-  inbox_level : int;
-  predecessor : string;
-  number_of_ticks : int;
-}
-
-type commitment_and_hash = {commitment : commitment; hash : string}
-
-type commitment_info = {
-  commitment_and_hash : commitment_and_hash;
-  first_published_at_level : int option;
-  published_at_level : int option;
-}
-
-type gc_info = {last_gc_level : int; first_available_level : int}
-
-let commitment_from_json json =
-  if JSON.is_null json then None
-  else
-    let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
-    let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
-    let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
-    let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
-    Some {compressed_state; inbox_level; predecessor; number_of_ticks}
-
-let commitment_with_hash_from_json json =
-  let hash, commitment_json =
-    (JSON.get "hash" json, JSON.get "commitment" json)
-  in
-  Option.map
-    (fun commitment -> {hash = JSON.as_string hash; commitment})
-    (commitment_from_json commitment_json)
-
-let commitment_info_from_json json =
-  let hash, commitment_json, first_published_at_level, published_at_level =
-    ( JSON.get "hash" json,
-      JSON.get "commitment" json,
-      JSON.get "first_published_at_level" json,
-      JSON.get "published_at_level" json )
-  in
-  Option.map
-    (fun commitment ->
-      {
-        commitment_and_hash = {hash = JSON.as_string hash; commitment};
-        first_published_at_level =
-          first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
-        published_at_level =
-          published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
-      })
-    (commitment_from_json commitment_json)
-
 let next_name = ref 1
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
@@ -301,35 +249,6 @@ let inspect_durable_state_value :
   | Subkeys ->
       rpc_req ()
       |> Runnable.map (fun json -> List.map JSON.as_string (JSON.as_list json))
-
-let last_stored_commitment ?hooks sc_client =
-  rpc_get ?hooks sc_client ["global"; "last_stored_commitment"]
-  |> Runnable.map commitment_with_hash_from_json
-
-let last_published_commitment ?hooks sc_client =
-  rpc_get ?hooks sc_client ["local"; "last_published_commitment"]
-  |> Runnable.map commitment_info_from_json
-
-let commitment ?hooks sc_client commitment_hash =
-  rpc_get ?hooks sc_client ["local"; "commitments"; commitment_hash]
-  |> Runnable.map commitment_info_from_json
-
-let gc_info ?hooks sc_client =
-  rpc_get ?hooks sc_client ["local"; "gc_info"]
-  |> Runnable.map @@ fun obj ->
-     {
-       last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
-       first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
-     }
-
-let get_dal_processed_slots ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "processed_slots"]
-  |> Runnable.map (fun json ->
-         JSON.as_list json
-         |> List.map (fun obj ->
-                let index = obj |> JSON.get "index" |> JSON.as_int in
-                let status = obj |> JSON.get "status" |> JSON.as_string in
-                (index, status)))
 
 let inject ?hooks sc_client messages =
   let messages_json =
