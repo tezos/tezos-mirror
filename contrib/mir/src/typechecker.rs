@@ -2576,10 +2576,8 @@ mod typecheck_tests {
 
     #[test]
     fn test_compare_gas_exhaustion() {
-        let mut ctx = Ctx {
-            gas: Gas::new(gas::tc_cost::INSTR_STEP),
-            ..Ctx::default()
-        };
+        let mut ctx = &mut Ctx::default();
+        ctx.gas = Gas::new(gas::tc_cost::INSTR_STEP);
         assert_eq!(
             typecheck_instruction(
                 &app!(COMPARE),

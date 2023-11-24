@@ -111,9 +111,9 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
     macro_rules! pop {
         ($($args:tt)*) => {
             crate::irrefutable_match::irrefutable_match!(
-              stack.pop().unwrap_or_else(|| unreachable_state());
-              $($args)*
-            )
+                stack.pop().unwrap_or_else(|| unreachable_state());
+                $($args)*
+                )
         };
     }
 
@@ -389,7 +389,7 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             let param = pop!();
             let mutez_amount = pop!(V::Mutez);
             let contract_address = pop!(V::Contract);
-            let counter: u64 = ctx.counter;
+            let counter = ctx.operation_counter();
             ctx.gas.consume(interpret_cost::TRANSFER_TOKENS)?;
             stack.push(TypedValue::new_operation(
                 Operation::TransferTokens(TransferTokens {
@@ -402,7 +402,7 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
         }
         I::SetDelegate => {
             let opt_keyhash = pop!(V::Option).map(|kh| irrefutable_match!(*kh; V::KeyHash));
-            let counter: u64 = ctx.counter;
+            let counter: u128 = ctx.operation_counter();
             ctx.gas.consume(interpret_cost::SET_DELEGATE)?;
             stack.push(TypedValue::new_operation(
                 Operation::SetDelegate(SetDelegate(opt_keyhash)),
@@ -1082,10 +1082,8 @@ mod interpreter_tests {
     #[test]
     fn amount() {
         let mut stack = stk![];
-        let mut ctx = Ctx {
-            amount: 100500,
-            ..Ctx::default()
-        };
+        let mut ctx = Ctx::default();
+        ctx.amount = 100500;
         assert_eq!(interpret(&vec![Amount], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Mutez(100500)]);
         assert_eq!(
@@ -1387,10 +1385,8 @@ mod interpreter_tests {
     #[test]
     fn chain_id_instr() {
         let chain_id = super::ChainId::from_base58_check("NetXynUjJNZm7wi").unwrap();
-        let ctx = &mut Ctx {
-            chain_id: chain_id.clone(),
-            ..Ctx::default()
-        };
+        let ctx = &mut Ctx::default();
+        ctx.chain_id = chain_id.clone();
         let start_milligas = ctx.gas.milligas();
         let stk = &mut stk![];
         assert_eq!(interpret(&vec![Instruction::ChainId], ctx, stk), Ok(()));
@@ -1404,10 +1400,8 @@ mod interpreter_tests {
     #[test]
     fn self_instr() {
         let stk = &mut stk![];
-        let ctx = &mut Ctx {
-            self_address: "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap(),
-            ..Ctx::default()
-        };
+        let ctx = &mut Ctx::default();
+        ctx.self_address = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap();
         assert_eq!(
             interpret(&vec![ISelf(Entrypoint::default())], ctx, stk),
             Ok(())
@@ -1433,14 +1427,14 @@ mod interpreter_tests {
             tt.param.clone()
         ];
         let ctx = &mut Ctx::default();
-        ctx.counter = 100;
+        ctx.set_operation_counter(100);
         let start_milligas = ctx.gas.milligas();
         assert_eq!(interpret(&vec![TransferTokens], ctx, stk), Ok(()));
         assert_eq!(
             stk,
             &stk![TypedValue::new_operation(
                 Operation::TransferTokens(tt),
-                100
+                101
             )]
         );
         assert_eq!(
@@ -1459,12 +1453,12 @@ mod interpreter_tests {
             sd.0.clone().unwrap()
         )))];
         let ctx = &mut Ctx::default();
-        ctx.counter = 100;
+        ctx.set_operation_counter(100);
         let start_milligas = ctx.gas.milligas();
         assert_eq!(interpret(&vec![I::SetDelegate], ctx, stk), Ok(()));
         assert_eq!(
             stk,
-            &stk![TypedValue::new_operation(Operation::SetDelegate(sd), 100)]
+            &stk![TypedValue::new_operation(Operation::SetDelegate(sd), 101)]
         );
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
@@ -1473,12 +1467,38 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn test_operation_counter() {
+        // Here we run two instructions that each generates an operation
+        // and check that the counter in the generated operations are incremented
+        // as expected.
+        use Instruction as I;
+        let sd = super::SetDelegate(Some(
+            KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
+        ));
+        let stk = &mut stk![
+            TypedValue::new_option(Some(TypedValue::KeyHash(sd.0.clone().unwrap()))),
+            TypedValue::new_option(Some(TypedValue::KeyHash(sd.0.clone().unwrap())))
+        ];
+        let ctx = &mut Ctx::default();
+        ctx.set_operation_counter(100);
+        assert_eq!(
+            interpret(&vec![I::SetDelegate, I::Swap, I::SetDelegate], ctx, stk),
+            Ok(())
+        );
+        assert_eq!(
+            stk,
+            &stk![
+                TypedValue::new_operation(Operation::SetDelegate(sd.clone()), 101),
+                TypedValue::new_operation(Operation::SetDelegate(sd), 102)
+            ]
+        );
+    }
+
+    #[test]
     fn self_instr_ep() {
         let stk = &mut stk![];
-        let ctx = &mut Ctx {
-            self_address: "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap(),
-            ..Ctx::default()
-        };
+        let ctx = &mut Ctx::default();
+        ctx.self_address = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap();
         assert_eq!(
             interpret(&vec![ISelf(Entrypoint::try_from("foo").unwrap())], ctx, stk),
             Ok(())

@@ -51,7 +51,7 @@ pub enum Operation {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OperationInfo {
     pub operation: Operation,
-    pub counter: u64,
+    pub counter: u128,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -212,7 +212,7 @@ impl TypedValue {
         Self::Or(Box::new(x))
     }
 
-    pub fn new_operation(o: Operation, c: u64) -> Self {
+    pub fn new_operation(o: Operation, c: u128) -> Self {
         Self::Operation(Box::new(OperationInfo {
             operation: o,
             counter: c,
