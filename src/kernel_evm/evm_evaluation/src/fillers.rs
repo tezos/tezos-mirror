@@ -172,12 +172,13 @@ fn check_storage(
                     let storage_value = value;
                     if current_storage_value != *storage_value {
                         *invalid_state = true;
-                        writeln!( host.buffer.borrow_mut(), "Account {}: storage don't match current one, {} was expected, but got {}.", hex_address, storage_value, current_storage_value).unwrap();
+                        writeln!( host.buffer.borrow_mut(), "Account {}: storage don't match current one for index {}, {} was expected, but got {}.", hex_address, index, storage_value, current_storage_value).unwrap();
                     } else {
                         writeln!(
                             host.buffer.borrow_mut(),
-                            "Account {}: storage matched.",
-                            hex_address
+                            "Account {}: storage matched for index {}.",
+                            hex_address,
+                            index
                         )
                         .unwrap();
                     }
