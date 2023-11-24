@@ -4,6 +4,10 @@
 
 ### EVM Kernel
 
+- Fix the memory limit of the runtime, which is now of the maximum size
+  addressable considering the limits of the WASM PVM (32bits, which means `2^32`
+  bytes addressable).
+
 ### EVM Node
 
 ### Bug fixes
