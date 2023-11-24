@@ -300,6 +300,7 @@ module Handler = struct
       | Starting -> return_unit
       | Ready ready_ctxt ->
           let head_level = header.shell.level in
+          Dal_metrics.new_layer1_head ~head_level ;
           let*! () =
             Event.(emit layer1_node_new_head (head_hash, head_level))
           in
@@ -384,6 +385,7 @@ module Handler = struct
                 (Node_context.get_gs_worker ctxt)
                 committee
             in
+            Dal_metrics.layer1_block_finalized ~block_level ;
             let*! () = Event.(emit layer1_node_final_block block_level) in
             may_update_plugin
               cctxt

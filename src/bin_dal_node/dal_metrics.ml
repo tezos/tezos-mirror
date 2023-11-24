@@ -48,6 +48,22 @@ module Node_metrics = struct
       ~namespace
       ~subsystem
       name
+
+  let new_layer1_head =
+    let name = "new_layer1_head" in
+    Prometheus.Gauge.v
+      ~help:"A new layer 1 head with the given level has been received"
+      ~namespace
+      ~subsystem
+      name
+
+  let layer1_block_finalized =
+    let name = "layer1_block_finalized" in
+    Prometheus.Gauge.v
+      ~help:"The layer 1 block with the given level has been finalized"
+      ~namespace
+      ~subsystem
+      name
 end
 
 module GS = struct
@@ -344,6 +360,13 @@ let slot_waiting_for_attestation ~set i =
 let slot_attested ~set i =
   let v = float_of_int @@ if set then 1 else 0 in
   Prometheus.Gauge.set (Node_metrics.slots_attested (string_of_int i)) v
+
+let new_layer1_head ~head_level =
+  Int32.to_float head_level |> Prometheus.Gauge.set Node_metrics.new_layer1_head
+
+let layer1_block_finalized ~block_level =
+  Int32.to_float block_level
+  |> Prometheus.Gauge.set Node_metrics.layer1_block_finalized
 
 let update_shards_verification_time f =
   Prometheus.DefaultHistogram.observe Node_metrics.verify_shard_time f

@@ -17,6 +17,12 @@ val slot_waiting_for_attestation : set:bool -> int -> unit
     value is set to 1 if [set] is true, and -1 otherwise. *)
 val slot_attested : set:bool -> int -> unit
 
+(** Update the seen layer1 heads with the given value. *)
+val new_layer1_head : head_level:int32 -> unit
+
+(** Update the finalized layer1 blocks with the given value. *)
+val layer1_block_finalized : block_level:int32 -> unit
+
 (** Update the shards verification time with the given value.  *)
 val update_shards_verification_time : float -> unit
 
