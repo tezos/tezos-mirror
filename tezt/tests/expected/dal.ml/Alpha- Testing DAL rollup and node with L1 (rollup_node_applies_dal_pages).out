@@ -63,17 +63,6 @@ This sequence of operations was run:
       Consumed gas: 170.875
 
 
-./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/slot_headers
-[ { "level": 4, "index": 0,
-    "commitment":
-      "[DAL_SLOT_HEADER]" },
-  { "level": 4, "index": 1,
-    "commitment":
-      "[DAL_SLOT_HEADER]" },
-  { "level": 4, "index": 2,
-    "commitment":
-      "[DAL_SLOT_HEADER]" } ]
-
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/processed_slots
 [ { "index": 0, "status": "unconfirmed" },
   { "index": 1, "status": "confirmed" },

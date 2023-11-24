@@ -42,17 +42,6 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-type slot_header = {level : int; commitment : string; index : int}
-
-type simulation_result = {
-  state_hash : string;
-  status : string;
-  output : JSON.t;
-  inbox_level : int;
-  num_ticks : int;
-  insights : string option list;
-}
-
 type gc_info = {last_gc_level : int; first_available_level : int}
 
 (** [create ~protocol ?runner ?name ?base_dir node] returns a fresh client
@@ -189,14 +178,6 @@ val commitment :
 (** [gc_info client] returns garbage collection information. *)
 val gc_info : ?hooks:Process.hooks -> t -> gc_info Runnable.process
 
-(** [dal_slot_headers ?block client] returns the dal slot headers of the
-    [block] (default ["head"]). *)
-val dal_slot_headers :
-  ?hooks:Process.hooks ->
-  ?block:string ->
-  t ->
-  slot_header list Runnable.process
-
 (** [get_dal_processed_slots ?block client] returns the slots indices that have
     been marked by the rollup node as confirmed or unconfirmed for block [block]
     (default ["head"]), with their statuses. *)
@@ -206,33 +187,7 @@ val get_dal_processed_slots :
   t ->
   (int * string) list Runnable.process
 
-(** [simulate ?block client ?reveal_pages ?insight_request messages] simulates
-    the evaluation of input [messages] for the rollup PVM at [block] (default
-    ["head"]). [reveal_pages] can be used to provide data to be used for the
-    revelation ticks. [insight_request] can be used to look at a list of keys in
-    the PVM state after the simulation. *)
-val simulate :
-  ?hooks:Process_hooks.t ->
-  ?block:string ->
-  t ->
-  ?reveal_pages:string list ->
-  ?insight_requests:
-    [`Pvm_state_key of string list | `Durable_storage_key of string list] list ->
-  string list ->
-  simulation_result Runnable.process
-
 (** [inject client messages] injects the [messages] in the queue the rollup
     node's batcher and returns the list of message hashes injected. *)
 val inject :
   ?hooks:Process_hooks.t -> t -> string list -> string list Runnable.process
-
-(** [batcher_queue client] returns the queue of messages, as pairs of message
-    hash and binary message, in the batcher. *)
-val batcher_queue :
-  ?hooks:Process_hooks.t -> t -> (string * string) list Runnable.process
-
-(** [get_batcher_msg client hash] fetches the message whose hash is [hash] from
-    the queue. It returns the message together with the full JSON response
-    including the status. *)
-val get_batcher_msg :
-  ?hooks:Process_hooks.t -> t -> string -> (string * JSON.t) Runnable.process

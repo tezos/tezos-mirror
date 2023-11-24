@@ -50,17 +50,6 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-type slot_header = {level : int; commitment : string; index : int}
-
-type simulation_result = {
-  state_hash : string;
-  status : string;
-  output : JSON.t;
-  inbox_level : int;
-  num_ticks : int;
-  insights : string option list;
-}
-
 type gc_info = {last_gc_level : int; first_available_level : int}
 
 let commitment_from_json json =
@@ -333,18 +322,6 @@ let gc_info ?hooks sc_client =
        first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
      }
 
-let dal_slot_headers ?hooks ?(block = "head") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
-  |> Runnable.map (fun json ->
-         JSON.(
-           as_list json
-           |> List.map (fun obj ->
-                  {
-                    level = obj |> get "level" |> as_int;
-                    commitment = obj |> get "commitment" |> as_string;
-                    index = obj |> get "index" |> as_int;
-                  })))
-
 let get_dal_processed_slots ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "processed_slots"]
   |> Runnable.map (fun json ->
@@ -354,49 +331,6 @@ let get_dal_processed_slots ?hooks ?(block = "head") sc_client =
                 let status = obj |> JSON.get "status" |> JSON.as_string in
                 (index, status)))
 
-let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = [])
-    ?(insight_requests = []) messages =
-  let messages_json =
-    `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
-  in
-  let reveal_json =
-    match reveal_pages with
-    | [] -> []
-    | pages ->
-        [
-          ( "reveal_pages",
-            `A (List.map (fun s -> `String Hex.(of_string s |> show)) pages) );
-        ]
-  in
-  let insight_requests_json =
-    let insight_request_json insight_request =
-      let insight_request_kind, key =
-        match insight_request with
-        | `Pvm_state_key key -> ("pvm_state", key)
-        | `Durable_storage_key key -> ("durable_storage", key)
-      in
-      let x = `A (List.map (fun s -> `String s) key) in
-      `O [("kind", `String insight_request_kind); ("key", x)]
-    in
-    [("insight_requests", `A (List.map insight_request_json insight_requests))]
-  in
-  let data =
-    `O ((("messages", messages_json) :: reveal_json) @ insight_requests_json)
-    |> JSON.annotate ~origin:"simulation data"
-  in
-  rpc_post ?hooks sc_client ["global"; "block"; block; "simulate"] data
-  |> Runnable.map (fun obj ->
-         JSON.
-           {
-             state_hash = obj |> get "state_hash" |> as_string;
-             status = obj |> get "status" |> as_string;
-             output = obj |> get "output";
-             inbox_level = obj |> get "inbox_level" |> as_int;
-             num_ticks = obj |> get "num_ticks" |> as_string |> int_of_string;
-             insights =
-               obj |> get "insights" |> as_list |> List.map as_string_opt;
-           })
-
 let inject ?hooks sc_client messages =
   let messages_json =
     `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
@@ -404,19 +338,3 @@ let inject ?hooks sc_client messages =
   in
   rpc_post ?hooks sc_client ["local"; "batcher"; "injection"] messages_json
   |> Runnable.map @@ fun obj -> JSON.as_list obj |> List.map JSON.as_string
-
-let batcher_queue ?hooks sc_client =
-  rpc_get ?hooks sc_client ["local"; "batcher"; "queue"]
-  |> Runnable.map @@ fun obj ->
-     JSON.as_list obj
-     |> List.map @@ fun o ->
-        let hash = JSON.(o |> get "hash" |> as_string) in
-        let hex_msg = JSON.(o |> get "message" |> get "content" |> as_string) in
-        (hash, Hex.to_string (`Hex hex_msg))
-
-let get_batcher_msg ?hooks sc_client msg_hash =
-  rpc_get ?hooks sc_client ["local"; "batcher"; "queue"; msg_hash]
-  |> Runnable.map @@ fun obj ->
-     if JSON.is_null obj then failwith "Message is not in the queue" ;
-     let hex_msg = JSON.(obj |> get "content" |> as_string) in
-     (Hex.to_string (`Hex hex_msg), obj)
