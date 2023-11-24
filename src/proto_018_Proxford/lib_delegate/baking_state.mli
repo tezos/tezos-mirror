@@ -146,6 +146,13 @@ type elected_block = {
   attestation_qc : Kind.attestation operation list;
 }
 
+type signed_block = {
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  block_header : block_header;
+  operations : Tezos_base.Operation.t list list;
+}
+
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
@@ -156,6 +163,7 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
+  next_forged_block : signed_block option;
 }
 
 type phase =
@@ -191,6 +199,7 @@ val round_proposer :
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
   | Time_to_bake_next_level of {at_round : Round.t}
+  | Time_to_forge_block
 
 val timeout_kind_encoding : timeout_kind Data_encoding.t
 

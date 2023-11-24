@@ -1745,6 +1745,159 @@ let test_scenario_m8 () =
       (1, (module Node_d_hooks));
     ]
 
+(*
+  Scenario M9
+
+  Two nodes: A, B
+
+  1. L1 - A proposes and reaches QC.
+  2. L1 - When QC is reached, observe that B emits time to forge event. Shortly after, observe
+          that B emits time to bake event.
+  3. L2 - A observes the block from B and ends.
+  
+*)
+let test_scenario_m9 () =
+  let stop_level = Int32.of_int 2 in
+  let node_b_qc = ref false in
+  let node_b_ttf = ref false in
+  let node_b_level = ref Int32.zero in
+  let bh : Block_hash.t option ref = ref None in
+  let stop_on_event0 = function
+    | Baking_state.New_head_proposal {block; _} ->
+        block.shell.level >= stop_level
+    | _ -> false
+  in
+  let module Node_a_hooks : Hooks = struct
+    include Default_hooks
+
+    let raise_error : string option ref = ref None
+
+    let block_round block_header =
+      let open Block_header in
+      match
+        Protocol.Alpha_context.Fitness.round_from_raw block_header.shell.fitness
+      with
+      | Error _ -> assert false
+      | Ok x -> x
+
+    let on_new_head ~block_hash ~block_header =
+      let open Block_header in
+      let block_round = block_round block_header in
+      let level = block_header.shell.level in
+      let is_round0 =
+        Protocol.Alpha_context.Round.equal
+          block_round
+          Protocol.Alpha_context.Round.zero
+      in
+      match level with
+      | 2l ->
+          raise_error :=
+            if
+              is_round0
+              && not (Block_hash.equal block_hash (Stdlib.Option.get !bh))
+            then Some "Block hash was not equal"
+            else if not is_round0 then
+              Some "Level 2 expected to have a block at round 0"
+            else None ;
+          Lwt.return @@ Some (block_hash, block_header)
+      | _ -> Lwt.return @@ Some (block_hash, block_header)
+
+    let stop_on_event = stop_on_event0
+
+    let check_chain_on_success ~chain:_ =
+      match !raise_error with
+      | Some err -> Stdlib.failwith err
+      | _ -> return_unit
+  end in
+  let module Node_b_hooks : Hooks = struct
+    include Default_hooks
+
+    let on_inject_block ~level:_ ~round:_ ~block_hash ~block_header ~operations
+        ~protocol_data:_ =
+      bh := Some block_hash ;
+      return (block_hash, block_header, operations, [Pass; Pass])
+
+    let stop_on_event = function
+      | Baking_state.Quorum_reached _ when !node_b_level = 1l ->
+          node_b_qc := true ;
+          false
+      | Baking_state.Timeout timeout when !node_b_level = 1l -> (
+          match timeout with
+          | Time_to_forge_block ->
+              if !node_b_qc then (
+                node_b_ttf := true ;
+                false)
+              else
+                Stdlib.failwith
+                  "time to forge emitted without observing qc event"
+          | Time_to_bake_next_level _ ->
+              if !node_b_qc && !node_b_ttf then false
+              else
+                Stdlib.failwith
+                  "time to bake emitted without observing qc or time to forge \
+                   event"
+          | End_of_round _ ->
+              Stdlib.failwith "End of round timeout not expected")
+      | Baking_state.New_valid_proposal {block; _} ->
+          node_b_level := block.shell.level ;
+          false
+      | event -> stop_on_event0 event
+  end in
+  let config =
+    {
+      default_config with
+      delegate_selection = [(1l, [(0l, bootstrap1)]); (2l, [(0l, bootstrap2)])];
+      round0 = 3L;
+      round1 = 4L;
+    }
+  in
+  run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
+
+(*
+   Scenario M10
+
+   Two nodes : A, B
+
+   1. Node A is the proposer at level 1, round 0, but is dead
+   2. Node B proposes at level 1, round 1, therefore the
+      Time_to_forge_block was not called.
+*)
+let test_scenario_m10 () =
+  let stop_level = 1l in
+  let stop_round = Protocol.Alpha_context.Round.(succ zero) in
+  let node_b_ttf = ref false in
+  let module Node_a_hooks : Hooks = struct
+    include Default_hooks
+
+    let stop_on_event _ = true (* Node A stops immediately. *)
+  end in
+  let module Node_b_hooks : Hooks = struct
+    include Default_hooks
+
+    let stop_on_event = function
+      | Baking_state.Timeout Time_to_forge_block ->
+          node_b_ttf := true ;
+          false
+      (* When we get to level = 1, round = 1, the time to forge timeout should
+         not have been called *)
+      | Baking_state.New_head_proposal {block; _} ->
+          let block_round = block.round in
+          if block.shell.level >= stop_level && block_round = stop_round then (
+            assert (not !node_b_ttf) ;
+            true)
+          else false
+      | _ -> false
+  end in
+  let config =
+    {
+      default_config with
+      round0 = 3L;
+      round1 = 4L;
+      delegate_selection = [(1l, [(0l, bootstrap1); (1l, bootstrap2)])];
+    }
+  in
+  run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
+
 let () =
   Alcotest_lwt.run "mockup_baking" ~__FILE__
   @@ List.map
@@ -1770,5 +1923,7 @@ let () =
          (Protocol.name ^ ": scenario m6", test_scenario_m6);
          (Protocol.name ^ ": scenario m7", test_scenario_m7);
          (Protocol.name ^ ": scenario m8", test_scenario_m8);
+         (Protocol.name ^ ": scenario m9", test_scenario_m9);
+         (Protocol.name ^ ": scenario m10", test_scenario_m10);
        ]
   |> Lwt_main.run
