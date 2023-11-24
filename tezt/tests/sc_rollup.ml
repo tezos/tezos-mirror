@@ -4118,8 +4118,10 @@ let test_rpcs ~kind
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_num_messages ()
   in
+  (* There are always 3 extra messages inserted by the protocol in the inbox. *)
+  let nb_protocol_messages = 3 in
   let l2_num_messages = JSON.as_int l2_num_messages in
-  Check.((l2_num_messages = batch_size) int)
+  Check.((l2_num_messages = batch_size + nb_protocol_messages) int)
     ~error_msg:"Number of messages of head is %L but should be %R" ;
 
   (* Durable value storage RPC tests *)
