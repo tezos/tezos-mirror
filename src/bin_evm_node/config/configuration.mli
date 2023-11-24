@@ -14,20 +14,27 @@ type log_filter_config = {
       See [get_logs] for more details. *)
 }
 
-type t = {
+type proxy = {rollup_node_endpoint : Uri.t}
+
+type sequencer = {
+  rollup_node_endpoint : Uri.t;
+      (** Rollup node endpoint used to make blueprints available and
+          monitor the delayed inbox. *)
+  kernel : string;  (** Path to the kernel to execute. *)
+  preimages : string;  (** Path to the preimages directory. *)
+}
+
+type 'a t = {
   rpc_addr : string;
   rpc_port : int;
   debug : bool;
-  rollup_node_endpoint : Uri.t;
   devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
   verbose : bool;
   log_filter : log_filter_config;
+  mode : 'a;
 }
-
-(** [default_config] is the default value for the configuration. *)
-val default : t
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
@@ -36,16 +43,23 @@ val default_data_dir : string
     the configuration filename from the [data_dir] *)
 val config_filename : data_dir:string -> string
 
-(** [save ~force ~data_dir configuration] writes the [configuration] file in
+(** [save_proxy ~force ~data_dir configuration] writes the proxy [configuration] file in
     [data_dir]. If [force] is [true], existing configurations are
     overwritten. *)
-val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
+val save_proxy : force:bool -> data_dir:string -> proxy t -> unit tzresult Lwt.t
 
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+(** Same as {!save_proxy} but for the sequencer configuration. *)
+val save_sequencer :
+  force:bool -> data_dir:string -> sequencer t -> unit tzresult Lwt.t
+
+(** [load_proxy ~data_dir] loads a proxy configuration stored in [data_dir]. *)
+val load_proxy : data_dir:string -> proxy t tzresult Lwt.t
+
+(** Same as {!load_proxy} but for the sequencer configuration. *)
+val load_sequencer : data_dir:string -> sequencer t tzresult Lwt.t
 
 module Cli : sig
-  val create :
+  val create_proxy :
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
@@ -53,12 +67,27 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    rollup_node_endpoint:Uri.t ->
     verbose:bool ->
+    rollup_node_endpoint:Uri.t ->
     unit ->
-    t
+    proxy t
 
-  val create_or_read_config :
+  val create_sequencer :
+    devmode:bool ->
+    ?rpc_addr:string ->
+    ?rpc_port:int ->
+    ?debug:bool ->
+    ?cors_origins:string trace ->
+    ?cors_headers:string trace ->
+    ?log_filter:log_filter_config ->
+    verbose:bool ->
+    ?rollup_node_endpoint:Uri.t ->
+    ?kernel:string ->
+    ?preimages:string ->
+    unit ->
+    sequencer t
+
+  val create_or_read_proxy_config :
     data_dir:string ->
     devmode:bool ->
     ?rpc_addr:string ->
@@ -67,8 +96,24 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    rollup_node_endpoint:Uri.t ->
     verbose:bool ->
+    rollup_node_endpoint:Uri.t ->
     unit ->
-    t tzresult Lwt.t
+    proxy t tzresult Lwt.t
+
+  val create_or_read_sequencer_config :
+    data_dir:string ->
+    devmode:bool ->
+    ?rpc_addr:string ->
+    ?rpc_port:int ->
+    ?debug:bool ->
+    ?cors_origins:string trace ->
+    ?cors_headers:string trace ->
+    ?log_filter:log_filter_config ->
+    verbose:bool ->
+    ?rollup_node_endpoint:Uri.t ->
+    ?kernel:string ->
+    ?preimages:string ->
+    unit ->
+    sequencer t tzresult Lwt.t
 end

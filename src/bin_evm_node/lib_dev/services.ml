@@ -103,7 +103,7 @@ let block_transaction_count block =
   | TxHash l -> List.length l
   | TxFull l -> List.length l
 
-let dispatch_input (config : Configuration.t)
+let dispatch_input (config : 'a Configuration.t)
     ((module Rollup_node_rpc : Services_backend_sig.S), _) (input, id) =
   let open Lwt_result_syntax in
   let dispatch_input_aux : type w. w input -> w output tzresult Lwt.t = function
