@@ -34,7 +34,7 @@ say () {
 
 declare -a source_directories
 
-source_directories=(src docs/doc_gen tezt devtools contrib)
+source_directories=(src docs/doc_gen tezt devtools contrib etherlink)
 
 update_all_dot_ocamlformats () {
     if ! type ocamlformat > /dev/null 2>&-; then

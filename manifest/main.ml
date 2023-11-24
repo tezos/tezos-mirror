@@ -8308,7 +8308,7 @@ let octez_evm_node_lib : Sub_lib.maker =
 let evm_node_config =
   octez_evm_node_lib
     "evm_node_config"
-    ~path:"src/bin_evm_node/config"
+    ~path:"etherlink/bin_evm_node/config"
     ~synopsis:"Configuration for the EVM node"
     ~deps:
       [
@@ -8320,7 +8320,7 @@ let evm_node_config =
 let evm_node_lib_prod_encoding =
   octez_evm_node_lib
     "evm_node_lib_prod_encoding"
-    ~path:"src/bin_evm_node/lib_prod/encodings"
+    ~path:"etherlink/bin_evm_node/lib_prod/encodings"
     ~synopsis:
       "EVM encodings for the EVM node and plugin for the WASM Debugger [prod \
        version]"
@@ -8330,7 +8330,7 @@ let evm_node_lib_prod_encoding =
 let evm_node_lib_prod =
   octez_evm_node_lib
     "evm_node_lib_prod"
-    ~path:"src/bin_evm_node/lib_prod"
+    ~path:"etherlink/bin_evm_node/lib_prod"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [prod version]"
@@ -8350,7 +8350,7 @@ let evm_node_lib_prod =
 let evm_node_lib_dev_encoding =
   octez_evm_node_lib
     "evm_node_lib_dev_encoding"
-    ~path:"src/bin_evm_node/lib_dev/encodings"
+    ~path:"etherlink/bin_evm_node/lib_dev/encodings"
     ~synopsis:
       "EVM encodings for the EVM node and plugin for the WASM Debugger [dev \
        version]"
@@ -8360,7 +8360,7 @@ let evm_node_lib_dev_encoding =
 let evm_node_lib_dev =
   octez_evm_node_lib
     "evm_node_lib_dev"
-    ~path:"src/bin_evm_node/lib_dev"
+    ~path:"etherlink/bin_evm_node/lib_dev"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [dev version]"
@@ -8380,7 +8380,7 @@ let evm_node_lib_dev =
 let _octez_evm_node_tests =
   tezt
     ["test_rlp"; "test_ethbloom"]
-    ~path:"src/bin_evm_node/test"
+    ~path:"etherlink/bin_evm_node/test"
     ~opam:"octez-evm-node-tests"
     ~synopsis:"Tests for the EVM Node"
     ~deps:
@@ -8399,7 +8399,7 @@ let _evm_node =
   public_exe
     (sf "octez-evm-node")
     ~internal_name:(sf "evm_node")
-    ~path:("src" // "bin_evm_node")
+    ~path:"etherlink/bin_evm_node"
     ~opam:"octez-evm-node"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
@@ -8817,7 +8817,7 @@ let () =
 
 (* Generate documentation index for [octez-evm-node-libs] *)
 let () =
-  write "src/bin_evm_node/index.mld" @@ fun fmt ->
+  write "etherlink/bin_evm_node/index.mld" @@ fun fmt ->
   let header =
     "{0 Octez-evm-node-libs: octez EVM Node libraries}\n\n\
      This is a package containing some libraries used by the EVM Node of \
