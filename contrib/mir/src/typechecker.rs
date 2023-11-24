@@ -1272,6 +1272,17 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(READ_TICKET, [], _), []) => no_overload!(READ_TICKET, len 1),
         (App(READ_TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(SPLIT_TICKET, [], _), [.., T::Pair(n), T::Ticket(_)])
+            if matches!(n.as_ref(), (T::Nat, T::Nat)) =>
+        {
+            let typ = pop!();
+            stack[0] = Type::new_option(Type::new_pair(typ.clone(), typ));
+            I::SplitTicket
+        }
+        (App(SPLIT_TICKET, [], _), [.., _, _]) => no_overload!(SPLIT_TICKET),
+        (App(SPLIT_TICKET, [], _), [] | [_]) => no_overload!(SPLIT_TICKET, len 2),
+        (App(SPLIT_TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -4763,6 +4774,43 @@ mod typecheck_tests {
                 test_ticket,
                 Type::new_pair(Type::Address, Type::new_pair(Type::Int, Type::Nat)),
             ]
+        );
+    }
+
+    #[test]
+    fn split_ticket() {
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::SPLIT_TICKET,
+                stack: stk![Type::Nat],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 2 })
+            })
+        );
+        let stk = &mut tc_stk![Type::Nat, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::SPLIT_TICKET,
+                stack: stk![Type::Nat, Type::Nat],
+                reason: None
+            })
+        );
+        let stk = &mut tc_stk![
+            Type::new_pair(Type::Nat, Type::Nat),
+            Type::new_ticket(Type::Unit)
+        ];
+        assert_eq!(
+            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Ctx::default(), stk),
+            Ok(SplitTicket)
+        );
+        assert_eq!(
+            stk,
+            &tc_stk![Type::new_option(Type::new_pair(
+                Type::new_ticket(Type::Unit),
+                Type::new_ticket(Type::Unit)
+            ))]
         );
     }
 

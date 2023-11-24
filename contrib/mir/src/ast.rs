@@ -430,6 +430,7 @@ pub enum Instruction<'a> {
         arg_ty: Type,
     },
     ReadTicket,
+    SplitTicket,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
