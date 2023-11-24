@@ -245,6 +245,7 @@ pub mod interpret_cost {
     pub const SET_DELEGATE: u32 = 60;
     pub const LAMBDA: u32 = 10;
     pub const EXEC: u32 = 10;
+    pub const HASH_KEY: u32 = 605;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
