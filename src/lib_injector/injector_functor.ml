@@ -97,7 +97,16 @@ module Make (Parameters : PARAMETERS) = struct
     l1_level : int32;
   }
 
-  type l1_op_content = {level : int32; inj_ops : Inj_operation.Hash.t list}
+  type injected_l1_op_content = {
+    level : int32;
+    inj_ops : Inj_operation.Hash.t list;
+    signer_pkh : Signature.public_key_hash;
+  }
+
+  type included_l1_op_content = {
+    level : int32;
+    inj_ops : Inj_operation.Hash.t list;
+  }
 
   type status =
     | Pending of POperation.t
@@ -121,7 +130,7 @@ module Make (Parameters : PARAMETERS) = struct
     injected_operations : injected_info Injected_operations.t;
         (** A table mapping L1 manager operation hashes to the injection info for that
           operation.  *)
-    injected_ophs : l1_op_content Injected_ophs.t;
+    injected_ophs : injected_l1_op_content Injected_ophs.t;
         (** A mapping of all L1 manager operations contained in a L1 batch (i.e. an L1
           operation). *)
   }
@@ -133,7 +142,7 @@ module Make (Parameters : PARAMETERS) = struct
     operations which are included in the L1 chain (but not confirmed). *)
   type included_state = {
     included_operations : included_info Included_operations.t;
-    included_in_blocks : l1_op_content Included_in_blocks.t;
+    included_in_blocks : included_l1_op_content Included_in_blocks.t;
   }
 
   type protocols = Tezos_shell_services.Chain_services.Blocks.protocols = {
@@ -346,7 +355,8 @@ module Make (Parameters : PARAMETERS) = struct
       Op_queue.replace state.queue op.hash op
 
   (** Mark operations as injected (in [oph]). *)
-  let add_injected_operations state oph ~injection_level operations =
+  let add_injected_operations state {pkh = signer_pkh; _} oph ~injection_level
+      operations =
     let infos =
       List.map
         (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))
@@ -358,7 +368,7 @@ module Make (Parameters : PARAMETERS) = struct
     Injected_ophs.replace
       state.injected.injected_ophs
       oph
-      {level = injection_level; inj_ops = List.map fst infos}
+      {level = injection_level; inj_ops = List.map fst infos; signer_pkh}
 
   (** [add_included_operations state oph l1_block l1_level operations] marks the
     [operations] as included (in the L1 batch [oph]) in the Tezos block
@@ -781,6 +791,7 @@ module Make (Parameters : PARAMETERS) = struct
             let () =
               add_injected_operations
                 state
+                signer
                 oph
                 ~injection_level
                 injected_operations
@@ -978,7 +989,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 confirmed_level) state confirmed_level in
     Included_in_blocks.iter_es
-      (fun block ({level = inclusion_level; _} : l1_op_content) ->
+      (fun block ({level = inclusion_level; _} : included_l1_op_content) ->
         if
           inclusion_level
           <= Int32.sub confirmed_level (Int32.of_int state.retention_period)
@@ -994,7 +1005,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let expired =
       Injected_ophs.fold
-        (fun oph ({level = injection_level; _} : l1_op_content) acc ->
+        (fun oph ({level = injection_level; _} : injected_l1_op_content) acc ->
           if
             head_level
             > Int32.add injection_level (Int32.of_int state.injection_ttl)
