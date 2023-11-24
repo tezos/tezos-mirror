@@ -51,12 +51,12 @@ version = "0.2.1"
 optional = true
 
 [dependencies.tezos_crypto_rs]
-version = "0.5.2"
+version = "=0.5.2"
 default-features = false
 optional = true
 
 [dependencies.tezos_data_encoding]
-version = "0.5.2"
+version = "=0.5.2"
 optional = true
 
 [features]

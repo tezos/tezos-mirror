@@ -41,7 +41,7 @@ path = "../installer-config"
 version = "0.2.1"
 
 [dependencies.tezos_data_encoding]
-version = "0.5.2"
+version = "=0.5.2"
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"

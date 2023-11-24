@@ -15,10 +15,10 @@ keywords = ["tezos", "smart", "rollup"]
 categories = ["no-std", "no-std::no-alloc", "encoding", "wasm"]
 
 [dependencies]
-tezos_data_encoding = { version = "0.5.2", optional = true }
-tezos_data_encoding_derive = { version = "0.5.2", optional = true }
+tezos_data_encoding = { version = "=0.5.2", optional = true }
+tezos_data_encoding_derive = { version = "=0.5.2", optional = true }
 nom = { version = "7.1", default-features = false }
-tezos_crypto_rs = { version = "0.5.2", default-features = false, optional = true }
+tezos_crypto_rs = { version = "=0.5.2", default-features = false, optional = true }
 
 num-bigint = { version = "0.3", optional = true }
 num-traits = { version = "0.2.8", optional = true }

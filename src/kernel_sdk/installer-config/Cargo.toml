@@ -38,7 +38,7 @@ version = "7.1"
 default-features = false
 
 [dependencies.tezos_data_encoding]
-version = "0.5.2"
+version = "=0.5.2"
 optional = true
 
 [dependencies.serde]
@@ -55,7 +55,7 @@ version = "0.4.3"
 optional = true
 
 [dependencies.tezos_crypto_rs]
-version = "0.5.2"
+version = "=0.5.2"
 default-features = false
 optional = true
 
