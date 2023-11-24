@@ -489,6 +489,18 @@ let test_drag_after_rolling_import =
         in
         (checkpoint, savepoint, caboose)
   in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7251
+     Restarting fresh_node to make sure that the store invariant
+     (savepoint/checkpoint/…) are well synchronized. Indeed, these
+     invariant are synchronized with the RPC-process in a best effort
+     way and as the RPC-process synchronization can be faster than a
+     store merge, it can return an unexpected value (the value before
+     the last expected update). *)
+  let* () =
+    let* () = Node.terminate fresh_node in
+    let* () = Node.run fresh_node node_arguments in
+    Node.wait_for_ready fresh_node
+  in
   let* () =
     check_consistency_after_import
       fresh_node
