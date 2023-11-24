@@ -26,7 +26,6 @@ SDK_VERSION := "0.2.2"
 
 .PHONY: check
 check: installer-template publish-check doc riscv-check
-	@cargo fmt --check
 	@cargo clippy --all-targets --all-features -- --deny warnings
 	@cargo check --no-default-features
 	@cargo check --target wasm32-unknown-unknown

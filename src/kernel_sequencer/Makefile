@@ -12,7 +12,6 @@ build:
 
 .PHONY: check
 check:
-	@cargo fmt --check
 	@cargo clippy --all-targets -- --deny warnings
 
 .PHONY: build-deps

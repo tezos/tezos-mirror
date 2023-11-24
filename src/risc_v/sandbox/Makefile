@@ -20,17 +20,12 @@ ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
 
-.PHONY: build-dev-deps
-build-dev-deps: build-deps
-	@rustup component add rustfmt clippy
-
 .PHONY: test
 test:
 	@cargo test
 
 .PHONY: check
 check:
-	@cargo fmt --check
 	@cargo clippy --all-targets -- --deny warnings
 
 .PHONY: clean

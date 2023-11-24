@@ -127,9 +127,6 @@ build: ${KERNELS} evm-evaluation-assessor evm-execution kernel_sdk risc-v-sandbo
 .PHONY: build-dev-deps
 build-dev-deps: build-deps
 	@make -C ${SDK_DIR} build-dev-deps
-	@make -C ${RISC_V_SANDBOX_DIR} build-dev-deps
-	@make -C ${RISC_V_INTERPRETER_DIR} build-dev-deps
-	@make -C ${RISC_V_DUMMY_DIR} build-dev-deps
 	@make -C ${EVM_DIR} build-dev-deps
 	@make -C ${SEQUENCER_DIR} build-dev-deps
 	@make -C ${DEMO_DIR} build-dev-deps
@@ -138,12 +135,13 @@ build-dev-deps: build-deps
 build-deps:
 	@make -C ${SDK_DIR} build-deps
 	@make -C ${RISC_V_SANDBOX_DIR} build-deps
-	@make -C ${RISC_V_INTERPRETER_DIR} build-deps
-	@make -C ${RISC_V_DUMMY_DIR} build-deps
-	@make -C ${RISC_V_TESTS_DIR} build-deps
 	@make -C ${EVM_DIR} build-deps
 	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
+
+	# Iterate through all the toolchains. 'rustup show' will install the
+	# toolchain in addition to showing toolchain information.
+	@find src -iname 'rust-toolchain*' -execdir rustup show active-toolchain \; 2>/dev/null
 
 .PHONY: test
 test:
@@ -165,6 +163,9 @@ check: build-dev-deps
 	@make -C ${SEQUENCER_DIR} check
 	@make -C ${DEMO_DIR} check
 	@make -C ${RISC_V_TESTS_DIR} check
+
+	# Check formatting of all crates.
+	@find src -iname Cargo.lock -execdir cargo fmt --check \;
 
 .PHONY: publish-sdk-deps
 publish-sdk-deps: build-deps

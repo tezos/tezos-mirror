@@ -43,8 +43,11 @@ test:
 
 .PHONY: check
 check:
-	@cargo fmt --check
 	@cargo clippy --all-targets -- --deny warnings
+
+.PHONY: check-all
+check-all: check
+	@cargo fmt --check
 
 .PHONY: clean
 clean:
