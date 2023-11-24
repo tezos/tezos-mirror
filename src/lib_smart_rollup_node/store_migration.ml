@@ -400,17 +400,17 @@ module V2_migrations = struct
           let open Lwt_result_syntax in
           let* () =
             migrate_messages
-              Store_v1.(Messages.read v1_store.messages)
+              (Store_v1.Messages.read v1_store.Store_v1.messages)
               v2_store
               l2_block
           and* () =
             migrate_commitment
-              Store_v1.(Commitments.find v1_store.commitments)
+              (Store_v1.Commitments.find v1_store.commitments)
               v2_store
               l2_block
           and* () =
             migrate_inbox
-              Store_v1.(Inboxes.read v1_store.inboxes)
+              (Store_v1.Inboxes.read v1_store.inboxes)
               v2_store
               l2_block
           in
@@ -426,17 +426,17 @@ module V2_migrations = struct
           let open Lwt_result_syntax in
           let* () =
             migrate_messages
-              Store_v0.(Messages.read v0_store.messages)
+              (Store_v0.Messages.read v0_store.Store_v0.messages)
               v2_store
               l2_block
           and* () =
             migrate_commitment
-              Store_v0.(Commitments.find v0_store.commitments)
+              (Store_v0.Commitments.find v0_store.commitments)
               v2_store
               l2_block
           and* () =
             migrate_inbox
-              Store_v0.(Inboxes.read v0_store.inboxes)
+              (Store_v0.Inboxes.read v0_store.inboxes)
               v2_store
               l2_block
           in

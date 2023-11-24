@@ -775,58 +775,19 @@ let get_inbox_by_block_hash node_ctxt hash =
   let* level = level_of_hash node_ctxt hash in
   inbox_of_head node_ctxt {hash; level}
 
-type messages_info = {
-  is_first_block : bool;
-  predecessor : Block_hash.t;
-  predecessor_timestamp : Time.Protocol.t;
-  messages : string list;
-}
+let unsafe_find_stored_messages node_ctxt =
+  Store.Messages.read node_ctxt.store.messages
 
-let find_messages node_ctxt messages_hash =
+let unsafe_get_stored_messages node_ctxt messages_hash =
   let open Lwt_result_syntax in
-  let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
-  match msg with
-  | None -> return_none
-  | Some (messages, pred_hash) ->
-      let* pred_header = header_of_hash node_ctxt pred_hash in
-      let* grand_parent_header =
-        header_of_hash node_ctxt pred_header.header.predecessor
-      in
-      let is_first_block =
-        pred_header.header.proto_level <> grand_parent_header.header.proto_level
-      in
-      return_some
-        {
-          is_first_block;
-          predecessor = pred_header.hash;
-          predecessor_timestamp = pred_header.header.timestamp;
-          messages;
-        }
-
-let get_messages_aux find pp node_ctxt hash =
-  let open Lwt_result_syntax in
-  let* res = find node_ctxt hash in
+  let* res = unsafe_find_stored_messages node_ctxt messages_hash in
   match res with
   | None ->
       failwith
         "Could not retrieve messages with payloads merkelized hash %a"
-        pp
-        hash
-  | Some res -> return res
-
-let get_messages node_ctxt =
-  get_messages_aux find_messages Merkelized_payload_hashes_hash.pp node_ctxt
-
-let get_messages_without_proto_messages node_ctxt =
-  get_messages_aux
-    (fun node_ctxt messages_hash ->
-      let open Lwt_result_syntax in
-      let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
-      match msg with
-      | None -> return_none
-      | Some (messages, _pred_hash) -> return_some messages)
-    Merkelized_payload_hashes_hash.pp
-    node_ctxt
+        Merkelized_payload_hashes_hash.pp
+        messages_hash
+  | Some (messages, _pred) -> return messages
 
 let get_num_messages {store; _} hash =
   let open Lwt_result_syntax in
@@ -851,7 +812,7 @@ let get_full_l2_block node_ctxt block_hash =
   let* block = get_l2_block node_ctxt block_hash in
   let* inbox = get_inbox node_ctxt block.header.inbox_hash
   and* messages =
-    get_messages_without_proto_messages node_ctxt block.header.inbox_witness
+    unsafe_get_stored_messages node_ctxt block.header.inbox_witness
   and* commitment =
     Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
   in

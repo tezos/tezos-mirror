@@ -140,7 +140,6 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
   let inbox_metrics = Metrics.Inbox.metrics in
   Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
   let inbox = Sc_rollup_proto_types.Inbox.of_octez inbox in
-  let serialized_messages = messages in
   let*? messages =
     Environment.wrap_tzresult
     @@ List.map_e
@@ -169,13 +168,6 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
     ~is_internal:(function
       | Sc_rollup.Inbox_message.Internal _ -> true
       | External _ -> false) ;
-  let* () =
-    Node_context.save_messages
-      node_ctxt
-      witness_hash
-      ~predecessor:predecessor.hash
-      serialized_messages
-  in
   let*? messages_with_protocol_internal_messages =
     Environment.wrap_tzresult
     @@ List.map_e
@@ -184,6 +176,13 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
            let+ msg = Sc_rollup.Inbox_message.serialize msg in
            Sc_rollup.Inbox_message.unsafe_to_string msg)
          messages_with_protocol_internal_messages
+  in
+  let* () =
+    Node_context.save_messages
+      node_ctxt
+      witness_hash
+      ~predecessor:predecessor.hash
+      messages_with_protocol_internal_messages
   in
   return
     (inbox_hash, inbox, witness_hash, messages_with_protocol_internal_messages)
@@ -264,6 +263,32 @@ let payloads_history_of_messages ~is_first_block ~predecessor
          messages
   in
   payloads_history
+
+let payloads_history_of_all_messages messages =
+  let open Result_syntax in
+  let payloads_history =
+    let capacity = List.length messages |> Int64.of_int in
+    Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity
+  in
+  match List.map Sc_rollup.Inbox_message.unsafe_of_string messages with
+  | [] -> assert false
+  | first :: messages ->
+      Environment.wrap_tzresult
+      @@ let* payloads_history, witness =
+           Sc_rollup.Inbox_merkelized_payload_hashes.genesis
+             payloads_history
+             first
+         in
+         let* payloads_history, _witness =
+           List.fold_left_e
+             (fun (payloads_history, witness) ->
+               Sc_rollup.Inbox_merkelized_payload_hashes.add_payload
+                 payloads_history
+                 witness)
+             (payloads_history, witness)
+             messages
+         in
+         return payloads_history
 
 let serialize_external_message msg =
   Environment.wrap_tzresult

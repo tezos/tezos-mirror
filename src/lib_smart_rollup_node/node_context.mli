@@ -261,6 +261,9 @@ val hash_of_level_opt : _ t -> int32 -> Block_hash.t option tzresult Lwt.t
     if it is known by the Tezos Layer 1 node. *)
 val level_of_hash : _ t -> Block_hash.t -> int32 tzresult Lwt.t
 
+(** Returns the block header for a given hash using the L1 node. *)
+val header_of_hash : _ t -> Block_hash.t -> Layer1.header tzresult Lwt.t
+
 (** [get_predecessor_opt state head] returns the predecessor of block [head],
     when [head] is not the genesis block. *)
 val get_predecessor_opt :
@@ -355,13 +358,6 @@ val register_published_commitment :
 
 (** {3 Inboxes} *)
 
-type messages_info = {
-  is_first_block : bool;
-  predecessor : Block_hash.t;
-  predecessor_timestamp : Time.Protocol.t;
-  messages : string list;
-}
-
 (** [get_inbox t inbox_hash] retrieves the inbox whose hash is [inbox_hash] from
     the rollup node's storage. *)
 val get_inbox :
@@ -393,14 +389,12 @@ val inbox_of_head :
 val get_inbox_by_block_hash :
   _ t -> Block_hash.t -> Octez_smart_rollup.Inbox.t tzresult Lwt.t
 
-(** [get_messages t witness_hash] retrieves the messages for the merkelized
-    payloads hash [witness_hash] stored by the rollup node. *)
-val get_messages :
-  _ t -> Merkelized_payload_hashes_hash.t -> messages_info tzresult Lwt.t
-
-(** Same as {!get_messages} but returns [None] if the payloads hash is not known. *)
-val find_messages :
-  _ t -> Merkelized_payload_hashes_hash.t -> messages_info option tzresult Lwt.t
+(** Returns messages as they are stored in the store, unsafe to use because all
+    messages may not be present. Use {!Messages.get} instead.  *)
+val unsafe_find_stored_messages :
+  _ t ->
+  Merkelized_payload_hashes_hash.t ->
+  (string list * Block_hash.t) option tzresult Lwt.t
 
 (** [get_num_messages t witness_hash] retrieves the number of messages for the
     inbox witness [witness_hash] stored by the rollup node. *)

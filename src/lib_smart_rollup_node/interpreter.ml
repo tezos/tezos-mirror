@@ -130,23 +130,11 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
       Layer1.{hash = block.header.predecessor; level = pred_level}
   in
   let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
-  let* {is_first_block; predecessor; predecessor_timestamp; messages} =
-    Node_context.get_messages node_ctxt block.header.inbox_witness
-  in
   let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
   let module Plugin = (val plugin) in
   let*! tick = Plugin.Pvm.get_tick node_ctxt.kind state in
   let*! state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
-  let messages =
-    Plugin.Pvm.start_of_level_serialized
-    ::
-    (if is_first_block then
-     Option.to_list Plugin.Pvm.protocol_migration_serialized
-    else [])
-    @ Plugin.Pvm.info_per_level_serialized ~predecessor ~predecessor_timestamp
-      :: messages
-    @ [Plugin.Pvm.end_of_level_serialized]
-  in
+  let* messages = Messages.get node_ctxt block.header.inbox_witness in
   return
     Pvm_plugin_sig.
       {

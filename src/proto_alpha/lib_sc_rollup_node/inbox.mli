@@ -79,6 +79,11 @@ val payloads_history_of_messages :
   string list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
 
+(** [payloads_history_of_all_messages messages] builds the merkelized payloads
+    history for the list of serialzied messages [messages]. *)
+val payloads_history_of_all_messages :
+  string trace -> Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
+
 (** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
     node agrees with the L1 node that inbox for [block] is [node_inbox]. *)
 val same_as_layer_1 :

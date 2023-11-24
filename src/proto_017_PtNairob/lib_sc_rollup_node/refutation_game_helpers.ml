@@ -206,19 +206,13 @@ let generate_proof (node_ctxt : _ Node_context.t)
              ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
         @@
         let open Lwt_result_syntax in
-        let* {is_first_block; predecessor; predecessor_timestamp; messages} =
-          Node_context.get_messages
+        let* messages =
+          Messages.get
             node_ctxt
             (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
                witness)
         in
-        let*? hist =
-          Inbox.payloads_history_of_messages
-            ~is_first_block
-            ~predecessor
-            ~predecessor_timestamp
-            messages
-        in
+        let*? hist = Inbox.payloads_history_of_all_messages messages in
         return hist
     end
 
