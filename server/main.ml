@@ -331,10 +331,12 @@ let may_insert_delegate =
   let delegate_cache = create 1_000 in
   fun (module Db : Caqti_lwt.CONNECTION) address ->
     let already_treated = mem delegate_cache address in
-    add delegate_cache address ;
     if already_treated then
       Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax.return_unit
-    else Db.exec Sql_requests.maybe_insert_delegate address
+    else
+      Lwt_result.map
+        (fun () -> add delegate_cache address)
+        (Db.exec Sql_requests.maybe_insert_delegate address)
 
 let endorsing_rights_callback db_pool g rights =
   let level = Int32.of_string (Re.Group.get g 1) in
@@ -366,30 +368,31 @@ let endorsing_rights_callback db_pool g rights =
         ~body:"Endorsing_right noted"
         ())
 
-let may_handle_operation =
+let may_insert_operation =
   let open
     Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
       (Tezos_base.TzPervasives.Operation_hash) in
   let operation_cache = create 10_000 in
-  fun hash f ->
+  fun (module Db : Caqti_lwt.CONNECTION) hash op ->
     let already_treated = mem operation_cache hash in
-    add operation_cache hash ;
     if already_treated then
       Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax.return_unit
-    else f ()
+    else
+      Lwt_result.map
+        (fun () -> add operation_cache hash)
+        (Db.exec Sql_requests.maybe_insert_operation op)
 
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
     block_hash operations =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
   let* () =
     Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-      Teztale_lib.Consensus_ops.(
-        fun op ->
-          may_handle_operation op.op.hash (fun () ->
-              Db.exec
-                Sql_requests.maybe_insert_operation
-                ( (level, op.op.hash, op.op.kind = Endorsement, op.op.round),
-                  op.delegate )))
+      (fun (op : Teztale_lib.Consensus_ops.block_op) ->
+        may_insert_operation
+          (module Db)
+          op.op.hash
+          ( (level, op.op.hash, op.op.kind = Endorsement, op.op.round),
+            op.delegate ))
       operations
   in
   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -417,7 +420,6 @@ let block_callback =
         (endorsements, preendorsements) ) ->
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
     let block_already_treated = Block_lru_cache.mem block_cache hash in
-    Block_lru_cache.add block_cache hash ;
     let may_handle_block f =
       if block_already_treated then return_unit else f ()
     in
@@ -444,6 +446,7 @@ let block_callback =
                   (cycle, Int32.sub level cycle_position, cycle_size)
             | _ -> Lwt.return_ok ()
           in
+          Block_lru_cache.add block_cache hash ;
           let* () =
             (* This data is non-redondant: we always treat it. *)
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -459,8 +462,6 @@ let block_callback =
           let operations_already_treated =
             Block_lru_cache.mem block_operations_cache hash
           in
-          if endorsements <> [] then
-            Block_lru_cache.add block_operations_cache hash ;
           let may_handle_operations f =
             if operations_already_treated then return_unit else f ()
           in
@@ -473,7 +474,15 @@ let block_callback =
               endorsements
           in
           may_handle_operations @@ fun () ->
-          insert_operations_from_block (module Db) level hash preendorsements)
+          Lwt_result.map
+            (fun () ->
+              if endorsements <> [] then
+                Block_lru_cache.add block_operations_cache hash)
+            (insert_operations_from_block
+               (module Db)
+               level
+               hash
+               preendorsements))
         db_pool
     in
     with_caqti_error out (fun () ->
@@ -503,15 +512,11 @@ let operations_callback db_pool g source operations =
             (fun (right, ops) ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun (op : Teztale_lib.Consensus_ops.received_operation) ->
-                  may_handle_operation op.op.hash (fun () ->
-                      Db.exec
-                        Sql_requests.maybe_insert_operation
-                        Teztale_lib.Consensus_ops.
-                          ( ( level,
-                              op.op.hash,
-                              op.op.kind = Endorsement,
-                              op.op.round ),
-                            right.Teztale_lib.Consensus_ops.address )))
+                  may_insert_operation
+                    (module Db)
+                    op.op.hash
+                    ( (level, op.op.hash, op.op.kind = Endorsement, op.op.round),
+                      right.Teztale_lib.Consensus_ops.address ))
                 ops)
             operations
         in
