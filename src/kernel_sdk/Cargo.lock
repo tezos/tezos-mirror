@@ -521,7 +521,7 @@ dependencies = [
 
 [[package]]
 name = "installer-kernel"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup",
  "tezos-smart-rollup-installer-config",
@@ -1243,7 +1243,7 @@ checksum = "95059e91184749cb66be6dc994f67f182b6d897cb3df74a5bf66b5e709295fd8"
 
 [[package]]
 name = "tezos-smart-rollup"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -1258,14 +1258,14 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-core"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "mockall",
 ]
 
 [[package]]
 name = "tezos-smart-rollup-debug"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
@@ -1273,7 +1273,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-encoding"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "hex",
  "nom",
@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-entrypoint"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "dlmalloc",
  "tezos-smart-rollup-core",
@@ -1302,7 +1302,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-host"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "mockall",
  "tezos-smart-rollup-core",
@@ -1313,7 +1313,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-installer"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "clap",
  "hex",
@@ -1331,7 +1331,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-installer-config"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "hex",
  "nom",
@@ -1348,7 +1348,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-mock"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",
@@ -1360,14 +1360,14 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-panic-hook"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
 ]
 
 [[package]]
 name = "tezos-smart-rollup-storage"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",

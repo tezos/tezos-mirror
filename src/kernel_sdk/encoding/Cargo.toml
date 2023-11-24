@@ -5,7 +5,7 @@
 
 [package]
 name = "tezos-smart-rollup-encoding"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -32,12 +32,12 @@ thiserror = { version = "1.0", optional = true }
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 
 [features]

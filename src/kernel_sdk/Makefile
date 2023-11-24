@@ -22,7 +22,7 @@ endif
 
 RISCV_OPTS = --target riscv64gc-unknown-none-elf --no-default-features --features proto-alpha
 
-SDK_VERSION := "0.2.1"
+SDK_VERSION := "0.2.2"
 
 .PHONY: check
 check: installer-template publish-check doc riscv-check

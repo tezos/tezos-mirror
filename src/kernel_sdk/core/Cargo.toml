@@ -6,7 +6,7 @@
 [package]
 name = "tezos-smart-rollup-core"
 edition = "2021"
-version = "0.2.1"
+version = "0.2.2"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
 repository = "https://gitlab.com/tezos/tezos.git"

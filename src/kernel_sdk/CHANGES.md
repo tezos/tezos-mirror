@@ -4,6 +4,12 @@
 
 ### SDK
 
+### Installer client/kernel
+
+## Version 0.2.2
+
+### SDK
+
 - Add michelson `or` and `option`.
 - Add a feature flag `proto-alpha` to enable host functions introduced in
   unreleased protocols.
