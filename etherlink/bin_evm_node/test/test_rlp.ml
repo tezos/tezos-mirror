@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec src/bin_evm_node/test/main.exe -- --file test_rlp.ml
+    Invocation:   dune exec etherlink/bin_evm_node/test/main.exe -- --file test_rlp.ml
     Subject:      Tests for the RLP encoder/decoder
 *)
 
