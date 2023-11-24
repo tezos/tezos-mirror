@@ -123,6 +123,10 @@ val create_with_endpoint :
   Client.endpoint ->
   t
 
+(** [write_in_stdin rollup_node str] write str into the stdin of the
+    rollup node process. *)
+val write_in_stdin : t -> string -> unit Lwt.t
+
 (** Get the name of an sc node. *)
 val name : t -> string
 
@@ -178,6 +182,7 @@ val run :
   ?gc_frequency:int ->
   ?history_mode:history_mode ->
   ?wait_ready:bool ->
+  ?password_file:string ->
   t ->
   string ->
   string list ->

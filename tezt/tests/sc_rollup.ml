@@ -5182,6 +5182,65 @@ let test_multiple_batcher_key ~kind =
     ~error_msg:"%L found where %R were expected" ;
   unit
 
+let start_rollup_node_with_encrypted_key ~kind =
+  test_l1_scenario
+    ~hooks
+    ~kind
+    {
+      variant = None;
+      tags = ["rollup_node"];
+      description = "start a rollup node with an encrypted key";
+    }
+  @@ fun _protocol sc_rollup node client ->
+  let encrypted_account =
+    {
+      alias = "encrypted_account";
+      public_key_hash = "";
+      public_key = "";
+      Account.secret_key =
+        Encrypted
+          "edesk1n2uGpPtVaeyhWkZzTEcaPRzkQHrqkw5pk8VkZvp3rM5KSc3mYNH5cJEuNcfB91B3G3JakKzfLQSmrgF4ht";
+    }
+  in
+  let password = "password" in
+  let* () =
+    let Account.{alias; secret_key; _} = encrypted_account in
+    Client.import_encrypted_secret_key client ~alias secret_key ~password
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.(of_int 1)
+      ~amount:(Tez.of_int 20_000)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:encrypted_account.alias
+      client
+  in
+  let* _ = Client.bake_for_and_wait client in
+  let rollup_node =
+    Sc_rollup_node.create
+      Operator
+      node
+      ~base_dir:(Client.base_dir client)
+      ~default_operator:encrypted_account.alias
+  in
+  let* () = Sc_rollup_node.run ~wait_ready:false rollup_node sc_rollup [] in
+  let* () =
+    repeat 3 (fun () ->
+        Sc_rollup_node.write_in_stdin rollup_node "invalid_password")
+  in
+  let* () =
+    Sc_rollup_node.check_error
+      rollup_node
+      ~exit_code:1
+      ~msg:(rex "3 incorrect password attempts")
+  in
+  let* () = Sc_rollup_node.kill rollup_node in
+  let password_file = Filename.temp_file "password_file" "" in
+  let () = write_file password_file ~contents:password in
+
+  let* () = Sc_rollup_node.run ~password_file rollup_node sc_rollup [] in
+  unit
+
 let register_riscv () =
   test_rollup_node_boots_into_initial_state [Protocol.Alpha] ~kind:"riscv" ;
   test_commitment_scenario
@@ -5356,6 +5415,7 @@ let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
      because the tezt will need to originate a rollup. However,
      the tezt will not test for PVM kind specific features. *)
+  start_rollup_node_with_encrypted_key protocols ~kind:"arith" ;
   test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
   test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
