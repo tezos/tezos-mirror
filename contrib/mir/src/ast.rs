@@ -434,6 +434,11 @@ pub enum Instruction<'a> {
     SplitTicket,
     JoinTickets,
     LoopLeft(Vec<Self>),
+    Blake2b,
+    Keccak,
+    Sha256,
+    Sha3,
+    Sha512,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

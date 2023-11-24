@@ -158,7 +158,7 @@ impl std::fmt::Display for Annotation<'_> {
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok<'a> {
-    #[regex(r"[A-Za-z_]+", lex_noun)]
+    #[regex(r"[A-Za-z_][A-Za-z_0-9]*", lex_noun)]
     Noun(Noun),
 
     #[regex("([+-]?)[0-9]+", lex_number)]
