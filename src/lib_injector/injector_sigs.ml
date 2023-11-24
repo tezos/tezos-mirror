@@ -279,8 +279,6 @@ module type S = sig
     | Included of included_info
         (** The operation has been included in a L1 block. *)
 
-  val included_info_encoding : included_info Data_encoding.t
-
   (** Initializes the injector with the rollup node state, for a list
       of signers, and start the workers. Each signer's list has its
       own worker with a queue of operations to inject.

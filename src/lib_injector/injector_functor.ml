@@ -104,24 +104,6 @@ module Make (Parameters : PARAMETERS) = struct
     | Injected of injected_info
     | Included of included_info
 
-  let included_info_encoding =
-    let open Data_encoding in
-    conv
-      (fun {op; oph; op_index; l1_block; l1_level} ->
-        (op, (oph, op_index, l1_block, l1_level)))
-      (fun (op, (oph, op_index, l1_block, l1_level)) ->
-        {op; oph; op_index; l1_block; l1_level})
-    @@ merge_objs
-         Inj_operation.encoding
-         (obj1
-            (req
-               "layer1"
-               (obj4
-                  (req "operation_hash" Operation_hash.encoding)
-                  (req "operation_index" int31)
-                  (req "block_hash" Block_hash.encoding)
-                  (req "level" int32))))
-
   module Op_queue =
     Disk_persistence.Make_queue
       (struct
@@ -144,46 +126,14 @@ module Make (Parameters : PARAMETERS) = struct
           operation). *)
   }
 
-  module Included_operations = Disk_persistence.Make_table (struct
-    include Inj_operation.Hash.Table
-
-    type value = included_info
-
-    let name = "included_operations"
-
-    let string_of_key = Inj_operation.Hash.to_b58check
-
-    let key_of_string = Inj_operation.Hash.of_b58check_opt
-
-    let value_encoding = included_info_encoding
-  end)
-
-  module Included_in_blocks = Disk_persistence.Make_table (struct
-    include Block_hash.Table
-
-    type value = l1_op_content
-
-    let name = "included_in_blocks"
-
-    let string_of_key = Block_hash.to_b58check
-
-    let key_of_string = Block_hash.of_b58check_opt
-
-    let value_encoding =
-      let open Data_encoding in
-      conv
-        (fun {level; inj_ops} -> (level, inj_ops))
-        (fun (level, inj_ops) -> {level; inj_ops})
-      @@ obj2
-           (req "inclusion_level" int32)
-           (req "inj_ops" (list Inj_operation.Hash.encoding))
-  end)
+  module Included_operations = Inj_operation.Hash.Table
+  module Included_in_blocks = Block_hash.Table
 
   (** The part of the state which gathers information about
     operations which are included in the L1 chain (but not confirmed). *)
   type included_state = {
-    included_operations : Included_operations.t;
-    included_in_blocks : Included_in_blocks.t;
+    included_operations : included_info Included_operations.t;
+    included_in_blocks : l1_op_content Included_in_blocks.t;
   }
 
   type protocols = Tezos_shell_services.Chain_services.Blocks.protocols = {
@@ -319,12 +269,8 @@ module Make (Parameters : PARAMETERS) = struct
       emit_event_loaded "injected_operations"
       @@ Injected_operations.length injected_operations
     in
-    let* included_operations =
-      Included_operations.load_from_disk
-        ~warn_unreadable
-        ~initial_size:((confirmations + retention_period) * n)
-        ~data_dir
-        ~filter:(filter (fun (i : included_info) -> i.op.operation))
+    let included_operations =
+      Included_operations.create ((confirmations + retention_period) * n)
     in
     let*! () =
       emit_event_loaded "included_operations"
@@ -334,13 +280,8 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () =
       emit_event_loaded "injected_ophs" @@ Injected_ophs.length injected_ophs
     in
-    let* included_in_blocks =
-      Included_in_blocks.load_from_disk
-        ~warn_unreadable
-        ~initial_size:((confirmations + retention_period) * n)
-        ~data_dir
-        ~filter:(fun {inj_ops; _} ->
-          List.exists (Included_operations.mem included_operations) inj_ops)
+    let included_in_blocks =
+      Included_in_blocks.create ((confirmations + retention_period) * n)
     in
     let*! () =
       emit_event_loaded "included_in_blocks"
@@ -427,27 +368,15 @@ module Make (Parameters : PARAMETERS) = struct
     [l1_block] of level [l1_level]. *)
   let add_included_operations state l1_block l1_level
       (operations : injected_info list) =
-    let open Lwt_result_syntax in
-    let*! () =
-      Event.(emit3 included)
-        state
-        l1_block
-        l1_level
-        (List.map
-           (fun (o : injected_info) -> o.op.Inj_operation.hash)
-           operations)
-    in
     let infos =
       List.map
         (fun ({op; oph; op_index} : injected_info) ->
           (op.Inj_operation.hash, {op; oph; op_index; l1_block; l1_level}))
         operations
     in
-    let* () =
-      Included_operations.replace_seq
-        state.included.included_operations
-        (List.to_seq infos)
-    in
+    Included_operations.replace_seq
+      state.included.included_operations
+      (List.to_seq infos) ;
     Included_in_blocks.replace
       state.included.included_in_blocks
       l1_block
@@ -485,27 +414,24 @@ module Make (Parameters : PARAMETERS) = struct
       e.g. when [block] is on an alternative chain in the case of a
       reorganization. *)
   let forget_block state block =
-    let open Lwt_result_syntax in
     match Included_in_blocks.find state.included.included_in_blocks block with
     | None ->
         (* Nothing removed *)
-        return_nil
+        []
     | Some {inj_ops; _} ->
-        let* () =
+        let () =
           Included_in_blocks.remove state.included.included_in_blocks block
         in
-        List.fold_left_es
+        List.fold_left
           (fun removed moph ->
             match
               Included_operations.find state.included.included_operations moph
             with
-            | None -> return removed
+            | None -> removed
             | Some info ->
-                let+ () =
-                  Included_operations.remove
-                    state.included.included_operations
-                    moph
-                in
+                Included_operations.remove
+                  state.included.included_operations
+                  moph ;
                 info :: removed)
           []
           inj_ops
@@ -960,9 +886,16 @@ module Make (Parameters : PARAMETERS) = struct
             ([], [])
             injected_infos
         in
-        let* () =
-          add_included_operations state block level (List.rev included)
+        let*! () =
+          Event.(emit3 included)
+            state
+            block
+            level
+            (List.map
+               (fun (o : injected_info) -> o.op.Inj_operation.hash)
+               included)
         in
+        add_included_operations state block level (List.rev included) ;
         List.iter_es
           (add_pending_operation ~retry:true state)
           (List.rev to_retry)
@@ -1001,7 +934,7 @@ module Make (Parameters : PARAMETERS) = struct
     chain. The operations are put back in the pending queue. *)
   let revert_included_operations state block =
     let open Lwt_result_syntax in
-    let* revert_infos = forget_block state block in
+    let revert_infos = forget_block state block in
     let*! () =
       Event.(emit1 revert_operations)
         state
@@ -1031,12 +964,12 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 confirmed_level) state confirmed_level in
     Included_in_blocks.iter_es
-      (fun block {level = inclusion_level; _} ->
+      (fun block ({level = inclusion_level; _} : l1_op_content) ->
         if
           inclusion_level
           <= Int32.sub confirmed_level (Int32.of_int state.retention_period)
         then
-          let* _removed_ops = forget_block state block in
+          let _removed_ops = forget_block state block in
           return_unit
         else return_unit)
       state.included.included_in_blocks
