@@ -877,6 +877,13 @@ let events =
     bin = kernel_inputs_path ^ "/events.bin";
   }
 
+let nested_create =
+  {
+    label = "nested_create";
+    abi = kernel_inputs_path ^ "/nested_create.abi";
+    bin = kernel_inputs_path ^ "/nested_create.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -3796,6 +3803,52 @@ let test_tx_pool_replacing_transactions =
     ~error_msg:"Bob has sent more than one transaction" ;
   unit
 
+let test_l2_nested_create =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_deploy"; "l2_create"; "inter_contract"]
+    ~title:"Check L2 nested create"
+  @@ fun protocol ->
+  let* ({evm_node; sc_rollup_client = _; sc_rollup_node; node; client; _} as
+       evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* nested_create_address, _tx =
+    deploy ~contract:nested_create ~sender evm_setup
+  in
+  let* tx1 =
+    let call_create (sender : Eth_account.t) n =
+      Eth_cli.contract_send
+        ~source_private_key:sender.private_key
+        ~endpoint
+        ~abi_label:nested_create.label
+        ~address:nested_create_address
+        ~method_call:(Printf.sprintf "create(%d)" n)
+    in
+    wait_for_application ~sc_rollup_node ~node ~client (call_create sender 1) ()
+  in
+  let* tx2 =
+    let call_create (sender : Eth_account.t) n salt =
+      Eth_cli.contract_send
+        ~source_private_key:sender.private_key
+        ~endpoint
+        ~abi_label:nested_create.label
+        ~address:nested_create_address
+        ~method_call:(Printf.sprintf "create2(%d, \"%s\")" n salt)
+    in
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_create sender 1 "0x")
+      ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx:tx1 in
+  let* () = check_tx_succeeded ~endpoint ~tx:tx2 in
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -3860,7 +3913,8 @@ let register_evm_node ~protocols =
   test_l2_call_inter_contract protocols ;
   test_rpc_getLogs protocols ;
   test_log_index protocols ;
-  test_tx_pool_replacing_transactions protocols
+  test_tx_pool_replacing_transactions protocols ;
+  test_l2_nested_create protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
