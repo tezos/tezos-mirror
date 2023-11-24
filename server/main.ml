@@ -348,7 +348,7 @@ let endorsing_rights_callback =
         let hash = Int32.to_int
       end) in
   let level_cache = create 100 in
-  fun conf db_pool g rights ->
+  fun db_pool g rights ->
     let level = Int32.of_string (Re.Group.get g 1) in
     let out =
       let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -361,7 +361,6 @@ let endorsing_rights_callback =
            Caqti_lwt.Pool.use
              (fun (module Db : Caqti_lwt.CONNECTION) ->
                let* () =
-                 maybe_with_transaction conf (module Db) @@ fun () ->
                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                    (fun right ->
                      may_insert_delegate
@@ -369,7 +368,6 @@ let endorsing_rights_callback =
                        right.Teztale_lib.Consensus_ops.address)
                    rights
                in
-               maybe_with_transaction conf (module Db) @@ fun () ->
                Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                  (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
                    Db.exec
@@ -480,7 +478,6 @@ let block_callback =
                  return_unit
                else
                  let* () =
-                   maybe_with_transaction conf (module Db) @@ fun () ->
                    insert_operations_from_block
                      (module Db)
                      (Int32.pred level)
@@ -488,7 +485,6 @@ let block_callback =
                      endorsements
                  in
                  let* () =
-                   maybe_with_transaction conf (module Db) @@ fun () ->
                    insert_operations_from_block
                      (module Db)
                      level
@@ -498,6 +494,7 @@ let block_callback =
                  return_unit)
           in
           (* This data is non-redondant: we always treat it. *)
+          maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun r ->
               let open Teztale_lib.Data.Block in
@@ -522,7 +519,6 @@ let operations_callback conf db_pool g source operations =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         let* () =
-          maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, _) ->
               may_insert_delegate
@@ -531,7 +527,6 @@ let operations_callback conf db_pool g source operations =
             operations
         in
         let* () =
-          maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, ops) ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -734,12 +729,12 @@ let routes :
     list =
   [
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"],
-      fun g ~conf ~admins:_ ~users db_pool header meth body ->
+      fun g ~conf:_ ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun _source ->
             with_data
               Teztale_lib.Consensus_ops.rights_encoding
               body
-              (endorsing_rights_callback conf db_pool g)) );
+              (endorsing_rights_callback db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
       fun g ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
