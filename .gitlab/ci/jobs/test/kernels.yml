@@ -11,3 +11,4 @@ test_kernels:
     - changes:
         - src/kernel_*/**/*
         - src/risc_v/**/*
+        - etherlink/kernel_evm/**/*

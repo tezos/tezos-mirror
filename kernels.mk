@@ -10,7 +10,7 @@ RISC_V_SANDBOX_DIR=src/risc_v/sandbox
 RISC_V_INTERPRETER_DIR=src/risc_v/interpreter
 RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
 RISC_V_TESTS_DIR=src/risc_v/tests
-EVM_DIR=src/kernel_evm
+EVM_DIR=etherlink/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
 SEQUENCER_DIR=src/kernel_sequencer
 EVM_KERNEL_PREIMAGES=_evm_installer_preimages
@@ -36,16 +36,16 @@ risc-v-interpreter:
 
 .PHONY: evm-execution
 evm-execution:
-	@make -C src/kernel_evm build-evm-execution
+	@make -C etherlink/kernel_evm build-evm-execution
 
 .PHONY: evm-evaluation-assessor
 evm-evaluation-assessor:
-	@make -C src/kernel_evm build-evm-evaluation
-	@cp src/kernel_evm/target/release/evm-evaluation $@
+	@make -C etherlink/kernel_evm build-evm-evaluation
+	@cp etherlink/kernel_evm/target/release/evm-evaluation $@
 
 evm_kernel_unstripped.wasm::
-	@make -C src/kernel_evm build
-	@cp src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
+	@make -C etherlink/kernel_evm build
+	@cp etherlink/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
 
 evm_kernel.wasm:: evm_kernel_unstripped.wasm
 	@cp evm_kernel_unstripped.wasm $@
@@ -73,16 +73,16 @@ endif
 
 evm_benchmark_installer.wasm::
 	@${MAKE} -f kernels.mk \
-	EVM_CONFIG=src/kernel_evm/config/benchmarking.yaml \
+	EVM_CONFIG=etherlink/kernel_evm/config/benchmarking.yaml \
 	EVM_KERNEL_FEATURES=benchmark,debug \
 	evm_unstripped_installer.wasm
 	cp evm_unstripped_installer.wasm $@
 
 evm_installer_dev.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=src/kernel_evm/config/dev.yaml evm_installer.wasm
+	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/kernel_evm/config/dev.yaml evm_installer.wasm
 
 sequencer.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=src/kernel_evm/config/sequencer.yaml evm_installer.wasm
+	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/kernel_evm/config/sequencer.yaml evm_installer.wasm
 	@cp evm_installer.wasm sequencer.wasm
 
 sequenced_kernel.wasm:

@@ -25,15 +25,16 @@ let evm_type =
 let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
 
 let exchanger_path () =
-  Base.(project_root // "src/kernel_evm/l1_bridge/exchanger.tz")
+  Base.(project_root // "etherlink/kernel_evm/l1_bridge/exchanger.tz")
 
 let bridge_path () =
-  Base.(project_root // "src/kernel_evm/l1_bridge/evm_bridge.tz")
+  Base.(project_root // "etherlink/kernel_evm/l1_bridge/evm_bridge.tz")
 
-let admin_path () = Base.(project_root // "src/kernel_evm/l1_bridge/admin.tz")
+let admin_path () =
+  Base.(project_root // "etherlink/kernel_evm/l1_bridge/admin.tz")
 
 let withdrawal_abi_path () =
-  Base.(project_root // "src/kernel_evm/l1_bridge/withdrawal.abi")
+  Base.(project_root // "etherlink/kernel_evm/l1_bridge/withdrawal.abi")
 
 type l1_contracts = {exchanger : string; bridge : string; admin : string}
 
@@ -869,7 +870,7 @@ let caller =
   }
 
 (** The info for the "events.sol" contract.
-    See [src/kernel_evm/solidity_examples] *)
+    See [etherlink/kernel_evm/solidity_examples] *)
 let events =
   {
     label = "events";
@@ -2235,7 +2236,7 @@ let test_kernel_upgrade_to_debug =
     ~tags:["debug"; "upgrade"]
     ~title:"Ensures EVM kernel's upgrade integrity to a debug kernel"
   @@ fun protocol ->
-  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
   let* _ = gen_test_kernel_upgrade ~base_installee ~installee protocol in
   unit
@@ -2267,7 +2268,7 @@ let test_kernel_upgrade_wrong_key =
     ~tags:["administrator"; "upgrade"]
     ~title:"Ensures EVM kernel's upgrade fails with a wrong administrator key"
   @@ fun protocol ->
-  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
   let* _ =
     gen_test_kernel_upgrade
@@ -2287,7 +2288,7 @@ let test_kernel_upgrade_wrong_rollup_address =
     ~tags:["address"; "upgrade"]
     ~title:"Ensures EVM kernel's upgrade fails with a wrong rollup address"
   @@ fun protocol ->
-  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
   let* _ =
     gen_test_kernel_upgrade
@@ -2306,7 +2307,7 @@ let test_kernel_upgrade_no_administrator =
     ~tags:["administrator"; "upgrade"]
     ~title:"Ensures EVM kernel's upgrade fails if there is no administrator"
   @@ fun protocol ->
-  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
   let* _ =
     gen_test_kernel_upgrade
@@ -2324,7 +2325,7 @@ let test_kernel_upgrade_failing_migration =
     ~tags:["migration"; "upgrade"]
     ~title:"Ensures EVM kernel's upgrade rollback when migration fails"
   @@ fun protocol ->
-  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
   let installee = "failed_migration" in
   let* ( sc_rollup_node,
          sc_rollup_client,
@@ -2544,7 +2545,9 @@ type storage_migration_results = {
      MUST be generated. *)
 let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
     ~scenario_prior ~scenario_after protocol =
-  let current_kernel_base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let current_kernel_base_installee =
+    "etherlink/kernel_evm/kernel/tests/resources"
+  in
   let current_kernel_installee = "ghostnet_evm_kernel" in
   let* evm_setup =
     setup_past_genesis
@@ -2676,7 +2679,8 @@ let test_deposit_dailynet =
       ~base_installee:"./"
       ~installee:"evm_kernel"
       ~config:
-        (`Path Base.(project_root // "src/kernel_evm/config/dailynet.yaml"))
+        (`Path
+          Base.(project_root // "etherlink/kernel_evm/config/dailynet.yaml"))
       ()
   in
 
