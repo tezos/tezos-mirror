@@ -496,7 +496,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     irmin_store;
   }
 
-let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
+let iter_l2_blocks ?progress _ {l2_blocks; l2_head; _} f =
   let open Lwt_result_syntax in
   let* head = L2_head.read l2_head in
   match head with
@@ -504,6 +504,14 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
       (* No reachable head, nothing to do *)
       return_unit
   | Some head ->
+      let track_progress =
+        match progress with
+        | None -> fun f -> f (fun _ -> Lwt.return_unit)
+        | Some message ->
+            let progress_bar = Progress_bar.spinner ~message in
+            Progress_bar.Lwt.with_reporter progress_bar
+      in
+      track_progress @@ fun count_progress ->
       let rec loop hash =
         let* block = L2_blocks.read l2_blocks hash in
         match block with
@@ -512,6 +520,7 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
             return_unit
         | Some (block, header) ->
             let* () = f {block with header} in
+            let*! () = count_progress 1 in
             loop header.predecessor
       in
       loop head.header.block_hash

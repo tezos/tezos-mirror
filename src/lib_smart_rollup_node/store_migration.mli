@@ -50,7 +50,10 @@ end
 module type S = sig
   (** Migration function for the store located in [storage_dir]. *)
   val migrate :
-    storage_dir:string -> index_buffer_size:int -> unit tzresult Lwt.t
+    Metadata.t ->
+    storage_dir:string ->
+    index_buffer_size:int ->
+    unit tzresult Lwt.t
 end
 
 (** Functor to create and {e register} a migration. *)
@@ -66,4 +69,7 @@ module Make
     current version to the last {!Store.version}, this function resolves with an
     error. *)
 val maybe_run_migration :
-  storage_dir:string -> index_buffer_size:int -> unit tzresult Lwt.t
+  Metadata.t ->
+  storage_dir:string ->
+  index_buffer_size:int ->
+  unit tzresult Lwt.t
