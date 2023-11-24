@@ -104,20 +104,6 @@ module Make (Parameters : PARAMETERS) = struct
     | Injected of injected_info
     | Included of included_info
 
-  let injected_info_encoding =
-    let open Data_encoding in
-    conv
-      (fun ({op; oph; op_index} : injected_info) -> (op, (oph, op_index)))
-      (fun (op, (oph, op_index)) -> {op; oph; op_index})
-    @@ merge_objs
-         Inj_operation.encoding
-         (obj1
-            (req
-               "layer1"
-               (obj2
-                  (req "operation_hash" Operation_hash.encoding)
-                  (req "operation_index" int31))))
-
   let included_info_encoding =
     let open Data_encoding in
     conv
@@ -144,48 +130,16 @@ module Make (Parameters : PARAMETERS) = struct
       (Inj_operation.Hash)
       (Inj_operation)
 
-  module Injected_operations = Disk_persistence.Make_table (struct
-    include Inj_operation.Hash.Table
-
-    type value = injected_info
-
-    let name = "injected_operations"
-
-    let string_of_key = Inj_operation.Hash.to_b58check
-
-    let key_of_string = Inj_operation.Hash.of_b58check_opt
-
-    let value_encoding = injected_info_encoding
-  end)
-
-  module Injected_ophs = Disk_persistence.Make_table (struct
-    include Operation_hash.Table
-
-    type value = l1_op_content
-
-    let name = "injected_ophs"
-
-    let string_of_key = Operation_hash.to_b58check
-
-    let key_of_string = Operation_hash.of_b58check_opt
-
-    let value_encoding =
-      let open Data_encoding in
-      conv
-        (fun {level; inj_ops} -> (level, inj_ops))
-        (fun (level, inj_ops) -> {level; inj_ops})
-      @@ obj2
-           (req "injection_level" int32)
-           (req "inj_ops" (list Inj_operation.Hash.encoding))
-  end)
+  module Injected_operations = Inj_operation.Hash.Table
+  module Injected_ophs = Operation_hash.Table
 
   (** The part of the state which gathers information about injected
     operations (but not included). *)
   type injected_state = {
-    injected_operations : Injected_operations.t;
+    injected_operations : injected_info Injected_operations.t;
         (** A table mapping L1 manager operation hashes to the injection info for that
           operation.  *)
-    injected_ophs : Injected_ophs.t;
+    injected_ophs : l1_op_content Injected_ophs.t;
         (** A mapping of all L1 manager operations contained in a L1 batch (i.e. an L1
           operation). *)
   }
@@ -360,13 +314,7 @@ module Make (Parameters : PARAMETERS) = struct
     let n =
       Tags.fold (fun t acc -> acc + Parameters.table_estimated_size t) tags 0
     in
-    let* injected_operations =
-      Injected_operations.load_from_disk
-        ~warn_unreadable
-        ~initial_size:n
-        ~data_dir
-        ~filter:(filter (fun (i : injected_info) -> i.op.operation))
-    in
+    let injected_operations = Injected_operations.create n in
     let*! () =
       emit_event_loaded "injected_operations"
       @@ Injected_operations.length injected_operations
@@ -382,14 +330,7 @@ module Make (Parameters : PARAMETERS) = struct
       emit_event_loaded "included_operations"
       @@ Included_operations.length included_operations
     in
-    let* injected_ophs =
-      Injected_ophs.load_from_disk
-        ~warn_unreadable
-        ~initial_size:n
-        ~data_dir
-        ~filter:(fun {inj_ops; _} ->
-          List.exists (Injected_operations.mem injected_operations) inj_ops)
-    in
+    let injected_ophs = Injected_ophs.create n in
     let*! () =
       emit_event_loaded "injected_ophs" @@ Injected_ophs.length injected_ophs
     in
@@ -467,25 +408,15 @@ module Make (Parameters : PARAMETERS) = struct
       Op_queue.replace state.queue op.hash op
 
   (** Mark operations as injected (in [oph]). *)
-  let add_injected_operations state signer oph ~injection_level operations =
-    let open Lwt_result_syntax in
-    let*! () =
-      Event.(emit2 injected_ops)
-        state
-        ~signers:[signer]
-        oph
-        (List.map (fun (_, o) -> o.Inj_operation.operation) operations)
-    in
+  let add_injected_operations state oph ~injection_level operations =
     let infos =
       List.map
         (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))
         operations
     in
-    let* () =
-      Injected_operations.replace_seq
-        state.injected.injected_operations
-        (List.to_seq infos)
-    in
+    Injected_operations.replace_seq
+      state.injected.injected_operations
+      (List.to_seq infos) ;
     Injected_ophs.replace
       state.injected.injected_ophs
       oph
@@ -526,26 +457,23 @@ module Make (Parameters : PARAMETERS) = struct
     [oph] from the injected operations in the injector state. This function is
     used to move operations from injected to included. *)
   let remove_injected_operation state oph =
-    let open Lwt_result_syntax in
     match Injected_ophs.find state.injected.injected_ophs oph with
     | None ->
         (* Nothing removed *)
-        return_nil
+        []
     | Some {inj_ops; _} ->
-        let* () = Injected_ophs.remove state.injected.injected_ophs oph in
-        let+ removed =
-          List.fold_left_es
+        Injected_ophs.remove state.injected.injected_ophs oph ;
+        let removed =
+          List.fold_left
             (fun removed moph ->
               match
                 Injected_operations.find state.injected.injected_operations moph
               with
-              | None -> return removed
+              | None -> removed
               | Some info ->
-                  let+ () =
-                    Injected_operations.remove
-                      state.injected.injected_operations
-                      moph
-                  in
+                  Injected_operations.remove
+                    state.injected.injected_operations
+                    moph ;
                   info :: removed)
             []
             inj_ops
@@ -911,10 +839,18 @@ module Make (Parameters : PARAMETERS) = struct
                   Op_queue.remove state.queue op.Inj_operation.hash)
                 injected_operations
             in
-            let* () =
+            let*! () =
+              Event.(emit2 injected_ops)
+                state
+                ~signers:[signer]
+                oph
+                (List.map
+                   (fun (_, o) -> o.Inj_operation.operation)
+                   injected_operations)
+            in
+            let () =
               add_injected_operations
                 state
-                signer
                 oph
                 ~injection_level
                 injected_operations
@@ -977,7 +913,7 @@ module Make (Parameters : PARAMETERS) = struct
       retried.  *)
   let register_included_operation state block level oph =
     let open Lwt_result_syntax in
-    let* injected_infos = remove_injected_operation state oph in
+    let injected_infos = remove_injected_operation state oph in
     match injected_infos with
     | [] ->
         (* No operations injected by us *)
@@ -1111,7 +1047,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let expired =
       Injected_ophs.fold
-        (fun oph {level = injection_level; _} acc ->
+        (fun oph ({level = injection_level; _} : l1_op_content) acc ->
           if
             head_level
             > Int32.add injection_level (Int32.of_int state.injection_ttl)
@@ -1120,10 +1056,10 @@ module Make (Parameters : PARAMETERS) = struct
         state.injected.injected_ophs
         []
     in
-    let* expired_infos =
-      List.fold_left_es
+    let expired_infos =
+      List.fold_left
         (fun acc oph ->
-          let+ injected_infos = remove_injected_operation state oph in
+          let injected_infos = remove_injected_operation state oph in
           List.rev_append injected_infos acc)
         []
         expired
