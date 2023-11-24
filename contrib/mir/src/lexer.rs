@@ -96,6 +96,8 @@ defprim! {
     IF_LEFT,
     contract,
     address,
+    chain_id,
+    CHAIN_ID,
 }
 
 defprim! {

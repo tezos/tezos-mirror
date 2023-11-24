@@ -53,6 +53,7 @@ extern {
         "or" => Tok::Prim(PT::Prim(Prim::or)),
         "contract" => Tok::Prim(PT::Prim(Prim::contract)),
         "address" => Tok::Prim(PT::Prim(Prim::address)),
+        "chain_id" => Tok::Prim(PT::Prim(Prim::chain_id)),
         "True" => Tok::Prim(PT::Prim(Prim::True)),
         "False" => Tok::Prim(PT::Prim(Prim::False)),
         "Unit" => Tok::Prim(PT::Prim(Prim::Unit)),
@@ -89,6 +90,7 @@ extern {
         "IF_CONS" => Tok::Prim(PT::Prim(Prim::IF_CONS)),
         "ITER" => Tok::Prim(PT::Prim(Prim::ITER)),
         "IF_LEFT" => Tok::Prim(PT::Prim(Prim::IF_LEFT)),
+        "CHAIN_ID" => Tok::Prim(PT::Prim(Prim::CHAIN_ID)),
         "(" => Tok::LParen,
         ")" => Tok::RParen,
         "{" => Tok::LBrace,
@@ -111,6 +113,7 @@ atomic_type: Type = {
   "unit" => Type::Unit,
   "operation" => Type::Operation,
   "address" => Type::Address,
+  "chain_id" => Type::ChainId,
 }
 
 pair_args: Type = {
@@ -196,6 +199,7 @@ atomic_instruction: ParsedInstruction = {
   "DUP" => Dup(None),
   "UNPAIR" => Unpair,
   "CONS" => Cons,
+  "CHAIN_ID" => Instruction::ChainId,
 }
 
 instruction: ParsedInstruction = {
@@ -292,7 +296,8 @@ tztEntity : TztEntity = {
   "output" "(" "generalOverflow" <a1:number> <a2:number> ")" => Output(TztError(InterpreterError(GeneralOverflow(a1, a2)))),
   "output" "(" "StaticError" <s:string> ")" => Output(TztError(TypecheckerError(Some(s)))),
   "output" "(" "StaticError" "_"  ")" => Output(TztError(TypecheckerError(None))),
-  "amount" <m:mutezAmount> => TztEntity::Amount(m)
+  "amount" <m:mutezAmount> => TztEntity::Amount(m),
+  "chain_id" <value_expr> => TztEntity::ChainId(<>),
 }
 
 pub tztTestEntities : Vec<TztEntity> = semicolonSepSeq<tztEntity>;

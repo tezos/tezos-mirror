@@ -13,6 +13,7 @@ pub mod parsed;
 pub mod typechecked;
 
 use std::collections::BTreeMap;
+pub use tezos_crypto_rs::hash::ChainId;
 
 pub use michelson_address::*;
 pub use michelson_list::MichelsonList;
@@ -36,6 +37,7 @@ pub enum Type {
     Or(Box<(Type, Type)>),
     Contract(Box<Type>),
     Address,
+    ChainId,
 }
 
 impl Type {
@@ -44,7 +46,7 @@ impl Type {
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
         match self {
-            Nat | Int | Bool | Mutez | String | Unit | Operation | Address => 1,
+            Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
         }
@@ -159,6 +161,7 @@ pub enum TypedValue {
     Map(BTreeMap<TypedValue, TypedValue>),
     Or(Box<Or<TypedValue, TypedValue>>),
     Address(Address),
+    ChainId(ChainId),
 }
 
 pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
@@ -193,6 +196,7 @@ pub fn typed_value_to_value_optimized(tv: TypedValue) -> Value {
         TV::Option(Some(r)) => V::new_option(Some(typed_value_to_value_optimized(*r))),
         TV::Or(x) => V::new_or(x.map(typed_value_to_value_optimized)),
         TV::Address(x) => V::Bytes(x.to_bytes_vec()),
+        TV::ChainId(x) => V::Bytes(x.into()),
     }
 }
 
@@ -274,6 +278,7 @@ pub enum Instruction<T: Stage> {
     IfCons(Vec<Instruction<T>>, Vec<Instruction<T>>),
     Iter(T::IterOverload, Vec<Instruction<T>>),
     IfLeft(Vec<Instruction<T>>, Vec<Instruction<T>>),
+    ChainId,
 }
 
 pub type ParsedAST = Vec<ParsedInstruction>;

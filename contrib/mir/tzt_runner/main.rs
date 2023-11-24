@@ -136,6 +136,34 @@ mod tztrunner_tests {
         ));
     }
 
+    #[test]
+    fn test_runner_chain_id() {
+        assert_eq!(
+            run_tzt_test(
+                parse_tzt_test(
+                    r#"code { CHAIN_ID };
+                    input {};
+                    chain_id "NetXdQprcVkpaWU";
+                    output { Stack_elt chain_id 0x7a06a770 }"#,
+                )
+                .unwrap()
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            run_tzt_test(
+                parse_tzt_test(
+                    r#"code { CHAIN_ID };
+                    input {};
+                    chain_id 0xbeeff00d;
+                    output { Stack_elt chain_id 0xbeeff00d }"#,
+                )
+                .unwrap()
+            ),
+            Ok(())
+        );
+    }
+
     const TZT_SAMPLE_ADD: &str = "code { ADD } ;
         input { Stack_elt int 5 ; Stack_elt int 5 } ;
         output { Stack_elt int 10 }";
