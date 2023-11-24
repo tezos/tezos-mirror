@@ -419,34 +419,30 @@ let block_callback =
         cycle_info,
         (endorsements, preendorsements) ) ->
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-    let block_already_treated = Block_lru_cache.mem block_cache hash in
-    let may_handle_block f =
-      if block_already_treated then return_unit else f ()
-    in
+    let level = Int32.of_string (Re.Group.get g 1) in
     let out =
       Caqti_lwt.Pool.use
         (fun (module Db : Caqti_lwt.CONNECTION) ->
           let* () =
-            may_handle_block @@ fun () ->
-            may_insert_delegate (module Db) delegate
-          in
-          let level = Int32.of_string (Re.Group.get g 1) in
-          let* () =
-            may_handle_block @@ fun () ->
-            Db.exec
-              Sql_requests.maybe_insert_block
-              ((level, timestamp, hash, round), (predecessor, delegate))
-          in
-          let* () =
-            may_handle_block @@ fun () ->
-            match cycle_info with
-            | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size} ->
+            if Block_lru_cache.mem block_cache hash then return_unit
+            else
+              let* () = may_insert_delegate (module Db) delegate in
+              let* () =
                 Db.exec
-                  Sql_requests.maybe_insert_cycle
-                  (cycle, Int32.sub level cycle_position, cycle_size)
-            | _ -> Lwt.return_ok ()
+                  Sql_requests.maybe_insert_block
+                  ((level, timestamp, hash, round), (predecessor, delegate))
+              in
+              let* () =
+                match cycle_info with
+                | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size} ->
+                    Db.exec
+                      Sql_requests.maybe_insert_cycle
+                      (cycle, Int32.sub level cycle_position, cycle_size)
+                | _ -> Lwt.return_ok ()
+              in
+              Block_lru_cache.add block_cache hash ;
+              return_unit
           in
-          Block_lru_cache.add block_cache hash ;
           let* () =
             (* This data is non-redondant: we always treat it. *)
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -459,30 +455,25 @@ let block_callback =
           in
           (* Validated blocks do not provide operations only applied
              one does so we need a second cache *)
-          let operations_already_treated =
-            Block_lru_cache.mem block_operations_cache hash
-          in
-          let may_handle_operations f =
-            if operations_already_treated then return_unit else f ()
-          in
-          let* () =
-            may_handle_operations @@ fun () ->
-            insert_operations_from_block
-              (module Db)
-              (Int32.pred level)
-              hash
-              endorsements
-          in
-          may_handle_operations @@ fun () ->
-          Lwt_result.map
-            (fun () ->
-              if endorsements <> [] then
-                Block_lru_cache.add block_operations_cache hash)
-            (insert_operations_from_block
-               (module Db)
-               level
-               hash
-               preendorsements))
+          if Block_lru_cache.mem block_operations_cache hash then return_unit
+          else
+            let* () =
+              insert_operations_from_block
+                (module Db)
+                (Int32.pred level)
+                hash
+                endorsements
+            in
+            let* () =
+              insert_operations_from_block
+                (module Db)
+                level
+                hash
+                preendorsements
+            in
+            if endorsements <> [] then
+              Block_lru_cache.add block_operations_cache hash ;
+            return_unit)
         db_pool
     in
     with_caqti_error out (fun () ->
