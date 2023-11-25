@@ -41,7 +41,7 @@ impl ContractScript {
         ctx: &mut crate::context::Ctx,
         parameter: Micheline,
         storage: Micheline,
-    ) -> Result<(Vec<TypedValue>, TypedValue), ContractInterpretError> {
+    ) -> Result<(impl Iterator<Item = OperationInfo>, TypedValue), ContractInterpretError> {
         let in_ty = Type::new_pair(self.parameter.clone(), self.storage.clone());
         let in_val = &[parameter, storage];
         let in_val = Micheline::App(Prim::Pair, in_val, NO_ANNS);
@@ -51,7 +51,11 @@ impl ContractScript {
         use TypedValue as V;
         match stack.pop().expect("empty execution stack") {
             V::Pair(p) => match *p {
-                (V::List(vec), storage) => Ok((vec.into(), storage)),
+                (V::List(vec), storage) => Ok((
+                    vec.into_iter()
+                        .map(|x| (*irrefutable_match!(x; TypedValue::Operation))),
+                    storage,
+                )),
                 (v, _) => panic!("expected `list operation`, got {:?}", v),
             },
             v => panic!("expected `pair 'a 'b`, got {:?}", v),
