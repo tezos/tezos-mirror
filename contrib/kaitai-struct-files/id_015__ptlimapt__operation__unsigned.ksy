@@ -29,18 +29,6 @@ types:
     - id: case__3
       type: s8
       if: (amount_tag == amount_tag::case__3)
-  annots:
-    seq:
-    - id: len_annots
-      type: s4
-    - id: annots
-      size: len_annots
-  arbitrary:
-    seq:
-    - id: len_arbitrary
-      type: s4
-    - id: arbitrary
-      size: len_arbitrary
   args:
     seq:
     - id: args_entries
@@ -49,7 +37,9 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: args
       type: args
       size: len_args
@@ -68,12 +58,6 @@ types:
       size: 32
     - id: ballot
       type: s1
-  batch:
-    seq:
-    - id: len_batch
-      type: s4
-    - id: batch
-      size: len_batch
   bh1:
     seq:
     - id: id_015__ptlimapt__block_header__alpha__full_header
@@ -81,7 +65,9 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh1
       type: bh1
       size: len_bh1
@@ -92,22 +78,20 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh2
       type: bh2
       size: len_bh2
-  boot_sector:
+  bytes_dyn_uint30:
     seq:
-    - id: len_boot_sector
-      type: s4
-    - id: boot_sector
-      size: len_boot_sector
-  bytes:
-    seq:
-    - id: len_bytes
-      type: s4
-    - id: bytes
-      size: len_bytes
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   case__0:
     seq:
     - id: case__0_field0
@@ -1475,14 +1459,18 @@ types:
   case__191_0:
     seq:
     - id: len_case__191
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__191
       type: case__191
       size: len_case__191
   case__191_1:
     seq:
     - id: len_case__191
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__191
       type: case__191
       size: len_case__191
@@ -1531,12 +1519,6 @@ types:
     - id: case__193
       type: case__193
       size: len_case__193
-  case__195:
-    seq:
-    - id: len_case__195
-      type: s4
-    - id: case__195
-      size: len_case__195
   case__19_field1_entries:
     seq:
     - id: case__19_field1_elt_field0
@@ -2404,7 +2386,9 @@ types:
   case__60_field1_0:
     seq:
     - id: len_case__60_field1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__60_field1
       type: case__60_field1
       size: len_case__60_field1
@@ -2428,7 +2412,9 @@ types:
   case__61_field1_0:
     seq:
     - id: len_case__61_field1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__61_field1
       type: case__61_field1
       size: len_case__61_field1
@@ -2452,7 +2438,9 @@ types:
   case__62_field1_0:
     seq:
     - id: len_case__62_field1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__62_field1
       type: case__62_field1
       size: len_case__62_field1
@@ -2476,7 +2464,9 @@ types:
   case__63_field1_0:
     seq:
     - id: len_case__63_field1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__63_field1
       type: case__63_field1
       size: len_case__63_field1
@@ -2597,29 +2587,19 @@ types:
   circuits_info_0:
     seq:
     - id: len_circuits_info
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: circuits_info
       type: circuits_info
       size: len_circuits_info
-  circuits_info_elt_field0:
-    seq:
-    - id: len_circuits_info_elt_field0
-      type: s4
-    - id: circuits_info_elt_field0
-      size: len_circuits_info_elt_field0
   circuits_info_entries:
     seq:
     - id: circuits_info_elt_field0
-      type: circuits_info_elt_field0
+      type: bytes_dyn_uint30
     - id: circuits_info_elt_field1
       type: u1
       enum: bool
-  code:
-    seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
   commitment:
     seq:
     - id: level
@@ -2640,18 +2620,6 @@ types:
       size: 32
     - id: number_of_ticks
       type: s8
-  content:
-    seq:
-    - id: len_content
-      type: s4
-    - id: content
-      size: len_content
-  contents:
-    seq:
-    - id: len_contents
-      type: s4
-    - id: contents
-      size: len_contents
   contents_entries:
     seq:
     - id: id_015__ptlimapt__operation__alpha__contents
@@ -2717,7 +2685,9 @@ types:
   dissection_0:
     seq:
     - id: len_dissection
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: dissection
       type: dissection
       size: len_dissection
@@ -2770,12 +2740,6 @@ types:
       type: s4
     - id: block_payload_hash
       size: 32
-  entrypoint:
-    seq:
-    - id: len_entrypoint
-      type: s4
-    - id: entrypoint
-      size: len_entrypoint
   id_015__ptlimapt__block_header__alpha__full_header:
     seq:
     - id: id_015__ptlimapt__block_header__alpha__full_header
@@ -2948,7 +2912,7 @@ types:
       type: drain_delegate
       if: (id_015__ptlimapt__operation__alpha__contents_tag == id_015__ptlimapt__operation__alpha__contents_tag::drain_delegate)
     - id: failing_noop
-      type: arbitrary
+      type: bytes_dyn_uint30
       if: (id_015__ptlimapt__operation__alpha__contents_tag == id_015__ptlimapt__operation__alpha__contents_tag::failing_noop)
     - id: register_global_constant
       type: register_global_constant
@@ -3025,16 +2989,14 @@ types:
       repeat: eos
   id_015__ptlimapt__rollup_address:
     seq:
-    - id: len_id_015__ptlimapt__rollup_address
-      type: s4
     - id: id_015__ptlimapt__rollup_address
-      size: len_id_015__ptlimapt__rollup_address
+      type: bytes_dyn_uint30
   id_015__ptlimapt__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
+      type: bytes_dyn_uint30
   id_015__ptlimapt__tx_rollup_id:
     seq:
     - id: rollup_hash
@@ -3046,7 +3008,7 @@ types:
     - id: message_counter
       type: n
     - id: serialized_proof
-      type: serialized_proof
+      type: bytes_dyn_uint30
   increase_paid_storage:
     seq:
     - id: source
@@ -3075,7 +3037,9 @@ types:
   init_state_0:
     seq:
     - id: len_init_state
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: init_state
       type: init_state
       size: len_init_state
@@ -3507,13 +3471,20 @@ types:
     - id: reveal__proof
       type: reveal_proof
       if: (input_proof_tag == input_proof_tag::reveal__proof)
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   message:
     seq:
     - id: message_tag
       type: u1
       enum: message_tag
     - id: batch
-      type: batch
+      type: bytes_dyn_uint30
       if: (message_tag == message_tag::batch)
     - id: deposit
       type: deposit
@@ -3526,16 +3497,16 @@ types:
   message_1:
     seq:
     - id: len_message
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: message
       type: message_0
       size: len_message
   message_entries:
     seq:
-    - id: len_message_elt
-      type: s4
     - id: message_elt
-      size: len_message_elt
+      type: bytes_dyn_uint30
   message_path:
     seq:
     - id: message_path_entries
@@ -3544,7 +3515,9 @@ types:
   message_path_0:
     seq:
     - id: len_message_path
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: message_path
       type: message_path
       size: len_message_path
@@ -3560,7 +3533,9 @@ types:
   message_result_path_0:
     seq:
     - id: len_message_result_path
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: message_result_path
       type: message_result_path
       size: len_message_result_path
@@ -3576,7 +3551,9 @@ types:
   messages_0:
     seq:
     - id: len_messages
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: messages
       type: messages
       size: len_messages
@@ -3593,7 +3570,7 @@ types:
       type: z
       if: (micheline__015__ptlimapt__michelson_v1__expression_tag == micheline__015__ptlimapt__michelson_v1__expression_tag::int)
     - id: string
-      type: string
+      type: bytes_dyn_uint30
       if: (micheline__015__ptlimapt__michelson_v1__expression_tag == micheline__015__ptlimapt__michelson_v1__expression_tag::string)
     - id: sequence
       type: sequence_0
@@ -3620,7 +3597,7 @@ types:
       type: prim__generic
       if: (micheline__015__ptlimapt__michelson_v1__expression_tag == micheline__015__ptlimapt__michelson_v1__expression_tag::prim__generic)
     - id: bytes
-      type: bytes
+      type: bytes_dyn_uint30
       if: (micheline__015__ptlimapt__michelson_v1__expression_tag == micheline__015__ptlimapt__michelson_v1__expression_tag::bytes)
   n:
     seq:
@@ -3659,7 +3636,9 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1
       size: len_op1
@@ -3670,7 +3649,9 @@ types:
   op1_2:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1_1
       size: len_op1
@@ -3681,7 +3662,9 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2
       size: len_op2
@@ -3692,21 +3675,25 @@ types:
   op2_2:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2_1
       size: len_op2
   op_0:
     seq:
     - id: len_op
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op
       type: op
       size: len_op
   op_elt_field0:
     seq:
     - id: op_code
-      type: s4
+      type: int31
     - id: price
       type: price
     - id: l1_dst
@@ -3761,31 +3748,13 @@ types:
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: script
       type: id_015__ptlimapt__scripted__contracts
-  origination_proof:
-    seq:
-    - id: len_origination_proof
-      type: s4
-    - id: origination_proof
-      size: len_origination_proof
-  output_proof:
-    seq:
-    - id: len_output_proof
-      type: s4
-    - id: output_proof
-      size: len_output_proof
   parameters:
     seq:
     - id: entrypoint
       type: id_015__ptlimapt__entrypoint
       doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
-      type: value
-  parameters_ty:
-    seq:
-    - id: len_parameters_ty
-      type: s4
-    - id: parameters_ty
-      size: len_parameters_ty
+      type: bytes_dyn_uint30
   payload:
     seq:
     - id: payload_entries
@@ -3794,7 +3763,9 @@ types:
   payload_0:
     seq:
     - id: len_payload
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: payload
       type: payload
       size: len_payload
@@ -3834,7 +3805,9 @@ types:
   previous_message_result_path_0:
     seq:
     - id: len_previous_message_result_path
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: previous_message_result_path
       type: previous_message_result_path
       size: len_previous_message_result_path
@@ -3861,7 +3834,7 @@ types:
     - id: arg
       type: micheline__015__ptlimapt__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__2_args__no_annots:
     seq:
     - id: prim
@@ -3879,7 +3852,7 @@ types:
     - id: arg2
       type: micheline__015__ptlimapt__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__generic:
     seq:
     - id: prim
@@ -3887,20 +3860,14 @@ types:
     - id: args
       type: args_0
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__no_args__some_annots:
     seq:
     - id: prim
       type: id_015__ptlimapt__michelson__v1__primitives
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   proof:
-    seq:
-    - id: len_proof
-      type: s4
-    - id: proof
-      size: len_proof
-  proof_0:
     seq:
     - id: proof_tag
       type: u1
@@ -3917,7 +3884,7 @@ types:
     - id: case__3
       type: case__3
       if: (proof_tag == proof_tag::case__3)
-  proof_1:
+  proof_0:
     seq:
     - id: proof_tag
       type: u1
@@ -3934,7 +3901,7 @@ types:
     - id: case__3
       type: case__3
       if: (proof_tag == proof_tag::case__3)
-  proof_2:
+  proof_1:
     seq:
     - id: pvm_step
       type: pvm_step
@@ -3952,7 +3919,7 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: s4
+      type: u4
       valid:
         max: 640
     - id: proposals
@@ -4002,38 +3969,20 @@ types:
   public_parameters:
     seq:
     - id: public_parameters_field0
-      type: public_parameters_field0
+      type: bytes_dyn_uint30
     - id: public_parameters_field1
-      type: public_parameters_field1
-  public_parameters_field0:
-    seq:
-    - id: len_public_parameters_field0
-      type: s4
-    - id: public_parameters_field0
-      size: len_public_parameters_field0
-  public_parameters_field1:
-    seq:
-    - id: len_public_parameters_field1
-      type: s4
-    - id: public_parameters_field1
-      size: len_public_parameters_field1
+      type: bytes_dyn_uint30
   pvm_step:
     seq:
     - id: pvm_step_tag
       type: u1
       enum: pvm_step_tag
     - id: arithmetic__pvm__with__proof
-      type: proof_0
+      type: proof
       if: (pvm_step_tag == pvm_step_tag::arithmetic__pvm__with__proof)
     - id: wasm__2__0__0__pvm__with__proof
-      type: proof_1
+      type: proof_0
       if: (pvm_step_tag == pvm_step_tag::wasm__2__0__0__pvm__with__proof)
-  raw_data:
-    seq:
-    - id: len_raw_data
-      type: s4
-    - id: raw_data
-      size: len_raw_data
   refutation:
     seq:
     - id: choice
@@ -4054,7 +4003,7 @@ types:
     - id: storage_limit
       type: n
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   reveal:
     seq:
     - id: source
@@ -4077,7 +4026,7 @@ types:
       type: u1
       enum: reveal_proof_tag
     - id: raw__data__proof
-      type: raw_data
+      type: bytes_dyn_uint30
       if: (reveal_proof_tag == reveal_proof_tag::raw__data__proof)
   sc_rollup_add_messages:
     seq:
@@ -4160,7 +4109,7 @@ types:
     - id: cemented_commitment
       size: 32
     - id: output_proof
-      type: output_proof
+      type: bytes_dyn_uint30
   sc_rollup_originate:
     seq:
     - id: source
@@ -4178,11 +4127,11 @@ types:
       type: u1
       enum: pvm_kind
     - id: boot_sector
-      type: boot_sector
+      type: bytes_dyn_uint30
     - id: origination_proof
-      type: origination_proof
+      type: bytes_dyn_uint30
     - id: parameters_ty
-      type: parameters_ty
+      type: bytes_dyn_uint30
   sc_rollup_publish:
     seq:
     - id: source
@@ -4279,7 +4228,9 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: sequence
       type: sequence
       size: len_sequence
@@ -4287,12 +4238,6 @@ types:
     seq:
     - id: sequence_elt
       type: micheline__015__ptlimapt__michelson_v1__expression
-  serialized_proof:
-    seq:
-    - id: len_serialized_proof
-      type: s4
-    - id: serialized_proof
-      size: len_serialized_proof
   set_deposits_limit:
     seq:
     - id: source
@@ -4354,32 +4299,8 @@ types:
       type: dissection_0
       if: (step_tag == step_tag::dissection)
     - id: proof
-      type: proof_2
+      type: proof_1
       if: (step_tag == step_tag::proof)
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
-  string:
-    seq:
-    - id: len_string
-      type: s4
-    - id: string
-      size: len_string
-  ticket_contents:
-    seq:
-    - id: len_ticket_contents
-      type: s4
-    - id: ticket_contents
-      size: len_ticket_contents
-  ticket_ty:
-    seq:
-    - id: len_ticket_ty
-      type: s4
-    - id: ticket_ty
-      size: len_ticket_ty
   tickets_info:
     seq:
     - id: tickets_info_entries
@@ -4388,16 +4309,18 @@ types:
   tickets_info_0:
     seq:
     - id: len_tickets_info
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: tickets_info
       type: tickets_info
       size: len_tickets_info
   tickets_info_entries:
     seq:
     - id: contents
-      type: contents
+      type: bytes_dyn_uint30
     - id: ty
-      type: ty
+      type: bytes_dyn_uint30
     - id: ticketer
       type: id_015__ptlimapt__contract_id
       doc: ! >-
@@ -4448,9 +4371,9 @@ types:
     - id: storage_limit
       type: n
     - id: ticket_contents
-      type: ticket_contents
+      type: bytes_dyn_uint30
     - id: ticket_ty
-      type: ticket_ty
+      type: bytes_dyn_uint30
     - id: ticket_ticketer
       type: id_015__ptlimapt__contract_id
       doc: ! >-
@@ -4464,7 +4387,7 @@ types:
         A contract handle: A contract notation as given to an RPC or inside scripts.
         Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: entrypoint
-      type: entrypoint
+      type: bytes_dyn_uint30
   tree_encoding:
     seq:
     - id: tree_encoding_tag
@@ -4870,7 +4793,7 @@ types:
       type: case__193_0
       if: (tree_encoding_tag == tree_encoding_tag::case__193)
     - id: case__195
-      type: case__195
+      type: bytes_dyn_uint30
       if: (tree_encoding_tag == tree_encoding_tag::case__195)
     - id: case__200
       size: 32
@@ -4933,7 +4856,7 @@ types:
     - id: context_hash
       size: 32
     - id: message_index
-      type: s4
+      type: int31
     - id: message_result_path
       type: message_result_path_0
     - id: tickets_info
@@ -5004,7 +4927,7 @@ types:
     - id: previous_message_result_path
       type: previous_message_result_path_0
     - id: proof
-      type: proof
+      type: bytes_dyn_uint30
   tx_rollup_remove_commitment:
     seq:
     - id: source
@@ -5060,19 +4983,13 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: content
-      type: content
+      type: bytes_dyn_uint30
     - id: burn_limit_tag
       type: u1
       enum: bool
     - id: burn_limit
       type: id_015__ptlimapt__mutez
       if: (burn_limit_tag == bool::true)
-  ty:
-    seq:
-    - id: len_ty
-      type: s4
-    - id: ty
-      size: len_ty
   update_consensus_key:
     seq:
     - id: source
@@ -5089,12 +5006,6 @@ types:
     - id: pk
       type: public_key
       doc: A Ed25519, Secp256k1, or P256 public key
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
   z:
     seq:
     - id: has_tail
@@ -5128,7 +5039,7 @@ types:
     - id: init_state
       type: init_state_0
     - id: nb_ops
-      type: s4
+      type: int31
   zk_rollup_publish:
     seq:
     - id: source

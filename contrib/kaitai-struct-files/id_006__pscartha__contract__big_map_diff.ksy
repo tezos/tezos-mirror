@@ -11,12 +11,6 @@ types:
       type: micheline__006__pscartha__michelson_v1__expression
     - id: value_type
       type: micheline__006__pscartha__michelson_v1__expression
-  annots:
-    seq:
-    - id: len_annots
-      type: s4
-    - id: annots
-      size: len_annots
   args:
     seq:
     - id: args_entries
@@ -25,7 +19,9 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: args
       type: args
       size: len_args
@@ -33,12 +29,14 @@ types:
     seq:
     - id: args_elt
       type: micheline__006__pscartha__michelson_v1__expression
-  bytes:
+  bytes_dyn_uint30:
     seq:
-    - id: len_bytes
-      type: s4
-    - id: bytes
-      size: len_bytes
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   copy:
     seq:
     - id: source_big_map
@@ -81,7 +79,7 @@ types:
       type: z
       if: (micheline__006__pscartha__michelson_v1__expression_tag == micheline__006__pscartha__michelson_v1__expression_tag::int)
     - id: string
-      type: string
+      type: bytes_dyn_uint30
       if: (micheline__006__pscartha__michelson_v1__expression_tag == micheline__006__pscartha__michelson_v1__expression_tag::string)
     - id: sequence
       type: sequence_0
@@ -108,7 +106,7 @@ types:
       type: prim__generic
       if: (micheline__006__pscartha__michelson_v1__expression_tag == micheline__006__pscartha__michelson_v1__expression_tag::prim__generic)
     - id: bytes
-      type: bytes
+      type: bytes_dyn_uint30
       if: (micheline__006__pscartha__michelson_v1__expression_tag == micheline__006__pscartha__michelson_v1__expression_tag::bytes)
   n_chunk:
     seq:
@@ -129,7 +127,7 @@ types:
     - id: arg
       type: micheline__006__pscartha__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__2_args__no_annots:
     seq:
     - id: prim
@@ -147,7 +145,7 @@ types:
     - id: arg2
       type: micheline__006__pscartha__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__generic:
     seq:
     - id: prim
@@ -155,13 +153,13 @@ types:
     - id: args
       type: args_0
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__no_args__some_annots:
     seq:
     - id: prim
       type: id_006__pscartha__michelson__v1__primitives
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   sequence:
     seq:
     - id: sequence_entries
@@ -170,7 +168,9 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: sequence
       type: sequence
       size: len_sequence
@@ -178,12 +178,6 @@ types:
     seq:
     - id: sequence_elt
       type: micheline__006__pscartha__michelson_v1__expression
-  string:
-    seq:
-    - id: len_string
-      type: s4
-    - id: string
-      size: len_string
   update:
     seq:
     - id: big_map
@@ -551,7 +545,9 @@ enums:
     10: bytes
 seq:
 - id: len_id_006__pscartha__contract__big_map_diff
-  type: s4
+  type: u4
+  valid:
+    max: 1073741823
 - id: id_006__pscartha__contract__big_map_diff
   type: id_006__pscartha__contract__big_map_diff
   size: len_id_006__pscartha__contract__big_map_diff

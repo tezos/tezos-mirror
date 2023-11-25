@@ -5,12 +5,14 @@ meta:
   - sapling__transaction__rcm
 doc: ! 'Encoding id: sapling.transaction.plaintext'
 types:
-  memo:
+  bytes_dyn_uint30:
     seq:
-    - id: len_memo
-      type: s4
-    - id: memo
-      size: len_memo
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   sapling__wallet__diversifier:
     seq:
     - id: sapling__wallet__diversifier
@@ -23,4 +25,4 @@ seq:
 - id: rcm
   type: sapling__transaction__rcm
 - id: memo
-  type: memo
+  type: bytes_dyn_uint30

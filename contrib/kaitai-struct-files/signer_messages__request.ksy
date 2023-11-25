@@ -3,19 +3,21 @@ meta:
   endian: be
 doc: ! 'Encoding id: signer_messages.request'
 types:
-  data:
+  bytes_dyn_uint30:
     seq:
-    - id: len_data
-      type: s4
-    - id: data
-      size: len_data
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   deterministic_nonce:
     seq:
     - id: pkh
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: data
-      type: data
+      type: bytes_dyn_uint30
     - id: signature_tag
       type: u1
       enum: bool
@@ -28,7 +30,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: data
-      type: data
+      type: bytes_dyn_uint30
     - id: signature_tag
       type: u1
       enum: bool
@@ -58,7 +60,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: data
-      type: data
+      type: bytes_dyn_uint30
     - id: signature_tag
       type: u1
       enum: bool

@@ -36,7 +36,9 @@ types:
       type: b7be
 seq:
 - id: len_id_008__ptedo2zk__delegate__frozen_balance_by_cycles
-  type: s4
+  type: u4
+  valid:
+    max: 1073741823
 - id: id_008__ptedo2zk__delegate__frozen_balance_by_cycles
   type: id_008__ptedo2zk__delegate__frozen_balance_by_cycles
   size: len_id_008__ptedo2zk__delegate__frozen_balance_by_cycles

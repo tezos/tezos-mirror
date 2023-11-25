@@ -7,6 +7,14 @@ doc: ! >-
   Description: The environment a protocol relies on and the components a protocol
   is made of.
 types:
+  bytes_dyn_uint30:
+    seq:
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   components:
     seq:
     - id: components_entries
@@ -15,40 +23,24 @@ types:
   components_0:
     seq:
     - id: len_components
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: components
       type: components
       size: len_components
   components_entries:
     seq:
     - id: name
-      type: name
+      type: bytes_dyn_uint30
     - id: interface_tag
       type: u1
       enum: bool
     - id: interface
-      type: interface
+      type: bytes_dyn_uint30
       if: (interface_tag == bool::true)
     - id: implementation
-      type: implementation
-  implementation:
-    seq:
-    - id: len_implementation
-      type: s4
-    - id: implementation
-      size: len_implementation
-  interface:
-    seq:
-    - id: len_interface
-      type: s4
-    - id: interface
-      size: len_interface
-  name:
-    seq:
-    - id: len_name
-      type: s4
-    - id: name
-      size: len_name
+      type: bytes_dyn_uint30
   protocol__environment_version:
     seq:
     - id: protocol__environment_version

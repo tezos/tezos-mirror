@@ -6,21 +6,17 @@ types:
   alpha__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
-  code:
+      type: bytes_dyn_uint30
+  bytes_dyn_uint30:
     seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
 seq:
 - id: alpha__scripted__contracts
   type: alpha__scripted__contracts

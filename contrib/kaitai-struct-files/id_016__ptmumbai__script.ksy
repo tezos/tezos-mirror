@@ -3,24 +3,20 @@ meta:
   endian: be
 doc: ! 'Encoding id: 016-PtMumbai.script'
 types:
-  code:
+  bytes_dyn_uint30:
     seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   id_016__ptmumbai__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
+      type: bytes_dyn_uint30
 seq:
 - id: id_016__ptmumbai__scripted__contracts
   type: id_016__ptmumbai__scripted__contracts

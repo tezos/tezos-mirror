@@ -12,12 +12,6 @@ types:
       size: 20
     - id: secret
       size: 20
-  arbitrary:
-    seq:
-    - id: len_arbitrary
-      type: s4
-    - id: arbitrary
-      size: len_arbitrary
   ballot:
     seq:
     - id: source
@@ -36,7 +30,9 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh1
       type: bh1
       size: len_bh1
@@ -47,16 +43,20 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh2
       type: bh2
       size: len_bh2
-  code:
+  bytes_dyn_uint30:
     seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   delegation:
     seq:
     - id: source
@@ -246,7 +246,7 @@ types:
       type: set_deposits_limit
       if: (id_012__psithaca__operation__alpha__contents_tag == id_012__psithaca__operation__alpha__contents_tag::set_deposits_limit)
     - id: failing_noop
-      type: arbitrary
+      type: bytes_dyn_uint30
       if: (id_012__psithaca__operation__alpha__contents_tag == id_012__psithaca__operation__alpha__contents_tag::failing_noop)
     - id: register_global_constant
       type: register_global_constant
@@ -254,9 +254,9 @@ types:
   id_012__psithaca__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
+      type: bytes_dyn_uint30
   n:
     seq:
     - id: n
@@ -289,7 +289,9 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1
       size: len_op1
@@ -300,7 +302,9 @@ types:
   op1_2:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1_1
       size: len_op1
@@ -311,7 +315,9 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2
       size: len_op2
@@ -322,7 +328,9 @@ types:
   op2_2:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2_1
       size: len_op2
@@ -363,7 +371,7 @@ types:
       type: id_012__psithaca__entrypoint
       doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   preendorsement:
     seq:
     - id: slot
@@ -382,7 +390,9 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: proposals
       type: proposals
       size: len_proposals
@@ -441,7 +451,7 @@ types:
     - id: storage_limit
       type: n
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   reveal:
     seq:
     - id: source
@@ -483,12 +493,6 @@ types:
     - id: limit
       type: id_012__psithaca__mutez
       if: (limit_tag == bool::true)
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
   transaction:
     seq:
     - id: source
@@ -515,12 +519,6 @@ types:
     - id: parameters
       type: parameters
       if: (parameters_tag == bool::true)
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
 enums:
   bool:
     0: false

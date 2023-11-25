@@ -3,12 +3,14 @@ meta:
   endian: be
 doc: ! 'Encoding id: signer_messages.deterministic_nonce.response'
 types:
-  deterministic_nonce:
+  bytes_dyn_uint30:
     seq:
-    - id: len_deterministic_nonce
-      type: s4
-    - id: deterministic_nonce
-      size: len_deterministic_nonce
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
 seq:
 - id: deterministic_nonce
-  type: deterministic_nonce
+  type: bytes_dyn_uint30

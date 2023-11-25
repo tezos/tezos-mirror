@@ -5,12 +5,14 @@ meta:
   - sapling__transaction__commitment_value
 doc: ! 'Encoding id: sapling.transaction.ciphertext'
 types:
-  payload_enc:
+  bytes_dyn_uint30:
     seq:
-    - id: len_payload_enc
-      type: s4
-    - id: payload_enc
-      size: len_payload_enc
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   sapling__dh__epk:
     seq:
     - id: sapling__dh__epk
@@ -21,7 +23,7 @@ seq:
 - id: epk
   type: sapling__dh__epk
 - id: payload_enc
-  type: payload_enc
+  type: bytes_dyn_uint30
 - id: nonce_enc
   size: 24
 - id: payload_out

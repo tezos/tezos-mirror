@@ -121,7 +121,9 @@ types:
   alpha__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_alpha__operation_metadata__alpha__balance_updates
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: alpha__operation_metadata__alpha__balance_updates
       type: alpha__operation_metadata__alpha__balance_updates
       size: len_alpha__operation_metadata__alpha__balance_updates

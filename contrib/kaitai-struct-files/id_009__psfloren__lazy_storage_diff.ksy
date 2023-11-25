@@ -21,12 +21,6 @@ types:
       type: updates_1
     - id: memo_size
       type: u2
-  annots:
-    seq:
-    - id: len_annots
-      type: s4
-    - id: annots
-      size: len_annots
   args:
     seq:
     - id: args_entries
@@ -35,7 +29,9 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: args
       type: args
       size: len_args
@@ -50,12 +46,14 @@ types:
       doc: ! 'Big map identifier: A big map identifier'
     - id: diff
       type: diff
-  bytes:
+  bytes_dyn_uint30:
     seq:
-    - id: len_bytes
-      type: s4
-    - id: bytes
-      size: len_bytes
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   commitments_and_ciphertexts:
     seq:
     - id: commitments_and_ciphertexts_entries
@@ -64,7 +62,9 @@ types:
   commitments_and_ciphertexts_0:
     seq:
     - id: len_commitments_and_ciphertexts
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: commitments_and_ciphertexts
       type: commitments_and_ciphertexts
       size: len_commitments_and_ciphertexts
@@ -154,7 +154,7 @@ types:
       type: z
       if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::int)
     - id: string
-      type: string
+      type: bytes_dyn_uint30
       if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::string)
     - id: sequence
       type: sequence_0
@@ -181,7 +181,7 @@ types:
       type: prim__generic
       if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__generic)
     - id: bytes
-      type: bytes
+      type: bytes_dyn_uint30
       if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::bytes)
   n_chunk:
     seq:
@@ -197,7 +197,9 @@ types:
   nullifiers_0:
     seq:
     - id: len_nullifiers
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: nullifiers
       type: nullifiers
       size: len_nullifiers
@@ -218,7 +220,7 @@ types:
     - id: arg
       type: micheline__009__psfloren__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__2_args__no_annots:
     seq:
     - id: prim
@@ -236,7 +238,7 @@ types:
     - id: arg2
       type: micheline__009__psfloren__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__generic:
     seq:
     - id: prim
@@ -244,13 +246,13 @@ types:
     - id: args
       type: args_0
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__no_args__some_annots:
     seq:
     - id: prim
       type: id_009__psfloren__michelson__v1__primitives
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   sapling_state:
     seq:
     - id: id
@@ -266,7 +268,9 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: sequence
       type: sequence
       size: len_sequence
@@ -274,12 +278,6 @@ types:
     seq:
     - id: sequence_elt
       type: micheline__009__psfloren__michelson_v1__expression
-  string:
-    seq:
-    - id: len_string
-      type: s4
-    - id: string
-      size: len_string
   updates:
     seq:
     - id: updates_entries
@@ -288,7 +286,9 @@ types:
   updates_0:
     seq:
     - id: len_updates
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: updates
       type: updates
       size: len_updates
@@ -721,7 +721,9 @@ enums:
     10: bytes
 seq:
 - id: len_id_009__psfloren__lazy_storage_diff
-  type: s4
+  type: u4
+  valid:
+    max: 1073741823
 - id: id_009__psfloren__lazy_storage_diff
   type: id_009__psfloren__lazy_storage_diff
   size: len_id_009__psfloren__lazy_storage_diff

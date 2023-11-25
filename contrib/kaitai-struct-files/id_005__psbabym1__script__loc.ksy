@@ -3,10 +3,17 @@ meta:
   endian: be
 doc: ! 'Encoding id: 005-PsBabyM1.script.loc'
 types:
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   micheline__location:
     seq:
     - id: micheline__location
-      type: s4
+      type: int31
 seq:
 - id: micheline__location
   type: micheline__location

@@ -7,6 +7,14 @@ doc: ! >-
   Description: Protocol metadata: the hash of the protocol, the expected environment
   version and the list of modules comprising the protocol.
 types:
+  bytes_dyn_uint30:
+    seq:
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   modules:
     seq:
     - id: modules_entries
@@ -15,16 +23,16 @@ types:
   modules_0:
     seq:
     - id: len_modules
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: modules
       type: modules
       size: len_modules
   modules_entries:
     seq:
-    - id: len_modules_elt
-      type: s4
     - id: modules_elt
-      size: len_modules_elt
+      type: bytes_dyn_uint30
   protocol__environment_version:
     seq:
     - id: protocol__environment_version

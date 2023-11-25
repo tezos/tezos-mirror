@@ -11,7 +11,9 @@ types:
   baking_reward_per_endorsement_0:
     seq:
     - id: len_baking_reward_per_endorsement
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: baking_reward_per_endorsement
       type: baking_reward_per_endorsement
       size: len_baking_reward_per_endorsement
@@ -27,7 +29,9 @@ types:
   cache_layout_0:
     seq:
     - id: len_cache_layout
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: cache_layout
       type: cache_layout
       size: len_cache_layout
@@ -43,7 +47,9 @@ types:
   endorsement_reward_0:
     seq:
     - id: len_endorsement_reward
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: endorsement_reward
       type: endorsement_reward
       size: len_endorsement_reward
@@ -55,6 +61,13 @@ types:
     seq:
     - id: id_011__pthangz2__mutez
       type: n
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   n:
     seq:
     - id: n
@@ -75,7 +88,9 @@ types:
   time_between_blocks_0:
     seq:
     - id: len_time_between_blocks
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: time_between_blocks
       type: time_between_blocks
       size: len_time_between_blocks
@@ -104,15 +119,15 @@ seq:
 - id: max_anon_ops_per_block
   type: u1
 - id: max_operation_data_length
-  type: s4
+  type: int31
 - id: max_proposals_per_delegate
   type: u1
 - id: max_micheline_node_count
-  type: s4
+  type: int31
 - id: max_micheline_bytes_limit
-  type: s4
+  type: int31
 - id: max_allowed_global_constants_depth
-  type: s4
+  type: int31
 - id: cache_layout
   type: cache_layout_0
 - id: michelson_maximum_type_size
@@ -142,7 +157,7 @@ seq:
 - id: seed_nonce_revelation_tip
   type: id_011__pthangz2__mutez
 - id: origination_size
-  type: s4
+  type: int31
 - id: block_security_deposit
   type: id_011__pthangz2__mutez
 - id: endorsement_security_deposit

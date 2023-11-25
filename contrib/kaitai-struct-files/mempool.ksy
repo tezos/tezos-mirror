@@ -15,7 +15,9 @@ types:
   known_valid_0:
     seq:
     - id: len_known_valid
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: known_valid
       type: known_valid
       size: len_known_valid
@@ -31,14 +33,18 @@ types:
   pending_0:
     seq:
     - id: len_pending
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: pending
       type: pending
       size: len_pending
   pending_1:
     seq:
     - id: len_pending
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: pending
       type: pending_0
       size: len_pending
