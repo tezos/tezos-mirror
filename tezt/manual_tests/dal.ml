@@ -342,6 +342,33 @@ let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
   let* level = Client.level client in
   loop level
 
+let stake_or_unstake_half_balance client ~baker_alias =
+  let* baker = Client.show_address ~alias:baker_alias client in
+  let* full_balance =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_full_balance
+      baker.Account.public_key_hash
+  in
+  let* available_balance = Client.get_balance_for ~account:baker_alias client in
+  (* Stake half of the baker's balance *)
+  let frozen_balance = Tez.(full_balance - available_balance) in
+  let entrypoint, amount =
+    if Tez.to_mutez available_balance > Tez.to_mutez frozen_balance then
+      ("stake", Tez.((available_balance - frozen_balance) /! 2L))
+    else ("unstake", Tez.((frozen_balance - available_balance) /! 2L))
+  in
+  if Tez.to_mutez amount = 0 then unit
+  else
+    Client.transfer
+      ~amount
+      ~giver:baker_alias
+      ~receiver:baker_alias
+      ~burn_cap:(Tez.of_mutez_int 140_000)
+      ~entrypoint
+      ~wait:"1"
+      client
+
+
 (** This function allows to start a baker and attests slots DAL slots in the
     given network. *)
 let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
@@ -365,33 +392,7 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   (* No need to check if baker_alias is already delegate. Re-registering an
      already registered delegate doesn't fail. *)
   let* _s = Client.register_delegate ~delegate:baker_alias client in
-  let* baker = Client.show_address ~alias:baker_alias client in
-
-  let* full_balance =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_delegate_full_balance
-         baker.Account.public_key_hash
-  in
-  let* available_balance = Client.get_balance_for ~account:baker_alias client in
-  (* Stake half of the baker's balance *)
-  let frozen_balance = Tez.(full_balance - available_balance) in
-  let* () =
-    let entrypoint, amount =
-      if Tez.to_mutez available_balance > Tez.to_mutez frozen_balance then
-        ("stake", Tez.((available_balance - frozen_balance) /! 2L))
-      else ("unstake", Tez.((frozen_balance - available_balance) /! 2L))
-    in
-    if Tez.to_mutez amount = 0 then unit
-    else
-      Client.transfer
-        ~amount
-        ~giver:baker_alias
-        ~receiver:baker_alias
-        ~burn_cap:(Tez.of_mutez_int 140_000)
-        ~entrypoint
-        ~wait:"1"
-        client
-  in
+  let* () = stake_or_unstake_half_balance client ~baker_alias in
   let baker = Baker.create ~protocol:Protocol.Alpha ~dal_node l1_node client in
   let* () = Baker.run baker in
   Lwt_unix.sleep Float.max_float
