@@ -28,10 +28,12 @@ local row = grafana.row;
 // We reuse Octez-p2p for p2p pannels
 local p2p = import '../p2p.jsonnet';
 local gossipsub = import './gossipsub.jsonnet';
+local dal_node = import './dal-node.jsonnet';
 
 local boardtitle = 'Octez DAL Node Dashboard';
 
-local gossipsub_y = 1;
+local node_y = 1;
+local gossipsub_y = node_y + 16;
 local p2p_y = gossipsub_y + 24;
 
 
@@ -60,6 +62,22 @@ dashboard.new(
 # The grid is 24 slots wide, where a slot is the unit used to position Grafana panels
 .addPanels(
   [
+
+    //# Dal Node row
+    row.new(
+      title="DAL node's core stats",
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 0, w: 24, x: 0, y: node_y } },
+
+    // ## First line of pannels
+    dal_node.layer1Monitor { gridPos: { h: 8, w: 12, x: 0, y: node_y } },
+    dal_node.storedShards { gridPos: { h: 8, w: 12, x: 12, y: node_y } },
+
+    // ## Second line of pannels
+    dal_node.slotsAttesatationSummary { gridPos: { h: 8, w: 8, x: 0, y: node_y + 8 } },
+    dal_node.slotsWaitingAttestations { gridPos: { h: 8, w: 8, x: 8, y: node_y + 8 } },
+    dal_node.slotsAttested { gridPos: { h: 8, w: 8, x: 16, y: node_y + 8 } },
 
     //# Gossipsub row
     row.new(
