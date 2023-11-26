@@ -342,12 +342,12 @@ let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
   let* level = Client.level client in
   loop level
 
-let stake_or_unstake_half_balance client ~baker_alias =
+let _stake_or_unstake_half_balance client ~baker_alias =
   let* baker = Client.show_address ~alias:baker_alias client in
   let* full_balance =
     Client.RPC.call client
     @@ RPC.get_chain_block_context_delegate_full_balance
-      baker.Account.public_key_hash
+         baker.Account.public_key_hash
   in
   let* available_balance = Client.get_balance_for ~account:baker_alias client in
   (* Stake half of the baker's balance *)
@@ -367,7 +367,6 @@ let stake_or_unstake_half_balance client ~baker_alias =
       ~entrypoint
       ~wait:"1"
       client
-
 
 (** This function allows to start a baker and attests slots DAL slots in the
     given network. *)
@@ -392,7 +391,11 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   (* No need to check if baker_alias is already delegate. Re-registering an
      already registered delegate doesn't fail. *)
   let* _s = Client.register_delegate ~delegate:baker_alias client in
-  let* () = stake_or_unstake_half_balance client ~baker_alias in
+  (* TODO: manual staking has been disabled in Oxford-2 (after being enabled in
+      rejected Oxford-1) in favor of automatic staking. So, this command
+      currently fails. But, it might be reactivated in protocol P.
+     let* () = _stake_or_unstake_half_balance client ~baker_alias in
+  *)
   let baker = Baker.create ~protocol:Protocol.Alpha ~dal_node l1_node client in
   let* () = Baker.run baker in
   Lwt_unix.sleep Float.max_float
