@@ -105,7 +105,7 @@ local mkPeersPanel(legendRightSide) =
     local received = 'Received data (KB)';
     local sent = 'Sent data (KB)';
     graphPanel.new(
-      title='Average data exchange (10-minute interval)',
+      title='Average data exchange (1-minute interval)',
       datasource='Prometheus',
       legend_rightSide=false,
       linewidth=1,
@@ -118,12 +118,12 @@ local mkPeersPanel(legendRightSide) =
     ).addTargets([
       prometheus.target(
         // Divide by 1,000 for KB
-        'deriv(' + namespace + '_p2p_io_scheduler_total_recv' + node_instance + '[10m]) / 1000',
+        'deriv(' + namespace + '_p2p_io_scheduler_total_recv' + node_instance + '[1m]) / 1000',
         legendFormat=received,
       ),
       prometheus.target(
         // Divide by 1,000 for KB
-        'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + node_instance + '[10m]) / 1000',
+        'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + node_instance + '[1m]) / 1000',
         legendFormat=sent,
       ),
     ]),
