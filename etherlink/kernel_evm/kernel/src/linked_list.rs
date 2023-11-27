@@ -152,6 +152,15 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
         Ok(path)
     }
 
+    /// Path to the data held by the pointer.
+    fn data_path(&self, prefix: &impl Path) -> Result<OwnedPath> {
+        let path = hex::encode(&self.id);
+        let path: Vec<u8> = format!("/{}/data", path).into();
+        let path = OwnedPath::try_from(path)?;
+        let path = concat(prefix, &path)?;
+        Ok(path)
+    }
+
     /// Load the pointer from the durable storage
     fn read(host: &impl Runtime, prefix: &impl Path, id: &Id) -> Result<Option<Self>> {
         storage::read_optional_rlp(host, &Self::pointer_path(id, prefix)?)
@@ -198,6 +207,73 @@ where
     /// Returns true if the list contains no elements.
     pub fn is_empty(&self) -> bool {
         self.pointers.is_none()
+    }
+
+    /// Appends an element to the back of a list.
+    ///
+    /// An element cannot be mutated.
+    /// The Id has to be unique by element.
+    /// The Id will be later use to retrieve the element
+    /// (example: it can be the hash of the element).
+    pub fn push(&mut self, host: &mut impl Runtime, id: &Id, elt: &Elt) -> Result<()> {
+        // Check if the path already exist
+        if Pointer::read(host, &self.path, id)?.is_some() {
+            return Ok(());
+        }
+        match &self.pointers {
+            Some(LinkedListPointer { front, back }) => {
+                // The list is not empty
+                // Modifies the old back pointer
+                let penultimate = Pointer {
+                    next: Some(id.clone()), // Points to the inserted element
+                    ..back.clone()
+                };
+                // Creates a new back pointer
+                let back = Pointer {
+                    id: id.clone(),
+                    previous: Some(penultimate.id.clone()), // Points to the penultimate pointer
+                    next: None, // None because there is no element after
+                };
+                // Saves the pointer
+                penultimate.save(host, &self.path)?;
+                back.save(host, &self.path)?;
+                // And the save the data
+                let data_path = back.data_path(&self.path)?;
+                storage::store_rlp(elt, host, &data_path)?;
+                // update the back pointer of the list
+                self.pointers = Some(LinkedListPointer {
+                    front: front.clone(),
+                    back,
+                });
+            }
+            None => {
+                // This case corresponds to the empty list
+                // A new pointer has to be created
+                let back = Pointer {
+                    id: id.clone(),
+                    previous: None, // None because it's the only element of the list
+                    next: None,     // None because it's the only element of the list
+                };
+                // Saves the pointer and its data
+                back.save(host, &self.path)?;
+                let data_path = back.data_path(&self.path)?;
+                storage::store_rlp(elt, host, &data_path)?;
+                // update the front and back pointers of the list
+                self.pointers = Some(LinkedListPointer {
+                    front: back.clone(),
+                    back,
+                });
+            }
+        };
+        self.save(host)
+    }
+
+    /// Returns an element at a given index.
+    ///
+    /// Returns None if the element is not present
+    pub fn get(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
+        let Some(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
+        storage::read_optional_rlp(host, &pointer.data_path(&self.path)?)
     }
 }
 
