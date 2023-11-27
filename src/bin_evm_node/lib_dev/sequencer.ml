@@ -19,8 +19,7 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    let encode_transaction ~smart_rollup_address:_
-        ~transaction:(Ethereum_types.Hex transaction) =
+    let encode_transaction ~smart_rollup_address:_ ~transaction =
       let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
       let tx_hash =
         Ethereum_types.(

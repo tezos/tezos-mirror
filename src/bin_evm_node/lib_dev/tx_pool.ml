@@ -12,7 +12,7 @@ module Pool = struct
   (** Transaction stored in the pool. *)
   type transaction = {
     index : int64; (* Global index of the transaction. *)
-    raw_tx : Ethereum_types.hex; (* Current transaction. *)
+    raw_tx : string; (* Current transaction. *)
     gas_price : Z.t; (* The maximum price the user can pay for fees. *)
   }
 
@@ -24,7 +24,7 @@ module Pool = struct
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
   (** Add a transacion to the pool.*)
-  let add t pkey base_fee (raw_tx : Ethereum_types.hex) =
+  let add t pkey base_fee raw_tx =
     let open Result_syntax in
     let {transactions; global_index} = t in
     let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
@@ -131,7 +131,7 @@ end
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        Ethereum_types.hex
+        string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | New_l2_head : Ethereum_types.block_height -> (unit, tztrace) t
 
@@ -148,7 +148,7 @@ module Request = struct
           ~title:"Add_transaction"
           (obj2
              (req "request" (constant "add_transaction"))
-             (req "transaction" Ethereum_types.hex_encoding))
+             (req "transaction" string))
           (function
             | View (Add_transaction messages) -> Some ((), messages) | _ -> None)
           (fun ((), messages) -> View (Add_transaction messages));
@@ -165,8 +165,10 @@ module Request = struct
   let pp ppf (View r) =
     match r with
     | Add_transaction transaction ->
-        let (Ethereum_types.Hex transaction) = transaction in
-        Format.fprintf ppf "Add [%s] tx to tx-pool" transaction
+        Format.fprintf
+          ppf
+          "Add [%s] tx to tx-pool"
+          (Hex.of_string transaction |> Hex.show)
     | New_l2_head block_height ->
         let (Ethereum_types.Block_height block_height) = block_height in
         Format.fprintf ppf "New L2 head: %s" (Z.to_string block_height)
@@ -192,7 +194,6 @@ let on_transaction state tx_raw =
       (* Add the tx to the pool*)
       let*? pool = Pool.add pool pkey base_fee tx_raw in
       (* compute the hash *)
-      let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
       let hash =
         Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)

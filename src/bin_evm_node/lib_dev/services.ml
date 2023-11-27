@@ -222,7 +222,7 @@ let dispatch_input (config : 'a Configuration.t)
         (* A block cannot have uncles. *)
         return (Get_uncle_by_block_number_and_index.Output (Ok None))
     | Send_raw_transaction.Input (Some tx_raw) -> (
-        let* tx_hash = Tx_pool.add tx_raw in
+        let* tx_hash = Tx_pool.add (Ethereum_types.hex_to_bytes tx_raw) in
         match tx_hash with
         | Ok tx_hash -> return (Send_raw_transaction.Output (Ok tx_hash))
         | Error reason ->

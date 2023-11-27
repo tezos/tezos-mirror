@@ -57,7 +57,6 @@ let chunk_transaction ~tx_hash ~tx_raw =
 
 let make_evm_inbox_transactions tx_raw =
   let open Result_syntax in
-  let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
   (* Maximum size describes the maximum size of [tx_raw] to fit
      in a simple transaction. *)
   let maximum_size =
@@ -84,12 +83,5 @@ let make_encoded_messages ~smart_rollup_address tx_raw =
   let tx_hash =
     Ethereum_types.(Hash Hex.(of_string tx_hash |> show |> hex_of_string))
   in
-  let messages =
-    List.map
-      (fun x ->
-        x
-        |> encode_transaction ~smart_rollup_address
-        |> Hex.of_string |> Hex.show)
-      messages
-  in
+  let messages = List.map (encode_transaction ~smart_rollup_address) messages in
   return (tx_hash, messages)

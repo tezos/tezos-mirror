@@ -21,7 +21,7 @@ module type S = sig
       and returns the hashes of injected transactions. *)
   val inject_raw_transactions :
     smart_rollup_address:string ->
-    transactions:Ethereum_types.hex list ->
+    transactions:string list ->
     Ethereum_types.hash list tzresult Lwt.t
 
   (** [current_block ~full_transaction_object] returns the most recent
@@ -90,7 +90,7 @@ module type S = sig
       if the nonce is correct and returns the associated public key of
       transaction. *)
   val is_tx_valid :
-    Ethereum_types.hex -> (Ethereum_types.address, string) result tzresult Lwt.t
+    string -> (Ethereum_types.address, string) result tzresult Lwt.t
 
   (** [storage_at address pos] returns the value at index [pos] of the
       account [address]'s storage. *)

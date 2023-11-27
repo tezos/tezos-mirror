@@ -14,8 +14,7 @@ val start : (module Services_backend_sig.S) * string -> unit tzresult Lwt.t
 val shutdown : unit -> unit Lwt.t
 
 (** [add raw_tx] adds a raw eth transaction to the tx-pool. *)
-val add :
-  Ethereum_types.hex -> (Ethereum_types.hash, string) result tzresult Lwt.t
+val add : string -> (Ethereum_types.hash, string) result tzresult Lwt.t
 
 (** [nonce address] returns the nonce of the user
     Returns the first gap in the tx-pool, or the nonce stored on the rollup 

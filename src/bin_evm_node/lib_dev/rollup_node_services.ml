@@ -46,7 +46,7 @@ let batcher_injection :
     ~query:Tezos_rpc.Query.empty
     ~input:
       Data_encoding.(
-        def "messages" ~description:"Messages to inject" (list string))
+        def "messages" ~description:"Messages to inject" (list (string' Hex)))
     ~output:
       Data_encoding.(
         def

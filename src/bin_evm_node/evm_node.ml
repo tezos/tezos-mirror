@@ -378,10 +378,11 @@ let make_prod_messages ~smart_rollup_address s =
 let make_dev_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
+  let s = Ethereum_types.hex_of_string s in
   let*? _, messages =
     Transaction_format.make_encoded_messages
       ~smart_rollup_address
-      (Evm_node_lib_dev_encoding.Ethereum_types.hex_of_string s)
+      (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
   in
   return messages
 

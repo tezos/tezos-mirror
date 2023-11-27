@@ -10,7 +10,7 @@ open Ethereum_types
 module type TxEncoder = sig
   val encode_transaction :
     smart_rollup_address:string ->
-    transaction:hex ->
+    transaction:string ->
     (hash * string list) tzresult
 end
 
