@@ -27,6 +27,7 @@ use crate::lexer::Prim;
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use michelson_address::*;
 pub use michelson_key::Key;
+pub use michelson_key_hash::KeyHash;
 pub use michelson_list::MichelsonList;
 pub use michelson_signature::Signature;
 pub use or::Or;
@@ -111,6 +112,7 @@ pub enum TypedValue {
     Bytes(Vec<u8>),
     Key(Key),
     Signature(Signature),
+    KeyHash(KeyHash),
 }
 
 pub fn typed_value_to_value_optimized<'a>(
@@ -151,6 +153,7 @@ pub fn typed_value_to_value_optimized<'a>(
         TV::Bytes(x) => V::Bytes(x),
         TV::Key(k) => V::Bytes(k.to_bytes_vec()),
         TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
+        TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
     }
 }
 

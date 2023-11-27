@@ -46,6 +46,9 @@ impl PartialOrd for TypedValue {
             (Signature(l), Signature(r)) => l.partial_cmp(r),
             (Signature(..), _) => None,
 
+            (KeyHash(l), KeyHash(r)) => l.partial_cmp(r),
+            (KeyHash(..), _) => None,
+
             // non-comparable types
             (List(..) | Map(..) | Contract(..), _) => None,
         }

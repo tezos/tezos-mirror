@@ -1118,6 +1118,17 @@ pub(crate) fn typecheck_value(
                 Signature::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Signature, e))?,
             )
         }
+        (T::KeyHash, V::String(str)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            TV::KeyHash(
+                KeyHash::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e))?,
+            )
+        }
+        (T::KeyHash, V::Bytes(bs)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            TV::KeyHash(KeyHash::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::KeyHash, e))?)
+        }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
 }
@@ -3324,6 +3335,26 @@ mod typecheck_tests {
                 "sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD"
                     .try_into()
                     .unwrap()
+            )))
+        );
+    }
+
+    #[test]
+    fn push_key_hash() {
+        assert_eq!(
+            parse("PUSH key_hash \"tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw\"")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::KeyHash(
+                "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap()
+            )))
+        );
+        assert_eq!(
+            parse("PUSH key_hash 0x036342f30484dd46b6074373aa6ddca9dfb70083d6")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::KeyHash(
+                "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN".try_into().unwrap()
             )))
         );
     }
