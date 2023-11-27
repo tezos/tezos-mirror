@@ -32,7 +32,7 @@ let octez_node = "./octez-node"
 
 let octez_proxy_server = "./octez-proxy-server"
 
-let octez_codec = "./octez-codec"
+let octez_codec = Uses.make ~tag:"codec" ~path:"./octez-codec"
 
 let octez_snoop = "./octez-snoop"
 

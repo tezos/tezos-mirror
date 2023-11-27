@@ -1776,6 +1776,7 @@ let register protocols =
     ~__FILE__
     ~title:"Binary RPC regression tests"
     ~tags:["rpc"; "regression"; "binary"]
+    ~uses:[Constant.octez_codec]
     binary_regression_test ;
   let register protocols test_mode_tag =
     let check_rpc_regression ?parameter_overrides ?supports ?nodes_args
