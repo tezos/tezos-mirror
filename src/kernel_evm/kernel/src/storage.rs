@@ -224,7 +224,7 @@ pub fn store_rlp<T: Encodable, Host: Runtime>(
 }
 
 fn read_rlp<T: Decodable, Host: Runtime>(
-    host: &mut Host,
+    host: &Host,
     path: &OwnedPath,
 ) -> Result<T, Error> {
     let bytes = host.store_read_all(path)?;
