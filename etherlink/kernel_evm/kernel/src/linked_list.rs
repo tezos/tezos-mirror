@@ -194,4 +194,9 @@ where
     fn read(host: &impl Runtime, path: &impl Path) -> Result<Option<Self>> {
         storage::read_optional_rlp(host, path)
     }
+
+    /// Returns true if the list contains no elements.
+    pub fn is_empty(&self) -> bool {
+        self.pointers.is_none()
+    }
 }
