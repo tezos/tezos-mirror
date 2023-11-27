@@ -397,6 +397,13 @@ where
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
         Ok(Some(front.get_data(host, &self.path)?))
     }
+
+    /// Removes the first element of the list and returns it
+    pub fn pop_first(&mut self, host: &mut impl Runtime) -> Result<Option<Elt>> {
+        let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
+        let to_remove = front.id.clone();
+        self.remove(host, &to_remove)
+    }
 }
 
 #[cfg(test)]
