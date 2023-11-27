@@ -6,6 +6,7 @@
 /******************************************************************************/
 
 pub mod annotations;
+pub mod byte_repr_trait;
 pub mod comparable;
 pub mod micheline;
 pub mod michelson_address;
@@ -22,6 +23,7 @@ use typed_arena::Arena;
 
 use crate::lexer::Prim;
 
+pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use michelson_address::*;
 pub use michelson_key::Key;
 pub use michelson_list::MichelsonList;
