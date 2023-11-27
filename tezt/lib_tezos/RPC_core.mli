@@ -97,6 +97,16 @@ type 'a response = {
 val check_string_response :
   ?body_rex:string -> code:int -> string response -> unit
 
+(** RPCs can have some hooks attached when requested. *)
+type rpc_hooks = {
+  on_request : string -> unit;
+      (** A hook is invoked for every request line,
+      and the string parameter represents the request message. *)
+  on_response : string -> unit;
+      (** A hook is invoked for every response line,
+          receiving the body of an HTTP response as a string parameter. *)
+}
+
 module type CALLERS = sig
   type uri_provider
 
@@ -110,6 +120,8 @@ module type CALLERS = sig
     They return the status code and you can use [decode] to parse the response body
     in case of success.
 
+    Parameter [hooks] allows to attach some hooks to the RPC.
+
     If [log_request] is [true], log the HTTP method and URI before calling the RPC.
     Default is [true].
 
@@ -121,6 +133,7 @@ module type CALLERS = sig
     For [call] and [call_json], if the response is valid JSON, it is pretty-printed
     with indentation. Default is [true]. *)
   val call :
+    ?rpc_hooks:rpc_hooks ->
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
@@ -132,6 +145,7 @@ module type CALLERS = sig
 
     Does not fail if the status code is not a success code. *)
   val call_raw :
+    ?rpc_hooks:rpc_hooks ->
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
@@ -144,6 +158,7 @@ module type CALLERS = sig
     Does not fail if the status code is not a success code,
     except if the response body is not valid JSON. *)
   val call_json :
+    ?rpc_hooks:rpc_hooks ->
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->

@@ -311,25 +311,30 @@ module Dal_RPC = struct
 
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
-    let call ?log_request ?log_response_status ?log_response_body node rpc =
+    let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+        node rpc =
       RPC_core.call
+        ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
         (Dal_node.as_rpc_endpoint node)
         rpc
 
-    let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
+    let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+        node rpc =
       RPC_core.call_raw
+        ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
         (Dal_node.as_rpc_endpoint node)
         rpc
 
-    let call_json ?log_request ?log_response_status ?log_response_body node rpc
-        =
+    let call_json ?rpc_hooks ?log_request ?log_response_status
+        ?log_response_body node rpc =
       RPC_core.call_json
+        ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
@@ -339,26 +344,30 @@ module Dal_RPC = struct
 
   module Remote :
     RPC_core.CALLERS with type uri_provider := remote_uri_provider = struct
-    let call ?log_request ?log_response_status ?log_response_body endpoint rpc =
+    let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+        endpoint rpc =
       RPC_core.call
+        ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
         endpoint
         rpc
 
-    let call_raw ?log_request ?log_response_status ?log_response_body endpoint
-        rpc =
+    let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+        endpoint rpc =
       RPC_core.call_raw
+        ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
         endpoint
         rpc
 
-    let call_json ?log_request ?log_response_status ?log_response_body endpoint
-        rpc =
+    let call_json ?rpc_hooks ?log_request ?log_response_status
+        ?log_response_body endpoint rpc =
       RPC_core.call_json
+        ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
