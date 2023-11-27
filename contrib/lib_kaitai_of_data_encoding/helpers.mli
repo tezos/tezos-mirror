@@ -77,3 +77,7 @@ val default_instance_spec : id:string -> Ast.t -> InstanceSpec.t
 (** [merge_summaries a s] adds the summary [s] to the doc of [a] preserving the
     existing doc if any. *)
 val merge_summaries : AttrSpec.t -> string option -> AttrSpec.t
+
+(** [merge_valid a v] adds the validation-spec [v] to the attribute [a],
+    combining the validation-specs if one is already present. *)
+val merge_valid : AttrSpec.t -> ValidationSpec.t -> AttrSpec.t

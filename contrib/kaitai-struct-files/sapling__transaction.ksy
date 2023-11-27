@@ -27,6 +27,8 @@ types:
     seq:
     - id: len_inputs
       type: s4
+      valid:
+        max: 1833216
     - id: inputs
       type: inputs
       size: len_inputs

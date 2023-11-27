@@ -94,3 +94,23 @@ let merge_summaries attr summary =
   | Some sumsum, Some s ->
       let summary = Some (sumsum ^ "\n\n" ^ s) in
       {attr with doc = {default_doc_spec with summary}}
+
+let merge_valid attr v =
+  match attr.AttrSpec.valid with
+  | None -> {attr with valid = Some v}
+  | Some v1 ->
+      let valid =
+        match (v1, v) with
+        | ValidationMax (IntNum m1), ValidationMax (IntNum m2) ->
+            (* Special case that is actually used in practice *)
+            ValidationSpec.ValidationMax (IntNum (min m1 m2))
+        | ( ValidationRange {min = smallm; max = IntNum bigm},
+            ValidationMax (IntNum m2) ) ->
+            (* Special case that is actually used in practice *)
+            ValidationSpec.ValidationRange
+              {min = smallm; max = IntNum (min bigm m2)}
+        | _, _ ->
+            (* Specialise whichever pattern on a by-need basis *)
+            failwith "Not supported (ranges)"
+      in
+      {attr with valid = Some valid}

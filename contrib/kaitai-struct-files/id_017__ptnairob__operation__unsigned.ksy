@@ -632,6 +632,8 @@ types:
     seq:
     - id: len_named
       type: u1
+      valid:
+        max: 31
     - id: named
       type: named
       size: len_named
@@ -956,6 +958,8 @@ types:
     seq:
     - id: len_proposals
       type: s4
+      valid:
+        max: 640
     - id: proposals
       type: proposals
       size: len_proposals
@@ -1026,6 +1030,8 @@ types:
     seq:
     - id: len_raw_data
       type: u2
+      valid:
+        max: 4096
     - id: raw_data
       type: raw_data
       size: len_raw_data
