@@ -375,7 +375,20 @@ let expand_deprecated_dxiiivp original =
         try
           let depth = decimal_of_roman (String.sub str 1 (len - 2)) in
           match args with
-          | [(Seq (_, _) as arg)] -> return_some (dip ~loc ~annot depth arg)
+          | [(Seq (_, _) as arg)] ->
+              let expanded = dip ~loc ~annot depth arg in
+              Format.eprintf
+                "Warning: Use of deprecated macro %a. This macro will soon be \
+                 removed, please use the %a instruction instead.@."
+                Micheline_printer.print_expr_unwrapped
+                (Micheline_printer.printable
+                   Fun.id
+                   (Micheline.strip_locations original))
+                Micheline_printer.print_expr_unwrapped
+                (Micheline_printer.printable
+                   Fun.id
+                   (Micheline.strip_locations expanded)) ;
+              return_some expanded
           | [_] -> tzfail (Sequence_expected str)
           | [] | _ :: _ :: _ ->
               tzfail (Invalid_arity (str, List.length args, 1))
@@ -548,7 +561,19 @@ let expand_deprecated_duuuuup original =
             else if str.[i] = 'U' then parse (i - 1)
             else raise_notrace Not_a_dup
           in
-          return_some (parse (len - 2))
+          let expanded = parse (len - 2) in
+          Format.eprintf
+            "Warning: Use of deprecated macro %a. This macro will soon be \
+             removed, please use the %a instruction instead.@."
+            Micheline_printer.print_expr_unwrapped
+            (Micheline_printer.printable
+               Fun.id
+               (Micheline.strip_locations original))
+            Micheline_printer.print_expr_unwrapped
+            (Micheline_printer.printable
+               Fun.id
+               (Micheline.strip_locations expanded)) ;
+          return_some expanded
         with Not_a_dup -> return_none
       else return_none
   | _ -> return_none
