@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__operation__raw
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.operation.raw'
 types:
   operation:
     doc: ! >-

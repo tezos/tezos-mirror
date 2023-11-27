@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__tez
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.tez'
 types:
   n:
     seq:

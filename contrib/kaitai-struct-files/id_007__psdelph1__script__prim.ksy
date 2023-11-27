@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__script__prim
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.script.prim'
 enums:
   id_007__psdelph1__michelson__v1__primitives:
     0: parameter

@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__voting_period__kind
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.voting_period.kind'
 enums:
   id_009__psfloren__voting_period__kind_tag:
     0: proposal

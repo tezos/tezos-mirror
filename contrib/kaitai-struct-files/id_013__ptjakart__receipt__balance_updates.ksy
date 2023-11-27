@@ -1,13 +1,20 @@
 meta:
   id: id_013__ptjakart__receipt__balance_updates
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.receipt.balance_updates'
 types:
+  frozen_bonds:
+    seq:
+    - id: contract
+      type: id_013__ptjakart__contract_id
+    - id: bond_id
+      type: id_013__ptjakart__bond_id
   id_013__ptjakart__bond_id:
     seq:
     - id: id_013__ptjakart__bond_id_tag
       type: u1
       enum: id_013__ptjakart__bond_id_tag
-    - id: id_013__ptjakart__bond_id_tx_rollup_bond_id
+    - id: tx_rollup_bond_id
       size: 20
       if: (id_013__ptjakart__bond_id_tag == id_013__ptjakart__bond_id_tag::tx_rollup_bond_id)
       doc: ! >-
@@ -21,55 +28,32 @@ types:
     - id: id_013__ptjakart__contract_id_tag
       type: u1
       enum: id_013__ptjakart__contract_id_tag
-    - id: id_013__ptjakart__contract_id_implicit
+    - id: implicit
       type: public_key_hash
       if: (id_013__ptjakart__contract_id_tag == id_013__ptjakart__contract_id_tag::implicit)
-    - id: id_013__ptjakart__contract_id_originated
-      type: id_013__ptjakart__contract_id_originated
+    - id: originated
+      type: originated
       if: (id_013__ptjakart__contract_id_tag == id_013__ptjakart__contract_id_tag::originated)
-  id_013__ptjakart__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
   id_013__ptjakart__operation_metadata__alpha__balance:
     seq:
     - id: id_013__ptjakart__operation_metadata__alpha__balance_tag
       type: u1
       enum: id_013__ptjakart__operation_metadata__alpha__balance_tag
-    - id: id_013__ptjakart__operation_metadata__alpha__balance_contract
-      type: id_013__ptjakart__contract_id
-      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::contract)
-    - id: id_013__ptjakart__operation_metadata__alpha__balance_deposits
-      type: public_key_hash
-      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::deposits)
-    - id: id_013__ptjakart__operation_metadata__alpha__balance_lost_endorsing_rewards
-      type: id_013__ptjakart__operation_metadata__alpha__balance_lost_endorsing_rewards
-      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::lost_endorsing_rewards)
-    - id: id_013__ptjakart__operation_metadata__alpha__balance_commitments
-      size: 20
-      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::commitments)
-    - id: id_013__ptjakart__operation_metadata__alpha__balance_frozen_bonds
-      type: id_013__ptjakart__operation_metadata__alpha__balance_frozen_bonds
-      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::frozen_bonds)
-  id_013__ptjakart__operation_metadata__alpha__balance_frozen_bonds:
-    seq:
     - id: contract
       type: id_013__ptjakart__contract_id
-    - id: bond_id
-      type: id_013__ptjakart__bond_id
-  id_013__ptjakart__operation_metadata__alpha__balance_lost_endorsing_rewards:
-    seq:
-    - id: delegate
+      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::contract)
+    - id: deposits
       type: public_key_hash
-    - id: participation
-      type: u1
-      enum: bool
-    - id: revelation
-      type: u1
-      enum: bool
+      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::deposits)
+    - id: lost_endorsing_rewards
+      type: lost_endorsing_rewards
+      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::lost_endorsing_rewards)
+    - id: commitments
+      size: 20
+      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::commitments)
+    - id: frozen_bonds
+      type: frozen_bonds
+      if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::frozen_bonds)
   id_013__ptjakart__operation_metadata__alpha__balance_updates:
     seq:
     - id: len_id_013__ptjakart__operation_metadata__alpha__balance_updates
@@ -87,19 +71,36 @@ types:
     - id: origin
       type: u1
       enum: origin_tag
+  lost_endorsing_rewards:
+    seq:
+    - id: delegate
+      type: public_key_hash
+    - id: participation
+      type: u1
+      enum: bool
+    - id: revelation
+      type: u1
+      enum: bool
+  originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
   public_key_hash:
     doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
 enums:

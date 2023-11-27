@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__constants
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.constants'
 types:
   baking_reward_per_endorsement:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: alpha__script__expr
   endian: be
+doc: ! 'Encoding id: alpha.script.expr'
 types:
   annots:
     seq:
@@ -31,48 +32,54 @@ types:
     - id: micheline__alpha__michelson_v1__expression_tag
       type: u1
       enum: micheline__alpha__michelson_v1__expression_tag
-    - id: micheline__alpha__michelson_v1__expression_int
+    - id: int
       type: z
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::int)
-    - id: micheline__alpha__michelson_v1__expression_string
+    - id: string
       type: string
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::string)
-    - id: micheline__alpha__michelson_v1__expression_sequence
-      type: micheline__alpha__michelson_v1__expression_sequence
+    - id: sequence
+      type: sequence
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::sequence)
-    - id: micheline__alpha__michelson_v1__expression_prim__no_args__no_annots
+    - id: prim__no_args__no_annots
       type: u1
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__no_args__no_annots)
       enum: alpha__michelson__v1__primitives
-    - id: micheline__alpha__michelson_v1__expression_prim__no_args__some_annots
-      type: micheline__alpha__michelson_v1__expression_prim__no_args__some_annots
+    - id: prim__no_args__some_annots
+      type: prim__no_args__some_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__no_args__some_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots
-      type: micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots
+    - id: prim__1_arg__no_annots
+      type: prim__1_arg__no_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__1_arg__no_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots
-      type: micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots
+    - id: prim__1_arg__some_annots
+      type: prim__1_arg__some_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__1_arg__some_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__2_args__no_annots
-      type: micheline__alpha__michelson_v1__expression_prim__2_args__no_annots
+    - id: prim__2_args__no_annots
+      type: prim__2_args__no_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__2_args__no_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__2_args__some_annots
-      type: micheline__alpha__michelson_v1__expression_prim__2_args__some_annots
+    - id: prim__2_args__some_annots
+      type: prim__2_args__some_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__2_args__some_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__generic
-      type: micheline__alpha__michelson_v1__expression_prim__generic
+    - id: prim__generic
+      type: prim__generic
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__generic)
-    - id: micheline__alpha__michelson_v1__expression_bytes
+    - id: bytes
       type: bytes
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::bytes)
-  micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots:
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
+  prim__1_arg__no_annots:
     seq:
     - id: prim
       type: u1
       enum: alpha__michelson__v1__primitives
     - id: arg
       type: micheline__alpha__michelson_v1__expression
-  micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots:
+  prim__1_arg__some_annots:
     seq:
     - id: prim
       type: u1
@@ -81,7 +88,7 @@ types:
       type: micheline__alpha__michelson_v1__expression
     - id: annots
       type: annots
-  micheline__alpha__michelson_v1__expression_prim__2_args__no_annots:
+  prim__2_args__no_annots:
     seq:
     - id: prim
       type: u1
@@ -90,7 +97,7 @@ types:
       type: micheline__alpha__michelson_v1__expression
     - id: arg2
       type: micheline__alpha__michelson_v1__expression
-  micheline__alpha__michelson_v1__expression_prim__2_args__some_annots:
+  prim__2_args__some_annots:
     seq:
     - id: prim
       type: u1
@@ -101,7 +108,7 @@ types:
       type: micheline__alpha__michelson_v1__expression
     - id: annots
       type: annots
-  micheline__alpha__michelson_v1__expression_prim__generic:
+  prim__generic:
     seq:
     - id: prim
       type: u1
@@ -110,14 +117,14 @@ types:
       type: args
     - id: annots
       type: annots
-  micheline__alpha__michelson_v1__expression_prim__no_args__some_annots:
+  prim__no_args__some_annots:
     seq:
     - id: prim
       type: u1
       enum: alpha__michelson__v1__primitives
     - id: annots
       type: annots
-  micheline__alpha__michelson_v1__expression_sequence:
+  sequence:
     seq:
     - id: len_sequence
       type: s4
@@ -125,12 +132,6 @@ types:
       type: sequence_entries
       size: len_sequence
       repeat: eos
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
   sequence_entries:
     seq:
     - id: sequence_elt

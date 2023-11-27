@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__operation__raw
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.operation.raw'
 types:
   operation:
     doc: ! >-

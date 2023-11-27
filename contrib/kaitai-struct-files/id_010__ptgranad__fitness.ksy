@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__fitness
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.fitness'
 types:
   fitness:
     doc: ! >-

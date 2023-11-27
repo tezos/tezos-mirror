@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__operation__raw
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.operation.raw'
 types:
   operation:
     doc: ! >-

@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__block_header__raw
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.block_header.raw'
 types:
   block_header:
     doc: ! 'Block header: Block header. It contains both shell and protocol specific

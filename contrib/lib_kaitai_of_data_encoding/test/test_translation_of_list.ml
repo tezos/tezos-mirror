@@ -18,6 +18,7 @@ let%expect_test "test fixed size list translation" =
   meta:
     id: list_of_uint8
     endian: be
+  doc: ! 'Encoding id: list_of_uint8'
   types:
     list_of_uint8_entries:
       seq:
@@ -42,6 +43,7 @@ let%expect_test "test variable size list translation" =
   meta:
     id: list_of_uint8
     endian: be
+  doc: ! 'Encoding id: list_of_uint8'
   types:
     list_of_uint8_entries:
       seq:
@@ -65,6 +67,7 @@ let%expect_test "test dynamic size list translation" =
   meta:
     id: list_of_uint8
     endian: be
+  doc: ! 'Encoding id: list_of_uint8'
   types:
     list_of_uint8_entries:
       seq:
@@ -91,6 +94,7 @@ let%expect_test "test dynamic size list with max length" =
   meta:
     id: list_with_length
     endian: be
+  doc: ! 'Encoding id: list_with_length'
   types:
     list_with_length_entries:
       seq:
@@ -117,6 +121,7 @@ let%expect_test "test variable size list with max length" =
   meta:
     id: list_with_length
     endian: be
+  doc: ! 'Encoding id: list_with_length'
   types:
     list_with_length_entries:
       seq:
@@ -140,6 +145,7 @@ let%expect_test "test list with length" =
   meta:
     id: list_with_length
     endian: be
+  doc: ! 'Encoding id: list_with_length'
   types:
     list_with_length_entries:
       seq:
@@ -166,6 +172,7 @@ let%expect_test "test list with length" =
   meta:
     id: list_with_length
     endian: be
+  doc: ! 'Encoding id: list_with_length'
   types:
     list_with_length_entries:
       seq:
@@ -192,6 +199,7 @@ let%expect_test "test list with length" =
   meta:
     id: list_with_length
     endian: be
+  doc: ! 'Encoding id: list_with_length'
   types:
     list_with_length_entries:
       seq:

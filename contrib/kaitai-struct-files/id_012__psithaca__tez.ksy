@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__tez
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.tez'
 types:
   n:
     seq:

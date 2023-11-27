@@ -18,6 +18,7 @@ let%expect_test "test string enum" =
     meta:
       id: simple_union
       endian: be
+    doc: ! 'Encoding id: simple_union'
     enums:
       simple_union:
         0: one
@@ -41,6 +42,7 @@ let%expect_test "test string enum" =
     meta:
       id: simple_union
       endian: be
+    doc: ! 'Encoding id: simple_union'
     enums:
       simple_union:
         0: one

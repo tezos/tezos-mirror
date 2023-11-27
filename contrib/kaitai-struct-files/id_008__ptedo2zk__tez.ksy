@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__tez
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.tez'
 types:
   n:
     seq:

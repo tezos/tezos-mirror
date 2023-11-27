@@ -18,6 +18,7 @@ let%expect_test "test obj translation" =
     meta:
       id: simple_obj
       endian: be
+    doc: ! 'Encoding id: simple_obj'
     enums:
       bool:
         0: false
@@ -48,6 +49,7 @@ let%expect_test "test long obj translation" =
     meta:
       id: long_obj
       endian: be
+    doc: ! 'Encoding id: long_obj'
     enums:
       bool:
         0: false
@@ -78,6 +80,7 @@ let%expect_test "test obj1 translation" =
     meta:
       id: obj1
       endian: be
+    doc: ! 'Encoding id: obj1'
     seq:
     - id: mono
       type: u1
@@ -99,6 +102,7 @@ let%expect_test "test objs with opt and dft fields" =
     meta:
       id: objreqdft
       endian: be
+    doc: ! 'Encoding id: objreqdft'
     types:
       one:
         seq:
@@ -157,6 +161,7 @@ let%expect_test "test objs with opt and dft fields and doc" =
     meta:
       id: objreqdftdoc
       endian: be
+    doc: ! 'Encoding id: objreqdftdoc'
     types:
       one:
         seq:
@@ -202,6 +207,7 @@ let%expect_test "test nested object translation" =
   meta:
     id: nested_objects
     endian: be
+  doc: ! 'Encoding id: nested_objects'
   types:
     protocol_hash:
       seq:
@@ -235,6 +241,7 @@ let%expect_test "test object translation with empty fields" =
     meta:
       id: nested_objects
       endian: be
+    doc: ! 'Encoding id: nested_objects'
     enums:
       bool:
         0: false

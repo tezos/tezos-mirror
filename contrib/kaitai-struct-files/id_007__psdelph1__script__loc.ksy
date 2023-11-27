@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__script__loc
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.script.loc'
 seq:
 - id: micheline__location
   type: s4

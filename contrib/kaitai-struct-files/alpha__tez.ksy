@@ -1,6 +1,7 @@
 meta:
   id: alpha__tez
   endian: be
+doc: ! 'Encoding id: alpha.tez'
 types:
   n:
     seq:

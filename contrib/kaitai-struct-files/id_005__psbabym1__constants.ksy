@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__constants
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.constants'
 types:
   n:
     seq:

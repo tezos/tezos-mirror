@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__operation__raw
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.operation.raw'
 types:
   operation:
     doc: ! >-

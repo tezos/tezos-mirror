@@ -18,6 +18,7 @@ let%expect_test "test small range" =
     meta:
       id: small_range
       endian: be
+    doc: ! 'Encoding id: small_range'
     seq:
     - id: small_range
       type: u1
@@ -37,6 +38,7 @@ let%expect_test "test bigger range" =
     meta:
       id: b_range
       endian: be
+    doc: ! 'Encoding id: b_range'
     seq:
     - id: b_range
       type: u2
@@ -56,6 +58,7 @@ let%expect_test "test biggest range" =
     meta:
       id: bb_range
       endian: be
+    doc: ! 'Encoding id: bb_range'
     seq:
     - id: bb_range
       type: s2
@@ -76,6 +79,7 @@ let%expect_test "test float range" =
     meta:
       id: float_range
       endian: be
+    doc: ! 'Encoding id: float_range'
     seq:
     - id: float_range
       type: f8
@@ -96,6 +100,7 @@ let%expect_test "test small shifted range" =
     meta:
       id: shifted_small_range
       endian: be
+    doc: ! 'Encoding id: shifted_small_range'
     types:
       shifted_small_range_shifted_to_zero:
         instances:
@@ -126,6 +131,7 @@ let%expect_test "test bigger shifted range" =
     meta:
       id: shifted_big_range
       endian: be
+    doc: ! 'Encoding id: shifted_big_range'
     types:
       shifted_big_range_shifted_to_zero:
         instances:

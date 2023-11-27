@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.fa1.2.token_transfer'
 types:
   destination:
     seq:

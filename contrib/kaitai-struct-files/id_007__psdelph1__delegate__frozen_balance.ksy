@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__delegate__frozen_balance
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.delegate.frozen_balance'
 types:
   n:
     seq:

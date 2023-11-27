@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__script
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.script'
 types:
   code:
     seq:

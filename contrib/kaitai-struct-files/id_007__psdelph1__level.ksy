@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__level
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.level'
 enums:
   bool:
     0: false

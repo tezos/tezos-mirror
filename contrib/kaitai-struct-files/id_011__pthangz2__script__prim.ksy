@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__script__prim
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.script.prim'
 enums:
   id_011__pthangz2__michelson__v1__primitives:
     0: parameter

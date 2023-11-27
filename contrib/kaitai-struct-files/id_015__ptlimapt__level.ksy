@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__level
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.level'
 enums:
   bool:
     0: false

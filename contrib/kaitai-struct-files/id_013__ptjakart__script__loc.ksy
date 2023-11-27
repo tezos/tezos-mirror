@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__script__loc
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.script.loc'
 seq:
 - id: micheline__location
   type: s4

@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__operation__raw
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.operation.raw'
 types:
   operation:
     doc: ! >-

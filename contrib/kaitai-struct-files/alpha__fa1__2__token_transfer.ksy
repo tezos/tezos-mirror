@@ -1,6 +1,7 @@
 meta:
   id: alpha__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: alpha.fa1.2.token_transfer'
 types:
   destination:
     seq:

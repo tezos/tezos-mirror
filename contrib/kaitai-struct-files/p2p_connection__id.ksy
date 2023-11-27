@@ -1,7 +1,11 @@
 meta:
   id: p2p_connection__id
   endian: be
-doc: The identifier for a p2p connection. It includes an address and a port number.
+doc: ! >-
+  Encoding id: p2p_connection.id
+
+  Description: The identifier for a p2p connection. It includes an address and a port
+  number.
 types:
   p2p_address:
     doc: An address for locating peers.

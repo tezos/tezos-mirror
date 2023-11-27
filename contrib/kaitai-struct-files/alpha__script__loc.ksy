@@ -1,6 +1,7 @@
 meta:
   id: alpha__script__loc
   endian: be
+doc: ! 'Encoding id: alpha.script.loc'
 seq:
 - id: micheline__location
   type: s4

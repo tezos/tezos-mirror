@@ -1,6 +1,7 @@
 meta:
   id: alpha__script__prim
   endian: be
+doc: ! 'Encoding id: alpha.script.prim'
 enums:
   alpha__michelson__v1__primitives:
     0: parameter

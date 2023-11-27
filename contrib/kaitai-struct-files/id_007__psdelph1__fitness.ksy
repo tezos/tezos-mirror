@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__fitness
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.fitness'
 types:
   fitness:
     doc: ! >-

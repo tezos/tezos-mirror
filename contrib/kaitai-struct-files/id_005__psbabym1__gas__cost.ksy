@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__gas__cost
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.gas.cost'
 types:
   n_chunk:
     seq:

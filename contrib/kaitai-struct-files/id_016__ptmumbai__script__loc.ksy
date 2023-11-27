@@ -1,6 +1,7 @@
 meta:
   id: id_016__ptmumbai__script__loc
   endian: be
+doc: ! 'Encoding id: 016-PtMumbai.script.loc'
 seq:
 - id: micheline__location
   type: s4

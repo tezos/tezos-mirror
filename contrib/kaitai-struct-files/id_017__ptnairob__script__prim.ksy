@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__script__prim
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.script.prim'
 enums:
   id_017__ptnairob__michelson__v1__primitives:
     0: parameter

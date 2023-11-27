@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__operation__raw
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.operation.raw'
 types:
   operation:
     doc: ! >-

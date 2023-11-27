@@ -1,6 +1,7 @@
 meta:
   id: sapling__wallet__viewing_key
   endian: be
+doc: ! 'Encoding id: sapling.wallet.viewing_key'
 types:
   sapling__wallet__full_viewing_key:
     seq:

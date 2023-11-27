@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__block_header
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.block_header'
 types:
   block_header__shell:
     doc: ! >-

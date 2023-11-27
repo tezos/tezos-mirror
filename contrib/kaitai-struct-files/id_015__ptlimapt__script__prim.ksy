@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__script__prim
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.script.prim'
 enums:
   id_015__ptlimapt__michelson__v1__primitives:
     0: parameter

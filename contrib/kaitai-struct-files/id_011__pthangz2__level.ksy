@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__level
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.level'
 enums:
   bool:
     0: false

@@ -2,7 +2,9 @@ meta:
   id: id_011__pthangz2__errors
   endian: be
 doc: ! >-
-  The full list of RPC errors would be too long to include.It is
+  Encoding id: 011-PtHangz2.errors
+
+  Description: The full list of RPC errors would be too long to include.It is
 
   available through the RPC `/errors` (GET).
 seq:

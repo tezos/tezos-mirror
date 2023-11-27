@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__gas
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.gas'
 types:
   n_chunk:
     seq:
@@ -29,6 +30,6 @@ seq:
 - id: id_010__ptgranad__gas_tag
   type: u1
   enum: id_010__ptgranad__gas_tag
-- id: id_010__ptgranad__gas_limited
+- id: limited
   type: z
   if: (id_010__ptgranad__gas_tag == id_010__ptgranad__gas_tag::limited)

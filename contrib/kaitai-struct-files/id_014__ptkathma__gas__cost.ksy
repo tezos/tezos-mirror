@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__gas__cost
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.gas.cost'
 types:
   n_chunk:
     seq:

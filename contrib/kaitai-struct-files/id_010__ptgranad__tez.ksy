@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__tez
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.tez'
 types:
   n:
     seq:

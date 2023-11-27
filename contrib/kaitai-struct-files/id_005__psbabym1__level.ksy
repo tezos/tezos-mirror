@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__level
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.level'
 enums:
   bool:
     0: false

@@ -1,6 +1,7 @@
 meta:
   id: alpha__constants__fixed
   endian: be
+doc: ! 'Encoding id: alpha.constants.fixed'
 types:
   n:
     seq:

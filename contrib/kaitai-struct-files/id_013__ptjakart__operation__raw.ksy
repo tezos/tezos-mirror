@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__operation__raw
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.operation.raw'
 types:
   operation:
     doc: ! >-

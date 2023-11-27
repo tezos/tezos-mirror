@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__operation__raw
   endian: be
+doc: ! 'Encoding id: 018-Proxford.operation.raw'
 types:
   operation:
     doc: ! >-

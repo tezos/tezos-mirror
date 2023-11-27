@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__script__prim
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.script.prim'
 enums:
   id_006__pscartha__michelson__v1__primitives:
     0: parameter

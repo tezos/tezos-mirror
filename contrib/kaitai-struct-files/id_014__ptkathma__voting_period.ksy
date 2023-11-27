@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__voting_period
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.voting_period'
 enums:
   kind_tag:
     0: proposal

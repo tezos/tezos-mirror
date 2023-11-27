@@ -1,7 +1,9 @@
 meta:
   id: ground__json
   endian: be
-doc: JSON values
+doc: ! 'Encoding id: ground.json
+
+  Description: JSON values'
 seq:
 - id: len_ground__json
   type: s4

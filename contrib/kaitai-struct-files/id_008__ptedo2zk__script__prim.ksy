@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__script__prim
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.script.prim'
 enums:
   id_008__ptedo2zk__michelson__v1__primitives:
     0: parameter

@@ -1,7 +1,10 @@
 meta:
   id: block_header
   endian: be
-doc: Block header. It contains both shell and protocol specific data.
+doc: ! >-
+  Encoding id: block_header
+
+  Description: Block header. It contains both shell and protocol specific data.
 types:
   block_header__shell:
     doc: ! >-

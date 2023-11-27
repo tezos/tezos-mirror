@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__gas__cost
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.gas.cost'
 types:
   n_chunk:
     seq:

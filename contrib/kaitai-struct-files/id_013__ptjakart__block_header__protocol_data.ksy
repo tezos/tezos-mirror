@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__block_header__protocol_data
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.block_header.protocol_data'
 types:
   id_013__ptjakart__block_header__alpha__signed_contents:
     seq:

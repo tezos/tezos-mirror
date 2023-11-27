@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__operation__internal
   endian: be
+doc: ! 'Encoding id: 018-Proxford.operation.internal'
 types:
   annots:
     seq:
@@ -32,32 +33,7 @@ types:
       type: s4
     - id: code
       size: len_code
-  id_018__proxford__apply_internal_results__alpha__operation_result:
-    seq:
-    - id: source
-      type: id_018__proxford__transaction_destination
-    - id: nonce
-      type: u2
-    - id: id_018__proxford__apply_internal_results__alpha__operation_result_tag
-      type: u1
-      enum: id_018__proxford__apply_internal_results__alpha__operation_result_tag
-    - id: id_018__proxford__apply_internal_results__alpha__operation_result_transaction
-      type: id_018__proxford__apply_internal_results__alpha__operation_result_transaction
-      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
-        id_018__proxford__apply_internal_results__alpha__operation_result_tag::transaction)
-    - id: id_018__proxford__apply_internal_results__alpha__operation_result_origination
-      type: id_018__proxford__apply_internal_results__alpha__operation_result_origination
-      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
-        id_018__proxford__apply_internal_results__alpha__operation_result_tag::origination)
-    - id: id_018__proxford__apply_internal_results__alpha__operation_result_delegation
-      type: id_018__proxford__apply_internal_results__alpha__operation_result_delegation
-      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
-        id_018__proxford__apply_internal_results__alpha__operation_result_tag::delegation)
-    - id: id_018__proxford__apply_internal_results__alpha__operation_result_event
-      type: id_018__proxford__apply_internal_results__alpha__operation_result_event
-      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
-        id_018__proxford__apply_internal_results__alpha__operation_result_tag::event)
-  id_018__proxford__apply_internal_results__alpha__operation_result_delegation:
+  delegation:
     seq:
     - id: delegate_tag
       type: u1
@@ -65,7 +41,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
-  id_018__proxford__apply_internal_results__alpha__operation_result_event:
+  event:
     seq:
     - id: type
       type: micheline__018__proxford__michelson_v1__expression
@@ -81,46 +57,40 @@ types:
     - id: payload
       type: micheline__018__proxford__michelson_v1__expression
       if: (payload_tag == bool::true)
-  id_018__proxford__apply_internal_results__alpha__operation_result_origination:
+  id_018__proxford__apply_internal_results__alpha__operation_result:
     seq:
-    - id: balance
-      type: n
-    - id: delegate_tag
-      type: u1
-      enum: bool
-    - id: delegate
-      type: public_key_hash
-      if: (delegate_tag == bool::true)
-    - id: script
-      type: id_018__proxford__scripted__contracts
-  id_018__proxford__apply_internal_results__alpha__operation_result_transaction:
-    seq:
-    - id: amount
-      type: n
-    - id: destination
+    - id: source
       type: id_018__proxford__transaction_destination
-    - id: parameters_tag
+    - id: nonce
+      type: u2
+    - id: id_018__proxford__apply_internal_results__alpha__operation_result_tag
       type: u1
-      enum: bool
-    - id: parameters
-      type: parameters
-      if: (parameters_tag == bool::true)
+      enum: id_018__proxford__apply_internal_results__alpha__operation_result_tag
+    - id: transaction
+      type: transaction
+      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
+        id_018__proxford__apply_internal_results__alpha__operation_result_tag::transaction)
+    - id: origination
+      type: origination
+      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
+        id_018__proxford__apply_internal_results__alpha__operation_result_tag::origination)
+    - id: delegation
+      type: delegation
+      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
+        id_018__proxford__apply_internal_results__alpha__operation_result_tag::delegation)
+    - id: event
+      type: event
+      if: (id_018__proxford__apply_internal_results__alpha__operation_result_tag ==
+        id_018__proxford__apply_internal_results__alpha__operation_result_tag::event)
   id_018__proxford__entrypoint:
     doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     seq:
     - id: id_018__proxford__entrypoint_tag
       type: u1
       enum: id_018__proxford__entrypoint_tag
-    - id: id_018__proxford__entrypoint_named
-      type: id_018__proxford__entrypoint_named
-      if: (id_018__proxford__entrypoint_tag == id_018__proxford__entrypoint_tag::named)
-  id_018__proxford__entrypoint_named:
-    seq:
-    - id: len_named
-      type: u1
     - id: named
-      size: len_named
-      size-eos: true
+      type: named
+      if: (id_018__proxford__entrypoint_tag == id_018__proxford__entrypoint_tag::named)
   id_018__proxford__scripted__contracts:
     seq:
     - id: code
@@ -137,138 +107,57 @@ types:
     - id: id_018__proxford__transaction_destination_tag
       type: u1
       enum: id_018__proxford__transaction_destination_tag
-    - id: id_018__proxford__transaction_destination_implicit
+    - id: implicit
       type: public_key_hash
       if: (id_018__proxford__transaction_destination_tag == id_018__proxford__transaction_destination_tag::implicit)
-    - id: id_018__proxford__transaction_destination_originated
-      type: id_018__proxford__transaction_destination_originated
+    - id: originated
+      type: originated
       if: (id_018__proxford__transaction_destination_tag == id_018__proxford__transaction_destination_tag::originated)
-    - id: id_018__proxford__transaction_destination_smart_rollup
-      type: id_018__proxford__transaction_destination_smart_rollup
+    - id: smart_rollup
+      type: smart_rollup
       if: (id_018__proxford__transaction_destination_tag == id_018__proxford__transaction_destination_tag::smart_rollup)
-    - id: id_018__proxford__transaction_destination_zk_rollup
-      type: id_018__proxford__transaction_destination_zk_rollup
+    - id: zk_rollup
+      type: zk_rollup
       if: (id_018__proxford__transaction_destination_tag == id_018__proxford__transaction_destination_tag::zk_rollup)
-  id_018__proxford__transaction_destination_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
-  id_018__proxford__transaction_destination_smart_rollup:
-    seq:
-    - id: smart_rollup_address
-      size: 20
-    - id: smart_rollup_padding
-      size: 1
-      doc: This field is for padding, ignore
-  id_018__proxford__transaction_destination_zk_rollup:
-    seq:
-    - id: zk_rollup_hash
-      size: 20
-    - id: zk_rollup_padding
-      size: 1
-      doc: This field is for padding, ignore
   micheline__018__proxford__michelson_v1__expression:
     seq:
     - id: micheline__018__proxford__michelson_v1__expression_tag
       type: u1
       enum: micheline__018__proxford__michelson_v1__expression_tag
-    - id: micheline__018__proxford__michelson_v1__expression_int
+    - id: int
       type: z
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::int)
-    - id: micheline__018__proxford__michelson_v1__expression_string
+    - id: string
       type: string
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::string)
-    - id: micheline__018__proxford__michelson_v1__expression_sequence
-      type: micheline__018__proxford__michelson_v1__expression_sequence
+    - id: sequence
+      type: sequence
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::sequence)
-    - id: micheline__018__proxford__michelson_v1__expression_prim__no_args__no_annots
+    - id: prim__no_args__no_annots
       type: u1
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::prim__no_args__no_annots)
       enum: id_018__proxford__michelson__v1__primitives
-    - id: micheline__018__proxford__michelson_v1__expression_prim__no_args__some_annots
-      type: micheline__018__proxford__michelson_v1__expression_prim__no_args__some_annots
+    - id: prim__no_args__some_annots
+      type: prim__no_args__some_annots
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::prim__no_args__some_annots)
-    - id: micheline__018__proxford__michelson_v1__expression_prim__1_arg__no_annots
-      type: micheline__018__proxford__michelson_v1__expression_prim__1_arg__no_annots
+    - id: prim__1_arg__no_annots
+      type: prim__1_arg__no_annots
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::prim__1_arg__no_annots)
-    - id: micheline__018__proxford__michelson_v1__expression_prim__1_arg__some_annots
-      type: micheline__018__proxford__michelson_v1__expression_prim__1_arg__some_annots
+    - id: prim__1_arg__some_annots
+      type: prim__1_arg__some_annots
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::prim__1_arg__some_annots)
-    - id: micheline__018__proxford__michelson_v1__expression_prim__2_args__no_annots
-      type: micheline__018__proxford__michelson_v1__expression_prim__2_args__no_annots
+    - id: prim__2_args__no_annots
+      type: prim__2_args__no_annots
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::prim__2_args__no_annots)
-    - id: micheline__018__proxford__michelson_v1__expression_prim__2_args__some_annots
-      type: micheline__018__proxford__michelson_v1__expression_prim__2_args__some_annots
+    - id: prim__2_args__some_annots
+      type: prim__2_args__some_annots
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::prim__2_args__some_annots)
-    - id: micheline__018__proxford__michelson_v1__expression_prim__generic
-      type: micheline__018__proxford__michelson_v1__expression_prim__generic
+    - id: prim__generic
+      type: prim__generic
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::prim__generic)
-    - id: micheline__018__proxford__michelson_v1__expression_bytes
+    - id: bytes
       type: bytes
       if: (micheline__018__proxford__michelson_v1__expression_tag == micheline__018__proxford__michelson_v1__expression_tag::bytes)
-  micheline__018__proxford__michelson_v1__expression_prim__1_arg__no_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_018__proxford__michelson__v1__primitives
-    - id: arg
-      type: micheline__018__proxford__michelson_v1__expression
-  micheline__018__proxford__michelson_v1__expression_prim__1_arg__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_018__proxford__michelson__v1__primitives
-    - id: arg
-      type: micheline__018__proxford__michelson_v1__expression
-    - id: annots
-      type: annots
-  micheline__018__proxford__michelson_v1__expression_prim__2_args__no_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_018__proxford__michelson__v1__primitives
-    - id: arg1
-      type: micheline__018__proxford__michelson_v1__expression
-    - id: arg2
-      type: micheline__018__proxford__michelson_v1__expression
-  micheline__018__proxford__michelson_v1__expression_prim__2_args__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_018__proxford__michelson__v1__primitives
-    - id: arg1
-      type: micheline__018__proxford__michelson_v1__expression
-    - id: arg2
-      type: micheline__018__proxford__michelson_v1__expression
-    - id: annots
-      type: annots
-  micheline__018__proxford__michelson_v1__expression_prim__generic:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_018__proxford__michelson__v1__primitives
-    - id: args
-      type: args
-    - id: annots
-      type: annots
-  micheline__018__proxford__michelson_v1__expression_prim__no_args__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_018__proxford__michelson__v1__primitives
-    - id: annots
-      type: annots
-  micheline__018__proxford__michelson_v1__expression_sequence:
-    seq:
-    - id: len_sequence
-      type: s4
-    - id: sequence
-      type: sequence_entries
-      size: len_sequence
-      repeat: eos
   n:
     seq:
     - id: n
@@ -281,34 +170,127 @@ types:
       type: b1be
     - id: payload
       type: b7be
+  named:
+    seq:
+    - id: len_named
+      type: u1
+    - id: named
+      size: len_named
+      size-eos: true
+  originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
+  origination:
+    seq:
+    - id: balance
+      type: n
+    - id: delegate_tag
+      type: u1
+      enum: bool
+    - id: delegate
+      type: public_key_hash
+      if: (delegate_tag == bool::true)
+    - id: script
+      type: id_018__proxford__scripted__contracts
   parameters:
     seq:
     - id: entrypoint
       type: id_018__proxford__entrypoint
     - id: value
       type: value
+  prim__1_arg__no_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_018__proxford__michelson__v1__primitives
+    - id: arg
+      type: micheline__018__proxford__michelson_v1__expression
+  prim__1_arg__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_018__proxford__michelson__v1__primitives
+    - id: arg
+      type: micheline__018__proxford__michelson_v1__expression
+    - id: annots
+      type: annots
+  prim__2_args__no_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_018__proxford__michelson__v1__primitives
+    - id: arg1
+      type: micheline__018__proxford__michelson_v1__expression
+    - id: arg2
+      type: micheline__018__proxford__michelson_v1__expression
+  prim__2_args__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_018__proxford__michelson__v1__primitives
+    - id: arg1
+      type: micheline__018__proxford__michelson_v1__expression
+    - id: arg2
+      type: micheline__018__proxford__michelson_v1__expression
+    - id: annots
+      type: annots
+  prim__generic:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_018__proxford__michelson__v1__primitives
+    - id: args
+      type: args
+    - id: annots
+      type: annots
+  prim__no_args__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_018__proxford__michelson__v1__primitives
+    - id: annots
+      type: annots
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
-    - id: public_key_hash_bls
+    - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+  sequence:
+    seq:
+    - id: len_sequence
+      type: s4
+    - id: sequence
+      type: sequence_entries
+      size: len_sequence
+      repeat: eos
   sequence_entries:
     seq:
     - id: sequence_elt
       type: micheline__018__proxford__michelson_v1__expression
+  smart_rollup:
+    seq:
+    - id: smart_rollup_address
+      size: 20
+    - id: smart_rollup_padding
+      size: 1
+      doc: This field is for padding, ignore
   storage:
     seq:
     - id: len_storage
@@ -321,6 +303,18 @@ types:
       type: s4
     - id: string
       size: len_string
+  transaction:
+    seq:
+    - id: amount
+      type: n
+    - id: destination
+      type: id_018__proxford__transaction_destination
+    - id: parameters_tag
+      type: u1
+      enum: bool
+    - id: parameters
+      type: parameters
+      if: (parameters_tag == bool::true)
   value:
     seq:
     - id: len_value
@@ -340,6 +334,13 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
+  zk_rollup:
+    seq:
+    - id: zk_rollup_hash
+      size: 20
+    - id: zk_rollup_padding
+      size: 1
+      doc: This field is for padding, ignore
 enums:
   bool:
     0: false

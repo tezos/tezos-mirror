@@ -1,6 +1,7 @@
 meta:
   id: id_018__proxford__level
   endian: be
+doc: ! 'Encoding id: 018-Proxford.level'
 enums:
   bool:
     0: false

@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__gas
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.gas'
 types:
   n_chunk:
     seq:
@@ -29,6 +30,6 @@ seq:
 - id: id_011__pthangz2__gas_tag
   type: u1
   enum: id_011__pthangz2__gas_tag
-- id: id_011__pthangz2__gas_limited
+- id: limited
   type: z
   if: (id_011__pthangz2__gas_tag == id_011__pthangz2__gas_tag::limited)

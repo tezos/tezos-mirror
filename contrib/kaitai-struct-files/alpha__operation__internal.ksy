@@ -1,6 +1,7 @@
 meta:
   id: alpha__operation__internal
   endian: be
+doc: ! 'Encoding id: alpha.operation.internal'
 types:
   alpha__apply_internal_results__alpha__operation_result:
     seq:
@@ -11,82 +12,27 @@ types:
     - id: alpha__apply_internal_results__alpha__operation_result_tag
       type: u1
       enum: alpha__apply_internal_results__alpha__operation_result_tag
-    - id: alpha__apply_internal_results__alpha__operation_result_transaction
-      type: alpha__apply_internal_results__alpha__operation_result_transaction
+    - id: transaction
+      type: transaction
       if: (alpha__apply_internal_results__alpha__operation_result_tag == alpha__apply_internal_results__alpha__operation_result_tag::transaction)
-    - id: alpha__apply_internal_results__alpha__operation_result_origination
-      type: alpha__apply_internal_results__alpha__operation_result_origination
+    - id: origination
+      type: origination
       if: (alpha__apply_internal_results__alpha__operation_result_tag == alpha__apply_internal_results__alpha__operation_result_tag::origination)
-    - id: alpha__apply_internal_results__alpha__operation_result_delegation
-      type: alpha__apply_internal_results__alpha__operation_result_delegation
+    - id: delegation
+      type: delegation
       if: (alpha__apply_internal_results__alpha__operation_result_tag == alpha__apply_internal_results__alpha__operation_result_tag::delegation)
-    - id: alpha__apply_internal_results__alpha__operation_result_event
-      type: alpha__apply_internal_results__alpha__operation_result_event
+    - id: event
+      type: event
       if: (alpha__apply_internal_results__alpha__operation_result_tag == alpha__apply_internal_results__alpha__operation_result_tag::event)
-  alpha__apply_internal_results__alpha__operation_result_delegation:
-    seq:
-    - id: delegate_tag
-      type: u1
-      enum: bool
-    - id: delegate
-      type: public_key_hash
-      if: (delegate_tag == bool::true)
-  alpha__apply_internal_results__alpha__operation_result_event:
-    seq:
-    - id: type
-      type: micheline__alpha__michelson_v1__expression
-    - id: tag_tag
-      type: u1
-      enum: bool
-    - id: tag
-      type: alpha__entrypoint
-      if: (tag_tag == bool::true)
-    - id: payload_tag
-      type: u1
-      enum: bool
-    - id: payload
-      type: micheline__alpha__michelson_v1__expression
-      if: (payload_tag == bool::true)
-  alpha__apply_internal_results__alpha__operation_result_origination:
-    seq:
-    - id: balance
-      type: n
-    - id: delegate_tag
-      type: u1
-      enum: bool
-    - id: delegate
-      type: public_key_hash
-      if: (delegate_tag == bool::true)
-    - id: script
-      type: alpha__scripted__contracts
-  alpha__apply_internal_results__alpha__operation_result_transaction:
-    seq:
-    - id: amount
-      type: n
-    - id: destination
-      type: alpha__transaction_destination
-    - id: parameters_tag
-      type: u1
-      enum: bool
-    - id: parameters
-      type: parameters
-      if: (parameters_tag == bool::true)
   alpha__entrypoint:
     doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     seq:
     - id: alpha__entrypoint_tag
       type: u1
       enum: alpha__entrypoint_tag
-    - id: alpha__entrypoint_named
-      type: alpha__entrypoint_named
-      if: (alpha__entrypoint_tag == alpha__entrypoint_tag::named)
-  alpha__entrypoint_named:
-    seq:
-    - id: len_named
-      type: u1
     - id: named
-      size: len_named
-      size-eos: true
+      type: named
+      if: (alpha__entrypoint_tag == alpha__entrypoint_tag::named)
   alpha__scripted__contracts:
     seq:
     - id: code
@@ -103,39 +49,18 @@ types:
     - id: alpha__transaction_destination_tag
       type: u1
       enum: alpha__transaction_destination_tag
-    - id: alpha__transaction_destination_implicit
+    - id: implicit
       type: public_key_hash
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::implicit)
-    - id: alpha__transaction_destination_originated
-      type: alpha__transaction_destination_originated
+    - id: originated
+      type: originated
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::originated)
-    - id: alpha__transaction_destination_smart_rollup
-      type: alpha__transaction_destination_smart_rollup
+    - id: smart_rollup
+      type: smart_rollup
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::smart_rollup)
-    - id: alpha__transaction_destination_zk_rollup
-      type: alpha__transaction_destination_zk_rollup
+    - id: zk_rollup
+      type: zk_rollup
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::zk_rollup)
-  alpha__transaction_destination_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
-  alpha__transaction_destination_smart_rollup:
-    seq:
-    - id: smart_rollup_address
-      size: 20
-    - id: smart_rollup_padding
-      size: 1
-      doc: This field is for padding, ignore
-  alpha__transaction_destination_zk_rollup:
-    seq:
-    - id: zk_rollup_hash
-      size: 20
-    - id: zk_rollup_padding
-      size: 1
-      doc: This field is for padding, ignore
   annots:
     seq:
     - id: len_annots
@@ -166,105 +91,69 @@ types:
       type: s4
     - id: code
       size: len_code
+  delegation:
+    seq:
+    - id: delegate_tag
+      type: u1
+      enum: bool
+    - id: delegate
+      type: public_key_hash
+      if: (delegate_tag == bool::true)
+  event:
+    seq:
+    - id: type
+      type: micheline__alpha__michelson_v1__expression
+    - id: tag_tag
+      type: u1
+      enum: bool
+    - id: tag
+      type: alpha__entrypoint
+      if: (tag_tag == bool::true)
+    - id: payload_tag
+      type: u1
+      enum: bool
+    - id: payload
+      type: micheline__alpha__michelson_v1__expression
+      if: (payload_tag == bool::true)
   micheline__alpha__michelson_v1__expression:
     seq:
     - id: micheline__alpha__michelson_v1__expression_tag
       type: u1
       enum: micheline__alpha__michelson_v1__expression_tag
-    - id: micheline__alpha__michelson_v1__expression_int
+    - id: int
       type: z
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::int)
-    - id: micheline__alpha__michelson_v1__expression_string
+    - id: string
       type: string
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::string)
-    - id: micheline__alpha__michelson_v1__expression_sequence
-      type: micheline__alpha__michelson_v1__expression_sequence
+    - id: sequence
+      type: sequence
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::sequence)
-    - id: micheline__alpha__michelson_v1__expression_prim__no_args__no_annots
+    - id: prim__no_args__no_annots
       type: u1
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__no_args__no_annots)
       enum: alpha__michelson__v1__primitives
-    - id: micheline__alpha__michelson_v1__expression_prim__no_args__some_annots
-      type: micheline__alpha__michelson_v1__expression_prim__no_args__some_annots
+    - id: prim__no_args__some_annots
+      type: prim__no_args__some_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__no_args__some_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots
-      type: micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots
+    - id: prim__1_arg__no_annots
+      type: prim__1_arg__no_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__1_arg__no_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots
-      type: micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots
+    - id: prim__1_arg__some_annots
+      type: prim__1_arg__some_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__1_arg__some_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__2_args__no_annots
-      type: micheline__alpha__michelson_v1__expression_prim__2_args__no_annots
+    - id: prim__2_args__no_annots
+      type: prim__2_args__no_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__2_args__no_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__2_args__some_annots
-      type: micheline__alpha__michelson_v1__expression_prim__2_args__some_annots
+    - id: prim__2_args__some_annots
+      type: prim__2_args__some_annots
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__2_args__some_annots)
-    - id: micheline__alpha__michelson_v1__expression_prim__generic
-      type: micheline__alpha__michelson_v1__expression_prim__generic
+    - id: prim__generic
+      type: prim__generic
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__generic)
-    - id: micheline__alpha__michelson_v1__expression_bytes
+    - id: bytes
       type: bytes
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::bytes)
-  micheline__alpha__michelson_v1__expression_prim__1_arg__no_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: alpha__michelson__v1__primitives
-    - id: arg
-      type: micheline__alpha__michelson_v1__expression
-  micheline__alpha__michelson_v1__expression_prim__1_arg__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: alpha__michelson__v1__primitives
-    - id: arg
-      type: micheline__alpha__michelson_v1__expression
-    - id: annots
-      type: annots
-  micheline__alpha__michelson_v1__expression_prim__2_args__no_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: alpha__michelson__v1__primitives
-    - id: arg1
-      type: micheline__alpha__michelson_v1__expression
-    - id: arg2
-      type: micheline__alpha__michelson_v1__expression
-  micheline__alpha__michelson_v1__expression_prim__2_args__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: alpha__michelson__v1__primitives
-    - id: arg1
-      type: micheline__alpha__michelson_v1__expression
-    - id: arg2
-      type: micheline__alpha__michelson_v1__expression
-    - id: annots
-      type: annots
-  micheline__alpha__michelson_v1__expression_prim__generic:
-    seq:
-    - id: prim
-      type: u1
-      enum: alpha__michelson__v1__primitives
-    - id: args
-      type: args
-    - id: annots
-      type: annots
-  micheline__alpha__michelson_v1__expression_prim__no_args__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: alpha__michelson__v1__primitives
-    - id: annots
-      type: annots
-  micheline__alpha__michelson_v1__expression_sequence:
-    seq:
-    - id: len_sequence
-      type: s4
-    - id: sequence
-      type: sequence_entries
-      size: len_sequence
-      repeat: eos
   n:
     seq:
     - id: n
@@ -277,34 +166,127 @@ types:
       type: b1be
     - id: payload
       type: b7be
+  named:
+    seq:
+    - id: len_named
+      type: u1
+    - id: named
+      size: len_named
+      size-eos: true
+  originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
+  origination:
+    seq:
+    - id: balance
+      type: n
+    - id: delegate_tag
+      type: u1
+      enum: bool
+    - id: delegate
+      type: public_key_hash
+      if: (delegate_tag == bool::true)
+    - id: script
+      type: alpha__scripted__contracts
   parameters:
     seq:
     - id: entrypoint
       type: alpha__entrypoint
     - id: value
       type: value
+  prim__1_arg__no_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: alpha__michelson__v1__primitives
+    - id: arg
+      type: micheline__alpha__michelson_v1__expression
+  prim__1_arg__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: alpha__michelson__v1__primitives
+    - id: arg
+      type: micheline__alpha__michelson_v1__expression
+    - id: annots
+      type: annots
+  prim__2_args__no_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: alpha__michelson__v1__primitives
+    - id: arg1
+      type: micheline__alpha__michelson_v1__expression
+    - id: arg2
+      type: micheline__alpha__michelson_v1__expression
+  prim__2_args__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: alpha__michelson__v1__primitives
+    - id: arg1
+      type: micheline__alpha__michelson_v1__expression
+    - id: arg2
+      type: micheline__alpha__michelson_v1__expression
+    - id: annots
+      type: annots
+  prim__generic:
+    seq:
+    - id: prim
+      type: u1
+      enum: alpha__michelson__v1__primitives
+    - id: args
+      type: args
+    - id: annots
+      type: annots
+  prim__no_args__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: alpha__michelson__v1__primitives
+    - id: annots
+      type: annots
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
-    - id: public_key_hash_bls
+    - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+  sequence:
+    seq:
+    - id: len_sequence
+      type: s4
+    - id: sequence
+      type: sequence_entries
+      size: len_sequence
+      repeat: eos
   sequence_entries:
     seq:
     - id: sequence_elt
       type: micheline__alpha__michelson_v1__expression
+  smart_rollup:
+    seq:
+    - id: smart_rollup_address
+      size: 20
+    - id: smart_rollup_padding
+      size: 1
+      doc: This field is for padding, ignore
   storage:
     seq:
     - id: len_storage
@@ -317,6 +299,18 @@ types:
       type: s4
     - id: string
       size: len_string
+  transaction:
+    seq:
+    - id: amount
+      type: n
+    - id: destination
+      type: alpha__transaction_destination
+    - id: parameters_tag
+      type: u1
+      enum: bool
+    - id: parameters
+      type: parameters
+      if: (parameters_tag == bool::true)
   value:
     seq:
     - id: len_value
@@ -336,6 +330,13 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
+  zk_rollup:
+    seq:
+    - id: zk_rollup_hash
+      size: 20
+    - id: zk_rollup_padding
+      size: 1
+      doc: This field is for padding, ignore
 enums:
   alpha__apply_internal_results__alpha__operation_result_tag:
     1: transaction

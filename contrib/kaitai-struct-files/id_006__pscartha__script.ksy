@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__script
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.script'
 types:
   code:
     seq:

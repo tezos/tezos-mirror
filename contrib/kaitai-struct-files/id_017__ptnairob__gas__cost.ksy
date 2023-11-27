@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__gas__cost
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.gas.cost'
 types:
   n_chunk:
     seq:

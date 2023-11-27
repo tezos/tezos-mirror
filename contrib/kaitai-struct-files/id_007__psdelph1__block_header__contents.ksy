@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__block_header__contents
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.block_header.contents'
 types:
   id_007__psdelph1__block_header__alpha__unsigned_contents:
     seq:

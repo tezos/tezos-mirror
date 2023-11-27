@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__block_header__unsigned
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.block_header.unsigned'
 types:
   block_header__shell:
     doc: ! >-

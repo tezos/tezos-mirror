@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__script__loc
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.script.loc'
 seq:
 - id: micheline__location
   type: s4

@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__delegate__frozen_balance_by_cycles
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.delegate.frozen_balance_by_cycles'
 types:
   id_005__psbabym1__delegate__frozen_balance_by_cycles_entries:
     seq:

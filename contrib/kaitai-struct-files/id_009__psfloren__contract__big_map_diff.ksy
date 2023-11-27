@@ -1,7 +1,16 @@
 meta:
   id: id_009__psfloren__contract__big_map_diff
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.contract.big_map_diff'
 types:
+  alloc:
+    seq:
+    - id: big_map
+      type: z
+    - id: key_type
+      type: micheline__009__psfloren__michelson_v1__expression
+    - id: value_type
+      type: micheline__009__psfloren__michelson_v1__expression
   annots:
     seq:
     - id: len_annots
@@ -26,21 +35,145 @@ types:
       type: s4
     - id: bytes
       size: len_bytes
-  id_009__psfloren__contract__big_map_diff_elt_alloc:
-    seq:
-    - id: big_map
-      type: z
-    - id: key_type
-      type: micheline__009__psfloren__michelson_v1__expression
-    - id: value_type
-      type: micheline__009__psfloren__michelson_v1__expression
-  id_009__psfloren__contract__big_map_diff_elt_copy:
+  copy:
     seq:
     - id: source_big_map
       type: z
     - id: destination_big_map
       type: z
-  id_009__psfloren__contract__big_map_diff_elt_update:
+  id_009__psfloren__contract__big_map_diff_entries:
+    seq:
+    - id: id_009__psfloren__contract__big_map_diff_elt_tag
+      type: u1
+      enum: id_009__psfloren__contract__big_map_diff_elt_tag
+    - id: update
+      type: update
+      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::update)
+    - id: remove
+      type: z
+      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::remove)
+    - id: copy
+      type: copy
+      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::copy)
+    - id: alloc
+      type: alloc
+      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::alloc)
+  micheline__009__psfloren__michelson_v1__expression:
+    seq:
+    - id: micheline__009__psfloren__michelson_v1__expression_tag
+      type: u1
+      enum: micheline__009__psfloren__michelson_v1__expression_tag
+    - id: int
+      type: z
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::int)
+    - id: string
+      type: string
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::string)
+    - id: sequence
+      type: sequence
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::sequence)
+    - id: prim__no_args__no_annots
+      type: u1
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__no_args__no_annots)
+      enum: id_009__psfloren__michelson__v1__primitives
+    - id: prim__no_args__some_annots
+      type: prim__no_args__some_annots
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__no_args__some_annots)
+    - id: prim__1_arg__no_annots
+      type: prim__1_arg__no_annots
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__1_arg__no_annots)
+    - id: prim__1_arg__some_annots
+      type: prim__1_arg__some_annots
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__1_arg__some_annots)
+    - id: prim__2_args__no_annots
+      type: prim__2_args__no_annots
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__2_args__no_annots)
+    - id: prim__2_args__some_annots
+      type: prim__2_args__some_annots
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__2_args__some_annots)
+    - id: prim__generic
+      type: prim__generic
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__generic)
+    - id: bytes
+      type: bytes
+      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::bytes)
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
+  prim__1_arg__no_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_009__psfloren__michelson__v1__primitives
+    - id: arg
+      type: micheline__009__psfloren__michelson_v1__expression
+  prim__1_arg__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_009__psfloren__michelson__v1__primitives
+    - id: arg
+      type: micheline__009__psfloren__michelson_v1__expression
+    - id: annots
+      type: annots
+  prim__2_args__no_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_009__psfloren__michelson__v1__primitives
+    - id: arg1
+      type: micheline__009__psfloren__michelson_v1__expression
+    - id: arg2
+      type: micheline__009__psfloren__michelson_v1__expression
+  prim__2_args__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_009__psfloren__michelson__v1__primitives
+    - id: arg1
+      type: micheline__009__psfloren__michelson_v1__expression
+    - id: arg2
+      type: micheline__009__psfloren__michelson_v1__expression
+    - id: annots
+      type: annots
+  prim__generic:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_009__psfloren__michelson__v1__primitives
+    - id: args
+      type: args
+    - id: annots
+      type: annots
+  prim__no_args__some_annots:
+    seq:
+    - id: prim
+      type: u1
+      enum: id_009__psfloren__michelson__v1__primitives
+    - id: annots
+      type: annots
+  sequence:
+    seq:
+    - id: len_sequence
+      type: s4
+    - id: sequence
+      type: sequence_entries
+      size: len_sequence
+      repeat: eos
+  sequence_entries:
+    seq:
+    - id: sequence_elt
+      type: micheline__009__psfloren__michelson_v1__expression
+  string:
+    seq:
+    - id: len_string
+      type: s4
+    - id: string
+      size: len_string
+  update:
     seq:
     - id: big_map
       type: z
@@ -54,138 +187,6 @@ types:
     - id: value
       type: micheline__009__psfloren__michelson_v1__expression
       if: (value_tag == bool::true)
-  id_009__psfloren__contract__big_map_diff_entries:
-    seq:
-    - id: id_009__psfloren__contract__big_map_diff_elt_tag
-      type: u1
-      enum: id_009__psfloren__contract__big_map_diff_elt_tag
-    - id: id_009__psfloren__contract__big_map_diff_elt_update
-      type: id_009__psfloren__contract__big_map_diff_elt_update
-      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::update)
-    - id: id_009__psfloren__contract__big_map_diff_elt_remove
-      type: z
-      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::remove)
-    - id: id_009__psfloren__contract__big_map_diff_elt_copy
-      type: id_009__psfloren__contract__big_map_diff_elt_copy
-      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::copy)
-    - id: id_009__psfloren__contract__big_map_diff_elt_alloc
-      type: id_009__psfloren__contract__big_map_diff_elt_alloc
-      if: (id_009__psfloren__contract__big_map_diff_elt_tag == id_009__psfloren__contract__big_map_diff_elt_tag::alloc)
-  micheline__009__psfloren__michelson_v1__expression:
-    seq:
-    - id: micheline__009__psfloren__michelson_v1__expression_tag
-      type: u1
-      enum: micheline__009__psfloren__michelson_v1__expression_tag
-    - id: micheline__009__psfloren__michelson_v1__expression_int
-      type: z
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::int)
-    - id: micheline__009__psfloren__michelson_v1__expression_string
-      type: string
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::string)
-    - id: micheline__009__psfloren__michelson_v1__expression_sequence
-      type: micheline__009__psfloren__michelson_v1__expression_sequence
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::sequence)
-    - id: micheline__009__psfloren__michelson_v1__expression_prim__no_args__no_annots
-      type: u1
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__no_args__no_annots)
-      enum: id_009__psfloren__michelson__v1__primitives
-    - id: micheline__009__psfloren__michelson_v1__expression_prim__no_args__some_annots
-      type: micheline__009__psfloren__michelson_v1__expression_prim__no_args__some_annots
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__no_args__some_annots)
-    - id: micheline__009__psfloren__michelson_v1__expression_prim__1_arg__no_annots
-      type: micheline__009__psfloren__michelson_v1__expression_prim__1_arg__no_annots
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__1_arg__no_annots)
-    - id: micheline__009__psfloren__michelson_v1__expression_prim__1_arg__some_annots
-      type: micheline__009__psfloren__michelson_v1__expression_prim__1_arg__some_annots
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__1_arg__some_annots)
-    - id: micheline__009__psfloren__michelson_v1__expression_prim__2_args__no_annots
-      type: micheline__009__psfloren__michelson_v1__expression_prim__2_args__no_annots
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__2_args__no_annots)
-    - id: micheline__009__psfloren__michelson_v1__expression_prim__2_args__some_annots
-      type: micheline__009__psfloren__michelson_v1__expression_prim__2_args__some_annots
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__2_args__some_annots)
-    - id: micheline__009__psfloren__michelson_v1__expression_prim__generic
-      type: micheline__009__psfloren__michelson_v1__expression_prim__generic
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::prim__generic)
-    - id: micheline__009__psfloren__michelson_v1__expression_bytes
-      type: bytes
-      if: (micheline__009__psfloren__michelson_v1__expression_tag == micheline__009__psfloren__michelson_v1__expression_tag::bytes)
-  micheline__009__psfloren__michelson_v1__expression_prim__1_arg__no_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_009__psfloren__michelson__v1__primitives
-    - id: arg
-      type: micheline__009__psfloren__michelson_v1__expression
-  micheline__009__psfloren__michelson_v1__expression_prim__1_arg__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_009__psfloren__michelson__v1__primitives
-    - id: arg
-      type: micheline__009__psfloren__michelson_v1__expression
-    - id: annots
-      type: annots
-  micheline__009__psfloren__michelson_v1__expression_prim__2_args__no_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_009__psfloren__michelson__v1__primitives
-    - id: arg1
-      type: micheline__009__psfloren__michelson_v1__expression
-    - id: arg2
-      type: micheline__009__psfloren__michelson_v1__expression
-  micheline__009__psfloren__michelson_v1__expression_prim__2_args__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_009__psfloren__michelson__v1__primitives
-    - id: arg1
-      type: micheline__009__psfloren__michelson_v1__expression
-    - id: arg2
-      type: micheline__009__psfloren__michelson_v1__expression
-    - id: annots
-      type: annots
-  micheline__009__psfloren__michelson_v1__expression_prim__generic:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_009__psfloren__michelson__v1__primitives
-    - id: args
-      type: args
-    - id: annots
-      type: annots
-  micheline__009__psfloren__michelson_v1__expression_prim__no_args__some_annots:
-    seq:
-    - id: prim
-      type: u1
-      enum: id_009__psfloren__michelson__v1__primitives
-    - id: annots
-      type: annots
-  micheline__009__psfloren__michelson_v1__expression_sequence:
-    seq:
-    - id: len_sequence
-      type: s4
-    - id: sequence
-      type: sequence_entries
-      size: len_sequence
-      repeat: eos
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
-  sequence_entries:
-    seq:
-    - id: sequence_elt
-      type: micheline__009__psfloren__michelson_v1__expression
-  string:
-    seq:
-    - id: len_string
-      type: s4
-    - id: string
-      size: len_string
   z:
     seq:
     - id: has_tail

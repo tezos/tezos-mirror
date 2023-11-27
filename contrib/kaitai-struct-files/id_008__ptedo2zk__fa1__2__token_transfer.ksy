@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.fa1.2.token_transfer'
 types:
   destination:
     seq:

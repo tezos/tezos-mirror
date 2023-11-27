@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__fa1__2__token_transfer
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.fa1.2.token_transfer'
 types:
   destination:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__delegate__frozen_balance_by_cycles
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.delegate.frozen_balance_by_cycles'
 types:
   id_006__pscartha__delegate__frozen_balance_by_cycles_entries:
     seq:

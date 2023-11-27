@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__delegate__frozen_balance_by_cycles
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.delegate.frozen_balance_by_cycles'
 types:
   id_008__ptedo2zk__delegate__frozen_balance_by_cycles_entries:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_007__psdelph1__constants__parametric
   endian: be
+doc: ! 'Encoding id: 007-PsDELPH1.constants.parametric'
 types:
   baking_reward_per_endorsement:
     seq:

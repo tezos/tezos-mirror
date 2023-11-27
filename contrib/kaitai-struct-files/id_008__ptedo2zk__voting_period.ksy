@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__voting_period
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.voting_period'
 enums:
   kind_tag:
     0: proposal

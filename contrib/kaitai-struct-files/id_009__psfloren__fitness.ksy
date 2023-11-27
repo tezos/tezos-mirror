@@ -1,6 +1,7 @@
 meta:
   id: id_009__psfloren__fitness
   endian: be
+doc: ! 'Encoding id: 009-PsFLoren.fitness'
 types:
   fitness:
     doc: ! >-

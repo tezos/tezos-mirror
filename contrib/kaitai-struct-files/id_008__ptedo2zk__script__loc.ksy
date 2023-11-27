@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__script__loc
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.script.loc'
 seq:
 - id: micheline__location
   type: s4

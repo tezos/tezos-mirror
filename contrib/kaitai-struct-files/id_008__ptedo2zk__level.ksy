@@ -1,6 +1,7 @@
 meta:
   id: id_008__ptedo2zk__level
   endian: be
+doc: ! 'Encoding id: 008-PtEdo2Zk.level'
 enums:
   bool:
     0: false

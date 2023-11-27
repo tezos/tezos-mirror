@@ -1,6 +1,7 @@
 meta:
   id: id_006__pscartha__level
   endian: be
+doc: ! 'Encoding id: 006-PsCARTHA.level'
 enums:
   bool:
     0: false

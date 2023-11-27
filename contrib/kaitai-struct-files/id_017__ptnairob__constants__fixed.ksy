@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__constants__fixed
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.constants.fixed'
 types:
   n:
     seq:

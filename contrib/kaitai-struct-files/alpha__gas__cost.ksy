@@ -1,6 +1,7 @@
 meta:
   id: alpha__gas__cost
   endian: be
+doc: ! 'Encoding id: alpha.gas.cost'
 types:
   n_chunk:
     seq:

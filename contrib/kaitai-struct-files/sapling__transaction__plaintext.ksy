@@ -1,6 +1,7 @@
 meta:
   id: sapling__transaction__plaintext
   endian: be
+doc: ! 'Encoding id: sapling.transaction.plaintext'
 types:
   memo:
     seq:

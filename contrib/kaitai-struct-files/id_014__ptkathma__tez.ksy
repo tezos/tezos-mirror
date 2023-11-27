@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__tez
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.tez'
 types:
   n:
     seq:

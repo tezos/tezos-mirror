@@ -1,6 +1,7 @@
 meta:
   id: id_015__ptlimapt__tez
   endian: be
+doc: ! 'Encoding id: 015-PtLimaPt.tez'
 types:
   n:
     seq:

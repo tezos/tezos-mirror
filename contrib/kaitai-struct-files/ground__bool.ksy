@@ -1,7 +1,9 @@
 meta:
   id: ground__bool
   endian: be
-doc: Boolean values
+doc: ! 'Encoding id: ground.bool
+
+  Description: Boolean values'
 enums:
   bool:
     0: false

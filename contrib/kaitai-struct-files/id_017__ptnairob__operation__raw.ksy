@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__operation__raw
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.operation.raw'
 types:
   operation:
     doc: ! >-

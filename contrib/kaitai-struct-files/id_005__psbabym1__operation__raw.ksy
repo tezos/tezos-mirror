@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__operation__raw
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.operation.raw'
 types:
   operation:
     doc: ! >-

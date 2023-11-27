@@ -1,6 +1,7 @@
 meta:
   id: alpha__level
   endian: be
+doc: ! 'Encoding id: alpha.level'
 enums:
   bool:
     0: false

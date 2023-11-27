@@ -1,7 +1,11 @@
 meta:
   id: protocol
   endian: be
-doc: The environment a protocol relies on and the components a protocol is made of.
+doc: ! >-
+  Encoding id: protocol
+
+  Description: The environment a protocol relies on and the components a protocol
+  is made of.
 types:
   components:
     seq:

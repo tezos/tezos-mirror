@@ -2,7 +2,9 @@ meta:
   id: id_018__proxford__errors
   endian: be
 doc: ! >-
-  The full list of RPC errors would be too long to include.It is
+  Encoding id: 018-Proxford.errors
+
+  Description: The full list of RPC errors would be too long to include.It is
 
   available through the RPC `/errors` (GET).
 seq:

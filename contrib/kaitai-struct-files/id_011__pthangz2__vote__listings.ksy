@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__vote__listings
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.vote.listings'
 types:
   id_011__pthangz2__vote__listings_entries:
     seq:
@@ -14,13 +15,13 @@ types:
     - id: public_key_hash_tag
       type: u1
       enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
+    - id: ed25519
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
+    - id: secp256k1
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
+    - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
 enums:

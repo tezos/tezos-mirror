@@ -1,6 +1,7 @@
 meta:
   id: id_005__psbabym1__block_header__contents
   endian: be
+doc: ! 'Encoding id: 005-PsBabyM1.block_header.contents'
 types:
   id_005__psbabym1__block_header__alpha__unsigned_contents:
     seq:

@@ -1,13 +1,14 @@
 meta:
   id: id_018__proxford__fitness
   endian: be
+doc: ! 'Encoding id: 018-Proxford.fitness'
 types:
   locked_round:
     seq:
     - id: locked_round_tag
       type: u1
       enum: locked_round_tag
-    - id: locked_round_some
+    - id: some
       type: s4
       if: (locked_round_tag == locked_round_tag::some)
 enums:

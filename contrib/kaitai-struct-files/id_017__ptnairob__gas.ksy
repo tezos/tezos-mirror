@@ -1,6 +1,7 @@
 meta:
   id: id_017__ptnairob__gas
   endian: be
+doc: ! 'Encoding id: 017-PtNairob.gas'
 types:
   n_chunk:
     seq:
@@ -29,6 +30,6 @@ seq:
 - id: id_017__ptnairob__gas_tag
   type: u1
   enum: id_017__ptnairob__gas_tag
-- id: id_017__ptnairob__gas_limited
+- id: limited
   type: z
   if: (id_017__ptnairob__gas_tag == id_017__ptnairob__gas_tag::limited)

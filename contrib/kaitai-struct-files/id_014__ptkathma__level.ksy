@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__level
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.level'
 enums:
   bool:
     0: false

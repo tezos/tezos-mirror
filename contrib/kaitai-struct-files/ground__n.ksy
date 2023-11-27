@@ -1,7 +1,9 @@
 meta:
   id: ground__n
   endian: be
-doc: Arbitrary precision natural numbers
+doc: ! 'Encoding id: ground.N
+
+  Description: Arbitrary precision natural numbers'
 types:
   n:
     seq:

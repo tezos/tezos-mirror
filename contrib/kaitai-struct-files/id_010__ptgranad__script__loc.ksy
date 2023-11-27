@@ -1,6 +1,7 @@
 meta:
   id: id_010__ptgranad__script__loc
   endian: be
+doc: ! 'Encoding id: 010-PtGRANAD.script.loc'
 seq:
 - id: micheline__location
   type: s4

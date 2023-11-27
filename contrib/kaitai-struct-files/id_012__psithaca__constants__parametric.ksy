@@ -1,23 +1,16 @@
 meta:
   id: id_012__psithaca__constants__parametric
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.constants.parametric'
 types:
   delegate_selection:
     seq:
     - id: delegate_selection_tag
       type: u1
       enum: delegate_selection_tag
-    - id: delegate_selection_round_robin_over_delegates
-      type: delegate_selection_round_robin_over_delegates
-      if: (delegate_selection_tag == delegate_selection_tag::round_robin_over_delegates)
-  delegate_selection_round_robin_over_delegates:
-    seq:
-    - id: len_round_robin_over_delegates
-      type: s4
     - id: round_robin_over_delegates
-      type: round_robin_over_delegates_entries
-      size: len_round_robin_over_delegates
-      repeat: eos
+      type: round_robin_over_delegates
+      if: (delegate_selection_tag == delegate_selection_tag::round_robin_over_delegates)
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -42,13 +35,13 @@ types:
     - id: public_key_tag
       type: u1
       enum: public_key_tag
-    - id: public_key_ed25519
+    - id: ed25519
       size: 32
       if: (public_key_tag == public_key_tag::ed25519)
-    - id: public_key_secp256k1
+    - id: secp256k1
       size: 33
       if: (public_key_tag == public_key_tag::secp256k1)
-    - id: public_key_p256
+    - id: p256
       size: 33
       if: (public_key_tag == public_key_tag::p256)
   ratio_of_frozen_deposits_slashed_per_double_endorsement:
@@ -57,6 +50,14 @@ types:
       type: u2
     - id: denominator
       type: u2
+  round_robin_over_delegates:
+    seq:
+    - id: len_round_robin_over_delegates
+      type: s4
+    - id: round_robin_over_delegates
+      type: round_robin_over_delegates_entries
+      size: len_round_robin_over_delegates
+      repeat: eos
   round_robin_over_delegates_elt_entries:
     seq:
     - id: signature__v0__public_key

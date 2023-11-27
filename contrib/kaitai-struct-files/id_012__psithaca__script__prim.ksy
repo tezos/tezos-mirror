@@ -1,6 +1,7 @@
 meta:
   id: id_012__psithaca__script__prim
   endian: be
+doc: ! 'Encoding id: 012-Psithaca.script.prim'
 enums:
   id_012__psithaca__michelson__v1__primitives:
     0: parameter

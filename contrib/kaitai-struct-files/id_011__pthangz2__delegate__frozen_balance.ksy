@@ -1,6 +1,7 @@
 meta:
   id: id_011__pthangz2__delegate__frozen_balance
   endian: be
+doc: ! 'Encoding id: 011-PtHangz2.delegate.frozen_balance'
 types:
   n:
     seq:

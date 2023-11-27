@@ -1,7 +1,10 @@
 meta:
   id: user_activated__upgrades
   endian: be
-doc: ! 'User activated upgrades: at given level, switch to given protocol.'
+doc: ! >-
+  Encoding id: user_activated.upgrades
+
+  Description: User activated upgrades: at given level, switch to given protocol.
 types:
   user_activated__upgrades_entries:
     seq:

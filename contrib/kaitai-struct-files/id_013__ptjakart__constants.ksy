@@ -1,6 +1,7 @@
 meta:
   id: id_013__ptjakart__constants
   endian: be
+doc: ! 'Encoding id: 013-PtJakart.constants'
 types:
   minimal_participation_ratio:
     seq:

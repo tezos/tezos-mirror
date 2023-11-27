@@ -1,7 +1,10 @@
 meta:
   id: user_activated__protocol_overrides
   endian: be
-doc: ! 'User activated protocol overrides: activate a protocol instead of another.'
+doc: ! >-
+  Encoding id: user_activated.protocol_overrides
+
+  Description: User activated protocol overrides: activate a protocol instead of another.
 types:
   user_activated__protocol_overrides_entries:
     seq:

@@ -1,6 +1,7 @@
 meta:
   id: id_014__ptkathma__gas
   endian: be
+doc: ! 'Encoding id: 014-PtKathma.gas'
 types:
   n_chunk:
     seq:
@@ -29,6 +30,6 @@ seq:
 - id: id_014__ptkathma__gas_tag
   type: u1
   enum: id_014__ptkathma__gas_tag
-- id: id_014__ptkathma__gas_limited
+- id: limited
   type: z
   if: (id_014__ptkathma__gas_tag == id_014__ptkathma__gas_tag::limited)
