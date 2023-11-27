@@ -513,6 +513,68 @@ mod tests {
         assert!(removed.is_none())
     }
 
+    #[test]
+    fn test_first() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/list");
+        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let elt = 0x32_u8;
+
+        list.push(&mut host, &id, &elt)
+            .expect("storage should workd");
+
+        let read: u8 = list
+            .first(&host)
+            .expect("storage should work")
+            .expect("element should be present");
+
+        assert_eq!(read, 0x32);
+    }
+
+    #[test]
+    fn test_first_when_only_two_elements() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/list");
+        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let id_2 = Hash([0x1; TRANSACTION_HASH_SIZE]);
+
+        list.push(&mut host, &id_1, &0x32_u8)
+            .expect("storage should workd");
+        list.push(&mut host, &id_2, &0x33_u8)
+            .expect("storage should workd");
+
+        let read: u8 = list
+            .first(&host)
+            .expect("storage should work")
+            .expect("element should be present");
+
+        assert_eq!(read, 0x32);
+    }
+
+    #[test]
+    fn test_first_after_two_push() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/list");
+        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let id_2 = Hash([0x1; TRANSACTION_HASH_SIZE]);
+
+        list.push(&mut host, &id_1, &0x32_u8)
+            .expect("storage should workd");
+        list.push(&mut host, &id_2, &0x33_u8)
+            .expect("storage should workd");
+        let _: Option<u8> = list.remove(&mut host, &id_1).expect("storage should work");
+
+        let read: u8 = list
+            .first(&host)
+            .expect("storage should work")
+            .expect("element should be present");
+
+        assert_eq!(read, 0x33);
+    }
+
     fn fill_list(
         elements: &HashMap<[u8; TRANSACTION_HASH_SIZE], u8>,
     ) -> (MockHost, LinkedList<Hash, u8>) {
