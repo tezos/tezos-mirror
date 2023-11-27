@@ -355,6 +355,9 @@ fn parse_ty_with_entrypoints(
         App(key, [], _) => Type::Key,
         App(key, ..) => unexpected()?,
 
+        App(key_hash, [], _) => Type::KeyHash,
+        App(key_hash, ..) => unexpected()?,
+
         App(signature, [], _) => Type::Signature,
         App(signature, ..) => unexpected()?,
 

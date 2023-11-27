@@ -121,6 +121,7 @@ defprim! {
     key,
     signature,
     CHECK_SIGNATURE,
+    key_hash,
 }
 
 defprim! {
