@@ -158,7 +158,6 @@ module Make (Parameters : PARAMETERS) = struct
         (** The client context which is used to perform the injections. *)
     l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
     signers : signer list;  (** The signers for this worker. *)
-    number_of_signers : int;
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
           purposes. *)
@@ -299,13 +298,11 @@ module Make (Parameters : PARAMETERS) = struct
     let proto_client =
       Inj_proto.proto_client_for_protocol head_protocols.next_protocol
     in
-    let number_of_signers = List.length signers in
     return
       {
         cctxt = injector_context (cctxt :> #Client_context.full);
         l1_ctxt;
         signers;
-        number_of_signers;
         tags;
         strategy;
         save_dir = data_dir;
@@ -475,6 +472,18 @@ module Make (Parameters : PARAMETERS) = struct
   let keep_half ops =
     let total = List.length ops in
     if total <= 1 then None else Some (List.take_n (total / 2) ops)
+
+  let available_signers state =
+    let used_signers =
+      Injected_ophs.fold
+        (fun _ {signer_pkh; _} signers_pkh ->
+          Signature.Public_key_hash.Set.add signer_pkh signers_pkh)
+        state.injected.injected_ophs
+        Signature.Public_key_hash.Set.empty
+    in
+    List.filter
+      (fun s -> not @@ Signature.Public_key_hash.Set.mem s.pkh used_signers)
+      state.signers
 
   (** [simulate_operations ~must_succeed state operations] simulates the
       injection of [operations] and returns a triple [(op, ops, results)] where
@@ -819,10 +828,11 @@ module Make (Parameters : PARAMETERS) = struct
         let module Proto_client = (val state.proto_client) in
         Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
+    let signers = available_signers state in
     let ops_batch =
-      get_n_ops_batch_from_queue ~size_limit state state.number_of_signers
+      get_n_ops_batch_from_queue ~size_limit state (List.length signers)
     in
-    let signers_and_ops = List.combine_drop state.signers ops_batch in
+    let signers_and_ops = List.combine_drop signers ops_batch in
     let*! res_list =
       List.map_p
         (fun (signer, operations_to_inject) ->
