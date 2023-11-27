@@ -680,5 +680,40 @@ mod tests {
                 assert_eq!(elt, &read);
             }
         }
+
+        #[test]
+        fn test_pop_first_after_push(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+            let mut host = MockHost::default();
+            let path = RefPath::assert_from(b"/list");
+            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+
+            for (id, elt) in elements {
+                list.push(&mut host, &Hash(id), &elt).expect("storage should work");
+                let removed = list.pop_first(&mut host).expect("storage should work").expect("element should be present");
+                assert_eq!(elt, removed);
+            }
+        }
+
+        #[test]
+        fn test_pop_first_keep_the_order(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+            let mut host = MockHost::default();
+            let path = RefPath::assert_from(b"/list");
+            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+
+            let mut inserted = vec![];
+            let mut removed = vec![];
+
+            for (id, elt) in elements {
+                list.push(&mut host, &Hash(id), &elt).expect("storage should work");
+                inserted.push(elt);
+            }
+
+            while !list.is_empty() {
+                let pop = list.pop_first(&mut host).expect("storage should work").expect("element should be present");
+                removed.push(pop);
+            }
+
+            assert_eq!(inserted, removed);
+        }
     }
 }
