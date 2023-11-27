@@ -161,7 +161,7 @@ let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
     match history_mode with
     | Node.Full_history ->
         iter_block_range_s 1 (savepoint - 1) @@ expect_no_metadata
-    | _ ->
+    | Node.Rolling_history ->
         if caboose <> 0 then
           iter_block_range_s 1 (caboose - 1) @@ expect_no_block
         else unit
@@ -312,10 +312,10 @@ let test_export_import_snapshots =
 let wait_for_complete_merge node target =
   let wait_for_starting_merge target =
     let filter json =
-      let level = JSON.(json |> as_int) in
+      let level = JSON.(json |-> "stop" |> as_int) in
       if level = target then Some () else None
     in
-    Node.wait_for node "start_merging_stores.v0" filter
+    Node.wait_for node "start_cementing_blocks.v0" filter
   in
   let wait_for_ending_merge () =
     Node.wait_for node "end_merging_stores.v0" @@ fun _json -> Some ()
@@ -383,6 +383,7 @@ let test_drag_after_rolling_import =
       ~name:fresh_node_name
       ~snapshot:(snapshot_dir // filename, false)
       node_arguments
+      ~event_sections_levels:[("node.store", `Info)]
   in
   (* Baking a few blocks so that the caboose is not the genesis
      anymore. *)
@@ -432,7 +433,7 @@ let test_drag_after_rolling_import =
           expected_head
           - ((preserved_cycles + additional_cycles) * blocks_per_cycle)
         in
-        (checkpoint, savepoint, savepoint - max_op_ttl)
+        (checkpoint, savepoint, min savepoint (checkpoint - max_op_ttl))
   in
   let* () =
     check_consistency_after_import
@@ -442,6 +443,11 @@ let test_drag_after_rolling_import =
       ~expected_savepoint
       ~expected_caboose
   in
+  (* Restart the node to invalidate the cache and avoid false
+     positives. *)
+  let* () = Node.terminate fresh_node in
+  let* () = Node.run fresh_node node_arguments in
+  let* () = Node.wait_for_ready fresh_node in
   let* () =
     check_blocks_availability
       fresh_node
