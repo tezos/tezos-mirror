@@ -777,6 +777,23 @@ fn interpret_one<'a>(
             let key = pop!(V::Key);
             stack.push(TypedValue::KeyHash(key.hash()))
         }
+        I::Ticket => {
+            let content = pop!();
+            let amount = pop!(V::Nat);
+            ctx.gas.consume(interpret_cost::TICKET)?;
+            if amount.is_zero() {
+                // If the amount is zero, then we push a None value
+                // as per the specified instruction behavior.
+                stack.push(V::new_option(None));
+            } else {
+                let ticket = Ticket {
+                    ticketer: ctx.self_address.clone(),
+                    content,
+                    amount,
+                };
+                stack.push(V::new_option(Some(V::new_ticket(ticket))));
+            }
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -2540,6 +2557,25 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::RIGHT - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn ticket() {
+        let mut stack = stk![V::nat(100), TypedValue::Unit];
+        let mut ctx = Ctx::default();
+        let expected_ticket = V::new_ticket(crate::ast::Ticket {
+            ticketer: ctx.self_address.clone(),
+            amount: 100u32.into(),
+            content: V::Unit,
+        });
+
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[Ticket], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(Some(expected_ticket))]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::TICKET + interpret_cost::INTERPRET_RET
         );
     }
 

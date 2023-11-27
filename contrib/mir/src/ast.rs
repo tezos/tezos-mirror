@@ -424,6 +424,7 @@ pub enum Instruction<'a> {
     Right,
     Lambda(Lambda<'a>),
     Exec,
+    Ticket,
     HashKey,
     Apply {
         arg_ty: Type,

@@ -490,9 +490,9 @@ pub(crate) fn typecheck_instruction<'a>(
     macro_rules! pop {
         ($($args:tt)*) => {
             irrefutable_match!(
-              stack.pop().expect("pop from empty stack!");
-              $($args)*
-            )
+                stack.pop().expect("pop from empty stack!");
+                $($args)*
+                )
         };
     }
 
@@ -1252,6 +1252,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(APPLY, [], _), [.., _, _]) => no_overload!(APPLY),
         (App(APPLY, [], _), [] | [_]) => no_overload!(APPLY, len 2),
         (App(APPLY, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(TICKET, [], _), [.., T::Nat, _]) => {
+            stack[0] = T::new_option(T::new_ticket(pop!()));
+            I::Ticket
+        }
+        (App(TICKET, [], _), [.., _, _]) => no_overload!(TICKET),
+        (App(TICKET, [], _), [] | [_]) => no_overload!(TICKET, len 2),
+        (App(TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
@@ -4693,6 +4701,29 @@ mod typecheck_tests {
                 &Type::new_ticket(Type::Unit)
             ),
             Ok(TypedValue::new_ticket(ticket))
+        );
+    }
+
+    #[test]
+    fn ticket() {
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("TICKET").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::TICKET,
+                stack: stk![Type::Nat],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 2 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Nat, Type::Unit];
+        assert_eq!(
+            typecheck_instruction(&parse("TICKET").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Ticket)
+        );
+        assert_eq!(
+            stk,
+            &tc_stk![Type::new_option(Type::new_ticket(Type::Unit))]
         );
     }
 
