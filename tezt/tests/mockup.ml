@@ -372,20 +372,20 @@ let get_candidates_to_migration () =
     let transient = Client.create_with_mode Client.Mockup in
     Client.list_protocols `Mockup transient
   in
-  (* Find all registered mockup protocols which declare a next protocol *)
+  (* Find all registered mockup protocols which declare a previous protocol *)
   let result =
     List.filter_map
       (fun (protocol : Protocol.t) ->
-        match Protocol.next_protocol protocol with
+        match Protocol.previous_protocol protocol with
         | None -> None
-        | Some next ->
-            let next_hash = Protocol.hash next in
+        | Some previous ->
+            let previous_hash = Protocol.hash previous in
             if
               List.exists
                 (String.equal (Protocol.hash protocol))
                 mockup_protocols
-              && List.exists (String.equal next_hash) mockup_protocols
-            then Some (protocol, next)
+              && List.exists (String.equal previous_hash) mockup_protocols
+            then Some (previous, protocol)
             else None)
       Protocol.all
   in

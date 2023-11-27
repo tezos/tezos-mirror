@@ -161,14 +161,6 @@ val write_parameter_file :
   parameter_overrides ->
   string Lwt.t
 
-(** Get the successor of a protocol.
-
-    WARNING: use of this function is discouraged, because:
-    - a protocol may have several possible successors;
-    - it prevents the type-checker from telling you that your test can no longer
-      run when removing a protocol. *)
-val next_protocol : t -> t option
-
 (** Get the predecessor of a protocol.
 
     WARNING: use of this function is discouraged, because it prevents the type-checker
