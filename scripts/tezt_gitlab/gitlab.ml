@@ -77,3 +77,9 @@ let get_all uri =
     | _ :: _ -> aux (from + 1) (List.rev_append list acc)
   in
   aux 1 []
+
+let get_job_logs ~project ~job_id () =
+  let uri =
+    Uri.of_string (sf "https://gitlab.com/%s/-/jobs/%d/raw" project job_id)
+  in
+  Process.run_and_read_stdout "curl" (curl_params ~location:true uri)
