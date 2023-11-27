@@ -237,7 +237,7 @@ val store_block :
   block_store -> Block_repr.t -> Context_hash.t -> unit tzresult Lwt.t
 
 (** [cement_blocks ?check_consistency ~write_metadata block_store
-    chunk_iterator]
+    chunk_iterator ~cycle_range]
 
     Wrapper of {!Cemented_block_store.cement_blocks}. *)
 val cement_blocks :
@@ -245,6 +245,7 @@ val cement_blocks :
   write_metadata:bool ->
   block_store ->
   Cemented_block_store.chunk_iterator ->
+  cycle_range:int32 * int32 ->
   unit tzresult Lwt.t
 
 (** [move_floating_store block_store ~src ~dst_kind] closes the
