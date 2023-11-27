@@ -345,7 +345,76 @@ let rec seq_field_of_data_encoding :
             name
         in
         (state, [attr])
-  | String_enum _ -> failwith "String_enum not implemented"
+  | String_enum (h, a) ->
+      (* In kaitai, [id]s inside [EnumSpec] must be valid identifier and
+         be unique for a given enum.  Here we:
+          - use [escape_id] so that we have valid identifier.
+         - try to preserve the original name when 2 escaped id collide.
+         - find unique identifier by suffixing a number. *)
+      let allocated_names =
+        let t = Hashtbl.create 17 in
+        Hashtbl.iter
+          (fun _ (original_name, i) ->
+            let name = escape_id original_name in
+            if String.equal name original_name && not (Hashtbl.mem t name) then
+              (* This name has is already a valid id. Let's reserve it. *)
+              Hashtbl.add t name i)
+          h ;
+        t
+      in
+      let rec find_available_name ~prefix:name n =
+        let name' = Printf.sprintf "%s_%d" name n in
+        if Hashtbl.mem allocated_names name' then
+          find_available_name ~prefix:name (succ n)
+        else name'
+      in
+      let map =
+        Hashtbl.to_seq_values h
+        |> Seq.map (fun (original_name, i) ->
+               (* [escape_id original_name] could fail because
+                  [original_name] can be an arbitrary string. Let's only
+                  revisit if we ever encounter the usecase. *)
+               let name = escape_id original_name in
+               let name =
+                 match Hashtbl.find_opt allocated_names name with
+                 | None ->
+                     Hashtbl.add allocated_names name i ;
+                     name
+                 | Some j when i = j -> (* This name was reserved above *) name
+                 | Some _ ->
+                     let name' = find_available_name ~prefix:name 0 in
+                     Hashtbl.add allocated_names name' i ;
+                     name'
+               in
+               let doc =
+                 DocSpec.
+                   {
+                     refs = [];
+                     summary =
+                       (if String.equal original_name name then None
+                       else Some original_name);
+                   }
+               in
+               (i, EnumValueSpec.{name; doc}))
+        |> List.of_seq
+        |> List.sort (fun (t1, _) (t2, _) -> compare t1 t2)
+      in
+      let enumspec = EnumSpec.{map} in
+      let state = add_enum state (id, enumspec) in
+      let dataType =
+        DataType.NumericType
+          (Int_type
+             (match Data_encoding__Binary_size.enum_size a with
+             | `Uint8 -> Int1Type {signed = false}
+             | `Uint16 ->
+                 IntMultiType {signed = false; width = W2; endian = None}
+             | `Uint30 ->
+                 IntMultiType {signed = false; width = W4; endian = None}))
+      in
+      let attr =
+        {(Helpers.default_attr_spec ~id) with dataType; enum = Some id}
+      in
+      (state, [attr])
 
 and seq_field_of_tups :
     type a.
