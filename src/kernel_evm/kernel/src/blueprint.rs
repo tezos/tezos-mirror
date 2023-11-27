@@ -10,7 +10,6 @@ use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
 use crate::sequencer_blueprint::SequencerBlueprint;
 use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{current_timestamp, sequencer_blueprint};
-use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
@@ -152,17 +151,7 @@ impl Encodable for Queue {
     }
 }
 
-fn filter_invalid_transactions(
-    transactions: Vec<Transaction>,
-    chain_id: U256,
-) -> Vec<Transaction> {
-    let filter_chain_id = |transaction: &Transaction| match &transaction.content {
-        TransactionContent::Deposit(_) => true,
-        TransactionContent::Ethereum(transaction) => {
-            U256::eq(&transaction.chain_id, &chain_id)
-        }
-    };
-
+fn filter_invalid_transactions(transactions: Vec<Transaction>) -> Vec<Transaction> {
     let filter_max_gas_limit = |transaction: &Transaction| match &transaction.content {
         TransactionContent::Deposit(_) => true,
         TransactionContent::Ethereum(transaction) => {
@@ -172,23 +161,19 @@ fn filter_invalid_transactions(
 
     transactions
         .into_iter()
-        .filter(|transaction| {
-            filter_chain_id(transaction) && filter_max_gas_limit(transaction)
-        })
+        .filter(filter_max_gas_limit)
         .collect()
 }
 
 pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    chain_id: U256,
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
 ) -> Result<Queue, anyhow::Error> {
     let inbox_content = read_inbox(host, smart_rollup_address, ticketer, admin)?;
-    let transactions = filter_invalid_transactions(inbox_content.transactions, chain_id);
+    let transactions = filter_invalid_transactions(inbox_content.transactions);
     let timestamp = current_timestamp(host);
-
     let blueprint = QueueElement::Blueprint(Blueprint {
         transactions,
         timestamp,
@@ -216,7 +201,6 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
 pub fn fetch<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    chain_id: U256,
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
     is_sequencer: bool,
@@ -224,7 +208,7 @@ pub fn fetch<Host: Runtime>(
     if is_sequencer {
         fetch_sequencer_blueprints(host)
     } else {
-        fetch_inbox_blueprints(host, smart_rollup_address, chain_id, ticketer, admin)
+        fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)
     }
 }
 
@@ -272,32 +256,6 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_invalid_chain_id() {
-        let chain_id = U256::one();
-
-        let valid_content = Ethereum(EthereumTransactionCommon { chain_id, ..tx() });
-        let valid_transaction = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: valid_content,
-        };
-
-        let invalid_content = Ethereum(EthereumTransactionCommon {
-            chain_id: U256::from(1312321),
-            ..tx()
-        });
-        let invalid_transaction = Transaction {
-            tx_hash: [1; TRANSACTION_HASH_SIZE],
-            content: invalid_content,
-        };
-
-        let filtered_transactions = filter_invalid_transactions(
-            vec![valid_transaction.clone(), invalid_transaction],
-            chain_id,
-        );
-        assert_eq!(vec![valid_transaction], filtered_transactions)
-    }
-
-    #[test]
     fn test_filter_large_gas_limit() {
         let valid_content = Ethereum(EthereumTransactionCommon {
             gas_limit: MAX_TRANSACTION_GAS_LIMIT,
@@ -317,10 +275,10 @@ mod tests {
             content: invalid_content,
         };
 
-        let filtered_transactions = filter_invalid_transactions(
-            vec![valid_transaction.clone(), invalid_transaction],
-            U256::one(),
-        );
+        let filtered_transactions = filter_invalid_transactions(vec![
+            valid_transaction.clone(),
+            invalid_transaction,
+        ]);
         assert_eq!(vec![valid_transaction], filtered_transactions)
     }
 

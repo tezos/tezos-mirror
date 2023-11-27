@@ -87,7 +87,6 @@ pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    chain_id: U256,
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
     is_sequencer: bool,
@@ -103,14 +102,7 @@ pub fn stage_one<Host: Runtime>(
 
     // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
     // if rebooted, don't fetch inbox
-    let queue = fetch(
-        host,
-        smart_rollup_address,
-        chain_id,
-        ticketer,
-        admin,
-        is_sequencer,
-    )?;
+    let queue = fetch(host, smart_rollup_address, ticketer, admin, is_sequencer)?;
 
     for (i, queue_elt) in queue.proposals.iter().enumerate() {
         match queue_elt {
@@ -257,20 +249,11 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
                 set_kernel_version(host)?;
                 let smart_rollup_address = retrieve_smart_rollup_address(host)
                     .context("Failed to retrieve smart rollup address")?;
-                let chain_id =
-                    retrieve_chain_id(host).context("Failed to retrieve chain id")?;
                 let ticketer = read_ticketer(host);
                 let admin = read_admin(host);
                 let is_sequencer = is_sequencer(host)?;
-                stage_one(
-                    host,
-                    smart_rollup_address,
-                    chain_id,
-                    ticketer,
-                    admin,
-                    is_sequencer,
-                )
-                .context("Failed during stage 1")?
+                stage_one(host, smart_rollup_address, ticketer, admin, is_sequencer)
+                    .context("Failed during stage 1")?
             }
             MigrationStatus::InProgress => return Ok(()),
         }
