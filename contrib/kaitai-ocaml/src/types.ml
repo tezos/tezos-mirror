@@ -371,7 +371,6 @@ module InstanceSpec = struct
         id : InstanceIdentifier.t;
         value : Ast.expr;
         ifExpr : Ast.expr option;
-        dataTypeOpt : DataType.t option;
       }
     | ParseInstanceSpec (* TODO *)
   [@@deriving sexp]
