@@ -19,7 +19,6 @@ use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::michelson_key::KeyError;
 use crate::ast::michelson_signature::SignatureError;
 use crate::ast::*;
 use crate::context::Ctx;
@@ -62,6 +61,8 @@ pub enum TcError {
     },
     #[error(transparent)]
     AddressError(#[from] AddressError),
+    #[error("invalid value for type {0:?}: {1}")]
+    ByteReprError(Type, ByteReprError),
     #[error("invalid value for chain_id: {0}")]
     ChainIdError(#[from] ChainIdError),
     #[error("SELF instruction is forbidden in this context")]
@@ -82,8 +83,6 @@ pub enum TcError {
     AnnotationError(#[from] AnnotationError),
     #[error("duplicate entrypoint: {0}")]
     DuplicateEntrypoint(Entrypoint),
-    #[error("invalid value for type key: {0}")]
-    KeyError(#[from] KeyError),
     #[error("invalid value for type signature: {0}")]
     SignatureError(#[from] SignatureError),
 }
@@ -1099,11 +1098,11 @@ pub(crate) fn typecheck_value(
         (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
         (T::Key, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
-            TV::Key(Key::from_base58_check(str)?)
+            TV::Key(Key::from_base58_check(str).map_err(|e| TcError::ByteReprError(T::Key, e))?)
         }
         (T::Key, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            TV::Key(Key::from_bytes(bs)?)
+            TV::Key(Key::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Key, e))?)
         }
         (T::Signature, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;

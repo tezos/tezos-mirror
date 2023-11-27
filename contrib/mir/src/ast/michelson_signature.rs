@@ -317,7 +317,7 @@ impl Signature {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::ast::michelson_key::Key;
+    use crate::ast::{byte_repr_trait::ByteReprTrait, michelson_key::Key};
 
     #[test]
     fn test_base58_to_bin() {
