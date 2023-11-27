@@ -11,6 +11,7 @@ pub mod comparable;
 pub mod micheline;
 pub mod michelson_address;
 pub mod michelson_key;
+pub mod michelson_key_hash;
 pub mod michelson_list;
 pub mod michelson_signature;
 pub mod or;

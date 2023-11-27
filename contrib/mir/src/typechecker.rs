@@ -1066,10 +1066,7 @@ pub(crate) fn typecheck_value(
         (T::Contract(ty), addr) => {
             let t_addr = irrefutable_match!(typecheck_value(addr, ctx, &T::Address)?; TV::Address);
             match t_addr.hash {
-                AddressHash::Tz1(_)
-                | AddressHash::Tz2(_)
-                | AddressHash::Tz3(_)
-                | AddressHash::Tz4(_) => {
+                AddressHash::Implicit(_) => {
                     if !t_addr.is_default_ep() {
                         return Err(TcError::NoSuchEntrypoint(t_addr.entrypoint));
                     }
@@ -3008,7 +3005,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0x00ff"
+            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
         );
         assert_matches!(
             typecheck_instruction(
