@@ -22,7 +22,13 @@ pub struct Address {
 }
 
 impl Address {
-    pub fn from_base58_check(data: &str) -> Result<Self, ByteReprError> {
+    pub fn is_default_ep(&self) -> bool {
+        self.entrypoint.is_default()
+    }
+}
+
+impl ByteReprTrait for Address {
+    fn from_base58_check(data: &str) -> Result<Self, ByteReprError> {
         let (hash, ep) = if let Some(ep_sep_pos) = data.find('%') {
             (&data[..ep_sep_pos], &data[ep_sep_pos + 1..])
         } else {
@@ -34,7 +40,7 @@ impl Address {
         })
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ByteReprError> {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ByteReprError> {
         check_size(bytes, AddressHash::BYTE_SIZE, "bytes")?;
 
         let (hash, ep) = bytes.split_at(AddressHash::BYTE_SIZE);
@@ -44,24 +50,14 @@ impl Address {
         })
     }
 
-    pub fn is_default_ep(&self) -> bool {
-        self.entrypoint.is_default()
-    }
-
-    pub fn to_bytes(&self, out: &mut Vec<u8>) {
+    fn to_bytes(&self, out: &mut Vec<u8>) {
         self.hash.to_bytes(out);
         if !self.is_default_ep() {
             out.extend_from_slice(self.entrypoint.as_bytes())
         }
     }
 
-    pub fn to_bytes_vec(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        self.to_bytes(&mut out);
-        out
-    }
-
-    pub fn to_base58_check(&self) -> String {
+    fn to_base58_check(&self) -> String {
         if self.is_default_ep() {
             self.hash.to_base58_check()
         } else {
