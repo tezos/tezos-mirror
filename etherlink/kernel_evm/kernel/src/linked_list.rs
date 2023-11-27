@@ -384,6 +384,13 @@ where
         self.save(host)?;
         Ok(Some(data))
     }
+
+    /// Returns the first element of the list
+    /// or `None` if it is empty.
+    pub fn first(&self, host: &impl Runtime) -> Result<Option<Elt>> {
+        let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
+        Ok(Some(front.get_data(host, &self.path)?))
+    }
 }
 
 #[cfg(test)]
