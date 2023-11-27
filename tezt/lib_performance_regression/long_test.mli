@@ -99,6 +99,7 @@ val register :
   __FILE__:string ->
   title:string ->
   tags:string list ->
+  ?uses:Uses.t list ->
   ?team:string ->
   executors:executor list ->
   timeout:timeout ->

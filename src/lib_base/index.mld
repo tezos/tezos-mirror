@@ -45,3 +45,4 @@ It contains the following libraries:
 - {{!module-Tezos_tree_encoding}Tezos_tree_encoding}: A general-purpose library to encode arbitrary data in Merkle trees
 - {{!module-Tezos_version}Tezos_version}: Version information generated from Git
 - {{!page-tezos_workers}Tezos_workers}: Worker library
+- {{!module-Tezt_wrapper}Tezt_wrapper}

@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-libs.test-helpers
-  tezt
+  octez-libs.tezt-wrapper
   str
   bls12-381
   tezt-tezos
@@ -125,8 +125,8 @@
  (flags
   (:standard)
   -open Tezos_test_helpers
-  -open Tezt
-  -open Tezt.Base
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_ethereum))

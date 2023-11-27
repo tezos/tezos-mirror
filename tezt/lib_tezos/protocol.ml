@@ -73,7 +73,11 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
 
-let accuser proto = "./octez-accuser-" ^ daemon_name proto
+let protocol_dependent_uses ~tag ~path protocol =
+  let protocol = daemon_name protocol in
+  Uses.make ~tag:(tag ^ String.lowercase_ascii protocol) ~path:(path ^ protocol)
+
+let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
 let baker proto = "./octez-baker-" ^ daemon_name proto
 
@@ -311,22 +315,31 @@ let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
-let add_to_test_parameters protocol title tags =
-  (name protocol ^ ": " ^ title, tag protocol :: tags)
+let add_to_test_parameters protocol title tags uses =
+  let uses = match uses with None -> [] | Some uses -> uses protocol in
+  (name protocol ^ ": " ^ title, tag protocol :: tags, uses)
 
-let register_test ~__FILE__ ~title ~tags ?supports body protocols =
+let register_test ~__FILE__ ~title ~tags ?uses ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags = add_to_test_parameters protocol title tags in
-  Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
+  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  Test.register ~__FILE__ ~title ~tags ~uses (fun () -> body protocol)
 
-let register_long_test ~__FILE__ ~title ~tags ?supports ?team ~executors
+let register_long_test ~__FILE__ ~title ~tags ?uses ?supports ?team ~executors
     ~timeout body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags = add_to_test_parameters protocol title tags in
-  Long_test.register ~__FILE__ ~title ~tags ?team ~executors ~timeout (fun () ->
-      body protocol)
+  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  Long_test.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~uses
+    ?team
+    ~executors
+    ~timeout
+    (fun () -> body protocol)
 
-let register_regression_test ~__FILE__ ~title ~tags ?supports body protocols =
+let register_regression_test ~__FILE__ ~title ~tags ?uses ?supports body
+    protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags = add_to_test_parameters protocol title tags in
-  Regression.register ~__FILE__ ~title ~tags (fun () -> body protocol)
+  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  Regression.register ~__FILE__ ~title ~tags ~uses (fun () -> body protocol)

@@ -46,11 +46,14 @@ let test_injection_and_activation () : unit =
     ~__FILE__
     ~title:"protocol injection and activation"
     ~tags:["protocol"; "injection"; "activation"; "network"; "not_static"]
+    ~uses:[Constant.octez_protocol_compiler]
   @@ fun () ->
   Log.info "Check protocol compiler and protocol availability" ;
   Check.file_exists ~__LOC__ protocol_path ;
-  Check.file_exists ~__LOC__ Constant.octez_protocol_compiler ;
-  let* compiler_is_static = is_static_binary Constant.octez_protocol_compiler in
+  Check.file_exists ~__LOC__ (Uses.path Constant.octez_protocol_compiler) ;
+  let* compiler_is_static =
+    is_static_binary (Uses.path Constant.octez_protocol_compiler)
+  in
   Check.is_false
     ~__LOC__
     compiler_is_static
