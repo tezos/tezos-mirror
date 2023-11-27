@@ -905,7 +905,7 @@ pub(crate) mod internal_for_tests {
     }
 }
 
-pub fn is_sequencer<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
+pub fn is_sequencer<Host: Runtime>(host: &Host) -> Result<bool, Error> {
     Ok(host.store_has(&SEQUENCER)?.is_some())
 }
 
