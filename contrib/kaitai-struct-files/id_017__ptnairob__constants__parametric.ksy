@@ -23,6 +23,24 @@ types:
       type: s4
     - id: number_of_shards
       type: u2
+  minimal_participation_ratio:
+    seq:
+    - id: numerator
+      type: u2
+    - id: denominator
+      type: u2
+  n:
+    seq:
+    - id: n
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
@@ -47,18 +65,6 @@ types:
       type: u2
     - id: denominator
       type: u2
-  minimal_participation_ratio:
-    seq:
-    - id: numerator
-      type: u2
-    - id: denominator
-      type: u2
-  n:
-    seq:
-    - id: n
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
   z:
     seq:
     - id: has_tail
@@ -72,21 +78,15 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
 enums:
+  bool:
+    0: false
+    255: true
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
-  bool:
-    0: false
-    255: true
 seq:
 - id: preserved_cycles
   type: u1

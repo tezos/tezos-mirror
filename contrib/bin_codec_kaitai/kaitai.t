@@ -133,6 +133,12 @@ ground.Z test
     endian: be
   doc: Arbitrary precision integers
   types:
+    n_chunk:
+      seq:
+      - id: has_more
+        type: b1be
+      - id: payload
+        type: b7be
     z:
       seq:
       - id: has_tail
@@ -146,12 +152,6 @@ ground.Z test
         repeat: until
         repeat-until: not (_.has_more).as<bool>
         if: has_tail.as<bool>
-    n_chunk:
-      seq:
-      - id: has_more
-        type: b1be
-      - id: payload
-        type: b7be
   seq:
   - id: ground__z
     type: z

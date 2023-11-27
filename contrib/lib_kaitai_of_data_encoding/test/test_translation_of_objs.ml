@@ -100,16 +100,6 @@ let%expect_test "test objs with opt and dft fields" =
       id: objreqdft
       endian: be
     types:
-      three:
-        seq:
-        - id: one
-          type: s8
-        - id: two_tag
-          type: u1
-          enum: bool
-        - id: two
-          type: u2
-          if: (two_tag == bool::true)
       one:
         seq:
         - id: one_tag
@@ -121,6 +111,16 @@ let%expect_test "test objs with opt and dft fields" =
           enum: bool
         - id: two
           type: u1
+      three:
+        seq:
+        - id: one
+          type: s8
+        - id: two_tag
+          type: u1
+          enum: bool
+        - id: two
+          type: u2
+          if: (two_tag == bool::true)
     enums:
       bool:
         0: false

@@ -3,6 +3,12 @@ meta:
   endian: be
 doc: Output of a transaction
 types:
+  payload_enc:
+    seq:
+    - id: len_payload_enc
+      type: s4
+    - id: payload_enc
+      size: len_payload_enc
   sapling__transaction__ciphertext:
     seq:
     - id: cv
@@ -17,12 +23,6 @@ types:
       size: 80
     - id: nonce_out
       size: 24
-  payload_enc:
-    seq:
-    - id: len_payload_enc
-      type: s4
-    - id: payload_enc
-      size: len_payload_enc
 seq:
 - id: cm
   size: 32

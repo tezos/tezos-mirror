@@ -2,60 +2,69 @@ meta:
   id: id_014__ptkathma__parameters
   endian: be
 types:
-  dal_parametric:
+  bootstrap_accounts:
     seq:
-    - id: feature_enable
-      type: u1
-      enum: bool
-    - id: number_of_slots
-      type: s2
-    - id: number_of_shards
-      type: s2
-    - id: endorsement_lag
-      type: s2
-    - id: availability_threshold
-      type: s2
-  ratio_of_frozen_deposits_slashed_per_double_endorsement:
-    seq:
-    - id: numerator
-      type: u2
-    - id: denominator
-      type: u2
-  minimal_participation_ratio:
-    seq:
-    - id: numerator
-      type: u2
-    - id: denominator
-      type: u2
-  z:
-    seq:
-    - id: has_tail
-      type: b1be
-    - id: sign
-      type: b1be
-    - id: payload
-      type: b6be
-    - id: tail
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
-      if: has_tail.as<bool>
-  commitments:
-    seq:
-    - id: len_commitments
+    - id: len_bootstrap_accounts
       type: s4
-    - id: commitments
-      type: commitments_entries
-      size: len_commitments
+    - id: bootstrap_accounts
+      type: bootstrap_accounts_entries
+      size: len_bootstrap_accounts
       repeat: eos
-  commitments_entries:
+  bootstrap_accounts_elt_public_key_known:
     seq:
-    - id: commitments_elt_field0
-      size: 20
-      doc: blinded__public__key__hash
-    - id: commitments_elt_field1
+    - id: public_key_known_field0
+      type: public_key
+      doc: signature__v0__public_key
+    - id: public_key_known_field1
       type: n
       doc: id_014__ptkathma__mutez
+  bootstrap_accounts_elt_public_key_known_with_delegate:
+    seq:
+    - id: public_key_known_with_delegate_field0
+      type: public_key
+      doc: signature__v0__public_key
+    - id: public_key_known_with_delegate_field1
+      type: n
+      doc: id_014__ptkathma__mutez
+    - id: public_key_known_with_delegate_field2
+      type: public_key_hash
+      doc: signature__v0__public_key_hash
+  bootstrap_accounts_elt_public_key_unknown:
+    seq:
+    - id: public_key_unknown_field0
+      type: public_key_hash
+      doc: signature__v0__public_key_hash
+    - id: public_key_unknown_field1
+      type: n
+      doc: id_014__ptkathma__mutez
+  bootstrap_accounts_elt_public_key_unknown_with_delegate:
+    seq:
+    - id: public_key_unknown_with_delegate_field0
+      type: public_key_hash
+      doc: signature__v0__public_key_hash
+    - id: public_key_unknown_with_delegate_field1
+      type: n
+      doc: id_014__ptkathma__mutez
+    - id: public_key_unknown_with_delegate_field2
+      type: public_key_hash
+      doc: signature__v0__public_key_hash
+  bootstrap_accounts_entries:
+    seq:
+    - id: bootstrap_accounts_elt_tag
+      type: u1
+      enum: bootstrap_accounts_elt_tag
+    - id: bootstrap_accounts_elt_public_key_known
+      type: bootstrap_accounts_elt_public_key_known
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known)
+    - id: bootstrap_accounts_elt_public_key_unknown
+      type: bootstrap_accounts_elt_public_key_unknown
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown)
+    - id: bootstrap_accounts_elt_public_key_known_with_delegate
+      type: bootstrap_accounts_elt_public_key_known_with_delegate
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known_with_delegate)
+    - id: bootstrap_accounts_elt_public_key_unknown_with_delegate
+      type: bootstrap_accounts_elt_public_key_unknown_with_delegate
+      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown_with_delegate)
   bootstrap_contracts:
     seq:
     - id: len_bootstrap_contracts
@@ -76,102 +85,53 @@ types:
       type: n
     - id: script
       type: id_014__ptkathma__scripted__contracts
-  id_014__ptkathma__scripted__contracts:
-    seq:
-    - id: code
-      type: code
-    - id: storage
-      type: storage
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
   code:
     seq:
     - id: len_code
       type: s4
     - id: code
       size: len_code
-  bootstrap_accounts:
+  commitments:
     seq:
-    - id: len_bootstrap_accounts
+    - id: len_commitments
       type: s4
-    - id: bootstrap_accounts
-      type: bootstrap_accounts_entries
-      size: len_bootstrap_accounts
+    - id: commitments
+      type: commitments_entries
+      size: len_commitments
       repeat: eos
-  bootstrap_accounts_entries:
+  commitments_entries:
     seq:
-    - id: bootstrap_accounts_elt_tag
+    - id: commitments_elt_field0
+      size: 20
+      doc: blinded__public__key__hash
+    - id: commitments_elt_field1
+      type: n
+      doc: id_014__ptkathma__mutez
+  dal_parametric:
+    seq:
+    - id: feature_enable
       type: u1
-      enum: bootstrap_accounts_elt_tag
-    - id: bootstrap_accounts_elt_public_key_known
-      type: bootstrap_accounts_elt_public_key_known
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known)
-    - id: bootstrap_accounts_elt_public_key_unknown
-      type: bootstrap_accounts_elt_public_key_unknown
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown)
-    - id: bootstrap_accounts_elt_public_key_known_with_delegate
-      type: bootstrap_accounts_elt_public_key_known_with_delegate
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known_with_delegate)
-    - id: bootstrap_accounts_elt_public_key_unknown_with_delegate
-      type: bootstrap_accounts_elt_public_key_unknown_with_delegate
-      if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_unknown_with_delegate)
-  bootstrap_accounts_elt_public_key_unknown_with_delegate:
+      enum: bool
+    - id: number_of_slots
+      type: s2
+    - id: number_of_shards
+      type: s2
+    - id: endorsement_lag
+      type: s2
+    - id: availability_threshold
+      type: s2
+  id_014__ptkathma__scripted__contracts:
     seq:
-    - id: public_key_unknown_with_delegate_field0
-      type: public_key_hash
-      doc: signature__v0__public_key_hash
-    - id: public_key_unknown_with_delegate_field1
-      type: n
-      doc: id_014__ptkathma__mutez
-    - id: public_key_unknown_with_delegate_field2
-      type: public_key_hash
-      doc: signature__v0__public_key_hash
-  bootstrap_accounts_elt_public_key_known_with_delegate:
+    - id: code
+      type: code
+    - id: storage
+      type: storage
+  minimal_participation_ratio:
     seq:
-    - id: public_key_known_with_delegate_field0
-      type: public_key
-      doc: signature__v0__public_key
-    - id: public_key_known_with_delegate_field1
-      type: n
-      doc: id_014__ptkathma__mutez
-    - id: public_key_known_with_delegate_field2
-      type: public_key_hash
-      doc: signature__v0__public_key_hash
-  bootstrap_accounts_elt_public_key_unknown:
-    seq:
-    - id: public_key_unknown_field0
-      type: public_key_hash
-      doc: signature__v0__public_key_hash
-    - id: public_key_unknown_field1
-      type: n
-      doc: id_014__ptkathma__mutez
-  public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
-    seq:
-    - id: public_key_hash_tag
-      type: u1
-      enum: public_key_hash_tag
-    - id: public_key_hash_ed25519
-      size: 20
-      if: (public_key_hash_tag == public_key_hash_tag::ed25519)
-    - id: public_key_hash_secp256k1
-      size: 20
-      if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
-    - id: public_key_hash_p256
-      size: 20
-      if: (public_key_hash_tag == public_key_hash_tag::p256)
-  bootstrap_accounts_elt_public_key_known:
-    seq:
-    - id: public_key_known_field0
-      type: public_key
-      doc: signature__v0__public_key
-    - id: public_key_known_field1
-      type: n
-      doc: id_014__ptkathma__mutez
+    - id: numerator
+      type: u2
+    - id: denominator
+      type: u2
   n:
     seq:
     - id: n
@@ -199,10 +159,55 @@ types:
     - id: public_key_p256
       size: 33
       if: (public_key_tag == public_key_tag::p256)
+  public_key_hash:
+    doc: A Ed25519, Secp256k1, or P256 public key hash
+    seq:
+    - id: public_key_hash_tag
+      type: u1
+      enum: public_key_hash_tag
+    - id: public_key_hash_ed25519
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::ed25519)
+    - id: public_key_hash_secp256k1
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
+    - id: public_key_hash_p256
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::p256)
+  ratio_of_frozen_deposits_slashed_per_double_endorsement:
+    seq:
+    - id: numerator
+      type: u2
+    - id: denominator
+      type: u2
+  storage:
+    seq:
+    - id: len_storage
+      type: s4
+    - id: storage
+      size: len_storage
+  z:
+    seq:
+    - id: has_tail
+      type: b1be
+    - id: sign
+      type: b1be
+    - id: payload
+      type: b6be
+    - id: tail
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+      if: has_tail.as<bool>
 enums:
   bool:
     0: false
     255: true
+  bootstrap_accounts_elt_tag:
+    0: public_key_known
+    1: public_key_unknown
+    2: public_key_known_with_delegate
+    3: public_key_unknown_with_delegate
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
@@ -211,11 +216,6 @@ enums:
     0: ed25519
     1: secp256k1
     2: p256
-  bootstrap_accounts_elt_tag:
-    0: public_key_known
-    1: public_key_unknown
-    2: public_key_known_with_delegate
-    3: public_key_unknown_with_delegate
 seq:
 - id: bootstrap_accounts
   type: bootstrap_accounts

@@ -2,24 +2,42 @@ meta:
   id: id_008__ptedo2zk__fa1__2__token_transfer
   endian: be
 types:
-  n:
+  destination:
     seq:
-    - id: n
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
+    - id: len_destination
+      type: s4
+    - id: destination
+      size: len_destination
   fee:
     seq:
     - id: len_fee
       type: s4
     - id: fee
       size: len_fee
+  n:
+    seq:
+    - id: n
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
   tez__amount:
     seq:
     - id: len_tez__amount
       type: s4
     - id: tez__amount
       size: len_tez__amount
+  token_contract:
+    seq:
+    - id: len_token_contract
+      type: s4
+    - id: token_contract
+      size: len_token_contract
   z:
     seq:
     - id: has_tail
@@ -33,24 +51,6 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
-  destination:
-    seq:
-    - id: len_destination
-      type: s4
-    - id: destination
-      size: len_destination
-  token_contract:
-    seq:
-    - id: len_token_contract
-      type: s4
-    - id: token_contract
-      size: len_token_contract
 enums:
   bool:
     0: false

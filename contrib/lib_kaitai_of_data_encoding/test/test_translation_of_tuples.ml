@@ -216,16 +216,19 @@ let%expect_test "test tuples descr inside" =
       id: tupdef
       endian: be
     types:
-      tupdef_field3:
+      n:
         seq:
-        - id: foo_tag
-          type: u1
-          enum: bool
-        - id: foo
-          type: u1
-          if: (foo_tag == bool::true)
-          enum: bool
-      tupdef_field2:
+        - id: n
+          type: n_chunk
+          repeat: until
+          repeat-until: not (_.has_more).as<bool>
+      n_chunk:
+        seq:
+        - id: has_more
+          type: b1be
+        - id: payload
+          type: b7be
+      tupdef_field0:
         seq:
         - id: foo_tag
           type: u1
@@ -242,19 +245,16 @@ let%expect_test "test tuples descr inside" =
         - id: foo
           type: n
           if: (foo_tag == bool::true)
-      n:
+      tupdef_field2:
         seq:
-        - id: n
-          type: n_chunk
-          repeat: until
-          repeat-until: not (_.has_more).as<bool>
-      n_chunk:
-        seq:
-        - id: has_more
-          type: b1be
-        - id: payload
-          type: b7be
-      tupdef_field0:
+        - id: foo_tag
+          type: u1
+          enum: bool
+        - id: foo
+          type: u1
+          if: (foo_tag == bool::true)
+          enum: bool
+      tupdef_field3:
         seq:
         - id: foo_tag
           type: u1

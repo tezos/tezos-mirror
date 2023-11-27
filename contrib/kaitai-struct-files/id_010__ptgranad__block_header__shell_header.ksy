@@ -37,16 +37,16 @@ types:
       type: fitness_entries
       size: len_fitness
       repeat: eos
-  fitness_entries:
-    seq:
-    - id: fitness__elem
-      type: fitness__elem
   fitness__elem:
     seq:
     - id: len_fitness__elem
       type: s4
     - id: fitness__elem
       size: len_fitness__elem
+  fitness_entries:
+    seq:
+    - id: fitness__elem
+      type: fitness__elem
 seq:
 - id: block_header__shell
   type: block_header__shell

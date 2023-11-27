@@ -3,17 +3,6 @@ meta:
   endian: be
 doc: ! "A sparse block locator \xE0 la Bitcoin"
 types:
-  history_entries:
-    seq:
-    - id: block_hash
-      size: 32
-  current_head:
-    seq:
-    - id: len_current_head
-      type: s4
-    - id: current_head
-      type: block_header
-      size: len_current_head
   block_header:
     doc: ! 'Block header: Block header. It contains both shell and protocol specific
       data.'
@@ -44,6 +33,13 @@ types:
       type: fitness
     - id: context
       size: 32
+  current_head:
+    seq:
+    - id: len_current_head
+      type: s4
+    - id: current_head
+      type: block_header
+      size: len_current_head
   fitness:
     doc: ! >-
       Block fitness: The fitness, or score, of a block, that allow the Tezos to decide
@@ -57,16 +53,20 @@ types:
       type: fitness_entries
       size: len_fitness
       repeat: eos
-  fitness_entries:
-    seq:
-    - id: fitness__elem
-      type: fitness__elem
   fitness__elem:
     seq:
     - id: len_fitness__elem
       type: s4
     - id: fitness__elem
       size: len_fitness__elem
+  fitness_entries:
+    seq:
+    - id: fitness__elem
+      type: fitness__elem
+  history_entries:
+    seq:
+    - id: block_hash
+      size: 32
 seq:
 - id: current_head
   type: current_head

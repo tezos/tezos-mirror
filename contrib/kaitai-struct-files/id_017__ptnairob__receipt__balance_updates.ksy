@@ -2,23 +2,44 @@ meta:
   id: id_017__ptnairob__receipt__balance_updates
   endian: be
 types:
-  id_017__ptnairob__operation_metadata__alpha__balance_updates:
+  id_017__ptnairob__bond_id:
     seq:
-    - id: len_id_017__ptnairob__operation_metadata__alpha__balance_updates
-      type: s4
-    - id: id_017__ptnairob__operation_metadata__alpha__balance_updates
-      type: id_017__ptnairob__operation_metadata__alpha__balance_updates_entries
-      size: len_id_017__ptnairob__operation_metadata__alpha__balance_updates
-      repeat: eos
-  id_017__ptnairob__operation_metadata__alpha__balance_updates_entries:
-    seq:
-    - id: id_017__ptnairob__operation_metadata__alpha__balance
-      type: id_017__ptnairob__operation_metadata__alpha__balance
-    - id: change
-      type: s8
-    - id: origin
+    - id: id_017__ptnairob__bond_id_tag
       type: u1
-      enum: origin_tag
+      enum: id_017__ptnairob__bond_id_tag
+    - id: id_017__ptnairob__bond_id_tx_rollup_bond_id
+      size: 20
+      if: (id_017__ptnairob__bond_id_tag == id_017__ptnairob__bond_id_tag::tx_rollup_bond_id)
+      doc: ! >-
+        A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
+        is a base58 tx rollup hash
+    - id: id_017__ptnairob__bond_id_smart_rollup_bond_id
+      size: 20
+      if: (id_017__ptnairob__bond_id_tag == id_017__ptnairob__bond_id_tag::smart_rollup_bond_id)
+      doc: ! >-
+        A smart rollup address: A smart rollup is identified by a base58 address starting
+        with sr1
+  id_017__ptnairob__contract_id:
+    doc: ! >-
+      A contract handle: A contract notation as given to an RPC or inside scripts.
+      Can be a base58 implicit contract hash or a base58 originated contract hash.
+    seq:
+    - id: id_017__ptnairob__contract_id_tag
+      type: u1
+      enum: id_017__ptnairob__contract_id_tag
+    - id: id_017__ptnairob__contract_id_implicit
+      type: public_key_hash
+      if: (id_017__ptnairob__contract_id_tag == id_017__ptnairob__contract_id_tag::implicit)
+    - id: id_017__ptnairob__contract_id_originated
+      type: id_017__ptnairob__contract_id_originated
+      if: (id_017__ptnairob__contract_id_tag == id_017__ptnairob__contract_id_tag::originated)
+  id_017__ptnairob__contract_id_originated:
+    seq:
+    - id: contract_hash
+      size: 20
+    - id: originated_padding
+      size: 1
+      doc: This field is for padding, ignore
   id_017__ptnairob__operation_metadata__alpha__balance:
     seq:
     - id: id_017__ptnairob__operation_metadata__alpha__balance_tag
@@ -45,23 +66,6 @@ types:
       type: id_017__ptnairob__contract_id
     - id: bond_id
       type: id_017__ptnairob__bond_id
-  id_017__ptnairob__bond_id:
-    seq:
-    - id: id_017__ptnairob__bond_id_tag
-      type: u1
-      enum: id_017__ptnairob__bond_id_tag
-    - id: id_017__ptnairob__bond_id_tx_rollup_bond_id
-      size: 20
-      if: (id_017__ptnairob__bond_id_tag == id_017__ptnairob__bond_id_tag::tx_rollup_bond_id)
-      doc: ! >-
-        A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
-        is a base58 tx rollup hash
-    - id: id_017__ptnairob__bond_id_smart_rollup_bond_id
-      size: 20
-      if: (id_017__ptnairob__bond_id_tag == id_017__ptnairob__bond_id_tag::smart_rollup_bond_id)
-      doc: ! >-
-        A smart rollup address: A smart rollup is identified by a base58 address starting
-        with sr1
   id_017__ptnairob__operation_metadata__alpha__balance_lost_endorsing_rewards:
     seq:
     - id: delegate
@@ -72,27 +76,23 @@ types:
     - id: revelation
       type: u1
       enum: bool
-  id_017__ptnairob__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
+  id_017__ptnairob__operation_metadata__alpha__balance_updates:
     seq:
-    - id: id_017__ptnairob__contract_id_tag
+    - id: len_id_017__ptnairob__operation_metadata__alpha__balance_updates
+      type: s4
+    - id: id_017__ptnairob__operation_metadata__alpha__balance_updates
+      type: id_017__ptnairob__operation_metadata__alpha__balance_updates_entries
+      size: len_id_017__ptnairob__operation_metadata__alpha__balance_updates
+      repeat: eos
+  id_017__ptnairob__operation_metadata__alpha__balance_updates_entries:
+    seq:
+    - id: id_017__ptnairob__operation_metadata__alpha__balance
+      type: id_017__ptnairob__operation_metadata__alpha__balance
+    - id: change
+      type: s8
+    - id: origin
       type: u1
-      enum: id_017__ptnairob__contract_id_tag
-    - id: id_017__ptnairob__contract_id_implicit
-      type: public_key_hash
-      if: (id_017__ptnairob__contract_id_tag == id_017__ptnairob__contract_id_tag::implicit)
-    - id: id_017__ptnairob__contract_id_originated
-      type: id_017__ptnairob__contract_id_originated
-      if: (id_017__ptnairob__contract_id_tag == id_017__ptnairob__contract_id_tag::originated)
-  id_017__ptnairob__contract_id_originated:
-    seq:
-    - id: contract_hash
-      size: 20
-    - id: originated_padding
-      size: 1
-      doc: This field is for padding, ignore
+      enum: origin_tag
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
@@ -112,22 +112,12 @@ types:
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
 enums:
-  origin_tag:
-    0: block_application
-    1: protocol_migration
-    2: subsidy
-    3: simulation
-  id_017__ptnairob__bond_id_tag:
-    0: tx_rollup_bond_id
-    1: smart_rollup_bond_id
   bool:
     0: false
     255: true
-  public_key_hash_tag:
-    0: ed25519
-    1: secp256k1
-    2: p256
-    3: bls
+  id_017__ptnairob__bond_id_tag:
+    0: tx_rollup_bond_id
+    1: smart_rollup_bond_id
   id_017__ptnairob__contract_id_tag:
     0: implicit
     1: originated
@@ -155,6 +145,16 @@ enums:
     23: tx_rollup_rejection_punishments
     24: smart_rollup_refutation_punishments
     25: smart_rollup_refutation_rewards
+  origin_tag:
+    0: block_application
+    1: protocol_migration
+    2: subsidy
+    3: simulation
+  public_key_hash_tag:
+    0: ed25519
+    1: secp256k1
+    2: p256
+    3: bls
 seq:
 - id: id_017__ptnairob__operation_metadata__alpha__balance_updates
   type: id_017__ptnairob__operation_metadata__alpha__balance_updates

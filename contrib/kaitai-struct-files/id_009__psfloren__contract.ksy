@@ -39,13 +39,13 @@ types:
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
 enums:
+  id_009__psfloren__contract_id_tag:
+    0: implicit
+    1: originated
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
-  id_009__psfloren__contract_id_tag:
-    0: implicit
-    1: originated
 seq:
 - id: id_009__psfloren__contract_id
   type: id_009__psfloren__contract_id

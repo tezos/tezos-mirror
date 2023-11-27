@@ -572,6 +572,7 @@ and seq_field_of_union :
           EnumValueSpec.
             {name = id; doc = DocSpec.{refs = []; summary = description}} ))
       tagged_cases
+    |> List.sort (fun (t1, _) (t2, _) -> compare t1 t2)
   in
   let tag_enum = EnumSpec.{map = tag_enum_map} in
   let state = add_enum state (tag_id, tag_enum) in
@@ -714,14 +715,15 @@ let from_data_encoding :
  fun ~id ?description encoding ->
   let encoding_name = escape_id id in
   let state = {types = []; enums = []; mus = MuSet.empty} in
+  let sort l = List.sort (fun (t1, _) (t2, _) -> compare t1 t2) l in
   match encoding.encoding with
   | Describe {encoding; description; id; _} ->
       let state, attrs = seq_field_of_data_encoding state encoding id in
       Helpers.class_spec_of_attrs
         ~id:encoding_name
         ?description
-        ~enums:state.enums
-        ~types:state.types
+        ~enums:(sort state.enums)
+        ~types:(sort state.types)
         ~instances:[]
         attrs
   | _ ->
@@ -731,7 +733,7 @@ let from_data_encoding :
       Helpers.class_spec_of_attrs
         ~id:encoding_name
         ?description
-        ~enums:state.enums
-        ~types:state.types
+        ~enums:(sort state.enums)
+        ~types:(sort state.types)
         ~instances:[]
         attrs

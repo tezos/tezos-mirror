@@ -16,38 +16,12 @@ types:
       type: center_dz
     - id: radius_dz
       type: radius_dz
-  radius_dz:
-    seq:
-    - id: numerator
-      type: z
-    - id: denominator
-      type: z
   center_dz:
     seq:
     - id: numerator
       type: z
     - id: denominator
       type: z
-  issuance_ratio_max:
-    seq:
-    - id: numerator
-      type: z
-    - id: denominator
-      type: z
-  issuance_ratio_min:
-    seq:
-    - id: numerator
-      type: z
-    - id: denominator
-      type: z
-  smart_rollup_reveal_activation_level:
-    seq:
-    - id: raw_data
-      type: s4
-    - id: metadata
-      type: s4
-    - id: dal_page
-      type: s4
   dal_parametric:
     seq:
     - id: feature_enable
@@ -69,6 +43,52 @@ types:
       type: s4
     - id: number_of_shards
       type: u2
+  issuance_ratio_max:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  issuance_ratio_min:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  issuance_weights:
+    seq:
+    - id: base_total_issued_per_minute
+      type: n
+    - id: baking_reward_fixed_portion_weight
+      type: s4
+    - id: baking_reward_bonus_weight
+      type: s4
+    - id: attesting_reward_weight
+      type: s4
+    - id: liquidity_baking_subsidy_weight
+      type: s4
+    - id: seed_nonce_revelation_tip_weight
+      type: s4
+    - id: vdf_revelation_tip_weight
+      type: s4
+  minimal_participation_ratio:
+    seq:
+    - id: numerator
+      type: u2
+    - id: denominator
+      type: u2
+  n:
+    seq:
+    - id: n
+      type: n_chunk
+      repeat: until
+      repeat-until: not (_.has_more).as<bool>
+  n_chunk:
+    seq:
+    - id: has_more
+      type: b1be
+    - id: payload
+      type: b7be
   public_key_hash:
     doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
@@ -87,27 +107,19 @@ types:
     - id: public_key_hash_bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
-  minimal_participation_ratio:
+  radius_dz:
     seq:
     - id: numerator
-      type: u2
+      type: z
     - id: denominator
-      type: u2
-  issuance_weights:
+      type: z
+  smart_rollup_reveal_activation_level:
     seq:
-    - id: base_total_issued_per_minute
-      type: n
-    - id: baking_reward_fixed_portion_weight
+    - id: raw_data
       type: s4
-    - id: baking_reward_bonus_weight
+    - id: metadata
       type: s4
-    - id: attesting_reward_weight
-      type: s4
-    - id: liquidity_baking_subsidy_weight
-      type: s4
-    - id: seed_nonce_revelation_tip_weight
-      type: s4
-    - id: vdf_revelation_tip_weight
+    - id: dal_page
       type: s4
   z:
     seq:
@@ -122,27 +134,15 @@ types:
       repeat: until
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
-  n:
-    seq:
-    - id: n
-      type: n_chunk
-      repeat: until
-      repeat-until: not (_.has_more).as<bool>
-  n_chunk:
-    seq:
-    - id: has_more
-      type: b1be
-    - id: payload
-      type: b7be
 enums:
+  bool:
+    0: false
+    255: true
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
-  bool:
-    0: false
-    255: true
 seq:
 - id: proof_of_work_nonce_size
   type: u1

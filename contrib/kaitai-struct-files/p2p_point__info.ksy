@@ -4,19 +4,6 @@ meta:
 doc: ! >-
   Information about a peer point. Includes flags, state, and records about past events.
 types:
-  last_seen:
-    seq:
-    - id: last_seen_field0
-      size: 16
-      doc: crypto_box__public_key_hash
-    - id: last_seen_field1
-      type: s8
-      doc: ! >-
-        A timestamp as seen by the underlying, local computer: subsecond-level precision,
-        epoch or rfc3339 based.
-
-
-        timestamp__system
   last_disconnection:
     seq:
     - id: last_disconnection_field0
@@ -56,6 +43,19 @@ types:
 
 
         timestamp__system
+  last_seen:
+    seq:
+    - id: last_seen_field0
+      size: 16
+      doc: crypto_box__public_key_hash
+    - id: last_seen_field1
+      type: s8
+      doc: ! >-
+        A timestamp as seen by the underlying, local computer: subsecond-level precision,
+        epoch or rfc3339 based.
+
+
+        timestamp__system
   p2p_point__state:
     doc: ! >-
       The state a connection to a peer point can be in: requested (connection open
@@ -72,14 +72,14 @@ types:
       size: 16
       if: (p2p_point__state_tag == p2p_point__state_tag::running)
 enums:
+  bool:
+    0: false
+    255: true
   p2p_point__state_tag:
     0: requested
     1: accepted
     2: running
     3: disconnected
-  bool:
-    0: false
-    255: true
 seq:
 - id: trusted
   type: u1
