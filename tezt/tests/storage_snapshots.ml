@@ -309,6 +309,20 @@ let test_export_import_snapshots =
   in
   unit
 
+let wait_for_complete_merge node target =
+  let wait_for_starting_merge target =
+    let filter json =
+      let level = JSON.(json |> as_int) in
+      if level = target then Some () else None
+    in
+    Node.wait_for node "start_merging_stores.v0" filter
+  in
+  let wait_for_ending_merge () =
+    Node.wait_for node "end_merging_stores.v0" @@ fun _json -> Some ()
+  in
+  let* () = wait_for_starting_merge target in
+  wait_for_ending_merge ()
+
 (* This test aims to export and import a rolling snapshot, bake some
    blocks and make sure that the checkpoint, savepoint and caboose are
    well dragged. *)
@@ -395,9 +409,18 @@ let test_drag_after_rolling_import =
       ~caboose:expected_caboose
   in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
-  let* () = Client.Admin.connect_address ~peer:fresh_node client in
   let* expected_head = Node.get_level archive_node in
+  let wait_for_merge_at_checkpoint =
+    (* Waiting for the last cycle to be cemented before checking
+       store's invariants. *)
+    let expected_checkpoint =
+      expected_head - (preserved_cycles * blocks_per_cycle)
+    in
+    wait_for_complete_merge fresh_node expected_checkpoint
+  in
+  let* () = Client.Admin.connect_address ~peer:fresh_node client in
   let* (_ : int) = Node.wait_for_level fresh_node expected_head in
+  let* () = wait_for_merge_at_checkpoint in
   let expected_checkpoint, expected_savepoint, expected_caboose =
     match history_mode with
     | Node.Full_history -> Test.fail "testing only rolling mode"
