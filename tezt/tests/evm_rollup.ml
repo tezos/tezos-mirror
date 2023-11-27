@@ -346,7 +346,7 @@ let setup_evm_kernel ?config ?kernel_installee
       ~default_operator:rollup_operator_key
   in
   (* Start a rollup node *)
-  let* boot_sector =
+  let* {output; _} =
     let base_installee, installee =
       match kernel_installee with
       | Some {base_installee; installee} -> (base_installee, installee)
@@ -362,7 +362,7 @@ let setup_evm_kernel ?config ?kernel_installee
   let* sc_rollup_address =
     originate_sc_rollup
       ~kind:pvm_kind
-      ~boot_sector
+      ~boot_sector:("file:" ^ output)
       ~parameters_ty:evm_type
       ~src:originator_key
       client
@@ -2183,22 +2183,12 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
     Option.value ~default:sc_rollup_address rollup_address
   in
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let* _, preimage_root_hash_opt =
-    Sc_rollup_helpers.prepare_installer_kernel_gen
+  let* {root_hash; _} =
+    Sc_rollup_helpers.prepare_installer_kernel
       ~preimages_dir
       ~base_installee
-      ~display_root_hash:true
       installee
   in
-  let preimage_root_hash_bytes =
-    match preimage_root_hash_opt with
-    | Some preimage_root_hash -> Hex.to_string @@ `Hex preimage_root_hash
-    | None ->
-        failwith
-          "Couldn't obtain the root hash of the preimages of the chunked \
-           kernel."
-  in
-  let upgrade_payload = Hex.of_string preimage_root_hash_bytes |> Hex.show in
   let* kernel_boot_wasm_before_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
   in
@@ -2215,7 +2205,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
         ~amount:Tez.zero
         ~giver:upgrador.public_key_hash
         ~receiver:l1_contracts.admin
-        ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address upgrade_payload)
+        ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address root_hash)
         ~burn_cap:Tez.one
         client
     in

@@ -59,6 +59,12 @@ module Installer_kernel_config : sig
   val check_dump : config:t -> string -> unit
 end
 
+type installer_result = {
+  output : string;  (** Output path of the boot sector. *)
+  boot_sector : string;  (** Boot sector. *)
+  root_hash : string;  (** Root hash of the boot sector. *)
+}
+
 (** [prepare_installer_kernel ~base_installee ~preimages_dir ?config
     installee] feeds the [smart-rollup-installer] with a kernel
     ([installee]), and returns the boot sector corresponding to the
@@ -83,23 +89,7 @@ val prepare_installer_kernel :
     | `Path of string
     | `Both of Installer_kernel_config.t * string ] ->
   string ->
-  string Lwt.t
-
-(** [prepare_installer_kernel ?runner ?base_installee ~preimages_dir
-    ?display_root_hash ?config installee] will behave just as
-    {!Sc_rollup_helpers.prepare_installer_kernel} but will also output
-    the preimage root hash if [display_root_hash] is set to [true]. *)
-val prepare_installer_kernel_gen :
-  ?runner:Runner.t ->
-  ?base_installee:string ->
-  preimages_dir:string ->
-  ?display_root_hash:bool ->
-  ?config:
-    [< `Config of Installer_kernel_config.t
-    | `Path of string
-    | `Both of Installer_kernel_config.t * string ] ->
-  string ->
-  (string * string option) Lwt.t
+  installer_result Lwt.t
 
 (** [setup_l1 protocol] initializes a protocol with the given parameters, and
     returns the L1 node and client. *)

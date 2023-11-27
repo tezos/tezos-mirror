@@ -153,18 +153,13 @@ let replace_preimages ~smart_rollup_node ~kernel_dir ~new_kernel =
   let preimages_dir =
     Sc_rollup_node.data_dir smart_rollup_node // "wasm_2_0_0"
   in
-  let* _, root_hash =
-    Sc_rollup_helpers.prepare_installer_kernel_gen
+  let* {root_hash; _} =
+    Sc_rollup_helpers.prepare_installer_kernel
       ~preimages_dir
       ~base_installee:kernel_dir
-      ~display_root_hash:true
       new_kernel
   in
-  match root_hash with
-  | Some root_hash -> return root_hash
-  | None ->
-      failwith
-        "Couldn't obtain the root hash of the preimages of the chunked kernel."
+  return root_hash
 
 let upgrade_kernel ~configuration_path ~testnet () =
   let upgrade_config =

@@ -288,7 +288,7 @@ let prepare_installer_kernel rollup_node =
 (* Originate a rollup with alias [rollup_alias] running the "dal_echo_kernel" on
    the given [rollup_node]. *)
 let originate_rollup client rollup_node rollup_alias =
-  let* boot_sector = prepare_installer_kernel rollup_node in
+  let* {boot_sector; _} = prepare_installer_kernel rollup_node in
   let* rollup_address =
     Client.Sc_rollup.originate
       ~force:true (* because the alias might have already been used *)

@@ -97,7 +97,7 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
           in
           `Path path
         in
-        let* boot_sector =
+        let* {boot_sector; _} =
           Sc_rollup_helpers.prepare_installer_kernel
             ~base_installee:"./"
             ~preimages_dir

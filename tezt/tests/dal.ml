@@ -1907,7 +1907,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       int
       ~error_msg:"The kernel used in the test assumes page_size of %R, got %L") ;
   Log.info "Originate rollup." ;
-  let* boot_sector =
+  let* {boot_sector; _} =
     Sc_rollup_helpers.prepare_installer_kernel
       ~base_installee:"./"
       ~preimages_dir:
@@ -3788,7 +3788,7 @@ module Tx_kernel_e2e = struct
   let test_tx_kernel_e2e protocol parameters dal_node sc_rollup_node
       _sc_rollup_address node client pvm_name =
     Log.info "Originate the tx kernel." ;
-    let* boot_sector =
+    let* {boot_sector; _} =
       Sc_rollup_helpers.prepare_installer_kernel
         ~base_installee:"./"
         ~preimages_dir:
@@ -3970,7 +3970,7 @@ module Tx_kernel_e2e = struct
   let test_echo_kernel_e2e protocol parameters dal_node sc_rollup_node
       _sc_rollup_address node client pvm_name =
     Log.info "Originate the echo kernel." ;
-    let* boot_sector =
+    let* {boot_sector; _} =
       Sc_rollup_helpers.prepare_installer_kernel
         ~base_installee:"./"
         ~preimages_dir:

@@ -114,16 +114,22 @@ module Installer_kernel_config = struct
       config
 end
 
+type installer_result = {
+  output : string;
+  boot_sector : string;
+  root_hash : string;
+}
+
 (* Testing the installation of a larger kernel, with e2e messages.
 
    When a kernel is too large to be originated directly, we can install
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel_gen ?runner
+let prepare_installer_kernel ?runner
     ?(base_installee =
       "src/proto_alpha/lib_protocol/test/integration/wasm_kernel")
-    ~preimages_dir ?(display_root_hash = false) ?config installee =
+    ~preimages_dir ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
   let installer = installee ^ "-installer.hex" in
@@ -155,9 +161,6 @@ let prepare_installer_kernel_gen ?runner
         ["--setup-file"; setup_file]
     | None -> []
   in
-  let display_root_hash_arg =
-    if display_root_hash then ["--display-root-hash"] else []
-  in
   let process =
     Process.spawn
       ?runner
@@ -171,31 +174,20 @@ let prepare_installer_kernel_gen ?runner
          output;
          "--preimages-dir";
          preimages_dir;
+         "--display-root-hash";
        ]
-      @ display_root_hash_arg @ setup_file_args)
+      @ setup_file_args)
   in
   let+ installer_output =
     Runnable.run
     @@ Runnable.{value = process; run = Process.check_and_read_stdout}
   in
   let root_hash =
-    if display_root_hash then installer_output =~* rex "ROOT_HASH: ?(\\w*)"
-    else None
+    match installer_output =~* rex "ROOT_HASH: ?(\\w*)" with
+    | Some root_hash -> root_hash
+    | None -> Test.fail "Failed to parse the root hash"
   in
-  (read_file output, root_hash)
-
-let prepare_installer_kernel ?runner ?base_installee ~preimages_dir ?config
-    installee =
-  let open Lwt.Syntax in
-  let+ output, _ =
-    prepare_installer_kernel_gen
-      ?runner
-      ?base_installee
-      ~preimages_dir
-      ?config
-      installee
-  in
-  output
+  {output; boot_sector = read_file output; root_hash}
 
 let default_boot_sector_of ~kind =
   match kind with
@@ -374,19 +366,13 @@ let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
   let smart_rollup_node_data_dir = Temp.dir (name ^ "-data-dir") in
 
   (* Create the installer boot sector. *)
-  let* boot_sector =
+  let* {boot_sector; output = boot_sector_file; _} =
     prepare_installer_kernel
       ?base_installee
       ~preimages_dir:(Filename.concat smart_rollup_node_data_dir "wasm_2_0_0")
       ?config
       installee
   in
-
-  (* Create a temporary file with the boot sector, which needs to
-     be given to the smart rollup node when the rollup is a bootstrap
-     smart rollup. *)
-  let boot_sector_file = Filename.temp_file "boot-sector" ".hex" in
-  let () = write_file boot_sector_file ~contents:boot_sector in
 
   (* Convert the parameters ty to a JSON representation. *)
   let* parameters_ty =

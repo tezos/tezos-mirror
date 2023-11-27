@@ -4615,7 +4615,7 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
       Operator
       node
   in
-  let* boot_sector =
+  let* {boot_sector; _} =
     (* The preimages will be saved in the rollup node's data directory
        ROLLUP_NODE_DATA_DIR, whereas the rollup node will try to look
        for the preimages in ROLLUP_NODE_DATA_DIR/wasm_2_0_0. *)
