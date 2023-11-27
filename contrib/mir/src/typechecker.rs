@@ -19,7 +19,6 @@ use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::michelson_signature::SignatureError;
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas;
@@ -83,8 +82,6 @@ pub enum TcError {
     AnnotationError(#[from] AnnotationError),
     #[error("duplicate entrypoint: {0}")]
     DuplicateEntrypoint(Entrypoint),
-    #[error("invalid value for type signature: {0}")]
-    SignatureError(#[from] SignatureError),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -1106,11 +1103,16 @@ pub(crate) fn typecheck_value(
         }
         (T::Signature, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
-            TV::Signature(Signature::from_base58_check(str)?)
+            TV::Signature(
+                Signature::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Signature, e))?,
+            )
         }
         (T::Signature, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            TV::Signature(Signature::from_bytes(bs)?)
+            TV::Signature(
+                Signature::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Signature, e))?,
+            )
         }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
