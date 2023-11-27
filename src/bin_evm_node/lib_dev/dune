@@ -14,7 +14,13 @@
   octez-libs.stdlib-unix
   octez-evm-node-libs.evm_node_lib_dev_encoding
   lwt-exit
-  octez-evm-node-libs.evm_node_config)
+  octez-evm-node-libs.evm_node_config
+  octez-libs.context.sigs
+  octez-libs.tezos-context.disk
+  octez-libs.tezos-context.encoding
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-helpers
+  octez-smart-rollup-wasm-debugger-lib)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -22,4 +28,6 @@
   -open Tezos_workers
   -open Tezos_stdlib_unix
   -open Evm_node_lib_dev_encoding
-  -open Evm_node_config))
+  -open Evm_node_config
+  -open Tezos_scoru_wasm_helpers
+  -open Octez_smart_rollup_wasm_debugger_lib))
