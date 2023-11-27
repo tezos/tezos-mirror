@@ -7,7 +7,7 @@ To generate the `installer` kernel, you can use the `smart-rollup-installer` too
 
 You will need:
 
-- at least **rust-1.66** installed (you can check with `cargo --version`), with the `wasm32-unknown-unknown` toolchain.
+- at least **rust-1.71.1** installed (you can check with `cargo --version`), with the `wasm32-unknown-unknown` toolchain.
 - the [WebAssemblyBinaryToolkit](https://github.com/WebAssembly/wabt) (`wabt`) installed. In particular, the `wasm-strip` executable.
 - `$HOME/.cargo/bin` should be available on your `$PATH`.
 - `clang>=11` installed, and set as `CC` environment variable.

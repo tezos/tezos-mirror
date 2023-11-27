@@ -729,11 +729,11 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tezos-smart-rollup-core"
-version = "0.2.1"
+version = "0.2.2"
 
 [[package]]
 name = "tezos-smart-rollup-debug"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-encoding"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "hex",
  "nom",
@@ -758,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-host"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos_crypto_rs",
@@ -768,7 +768,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-mock"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",

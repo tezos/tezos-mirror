@@ -73,7 +73,7 @@ The following `Cargo.toml` file can be used to set up development with the Kerne
 name = "kernel"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.66"
+rust-version = "1.71.1"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
