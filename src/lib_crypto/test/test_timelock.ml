@@ -184,19 +184,35 @@ let test_wesolowski () =
   ()
 
 let tests =
+  let jsoo_backend =
+    match Sys.backend_type with
+    | Other "js_of_ocaml" -> true
+    | Native | Bytecode | Other _ -> false
+  in
+  let dont_run_in_js x = if jsoo_backend then None else Some x in
   [
     ( "timelock",
-      [
-        ("raw scenario - precomputed 1000", `Quick, test_raw_scenario 1000);
-        ("raw scenario - precomputed 30_000", `Quick, test_raw_scenario 30000);
-        ("raw scenario - short", `Quick, test_raw_scenario 5);
-        ("raw scenario - long", `Slow, test_raw_scenario 100000);
-        ("high level scenario - short", `Quick, test_high_level_scenario 1000);
-        ("high level scenario - long", `Quick, test_high_level_scenario 3456);
-        ("bench", `Slow, bench);
-        ("negative test - high level", `Quick, test_high_level_negative);
-        ("negative test - low level", `Quick, test_low_level_negative);
-        ("sampler test", `Quick, test_sampler_and_get_plaintext_size);
-        ("test wesolowski", `Quick, test_wesolowski);
-      ] );
+      List.filter_map
+        (fun x -> x)
+        [
+          Some
+            ("raw scenario - precomputed 1000", `Quick, test_raw_scenario 1000);
+          Some
+            ( "raw scenario - precomputed 30_000",
+              `Quick,
+              test_raw_scenario 30000 );
+          Some ("raw scenario - short", `Quick, test_raw_scenario 5);
+          dont_run_in_js ("raw scenario - long", `Slow, test_raw_scenario 100000);
+          Some
+            ( "high level scenario - short",
+              `Quick,
+              test_high_level_scenario 1000 );
+          dont_run_in_js
+            ("high level scenario - long", `Quick, test_high_level_scenario 3456);
+          dont_run_in_js ("bench", `Slow, bench);
+          Some ("negative test - high level", `Quick, test_high_level_negative);
+          Some ("negative test - low level", `Quick, test_low_level_negative);
+          Some ("sampler test", `Quick, test_sampler_and_get_plaintext_size);
+          Some ("test wesolowski", `Quick, test_wesolowski);
+        ] );
   ]

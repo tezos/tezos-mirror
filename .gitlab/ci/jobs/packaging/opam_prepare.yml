@@ -26,6 +26,7 @@
     expire_in: 1 week
     when: always
   variables:
+    # See `.gitlab-ci.yml` for details on `RUNTEZTALIAS`
     RUNTEZTALIAS: "true"
     # We store caches in _build for two reasons: (1) the _build
     # folder is excluded from opam's rsync. (2) gitlab ci cache

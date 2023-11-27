@@ -13,7 +13,11 @@ function blst_pairing_sizeof() {
 //Provides: Blst_pairing
 //Requires: blst_pairing_sizeof
 //Requires: bls_allocate_mlbytes, bls_free
-if (typeof globalThis.FinalizationRegistry === 'function') {
+if (typeof globalThis.FinalizationRegistry === 'function' && false) {
+  // There is something broken with FinalizationRegistry (at least inside node)
+  // Reported there -> https://github.com/nodejs/node/issues/47748
+  // We avoid this code pass for now so that tests are not flaky
+  // and tests can be enabled in the CI.
   var blst_pairing_finalizer = new globalThis.FinalizationRegistry(bls_free);
 } else {
   var blst_pairing_finalizer = null;
