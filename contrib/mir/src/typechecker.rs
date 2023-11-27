@@ -58,10 +58,10 @@ pub enum TcError {
         stack: TypeStack,
         reason: Option<NoMatchingOverloadReason>,
     },
-    #[error(transparent)]
-    AddressError(#[from] AddressError),
     #[error("invalid value for type {0:?}: {1}")]
     ByteReprError(Type, ByteReprError),
+    #[error("invalid entrypoint: {0}")]
+    EntrypointError(ByteReprError),
     #[error("invalid value for chain_id: {0}")]
     ChainIdError(#[from] ChainIdError),
     #[error("SELF instruction is forbidden in this context")]
@@ -936,7 +936,8 @@ pub(crate) fn typecheck_instruction(
             let entrypoint = anns
                 .get_single_field_ann()?
                 .map(Entrypoint::try_from)
-                .transpose()?
+                .transpose()
+                .map_err(TcError::EntrypointError)?
                 .unwrap_or_default();
             stack.push(T::new_contract(
                 self_entrypoints
@@ -1050,11 +1051,14 @@ pub(crate) fn typecheck_value(
         }
         (T::Address, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
-            TV::Address(Address::from_base58_check(str)?)
+            TV::Address(
+                Address::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Address, e))?,
+            )
         }
         (T::Address, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
-            TV::Address(Address::from_bytes(bs)?)
+            TV::Address(Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?)
         }
         (T::Contract(ty), addr) => {
             let t_addr = irrefutable_match!(typecheck_value(addr, ctx, &T::Address)?; TV::Address);
@@ -2952,7 +2956,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::WrongFormat(_)))
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
         );
         assert_matches!(
             typecheck_instruction(
@@ -2960,7 +2967,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::UnknownPrefix(s))) if s == "tz9"
+            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(s))) if s == "tz9"
         );
         assert_matches!(
             typecheck_instruction(
@@ -2968,7 +2975,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::WrongFormat(_)))
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
         );
         assert_matches!(
             typecheck_instruction(
@@ -2976,7 +2986,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::WrongFormat(_)))
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
         );
         assert_matches!(
             typecheck_instruction(
@@ -2984,7 +2997,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::UnknownPrefix(p))) if p == "0xff"
+            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
         );
         assert_matches!(
             typecheck_instruction(
@@ -2992,7 +3005,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::UnknownPrefix(p))) if p == "0x00ff"
+            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0x00ff"
         );
         assert_matches!(
             typecheck_instruction(
@@ -3000,7 +3013,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::WrongFormat(_)))
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
         );
         assert_matches!(
             typecheck_instruction(
@@ -3009,7 +3025,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::WrongFormat(_)))
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
         );
         assert_matches!(
             typecheck_instruction(
@@ -3017,7 +3036,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::AddressError(AddressError::WrongFormat(_)))
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
         );
     }
 
@@ -3176,11 +3198,10 @@ mod typecheck_tests {
             ))
             .unwrap()
             .typecheck_script(&mut ctx),
-            Err(AddressError::WrongFormat(
+            Err(TcError::EntrypointError(ByteReprError::WrongFormat(
                 "entrypoint name must be at most 31 characters long, but it is 32 characters long"
                     .into()
-            )
-            .into())
+            )))
         );
     }
 
