@@ -472,15 +472,34 @@ let commands () =
               | None ->
                   (* [id] is from iterating over the list of registered encodings *)
                   assert false
-              | Some e -> (id, e))
+              | Some (Any e) ->
+                  (id, Kaitai_of_data_encoding.Translate.AnyEncoding.pack e))
             all
         in
         let name_of_id id = Kaitai_of_data_encoding.Translate.escape_id id in
+        let extern =
+          let t =
+            Kaitai_of_data_encoding.Translate.AnyEncoding.Tbl.create 200
+          in
+          List.iter
+            (fun (id, encoding) ->
+              Kaitai_of_data_encoding.Translate.AnyEncoding.Tbl.add
+                t
+                encoding
+                (name_of_id id))
+            all ;
+          t
+        in
         let* () =
           List.iter_s
-            (fun (id, Data_encoding.Registration.Any e) ->
+            (fun ( id,
+                   Kaitai_of_data_encoding.Translate.AnyEncoding.AnyEncoding e
+                 ) ->
               match
-                Kaitai_of_data_encoding.Translate.from_data_encoding ~id e
+                Kaitai_of_data_encoding.Translate.from_data_encoding
+                  ~id
+                  ~extern
+                  e
               with
               | exception e ->
                   cctxt#warning

@@ -1,6 +1,9 @@
 meta:
   id: p2p_connection__pool_event
   endian: be
+  imports:
+  - p2p_connection__id
+  - p2p_point__id
 doc: ! >-
   Encoding id: p2p_connection.pool_event
 
@@ -26,35 +29,9 @@ types:
     seq:
     - id: identity_field0
       type: p2p_connection__id
-      doc: p2p_connection__id
     - id: identity_field1
       size: 16
       doc: crypto_box__public_key_hash
-  p2p_address:
-    doc: An address for locating peers.
-    seq:
-    - id: len_p2p_address
-      type: s4
-    - id: p2p_address
-      size: len_p2p_address
-  p2p_connection__id:
-    doc: The identifier for a p2p connection. It includes an address and a port number.
-    seq:
-    - id: addr
-      type: p2p_address
-    - id: port_tag
-      type: u1
-      enum: bool
-    - id: port
-      type: u2
-      if: (port_tag == bool::true)
-  p2p_point__id:
-    doc: Identifier for a peer point
-    seq:
-    - id: len_p2p_point__id
-      type: s4
-    - id: p2p_point__id
-      size: len_p2p_point__id
   rejecting_request:
     seq:
     - id: point

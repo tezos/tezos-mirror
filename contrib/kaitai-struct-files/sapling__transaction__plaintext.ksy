@@ -1,6 +1,8 @@
 meta:
   id: sapling__transaction__plaintext
   endian: be
+  imports:
+  - sapling__transaction__rcm
 doc: ! 'Encoding id: sapling.transaction.plaintext'
 types:
   memo:
@@ -15,6 +17,6 @@ seq:
 - id: amount
   type: s8
 - id: rcm
-  size: 32
+  type: sapling__transaction__rcm
 - id: memo
   type: memo
