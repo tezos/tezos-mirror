@@ -217,10 +217,10 @@ pub fn read_current_block_hash<Host: Runtime>(host: &mut Host) -> Result<H256, E
 pub fn store_rlp<T: Encodable, Host: Runtime>(
     src: &T,
     host: &mut Host,
-    path: &OwnedPath,
+    path: &impl Path,
 ) -> Result<(), Error> {
     let bytes = src.rlp_bytes();
-    host.store_write(path, &bytes, 0).map_err(Error::from)
+    host.store_write_all(path, &bytes).map_err(Error::from)
 }
 
 fn read_rlp<T: Decodable, Host: Runtime>(
