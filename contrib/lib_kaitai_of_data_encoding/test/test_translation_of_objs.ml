@@ -215,3 +215,31 @@ let%expect_test "test nested object translation" =
   - id: replacement_protocol
     type: protocol_hash
   |}]
+
+let%expect_test "test object translation with empty fields" =
+  let open Data_encoding in
+  let encoding =
+    obj3
+      (req "cst1" (constant "cst1"))
+      (opt "cst2" (constant "cst2"))
+      (dft "cst3" (constant "cst3") ())
+  in
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~id:"nested_objects"
+      encoding
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: nested_objects
+      endian: be
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: cst2_tag
+      type: u1
+      enum: bool |}]
