@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 007-PsDELPH1.tez'
 types:
+  id_007__psdelph1__mutez:
+    seq:
+    - id: id_007__psdelph1__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_007__psdelph1__mutez
-  type: n
+  type: id_007__psdelph1__mutez

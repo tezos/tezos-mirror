@@ -303,10 +303,10 @@ let bitendian x : BitEndianness.t =
   | "le" -> LittleBitEndian
   | _ -> raise (Error "bitendian")
 
-let meta content id =
+let meta content =
   let m = mapping content in
   let id =
-    match find_key_opt m "id" with None -> id | Some i -> Some (scalar i)
+    match find_key_opt m "id" with None -> None | Some i -> Some (scalar i)
   in
   let endian =
     match find_key_opt m "endian" with
@@ -353,7 +353,7 @@ let rec classSpec id yaml =
   let m = mapping yaml in
   let meta =
     match find_key_opt m "meta" with
-    | Some content -> meta content id
+    | Some content -> meta content
     | None ->
         MetaSpec.
           {
@@ -373,7 +373,7 @@ let rec classSpec id yaml =
     | None -> []
     | Some content ->
         let m = mapping content in
-        keys m (fun k v -> (k, classSpec (Some k) v))
+        keys m (fun k v -> (k, classSpec None v))
   in
   let instances =
     match find_key_opt m "instances" with

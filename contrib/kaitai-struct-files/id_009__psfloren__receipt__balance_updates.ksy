@@ -7,18 +7,17 @@ types:
     seq:
     - id: delegate
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: cycle
       type: s4
   fees:
     seq:
     - id: delegate
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: cycle
       type: s4
   id_009__psfloren__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
     seq:
     - id: id_009__psfloren__contract_id_tag
       type: u1
@@ -26,6 +25,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (id_009__psfloren__contract_id_tag == id_009__psfloren__contract_id_tag::implicit)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: originated
       type: originated
       if: (id_009__psfloren__contract_id_tag == id_009__psfloren__contract_id_tag::originated)
@@ -37,6 +37,9 @@ types:
     - id: contract
       type: id_009__psfloren__contract_id
       if: (id_009__psfloren__operation_metadata__alpha__balance_tag == id_009__psfloren__operation_metadata__alpha__balance_tag::contract)
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: rewards
       type: rewards
       if: (id_009__psfloren__operation_metadata__alpha__balance_tag == id_009__psfloren__operation_metadata__alpha__balance_tag::rewards)
@@ -46,20 +49,32 @@ types:
     - id: deposits
       type: deposits
       if: (id_009__psfloren__operation_metadata__alpha__balance_tag == id_009__psfloren__operation_metadata__alpha__balance_tag::deposits)
+  id_009__psfloren__operation_metadata__alpha__balance_update:
+    seq:
+    - id: change
+      type: s8
   id_009__psfloren__operation_metadata__alpha__balance_updates:
+    seq:
+    - id: id_009__psfloren__operation_metadata__alpha__balance_updates_entries
+      type: id_009__psfloren__operation_metadata__alpha__balance_updates_entries
+      repeat: eos
+  id_009__psfloren__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_id_009__psfloren__operation_metadata__alpha__balance_updates
       type: s4
     - id: id_009__psfloren__operation_metadata__alpha__balance_updates
-      type: id_009__psfloren__operation_metadata__alpha__balance_updates_entries
+      type: id_009__psfloren__operation_metadata__alpha__balance_updates
       size: len_id_009__psfloren__operation_metadata__alpha__balance_updates
-      repeat: eos
   id_009__psfloren__operation_metadata__alpha__balance_updates_entries:
     seq:
     - id: id_009__psfloren__operation_metadata__alpha__balance
       type: id_009__psfloren__operation_metadata__alpha__balance
-    - id: change
-      type: s8
+    - id: id_009__psfloren__operation_metadata__alpha__balance_update
+      type: id_009__psfloren__operation_metadata__alpha__balance_update
+    - id: id_009__psfloren__operation_metadata__alpha__update_origin
+      type: id_009__psfloren__operation_metadata__alpha__update_origin
+  id_009__psfloren__operation_metadata__alpha__update_origin:
+    seq:
     - id: origin
       type: u1
       enum: origin_tag
@@ -71,7 +86,6 @@ types:
       size: 1
       doc: This field is for padding, ignore
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -89,6 +103,7 @@ types:
     seq:
     - id: delegate
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: cycle
       type: s4
 enums:
@@ -109,4 +124,4 @@ enums:
     2: p256
 seq:
 - id: id_009__psfloren__operation_metadata__alpha__balance_updates
-  type: id_009__psfloren__operation_metadata__alpha__balance_updates
+  type: id_009__psfloren__operation_metadata__alpha__balance_updates_0

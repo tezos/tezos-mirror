@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 010-PtGRANAD.tez'
 types:
+  id_010__ptgranad__mutez:
+    seq:
+    - id: id_010__ptgranad__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_010__ptgranad__mutez
-  type: n
+  type: id_010__ptgranad__mutez

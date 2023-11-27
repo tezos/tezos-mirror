@@ -34,34 +34,35 @@ end
 (* Defining a few types now to break circular dependencies. *)
 
 let n_chunk_type =
-  {
-    (* TODO/nice to have: Add a docstring, i.e. [?description]
-                          to custom defined class spec. *)
-    (Helpers.default_class_spec ~id:"n_chunk" ())
-    with
-    seq =
-      [
-        {
-          (Helpers.default_attr_spec ~id:"has_more") with
-          dataType =
-            DataType.(
-              NumericType
-                (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
-        };
-        {
-          (Helpers.default_attr_spec ~id:"payload") with
-          dataType =
-            DataType.(
-              NumericType
-                (Int_type (BitsType {width = 7; bit_endian = BigBitEndian})));
-        };
-      ];
-  }
+  ( "n_chunk",
+    {
+      (* TODO/nice to have: Add a docstring, i.e. [?description]
+                            to custom defined class spec. *)
+      (Helpers.default_class_spec ())
+      with
+      seq =
+        [
+          {
+            (Helpers.default_attr_spec ~id:"has_more") with
+            dataType =
+              DataType.(
+                NumericType
+                  (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
+          };
+          {
+            (Helpers.default_attr_spec ~id:"payload") with
+            dataType =
+              DataType.(
+                NumericType
+                  (Int_type (BitsType {width = 7; bit_endian = BigBitEndian})));
+          };
+        ];
+    } )
 
 let n_seq_attr =
   {
     (Helpers.default_attr_spec ~id:"n") with
-    dataType = Helpers.usertype n_chunk_type;
+    dataType = ComplexDataType (UserType (fst n_chunk_type));
     cond =
       {
         Helpers.cond_no_cond with
@@ -82,84 +83,86 @@ let n_seq_attr =
   }
 
 let n_type =
-  {
-    (* TODO/nice to have: Add a docstring, i.e. [?description]
-                          to custom defined class spec. *)
-    (Helpers.default_class_spec ~id:"n" ())
-    with
-    seq = [n_seq_attr];
-  }
+  ( "n",
+    {
+      (* TODO/nice to have: Add a docstring, i.e. [?description]
+                            to custom defined class spec. *)
+      (Helpers.default_class_spec ())
+      with
+      seq = [n_seq_attr];
+    } )
 
 let z_type =
-  {
-    (Helpers.default_class_spec ~id:"z" ()) with
-    seq =
-      [
-        {
-          (Helpers.default_attr_spec ~id:"has_tail") with
-          dataType =
-            DataType.(
-              NumericType
-                (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
-        };
-        {
-          (Helpers.default_attr_spec ~id:"sign") with
-          dataType =
-            DataType.(
-              NumericType
-                (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
-        };
-        {
-          (Helpers.default_attr_spec ~id:"payload") with
-          dataType =
-            DataType.(
-              NumericType
-                (Int_type (BitsType {width = 6; bit_endian = BigBitEndian})));
-        };
-        {
-          (Helpers.default_attr_spec ~id:"tail") with
-          dataType = Helpers.usertype n_chunk_type;
-          cond =
-            {
-              ifExpr =
-                Some
-                  (CastToType
-                     {
-                       value = Name "has_tail";
-                       typeName =
-                         {absolute = false; names = ["bool"]; isArray = false};
-                     });
-              repeat =
-                RepeatUntil
-                  (UnaryOp
-                     {
-                       op = Not;
-                       operand =
-                         CastToType
-                           {
-                             value =
-                               Attribute {value = Name "_"; attr = "has_more"};
-                             typeName =
-                               {
-                                 absolute = false;
-                                 names = ["bool"];
-                                 isArray = false;
-                               };
-                           };
-                     });
-            };
-        };
-      ];
-  }
+  ( "z",
+    {
+      (Helpers.default_class_spec ()) with
+      seq =
+        [
+          {
+            (Helpers.default_attr_spec ~id:"has_tail") with
+            dataType =
+              DataType.(
+                NumericType
+                  (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
+          };
+          {
+            (Helpers.default_attr_spec ~id:"sign") with
+            dataType =
+              DataType.(
+                NumericType
+                  (Int_type (BitsType {width = 1; bit_endian = BigBitEndian})));
+          };
+          {
+            (Helpers.default_attr_spec ~id:"payload") with
+            dataType =
+              DataType.(
+                NumericType
+                  (Int_type (BitsType {width = 6; bit_endian = BigBitEndian})));
+          };
+          {
+            (Helpers.default_attr_spec ~id:"tail") with
+            dataType = ComplexDataType (UserType (fst n_chunk_type));
+            cond =
+              {
+                ifExpr =
+                  Some
+                    (CastToType
+                       {
+                         value = Name "has_tail";
+                         typeName =
+                           {absolute = false; names = ["bool"]; isArray = false};
+                       });
+                repeat =
+                  RepeatUntil
+                    (UnaryOp
+                       {
+                         op = Not;
+                         operand =
+                           CastToType
+                             {
+                               value =
+                                 Attribute {value = Name "_"; attr = "has_more"};
+                               typeName =
+                                 {
+                                   absolute = false;
+                                   names = ["bool"];
+                                   isArray = false;
+                                 };
+                             };
+                       });
+              };
+          };
+        ];
+    } )
 
 module Type = struct
   type assoc = (string * Kaitai.Types.ClassSpec.t) list
 
-  let n_chunk = ("n_chunk", n_chunk_type)
+  let n_chunk = n_chunk_type
 
-  let n = ("n", n_type)
+  let n = n_type
 
-  let z = ("z", z_type)
+  let z = z_type
 end
 
 module Attr = struct
@@ -283,13 +286,13 @@ module Attr = struct
   let n ~id =
     {
       (Helpers.default_attr_spec ~id) with
-      dataType = Helpers.usertype (snd Type.n);
+      dataType = ComplexDataType (UserType (fst Type.n));
     }
 
   let z ~id =
     {
       (Helpers.default_attr_spec ~id) with
-      dataType = Helpers.usertype (snd Type.z);
+      dataType = ComplexDataType (UserType (fst Type.z));
     }
 
   let binary_length_kind ~id kind =

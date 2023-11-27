@@ -35,11 +35,11 @@ let default_attr_spec ~id =
       size = None;
     }
 
-let default_meta_spec ?(imports = []) ~id () =
+let default_meta_spec ?(imports = []) () =
   MetaSpec.
     {
       isOpaque = false;
-      id = Some id;
+      id = None;
       endian = Some `BE;
       bitEndian = None;
       encoding = None;
@@ -49,11 +49,11 @@ let default_meta_spec ?(imports = []) ~id () =
       imports;
     }
 
-let default_class_spec ~id ?description ?imports () =
+let default_class_spec ?description ?imports () =
   ClassSpec.
     {
       fileName = None;
-      meta = default_meta_spec ?imports ~id ();
+      meta = default_meta_spec ?imports ();
       doc = {default_doc_spec with summary = description};
       toStringExpr = None;
       params = [];
@@ -70,10 +70,10 @@ let add_uniq_assoc mappings ((k, v) as mapping) =
       if v = vv then mappings
       else raise (Invalid_argument ("Mappings.add: duplicate keys (" ^ k ^ ")"))
 
-let class_spec_of_attrs ~id ?description ?(enums = []) ?(types = [])
+let class_spec_of_attrs ?description ?(enums = []) ?(types = [])
     ?(instances = []) ?imports attrs =
   {
-    (default_class_spec ~id ?description ?imports ()) with
+    (default_class_spec ?description ?imports ()) with
     seq = attrs;
     enums;
     types;
@@ -88,11 +88,6 @@ let default_instance_spec ~id value =
         InstanceSpec.ValueInstanceSpec
           {id; value; ifExpr = None; dataTypeOpt = None};
     }
-
-let usertype (c : ClassSpec.t) =
-  match c.meta.id with
-  | None -> failwith "usertype: no id found in classspec"
-  | Some id -> DataType.(ComplexDataType (UserType id))
 
 let merge_summaries attr summary =
   match (attr.AttrSpec.doc.summary, summary) with

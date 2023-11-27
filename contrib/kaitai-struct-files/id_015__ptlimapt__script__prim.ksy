@@ -2,6 +2,12 @@ meta:
   id: id_015__ptlimapt__script__prim
   endian: be
 doc: ! 'Encoding id: 015-PtLimaPt.script.prim'
+types:
+  id_015__ptlimapt__michelson__v1__primitives:
+    seq:
+    - id: id_015__ptlimapt__michelson__v1__primitives
+      type: u1
+      enum: id_015__ptlimapt__michelson__v1__primitives
 enums:
   id_015__ptlimapt__michelson__v1__primitives:
     0: parameter
@@ -393,5 +399,4 @@ enums:
       doc: TICKET
 seq:
 - id: id_015__ptlimapt__michelson__v1__primitives
-  type: u1
-  enum: id_015__ptlimapt__michelson__v1__primitives
+  type: id_015__ptlimapt__michelson__v1__primitives

@@ -4,7 +4,6 @@ meta:
 doc: ! 'Encoding id: p2p_point.id'
 types:
   p2p_point__id:
-    doc: Identifier for a peer point
     seq:
     - id: len_p2p_point__id
       type: s4
@@ -13,3 +12,4 @@ types:
 seq:
 - id: p2p_point__id
   type: p2p_point__id
+  doc: Identifier for a peer point

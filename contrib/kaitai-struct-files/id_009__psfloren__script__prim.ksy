@@ -2,6 +2,12 @@ meta:
   id: id_009__psfloren__script__prim
   endian: be
 doc: ! 'Encoding id: 009-PsFLoren.script.prim'
+types:
+  id_009__psfloren__michelson__v1__primitives:
+    seq:
+    - id: id_009__psfloren__michelson__v1__primitives
+      type: u1
+      enum: id_009__psfloren__michelson__v1__primitives
 enums:
   id_009__psfloren__michelson__v1__primitives:
     0: parameter
@@ -363,5 +369,4 @@ enums:
       doc: GET_AND_UPDATE
 seq:
 - id: id_009__psfloren__michelson__v1__primitives
-  type: u1
-  enum: id_009__psfloren__michelson__v1__primitives
+  type: id_009__psfloren__michelson__v1__primitives

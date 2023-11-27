@@ -19,12 +19,16 @@ types:
       type: radius_dz
   bootstrap_accounts:
     seq:
+    - id: bootstrap_accounts_entries
+      type: bootstrap_accounts_entries
+      repeat: eos
+  bootstrap_accounts_0:
+    seq:
     - id: len_bootstrap_accounts
       type: s4
     - id: bootstrap_accounts
-      type: bootstrap_accounts_entries
+      type: bootstrap_accounts
       size: len_bootstrap_accounts
-      repeat: eos
   bootstrap_accounts_entries:
     seq:
     - id: bootstrap_accounts_elt_tag
@@ -47,12 +51,16 @@ types:
       if: (bootstrap_accounts_elt_tag == bootstrap_accounts_elt_tag::public_key_known_with_consensus_key)
   bootstrap_contracts:
     seq:
+    - id: bootstrap_contracts_entries
+      type: bootstrap_contracts_entries
+      repeat: eos
+  bootstrap_contracts_0:
+    seq:
     - id: len_bootstrap_contracts
       type: s4
     - id: bootstrap_contracts
-      type: bootstrap_contracts_entries
+      type: bootstrap_contracts
       size: len_bootstrap_contracts
-      repeat: eos
   bootstrap_contracts_entries:
     seq:
     - id: delegate_tag
@@ -61,8 +69,9 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: amount
-      type: n
+      type: id_018__proxford__mutez
     - id: script
       type: id_018__proxford__scripted__contracts
     - id: hash_tag
@@ -73,12 +82,16 @@ types:
       if: (hash_tag == bool::true)
   bootstrap_smart_rollups:
     seq:
+    - id: bootstrap_smart_rollups_entries
+      type: bootstrap_smart_rollups_entries
+      repeat: eos
+  bootstrap_smart_rollups_0:
+    seq:
     - id: len_bootstrap_smart_rollups
       type: s4
     - id: bootstrap_smart_rollups
-      type: bootstrap_smart_rollups_entries
+      type: bootstrap_smart_rollups
       size: len_bootstrap_smart_rollups
-      repeat: eos
   bootstrap_smart_rollups_entries:
     seq:
     - id: address
@@ -104,19 +117,23 @@ types:
       size: len_code
   commitments:
     seq:
+    - id: commitments_entries
+      type: commitments_entries
+      repeat: eos
+  commitments_0:
+    seq:
     - id: len_commitments
       type: s4
     - id: commitments
-      type: commitments_entries
+      type: commitments
       size: len_commitments
-      repeat: eos
   commitments_entries:
     seq:
     - id: commitments_elt_field0
       size: 20
       doc: blinded__public__key__hash
     - id: commitments_elt_field1
-      type: n
+      type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
   dal_parametric:
     seq:
@@ -139,6 +156,10 @@ types:
       type: s4
     - id: number_of_shards
       type: u2
+  id_018__proxford__mutez:
+    seq:
+    - id: id_018__proxford__mutez
+      type: n
   id_018__proxford__scripted__contracts:
     seq:
     - id: code
@@ -160,7 +181,7 @@ types:
   issuance_weights:
     seq:
     - id: base_total_issued_per_minute
-      type: n
+      type: id_018__proxford__mutez
     - id: baking_reward_fixed_portion_weight
       type: s4
     - id: baking_reward_bonus_weight
@@ -204,7 +225,6 @@ types:
     - id: parameters_ty
       size: len_parameters_ty
   public_key:
-    doc: A Ed25519, Secp256k1, or P256 public key
     seq:
     - id: public_key_tag
       type: u1
@@ -222,7 +242,6 @@ types:
       size: 48
       if: (public_key_tag == public_key_tag::bls)
   public_key_hash:
-    doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -243,51 +262,75 @@ types:
     seq:
     - id: public_key_known_field0
       type: public_key
-      doc: signature__public_key
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key
+
+
+        signature__public_key'
     - id: public_key_known_field1
-      type: n
+      type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
   public_key_known_with_consensus_key:
     seq:
     - id: public_key_known_with_consensus_key_field0
       type: public_key
-      doc: signature__public_key
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key
+
+
+        signature__public_key'
     - id: public_key_known_with_consensus_key_field1
-      type: n
+      type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
     - id: public_key_known_with_consensus_key_field2
       type: public_key
-      doc: signature__public_key
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key
+
+
+        signature__public_key'
   public_key_known_with_delegate:
     seq:
     - id: public_key_known_with_delegate_field0
       type: public_key
-      doc: signature__public_key
+      doc: ! 'A Ed25519, Secp256k1, or P256 public key
+
+
+        signature__public_key'
     - id: public_key_known_with_delegate_field1
-      type: n
+      type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
     - id: public_key_known_with_delegate_field2
       type: public_key_hash
-      doc: signature__public_key_hash
+      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+
+
+        signature__public_key_hash'
   public_key_unknown:
     seq:
     - id: public_key_unknown_field0
       type: public_key_hash
-      doc: signature__public_key_hash
+      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+
+
+        signature__public_key_hash'
     - id: public_key_unknown_field1
-      type: n
+      type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
   public_key_unknown_with_delegate:
     seq:
     - id: public_key_unknown_with_delegate_field0
       type: public_key_hash
-      doc: signature__public_key_hash
+      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+
+
+        signature__public_key_hash'
     - id: public_key_unknown_with_delegate_field1
-      type: n
+      type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
     - id: public_key_unknown_with_delegate_field2
       type: public_key_hash
-      doc: signature__public_key_hash
+      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+
+
+        signature__public_key_hash'
   radius_dz:
     seq:
     - id: numerator
@@ -346,13 +389,13 @@ enums:
     1: wasm_2_0_0
 seq:
 - id: bootstrap_accounts
-  type: bootstrap_accounts
+  type: bootstrap_accounts_0
 - id: bootstrap_contracts
-  type: bootstrap_contracts
+  type: bootstrap_contracts_0
 - id: bootstrap_smart_rollups
-  type: bootstrap_smart_rollups
+  type: bootstrap_smart_rollups_0
 - id: commitments
-  type: commitments
+  type: commitments_0
 - id: security_deposit_ramp_up_cycles_tag
   type: u1
   enum: bool
@@ -384,9 +427,9 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: minimal_stake
-  type: n
+  type: id_018__proxford__mutez
 - id: minimal_frozen_stake
-  type: n
+  type: id_018__proxford__mutez
 - id: vdf_difficulty
   type: s8
 - id: origination_size
@@ -394,7 +437,7 @@ seq:
 - id: issuance_weights
   type: issuance_weights
 - id: cost_per_byte
-  type: n
+  type: id_018__proxford__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
@@ -431,6 +474,7 @@ seq:
 - id: testnet_dictator
   type: public_key_hash
   if: (testnet_dictator_tag == bool::true)
+  doc: A Ed25519, Secp256k1, P256, or BLS public key hash
 - id: initial_seed_tag
   type: u1
   enum: bool
@@ -456,7 +500,7 @@ seq:
 - id: smart_rollup_challenge_window_in_blocks
   type: s4
 - id: smart_rollup_stake_amount
-  type: n
+  type: id_018__proxford__mutez
 - id: smart_rollup_commitment_period_in_blocks
   type: s4
 - id: smart_rollup_max_lookahead_in_blocks

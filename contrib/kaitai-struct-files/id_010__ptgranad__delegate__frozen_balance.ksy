@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 010-PtGRANAD.delegate.frozen_balance'
 types:
+  id_010__ptgranad__mutez:
+    seq:
+    - id: id_010__ptgranad__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,8 +21,8 @@ types:
       type: b7be
 seq:
 - id: deposits
-  type: n
+  type: id_010__ptgranad__mutez
 - id: fees
-  type: n
+  type: id_010__ptgranad__mutez
 - id: rewards
-  type: n
+  type: id_010__ptgranad__mutez

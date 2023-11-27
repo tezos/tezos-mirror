@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 005-PsBabyM1.constants'
 types:
+  id_005__psbabym1__mutez:
+    seq:
+    - id: id_005__psbabym1__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,12 +21,16 @@ types:
       type: b7be
   time_between_blocks:
     seq:
+    - id: time_between_blocks_entries
+      type: time_between_blocks_entries
+      repeat: eos
+  time_between_blocks_0:
+    seq:
     - id: len_time_between_blocks
       type: s4
     - id: time_between_blocks
-      type: time_between_blocks_entries
+      type: time_between_blocks
       size: len_time_between_blocks
-      repeat: eos
   time_between_blocks_entries:
     seq:
     - id: time_between_blocks_elt
@@ -62,7 +70,7 @@ seq:
 - id: blocks_per_voting_period
   type: s4
 - id: time_between_blocks
-  type: time_between_blocks
+  type: time_between_blocks_0
 - id: endorsers_per_block
   type: u2
 - id: hard_gas_limit_per_operation
@@ -72,23 +80,23 @@ seq:
 - id: proof_of_work_threshold
   type: s8
 - id: tokens_per_roll
-  type: n
+  type: id_005__psbabym1__mutez
 - id: michelson_maximum_type_size
   type: u2
 - id: seed_nonce_revelation_tip
-  type: n
+  type: id_005__psbabym1__mutez
 - id: origination_size
   type: s4
 - id: block_security_deposit
-  type: n
+  type: id_005__psbabym1__mutez
 - id: endorsement_security_deposit
-  type: n
+  type: id_005__psbabym1__mutez
 - id: block_reward
-  type: n
+  type: id_005__psbabym1__mutez
 - id: endorsement_reward
-  type: n
+  type: id_005__psbabym1__mutez
 - id: cost_per_byte
-  type: n
+  type: id_005__psbabym1__mutez
 - id: hard_storage_limit_per_operation
   type: z
 - id: test_chain_duration

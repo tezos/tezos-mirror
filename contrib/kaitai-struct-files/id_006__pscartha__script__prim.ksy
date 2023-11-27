@@ -2,6 +2,12 @@ meta:
   id: id_006__pscartha__script__prim
   endian: be
 doc: ! 'Encoding id: 006-PsCARTHA.script.prim'
+types:
+  id_006__pscartha__michelson__v1__primitives:
+    seq:
+    - id: id_006__pscartha__michelson__v1__primitives
+      type: u1
+      enum: id_006__pscartha__michelson__v1__primitives
 enums:
   id_006__pscartha__michelson__v1__primitives:
     0: parameter
@@ -308,5 +314,4 @@ enums:
       doc: CHAIN_ID
 seq:
 - id: id_006__pscartha__michelson__v1__primitives
-  type: u1
-  enum: id_006__pscartha__michelson__v1__primitives
+  type: id_006__pscartha__michelson__v1__primitives

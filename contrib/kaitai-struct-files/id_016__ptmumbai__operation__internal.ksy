@@ -11,12 +11,16 @@ types:
       size: len_annots
   args:
     seq:
+    - id: args_entries
+      type: args_entries
+      repeat: eos
+  args_0:
+    seq:
     - id: len_args
       type: s4
     - id: args
-      type: args_entries
+      type: args
       size: len_args
-      repeat: eos
   args_entries:
     seq:
     - id: args_elt
@@ -41,6 +45,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   event:
     seq:
     - id: type
@@ -51,6 +56,7 @@ types:
     - id: tag
       type: id_016__ptmumbai__entrypoint
       if: (tag_tag == bool::true)
+      doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: payload_tag
       type: u1
       enum: bool
@@ -61,6 +67,11 @@ types:
     seq:
     - id: source
       type: id_016__ptmumbai__transaction_destination
+      doc: ! >-
+        A destination of a transaction: A destination notation compatible with the
+        contract notation as given to an RPC or inside scripts. Can be a base58 implicit
+        contract hash, a base58 originated contract hash, a base58 originated transaction
+        rollup, or a base58 originated smart rollup.
     - id: nonce
       type: u2
     - id: id_016__ptmumbai__apply_internal_results__alpha__operation_result_tag
@@ -83,14 +94,22 @@ types:
       if: (id_016__ptmumbai__apply_internal_results__alpha__operation_result_tag ==
         id_016__ptmumbai__apply_internal_results__alpha__operation_result_tag::event)
   id_016__ptmumbai__entrypoint:
-    doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     seq:
     - id: id_016__ptmumbai__entrypoint_tag
       type: u1
       enum: id_016__ptmumbai__entrypoint_tag
     - id: named
-      type: named
+      type: named_0
       if: (id_016__ptmumbai__entrypoint_tag == id_016__ptmumbai__entrypoint_tag::named)
+  id_016__ptmumbai__michelson__v1__primitives:
+    seq:
+    - id: id_016__ptmumbai__michelson__v1__primitives
+      type: u1
+      enum: id_016__ptmumbai__michelson__v1__primitives
+  id_016__ptmumbai__mutez:
+    seq:
+    - id: id_016__ptmumbai__mutez
+      type: n
   id_016__ptmumbai__scripted__contracts:
     seq:
     - id: code
@@ -98,11 +117,6 @@ types:
     - id: storage
       type: storage
   id_016__ptmumbai__transaction_destination:
-    doc: ! >-
-      A destination of a transaction: A destination notation compatible with the contract
-      notation as given to an RPC or inside scripts. Can be a base58 implicit contract
-      hash, a base58 originated contract hash, a base58 originated transaction rollup,
-      or a base58 originated smart rollup.
     seq:
     - id: id_016__ptmumbai__transaction_destination_tag
       type: u1
@@ -110,6 +124,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (id_016__ptmumbai__transaction_destination_tag == id_016__ptmumbai__transaction_destination_tag::implicit)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: originated
       type: originated
       if: (id_016__ptmumbai__transaction_destination_tag == id_016__ptmumbai__transaction_destination_tag::originated)
@@ -122,6 +137,10 @@ types:
     - id: zk_rollup
       type: zk_rollup
       if: (id_016__ptmumbai__transaction_destination_tag == id_016__ptmumbai__transaction_destination_tag::zk_rollup)
+  id_016__ptmumbai__tx_rollup_id:
+    seq:
+    - id: rollup_hash
+      size: 20
   micheline__016__ptmumbai__michelson_v1__expression:
     seq:
     - id: micheline__016__ptmumbai__michelson_v1__expression_tag
@@ -134,12 +153,11 @@ types:
       type: string
       if: (micheline__016__ptmumbai__michelson_v1__expression_tag == micheline__016__ptmumbai__michelson_v1__expression_tag::string)
     - id: sequence
-      type: sequence
+      type: sequence_0
       if: (micheline__016__ptmumbai__michelson_v1__expression_tag == micheline__016__ptmumbai__michelson_v1__expression_tag::sequence)
     - id: prim__no_args__no_annots
-      type: u1
+      type: id_016__ptmumbai__michelson__v1__primitives
       if: (micheline__016__ptmumbai__michelson_v1__expression_tag == micheline__016__ptmumbai__michelson_v1__expression_tag::prim__no_args__no_annots)
-      enum: id_016__ptmumbai__michelson__v1__primitives
     - id: prim__no_args__some_annots
       type: prim__no_args__some_annots
       if: (micheline__016__ptmumbai__michelson_v1__expression_tag == micheline__016__ptmumbai__michelson_v1__expression_tag::prim__no_args__some_annots)
@@ -175,11 +193,15 @@ types:
       type: b7be
   named:
     seq:
+    - id: named
+      size-eos: true
+  named_0:
+    seq:
     - id: len_named
       type: u1
     - id: named
+      type: named
       size: len_named
-      size-eos: true
   originated:
     seq:
     - id: contract_hash
@@ -190,33 +212,33 @@ types:
   origination:
     seq:
     - id: balance
-      type: n
+      type: id_016__ptmumbai__mutez
     - id: delegate_tag
       type: u1
       enum: bool
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: script
       type: id_016__ptmumbai__scripted__contracts
   parameters:
     seq:
     - id: entrypoint
       type: id_016__ptmumbai__entrypoint
+      doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
       type: value
   prim__1_arg__no_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_016__ptmumbai__michelson__v1__primitives
+      type: id_016__ptmumbai__michelson__v1__primitives
     - id: arg
       type: micheline__016__ptmumbai__michelson_v1__expression
   prim__1_arg__some_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_016__ptmumbai__michelson__v1__primitives
+      type: id_016__ptmumbai__michelson__v1__primitives
     - id: arg
       type: micheline__016__ptmumbai__michelson_v1__expression
     - id: annots
@@ -224,8 +246,7 @@ types:
   prim__2_args__no_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_016__ptmumbai__michelson__v1__primitives
+      type: id_016__ptmumbai__michelson__v1__primitives
     - id: arg1
       type: micheline__016__ptmumbai__michelson_v1__expression
     - id: arg2
@@ -233,8 +254,7 @@ types:
   prim__2_args__some_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_016__ptmumbai__michelson__v1__primitives
+      type: id_016__ptmumbai__michelson__v1__primitives
     - id: arg1
       type: micheline__016__ptmumbai__michelson_v1__expression
     - id: arg2
@@ -244,21 +264,18 @@ types:
   prim__generic:
     seq:
     - id: prim
-      type: u1
-      enum: id_016__ptmumbai__michelson__v1__primitives
+      type: id_016__ptmumbai__michelson__v1__primitives
     - id: args
-      type: args
+      type: args_0
     - id: annots
       type: annots
   prim__no_args__some_annots:
     seq:
     - id: prim
-      type: u1
-      enum: id_016__ptmumbai__michelson__v1__primitives
+      type: id_016__ptmumbai__michelson__v1__primitives
     - id: annots
       type: annots
   public_key_hash:
-    doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -277,12 +294,16 @@ types:
       if: (public_key_hash_tag == public_key_hash_tag::bls)
   sequence:
     seq:
+    - id: sequence_entries
+      type: sequence_entries
+      repeat: eos
+  sequence_0:
+    seq:
     - id: len_sequence
       type: s4
     - id: sequence
-      type: sequence_entries
+      type: sequence
       size: len_sequence
-      repeat: eos
   sequence_entries:
     seq:
     - id: sequence_elt
@@ -309,9 +330,14 @@ types:
   transaction:
     seq:
     - id: amount
-      type: n
+      type: id_016__ptmumbai__mutez
     - id: destination
       type: id_016__ptmumbai__transaction_destination
+      doc: ! >-
+        A destination of a transaction: A destination notation compatible with the
+        contract notation as given to an RPC or inside scripts. Can be a base58 implicit
+        contract hash, a base58 originated contract hash, a base58 originated transaction
+        rollup, or a base58 originated smart rollup.
     - id: parameters_tag
       type: u1
       enum: bool
@@ -320,8 +346,8 @@ types:
       if: (parameters_tag == bool::true)
   tx_rollup:
     seq:
-    - id: rollup_hash
-      size: 20
+    - id: id_016__ptmumbai__tx_rollup_id
+      type: id_016__ptmumbai__tx_rollup_id
       doc: ! >-
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash

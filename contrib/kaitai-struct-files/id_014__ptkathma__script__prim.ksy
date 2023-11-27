@@ -2,6 +2,12 @@ meta:
   id: id_014__ptkathma__script__prim
   endian: be
 doc: ! 'Encoding id: 014-PtKathma.script.prim'
+types:
+  id_014__ptkathma__michelson__v1__primitives:
+    seq:
+    - id: id_014__ptkathma__michelson__v1__primitives
+      type: u1
+      enum: id_014__ptkathma__michelson__v1__primitives
 enums:
   id_014__ptkathma__michelson__v1__primitives:
     0: parameter
@@ -384,5 +390,4 @@ enums:
       doc: EMIT
 seq:
 - id: id_014__ptkathma__michelson__v1__primitives
-  type: u1
-  enum: id_014__ptkathma__michelson__v1__primitives
+  type: id_014__ptkathma__michelson__v1__primitives

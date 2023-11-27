@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 016-PtMumbai.tez'
 types:
+  id_016__ptmumbai__mutez:
+    seq:
+    - id: id_016__ptmumbai__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,4 +21,4 @@ types:
       type: b7be
 seq:
 - id: id_016__ptmumbai__mutez
-  type: n
+  type: id_016__ptmumbai__mutez

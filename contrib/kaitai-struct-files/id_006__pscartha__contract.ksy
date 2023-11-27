@@ -4,9 +4,6 @@ meta:
 doc: ! 'Encoding id: 006-PsCARTHA.contract'
 types:
   id_006__pscartha__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
     seq:
     - id: id_006__pscartha__contract_id_tag
       type: u1
@@ -14,6 +11,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (id_006__pscartha__contract_id_tag == id_006__pscartha__contract_id_tag::implicit)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: originated
       type: originated
       if: (id_006__pscartha__contract_id_tag == id_006__pscartha__contract_id_tag::originated)
@@ -25,7 +23,6 @@ types:
       size: 1
       doc: This field is for padding, ignore
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -50,3 +47,6 @@ enums:
 seq:
 - id: id_006__pscartha__contract_id
   type: id_006__pscartha__contract_id
+  doc: ! >-
+    A contract handle: A contract notation as given to an RPC or inside scripts. Can
+    be a base58 implicit contract hash or a base58 originated contract hash.

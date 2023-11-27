@@ -2,6 +2,12 @@ meta:
   id: id_018__proxford__script__prim
   endian: be
 doc: ! 'Encoding id: 018-Proxford.script.prim'
+types:
+  id_018__proxford__michelson__v1__primitives:
+    seq:
+    - id: id_018__proxford__michelson__v1__primitives
+      type: u1
+      enum: id_018__proxford__michelson__v1__primitives
 enums:
   id_018__proxford__michelson__v1__primitives:
     0: parameter
@@ -399,5 +405,4 @@ enums:
       doc: NAT
 seq:
 - id: id_018__proxford__michelson__v1__primitives
-  type: u1
-  enum: id_018__proxford__michelson__v1__primitives
+  type: id_018__proxford__michelson__v1__primitives

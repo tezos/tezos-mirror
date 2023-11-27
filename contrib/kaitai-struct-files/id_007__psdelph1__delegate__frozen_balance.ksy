@@ -3,6 +3,10 @@ meta:
   endian: be
 doc: ! 'Encoding id: 007-PsDELPH1.delegate.frozen_balance'
 types:
+  id_007__psdelph1__mutez:
+    seq:
+    - id: id_007__psdelph1__mutez
+      type: n
   n:
     seq:
     - id: n
@@ -17,8 +21,8 @@ types:
       type: b7be
 seq:
 - id: deposit
-  type: n
+  type: id_007__psdelph1__mutez
 - id: fees
-  type: n
+  type: id_007__psdelph1__mutez
 - id: rewards
-  type: n
+  type: id_007__psdelph1__mutez

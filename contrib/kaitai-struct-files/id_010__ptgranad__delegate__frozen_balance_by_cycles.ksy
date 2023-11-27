@@ -3,15 +3,24 @@ meta:
   endian: be
 doc: ! 'Encoding id: 010-PtGRANAD.delegate.frozen_balance_by_cycles'
 types:
+  id_010__ptgranad__delegate__frozen_balance_by_cycles:
+    seq:
+    - id: id_010__ptgranad__delegate__frozen_balance_by_cycles_entries
+      type: id_010__ptgranad__delegate__frozen_balance_by_cycles_entries
+      repeat: eos
   id_010__ptgranad__delegate__frozen_balance_by_cycles_entries:
     seq:
     - id: cycle
       type: s4
     - id: deposits
-      type: n
+      type: id_010__ptgranad__mutez
     - id: fees
-      type: n
+      type: id_010__ptgranad__mutez
     - id: rewards
+      type: id_010__ptgranad__mutez
+  id_010__ptgranad__mutez:
+    seq:
+    - id: id_010__ptgranad__mutez
       type: n
   n:
     seq:
@@ -29,6 +38,5 @@ seq:
 - id: len_id_010__ptgranad__delegate__frozen_balance_by_cycles
   type: s4
 - id: id_010__ptgranad__delegate__frozen_balance_by_cycles
-  type: id_010__ptgranad__delegate__frozen_balance_by_cycles_entries
+  type: id_010__ptgranad__delegate__frozen_balance_by_cycles
   size: len_id_010__ptgranad__delegate__frozen_balance_by_cycles
-  repeat: eos

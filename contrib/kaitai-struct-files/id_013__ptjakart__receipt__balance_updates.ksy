@@ -7,6 +7,9 @@ types:
     seq:
     - id: contract
       type: id_013__ptjakart__contract_id
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: bond_id
       type: id_013__ptjakart__bond_id
   id_013__ptjakart__bond_id:
@@ -15,15 +18,12 @@ types:
       type: u1
       enum: id_013__ptjakart__bond_id_tag
     - id: tx_rollup_bond_id
-      size: 20
+      type: id_013__ptjakart__tx_rollup_id
       if: (id_013__ptjakart__bond_id_tag == id_013__ptjakart__bond_id_tag::tx_rollup_bond_id)
       doc: ! >-
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
   id_013__ptjakart__contract_id:
-    doc: ! >-
-      A contract handle: A contract notation as given to an RPC or inside scripts.
-      Can be a base58 implicit contract hash or a base58 originated contract hash.
     seq:
     - id: id_013__ptjakart__contract_id_tag
       type: u1
@@ -31,6 +31,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (id_013__ptjakart__contract_id_tag == id_013__ptjakart__contract_id_tag::implicit)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: originated
       type: originated
       if: (id_013__ptjakart__contract_id_tag == id_013__ptjakart__contract_id_tag::originated)
@@ -42,9 +43,13 @@ types:
     - id: contract
       type: id_013__ptjakart__contract_id
       if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::contract)
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: deposits
       type: public_key_hash
       if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::deposits)
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: lost_endorsing_rewards
       type: lost_endorsing_rewards
       if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::lost_endorsing_rewards)
@@ -54,27 +59,44 @@ types:
     - id: frozen_bonds
       type: frozen_bonds
       if: (id_013__ptjakart__operation_metadata__alpha__balance_tag == id_013__ptjakart__operation_metadata__alpha__balance_tag::frozen_bonds)
+  id_013__ptjakart__operation_metadata__alpha__balance_update:
+    seq:
+    - id: change
+      type: s8
   id_013__ptjakart__operation_metadata__alpha__balance_updates:
+    seq:
+    - id: id_013__ptjakart__operation_metadata__alpha__balance_updates_entries
+      type: id_013__ptjakart__operation_metadata__alpha__balance_updates_entries
+      repeat: eos
+  id_013__ptjakart__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_id_013__ptjakart__operation_metadata__alpha__balance_updates
       type: s4
     - id: id_013__ptjakart__operation_metadata__alpha__balance_updates
-      type: id_013__ptjakart__operation_metadata__alpha__balance_updates_entries
+      type: id_013__ptjakart__operation_metadata__alpha__balance_updates
       size: len_id_013__ptjakart__operation_metadata__alpha__balance_updates
-      repeat: eos
   id_013__ptjakart__operation_metadata__alpha__balance_updates_entries:
     seq:
     - id: id_013__ptjakart__operation_metadata__alpha__balance
       type: id_013__ptjakart__operation_metadata__alpha__balance
-    - id: change
-      type: s8
+    - id: id_013__ptjakart__operation_metadata__alpha__balance_update
+      type: id_013__ptjakart__operation_metadata__alpha__balance_update
+    - id: id_013__ptjakart__operation_metadata__alpha__update_origin
+      type: id_013__ptjakart__operation_metadata__alpha__update_origin
+  id_013__ptjakart__operation_metadata__alpha__update_origin:
+    seq:
     - id: origin
       type: u1
       enum: origin_tag
+  id_013__ptjakart__tx_rollup_id:
+    seq:
+    - id: rollup_hash
+      size: 20
   lost_endorsing_rewards:
     seq:
     - id: delegate
       type: public_key_hash
+      doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: participation
       type: u1
       enum: bool
@@ -89,7 +111,6 @@ types:
       size: 1
       doc: This field is for padding, ignore
   public_key_hash:
-    doc: A Ed25519, Secp256k1, or P256 public key hash
     seq:
     - id: public_key_hash_tag
       type: u1
@@ -145,4 +166,4 @@ enums:
     2: p256
 seq:
 - id: id_013__ptjakart__operation_metadata__alpha__balance_updates
-  type: id_013__ptjakart__operation_metadata__alpha__balance_updates
+  type: id_013__ptjakart__operation_metadata__alpha__balance_updates_0

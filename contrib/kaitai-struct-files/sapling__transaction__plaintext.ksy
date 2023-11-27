@@ -11,9 +11,13 @@ types:
       type: s4
     - id: memo
       size: len_memo
+  sapling__wallet__diversifier:
+    seq:
+    - id: sapling__wallet__diversifier
+      size: 11
 seq:
 - id: diversifier
-  size: 11
+  type: sapling__wallet__diversifier
 - id: amount
   type: s8
 - id: rcm

@@ -2,6 +2,12 @@ meta:
   id: id_011__pthangz2__script__prim
   endian: be
 doc: ! 'Encoding id: 011-PtHangz2.script.prim'
+types:
+  id_011__pthangz2__michelson__v1__primitives:
+    seq:
+    - id: id_011__pthangz2__michelson__v1__primitives
+      type: u1
+      enum: id_011__pthangz2__michelson__v1__primitives
 enums:
   id_011__pthangz2__michelson__v1__primitives:
     0: parameter
@@ -373,5 +379,4 @@ enums:
     146: constant
 seq:
 - id: id_011__pthangz2__michelson__v1__primitives
-  type: u1
-  enum: id_011__pthangz2__michelson__v1__primitives
+  type: id_011__pthangz2__michelson__v1__primitives

@@ -2,6 +2,12 @@ meta:
   id: id_010__ptgranad__script__prim
   endian: be
 doc: ! 'Encoding id: 010-PtGRANAD.script.prim'
+types:
+  id_010__ptgranad__michelson__v1__primitives:
+    seq:
+    - id: id_010__ptgranad__michelson__v1__primitives
+      type: u1
+      enum: id_010__ptgranad__michelson__v1__primitives
 enums:
   id_010__ptgranad__michelson__v1__primitives:
     0: parameter
@@ -363,5 +369,4 @@ enums:
       doc: GET_AND_UPDATE
 seq:
 - id: id_010__ptgranad__michelson__v1__primitives
-  type: u1
-  enum: id_010__ptgranad__michelson__v1__primitives
+  type: id_010__ptgranad__michelson__v1__primitives

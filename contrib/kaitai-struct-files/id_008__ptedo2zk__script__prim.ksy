@@ -2,6 +2,12 @@ meta:
   id: id_008__ptedo2zk__script__prim
   endian: be
 doc: ! 'Encoding id: 008-PtEdo2Zk.script.prim'
+types:
+  id_008__ptedo2zk__michelson__v1__primitives:
+    seq:
+    - id: id_008__ptedo2zk__michelson__v1__primitives
+      type: u1
+      enum: id_008__ptedo2zk__michelson__v1__primitives
 enums:
   id_008__ptedo2zk__michelson__v1__primitives:
     0: parameter
@@ -363,5 +369,4 @@ enums:
       doc: GET_AND_UPDATE
 seq:
 - id: id_008__ptedo2zk__michelson__v1__primitives
-  type: u1
-  enum: id_008__ptedo2zk__michelson__v1__primitives
+  type: id_008__ptedo2zk__michelson__v1__primitives
