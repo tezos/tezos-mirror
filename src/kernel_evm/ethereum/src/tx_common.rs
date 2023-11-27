@@ -310,7 +310,7 @@ impl EthereumTransactionCommon {
         // self.max_fee_per_gas has to be equal to gas_price
         stream.append(&self.max_fee_per_gas);
         stream.append(&self.gas_limit);
-        append_option(stream, self.to);
+        append_option(stream, &self.to);
         stream.append(&self.value);
         append_vec(stream, &self.data);
         match &self.signature {
@@ -337,7 +337,7 @@ impl EthereumTransactionCommon {
         // self.max_fee_per_gas has to be equal to gas_price
         stream.append(&self.max_fee_per_gas);
         stream.append(&self.gas_limit);
-        append_option(stream, self.to);
+        append_option(stream, &self.to);
         stream.append(&self.value);
         append_vec(stream, &self.data);
         stream.append_list(&self.access_list);
@@ -362,7 +362,7 @@ impl EthereumTransactionCommon {
         stream.append(&self.max_priority_fee_per_gas);
         stream.append(&self.max_fee_per_gas);
         stream.append(&self.gas_limit);
-        append_option(stream, self.to);
+        append_option(stream, &self.to);
         stream.append(&self.value);
         append_vec(stream, &self.data);
         stream.append_list(&self.access_list);

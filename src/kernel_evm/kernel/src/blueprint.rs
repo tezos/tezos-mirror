@@ -148,7 +148,7 @@ impl Encodable for Queue {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
         stream.append_list(&self.proposals);
-        rlp_helpers::append_option(stream, self.kernel_upgrade.clone());
+        rlp_helpers::append_option(stream, &self.kernel_upgrade);
     }
 }
 
