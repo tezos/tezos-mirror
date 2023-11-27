@@ -200,3 +200,46 @@ where
         self.pointers.is_none()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::LinkedList;
+    use rlp::{Decodable, DecoderError, Encodable};
+    use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_mock::MockHost;
+
+    #[derive(Clone)]
+    struct Hash([u8; TRANSACTION_HASH_SIZE]);
+
+    impl Encodable for Hash {
+        fn rlp_append(&self, s: &mut rlp::RlpStream) {
+            s.append(&self.0.to_vec());
+        }
+    }
+
+    impl Decodable for Hash {
+        fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+            let hash: Vec<u8> = decoder.as_val()?;
+            let hash = hash
+                .try_into()
+                .map_err(|_| DecoderError::Custom("expected a vec of 32 elements"))?;
+            Ok(Hash(hash))
+        }
+    }
+
+    impl AsRef<[u8]> for Hash {
+        fn as_ref(&self) -> &[u8] {
+            &self.0
+        }
+    }
+
+    #[test]
+    fn test_empty() {
+        let host = MockHost::default();
+        let path = RefPath::assert_from(b"/list");
+        let list =
+            LinkedList::<Hash, u8>::new(&path, &host).expect("list should be created");
+        assert!(list.is_empty())
+    }
+}
