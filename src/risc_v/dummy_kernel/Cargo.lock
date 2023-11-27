@@ -195,7 +195,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -206,11 +206,11 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-core"
-version = "0.2.1"
+version = "0.2.2"
 
 [[package]]
 name = "tezos-smart-rollup-debug"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-encoding"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "nom",
  "tezos-smart-rollup-core",
@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-entrypoint"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -236,14 +236,14 @@ dependencies = [
 
 [[package]]
 name = "tezos-smart-rollup-host"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
 ]
 
 [[package]]
 name = "tezos-smart-rollup-panic-hook"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup-core",
 ]
