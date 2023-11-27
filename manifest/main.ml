@@ -898,6 +898,23 @@ let octez_risc_v_pvm =
   let archive_file = Format.sprintf "lib%s.a" base_name in
   let archive_output_file = Format.sprintf "target/release/%s" archive_file in
   let header_file = Format.sprintf "%s.h" base_name in
+  let replace_symbol original replaced =
+    assert (String.length original = String.length replaced) ;
+    Dune.
+      [
+        S "setenv";
+        S "LC_ALL";
+        S "C";
+        [
+          S "run";
+          S "sed";
+          S "-i''";
+          S "-e";
+          S (Format.sprintf "s/%s/%s/" original replaced);
+          S archive_file;
+        ];
+      ]
+  in
   let rust_foreign_library =
     Dune.
       [
@@ -926,17 +943,11 @@ let octez_risc_v_pvm =
               S "progn";
               [S "run"; S "cargo"; S "build"; S "--release"];
               [S "copy"; S archive_output_file; S archive_file];
-              [
-                S "run";
-                S "sed";
-                S "-i";
-                (* XXX: https://gitlab.com/tezos/tezos/-/issues/6630
-                   Rename ___rdl_oom because it would conflict with other
-                   Rust staticlibs (e.g. libwasmer, librustzcash) when linking
-                   everything together into one artifact. *)
-                S "s/___rdl_oom/tz_rdl_oo0/";
-                S "liboctez_risc_v_pvm.a";
-              ];
+              (* XXX: https://gitlab.com/tezos/tezos/-/issues/6630
+                 Rename ___rdl_oom because it would conflict with other
+                 Rust staticlibs (e.g. libwasmer, librustzcash) when linking
+                 everything together into one artifact. *)
+              replace_symbol "___rdl_oom" "tz_rdl_oo0";
             ];
           ];
         ];
