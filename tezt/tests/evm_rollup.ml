@@ -346,7 +346,7 @@ let setup_evm_kernel ?config ?kernel_installee
       ~default_operator:rollup_operator_key
   in
   (* Start a rollup node *)
-  let* {boot_sector; _} =
+  let* {output; _} =
     let base_installee, installee =
       match kernel_installee with
       | Some {base_installee; installee} -> (base_installee, installee)
@@ -362,7 +362,7 @@ let setup_evm_kernel ?config ?kernel_installee
   let* sc_rollup_address =
     originate_sc_rollup
       ~kind:pvm_kind
-      ~boot_sector
+      ~boot_sector:("file:" ^ output)
       ~parameters_ty:evm_type
       ~src:originator_key
       client
