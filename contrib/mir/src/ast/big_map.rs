@@ -6,7 +6,11 @@
 /******************************************************************************/
 
 use num_bigint::BigInt;
-use std::{collections::BTreeMap, fmt::Display};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    fmt::Display,
+    mem,
+};
 use typed_arena::Arena;
 
 use super::{Micheline, Type, TypedValue};
@@ -413,6 +417,347 @@ mod test_big_map_operations {
             storage,
             TypedValue::int(3),
             Some(TypedValue::int(3)),
+        );
+    }
+}
+
+impl<'a> TypedValue<'a> {
+    /// Traverses a `TypedValue` and applies the `put_res` function on all big
+    /// maps inside it.
+    fn collect_big_maps<'b>(&'b mut self, put_res: &mut impl FnMut(&'b mut BigMap<'a>)) {
+        use crate::ast::Or::*;
+        use TypedValue::*;
+        match self {
+            Int(_) => {}
+            Nat(_) => {}
+            Mutez(_) => {}
+            Bool(_) => {}
+            Unit => {}
+            String(_) => {}
+            Bytes(_) => {}
+            Address(_) => {}
+            KeyHash(_) => {}
+            Key(_) => {}
+            Signature(_) => {}
+            ChainId(_) => {}
+            Contract(_) => {}
+            Timestamp(_) => {}
+            Bls12381Fr(_) => {}
+            Bls12381G1(_) => {}
+            Bls12381G2(_) => {}
+            Pair(p) => {
+                p.0.collect_big_maps(put_res);
+                p.1.collect_big_maps(put_res);
+            }
+            Or(p) => match p.as_mut() {
+                Left(l) => l.collect_big_maps(put_res),
+                Right(r) => r.collect_big_maps(put_res),
+            },
+            Option(p) => match p {
+                Some(x) => x.collect_big_maps(put_res),
+                None => {}
+            },
+            List(l) => l.iter_mut().for_each(|v| v.collect_big_maps(put_res)),
+            Set(_) => {
+                // Elements are comparable and so have no big maps
+            }
+            Map(m) => m.iter_mut().for_each(|(_k, v)| {
+                // Key is comparable as so has no big map, skipping it
+                v.collect_big_maps(put_res)
+            }),
+            Ticket(_) => {
+                // Value is comparable, has no big map
+            }
+            Lambda(_) => {
+                // Can contain only pushable values, thus no big maps
+            }
+            // TODO: next merge request
+            // actually take some big maps once they are present in TypedValue
+            Operation(op) => match &mut op.as_mut().operation {
+                crate::ast::Operation::TransferTokens(t) => t.param.collect_big_maps(put_res),
+                crate::ast::Operation::SetDelegate(_) => {}
+            },
+        }
+    }
+
+    pub fn view_big_maps_mut<'b>(&'b mut self, out: &mut Vec<&'b mut BigMap<'a>>) {
+        self.collect_big_maps(&mut |m| out.push(m));
+    }
+
+    pub fn view_big_map_ids<T>(&mut self, out: &mut Vec<BigMapId>) {
+        self.collect_big_maps(&mut |m| {
+            if let Some(id) = &m.id {
+                out.push(id.clone())
+            }
+        });
+    }
+}
+
+/// Given big map IDs before contract execution and big maps after the
+/// execution, dump all the updates to the lazy storage. All the big maps
+/// remaining unused will be removed from the storage.
+///
+/// After the call, [BigMap::overlay] field in all provided big maps is
+/// guaranteed to be empty and all [BigMap::id]s are guaranteed to be non-None.
+/// Also, some [BigMap::id] fields may change to avoid duplications.
+pub fn dump_big_map_updates<'a>(
+    storage: &mut impl LazyStorage<'a>,
+    started_with_map_ids: &[BigMapId],
+    finished_with_maps: &mut [&mut BigMap<'a>],
+) -> Result<(), LazyStorageError> {
+    // Note: this function is similar to `extract_lazy_storage_diff` from the
+    // Tezos protocol implementation. The difference is that we don't have
+    // their's `to_duplicate` argument.
+    //
+    // Temporarily we go with a simpler solution where each ID in
+    // `started_with_map_ids` is guaranteed to be used by only one big map, a
+    // big map that comes from parameter or storage value; these IDs are
+    // expected to be not used by big maps in other contracts. Consequences of
+    // this:
+    // * If a contract produces an operation with a big map, we immediately
+    // deduplicate big map ID there too (the Tezos protocol implementation does
+    // not).
+    // * There is no need to implement temporary lazy storage for now.
+
+    // The `finished_with_maps` vector above is supposed to contain all big maps
+    // remaining on stack at the end of contract execution. After this function
+    // call, we want the provided big maps to satisfy the following invariants:
+    // * No `BigMapId` appears twice. This ensures that a big map in the storage
+    //   cannot be updated in-parallel via different `Value::BigMap` values.
+    // * Big maps, whose IDs are gone, are removed from the lazy storage.
+    // * Best effort is made to avoid copying big maps in the lazy storage, big
+    //   maps are updated in-place when possible.
+
+    // First, we find big maps that are related to same big map IDs in the
+    // storage. This is necessary to understand which maps will be updated in
+    // lazy storage in-place and which have to be copied.
+    //
+    // With big map IDs we associate a non-empty list of big maps.
+    // Where "non-empty" is kept `(T, Vec<T>)` for convenience. Note
+    // that in the vast majority of the real-life cases big maps are not
+    // de-facto copied, so the vector will usually stay empty and produce no
+    // allocations.
+    type NonEmpty<T> = (T, Vec<T>);
+    let mut grouped_maps: BTreeMap<BigMapId, NonEmpty<&mut BigMap>> = BTreeMap::new();
+    for map in finished_with_maps {
+        match map.id {
+            Some(ref id) => {
+                // Insert to grouped_maps
+                match grouped_maps.entry(id.clone()) {
+                    Entry::Vacant(e) => {
+                        e.insert((map, Vec::new()));
+                    }
+                    Entry::Occupied(e) => e.into_mut().1.push(map),
+                }
+            }
+            None => {
+                // ID is empty, meaning that the entire big map is still in
+                // memory. We have to create a new map in the storage.
+                let id = storage.big_map_new(&map.key_type, &map.value_type)?;
+                storage.big_map_bulk_update(&id, mem::take(&mut map.overlay))?;
+                map.id = Some(id)
+            }
+        };
+    }
+
+    // Remove big maps that were gone.
+    for map_id in started_with_map_ids {
+        // If not found in `finished_with_maps`...
+        if !grouped_maps.contains_key(map_id) {
+            storage.big_map_remove(map_id)?
+        }
+    }
+
+    // Update lazy storage with data from overlay.
+    for (id, (main_map, other_maps)) in grouped_maps {
+        // If there are any big maps with duplicate ID, we first copy them in
+        // the storage.
+        for map in other_maps {
+            let new_id = storage.big_map_copy(&id)?;
+            storage.big_map_bulk_update(&new_id, mem::take(&mut map.overlay))?;
+            map.id = Some(new_id)
+        }
+        // The only remaining big map we update in the lazy storage in-place.
+        storage.big_map_bulk_update(&id, mem::take(&mut main_map.overlay))?
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod test_big_map_to_storage_update {
+    use crate::ast::Type;
+
+    use super::*;
+
+    #[track_caller]
+    fn check_is_dumped_map(map: BigMap, id: BigMapId) {
+        assert_eq!((map.id, map.overlay), (Some(id), BTreeMap::new()));
+    }
+
+    #[test]
+    fn test_map_from_memory() {
+        let storage = &mut InMemoryLazyStorage::new();
+        let mut map = BigMap {
+            id: None,
+            overlay: BTreeMap::from([
+                (TypedValue::int(1), Some(TypedValue::int(1))),
+                (TypedValue::int(2), Some(TypedValue::int(2))),
+            ]),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        dump_big_map_updates(storage, &[], &mut [&mut map]).unwrap();
+
+        check_is_dumped_map(map, BigMapId(0.into()));
+        assert_eq!(
+            storage.big_maps,
+            BTreeMap::from([(
+                BigMapId(0.into()),
+                MapInfo {
+                    map: BTreeMap::from([
+                        (TypedValue::int(1), TypedValue::int(1)),
+                        (TypedValue::int(2), TypedValue::int(2))
+                    ]),
+                    key_type: Type::Int,
+                    value_type: Type::Int
+                }
+            )])
+        )
+    }
+
+    #[test]
+    fn test_map_updates_to_storage() {
+        let storage = &mut InMemoryLazyStorage::new();
+        let map_id = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&map_id, TypedValue::int(0), Some(TypedValue::int(0)))
+            .unwrap();
+        storage
+            .big_map_update(&map_id, TypedValue::int(1), Some(TypedValue::int(1)))
+            .unwrap();
+        let mut map = BigMap {
+            id: Some(map_id),
+            overlay: BTreeMap::from([
+                (TypedValue::int(0), None),
+                (TypedValue::int(1), Some(TypedValue::int(5))),
+                (TypedValue::int(2), None),
+                (TypedValue::int(3), Some(TypedValue::int(3))),
+            ]),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        dump_big_map_updates(storage, &[], &mut [&mut map]).unwrap();
+
+        check_is_dumped_map(map, BigMapId(0.into()));
+        assert_eq!(
+            storage.big_maps,
+            BTreeMap::from([(
+                BigMapId(0.into()),
+                MapInfo {
+                    map: BTreeMap::from([
+                        (TypedValue::int(1), TypedValue::int(5)),
+                        (TypedValue::int(3), TypedValue::int(3))
+                    ]),
+                    key_type: Type::Int,
+                    value_type: Type::Int
+                }
+            )])
+        )
+    }
+
+    #[test]
+    fn test_duplicate_ids() {
+        let storage = &mut InMemoryLazyStorage::new();
+        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let mut map1_1 = BigMap {
+            id: Some(map_id1.clone()),
+            overlay: BTreeMap::from([(TypedValue::int(11), Some(TypedValue::int(11)))]),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        let mut map1_2 = BigMap {
+            id: Some(map_id1),
+            overlay: BTreeMap::from([(TypedValue::int(12), Some(TypedValue::int(12)))]),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        let mut map2 = BigMap {
+            id: Some(map_id2),
+            overlay: BTreeMap::from([(TypedValue::int(2), Some(TypedValue::int(2)))]),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        dump_big_map_updates(storage, &[], &mut [&mut map1_1, &mut map1_2, &mut map2]).unwrap();
+
+        check_is_dumped_map(map1_1, BigMapId(0.into()));
+        check_is_dumped_map(map1_2, BigMapId(2.into())); // newly created map
+        check_is_dumped_map(map2, BigMapId(1.into()));
+
+        assert_eq!(
+            storage.big_maps,
+            BTreeMap::from([
+                (
+                    BigMapId(0.into()),
+                    MapInfo {
+                        map: BTreeMap::from([(TypedValue::int(11), TypedValue::int(11))]),
+                        key_type: Type::Int,
+                        value_type: Type::Int
+                    }
+                ),
+                (
+                    BigMapId(1.into()),
+                    MapInfo {
+                        map: BTreeMap::from([(TypedValue::int(2), TypedValue::int(2))]),
+                        key_type: Type::Int,
+                        value_type: Type::Int
+                    }
+                ),
+                (
+                    BigMapId(2.into()),
+                    MapInfo {
+                        map: BTreeMap::from([(TypedValue::int(12), TypedValue::int(12))]),
+                        key_type: Type::Int,
+                        value_type: Type::Int
+                    }
+                )
+            ])
+        );
+    }
+
+    #[test]
+    fn test_remove_ids() {
+        let storage = &mut InMemoryLazyStorage::new();
+        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
+            .unwrap();
+        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&map_id2, TypedValue::int(0), Some(TypedValue::int(0)))
+            .unwrap();
+        let mut map1 = BigMap {
+            id: Some(map_id1.clone()),
+            overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        dump_big_map_updates(storage, &[map_id1, map_id2], &mut [&mut map1]).unwrap();
+
+        assert_eq!(
+            storage.big_maps,
+            BTreeMap::from([(
+                BigMapId(0.into()),
+                MapInfo {
+                    map: BTreeMap::from([
+                        (TypedValue::int(0), TypedValue::int(0)),
+                        (TypedValue::int(1), TypedValue::int(1))
+                    ]),
+                    key_type: Type::Int,
+                    value_type: Type::Int
+                }
+            )])
         );
     }
 }

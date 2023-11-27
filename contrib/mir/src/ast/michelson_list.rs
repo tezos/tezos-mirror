@@ -31,6 +31,10 @@ impl<T> MichelsonList<T> {
         // delegate to `impl IntoIterator for &MichelsonList`
         self.into_iter()
     }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        self.0.iter_mut().rev()
+    }
 }
 
 impl<T> Default for MichelsonList<T> {
