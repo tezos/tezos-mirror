@@ -1957,7 +1957,7 @@ module Tx_kernel_e2e = struct
     let* _ = Dac_node.init_config observer_node in
     let* () = Dac_node.run observer_node in
     let* () = check_liveness_and_readiness observer_node in
-    let* boot_sector =
+    let* {boot_sector; _} =
       prepare_installer_kernel
         ~preimages_dir:
           (Filename.concat
@@ -2119,7 +2119,7 @@ module Tx_kernel_e2e = struct
       scenario
     in
     let sc_rollup_node = List.nth rollup_nodes 0 in
-    let* boot_sector =
+    let* {boot_sector; _} =
       prepare_installer_kernel
         ~preimages_dir:
           (Filename.concat

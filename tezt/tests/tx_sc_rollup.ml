@@ -282,7 +282,7 @@ let setup_classic ~commitment_period ~challenge_window protocol =
       ~base_dir:(Client.base_dir client)
       ~default_operator:bootstrap1_key
   in
-  let* boot_sector =
+  let* {boot_sector; _} =
     prepare_installer_kernel
       ~base_installee:"./"
       ~preimages_dir:
