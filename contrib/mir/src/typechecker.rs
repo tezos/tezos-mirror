@@ -19,6 +19,7 @@ pub mod type_props;
 use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
+use crate::ast::big_map::{BigMap, BigMapId, LazyStorageError};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
@@ -97,6 +98,10 @@ pub enum TcError {
     TodoInstr(Prim),
     #[error("Unhandled type: {0}")]
     TodoType(Prim),
+    #[error("big map with ID {0} not found in the lazy storage")]
+    BigMapNotFound(BigInt),
+    #[error("lazy storage error: {0:?}")]
+    LazyStorageError(LazyStorageError),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -386,6 +391,15 @@ fn parse_ty_with_entrypoints(
             Type::new_map(k, v)
         }
         App(map, ..) => unexpected()?,
+
+        App(big_map, [k, v], _) => {
+            let k = parse_ty(ctx, k)?;
+            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            let v = parse_ty(ctx, v)?;
+            v.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            Type::new_big_map(k, v)
+        }
+        App(big_map, ..) => unexpected()?,
 
         App(bytes, [], _) => Type::Bytes,
         App(bytes, ..) => unexpected()?,
@@ -1726,6 +1740,11 @@ pub(crate) fn typecheck_value<'a>(
     use Type as T;
     use TypedValue as TV;
     ctx.gas.consume(gas::tc_cost::VALUE_STEP)?;
+    macro_rules! invalid_value_for_type {
+        () => {
+            TcError::InvalidValueForType(format!("{v:?}"), t.clone())
+        };
+    }
     Ok(match (t, v) {
         (T::Nat, V::Int(n)) => TV::Nat(BigUint::try_from(n)?),
         (T::Int, V::Int(n)) => TV::Int(n.clone()),
@@ -1766,6 +1785,48 @@ pub(crate) fn typecheck_value<'a>(
         (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
             TV::Map(typecheck_map(ctx, t, tk, tv, vs, |v| v)?)
+        }
+        (T::BigMap(m), v) => {
+            let (id_opt, vs_opt) = match v {
+                // All valid instantiations of big map are mentioned in
+                // https://tezos.gitlab.io/michelson-reference/#type-big_map
+                V::Int(i) => (Some(i.clone()), None),
+                V::Seq(vs) => (None, Some(vs)),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs)),
+                _ => return Err(invalid_value_for_type!()),
+            };
+
+            let (tk, tv) = m.as_ref();
+
+            let big_map_id = if let Some(id) = id_opt {
+                let big_map_id = BigMapId(id.clone());
+                let (key_type, value_type) = ctx
+                    .big_map_storage
+                    .big_map_get_type(&big_map_id)
+                    .map_err(TcError::LazyStorageError)?
+                    .ok_or(TcError::BigMapNotFound(id))?;
+
+                // Clone to avoid conflicting borrows of ctx.
+                let key_type = &key_type.clone();
+                let value_type = &value_type.clone();
+                ensure_ty_eq(ctx, key_type, tk)?;
+                ensure_ty_eq(ctx, value_type, tv)?;
+                Some(big_map_id)
+            } else {
+                None
+            };
+
+            let overlay = if let Some(vs) = vs_opt {
+                typecheck_map(ctx, t, tk, tv, vs, Some)?
+            } else {
+                BTreeMap::default()
+            };
+            TV::BigMap(BigMap {
+                id: big_map_id,
+                overlay,
+                key_type: tk.clone(),
+                value_type: tv.clone(),
+            })
         }
         (T::Address, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
@@ -1863,7 +1924,7 @@ pub(crate) fn typecheck_value<'a>(
                         amount: irrefutable_match!(c.1; TV::Nat),
                     })
                 }
-                _ => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
+                _ => return Err(invalid_value_for_type!()),
             }
         }
         (T::Bls12381Fr, V::Int(i)) => {
@@ -1872,26 +1933,17 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::Bls12381Fr, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_FR)?;
-            TV::Bls12381Fr(
-                bls::Fr::from_bytes(bs)
-                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
-            )
+            TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G1)?;
-            TV::new_bls12381_g1(
-                bls::G1::from_bytes(bs)
-                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
-            )
+            TV::new_bls12381_g1(bls::G1::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G2)?;
-            TV::new_bls12381_g2(
-                bls::G2::from_bytes(bs)
-                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
-            )
+            TV::new_bls12381_g2(bls::G2::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
-        (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
+        (_, _) => return Err(invalid_value_for_type!()),
     })
 }
 
@@ -4539,6 +4591,158 @@ mod typecheck_tests {
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
             ))
+        );
+    }
+
+    #[test]
+    fn test_invalid_big_map_key_type() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter (big_map (list unit) unit);",
+                "storage nat;",
+                "code FAILWITH;",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_invalid_big_map_value_type() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter (big_map int (contract unit));",
+                "storage nat;",
+                "code { UNIT; FAILWITH };",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::BigMapValue,
+                Type::new_contract(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    // Test that the empty sequence cannot be given the type `big_map (list unit) unit`
+    // because `list unit` is not comparable and therefore `big_map (list unit) unit` is
+    // not well formed.
+    fn test_invalid_big_map_value() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            Micheline::Seq(&[])
+                .typecheck_value(&mut ctx, &app!(big_map[app!(list[app!(unit)]), app!(unit)])),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parsing_big_map_value() {
+        let mut ctx = Ctx::default();
+        let storage = &mut ctx.big_map_storage;
+        let id0 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&id0, TypedValue::int(5), Some(TypedValue::int(5)))
+            .unwrap();
+
+        // Only ID - ok case
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(0.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: Some(id0.clone()),
+                overlay: BTreeMap::new(),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
+        );
+
+        // Only ID - non-existing big map
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(5.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Err(TcError::BigMapNotFound(5.into()))
+        );
+
+        // Only ID - key mismatch
+        // NB: Octez implementation just says that big map does not exists,
+        // but this difference seems fine.
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(0.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Nat, Type::Int)
+            ),
+            Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Nat)))
+        );
+
+        // Only ID - value mismatch
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(0.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Nat)
+            ),
+            Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Nat)))
+        );
+
+        // Only overlay - ok case
+        assert_eq!(
+            typecheck_value(
+                &seq!(app!(Elt[7, 8])),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: None,
+                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
+        );
+
+        // Only overlay - key type mismatch case
+        assert_eq!(
+            typecheck_value(
+                &seq!(app!(Elt["a", 8])),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Err(TcError::InvalidValueForType(
+                "String(\"a\")".into(),
+                Type::Int
+            ))
+        );
+
+        // ID and overlay - ok case
+        assert_eq!(
+            typecheck_value(
+                &app!(Pair[0, seq!(app!(Elt[7, 8]))]),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: Some(id0),
+                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
         );
     }
 

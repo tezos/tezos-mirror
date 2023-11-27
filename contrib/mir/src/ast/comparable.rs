@@ -54,8 +54,8 @@ impl PartialOrd for TypedValue<'_> {
 
             // non-comparable types
             (
-                List(..) | Set(..) | Map(..) | Contract(..) | Operation(_) | Ticket(..)
-                | Lambda(..) | Bls12381Fr(..) | Bls12381G1(..) | Bls12381G2(..),
+                List(..) | Set(..) | Map(..) | BigMap(..) | Contract(..) | Operation(_)
+                | Ticket(..) | Lambda(..) | Bls12381Fr(..) | Bls12381G1(..) | Bls12381G2(..),
                 _,
             ) => None,
         }

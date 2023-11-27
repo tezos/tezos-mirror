@@ -126,8 +126,7 @@ pub trait IntoMicheline<'a> {
 /// supported. Useful for total match in the typechecker.
 macro_rules! micheline_unsupported_types {
     () => {
-        Prim::big_map
-            | Prim::chest
+        Prim::chest
             | Prim::chest_key
             | Prim::tx_rollup_l2_address
             | Prim::sapling_state
