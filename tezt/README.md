@@ -146,3 +146,9 @@ To see all the tests associated with a product, run:
 ```shell
 scripts/tests_of_product.sh PRODUCT
 ```
+
+To see the products associated with a set of tests, run:
+
+```shell
+scripts/tests_of_product.sh --reverse TSL_EXPRESSION
+```
