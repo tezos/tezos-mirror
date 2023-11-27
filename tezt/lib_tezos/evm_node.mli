@@ -28,7 +28,8 @@
 (** EVM node server state. *)
 type t
 
-(** [create ?runner ?devmode ?rpc_addr ?rpc_port rollup_node] creates an EVM node server.
+(** [create ?runner ?data_dir ?devmode ?rpc_addr ?rpc_port
+    rollup_node] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to ["127.0.0.1"] and a fresh port is
@@ -42,6 +43,7 @@ type t
 *)
 val create :
   ?runner:Runner.t ->
+  ?data_dir:string ->
   ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
@@ -52,10 +54,12 @@ val create :
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
-(** [init ?runner ?devmode ?rpc_addr ?rpc_port rollup_node] creates an EVM node server
-    with {!create} and runs it with {!run}. *)
+(** [init ?runner ?data_dir ?devmode ?rpc_addr ?rpc_port rollup_node]
+    creates an EVM node server with {!create} and runs it with
+    {!run}. *)
 val init :
   ?runner:Runner.t ->
+  ?data_dir:string ->
   ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
