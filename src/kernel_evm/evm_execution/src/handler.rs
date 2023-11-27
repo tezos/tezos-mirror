@@ -18,7 +18,6 @@ use crate::PrecompileSet;
 use crate::{storage, tick_model_opcodes};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
-use core::cmp::min;
 use core::convert::Infallible;
 use evm::executor::stack::Log;
 use evm::gasometer::{GasCost, Gasometer, MemoryCost};
@@ -29,6 +28,7 @@ use evm::{
 use host::runtime::Runtime;
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
+use std::cmp::min;
 use std::fmt::Debug;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::withdrawal::Withdrawal;
@@ -1406,6 +1406,20 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Err(err) => Capture::Exit((ethereum_error_to_exit_reason(err), None, vec![])),
         }
     }
+
+    fn nested_call_gas_limit(&mut self, target_gas: Option<u64>) -> Option<u64> {
+        target_gas.map(|gas| {
+            // Part of EIP-150: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md
+            let gas_remaining = self.gas_remaining();
+            let max_gas_limit = if self.config.call_l64_after_gas {
+                gas_remaining - gas_remaining / 64
+            } else {
+                gas_remaining
+            };
+
+            min(gas, max_gas_limit)
+        })
+    }
 }
 
 #[allow(unused_variables)]
@@ -1595,9 +1609,20 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         init_code: Vec<u8>,
         target_gas: Option<u64>,
     ) -> Capture<CreateOutcome, Self::CreateInterrupt> {
-        if let Err(err) = self.begin_inter_transaction(false, target_gas) {
+        let gas_limit = self.nested_call_gas_limit(target_gas);
+
+        if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
+            log!(
+                self.host,
+                Debug,
+                "Not enought gas for call. Required at least: {:?}",
+                gas_limit
+            );
+
             Capture::Exit((
-                ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{err:?}")))),
+                ExitReason::Fatal(ExitFatal::Other(Cow::from(
+                    "Out of gas before recursive create",
+                ))),
                 None,
                 vec![],
             ))
@@ -1617,16 +1642,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         is_static: bool,
         context: Context,
     ) -> Capture<CallOutcome, Self::CallInterrupt> {
-        let gas_limit = target_gas.map(|gas| {
-            // Part of EIP-150: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md
-            let max_gas_limit = if self.config.call_l64_after_gas {
-                gas - gas / 64
-            } else {
-                gas
-            };
-
-            min(max_gas_limit, self.gas_remaining())
-        });
+        let gas_limit = self.nested_call_gas_limit(target_gas);
 
         if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
             log!(
