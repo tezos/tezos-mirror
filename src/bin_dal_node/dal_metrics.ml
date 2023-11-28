@@ -121,11 +121,7 @@ module GS = struct
       ref Prometheus.LabelSetMap.empty
 
     let topic_as_label Types.Topic.{pkh; slot_index} =
-      Format.asprintf
-        "topic__pkh-%a__slot_index-%d }"
-        Signature.Public_key_hash.pp
-        pkh
-        slot_index
+      Format.asprintf "topic-%a-%d" Signature.Public_key_hash.pp pkh slot_index
 
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
 
