@@ -3,6 +3,13 @@ meta:
   endian: be
 doc: ! 'Encoding id: alpha.constants.fixed'
 types:
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   n:
     seq:
     - id: n
@@ -23,15 +30,15 @@ seq:
 - id: max_anon_ops_per_block
   type: u1
 - id: max_operation_data_length
-  type: s4
+  type: int31
 - id: max_proposals_per_delegate
   type: u1
 - id: max_micheline_node_count
-  type: s4
+  type: int31
 - id: max_micheline_bytes_limit
-  type: s4
+  type: int31
 - id: max_allowed_global_constants_depth
-  type: s4
+  type: int31
 - id: cache_layout_size
   type: u1
 - id: michelson_maximum_type_size
@@ -39,8 +46,8 @@ seq:
 - id: max_slashing_period
   type: u1
 - id: smart_rollup_max_wrapped_proof_binary_size
-  type: s4
+  type: int31
 - id: smart_rollup_message_size_limit
-  type: s4
+  type: int31
 - id: smart_rollup_max_number_of_messages_per_level
   type: n

@@ -11,7 +11,9 @@ types:
   baking_reward_per_endorsement_0:
     seq:
     - id: len_baking_reward_per_endorsement
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: baking_reward_per_endorsement
       type: baking_reward_per_endorsement
       size: len_baking_reward_per_endorsement
@@ -27,7 +29,9 @@ types:
   bootstrap_accounts_0:
     seq:
     - id: len_bootstrap_accounts
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bootstrap_accounts
       type: bootstrap_accounts
       size: len_bootstrap_accounts
@@ -50,7 +54,9 @@ types:
   bootstrap_contracts_0:
     seq:
     - id: len_bootstrap_contracts
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bootstrap_contracts
       type: bootstrap_contracts
       size: len_bootstrap_contracts
@@ -63,12 +69,14 @@ types:
       type: id_007__psdelph1__mutez
     - id: script
       type: id_007__psdelph1__scripted__contracts
-  code:
+  bytes_dyn_uint30:
     seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   commitments:
     seq:
     - id: commitments_entries
@@ -77,7 +85,9 @@ types:
   commitments_0:
     seq:
     - id: len_commitments
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: commitments
       type: commitments
       size: len_commitments
@@ -97,7 +107,9 @@ types:
   endorsement_reward_0:
     seq:
     - id: len_endorsement_reward
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: endorsement_reward
       type: endorsement_reward
       size: len_endorsement_reward
@@ -112,9 +124,16 @@ types:
   id_007__psdelph1__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
+      type: bytes_dyn_uint30
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   n:
     seq:
     - id: n
@@ -177,12 +196,6 @@ types:
     - id: public_key_unknown_field1
       type: id_007__psdelph1__mutez
       doc: id_007__psdelph1__mutez
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
   time_between_blocks:
     seq:
     - id: time_between_blocks_entries
@@ -191,7 +204,9 @@ types:
   time_between_blocks_0:
     seq:
     - id: len_time_between_blocks
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: time_between_blocks
       type: time_between_blocks
       size: len_time_between_blocks
@@ -238,13 +253,13 @@ seq:
   type: u1
   enum: bool
 - id: security_deposit_ramp_up_cycles
-  type: s4
+  type: int31
   if: (security_deposit_ramp_up_cycles_tag == bool::true)
 - id: no_reward_cycles_tag
   type: u1
   enum: bool
 - id: no_reward_cycles
-  type: s4
+  type: int31
   if: (no_reward_cycles_tag == bool::true)
 - id: preserved_cycles
   type: u1
@@ -273,7 +288,7 @@ seq:
 - id: seed_nonce_revelation_tip
   type: id_007__psdelph1__mutez
 - id: origination_size
-  type: s4
+  type: int31
 - id: block_security_deposit
   type: id_007__psdelph1__mutez
 - id: endorsement_security_deposit

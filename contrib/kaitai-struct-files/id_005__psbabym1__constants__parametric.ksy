@@ -7,6 +7,13 @@ types:
     seq:
     - id: id_005__psbabym1__mutez
       type: n
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   n:
     seq:
     - id: n
@@ -27,7 +34,9 @@ types:
   time_between_blocks_0:
     seq:
     - id: len_time_between_blocks
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: time_between_blocks
       type: time_between_blocks
       size: len_time_between_blocks
@@ -76,7 +85,7 @@ seq:
 - id: seed_nonce_revelation_tip
   type: id_005__psbabym1__mutez
 - id: origination_size
-  type: s4
+  type: int31
 - id: block_security_deposit
   type: id_005__psbabym1__mutez
 - id: endorsement_security_deposit

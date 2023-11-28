@@ -32,7 +32,14 @@ let%expect_test "test duplicate types" =
       fancy_type_0:
         seq:
         - id: fancy_type
+          type: int31
+      int31:
+        seq:
+        - id: int31
           type: s4
+          valid:
+            min: -1073741824
+            max: 1073741823
     enums:
       bool:
         0: false

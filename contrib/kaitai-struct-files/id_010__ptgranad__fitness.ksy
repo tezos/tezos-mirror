@@ -3,6 +3,14 @@ meta:
   endian: be
 doc: ! 'Encoding id: 010-PtGRANAD.fitness'
 types:
+  bytes_dyn_uint30:
+    seq:
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   fitness:
     seq:
     - id: fitness_entries
@@ -11,16 +19,16 @@ types:
   fitness_0:
     seq:
     - id: len_fitness
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: fitness
       type: fitness
       size: len_fitness
   fitness__elem:
     seq:
-    - id: len_fitness__elem
-      type: s4
     - id: fitness__elem
-      size: len_fitness__elem
+      type: bytes_dyn_uint30
   fitness_entries:
     seq:
     - id: fitness__elem

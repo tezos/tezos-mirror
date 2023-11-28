@@ -162,13 +162,15 @@ let%expect_test "test union with structures inside" =
         - id: b_field0
           type: u2
         - id: b_field1
-          type: b_field1
-      b_field1:
+          type: bytes_dyn_uint30
+      bytes_dyn_uint30:
         seq:
-        - id: len_b_field1
-          type: s4
-        - id: b_field1
-          size: len_b_field1
+        - id: len_bytes_dyn_uint30
+          type: u4
+          valid:
+            max: 1073741823
+        - id: bytes_dyn_uint30
+          size: len_bytes_dyn_uint30
       c:
         seq:
         - id: l

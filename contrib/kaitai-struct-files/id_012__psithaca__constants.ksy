@@ -11,7 +11,9 @@ types:
   cache_layout_0:
     seq:
     - id: len_cache_layout
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: cache_layout
       type: cache_layout
       size: len_cache_layout
@@ -31,6 +33,13 @@ types:
     seq:
     - id: id_012__psithaca__mutez
       type: n
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -77,7 +86,9 @@ types:
   round_robin_over_delegates_0:
     seq:
     - id: len_round_robin_over_delegates
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: round_robin_over_delegates
       type: round_robin_over_delegates
       size: len_round_robin_over_delegates
@@ -94,7 +105,9 @@ types:
   round_robin_over_delegates_entries:
     seq:
     - id: len_round_robin_over_delegates_elt
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: round_robin_over_delegates_elt
       type: round_robin_over_delegates_elt
       size: len_round_robin_over_delegates_elt
@@ -127,15 +140,15 @@ seq:
 - id: max_anon_ops_per_block
   type: u1
 - id: max_operation_data_length
-  type: s4
+  type: int31
 - id: max_proposals_per_delegate
   type: u1
 - id: max_micheline_node_count
-  type: s4
+  type: int31
 - id: max_micheline_bytes_limit
-  type: s4
+  type: int31
 - id: max_allowed_global_constants_depth
-  type: s4
+  type: int31
 - id: cache_layout
   type: cache_layout_0
 - id: michelson_maximum_type_size
@@ -161,7 +174,7 @@ seq:
 - id: seed_nonce_revelation_tip
   type: id_012__psithaca__mutez
 - id: origination_size
-  type: s4
+  type: int31
 - id: baking_reward_fixed_portion
   type: id_012__psithaca__mutez
 - id: baking_reward_bonus_per_slot
@@ -191,15 +204,15 @@ seq:
 - id: delay_increment_per_round
   type: s8
 - id: consensus_committee_size
-  type: s4
+  type: int31
 - id: consensus_threshold
-  type: s4
+  type: int31
 - id: minimal_participation_ratio
   type: minimal_participation_ratio
 - id: max_slashing_period
-  type: s4
+  type: int31
 - id: frozen_deposits_percentage
-  type: s4
+  type: int31
 - id: double_baking_punishment
   type: id_012__psithaca__mutez
 - id: ratio_of_frozen_deposits_slashed_per_double_endorsement

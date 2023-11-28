@@ -20,6 +20,13 @@ types:
     seq:
     - id: id_014__ptkathma__mutez
       type: n
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -105,7 +112,7 @@ seq:
 - id: seed_nonce_revelation_tip
   type: id_014__ptkathma__mutez
 - id: origination_size
-  type: s4
+  type: int31
 - id: baking_reward_fixed_portion
   type: id_014__ptkathma__mutez
 - id: baking_reward_bonus_per_slot
@@ -135,15 +142,15 @@ seq:
 - id: delay_increment_per_round
   type: s8
 - id: consensus_committee_size
-  type: s4
+  type: int31
 - id: consensus_threshold
-  type: s4
+  type: int31
 - id: minimal_participation_ratio
   type: minimal_participation_ratio
 - id: max_slashing_period
-  type: s4
+  type: int31
 - id: frozen_deposits_percentage
-  type: s4
+  type: int31
 - id: double_baking_punishment
   type: id_014__ptkathma__mutez
 - id: ratio_of_frozen_deposits_slashed_per_double_endorsement
@@ -162,7 +169,7 @@ seq:
   size: 32
   if: (initial_seed_tag == bool::true)
 - id: cache_script_size
-  type: s4
+  type: int31
 - id: cache_stake_distribution_cycles
   type: s1
 - id: cache_sampler_state_cycles
@@ -171,31 +178,31 @@ seq:
   type: u1
   enum: bool
 - id: tx_rollup_origination_size
-  type: s4
+  type: int31
 - id: tx_rollup_hard_size_limit_per_inbox
-  type: s4
+  type: int31
 - id: tx_rollup_hard_size_limit_per_message
-  type: s4
+  type: int31
 - id: tx_rollup_max_withdrawals_per_batch
-  type: s4
+  type: int31
 - id: tx_rollup_commitment_bond
   type: id_014__ptkathma__mutez
 - id: tx_rollup_finality_period
-  type: s4
+  type: int31
 - id: tx_rollup_withdraw_period
-  type: s4
+  type: int31
 - id: tx_rollup_max_inboxes_count
-  type: s4
+  type: int31
 - id: tx_rollup_max_messages_per_inbox
-  type: s4
+  type: int31
 - id: tx_rollup_max_commitments_count
-  type: s4
+  type: int31
 - id: tx_rollup_cost_per_byte_ema_factor
-  type: s4
+  type: int31
 - id: tx_rollup_max_ticket_payload_size
-  type: s4
+  type: int31
 - id: tx_rollup_rejection_max_proof_size
-  type: s4
+  type: int31
 - id: tx_rollup_sunset_level
   type: s4
 - id: dal_parametric
@@ -204,18 +211,18 @@ seq:
   type: u1
   enum: bool
 - id: sc_rollup_origination_size
-  type: s4
+  type: int31
 - id: sc_rollup_challenge_window_in_blocks
-  type: s4
+  type: int31
 - id: sc_rollup_max_available_messages
-  type: s4
+  type: int31
 - id: sc_rollup_stake_amount
   type: id_014__ptkathma__mutez
 - id: sc_rollup_commitment_period_in_blocks
-  type: s4
+  type: int31
 - id: sc_rollup_max_lookahead_in_blocks
   type: s4
 - id: sc_rollup_max_active_outbox_levels
   type: s4
 - id: sc_rollup_max_outbox_messages_per_level
-  type: s4
+  type: int31

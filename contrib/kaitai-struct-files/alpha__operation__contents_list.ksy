@@ -184,7 +184,7 @@ types:
       type: drain_delegate
       if: (alpha__operation_with_legacy_attestation_name__alpha__contents_tag == alpha__operation_with_legacy_attestation_name__alpha__contents_tag::drain_delegate)
     - id: failing_noop
-      type: arbitrary
+      type: bytes_dyn_uint30
       if: (alpha__operation_with_legacy_attestation_name__alpha__contents_tag == alpha__operation_with_legacy_attestation_name__alpha__contents_tag::failing_noop)
     - id: register_global_constant
       type: register_global_constant
@@ -236,21 +236,9 @@ types:
   alpha__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
-  annots:
-    seq:
-    - id: len_annots
-      type: s4
-    - id: annots
-      size: len_annots
-  arbitrary:
-    seq:
-    - id: len_arbitrary
-      type: s4
-    - id: arbitrary
-      size: len_arbitrary
+      type: bytes_dyn_uint30
   args:
     seq:
     - id: args_entries
@@ -259,7 +247,9 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: args
       type: args
       size: len_args
@@ -285,7 +275,9 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh1
       type: bh1
       size: len_bh1
@@ -296,16 +288,20 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh2
       type: bh2
       size: len_bh2
-  bytes:
+  bytes_dyn_uint30:
     seq:
-    - id: len_bytes
-      type: s4
-    - id: bytes
-      size: len_bytes
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   circuits_info:
     seq:
     - id: circuits_info_entries
@@ -314,30 +310,20 @@ types:
   circuits_info_0:
     seq:
     - id: len_circuits_info
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: circuits_info
       type: circuits_info
       size: len_circuits_info
-  circuits_info_elt_field0:
-    seq:
-    - id: len_circuits_info_elt_field0
-      type: s4
-    - id: circuits_info_elt_field0
-      size: len_circuits_info_elt_field0
   circuits_info_entries:
     seq:
     - id: circuits_info_elt_field0
-      type: circuits_info_elt_field0
+      type: bytes_dyn_uint30
     - id: circuits_info_elt_field1
       type: u1
       enum: circuits_info_elt_field1_tag
       doc: circuits_info_elt_field1_tag
-  code:
-    seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
   commitment:
     seq:
     - id: compressed_state
@@ -353,7 +339,7 @@ types:
     - id: dal_page_id
       type: dal_page_id
     - id: dal_proof
-      type: dal_proof
+      type: bytes_dyn_uint30
   dal_attestation:
     seq:
     - id: attestation
@@ -370,12 +356,6 @@ types:
       type: u1
     - id: page_index
       type: s2
-  dal_proof:
-    seq:
-    - id: len_dal_proof
-      type: s4
-    - id: dal_proof
-      size: len_dal_proof
   dal_publish_slot_header:
     seq:
     - id: source
@@ -419,7 +399,9 @@ types:
   dissection_0:
     seq:
     - id: len_dissection
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: dissection
       type: dissection
       size: len_dissection
@@ -472,12 +454,6 @@ types:
       type: s4
     - id: block_payload_hash
       size: 32
-  entrypoint:
-    seq:
-    - id: len_entrypoint
-      type: s4
-    - id: entrypoint
-      size: len_entrypoint
   inbox__proof:
     seq:
     - id: level
@@ -485,7 +461,7 @@ types:
     - id: message_counter
       type: n
     - id: serialized_proof
-      type: serialized_proof
+      type: bytes_dyn_uint30
   increase_paid_storage:
     seq:
     - id: source
@@ -514,7 +490,9 @@ types:
   init_state_0:
     seq:
     - id: len_init_state
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: init_state
       type: init_state
       size: len_init_state
@@ -533,12 +511,13 @@ types:
     - id: reveal__proof
       type: reveal_proof
       if: (input_proof_tag == input_proof_tag::reveal__proof)
-  kernel:
+  int31:
     seq:
-    - id: len_kernel
+    - id: int31
       type: s4
-    - id: kernel
-      size: len_kernel
+      valid:
+        min: -1073741824
+        max: 1073741823
   message:
     seq:
     - id: message_entries
@@ -547,16 +526,16 @@ types:
   message_0:
     seq:
     - id: len_message
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: message
       type: message
       size: len_message
   message_entries:
     seq:
-    - id: len_message_elt
-      type: s4
     - id: message_elt
-      size: len_message_elt
+      type: bytes_dyn_uint30
   micheline__alpha__michelson_v1__expression:
     seq:
     - id: micheline__alpha__michelson_v1__expression_tag
@@ -566,7 +545,7 @@ types:
       type: z
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::int)
     - id: string
-      type: string
+      type: bytes_dyn_uint30
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::string)
     - id: sequence
       type: sequence_0
@@ -593,7 +572,7 @@ types:
       type: prim__generic
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__generic)
     - id: bytes
-      type: bytes
+      type: bytes_dyn_uint30
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::bytes)
   move:
     seq:
@@ -634,7 +613,9 @@ types:
   new_state_0:
     seq:
     - id: len_new_state
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: new_state
       type: new_state
       size: len_new_state
@@ -654,7 +635,9 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1
       size: len_op1
@@ -665,7 +648,9 @@ types:
   op1_2:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1_1
       size: len_op1
@@ -676,7 +661,9 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2
       size: len_op2
@@ -687,21 +674,25 @@ types:
   op2_2:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2_1
       size: len_op2
   op_0:
     seq:
     - id: len_op
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op
       type: op
       size: len_op
   op_elt_field0:
     seq:
     - id: op_code
-      type: s4
+      type: int31
     - id: price
       type: price
     - id: l1_dst
@@ -756,25 +747,13 @@ types:
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: script
       type: alpha__scripted__contracts
-  output_proof:
-    seq:
-    - id: len_output_proof
-      type: s4
-    - id: output_proof
-      size: len_output_proof
   parameters:
     seq:
     - id: entrypoint
       type: alpha__entrypoint
       doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
-      type: value
-  parameters_ty:
-    seq:
-    - id: len_parameters_ty
-      type: s4
-    - id: parameters_ty
-      size: len_parameters_ty
+      type: bytes_dyn_uint30
   payload:
     seq:
     - id: payload_entries
@@ -783,7 +762,9 @@ types:
   payload_0:
     seq:
     - id: len_payload
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: payload
       type: payload
       size: len_payload
@@ -799,16 +780,12 @@ types:
   pending_pis_0:
     seq:
     - id: len_pending_pis
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: pending_pis
       type: pending_pis
       size: len_pending_pis
-  pending_pis_elt_field0:
-    seq:
-    - id: len_pending_pis_elt_field0
-      type: s4
-    - id: pending_pis_elt_field0
-      size: len_pending_pis_elt_field0
   pending_pis_elt_field1:
     seq:
     - id: new_state
@@ -821,7 +798,7 @@ types:
   pending_pis_entries:
     seq:
     - id: pending_pis_elt_field0
-      type: pending_pis_elt_field0
+      type: bytes_dyn_uint30
     - id: pending_pis_elt_field1
       type: pending_pis_elt_field1
   preendorsement:
@@ -853,7 +830,7 @@ types:
     - id: arg
       type: micheline__alpha__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__2_args__no_annots:
     seq:
     - id: prim
@@ -871,7 +848,7 @@ types:
     - id: arg2
       type: micheline__alpha__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__generic:
     seq:
     - id: prim
@@ -879,13 +856,13 @@ types:
     - id: args
       type: args_0
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__no_args__some_annots:
     seq:
     - id: prim
       type: alpha__michelson__v1__primitives
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   private_pis:
     seq:
     - id: private_pis_entries
@@ -894,16 +871,12 @@ types:
   private_pis_0:
     seq:
     - id: len_private_pis
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: private_pis
       type: private_pis
       size: len_private_pis
-  private_pis_elt_field0:
-    seq:
-    - id: len_private_pis_elt_field0
-      type: s4
-    - id: private_pis_elt_field0
-      size: len_private_pis_elt_field0
   private_pis_elt_field1:
     seq:
     - id: new_state
@@ -913,25 +886,19 @@ types:
   private_pis_entries:
     seq:
     - id: private_pis_elt_field0
-      type: private_pis_elt_field0
+      type: bytes_dyn_uint30
     - id: private_pis_elt_field1
       type: private_pis_elt_field1
   proof:
     seq:
     - id: pvm_step
-      type: pvm_step
+      type: bytes_dyn_uint30
     - id: input_proof_tag
       type: u1
       enum: bool
     - id: input_proof
       type: input_proof
       if: (input_proof_tag == bool::true)
-  proof_0:
-    seq:
-    - id: len_proof
-      type: s4
-    - id: proof
-      size: len_proof
   proposals:
     seq:
     - id: proposals_entries
@@ -940,7 +907,7 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: s4
+      type: u4
       valid:
         max: 640
     - id: proposals
@@ -993,18 +960,6 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
-  public_parameters:
-    seq:
-    - id: len_public_parameters
-      type: s4
-    - id: public_parameters
-      size: len_public_parameters
-  pvm_step:
-    seq:
-    - id: len_pvm_step
-      type: s4
-    - id: pvm_step
-      size: len_pvm_step
   raw_data:
     seq:
     - id: raw_data
@@ -1043,7 +998,7 @@ types:
     - id: storage_limit
       type: n
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   reveal:
     seq:
     - id: source
@@ -1085,7 +1040,9 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: sequence
       type: sequence
       size: len_sequence
@@ -1093,12 +1050,6 @@ types:
     seq:
     - id: sequence_elt
       type: micheline__alpha__michelson_v1__expression
-  serialized_proof:
-    seq:
-    - id: len_serialized_proof
-      type: s4
-    - id: serialized_proof
-      size: len_serialized_proof
   set_deposits_limit:
     seq:
     - id: source
@@ -1174,7 +1125,7 @@ types:
     - id: cemented_commitment
       size: 32
     - id: output_proof
-      type: output_proof
+      type: bytes_dyn_uint30
   smart_rollup_originate:
     seq:
     - id: source
@@ -1192,9 +1143,9 @@ types:
       type: u1
       enum: pvm_kind
     - id: kernel
-      type: kernel
+      type: bytes_dyn_uint30
     - id: parameters_ty
-      type: parameters_ty
+      type: bytes_dyn_uint30
     - id: whitelist_tag
       type: u1
       enum: bool
@@ -1315,30 +1266,6 @@ types:
     - id: proof
       type: proof
       if: (step_tag == step_tag::proof)
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
-  string:
-    seq:
-    - id: len_string
-      type: s4
-    - id: string
-      size: len_string
-  ticket_contents:
-    seq:
-    - id: len_ticket_contents
-      type: s4
-    - id: ticket_contents
-      size: len_ticket_contents
-  ticket_ty:
-    seq:
-    - id: len_ticket_ty
-      type: s4
-    - id: ticket_ty
-      size: len_ticket_ty
   transaction:
     seq:
     - id: source
@@ -1379,9 +1306,9 @@ types:
     - id: storage_limit
       type: n
     - id: ticket_contents
-      type: ticket_contents
+      type: bytes_dyn_uint30
     - id: ticket_ty
-      type: ticket_ty
+      type: bytes_dyn_uint30
     - id: ticket_ticketer
       type: alpha__contract_id
       doc: ! >-
@@ -1395,7 +1322,7 @@ types:
         A contract handle: A contract notation as given to an RPC or inside scripts.
         Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: entrypoint
-      type: entrypoint
+      type: bytes_dyn_uint30
   update:
     seq:
     - id: pending_pis
@@ -1405,7 +1332,7 @@ types:
     - id: fee_pi
       type: new_state_0
     - id: proof
-      type: proof_0
+      type: bytes_dyn_uint30
   update_consensus_key:
     seq:
     - id: source
@@ -1422,12 +1349,6 @@ types:
     - id: pk
       type: public_key
       doc: A Ed25519, Secp256k1, or P256 public key
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
   whitelist:
     seq:
     - id: whitelist_entries
@@ -1436,7 +1357,9 @@ types:
   whitelist_0:
     seq:
     - id: len_whitelist
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: whitelist
       type: whitelist
       size: len_whitelist
@@ -1472,13 +1395,13 @@ types:
     - id: storage_limit
       type: n
     - id: public_parameters
-      type: public_parameters
+      type: bytes_dyn_uint30
     - id: circuits_info
       type: circuits_info_0
     - id: init_state
       type: init_state_0
     - id: nb_ops
-      type: s4
+      type: int31
   zk_rollup_publish:
     seq:
     - id: source

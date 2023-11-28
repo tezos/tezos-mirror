@@ -3,12 +3,14 @@ meta:
   endian: be
 doc: ! 'Encoding id: 005-PsBabyM1.operation.internal'
 types:
-  code:
+  bytes_dyn_uint30:
     seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   delegation:
     seq:
     - id: delegate_tag
@@ -70,9 +72,9 @@ types:
   id_005__psbabym1__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
+      type: bytes_dyn_uint30
   n:
     seq:
     - id: n
@@ -124,7 +126,7 @@ types:
       type: id_005__psbabym1__entrypoint
       doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   public_key:
     seq:
     - id: public_key_tag
@@ -153,12 +155,6 @@ types:
     - id: p256
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::p256)
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
   transaction:
     seq:
     - id: amount
@@ -174,12 +170,6 @@ types:
     - id: parameters
       type: parameters
       if: (parameters_tag == bool::true)
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
 enums:
   bool:
     0: false

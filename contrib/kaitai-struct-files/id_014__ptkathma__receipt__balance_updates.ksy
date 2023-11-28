@@ -3,6 +3,14 @@ meta:
   endian: be
 doc: ! 'Encoding id: 014-PtKathma.receipt.balance_updates'
 types:
+  bytes_dyn_uint30:
+    seq:
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   frozen_bonds:
     seq:
     - id: contract
@@ -77,7 +85,9 @@ types:
   id_014__ptkathma__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_id_014__ptkathma__operation_metadata__alpha__balance_updates
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: id_014__ptkathma__operation_metadata__alpha__balance_updates
       type: id_014__ptkathma__operation_metadata__alpha__balance_updates
       size: len_id_014__ptkathma__operation_metadata__alpha__balance_updates
@@ -96,10 +106,8 @@ types:
       enum: origin_tag
   id_014__ptkathma__rollup_address:
     seq:
-    - id: len_id_014__ptkathma__rollup_address
-      type: s4
     - id: id_014__ptkathma__rollup_address
-      size: len_id_014__ptkathma__rollup_address
+      type: bytes_dyn_uint30
   id_014__ptkathma__tx_rollup_id:
     seq:
     - id: rollup_hash

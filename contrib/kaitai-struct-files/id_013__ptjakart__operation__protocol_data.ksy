@@ -29,12 +29,6 @@ types:
     - id: case__3
       type: s8
       if: (amount_tag == amount_tag::case__3)
-  arbitrary:
-    seq:
-    - id: len_arbitrary
-      type: s4
-    - id: arbitrary
-      size: len_arbitrary
   ballot:
     seq:
     - id: source
@@ -46,12 +40,6 @@ types:
       size: 32
     - id: ballot
       type: s1
-  batch:
-    seq:
-    - id: len_batch
-      type: s4
-    - id: batch
-      size: len_batch
   bh1:
     seq:
     - id: id_013__ptjakart__block_header__alpha__full_header
@@ -59,7 +47,9 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh1
       type: bh1
       size: len_bh1
@@ -70,16 +60,20 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bh2
       type: bh2
       size: len_bh2
-  boot_sector:
+  bytes_dyn_uint30:
     seq:
-    - id: len_boot_sector
-      type: s4
-    - id: boot_sector
-      size: len_boot_sector
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   case__0:
     seq:
     - id: case__0_field0
@@ -100,7 +94,9 @@ types:
   case__0_field3_0:
     seq:
     - id: len_case__0_field3
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__0_field3
       type: case__0_field3
       size: len_case__0_field3
@@ -173,7 +169,7 @@ types:
       type: case__193_0
       if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__193)
     - id: case__195
-      type: case__195
+      type: bytes_dyn_uint30
       if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__195)
     - id: case__224
       type: case__224
@@ -307,28 +303,36 @@ types:
   case__131_0:
     seq:
     - id: len_case__131
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__131
       type: case__131
       size: len_case__131
   case__131_1:
     seq:
     - id: len_case__131
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__131
       type: case__131
       size: len_case__131
   case__131_2:
     seq:
     - id: len_case__131
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__131
       type: case__131
       size: len_case__131
   case__131_3:
     seq:
     - id: len_case__131
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__131
       type: case__131
       size: len_case__131
@@ -478,12 +482,6 @@ types:
     - id: case__193
       type: case__193
       size: len_case__193
-  case__195:
-    seq:
-    - id: len_case__195
-      type: s4
-    - id: case__195
-      size: len_case__195
   case__1_field3:
     seq:
     - id: case__1_field3_entries
@@ -492,7 +490,9 @@ types:
   case__1_field3_0:
     seq:
     - id: len_case__1_field3
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__1_field3
       type: case__1_field3
       size: len_case__1_field3
@@ -565,7 +565,7 @@ types:
       type: case__193_2
       if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__193)
     - id: case__195
-      type: case__195
+      type: bytes_dyn_uint30
       if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__195)
     - id: case__224
       type: case__224
@@ -687,7 +687,9 @@ types:
   case__2_field3_0:
     seq:
     - id: len_case__2_field3
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__2_field3
       type: case__2_field3
       size: len_case__2_field3
@@ -760,7 +762,7 @@ types:
       type: case__193_1
       if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__193)
     - id: case__195
-      type: case__195
+      type: bytes_dyn_uint30
       if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__195)
     - id: case__224
       type: case__224
@@ -794,7 +796,9 @@ types:
   case__3_field3_0:
     seq:
     - id: len_case__3_field3
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: case__3_field3
       type: case__3_field3
       size: len_case__3_field3
@@ -867,7 +871,7 @@ types:
       type: case__193_3
       if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__193)
     - id: case__195
-      type: case__195
+      type: bytes_dyn_uint30
       if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__195)
     - id: case__224
       type: case__224
@@ -941,12 +945,6 @@ types:
 
 
         case__9_field1_field1'
-  code:
-    seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
   commitment:
     seq:
     - id: level
@@ -969,18 +967,6 @@ types:
       type: s4
     - id: number_of_ticks
       type: s4
-  content:
-    seq:
-    - id: len_content
-      type: s4
-    - id: content
-      size: len_content
-  contents:
-    seq:
-    - id: len_contents
-      type: s4
-    - id: contents
-      size: len_contents
   contents_entries:
     seq:
     - id: id_013__ptjakart__operation__alpha__contents
@@ -1044,12 +1030,6 @@ types:
       type: s4
     - id: block_payload_hash
       size: 32
-  entrypoint:
-    seq:
-    - id: len_entrypoint
-      type: s4
-    - id: entrypoint
-      size: len_entrypoint
   id_013__ptjakart__block_header__alpha__full_header:
     seq:
     - id: id_013__ptjakart__block_header__alpha__full_header
@@ -1194,7 +1174,7 @@ types:
       type: set_deposits_limit
       if: (id_013__ptjakart__operation__alpha__contents_tag == id_013__ptjakart__operation__alpha__contents_tag::set_deposits_limit)
     - id: failing_noop
-      type: arbitrary
+      type: bytes_dyn_uint30
       if: (id_013__ptjakart__operation__alpha__contents_tag == id_013__ptjakart__operation__alpha__contents_tag::failing_noop)
     - id: register_global_constant
       type: register_global_constant
@@ -1247,16 +1227,14 @@ types:
       size: 64
   id_013__ptjakart__rollup_address:
     seq:
-    - id: len_id_013__ptjakart__rollup_address
-      type: s4
     - id: id_013__ptjakart__rollup_address
-      size: len_id_013__ptjakart__rollup_address
+      type: bytes_dyn_uint30
   id_013__ptjakart__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
+      type: bytes_dyn_uint30
   id_013__ptjakart__transaction_destination:
     seq:
     - id: id_013__ptjakart__transaction_destination_tag
@@ -1276,13 +1254,20 @@ types:
     seq:
     - id: rollup_hash
       size: 20
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   message:
     seq:
     - id: message_tag
       type: u1
       enum: message_tag
     - id: batch
-      type: batch
+      type: bytes_dyn_uint30
       if: (message_tag == message_tag::batch)
     - id: deposit
       type: deposit
@@ -1295,16 +1280,16 @@ types:
   message_1:
     seq:
     - id: len_message
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: message
       type: message_0
       size: len_message
   message_entries:
     seq:
-    - id: len_message_elt
-      type: s4
     - id: message_elt
-      size: len_message_elt
+      type: bytes_dyn_uint30
   message_path:
     seq:
     - id: message_path_entries
@@ -1313,7 +1298,9 @@ types:
   message_path_0:
     seq:
     - id: len_message_path
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: message_path
       type: message_path
       size: len_message_path
@@ -1329,7 +1316,9 @@ types:
   message_result_path_0:
     seq:
     - id: len_message_result_path
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: message_result_path
       type: message_result_path
       size: len_message_result_path
@@ -1345,7 +1334,9 @@ types:
   messages_0:
     seq:
     - id: len_messages
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: messages
       type: messages
       size: len_messages
@@ -1385,7 +1376,9 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1
       size: len_op1
@@ -1396,7 +1389,9 @@ types:
   op1_2:
     seq:
     - id: len_op1
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op1
       type: op1_1
       size: len_op1
@@ -1407,7 +1402,9 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2
       size: len_op2
@@ -1418,7 +1415,9 @@ types:
   op2_2:
     seq:
     - id: len_op2
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: op2
       type: op2_1
       size: len_op2
@@ -1459,7 +1458,7 @@ types:
       type: id_013__ptjakart__entrypoint
       doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   predecessor:
     seq:
     - id: predecessor_tag
@@ -1492,7 +1491,9 @@ types:
   previous_message_result_path_0:
     seq:
     - id: len_previous_message_result_path
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: previous_message_result_path
       type: previous_message_result_path
       size: len_previous_message_result_path
@@ -1525,7 +1526,9 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: proposals
       type: proposals
       size: len_proposals
@@ -1584,7 +1587,7 @@ types:
     - id: storage_limit
       type: n
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   reveal:
     seq:
     - id: source
@@ -1658,7 +1661,7 @@ types:
       type: u2
       enum: kind_tag
     - id: boot_sector
-      type: boot_sector
+      type: bytes_dyn_uint30
   sc_rollup_publish:
     seq:
     - id: source
@@ -1704,24 +1707,6 @@ types:
     - id: limit
       type: id_013__ptjakart__mutez
       if: (limit_tag == bool::true)
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
-  ticket_contents:
-    seq:
-    - id: len_ticket_contents
-      type: s4
-    - id: ticket_contents
-      size: len_ticket_contents
-  ticket_ty:
-    seq:
-    - id: len_ticket_ty
-      type: s4
-    - id: ticket_ty
-      size: len_ticket_ty
   tickets_info:
     seq:
     - id: tickets_info_entries
@@ -1730,16 +1715,18 @@ types:
   tickets_info_0:
     seq:
     - id: len_tickets_info
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: tickets_info
       type: tickets_info
       size: len_tickets_info
   tickets_info_entries:
     seq:
     - id: contents
-      type: contents
+      type: bytes_dyn_uint30
     - id: ty
-      type: ty
+      type: bytes_dyn_uint30
     - id: ticketer
       type: id_013__ptjakart__contract_id
       doc: ! >-
@@ -1792,9 +1779,9 @@ types:
     - id: storage_limit
       type: n
     - id: ticket_contents
-      type: ticket_contents
+      type: bytes_dyn_uint30
     - id: ticket_ty
-      type: ticket_ty
+      type: bytes_dyn_uint30
     - id: ticket_ticketer
       type: id_013__ptjakart__contract_id
       doc: ! >-
@@ -1808,7 +1795,7 @@ types:
         A contract handle: A contract notation as given to an RPC or inside scripts.
         Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: entrypoint
-      type: entrypoint
+      type: bytes_dyn_uint30
   tx_rollup:
     seq:
     - id: id_013__ptjakart__tx_rollup_id
@@ -1862,7 +1849,7 @@ types:
     - id: context_hash
       size: 32
     - id: message_index
-      type: s4
+      type: int31
     - id: message_result_path
       type: message_result_path_0
     - id: tickets_info
@@ -1989,25 +1976,13 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: content
-      type: content
+      type: bytes_dyn_uint30
     - id: burn_limit_tag
       type: u1
       enum: bool
     - id: burn_limit
       type: id_013__ptjakart__mutez
       if: (burn_limit_tag == bool::true)
-  ty:
-    seq:
-    - id: len_ty
-      type: s4
-    - id: ty
-      size: len_ty
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
 enums:
   amount_tag:
     0: case__0

@@ -12,12 +12,14 @@ doc: ! >-
   Description: A Sapling transaction with inputs, outputs, balance, root, bound_data
   and binding sig.
 types:
-  bound_data:
+  bytes_dyn_uint30:
     seq:
-    - id: len_bound_data
-      type: s4
-    - id: bound_data
-      size: len_bound_data
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   inputs:
     seq:
     - id: inputs_entries
@@ -26,7 +28,7 @@ types:
   inputs_0:
     seq:
     - id: len_inputs
-      type: s4
+      type: u4
       valid:
         max: 1833216
     - id: inputs
@@ -44,7 +46,9 @@ types:
   outputs_0:
     seq:
     - id: len_outputs
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: outputs
       type: outputs
       size: len_outputs
@@ -64,4 +68,4 @@ seq:
 - id: root
   type: sapling__transaction__commitment_hash
 - id: bound_data
-  type: bound_data
+  type: bytes_dyn_uint30

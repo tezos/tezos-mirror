@@ -36,7 +36,9 @@ enums:
     2: p256
 seq:
 - id: len_id_009__psfloren__vote__listings
-  type: s4
+  type: u4
+  valid:
+    max: 1073741823
 - id: id_009__psfloren__vote__listings
   type: id_009__psfloren__vote__listings
   size: len_id_009__psfloren__vote__listings

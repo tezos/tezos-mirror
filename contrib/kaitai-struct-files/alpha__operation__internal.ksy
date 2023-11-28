@@ -49,9 +49,9 @@ types:
   alpha__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
+      type: bytes_dyn_uint30
   alpha__transaction_destination:
     seq:
     - id: alpha__transaction_destination_tag
@@ -70,12 +70,6 @@ types:
     - id: zk_rollup
       type: zk_rollup
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::zk_rollup)
-  annots:
-    seq:
-    - id: len_annots
-      type: s4
-    - id: annots
-      size: len_annots
   args:
     seq:
     - id: args_entries
@@ -84,7 +78,9 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: args
       type: args
       size: len_args
@@ -92,18 +88,14 @@ types:
     seq:
     - id: args_elt
       type: micheline__alpha__michelson_v1__expression
-  bytes:
+  bytes_dyn_uint30:
     seq:
-    - id: len_bytes
-      type: s4
-    - id: bytes
-      size: len_bytes
-  code:
-    seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   delegation:
     seq:
     - id: delegate_tag
@@ -139,7 +131,7 @@ types:
       type: z
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::int)
     - id: string
-      type: string
+      type: bytes_dyn_uint30
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::string)
     - id: sequence
       type: sequence_0
@@ -166,7 +158,7 @@ types:
       type: prim__generic
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::prim__generic)
     - id: bytes
-      type: bytes
+      type: bytes_dyn_uint30
       if: (micheline__alpha__michelson_v1__expression_tag == micheline__alpha__michelson_v1__expression_tag::bytes)
   n:
     seq:
@@ -219,7 +211,7 @@ types:
       type: alpha__entrypoint
       doc: ! 'entrypoint: Named entrypoint to a Michelson smart contract'
     - id: value
-      type: value
+      type: bytes_dyn_uint30
   prim__1_arg__no_annots:
     seq:
     - id: prim
@@ -233,7 +225,7 @@ types:
     - id: arg
       type: micheline__alpha__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__2_args__no_annots:
     seq:
     - id: prim
@@ -251,7 +243,7 @@ types:
     - id: arg2
       type: micheline__alpha__michelson_v1__expression
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__generic:
     seq:
     - id: prim
@@ -259,13 +251,13 @@ types:
     - id: args
       type: args_0
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   prim__no_args__some_annots:
     seq:
     - id: prim
       type: alpha__michelson__v1__primitives
     - id: annots
-      type: annots
+      type: bytes_dyn_uint30
   public_key_hash:
     seq:
     - id: public_key_hash_tag
@@ -291,7 +283,9 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: sequence
       type: sequence
       size: len_sequence
@@ -306,18 +300,6 @@ types:
     - id: smart_rollup_padding
       size: 1
       doc: This field is for padding, ignore
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
-  string:
-    seq:
-    - id: len_string
-      type: s4
-    - id: string
-      size: len_string
   transaction:
     seq:
     - id: amount
@@ -335,12 +317,6 @@ types:
     - id: parameters
       type: parameters
       if: (parameters_tag == bool::true)
-  value:
-    seq:
-    - id: len_value
-      type: s4
-    - id: value
-      size: len_value
   z:
     seq:
     - id: has_tail

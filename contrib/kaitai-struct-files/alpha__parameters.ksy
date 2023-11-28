@@ -24,9 +24,9 @@ types:
   alpha__scripted__contracts:
     seq:
     - id: code
-      type: code
+      type: bytes_dyn_uint30
     - id: storage
-      type: storage
+      type: bytes_dyn_uint30
   bootstrap_accounts:
     seq:
     - id: bootstrap_accounts_entries
@@ -35,7 +35,9 @@ types:
   bootstrap_accounts_0:
     seq:
     - id: len_bootstrap_accounts
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bootstrap_accounts
       type: bootstrap_accounts
       size: len_bootstrap_accounts
@@ -67,7 +69,9 @@ types:
   bootstrap_contracts_0:
     seq:
     - id: len_bootstrap_contracts
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bootstrap_contracts
       type: bootstrap_contracts
       size: len_bootstrap_contracts
@@ -98,7 +102,9 @@ types:
   bootstrap_smart_rollups_0:
     seq:
     - id: len_bootstrap_smart_rollups
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: bootstrap_smart_rollups
       type: bootstrap_smart_rollups
       size: len_bootstrap_smart_rollups
@@ -110,27 +116,29 @@ types:
       type: u1
       enum: pvm_kind
     - id: kernel
-      type: kernel
+      type: bytes_dyn_uint30
     - id: parameters_ty
-      type: parameters_ty
+      type: bytes_dyn_uint30
     - id: whitelist_tag
       type: u1
       enum: bool
     - id: whitelist
       type: whitelist_0
       if: (whitelist_tag == bool::true)
+  bytes_dyn_uint30:
+    seq:
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   center_dz:
     seq:
     - id: numerator
       type: z
     - id: denominator
       type: z
-  code:
-    seq:
-    - id: len_code
-      type: s4
-    - id: code
-      size: len_code
   commitments:
     seq:
     - id: commitments_entries
@@ -139,7 +147,9 @@ types:
   commitments_0:
     seq:
     - id: len_commitments
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: commitments
       type: commitments
       size: len_commitments
@@ -169,7 +179,7 @@ types:
     - id: page_size
       type: u2
     - id: slot_size
-      type: s4
+      type: int31
     - id: number_of_shards
       type: u2
   growth_rate:
@@ -178,6 +188,13 @@ types:
       type: z
     - id: denominator
       type: z
+  int31:
+    seq:
+    - id: int31
+      type: s4
+      valid:
+        min: -1073741824
+        max: 1073741823
   issuance_ratio_max:
     seq:
     - id: numerator
@@ -195,23 +212,17 @@ types:
     - id: base_total_issued_per_minute
       type: alpha__mutez
     - id: baking_reward_fixed_portion_weight
-      type: s4
+      type: int31
     - id: baking_reward_bonus_weight
-      type: s4
+      type: int31
     - id: attesting_reward_weight
-      type: s4
+      type: int31
     - id: liquidity_baking_subsidy_weight
-      type: s4
+      type: int31
     - id: seed_nonce_revelation_tip_weight
-      type: s4
+      type: int31
     - id: vdf_revelation_tip_weight
-      type: s4
-  kernel:
-    seq:
-    - id: len_kernel
-      type: s4
-    - id: kernel
-      size: len_kernel
+      type: int31
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -230,12 +241,6 @@ types:
       type: b1be
     - id: payload
       type: b7be
-  parameters_ty:
-    seq:
-    - id: len_parameters_ty
-      type: s4
-    - id: parameters_ty
-      size: len_parameters_ty
   public_key:
     seq:
     - id: public_key_tag
@@ -359,12 +364,6 @@ types:
       type: s4
     - id: dal_parameters
       type: s4
-  storage:
-    seq:
-    - id: len_storage
-      type: s4
-    - id: storage
-      size: len_storage
   whitelist:
     seq:
     - id: whitelist_entries
@@ -373,7 +372,9 @@ types:
   whitelist_0:
     seq:
     - id: len_whitelist
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: whitelist
       type: whitelist
       size: len_whitelist
@@ -432,13 +433,13 @@ seq:
   type: u1
   enum: bool
 - id: security_deposit_ramp_up_cycles
-  type: s4
+  type: int31
   if: (security_deposit_ramp_up_cycles_tag == bool::true)
 - id: no_reward_cycles_tag
   type: u1
   enum: bool
 - id: no_reward_cycles
-  type: s4
+  type: int31
   if: (no_reward_cycles_tag == bool::true)
 - id: preserved_cycles
   type: u1
@@ -465,7 +466,7 @@ seq:
 - id: vdf_difficulty
   type: s8
 - id: origination_size
-  type: s4
+  type: int31
 - id: issuance_weights
   type: issuance_weights
 - id: cost_per_byte
@@ -487,9 +488,9 @@ seq:
 - id: delay_increment_per_round
   type: s8
 - id: consensus_committee_size
-  type: s4
+  type: int31
 - id: consensus_threshold
-  type: s4
+  type: int31
 - id: minimal_participation_ratio
   type: minimal_participation_ratio
 - id: limit_of_delegation_over_baking
@@ -512,7 +513,7 @@ seq:
   size: 32
   if: (initial_seed_tag == bool::true)
 - id: cache_script_size
-  type: s4
+  type: int31
 - id: cache_stake_distribution_cycles
   type: s1
 - id: cache_sampler_state_cycles
@@ -523,27 +524,27 @@ seq:
   type: u1
   enum: bool
 - id: smart_rollup_origination_size
-  type: s4
+  type: int31
 - id: smart_rollup_challenge_window_in_blocks
-  type: s4
+  type: int31
 - id: smart_rollup_stake_amount
   type: alpha__mutez
 - id: smart_rollup_commitment_period_in_blocks
-  type: s4
+  type: int31
 - id: smart_rollup_max_lookahead_in_blocks
   type: s4
 - id: smart_rollup_max_active_outbox_levels
   type: s4
 - id: smart_rollup_max_outbox_messages_per_level
-  type: s4
+  type: int31
 - id: smart_rollup_number_of_sections_in_dissection
   type: u1
 - id: smart_rollup_timeout_period_in_blocks
-  type: s4
+  type: int31
 - id: smart_rollup_max_number_of_cemented_commitments
-  type: s4
+  type: int31
 - id: smart_rollup_max_number_of_parallel_games
-  type: s4
+  type: int31
 - id: smart_rollup_reveal_activation_level
   type: smart_rollup_reveal_activation_level
 - id: smart_rollup_private_enable
@@ -556,11 +557,11 @@ seq:
   type: u1
   enum: bool
 - id: zk_rollup_origination_size
-  type: s4
+  type: int31
 - id: zk_rollup_min_pending_to_process
-  type: s4
+  type: int31
 - id: zk_rollup_max_ticket_payload_size
-  type: s4
+  type: int31
 - id: global_limit_of_staking_over_baking
   type: u1
 - id: edge_of_staking_over_delegation

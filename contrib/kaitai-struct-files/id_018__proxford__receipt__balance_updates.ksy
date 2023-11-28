@@ -73,7 +73,9 @@ types:
   id_018__proxford__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_id_018__proxford__operation_metadata__alpha__balance_updates
-      type: s4
+      type: u4
+      valid:
+        max: 1073741823
     - id: id_018__proxford__operation_metadata__alpha__balance_updates
       type: id_018__proxford__operation_metadata__alpha__balance_updates
       size: len_id_018__proxford__operation_metadata__alpha__balance_updates

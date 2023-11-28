@@ -3,18 +3,14 @@ meta:
   endian: be
 doc: ! 'Encoding id: 010-PtGRANAD.fa1.2.token_transfer'
 types:
-  destination:
+  bytes_dyn_uint30:
     seq:
-    - id: len_destination
-      type: s4
-    - id: destination
-      size: len_destination
-  fee:
-    seq:
-    - id: len_fee
-      type: s4
-    - id: fee
-      size: len_fee
+    - id: len_bytes_dyn_uint30
+      type: u4
+      valid:
+        max: 1073741823
+    - id: bytes_dyn_uint30
+      size: len_bytes_dyn_uint30
   n:
     seq:
     - id: n
@@ -27,18 +23,6 @@ types:
       type: b1be
     - id: payload
       type: b7be
-  tez__amount:
-    seq:
-    - id: len_tez__amount
-      type: s4
-    - id: tez__amount
-      size: len_tez__amount
-  token_contract:
-    seq:
-    - id: len_token_contract
-      type: s4
-    - id: token_contract
-      size: len_token_contract
   z:
     seq:
     - id: has_tail
@@ -58,22 +42,22 @@ enums:
     255: true
 seq:
 - id: token_contract
-  type: token_contract
+  type: bytes_dyn_uint30
 - id: destination
-  type: destination
+  type: bytes_dyn_uint30
 - id: amount
   type: z
 - id: tez__amount_tag
   type: u1
   enum: bool
 - id: tez__amount
-  type: tez__amount
+  type: bytes_dyn_uint30
   if: (tez__amount_tag == bool::true)
 - id: fee_tag
   type: u1
   enum: bool
 - id: fee
-  type: fee
+  type: bytes_dyn_uint30
   if: (fee_tag == bool::true)
 - id: gas__limit_tag
   type: u1
