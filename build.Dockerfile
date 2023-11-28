@@ -45,6 +45,7 @@ WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup kernels.mk evm_kernel
 COPY --chown=tezos:nogroup src evm_kernel/src
+COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
 RUN make -C evm_kernel -f kernels.mk build-deps \
   && make -C evm_kernel -f kernels.mk EVM_CONFIG=etherlink/kernel_evm/config/dailynet.yaml evm_installer.wasm \
   && make -C evm_kernel -f kernels.mk evm_benchmark_installer.wasm
