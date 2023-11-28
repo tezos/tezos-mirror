@@ -262,61 +262,160 @@ end
 
 (** Representation of Unstaked frozen deposits *)
 module Unstaked_frozen = struct
-  type t = (Cycle.t * Frozen_tez.t) list
+  type r = {
+    cycle : Cycle.t;
+    (* initial total requested amount (slash ∝ initial) *)
+    initial : Tez.t;
+    (* current amount, slashes applied here *)
+    current : Tez.t;
+    (* initial requests, don't apply slash unless finalize or balance query *)
+    requests : Tez.t String.Map.t;
+    (* slash pct memory for requests *)
+    slash_pct : int;
+  }
+
+  type t = r list
+
+  type get_info = {cycle : Cycle.t; request : Tez.t; current : Tez.t}
+
+  type get_info_list = get_info list
+
+  type finalizable_info = {
+    amount : Tez.t;
+    slashed_requests : Tez.t String.Map.t;
+  }
 
   let zero = []
 
-  let fold unstaked =
-    List.fold_left
-      (fun acc (_, frozen) -> Frozen_tez.union acc frozen)
-      Frozen_tez.zero
+  let init_r cycle request account =
+    {
+      cycle;
+      initial = request;
+      current = request;
+      requests = String.Map.singleton account request;
+      slash_pct = 0;
+    }
+
+  let apply_slash_to_request slash_pct amount =
+    let slashed_amount =
+      Tez.mul_q amount Q.(slash_pct // 100) |> Tez.of_q ~round_up:true
+    in
+    Tez.(amount -! slashed_amount)
+
+  let apply_slash_to_current slash_pct initial current =
+    let slashed_amount =
+      Tez.mul_q initial Q.(slash_pct // 100) |> Tez.of_q ~round_up:false
+    in
+    Tez.sub_opt current slashed_amount |> Option.value ~default:Tez.zero
+
+  let remove_zeros (a : t) : t =
+    List.filter (fun ({current; _} : r) -> Tez.(current > zero)) a
+
+  let get account unstaked : get_info_list =
+    List.filter_map
+      (fun {cycle; requests; slash_pct; _} ->
+        String.Map.find account requests
+        |> Option.map (fun request ->
+               {
+                 cycle;
+                 request;
+                 current = apply_slash_to_request slash_pct request;
+               }))
       unstaked
 
-  let remove_zeros a =
-    List.filter
-      (fun (_, frozen) -> Tez.(Frozen_tez.total_current frozen > zero))
-      a
+  let get_total account unstaked =
+    get account unstaked
+    |> List.fold_left
+         (fun acc ({current; _} : get_info) -> Tez.(acc +! current))
+         Tez.zero
 
-  let get account unstaked =
-    List.map (fun (c, frozen) -> (c, Frozen_tez.get account frozen)) unstaked
-
-  let get_total account unstaked = Frozen_tez.get account (fold unstaked)
-
-  let sum_current unstaked = Frozen_tez.total_current (fold unstaked)
+  let sum_current unstaked =
+    List.fold_left
+      (fun acc ({current; _} : r) -> Tez.(acc +! current))
+      Tez.zero
+      unstaked
 
   (* Happens each unstake operation *)
-  let rec add_unstake cycle amount account = function
-    (* fun trick: use "" as delegate, because even the delegate has to share in ufd *)
-    | [] -> [(cycle, Frozen_tez.init amount account "")]
-    | (c, a) :: t ->
-        if Cycle.equal c cycle then
-          (c, Frozen_tez.add_init amount account a) :: t
-        else (c, a) :: add_unstake cycle amount account t
+  let rec add_unstake cycle amount account : t -> t = function
+    | [] -> [init_r cycle amount account]
+    | ({cycle = c; requests; initial; current; slash_pct} as h) :: t ->
+        let open Tez in
+        if Cycle.equal c cycle then (
+          assert (Int.equal slash_pct 0) ;
+          {
+            cycle;
+            initial = initial +! amount;
+            current = current +! amount;
+            slash_pct;
+            requests =
+              String.Map.update
+                account
+                (function
+                  | None -> Some amount | Some x -> Some Tez.(x +! amount))
+                requests;
+          }
+          :: t)
+        else h :: add_unstake cycle amount account t
+
+  (* Happens in stake from unstake *)
+  let sub_unstake amount account : r -> r =
+   fun {cycle; requests; initial; current; slash_pct} ->
+    assert (slash_pct = 0) ;
+    let open Tez in
+    {
+      cycle;
+      initial = initial -! amount;
+      current = current -! amount;
+      slash_pct;
+      requests =
+        String.Map.update
+          account
+          (function
+            | None ->
+                assert (Tez.(amount = zero)) ;
+                None
+            | Some x ->
+                if Tez.(x = amount) then None else Some Tez.(x -! amount))
+          requests;
+    }
 
   (* Makes given cycle finalizable (and unslashable) *)
-  let rec pop_cycle cycle = function
-    | [] -> (Frozen_tez.zero, [])
-    | (c, a) :: t ->
-        if Cycle.(c = cycle) then (a, t)
+  let rec pop_cycle cycle : t -> finalizable_info * t = function
+    | [] -> ({amount = Tez.zero; slashed_requests = String.Map.empty}, [])
+    | ({cycle = c; requests; initial = _; current; slash_pct} as h) :: t ->
+        if Cycle.(c = cycle) then
+          let amount = current in
+          let slashed_requests =
+            String.Map.map (apply_slash_to_request slash_pct) requests
+          in
+          ({amount; slashed_requests}, t)
         else if Cycle.(c < cycle) then
           Stdlib.failwith
             "Unstaked_frozen: found unfinalized cycle before given [cycle]. \
              Make sure to call [apply_unslashable] every cycle"
         else
-          let amount, rest = pop_cycle cycle t in
-          (amount, (c, a) :: rest)
+          let info, rest = pop_cycle cycle t in
+          (info, h :: rest)
 
   let slash ~preserved_cycles slashed_cycle pct_times_100 a =
     remove_zeros a
-    |> List.map (fun (c, frozen) ->
+    |> List.map
+         (fun
+           ({cycle; requests = _; initial; current; slash_pct = old_slash_pct}
+           as r)
+         ->
            if
-             Cycle.(c > slashed_cycle || add c preserved_cycles < slashed_cycle)
-           then ((c, frozen), Tez.zero)
+             Cycle.(
+               cycle > slashed_cycle
+               || add cycle preserved_cycles < slashed_cycle)
+           then (r, Tez.zero)
            else
-             let ufd, slashed =
-               Frozen_tez.slash frozen.Frozen_tez.initial pct_times_100 frozen
+             let new_current =
+               apply_slash_to_current pct_times_100 initial current
              in
-             ((c, ufd), slashed))
+             let slashed = Tez.(current -! new_current) in
+             let slash_pct = min 100 (pct_times_100 + old_slash_pct) in
+             ({r with slash_pct; current = new_current}, slashed))
     |> List.split
 end
 
@@ -330,21 +429,16 @@ module Unstaked_finalizable = struct
   let zero = {map = String.Map.empty; remainder = Tez.zero}
 
   (* Called when unstaked frozen for some cycle becomes finalizable *)
-  let add_from_frozen (frozen : Frozen_tez.t) {map; remainder} =
-    let map_rounded_down =
-      String.Map.map
-        (fun qt -> Partial_tez.to_tez ~round_up:false qt)
-        frozen.co_current
+  let add_from_poped_ufd
+      ({amount; slashed_requests} : Unstaked_frozen.finalizable_info)
+      {map; remainder} =
+    let total_requested =
+      String.Map.fold (fun _ x acc -> Tez.(x +! acc)) slashed_requests Tez.zero
     in
+    let remainder = Tez.(remainder +! amount -! total_requested) in
     let map =
-      String.Map.union (fun _ a b -> Some Tez.(a +! b)) map map_rounded_down
+      String.Map.union (fun _ a b -> Some Tez.(a +! b)) map slashed_requests
     in
-    let full_frozen = Frozen_tez.total_current frozen in
-    let actual_frozen =
-      String.Map.fold (fun _ x acc -> Tez.(x +! acc)) map_rounded_down Tez.zero
-    in
-    let undistributed = Tez.(full_frozen -! actual_frozen) in
-    let remainder = Tez.(remainder +! undistributed) in
     {map; remainder}
 
   let total {map; remainder} =
@@ -737,24 +831,25 @@ let stake_from_unstake amount current_cycle preserved_cycles delegate_name
       else
         let unstaked_frozen =
           List.sort
-            (fun (cycle1, _) (cycle2, _) -> Cycle.compare cycle2 cycle1)
+            (fun (Unstaked_frozen.{cycle = cycle1; _} : Unstaked_frozen.r)
+                 {cycle = cycle2; _} -> Cycle.compare cycle2 cycle1)
             unstaked_frozen
         in
         let rec aux acc_unstakes rem_amount rem_unstakes =
           match rem_unstakes with
           | [] -> (acc_unstakes, rem_amount)
-          | (cycle, frozen_map) :: t ->
+          | (Unstaked_frozen.{initial; _} as h) :: t ->
               if Tez.(rem_amount = zero) then
                 (acc_unstakes @ rem_unstakes, Tez.zero)
+              else if Tez.(rem_amount >= initial) then
+                let h = Unstaked_frozen.sub_unstake initial delegate_name h in
+                let rem_amount = Tez.(rem_amount -! initial) in
+                aux (acc_unstakes @ [h]) rem_amount t
               else
-                let frozen_map, removed =
-                  Frozen_tez.sub_current_and_init
-                    rem_amount
-                    delegate_name
-                    frozen_map
+                let h =
+                  Unstaked_frozen.sub_unstake rem_amount delegate_name h
                 in
-                let rem_amount = Tez.(rem_amount -! removed) in
-                aux (acc_unstakes @ [(cycle, frozen_map)]) rem_amount t
+                (acc_unstakes @ [h] @ t, Tez.zero)
         in
         let unstaked_frozen, rem_amount = aux [] amount unstaked_frozen in
         let frozen_deposits =
@@ -848,7 +943,7 @@ let apply_unslashable_f cycle delegate =
     Unstaked_frozen.pop_cycle cycle delegate.unstaked_frozen
   in
   let unstaked_finalizable =
-    Unstaked_finalizable.add_from_frozen
+    Unstaked_finalizable.add_from_poped_ufd
       amount_unslashable
       delegate.unstaked_finalizable
   in
@@ -976,7 +1071,7 @@ let apply_slashing
       Unstaked_frozen.slash
         ~preserved_cycles:constants.preserved_cycles
         slashed_cycle
-        slashed_pct
+        (slashed_pct :> int)
         unstaked_frozen
     in
     ( {acc with frozen_deposits; unstaked_frozen},
