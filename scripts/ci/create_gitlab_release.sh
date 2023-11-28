@@ -16,17 +16,17 @@ echo "Query GitLab to get generic package URL"
 # :gitlab_api_url/projects/:id/packages
 web_path=$(curl -fsSL -X GET \
                 -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_package_name}" \
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_package_name}" \
            | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
 
 deb_web_path=$(curl -fsSL -X GET \
                     -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_deb_package_name}" \
+                    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_deb_package_name}" \
            | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
 
 rpm_web_path=$(curl -fsSL -X GET \
                     -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_rpm_package_name}" \
+                    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_rpm_package_name}" \
            | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
 
 if [ -z "${web_path}" ]

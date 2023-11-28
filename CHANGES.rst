@@ -166,3 +166,7 @@ Miscellaneous
 
 - Extended the Micheline lexer to allow primitives starting with the
   underscore symbol (``_``). (MR :gl:`!10782`)
+
+- Beta Debian and Redhat packages are now linked in gitlab releases.
+
+- Renamed package registries for releases from ``tezos-x.y`` to ``octez-x.y``.
