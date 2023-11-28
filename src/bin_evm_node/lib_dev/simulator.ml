@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Ethereum_types
-
 module type SimulationBackend = sig
   val simulate_and_read :
     input:Simulation.Encodings.simulate_input ->
@@ -60,7 +58,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     Simulation.gas_estimation results
 
-  let is_tx_valid (Hex tx_raw) =
+  let is_tx_valid tx_raw =
     let open Lwt_result_syntax in
     let*? messages = Simulation.encode_tx tx_raw in
     let insight_requests =

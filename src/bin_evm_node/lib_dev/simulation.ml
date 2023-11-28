@@ -52,8 +52,6 @@ let rlp_encode call =
   (* we aim to use [String.chunk_bytes] *)
   Rlp.encode rlp_form
 
-let tx_rlp_encode tx_raw = `Hex tx_raw |> Hex.to_bytes_exn
-
 type simulation_message =
   | Start
   | Simple of string
@@ -94,21 +92,18 @@ let evaluation_tag = "\000"
 (** Tag indicating simulation is a validation *)
 let validation_tag = "\001"
 
-(** [hex_str_of_binary_string s] translate a binary string into an hax string *)
-let hex_str_of_binary_string s = s |> Hex.of_string |> Hex.show
-
 (** [add_tag tag bytes] prefixes bytes by the given tag *)
 let add_tag tag bytes = tag ^ Bytes.to_string bytes |> String.to_bytes
 
 let encode_message = function
-  | Start -> hex_str_of_binary_string @@ simulation_tag
-  | Simple s -> hex_str_of_binary_string @@ simulation_tag ^ simple_tag ^ s
+  | Start -> simulation_tag
+  | Simple s -> simulation_tag ^ simple_tag ^ s
   | NewChunked n ->
       let n_le_str = Ethereum_types.u16_to_bytes n in
-      hex_str_of_binary_string @@ simulation_tag ^ new_chunked_tag ^ n_le_str
+      simulation_tag ^ new_chunked_tag ^ n_le_str
   | Chunk (i, c) ->
       let i_le_str = Ethereum_types.u16_to_bytes i in
-      hex_str_of_binary_string @@ simulation_tag ^ chunk_tag ^ i_le_str ^ c
+      simulation_tag ^ chunk_tag ^ i_le_str ^ c
 
 let encode call =
   let open Result_syntax in
@@ -120,7 +115,7 @@ let encode call =
 let encode_tx tx =
   let open Result_syntax in
   let* messages =
-    tx |> tx_rlp_encode |> add_tag validation_tag |> split_in_messages
+    Bytes.of_string tx |> add_tag validation_tag |> split_in_messages
   in
   return @@ List.map encode_message messages
 
@@ -148,8 +143,6 @@ module Encodings = struct
     insight_requests : insight_request list;
     log_kernel_debug_file : string option;
   }
-
-  let hex_string = conv Bytes.of_string Bytes.to_string bytes
 
   let insight_request =
     union
@@ -181,11 +174,11 @@ module Encodings = struct
     @@ obj4
          (req
             "messages"
-            (list string)
+            (list (string' Hex))
             ~description:"Serialized messages for simulation.")
          (opt
             "reveal_pages"
-            (list hex_string)
+            (list (string' Hex))
             ~description:"Pages (at most 4kB) to be used for revelation ticks")
          (dft
             "insight_requests"

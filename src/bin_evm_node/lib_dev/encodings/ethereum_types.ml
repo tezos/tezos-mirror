@@ -971,10 +971,9 @@ let hash_raw_tx str =
   str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
   |> Bytes.to_string
 
-(** [transaction_nonce raw_tx] returns the nonce of a given raw transaction. *)
-let transaction_nonce raw_tx =
+(** [transaction_nonce bytes] returns the nonce of a given raw transaction. *)
+let transaction_nonce bytes =
   let open Result_syntax in
-  let bytes = hex_to_bytes raw_tx in
   if String.starts_with ~prefix:"01" bytes then
     (* eip 2930*)
     match bytes |> String.to_bytes |> Rlp.decode with
@@ -999,11 +998,10 @@ let transaction_nonce raw_tx =
         Qty nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
-(** [transaction_gas_price base_fee raw_tx] returns the maximum gas price the
+(** [transaction_gas_price base_fee bytes] returns the maximum gas price the
     user can pay for the tx. *)
-let transaction_gas_price base_fee raw_tx =
+let transaction_gas_price base_fee bytes =
   let open Result_syntax in
-  let bytes = hex_to_bytes raw_tx in
   if String.starts_with ~prefix:"01" bytes then
     (* eip 2930*)
     match bytes |> String.to_bytes |> Rlp.decode with
