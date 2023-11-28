@@ -13,6 +13,7 @@ thiserror.workspace = true
 
 evm-execution = { workspace = true, features = ["debug"] }
 tezos_ethereum.workspace = true
+tezos-evm-logging.workspace = true
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-core.workspace = true
@@ -28,3 +29,6 @@ serde_yaml = "0.9.25"
 structopt = "0.3.26"
 # Overwriting primitive-types from workspace to enable multiple features
 primitive-types = { version = "0.12.1", features = ["rlp", "serde"] }
+
+[features]
+debug = ["tezos-evm-logging/debug"]

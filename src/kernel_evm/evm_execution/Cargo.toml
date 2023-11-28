@@ -56,6 +56,6 @@ tezos_data_encoding.workspace = true
 default = ["evm_execution"]
 testing = ["rand", "proptest"]
 evm_execution = []
-debug = []
+debug = ["tezos-evm-logging/debug"]
 # the `benchmark` feature flag instruments the kernel for profiling
 benchmark = ["debug"]
