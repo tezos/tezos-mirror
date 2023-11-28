@@ -25,6 +25,34 @@
 
 (** Simple abstraction from low-level storage to handle unstaked frozen deposits.
 
+    Unstaked frozen deposits are tez coming from frozen deposits that have been
+    unstaked, either:
+    - manually with the "unstake" pseudo-operation,
+    - automatically at cycle ends with the auto-staking mechanism, or
+    - when a delegator changes delegate.
+    The amounts are attached to a given cycle, the cycle at which the unstake
+    happened, and are slashable for another
+    [preserved_cycles + max_slashing_period - 1] cycles. After this, they can be
+    finalized either with the "finalize_unstake" pseudo-operation, via
+    auto-staking (for bakers only), or when staking or unstaking.
+
+    Unstaked frozen deposits contain, for each cycle, a [current_amount] and an
+    [initial_amount].
+    Only unstaked frozen deposits for the current cycles can be increased, via
+    unstaking.
+    After a cycle has ended, the initial amount becomes the basis for
+    forthcoming slashings. It can only be decreased by the
+    "stake from unstake" mechanism.
+    Slashings only affects the [current_amount] of the slashed cycles.
+
+    Unstaked frozen deposits of finished cycles can be decreased by the
+    "stake from unstake" mechanism, but only if the cycles haven't been slashed
+    (to avoid shooting ourselves in the feet).
+
+    To avoid the list of cycles growing unboundedly, amounts for finalizable
+    cycles are squashed together, lazily, when the list needs to be updated,
+    only.
+
     This module is responsible for maintaining the
     {!Storage.Contract.Unstaked_frozen_deposits} table. *)
 
