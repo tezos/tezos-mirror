@@ -35,6 +35,7 @@ use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::{index_account, read_ticketer};
+use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{tick_model, CONFIG};
 
 // This implementation of `Transaction` is used to share the logic of
@@ -197,6 +198,11 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     // Chain id is correct.
     if block_constant.chain_id != transaction.chain_id {
         log!(host, Debug, "Transaction status: ERROR_CHAINID");
+        return Ok(None);
+    }
+    // Gas limit is bounded.
+    if transaction.gas_limit > MAX_TRANSACTION_GAS_LIMIT {
+        log!(host, Debug, "Transaction status: ERROR_GASLIMIT");
         return Ok(None);
     }
     // The transaction signature is valid.
@@ -520,6 +526,7 @@ pub fn apply_transaction<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use tezos_ethereum::{
@@ -724,6 +731,37 @@ mod tests {
         let balance = U256::from(21000 * 21000);
         let mut transaction = valid_tx();
         transaction.chain_id = U256::from(42);
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            None,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_wrong_gas_limit() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let mut transaction = valid_tx();
+        transaction.gas_limit = MAX_TRANSACTION_GAS_LIMIT + 1;
         transaction = resign(transaction);
 
         // fund account

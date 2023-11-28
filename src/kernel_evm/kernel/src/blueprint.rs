@@ -6,9 +6,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
-use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
+use crate::inbox::{read_inbox, KernelUpgrade, Transaction};
 use crate::sequencer_blueprint::SequencerBlueprint;
-use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{current_timestamp, sequencer_blueprint};
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -151,20 +150,6 @@ impl Encodable for Queue {
     }
 }
 
-fn filter_invalid_transactions(transactions: Vec<Transaction>) -> Vec<Transaction> {
-    let filter_max_gas_limit = |transaction: &Transaction| match &transaction.content {
-        TransactionContent::Deposit(_) => true,
-        TransactionContent::Ethereum(transaction) => {
-            transaction.gas_limit <= MAX_TRANSACTION_GAS_LIMIT
-        }
-    };
-
-    transactions
-        .into_iter()
-        .filter(filter_max_gas_limit)
-        .collect()
-}
-
 pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -172,7 +157,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     admin: Option<ContractKt1Hash>,
 ) -> Result<Queue, anyhow::Error> {
     let inbox_content = read_inbox(host, smart_rollup_address, ticketer, admin)?;
-    let transactions = filter_invalid_transactions(inbox_content.transactions);
+    let transactions = inbox_content.transactions;
     let timestamp = current_timestamp(host);
     let blueprint = QueueElement::Blueprint(Blueprint {
         transactions,
@@ -244,42 +229,12 @@ mod tests {
             signature: None,
         }
     }
-    fn tx() -> EthereumTransactionCommon {
-        tx_(40000000u64)
-    }
 
     fn dummy_transaction(i: u8) -> Transaction {
         Transaction {
             tx_hash: [i; TRANSACTION_HASH_SIZE],
             content: Ethereum(tx_(i.into())),
         }
-    }
-
-    #[test]
-    fn test_filter_large_gas_limit() {
-        let valid_content = Ethereum(EthereumTransactionCommon {
-            gas_limit: MAX_TRANSACTION_GAS_LIMIT,
-            ..tx()
-        });
-        let valid_transaction = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: valid_content,
-        };
-
-        let invalid_content = Ethereum(EthereumTransactionCommon {
-            gas_limit: MAX_TRANSACTION_GAS_LIMIT + 1,
-            ..tx()
-        });
-        let invalid_transaction = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: invalid_content,
-        };
-
-        let filtered_transactions = filter_invalid_transactions(vec![
-            valid_transaction.clone(),
-            invalid_transaction,
-        ]);
-        assert_eq!(vec![valid_transaction], filtered_transactions)
     }
 
     #[test]
