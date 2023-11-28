@@ -7,31 +7,53 @@
 
 include Progress
 
+type 'a line = {when_tty : 'a Line.t; when_no_tty : string}
+
 let progress_bar ~message ~counter ?color total =
   let open Line in
   let pcount = match counter with `Bytes -> bytes | `Int -> count_to total in
-  list
-    [
-      const message;
-      pcount;
-      elapsed ();
-      bar ~style:`UTF8 ?color total;
-      percentage_of total;
-    ]
+  {
+    when_no_tty = message;
+    when_tty =
+      list
+        [
+          const message;
+          pcount;
+          elapsed ();
+          bar ~style:`UTF8 ?color total;
+          percentage_of total;
+        ];
+  }
 
 let spinner ~message =
   let open Line in
-  list [const (message ^ " "); spinner (); const " "; elapsed ()]
+  {
+    when_no_tty = message;
+    when_tty = list [const (message ^ " "); spinner (); const " "; elapsed ()];
+  }
+
+let with_reporter_tty {when_tty; _} = with_reporter ?config:None when_tty
+
+let with_reporter_no_tty {when_no_tty; _} f =
+  Format.eprintf "%s ...%!" when_no_tty ;
+  let res = f ignore in
+  Format.eprintf " Done.@." ;
+  res
+
+let with_reporter line f =
+  (* Progress bars are displayed on stderr by default. *)
+  if Unix.isatty Unix.stderr then with_reporter_tty line f
+  else with_reporter_no_tty line f
 
 (* Progress bar reporter compatible with Lwt. See
    https://github.com/craigfe/progress/issues/25#issuecomment-1030596594 *)
 module Lwt = struct
   let flush () =
     let open Lwt_syntax in
-    let+ () = Lwt_io.printf "%s\n%!" @@ Format.flush_str_formatter () in
+    let+ () = Lwt_io.eprintf "%s\n%!" @@ Format.flush_str_formatter () in
     Terminal.Ansi.move_up Format.str_formatter 1
 
-  let with_reporter line f =
+  let with_reporter_tty {when_tty = line; _} f =
     let open Lwt_syntax in
     let config =
       Config.v
@@ -50,4 +72,16 @@ module Lwt = struct
       flush ()
     in
     f report
+
+  let with_reporter_no_tty {when_no_tty; _} f =
+    let open Lwt_syntax in
+    let* () = Lwt_io.eprintf "%s ...%!" when_no_tty in
+    let* res = f (fun _ -> Lwt.return_unit) in
+    let* () = Lwt_io.eprintf " Done.\n%!" in
+    return res
+
+  let with_reporter line f =
+    let open Lwt_syntax in
+    let* tty = Lwt_unix.isatty Lwt_unix.stderr in
+    if tty then with_reporter_tty line f else with_reporter_no_tty line f
 end
