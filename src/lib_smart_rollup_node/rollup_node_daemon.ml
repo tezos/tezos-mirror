@@ -157,7 +157,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       Int32.(sub head.level (of_int node_ctxt.block_finality_time))
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
-  let () = Lwt_watcher.notify state.node_ctxt.global_block_watcher l2_block in
   return l2_block
 
 let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
@@ -182,14 +181,20 @@ let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
                exist in the chain. *)
             return `Nothing
         | Some predecessor ->
-            let* () = update_l2_chain state ~catching_up:true predecessor in
+            let* () =
+              update_l2_chain
+                state
+                ~catching_up:true
+                ~recurse_pred:true
+                predecessor
+            in
             let* l2_head =
               process_unseen_head state ~catching_up ~predecessor head
             in
             return (`New l2_head))
 
 and update_l2_chain ({node_ctxt; _} as state) ~catching_up
-    (head : Layer1.header) =
+    ?(recurse_pred = false) (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
   let* () =
@@ -201,9 +206,15 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
   match done_ with
   | `Nothing -> return_unit
   | `Already_processed l2_block ->
-      let return_l2 = Node_context.set_l2_head node_ctxt l2_block in
-      Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
-      return_l2
+      if recurse_pred then
+        (* We are calling update_l2_chain recursively to ensure we have handled
+           the predecessor. In this case, we don't update the head or notify the
+           block. *)
+        return_unit
+      else
+        let* () = Node_context.set_l2_head node_ctxt l2_block in
+        Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
+        return_unit
   | `New l2_block ->
       let* () = Node_context.set_l2_head node_ctxt l2_block in
       Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
