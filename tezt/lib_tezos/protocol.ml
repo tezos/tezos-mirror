@@ -341,3 +341,12 @@ let register_regression_test ~__FILE__ ~title ~tags ?uses ?supports body
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses = add_to_test_parameters protocol title tags uses in
   Regression.register ~__FILE__ ~title ~tags ~uses (fun () -> body protocol)
+
+let with_predecessor f protocol =
+  match previous_protocol protocol with
+  | None ->
+      Test.fail
+        "protocol %s has no predecessor; you should probably annotate your \
+         test with ~supports:Has_predecessor"
+        (name protocol)
+  | Some previous_protocol -> f ~previous_protocol ~protocol

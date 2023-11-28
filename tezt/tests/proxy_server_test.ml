@@ -261,72 +261,61 @@ let test_multi_protocols =
     ~tags:["multi_protocols"]
     ~uses:(fun _protocol -> [Constant.octez_proxy_server])
     ~supports:Has_predecessor
-  @@ fun to_protocol ->
-  match Protocol.previous_protocol to_protocol with
-  | None ->
-      Test.fail
-        "this test requires the protocol to have a predecessor, which is \
-         supposed to be the case thanks to the ~supports it was declared with"
-  | Some from_protocol ->
-      (* Create a context with 3 blocks in [from_protocol] and 2 blocks in [to_protocol] *)
-      let patch_config =
-        Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-          [(4, to_protocol)]
+  @@ Protocol.with_predecessor
+  @@ fun ~previous_protocol:from_protocol ~protocol:to_protocol ->
+  (* Create a context with 3 blocks in [from_protocol] and 2 blocks in [to_protocol] *)
+  let patch_config =
+    Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+      [(4, to_protocol)]
+  in
+  let* node = Node.init ~patch_config [Synchronisation_threshold 0] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol ~protocol:from_protocol client in
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+  (* Launch the proxy server and plug the client to it *)
+  let* proxy_server = Proxy_server.init node in
+  Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
+  let check_attestation_levels ~__LOC__ ?block ~expected_level proto =
+    let check levels =
+      let returned_level = JSON.(levels |> geti 0 |> get "level" |> as_int) in
+      Check.(
+        (expected_level = returned_level)
+          int
+          ~error_msg:
+            (sf
+               "%s: Unexpected level returned in proxy_server multi protocol \
+                test, expected %%L instead of %%R"
+               __LOC__))
+    in
+    let* proto_attestation_rights =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_helper_attestation_rights ?block ()
+    in
+    check proto_attestation_rights ;
+    if Protocol.(number proto <= number Nairobi + 1) then (
+      let* proto_endorsing_rights =
+        Client.RPC.call client
+        @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
+           This RPC helper should be removed once Oxford will be frozen. *)
       in
-      let* node = Node.init ~patch_config [Synchronisation_threshold 0] in
-      let* client = Client.init ~endpoint:(Node node) () in
-      let* () = Client.activate_protocol ~protocol:from_protocol client in
-      let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
-      (* Launch the proxy server and plug the client to it *)
-      let* proxy_server = Proxy_server.init node in
-      Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
-      let check_attestation_levels ~__LOC__ ?block ~expected_level proto =
-        let check levels =
-          let returned_level =
-            JSON.(levels |> geti 0 |> get "level" |> as_int)
-          in
-          Check.(
-            (expected_level = returned_level)
-              int
-              ~error_msg:
-                (sf
-                   "%s: Unexpected level returned in proxy_server multi \
-                    protocol test, expected %%L instead of %%R"
-                   __LOC__))
-        in
-        let* proto_attestation_rights =
-          Client.RPC.call client
-          @@ RPC.get_chain_block_helper_attestation_rights ?block ()
-        in
-        check proto_attestation_rights ;
-        if Protocol.(number proto <= number Nairobi + 1) then (
-          let* proto_endorsing_rights =
-            Client.RPC.call client
-            @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
-               This RPC helper should be removed once Oxford will be frozen. *)
-          in
-          check proto_endorsing_rights ;
-          unit)
-        else unit
-      in
-      (* Ensure the proxy serves a query to a block in [to_protocol] *)
-      let* () =
-        check_attestation_levels
-          ~__LOC__
-          ~block:"3"
-          ~expected_level:3
-          from_protocol
-      in
-      (* Ensure the proxy serves a query to a block in [from_protocol] *)
-      let* () =
-        check_attestation_levels
-          ~__LOC__
-          ~block:"head~1"
-          ~expected_level:5
-          to_protocol
-      in
-      unit
+      check proto_endorsing_rights ;
+      unit)
+    else unit
+  in
+  (* Ensure the proxy serves a query to a block in [to_protocol] *)
+  let* () =
+    check_attestation_levels ~__LOC__ ~block:"3" ~expected_level:3 from_protocol
+  in
+  (* Ensure the proxy serves a query to a block in [from_protocol] *)
+  let* () =
+    check_attestation_levels
+      ~__LOC__
+      ~block:"head~1"
+      ~expected_level:5
+      to_protocol
+  in
+  unit
 
 let register ~protocols =
   let register mode =

@@ -104,7 +104,7 @@ let start ?(public = false) ?event_level ?event_sections_levels
           Node.on_event node (fun {name; _} ->
               match name with
               | "disconnection.v0" ->
-                  Log.warn "The topology of the test has changed"
+                  Log.debug "The topology of the test has changed"
               | _ -> ()) ;
           Node.wait_for_connections node n)
         else unit
