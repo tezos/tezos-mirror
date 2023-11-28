@@ -116,7 +116,7 @@ variables:
   # for the `build_deps_image_name` images and specified in the
   # variable `alpine_version` in `scripts/version.sh`. This is checked
   # by the jobs `trigger` and `sanity_ci`.
-  image: alpine:3.17
+  image: alpine:3.18
 
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
