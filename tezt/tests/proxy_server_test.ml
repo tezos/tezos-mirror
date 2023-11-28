@@ -199,6 +199,7 @@ let test_equivalence =
     ~__FILE__
     ~title:"(Vanilla, proxy_server endpoint) Compare RPC get"
     ~tags:(compare_tags alt_mode)
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _, alternative = init ~protocol () in
   let vanilla = Client.create ~endpoint:(Node node) () in
@@ -211,6 +212,7 @@ let test_wrong_data_dir =
     ~__FILE__
     ~title:"proxy_server wrong data_dir"
     ~tags:["data_dir"]
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let wrong_data_dir = Temp.dir "empty" in
@@ -231,6 +233,7 @@ let test_proxy_server_serve_unsupported =
     ~__FILE__
     ~title:"proxy_server serve unsupported curl"
     ~tags:["redirect"]
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let* _ps = Proxy_server.init node in
@@ -256,6 +259,7 @@ let test_multi_protocols =
     ~__FILE__
     ~title:"proxy_server multi protocols"
     ~tags:["multi_protocols"]
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
     ~supports:Has_predecessor
   @@ fun to_protocol ->
   match Protocol.previous_protocol to_protocol with
@@ -326,16 +330,24 @@ let test_multi_protocols =
 
 let register ~protocols =
   let register mode =
-    let mode_tag =
+    let mode_string =
       match mode with
       | `Node -> "node"
       | `Proxy_server_rpc -> "proxy_server"
       | `Proxy_server_data_dir -> "proxy_server_data_dir"
     in
+    let mode_tags, uses =
+      match mode with
+      | `Node -> (["node"], [])
+      | `Proxy_server_rpc -> ([], [Constant.octez_proxy_server])
+      | `Proxy_server_data_dir ->
+          (["proxy_server_data_dir"], [Constant.octez_proxy_server])
+    in
     Protocol.register_test
       ~__FILE__
-      ~title:(sf "big_map_perf (%s)" mode_tag)
-      ~tags:["bigmapperf"; mode_tag]
+      ~title:(sf "big_map_perf (%s)" mode_string)
+      ~tags:("bigmapperf" :: mode_tags)
+      ~uses:(fun _protocol -> uses)
       (fun protocol -> big_map_get ~protocol mode ())
       protocols
   in

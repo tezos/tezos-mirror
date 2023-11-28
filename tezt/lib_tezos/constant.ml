@@ -30,11 +30,12 @@ let octez_admin_client = "./octez-admin-client"
 
 let octez_node = "./octez-node"
 
-let octez_proxy_server = "./octez-proxy-server"
+let octez_proxy_server =
+  Uses.make ~tag:"proxy_server" ~path:"./octez-proxy-server"
 
 let octez_codec = Uses.make ~tag:"codec" ~path:"./octez-codec"
 
-let octez_snoop = "./octez-snoop"
+let octez_snoop = Uses.make ~tag:"snoop" ~path:"./octez-snoop"
 
 let octez_protocol_compiler =
   Uses.make ~tag:"protocol_compiler" ~path:"./octez-protocol-compiler"

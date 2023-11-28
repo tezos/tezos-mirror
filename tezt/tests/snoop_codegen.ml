@@ -31,7 +31,11 @@
 *)
 
 let generate_code_using_solution_test () =
-  Test.register ~title:"snoop codegen" ~tags:["snoop"; "codegen"] ~__FILE__
+  Test.register
+    ~title:"snoop codegen"
+    ~tags:["codegen"]
+    ~uses:[Constant.octez_snoop]
+    ~__FILE__
   @@ fun () ->
   let open Lwt.Syntax in
   let snoop = Snoop.create () in

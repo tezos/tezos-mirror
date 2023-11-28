@@ -33,7 +33,8 @@
 let generate_code_using_solution_test () =
   Test.register
     ~title:"snoop protocol codegen"
-    ~tags:["snoop"; "codegen"; "protocol"]
+    ~tags:["codegen"; "protocol"]
+    ~uses:[Constant.octez_snoop]
     ~__FILE__
   @@ fun () ->
   let open Lwt.Syntax in
