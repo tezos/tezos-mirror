@@ -413,9 +413,9 @@ code
                       { SWAP ;
                         DIP
                           {
-                            SWAP ; DIIP { DUUP } ;
+                            SWAP ; DIP 2 { DUP 2 } ;
                             # Checks signatures, fails if invalid
-                            { DUUUP; DIP {CHECK_SIGNATURE}; SWAP; IF {DROP} {FAILWITH} };
+                            { DUP 3; DIP {CHECK_SIGNATURE}; SWAP; IF {DROP} {FAILWITH} };
                             PUSH nat 1 ; ADD @valid } }
                       { SWAP ; DROP }
                   }
