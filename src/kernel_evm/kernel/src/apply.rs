@@ -693,6 +693,7 @@ mod tests {
         let balance = U256::from(21000 * 21000);
         let mut transaction = valid_tx();
         transaction.nonce = U256::from(42);
+        transaction = resign(transaction);
 
         // fund account
         set_balance(&mut host, &mut evm_account_storage, &address, balance);
