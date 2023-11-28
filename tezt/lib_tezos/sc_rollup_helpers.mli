@@ -54,9 +54,11 @@ module Installer_kernel_config : sig
   (** Set of instructions used by the installer-client. *)
   type t = instr list
 
-  (** [check_dump ~config dump] checks that the given [config] is included
-      in the dumped PVM state. *)
-  val check_dump : config:t -> string -> unit
+  (** [of_json path] parses the JSON file at [path] and returns the
+      installer config.  Note that the instruction [Reveal] cannot be
+      expressed in JSON because of the YAML definition, therefore [path]
+      must not contain these instructions.  *)
+  val of_json : string -> t
 end
 
 type installer_result = {
