@@ -1050,9 +1050,29 @@ let apply_slashing
   in
   let get_total_supply acc_map =
     String.Map.fold
-      (fun k _ tot ->
-        let _, tt = balance_and_total_balance_of_account k acc_map in
-        Tez.(tt +! tot))
+      (fun _name
+           {
+             pkh = _;
+             contract = _;
+             delegate = _;
+             parameters = _;
+             liquid;
+             bonds;
+             frozen_deposits;
+             unstaked_frozen;
+             unstaked_finalizable;
+             staking_delegator_numerator = _;
+             staking_delegate_denominator = _;
+             frozen_rights = _;
+             slashed_cycles = _;
+           }
+           tot ->
+        Tez.(
+          liquid +! bonds
+          +! Frozen_tez.total_current frozen_deposits
+          +! Unstaked_frozen.sum_current unstaked_frozen
+          +! Unstaked_finalizable.total unstaked_finalizable
+          +! tot))
       acc_map
       Tez.zero
   in
