@@ -60,7 +60,7 @@ let create_with_endpoint ?runner ?name ?path ?base_dir
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
-  let path = Option.value ~default:Constant.octez_dac_client path in
+  let path = Option.value ~default:(Uses.path Constant.octez_dac_client) path in
   {name; path; dac_node = endpoint; base_dir; color; runner}
 
 let create ?runner ?name ?path ?base_dir ?color dac_node =

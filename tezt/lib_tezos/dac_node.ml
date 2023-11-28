@@ -262,9 +262,9 @@ let wait_for_ready dac_node =
 let handle_event dac_node {name; value = _; timestamp = _} =
   match name with "dac_node_is_ready.v0" -> set_ready dac_node | _ -> ()
 
-let create_with_endpoint ?(path = Constant.octez_dac_node) ?name ?color
-    ?data_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?reveal_data_dir
-    ~mode ~endpoint ~client ?(allow_v1_api = false) () =
+let create_with_endpoint ?(path = Uses.path Constant.octez_dac_node) ?name
+    ?color ?data_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port
+    ?reveal_data_dir ~mode ~endpoint ~client ?(allow_v1_api = false) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir

@@ -46,13 +46,13 @@ let make_int_parameter name = function
   | None -> []
   | Some value -> [(name, `Int value)]
 
-let test ~__FILE__ ?(tags = []) ?supports title f =
+let test ~__FILE__ ?(tags = []) ?uses ?supports title f =
   let tags = "dac" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags ?supports f
+  Protocol.register_test ~__FILE__ ~title ~tags ?uses ?supports f
 
-let regression_test ~__FILE__ ?(tags = []) ?supports title f =
+let regression_test ~__FILE__ ?(tags = []) ?uses ?supports title f =
   let tags = "dac" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags ?supports f
+  Protocol.register_regression_test ~__FILE__ ~title ~tags ?uses ?supports f
 
 (* Some initialization functions to start needed nodes. *)
 
@@ -216,15 +216,17 @@ let with_fresh_rollup ?(pvm_name = "arith") ?hooks tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
-    ?(pvm_name = "arith") ?(custom_committee_members = []) ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments
-    ?(allow_v1_api = false) ?(allow_regression = false) ~__FILE__
-    ~committee_size ~observers variant scenario =
+    ?(uses = fun _protocol -> []) ?(pvm_name = "arith")
+    ?(custom_committee_members = []) ?commitment_period ?challenge_window
+    ?event_sections_levels ?node_arguments ?(allow_v1_api = false)
+    ?(allow_regression = false) ~__FILE__ ~committee_size ~observers variant
+    scenario =
   let description = "Testing Full DAC infrastructure" in
   (if allow_regression then regression_test else test)
     ?supports
     ~__FILE__
     ~tags
+    ~uses:(fun protocol -> Constant.octez_dac_node :: uses protocol)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
@@ -341,13 +343,14 @@ let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments ~__FILE__ variant
-    scenario =
+let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?uses
+    ?commitment_period ?challenge_window ?event_sections_levels ?node_arguments
+    ~__FILE__ variant scenario =
   let description = "Testing DAC L1 integration" in
   test
     ~__FILE__
     ~tags
+    ?uses
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1

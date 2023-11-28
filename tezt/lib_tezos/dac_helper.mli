@@ -105,6 +105,7 @@ val with_fresh_rollup :
 val scenario_with_full_dac_infrastructure :
   ?supports:Protocol.supported_protocols ->
   ?tags:string list ->
+  ?uses:(Protocol.t -> Uses.t list) ->
   ?pvm_name:string ->
   ?custom_committee_members:Account.aggregate_key list ->
   ?commitment_period:int ->
@@ -124,6 +125,7 @@ val scenario_with_full_dac_infrastructure :
 (** Initalizes a scenario with L1 node only. *)
 val scenario_with_layer1_node :
   ?tags:string list ->
+  ?uses:(Protocol.t -> Uses.t list) ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
