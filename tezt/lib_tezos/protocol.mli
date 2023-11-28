@@ -188,7 +188,7 @@ val all : t list
     - [Until_protocol n]: the test can run on protocols [p] such that [number p <= n].
     - [Between_protocols (a, b)]: the test can run on protocols [p]
       such that [a <= number p <= b].
-    - [Has_a_predecessor]: the test can run on protocols which have a predecessor
+    - [Has_predecessor]: the test can run on protocols which have a predecessor
       according to [previous_protocol].
     - [And l]: all predicates of [l] hold.
     - [Or l]: at least one predicate of [l] hold.
@@ -268,3 +268,20 @@ val register_regression_test :
   (t -> unit Lwt.t) ->
   t list ->
   unit
+
+(** Convert a function that expects two successive protocols
+    into a function that expects only one.
+
+    The resulting function causes the test to fail if called on a protocol
+    which does not have a predecessor. Use [~supports:Has_predecessor]
+    to prevent this.
+
+    Typical usage:
+    {[
+      Protocol.register_test ...
+        ~supports:Has_predecessor
+      @@ Protocol.with_predecessor
+      @@ fun ~previous_protocol ~protocol ->
+      ...
+    ]}*)
+val with_predecessor : (previous_protocol:t -> protocol:t -> 'a) -> t -> 'a
