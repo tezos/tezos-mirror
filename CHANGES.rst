@@ -143,6 +143,37 @@ Smart Rollup node
 Smart Rollup client
 -------------------
 
+- **Breaking change** smart rollup client have been deprecated and
+  no longer exist, most commands have equivalents RPCs and ``octez-codec`` (MR :gl:`!11046`).
+
+- The following table outlines the deprecated of smart rollup client commands and
+  their corresponding replacements with new RPCs:
+
+  .. code-block:: rst
+
+    ==========================================  ====================================================
+    Command                                     RPC
+    ==========================================  ====================================================
+    get smart rollup address                    [GET global/smart_rollup_address]
+    ------------------------------------------  ----------------------------------------------------
+    get state value for <key> [-B --block       [GET global/block/<block>/state]
+    <block>]
+    ------------------------------------------  ----------------------------------------------------
+    get proof for message <index> of outbox     [GET /global/block/<block-id>/helpers/proofs/outbox/
+    at level <level> transferring               <outbox_level>/messages] with message index in query
+    <transactions>
+    ------------------------------------------  ----------------------------------------------------
+    get proof for message <index> of outbox     [GET /global/block/<block-id>/helpers/proofs/outbox/
+    at level <level>                            <outbox_level>/messages] with message index in query
+    ==========================================  ====================================================
+
+- The result of ``encode outbox message <transactions>`` can be achieved:
+  ``octez-codec encode alpha.smart_rollup.outbox.message from <transactions>``.
+
+- The keys in the smart rollup client use the same format as the ``octez-client``.
+  They can be imported with ``octez-client import secret key <sk_uri>``, or by merging the key files
+  between the ``octez-client`` base directory and the ``smart-rollup-client-<proto>`` base directory.
+
 Smart Rollup WASM Debugger
 --------------------------
 
