@@ -1722,8 +1722,8 @@ let check_balance_field src_name field amount : (t, t) scenarios =
             let* () = check' rpc_balance.staked_b in
             check' src_balance.staked_b
         | `Unstaked_frozen_total ->
-            let* () = check' rpc_balance.unstaked_frozen_b in
-            check' src_balance.unstaked_frozen_b
+            let* () = check rpc_balance.unstaked_frozen_b in
+            check src_balance.unstaked_frozen_b
         | `Unstaked_finalizable ->
             let* () = check rpc_balance.unstaked_finalizable_b in
             check src_balance.unstaked_finalizable_b
@@ -2237,7 +2237,8 @@ module Autostaking = struct
             Q.of_int64 @@ Tez.to_mutez new_balance.liquid_b )
       | `staked -> (old_balance.staked_b, new_balance.staked_b)
       | `unstaked_frozen ->
-          (old_balance.unstaked_frozen_b, new_balance.unstaked_frozen_b)
+          ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_frozen_b,
+            Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_frozen_b )
       | `unstaked_finalizable ->
           ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_finalizable_b,
             Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_finalizable_b )

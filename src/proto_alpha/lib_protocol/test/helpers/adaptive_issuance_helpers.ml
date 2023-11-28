@@ -507,7 +507,7 @@ type balance = {
   liquid_b : Tez.t;
   bonds_b : Tez.t;
   staked_b : Partial_tez.t;
-  unstaked_frozen_b : Partial_tez.t;
+  unstaked_frozen_b : Tez.t;
   unstaked_finalizable_b : Tez.t;
   staking_delegator_numerator_b : Z.t;
   staking_delegate_denominator_b : Z.t;
@@ -518,7 +518,7 @@ let balance_zero =
     liquid_b = Tez.zero;
     bonds_b = Tez.zero;
     staked_b = Partial_tez.zero;
-    unstaked_frozen_b = Partial_tez.zero;
+    unstaked_frozen_b = Tez.zero;
     unstaked_finalizable_b = Tez.zero;
     staking_delegator_numerator_b = Z.zero;
     staking_delegate_denominator_b = Z.zero;
@@ -571,11 +571,11 @@ let balance_of_account account_name (account_map : account_map) =
         String.Map.fold
           (fun _delegate_name delegate (frozen, finalzbl) ->
             let frozen =
-              Q.(
+              Tez.(
                 frozen
-                + Unstaked_frozen.get_total
-                    account_name
-                    delegate.unstaked_frozen)
+                +! Unstaked_frozen.get_total
+                     account_name
+                     delegate.unstaked_frozen)
             in
             let finalzbl =
               Tez.(
@@ -586,7 +586,7 @@ let balance_of_account account_name (account_map : account_map) =
             in
             (frozen, finalzbl))
           account_map
-          (Q.zero, Tez.zero)
+          (Tez.zero, Tez.zero)
       in
       {balance with unstaked_frozen_b; unstaked_finalizable_b}
 
@@ -617,7 +617,7 @@ let balance_pp fmt
     bonds_b
     Partial_tez.pp
     staked_b
-    Partial_tez.pp
+    Tez.pp
     unstaked_frozen_b
     Tez.pp
     unstaked_finalizable_b
@@ -668,9 +668,9 @@ let balance_update_pp fmt
     a_staked_b
     Partial_tez.pp
     b_staked_b
-    Partial_tez.pp
+    Tez.pp
     a_unstaked_frozen_b
-    Partial_tez.pp
+    Tez.pp
     b_unstaked_frozen_b
     Tez.pp
     a_unstaked_finalizable_b
@@ -740,8 +740,8 @@ let assert_balance_equal ~loc account_name
           Tez.equal
           (f "Unstaked frozen balances do not match")
           Tez.pp
-          (Partial_tez.to_tez ~round_up:false a_unstaked_frozen_b)
-          (Partial_tez.to_tez ~round_up:false b_unstaked_frozen_b);
+          a_unstaked_frozen_b
+          b_unstaked_frozen_b;
         Assert.equal
           ~loc
           Tez.equal
@@ -1009,8 +1009,7 @@ let balance_and_total_balance_of_account account_name account_map =
     Tez.(
       liquid_b +! bonds_b
       +! Partial_tez.to_tez ~round_up:false staked_b
-      +! Partial_tez.to_tez ~round_up:false unstaked_frozen_b
-      +! unstaked_finalizable_b) )
+      +! unstaked_frozen_b +! unstaked_finalizable_b) )
 
 let apply_slashing
     ( culprit,
@@ -1150,9 +1149,7 @@ let get_balance_from_context ctxt contract =
   let* unstaked_frozen_b =
     Context.Contract.unstaked_frozen_balance ctxt contract
   in
-  let unstaked_frozen_b =
-    Option.value ~default:Tez.zero unstaked_frozen_b |> Partial_tez.of_tez
-  in
+  let unstaked_frozen_b = Option.value ~default:Tez.zero unstaked_frozen_b in
   let* unstaked_finalizable_b =
     Context.Contract.unstaked_finalizable_balance ctxt contract
   in
