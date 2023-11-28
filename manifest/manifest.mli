@@ -38,6 +38,11 @@ module Dune : sig
     - [JS]: compile to JavaScript. *)
   type mode = Byte | Native | JS
 
+  (** The content of the [(kind ...)] stanza of a [dune] file, when a
+      library is intended to be used as a PPX rewriter or a
+      [[@@deriving ...]]  plugin. *)
+  type ppx_kind = Ppx_rewriter | Ppx_deriver
+
   (** S-expressions.
 
       S-expressions are lists of atoms and/or s-expressions.
@@ -555,8 +560,11 @@ type preprocessor
 (** Make a preprocessor.
 
     [pps target] becomes a [(preprocess (pps target))] stanza in the [dune] file.
-    The target's package is also added as a dependency in the [.opam] file. *)
-val pps : target -> preprocessor
+    The target's package is also added as a dependency in the [.opam] file.
+
+    - [args]: provides extra arguments, e.g. [~args:["--"; "--lib";
+      "Type"]] produces [(preprocess (pps target -- --lib Type))]. *)
+val pps : ?args:string list -> target -> preprocessor
 
 (** Apply multiple preprocessors.
 
@@ -758,6 +766,14 @@ type bisect_ppx = No | Yes | With_sigterm
 
     - [path]: path of the directory in which to generate the [dune] file for this target.
 
+    - [ppx_kind]: specifies a [(kind ppx_rewriter)] or [(kind ppx_deriver)]
+      stanza for the [dune] target. Must be set when the library is intended
+      to be used as a PPX rewriter or a [@@deriving ...] plugin.
+
+    - [ppx_runtime_libraries]: adds a [(ppx_runtime_libraries ...)]
+      stanza to the [dune] target, allowing to specify runtime
+      dependencies when the library is a [ppx_rewriter] or a [ppx_deriver].
+
     - [preprocess]: preprocessor directives to add using the [(preprocess ...)] stanza.
       Those preprocessors are also added as dependencies in the [.opam] file.
 
@@ -850,6 +866,8 @@ type 'a maker =
   ?opam_homepage:string ->
   ?opam_with_test:with_test ->
   ?optional:bool ->
+  ?ppx_kind:Dune.ppx_kind ->
+  ?ppx_runtime_libraries:target list ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
@@ -1214,6 +1232,11 @@ val open_ : ?m:string -> target -> target
 
     Example: [tezos_base |> open_if protocol_is_recent_enough] *)
 val open_if : ?m:string -> bool -> target -> target
+
+(** Selectively makes a dependency available to the library's users:
+    extends to [(re_export <target's name>)] inside a dependency
+    stanza. *)
+val re_export : target -> target
 
 (** Add a dependency to a profile.
 

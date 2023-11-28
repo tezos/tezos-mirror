@@ -96,6 +96,8 @@ module Dune = struct
     | Native -> "native"
     | JS -> "js"
 
+  type ppx_kind = Ppx_rewriter | Ppx_deriver
+
   type s_expr =
     | E
     | S of string
@@ -222,10 +224,11 @@ module Dune = struct
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
-      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false)
-      ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
-      ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
-      ?modules ?modules_without_implementation ?modes
+      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false) ?ppx_kind
+      ?(ppx_runtime_libraries = []) ?(preprocess = Stdlib.List.[])
+      ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
+      ?default_implementation ?implements ?modules
+      ?modules_without_implementation ?modes
       ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
       ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
       (names : string list) =
@@ -283,6 +286,13 @@ module Dune = struct
              | deps -> S "deps" :: of_list deps);
            ]
           else E);
+          (match ppx_kind with
+          | None -> E
+          | Some Ppx_rewriter -> [S "kind"; S "ppx_rewriter"]
+          | Some Ppx_deriver -> [S "kind"; S "ppx_deriver"]);
+          (match ppx_runtime_libraries with
+          | [] -> E
+          | _ -> [V (S "ppx_runtime_libraries" :: ppx_runtime_libraries)]);
           (match preprocess with
           | [] -> E
           | _ :: _ -> S "preprocess" :: of_list preprocess);
@@ -410,7 +420,9 @@ module Dune = struct
 
   let ocamlyacc name = [S "ocamlyacc"; S name]
 
-  let pps names = S "pps" :: of_atom_list names
+  let pps ?(args = Stdlib.List.[]) names =
+    let atoms = match args with [] -> names | _ :: _ -> names @ args in
+    S "pps" :: of_atom_list atoms
 
   let staged_pps names =
     let s_exprs = Stdlib.List.map (fun n -> S n) names in
@@ -1214,6 +1226,8 @@ module Target = struct
     optional : bool;
     opens : string list;
     path : string;
+    ppx_kind : Dune.ppx_kind option;
+    ppx_runtime_libraries : t list;
     preprocess : preprocessor list;
     preprocessor_deps : preprocessor_dep list;
     private_modules : string list;
@@ -1234,7 +1248,9 @@ module Target = struct
     with_macos_security_framework : bool;
   }
 
-  and preprocessor = PPS of t list | Staged_PPS of t list
+  and preprocessor =
+    | PPS of {targets : t list; args : string list}
+    | Staged_PPS of t list
 
   and inline_tests = Inline_tests_backend of t
 
@@ -1251,21 +1267,21 @@ module Target = struct
     | External of external_
     | Opam_only of opam_only
     | Optional of t
+    | Re_export of t  (** Stanza [(re_export <t>)] *)
     | Select of select
     | Open of t * string
 
   let rec get_internal = function
     | Internal i -> Some i
-    | Optional t -> get_internal t
-    | Open (t, _) -> get_internal t
-    | Select {package; _} -> get_internal package
+    | Optional t | Re_export t | Open (t, _) | Select {package = t; _} ->
+        get_internal t
     | Vendored _ -> None
     | External _ -> None
     | Opam_only _ -> None
 
-  let pps = function
+  let pps ?(args = []) = function
     | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
-    | Some target -> PPS [target]
+    | Some target -> PPS {targets = [target]; args}
 
   let ppses targets =
     let targets =
@@ -1276,7 +1292,7 @@ module Target = struct
           | Some target -> target)
         targets
     in
-    PPS targets
+    PPS {targets; args = []}
 
   let staged_pps targets =
     Staged_PPS (Stdlib.List.concat_map Option.to_list targets)
@@ -1333,13 +1349,19 @@ module Target = struct
   (* Note: this function is redefined below for the version with optional targets. *)
   let rec name_for_errors = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         name_for_errors target
     | Internal {kind; _} -> kind_name_for_errors kind
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         names_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -1351,7 +1373,10 @@ module Target = struct
 
   let rec library_name_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> Ok name
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         library_name_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -1397,6 +1422,8 @@ module Target = struct
     ?opam_homepage:string ->
     ?opam_with_test:with_test ->
     ?optional:bool ->
+    ?ppx_kind:Dune.ppx_kind ->
+    ?ppx_runtime_libraries:t option list ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
@@ -1453,10 +1480,12 @@ module Target = struct
               | Vendored {npm_deps; _} ->
                   let seen = String_set.add name seen in
                   (seen, List.map Npm.node_preload npm_deps @ acc)
-              | Select {package; _} -> loop (seen, acc) package
               | Opam_only _ -> (seen, acc)
-              | Optional t -> loop (seen, acc) t
-              | Open (t, _) -> loop (seen, acc) t)
+              | Optional target
+              | Re_export target
+              | Select {package = target; _}
+              | Open (target, _) ->
+                  loop (seen, acc) target)
       and loops (seen, acc) deps =
         List.fold_left
           (fun (seen, acc) x -> loop (seen, acc) x)
@@ -1475,16 +1504,17 @@ module Target = struct
       ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
       ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
       ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
-      ?(optional = false) ?(preprocess = []) ?(preprocessor_deps = [])
-      ?(private_modules = []) ?profile ?(opam_only_deps = [])
-      ?(release_status = Auto_opam) ?static ?synopsis ?description
-      ?(time_measurement_ppx = false) ?(available : available = Always)
-      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
-      ?(extra_authors = []) ?(with_macos_security_framework = false) ~path names
-      =
+      ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
+      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
+      ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
+      ?synopsis ?description ?(time_measurement_ppx = false)
+      ?(available : available = Always) ?(virtual_modules = [])
+      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
+      ?(with_macos_security_framework = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
+    let ppx_runtime_libraries = List.filter_map Fun.id ppx_runtime_libraries in
     let implements =
       match implements with
       | None -> None
@@ -1495,7 +1525,8 @@ module Target = struct
     let opens =
       let rec get_opens acc = function
         | Internal _ | Vendored _ | External _ | Opam_only _ -> acc
-        | Optional target | Select {package = target; _} -> get_opens acc target
+        | Optional target | Re_export target | Select {package = target; _} ->
+            get_opens acc target
         | Open (target, module_name) -> get_opens (module_name :: acc) target
       in
       List.flatten (List.map (get_opens []) deps)
@@ -1522,7 +1553,7 @@ module Target = struct
       | Some (Inline_tests_backend target), (Some _ | None) -> (
           match kind with
           | Public_library _ | Private_library _ ->
-              (PPS [target] :: preprocess, true)
+              (PPS {targets = [target]; args = []} :: preprocess, true)
           | Public_executable _ | Private_executable _ | Test_executable _ ->
               invalid_arg
                 "Target.internal: cannot specify `inline_tests` for \
@@ -1684,6 +1715,26 @@ module Target = struct
                 (String.concat ", " privates))
       | _ -> ()
     in
+    let () =
+      (* Sanity checks around [ppx_rewriter] and [ppx_deriver] libraries. *)
+      match ppx_kind with
+      | Some (Dune.Ppx_rewriter | Ppx_deriver) -> (
+          match kind with
+          | Public_library _ | Private_library _ -> ()
+          | Public_executable _ | Private_executable _ | Test_executable _ ->
+              error
+                "Argument ~ppx_kind is only allowed for libraries; target %s \
+                 is not a library"
+                (kind_name_for_errors kind))
+      | None -> (
+          match ppx_runtime_libraries with
+          | [] -> ()
+          | _ :: _ ->
+              error
+                "Argument ~ppx_runtime_libraries is only allowed when \
+                 ~ppx_kind is also specified; target %s does not qualify"
+                (kind_name_for_errors kind))
+    in
     let static =
       match (static, kind) with
       | Some static, _ -> static
@@ -1827,6 +1878,8 @@ module Target = struct
         optional;
         opens;
         path;
+        ppx_kind;
+        ppx_runtime_libraries;
         preprocess;
         preprocessor_deps;
         private_modules;
@@ -1974,6 +2027,10 @@ module Target = struct
         invalid_arg
           "Target.external_sublib: Optional should be used in dependency \
            lists, not when registering"
+    | Re_export _ ->
+        invalid_arg
+          "Target.external_sublib: Re_export should be used in dependency \
+           lists, not when registering"
     | Select _ ->
         invalid_arg
           "Target.external_sublib: Select should be used in dependency lists, \
@@ -2003,7 +2060,10 @@ module Target = struct
                 "Manifest.open_: cannot be used on executable and test targets \
                  (such as %s)"
                 (name_for_errors target))
-      | Optional target | Select {package = target; _} | Open (target, _) ->
+      | Optional target
+      | Re_export target
+      | Select {package = target; _}
+      | Open (target, _) ->
           main_module_name target
       | Vendored {main_module = Some main_module; _}
       | External {main_module = Some main_module; _} ->
@@ -2036,6 +2096,10 @@ module Target = struct
   let open_if ?m condition target =
     if condition then open_ ?m target else target
 
+  let re_export = function
+    | None -> None
+    | Some target -> Some (Re_export target)
+
   let select ~package ~source_if_present ~source_if_absent ~target =
     match package with
     | None -> None
@@ -2044,10 +2108,10 @@ module Target = struct
 
   let all_internal_deps internal =
     let extract_targets = function
-      | PPS targets | Staged_PPS targets -> targets
+      | PPS {targets; args = _} | Staged_PPS targets -> targets
     in
     List.concat_map extract_targets internal.preprocess
-    @ internal.deps @ internal.opam_only_deps
+    @ internal.deps @ internal.opam_only_deps @ internal.ppx_runtime_libraries
 end
 
 type target = Target.t option
@@ -2336,6 +2400,8 @@ module Sub_lib = struct
        ?opam_homepage
        ?opam_with_test
        ?optional
+       ?ppx_kind
+       ?ppx_runtime_libraries
        ?preprocess
        ?preprocessor_deps
        ?private_modules
@@ -2416,6 +2482,8 @@ module Sub_lib = struct
       ?opam_homepage
       ?opam_with_test
       ?optional
+      ?ppx_kind
+      ?ppx_runtime_libraries
       ?preprocess
       ?preprocessor_deps
       ?private_modules
@@ -2475,7 +2543,7 @@ let write filename f =
   write_raw filename f
 
 let generate_dune (internal : Target.internal) =
-  let libraries, empty_files_to_create =
+  let libraries, ppx_runtime_libraries, empty_files_to_create =
     let empty_files_to_create = ref [] in
     let rec get_library (dep : Target.t) =
       let name =
@@ -2508,6 +2576,7 @@ let generate_dune (internal : Target.internal) =
               [H [S name; S "->"; S empty_name]];
               [H [S "->"; S empty_name]];
             ]
+      | Re_export _ -> Dune.[G [S "re_export"; S name]]
       | Select {package = _; source_if_present; source_if_absent; target} ->
           Dune.
             [
@@ -2518,7 +2587,10 @@ let generate_dune (internal : Target.internal) =
       | Open (target, _) -> get_library target
     in
     let libraries = List.map get_library internal.deps |> Dune.of_list in
-    (libraries, List.rev !empty_files_to_create)
+    let ppx_runtime_libraries =
+      List.map get_library internal.ppx_runtime_libraries |> Dune.of_list
+    in
+    (libraries, ppx_runtime_libraries, List.rev !empty_files_to_create)
   in
   let is_lib =
     match internal.kind with
@@ -2575,8 +2647,8 @@ let generate_dune (internal : Target.internal) =
             ^ String.concat ", " (hd :: tl))
     in
     let make_preprocessors = function
-      | (PPS targets : Target.preprocessor) ->
-          Dune.pps @@ List.map get_target_name targets
+      | (PPS {targets; args} : Target.preprocessor) ->
+          Dune.pps ~args @@ List.map get_target_name targets
       | Staged_PPS targets ->
           Dune.staged_pps @@ List.map get_target_name targets
     in
@@ -2698,6 +2770,8 @@ let generate_dune (internal : Target.internal) =
       ~inline_tests:internal.inline_tests
       ?inline_tests_deps:internal.inline_tests_deps
       ~optional:internal.optional
+      ?ppx_kind:internal.ppx_kind
+      ~ppx_runtime_libraries
       ~preprocess
       ~preprocessor_deps
       ~virtual_modules:internal.virtual_modules
@@ -2987,7 +3061,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
            ~with_test
            ~optional
            target)
-  | Open (target, _) ->
+  | Re_export target | Open (target, _) ->
       as_opam_dependency
         ~for_release
         ~for_conflicts
@@ -3379,8 +3453,11 @@ let generate_package_json_file () =
     | External {npm_deps; _} | Vendored {npm_deps; _} | Internal {npm_deps; _}
       ->
         List.iter add npm_deps
-    | Optional internal -> collect internal
-    | Select {package; _} | Open (package, _) -> collect package
+    | Optional package
+    | Re_export package
+    | Select {package; _}
+    | Open (package, _) ->
+        collect package
     | Opam_only _ -> ()
   in
   Target.iter_internal_by_path (fun _path internals ->
@@ -3570,8 +3647,11 @@ let check_js_of_ocaml () =
     | Internal ({js_compatible; _} as internal) ->
         if not js_compatible then
           missing_jsoo_for_target ~used_by (internal_name internal)
-    | Optional internal -> check_target ~used_by internal
-    | Select {package; _} | Open (package, _) -> check_target ~used_by package
+    | Optional package
+    | Re_export package
+    | Select {package; _}
+    | Open (package, _) ->
+        check_target ~used_by package
     | Opam_only _ -> (* irrelevent to this check *) ()
   in
   let check_internal (internal : Target.internal) =
@@ -3913,7 +3993,10 @@ let generate_profiles ~default_profile =
         (* This corresponds to libs from the stdlib, like dynlink, compiler-libs etc.
            There is no opam package to add to the lock file. *)
         ()
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         add_target_to deps profile target
   in
   String_map.iter
