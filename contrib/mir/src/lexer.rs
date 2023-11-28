@@ -98,6 +98,7 @@ defprim! {
     address,
     chain_id,
     CHAIN_ID,
+    SELF,
 }
 
 defprim! {

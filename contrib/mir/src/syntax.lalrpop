@@ -91,6 +91,7 @@ extern {
         "ITER" => Tok::Prim(PT::Prim(Prim::ITER)),
         "IF_LEFT" => Tok::Prim(PT::Prim(Prim::IF_LEFT)),
         "CHAIN_ID" => Tok::Prim(PT::Prim(Prim::CHAIN_ID)),
+        "SELF" => Tok::Prim(PT::Prim(Prim::SELF)),
         "(" => Tok::LParen,
         ")" => Tok::RParen,
         "{" => Tok::LBrace,
@@ -200,6 +201,7 @@ atomic_instruction: ParsedInstruction = {
   "UNPAIR" => Unpair,
   "CONS" => Cons,
   "CHAIN_ID" => Instruction::ChainId,
+  "SELF" => ISelf,
 }
 
 instruction: ParsedInstruction = {
