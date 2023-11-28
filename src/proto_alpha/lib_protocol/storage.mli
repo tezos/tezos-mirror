@@ -282,9 +282,11 @@ module Contract : sig
       percentages.
 
       This storage is inefficient but is not expected to grow large (as of
-      2023-05-22, the last slashing on mainnet dates back to:
+      2023-11-28, the last slashing on mainnet dates back to:
       - 2021-12-17 for double baking (154 events in total),
       - 2019-08-08 for double endorsing (24 events in total).
+      Since slashings are here grouped by baker and cycle, there would only be
+      a few elements in each list.
 
       The slashing percentages are used to compute the real value of stake
       withdrawals.
