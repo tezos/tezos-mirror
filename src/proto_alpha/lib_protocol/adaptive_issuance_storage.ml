@@ -30,6 +30,10 @@ let default_reward = Q.one
 (* Default bonus value *)
 let default_bonus = Issuance_bonus_repr.zero
 
+(* Note: the reward and the bonus values are computed as rationals ([Q.t]) but
+   are stored as fixed-point values (see {!Issuance_bonus_repr}) so that the
+   stored representation does not grow unboundedly. *)
+
 type error += Undetermined_issuance_coeff_for_cycle of Cycle_repr.t
 
 let () =
