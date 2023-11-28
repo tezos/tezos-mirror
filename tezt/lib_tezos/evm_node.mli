@@ -28,7 +28,16 @@
 (** EVM node server state. *)
 type t
 
-(** [create ?runner ?data_dir ?devmode ?rpc_addr ?rpc_port
+(** EVM node mode. *)
+type mode =
+  | Sequencer of {
+      kernel : string;  (** Path to the kernel used by the sequencer. *)
+      preimage_dir : string;
+          (** Path to the directory with the associated preimages. *)
+    }
+  | Proxy
+
+(** [create ?runner ?mode ?data_dir ?devmode ?rpc_addr ?rpc_port
     rollup_node] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
@@ -40,9 +49,12 @@ type t
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node].
+
+    [mode] defaults to [Proxy].
 *)
 val create :
   ?runner:Runner.t ->
+  ?mode:mode ->
   ?data_dir:string ->
   ?devmode:bool ->
   ?rpc_addr:string ->
@@ -54,11 +66,12 @@ val create :
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
-(** [init ?runner ?data_dir ?devmode ?rpc_addr ?rpc_port rollup_node]
+(** [init ?runner ?mode ?data_dir ?devmode ?rpc_addr ?rpc_port rollup_node]
     creates an EVM node server with {!create} and runs it with
     {!run}. *)
 val init :
   ?runner:Runner.t ->
+  ?mode:mode ->
   ?data_dir:string ->
   ?devmode:bool ->
   ?rpc_addr:string ->

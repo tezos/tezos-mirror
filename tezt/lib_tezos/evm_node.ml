@@ -25,10 +25,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type mode = Sequencer of {kernel : string; preimage_dir : string} | Proxy
+
 module Parameters = struct
   type persistent_state = {
     arguments : string list;
     mutable pending_ready : unit option Lwt.u list;
+    mode : mode;
     data_dir : string;
     devmode : bool;
     rpc_addr : string;
@@ -92,7 +95,8 @@ let wait_for_ready evm_node =
         resolver :: evm_node.persistent_state.pending_ready ;
       check_event evm_node event_ready_name promise
 
-let create ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node =
+let create ?runner ?(mode = Proxy) ?data_dir ~devmode ?rpc_addr ?rpc_port
+    rollup_node =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ~devmode ?rpc_addr ?rpc_port ()
   in
@@ -107,6 +111,7 @@ let create ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node =
       {
         arguments;
         pending_ready = [];
+        mode;
         data_dir;
         devmode;
         rpc_addr;
@@ -118,9 +123,9 @@ let create ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node =
   on_event evm_node (handle_event evm_node) ;
   evm_node
 
-let create ?runner ?data_dir ?(devmode = false) ?rpc_addr ?rpc_port rollup_node
-    =
-  create ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node
+let create ?runner ?mode ?data_dir ?(devmode = false) ?rpc_addr ?rpc_port
+    rollup_node =
+  create ?mode ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node
 
 let rollup_node_endpoint evm_node =
   Sc_rollup_node.endpoint evm_node.persistent_state.rollup_node
@@ -128,9 +133,25 @@ let rollup_node_endpoint evm_node =
 let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
 let run_args evm_node =
-  ["run"; "proxy"; "with"; "endpoint"]
-  @ [rollup_node_endpoint evm_node]
-  @ data_dir evm_node @ evm_node.persistent_state.arguments
+  let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
+  let mode_args =
+    match evm_node.persistent_state.mode with
+    | Proxy ->
+        ["run"; "proxy"; "with"; "endpoint"; rollup_node_endpoint evm_node]
+    | Sequencer {kernel; preimage_dir} ->
+        [
+          "run";
+          "sequencer";
+          "with";
+          "endpoint";
+          rollup_node_endpoint evm_node;
+          "--kernel";
+          kernel;
+          "--preimage-dir";
+          preimage_dir;
+        ]
+  in
+  mode_args @ shared_args
 
 let run evm_node =
   let* () = run evm_node {ready = false} (run_args evm_node) in
@@ -151,9 +172,10 @@ let endpoint (evm_node : t) =
     evm_node.persistent_state.rpc_addr
     evm_node.persistent_state.rpc_port
 
-let init ?runner ?data_dir ?(devmode = false) ?rpc_addr ?rpc_port rollup_node =
+let init ?runner ?mode ?data_dir ?(devmode = false) ?rpc_addr ?rpc_port
+    rollup_node =
   let evm_node =
-    create ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node
+    create ?runner ?mode ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node
   in
   let* () = run evm_node in
   return evm_node
