@@ -24,8 +24,8 @@ val sub_bounded : t -> t -> t
 (** 0 *)
 val p0 : t
 
-(** 7 *)
-val p7 : t
+(** 5 *)
+val p5 : t
 
 (** 50 *)
 val p50 : t
