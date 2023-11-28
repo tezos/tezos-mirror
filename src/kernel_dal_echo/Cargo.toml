@@ -15,5 +15,5 @@ tezos-smart-rollup-host = { path = "../kernel_sdk/host", features = ["proto-alph
 tezos-smart-rollup-debug = { path = "../kernel_sdk/debug" }
 tezos-smart-rollup-entrypoint = { path = "../kernel_sdk/entrypoint" }
 tezos-smart-rollup-storage = { path = "../kernel_sdk/storage" }
-tezos-smart-rollup-encoding = { path = "../kernel_sdk/encoding" }
+tezos-smart-rollup-encoding = { path = "../kernel_sdk/encoding", default-features = false, features = ["alloc", "tezos-encoding", "crypto"] }
 tezos-smart-rollup-mock = { path = "../kernel_sdk/mock", features = ["proto-alpha"] }
