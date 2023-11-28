@@ -7,7 +7,8 @@
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
-let make_config ?bootstrap_accounts ?ticketer ?administrator () =
+let make_config ?bootstrap_accounts ?ticketer ?administrator
+    ?(sequencer = false) () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
     Option.fold
@@ -42,6 +43,10 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator () =
       ~none:[]
       administrator
   in
-  match ticketer @ bootstrap_accounts @ administrator with
+  let sequencer =
+    if sequencer then [Set {value = "00"; to_ = Durable_storage_path.sequencer}]
+    else []
+  in
+  match ticketer @ bootstrap_accounts @ administrator @ sequencer with
   | [] -> None
   | res -> Some (`Config res)

@@ -48,4 +48,6 @@ let admin = evm "/admin"
 
 let ticketer = evm "/ticketer"
 
+let sequencer = evm "/sequencer"
+
 let kernel_boot_wasm = kernel "/boot.wasm"
