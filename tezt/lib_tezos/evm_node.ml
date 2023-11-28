@@ -127,15 +127,13 @@ let rollup_node_endpoint evm_node =
 
 let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
+let run_args evm_node =
+  ["run"; "proxy"; "with"; "endpoint"]
+  @ [rollup_node_endpoint evm_node]
+  @ data_dir evm_node @ evm_node.persistent_state.arguments
+
 let run evm_node =
-  let* () =
-    run
-      evm_node
-      {ready = false}
-      (["run"; "proxy"; "with"; "endpoint"]
-      @ [rollup_node_endpoint evm_node]
-      @ data_dir evm_node @ evm_node.persistent_state.arguments)
-  in
+  let* () = run evm_node {ready = false} (run_args evm_node) in
   let* () = wait_for_ready evm_node in
   unit
 
@@ -145,13 +143,7 @@ let spawn_command evm_node args =
     (Uses.path Constant.octez_evm_node)
   @@ args
 
-let spawn_run evm_node =
-  spawn_command
-    evm_node
-    (["run"; "proxy"; "with"; "endpoint"]
-    @ data_dir evm_node
-    @ [rollup_node_endpoint evm_node]
-    @ evm_node.persistent_state.arguments)
+let spawn_run evm_node = spawn_command evm_node (run_args evm_node)
 
 let endpoint (evm_node : t) =
   Format.sprintf
