@@ -528,7 +528,7 @@ let run_safety_check_experiment chain_store current_head protocol_hash_opt
   let is_network_safe =
     unsafe_blocks_number = 0
     && either_unsafe_or_maybe_unsafe_blocks_number * 100
-       > total_number_of_blocks * max_maybe_unsafe_ratio
+       <= total_number_of_blocks * max_maybe_unsafe_ratio
   in
   Format.printf
     "Experiment finished: Network safety result = %b.@."
