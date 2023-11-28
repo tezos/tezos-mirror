@@ -178,7 +178,7 @@ let report_errors ppf (parsed, errs) =
               (Michelson_v1_error_reporter.report_errors
                  ~details:false
                  ~show_source:false
-                 ~parsed)
+                 ~parsed:(Michelson_v1_parser.unrecognize_prims parsed))
               errs
           in
           let {start = {point = s; _}; stop = {point = e; _}} = loc in
@@ -222,7 +222,7 @@ let report_errors ppf (parsed, errs) =
              (Michelson_v1_error_reporter.report_errors
                 ~details:false
                 ~show_source:false
-                ~parsed)
+                ~parsed:(Michelson_v1_parser.unrecognize_prims parsed))
              [err]
          in
          let {start = {point = s; _}; stop = {point = e; _}} = loc in

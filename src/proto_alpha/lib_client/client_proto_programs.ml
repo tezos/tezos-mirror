@@ -54,6 +54,7 @@ end)
 let print_errors ?parsed (cctxt : #Protocol_client_context.full) errs
     ~show_source =
   let open Lwt_result_syntax in
+  let parsed = Option.map Michelson_v1_parser.unrecognize_prims parsed in
   let*! errs =
     Michelson_v1_error_reporter.enrich_runtime_errors
       cctxt
@@ -491,7 +492,7 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
             (Michelson_v1_error_reporter.report_errors
                ~details:show_types
                ~show_source:print_source_on_error
-               ~parsed:program)
+               ~parsed:(Michelson_v1_parser.unrecognize_prims program))
             errs
         in
         cctxt#error "script %S is ill-typed" name

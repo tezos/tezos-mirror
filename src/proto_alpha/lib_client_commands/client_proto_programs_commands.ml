@@ -209,7 +209,7 @@ let commands () =
             (fun ppf () ->
               Michelson_v1_error_reporter.report_errors
                 ~details:(not no_print_source)
-                ~parsed
+                ~parsed:(Michelson_v1_parser.unrecognize_prims parsed)
                 ~show_source:(not no_print_source)
                 ppf
                 errors)
