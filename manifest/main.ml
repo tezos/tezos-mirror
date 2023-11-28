@@ -6652,6 +6652,7 @@ let hash = Protocol.hash
         (sf "octez_smart_rollup_client_%s" short_hash)
         ~path:(path // "lib_sc_rollup_client")
         ~opam:(sf "octez-smart-rollup-client-%s" short_hash)
+        ~release_status:Experimental
         ~deps:
           [
             octez_base |> open_ |> open_ ~m:"TzPervasives"
@@ -6673,7 +6674,7 @@ let hash = Protocol.hash
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
         ~synopsis:"Tezos/Protocol: Smart rollup client"
-        ~release_status:executable_release_status
+        ~release_status:Experimental
         ~with_macos_security_framework:true
         ~deps:
           [
