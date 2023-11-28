@@ -295,7 +295,7 @@ pub fn store_current_block<Host: Runtime>(
         Ok(()) => {
             log!(
                 host,
-                Debug,
+                Info,
                 "Storing block {} containing {} transaction(s) for {} gas used.",
                 block.number,
                 block.transactions.len(),
