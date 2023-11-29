@@ -339,35 +339,50 @@ let may_insert_delegate =
          .return_unit
        else Db.exec Sql_requests.maybe_insert_delegate address)
 
-let endorsing_rights_callback db_pool g rights =
-  let level = Int32.of_string (Re.Group.get g 1) in
-  let out =
-    let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-    Caqti_lwt.Pool.use
-      (fun (module Db : Caqti_lwt.CONNECTION) ->
-        let* () =
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun right ->
-              may_insert_delegate
-                (module Db)
-                right.Teztale_lib.Consensus_ops.address)
-            rights
-        in
-        Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-          (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
-            Db.exec
-              Sql_requests.maybe_insert_endorsing_right
-              (level, first_slot, power, address))
-          rights)
-      db_pool
-  in
-  with_caqti_error out (fun () ->
-      Cohttp_lwt_unix.Server.respond_string
-        ~headers:
-          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
-        ~status:`OK
-        ~body:"Endorsing_right noted"
-        ())
+let endorsing_rights_callback =
+  let open
+    Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
+      (struct
+        include Int32
+
+        let hash = Int32.to_int
+      end) in
+  let level_cache = create 100 in
+  fun db_pool g rights ->
+    let level = Int32.of_string (Re.Group.get g 1) in
+    let out =
+      let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+      (* Note: even if data is already in cache,
+         we add it again in order to mark it as recent. *)
+      Lwt_result.map
+        (fun () -> add level_cache level)
+        (if mem level_cache level then return_unit
+         else
+           Caqti_lwt.Pool.use
+             (fun (module Db : Caqti_lwt.CONNECTION) ->
+               let* () =
+                 Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                   (fun right ->
+                     may_insert_delegate
+                       (module Db)
+                       right.Teztale_lib.Consensus_ops.address)
+                   rights
+               in
+               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                 (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
+                   Db.exec
+                     Sql_requests.maybe_insert_endorsing_right
+                     (level, first_slot, power, address))
+                 rights)
+             db_pool)
+    in
+    with_caqti_error out (fun () ->
+        Cohttp_lwt_unix.Server.respond_string
+          ~headers:
+            (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+          ~status:`OK
+          ~body:"Endorsing_right noted"
+          ())
 
 let may_insert_operation =
   let open
