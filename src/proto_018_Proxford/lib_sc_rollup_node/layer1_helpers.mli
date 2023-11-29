@@ -79,7 +79,7 @@ val get_boot_sector : Block_hash.t -> _ Node_context.t -> string tzresult Lwt.t
 val find_whitelist :
   #Client_context.full ->
   Address.t ->
-  Signature.public_key_hash list option tzresult Lwt.t
+  Protocol.Alpha_context.Sc_rollup.Whitelist.t option tzresult Lwt.t
 
 (** Find and retrieve information about the last whitelist update. *)
 val find_last_whitelist_update :

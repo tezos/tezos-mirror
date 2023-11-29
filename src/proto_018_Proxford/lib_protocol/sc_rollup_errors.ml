@@ -99,6 +99,11 @@ type error +=
       Sc_rollup_no_commitment_to_cement of Raw_level_repr.t
   | (* `Permanent *)
       Sc_rollup_double_publish of Sc_rollup_commitment_repr.Hash.t
+  | Sc_rollup_empty_whitelist
+  | Sc_rollup_whitelist_disabled
+  | Sc_rollup_staker_not_in_whitelist
+  | Sc_rollup_duplicated_key_in_whitelist
+  | Sc_rollup_is_public
 
 let () =
   register_error_kind
@@ -693,4 +698,62 @@ let () =
     (function
       | Sc_rollup_double_publish commitment_hash -> Some commitment_hash
       | _ -> None)
-    (fun commitment_hash -> Sc_rollup_double_publish commitment_hash)
+    (fun commitment_hash -> Sc_rollup_double_publish commitment_hash) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_empty_whitelist"
+    ~title:"Invalid whitelist: whitelist cannot be empty"
+    ~description:"Smart rollup whitelist cannot be empty"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Smart rollup whitelist cannot be empty.")
+    Data_encoding.empty
+    (function Sc_rollup_empty_whitelist -> Some () | _ -> None)
+    (fun () -> Sc_rollup_empty_whitelist) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_whitelist_disabled"
+    ~title:"Invalid whitelist: must be None when the feature is deactivated"
+    ~description:"The whitelist must be None when the feature is deactivated."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Private smart rollup with whitelist ACL is disabled.")
+    Data_encoding.empty
+    (function Sc_rollup_whitelist_disabled -> Some () | _ -> None)
+    (fun () -> Sc_rollup_whitelist_disabled) ;
+  register_error_kind
+    `Temporary
+    ~id:"smart_rollup_staker_not_in_whitelist"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The rollup is private and the submitter of the commitment is not \
+         present in the whitelist.")
+    Data_encoding.empty
+    (function Sc_rollup_staker_not_in_whitelist -> Some () | _ -> None)
+    (fun () -> Sc_rollup_staker_not_in_whitelist) ;
+  register_error_kind
+    `Temporary
+    ~id:"smart_rollup_duplicated_key_in_whitelist"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The whitelist contains twice the same key. This is forbidden and all \
+         keys in the whitelist should be disctinct.")
+    Data_encoding.empty
+    (function Sc_rollup_duplicated_key_in_whitelist -> Some () | _ -> None)
+    (fun () -> Sc_rollup_duplicated_key_in_whitelist) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_rollup_is_public"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The rollup is public, no update whitelist message can be executed.")
+    Data_encoding.empty
+    (function Sc_rollup_is_public -> Some () | _ -> None)
+    (fun () -> Sc_rollup_is_public)

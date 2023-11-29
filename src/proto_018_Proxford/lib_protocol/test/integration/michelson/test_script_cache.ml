@@ -52,30 +52,32 @@ let liquidity_baking_contract =
   Contract_hash.of_b58check_exn "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
 
 let make_block block f =
-  Incremental.begin_construction block >>=? fun incr ->
-  f (Incremental.alpha_ctxt incr) >>=? fun (ret, ctxt) ->
+  let open Lwt_result_syntax in
+  let* incr = Incremental.begin_construction block in
+  let* ret, ctxt = f (Incremental.alpha_ctxt incr) in
   let incr = Incremental.set_alpha_ctxt incr ctxt in
-  Incremental.finalize_block incr >>=? fun block ->
-  Block.bake block >>=? fun next_block -> return (ret, next_block)
+  let* block = Incremental.finalize_block incr in
+  let* next_block = Block.bake block in
+  return (ret, next_block)
 
 let ( @! ) f g =
+  let open Lwt_result_syntax in
   f @@ fun ctxt ->
-  g ctxt >>=? fun ret -> return (ret, ctxt)
-
-let throw_block_away (x, _block) = return x
+  let* ret = g ctxt in
+  return (ret, ctxt)
 
 let equal_scripts (s1 : Script.t) (s2 : Script.t) =
+  let open Result_syntax in
   Script_repr.(
-    force_bytes s1.code >>? fun code1 ->
-    force_bytes s2.code >>? fun code2 ->
-    force_bytes s1.storage >>? fun storage1 ->
-    force_bytes s2.storage >>? fun storage2 ->
-    ok (Bytes.equal code1 code2 && Bytes.equal storage1 storage2))
-  |> Environment.wrap_tzresult
+    let* code1 = force_bytes s1.code in
+    let* code2 = force_bytes s2.code in
+    let* storage1 = force_bytes s1.storage in
+    let* storage2 = force_bytes s2.storage in
+    return (Bytes.equal code1 code2 && Bytes.equal storage1 storage2))
 
 let find ctxt addr =
-  Script_cache.find ctxt addr >|= Environment.wrap_tzresult
-  >>=? fun (ctxt, identifier, result) ->
+  let open Lwt_result_wrap_syntax in
+  let*@ ctxt, identifier, result = Script_cache.find ctxt addr in
   match result with
   | None ->
       (* by [find_correctly_looks_up]. *)
@@ -90,27 +92,31 @@ let value_as_int :
 let path = project_root // Filename.dirname __FILE__
 
 let add_some_contracts k src block baker =
-  ( make_block block @@ fun ctxt ->
-    find ctxt liquidity_baking_contract >>=? fun (ctxt, id, _, _) ->
-    return (id, ctxt) )
-  >>=? fun (liquidity_baking_contract_id, block) ->
-  List.fold_left_es
-    (fun (rev_contracts, block) _ ->
-      originate_contract_hash
-        (path // "contracts/int-store.tz")
-        "31"
-        src
-        block
-        baker
-      >>=? fun (addr, block) ->
-      Block.bake block >>=? fun block ->
-      make_block block @@ fun ctxt ->
-      find ctxt addr >>=? fun (ctxt, id, _, _) ->
-      let contract = (id, addr) in
-      return (contract :: rev_contracts, ctxt))
-    ([], block)
-    (1 -- k)
-  >>=? fun (rev_contracts, block) ->
+  let open Lwt_result_syntax in
+  let* liquidity_baking_contract_id, block =
+    make_block block @@ fun ctxt ->
+    let* ctxt, id, _, _ = find ctxt liquidity_baking_contract in
+    return (id, ctxt)
+  in
+  let* rev_contracts, block =
+    List.fold_left_es
+      (fun (rev_contracts, block) _ ->
+        let* addr, block =
+          originate_contract_hash
+            (path // "contracts/int-store.tz")
+            "31"
+            src
+            block
+            baker
+        in
+        let* block = Block.bake block in
+        make_block block @@ fun ctxt ->
+        let* ctxt, id, _, _ = find ctxt addr in
+        let contract = (id, addr) in
+        return (contract :: rev_contracts, ctxt))
+      ([], block)
+      (1 -- k)
+  in
   let contracts =
     (* After each baking [liquidity_baking_contract] is the most
        recently used contract. *)
@@ -142,26 +148,32 @@ let assert_cache_size expected_size ctxt =
           (Script_cache.size ctxt)))
 
 let test_size_of_liquidity_baking_contract () =
-  init () >>=? fun (block, _, _, _) ->
-  make_block block @! assert_cache_size liquidity_baking_contract_size
-  >>=? throw_block_away
+  let open Lwt_result_syntax in
+  let* block, _, _, _ = init () in
+  let* (), _block =
+    make_block block @! assert_cache_size liquidity_baking_contract_size
+  in
+  return_unit
 
 let test_size_of_int_store_contract () =
-  init () >>=? fun (block, baker, src, _) ->
-  originate_contract_hash
-    (path // "contracts/int-store.tz")
-    "31"
-    src
-    block
-    baker
-  >>=? fun (addr, block) ->
-  ( make_block block @! fun ctxt ->
-    Script_cache.find ctxt addr >|= Environment.wrap_tzresult
-    >>=? fun (ctxt, _, _) ->
+  let open Lwt_result_wrap_syntax in
+  let* block, baker, src, _ = init () in
+  let* addr, block =
+    originate_contract_hash
+      (path // "contracts/int-store.tz")
+      "31"
+      src
+      block
+      baker
+  in
+  let* (), _block =
+    make_block block @! fun ctxt ->
+    let*@ ctxt, _, _ = Script_cache.find ctxt addr in
     assert_cache_size
       (int_store_contract_size + liquidity_baking_contract_size)
-      ctxt )
-  >>=? throw_block_away
+      ctxt
+  in
+  return_unit
 
 (*
 
@@ -169,43 +181,47 @@ let test_size_of_int_store_contract () =
 
 *)
 let test_find_correctly_looks_up () =
-  init () >>=? fun (block, baker, src, _) ->
-  originate_contract_hash
-    (path // "contracts/sapling_contract.tz")
-    "{ }"
-    src
-    block
-    baker
-  >>=? fun (addr, block) ->
-  ( make_block block @! fun ctxt ->
+  let open Lwt_result_wrap_syntax in
+  let* block, baker, src, _ = init () in
+  let* addr, block =
+    originate_contract_hash
+      (path // "contracts/sapling_contract.tz")
+      "{ }"
+      src
+      block
+      baker
+  in
+  let* (), _block =
+    make_block block @! fun ctxt ->
     (*
       Contract is present.
     *)
-    Script_cache.find ctxt addr >|= Environment.wrap_tzresult
-    >>=? fun (_, _, result) ->
-    Contract.get_script ctxt addr >|= Environment.wrap_tzresult
-    >>=? fun (ctxt, script) ->
-    (match (result, script) with
-    | None, _ -> ok false
-    | Some _, None ->
-        (* because we assume that get_script correctly behaves. *)
-        assert false
-    | Some (cached_script, _), Some script -> equal_scripts script cached_script)
-    >>?= fun cond ->
-    fail_unless
-      cond
-      (err "find should be able to retrieve an originated contract")
-    (*
+    let*@ _, _, result = Script_cache.find ctxt addr in
+    let*@ ctxt, script = Contract.get_script ctxt addr in
+    let*?@ cond =
+      match (result, script) with
+      | None, _ -> Result_syntax.return_false
+      | Some _, None ->
+          (* because we assume that get_script correctly behaves. *)
+          assert false
+      | Some (cached_script, _), Some script ->
+          equal_scripts script cached_script
+    in
+    let* () =
+      fail_unless
+        cond
+        (err "find should be able to retrieve an originated contract")
+      (*
       Contract is absent.
     *)
-    >>=? fun () ->
+    in
     let addr = Contract_helpers.fake_KT1 in
-    Script_cache.find ctxt addr >|= Environment.wrap_tzresult
-    >>=? fun (_, _, cached_contract) ->
+    let*@ _, _, cached_contract = Script_cache.find ctxt addr in
     fail_unless
       (cached_contract = None)
-      (err "find should return None for unbound contracts") )
-  >>=? throw_block_away
+      (err "find should return None for unbound contracts")
+  in
+  return_unit
 
 (*
 
@@ -213,26 +229,27 @@ let test_find_correctly_looks_up () =
 
 *)
 let test_update_modifies_cached_contract () =
-  init () >>=? fun (block, baker, src, _) ->
-  originate_contract_hash
-    (path // "contracts/int-store.tz")
-    "36"
-    src
-    block
-    baker
-  >>=? fun (addr, block) ->
-  ( make_block block @! fun ctxt ->
-    find ctxt addr >>=? fun (ctxt, identifier, script, Ex_script (Script ir)) ->
+  let open Lwt_result_wrap_syntax in
+  let* block, baker, src, _ = init () in
+  let* addr, block =
+    originate_contract_hash
+      (path // "contracts/int-store.tz")
+      "36"
+      src
+      block
+      baker
+  in
+  let* (), _block =
+    make_block block @! fun ctxt ->
+    let* ctxt, identifier, script, Ex_script (Script ir) = find ctxt addr in
     match ir.storage_type with
     | Int_t ->
         let storage' = Script_int.(add ir.storage (Script_int.of_int 1)) in
         let cached_contract' =
           (script, Ex_script (Script {ir with storage = storage'}))
         in
-        Script_cache.update ctxt identifier cached_contract' 1
-        |> Environment.wrap_tzresult
-        >>?= fun ctxt ->
-        find ctxt addr >>=? fun (_, _, _, Ex_script (Script ir')) ->
+        let*?@ ctxt = Script_cache.update ctxt identifier cached_contract' 1 in
+        let* _, _, _, Ex_script (Script ir') = find ctxt addr in
         let storage = value_as_int ir'.storage_type ir'.storage in
         fail_unless
           (Script_int.compare storage storage' = 0)
@@ -243,8 +260,9 @@ let test_update_modifies_cached_contract () =
                 (Script_int.to_string storage)))
     | _ ->
         (* by definition of int-store.tz. *)
-        assert false )
-  >>=? throw_block_away
+        assert false
+  in
+  return_unit
 
 (*
 
@@ -253,17 +271,20 @@ let test_update_modifies_cached_contract () =
 
 *)
 let test_entries_returns_the_list_in_correct_order () =
+  let open Lwt_result_wrap_syntax in
   let ncontracts = 10 in
-  init () >>=? fun (block, baker, src, _) ->
-  add_some_contracts ncontracts src block baker >>=? fun (contracts, block) ->
+  let* block, baker, src, _ = init () in
+  let* contracts, block = add_some_contracts ncontracts src block baker in
   let addrs = snd @@ List.split contracts in
-  ( make_block block @! fun ctxt ->
-    Script_cache.entries ctxt |> Environment.wrap_tzresult >>?= fun entries ->
+  let* (), _block =
+    make_block block @! fun ctxt ->
+    let*?@ entries = Script_cache.entries ctxt in
     let cached_contracts = fst (List.split entries) in
     fail_unless
       (addrs = cached_contracts)
-      (err "entries must return cached contracts in order") )
-  >>=? throw_block_away
+      (err "entries must return cached contracts in order")
+  in
+  return_unit
 
 (*
 
@@ -271,28 +292,33 @@ let test_entries_returns_the_list_in_correct_order () =
 
 *)
 let test_contract_rank_is_lru_rank () =
+  let open Lwt_result_syntax in
   let ncontracts = 10 in
-  init () >>=? fun (block, baker, src, _) ->
-  add_some_contracts ncontracts src block baker >>=? fun (contracts, block) ->
+  let* block, baker, src, _ = init () in
+  let* contracts, block = add_some_contracts ncontracts src block baker in
   let addrs = snd @@ List.split contracts in
-  ( make_block block @! fun ctxt ->
+  let* (), _block =
+    make_block block @! fun ctxt ->
     let rec check_rank k = function
-      | [] -> return ()
+      | [] -> return_unit
       | addr :: addrs -> (
           match Script_cache.contract_rank ctxt addr with
-          | None -> fail (err "Contract rank should find a cached contract")
+          | None -> tzfail (err "Contract rank should find a cached contract")
           | Some rank ->
-              fail_unless
-                (k = rank)
-                (err
-                   (Printf.sprintf
-                      "Invalid contract rank, expecting %d, got %d"
-                      k
-                      rank))
-              >>=? fun () -> check_rank (k + 1) addrs)
+              let* () =
+                fail_unless
+                  (k = rank)
+                  (err
+                     (Printf.sprintf
+                        "Invalid contract rank, expecting %d, got %d"
+                        k
+                        rank))
+              in
+              check_rank (k + 1) addrs)
     in
-    check_rank 0 addrs )
-  >>=? throw_block_away
+    check_rank 0 addrs
+  in
+  return_unit
 
 (*
 
@@ -300,10 +326,12 @@ let test_contract_rank_is_lru_rank () =
 
 *)
 let test_size_adds_entries_sizes () =
+  let open Lwt_result_syntax in
   let ncontracts = 10 in
-  init () >>=? fun (block, baker, src, _) ->
-  add_some_contracts ncontracts src block baker >>=? fun (_, block) ->
-  ( make_block block @! fun ctxt ->
+  let* block, baker, src, _ = init () in
+  let* _, block = add_some_contracts ncontracts src block baker in
+  let* (), _block =
+    make_block block @! fun ctxt ->
     let expected_size =
       liquidity_baking_contract_size + (ncontracts * int_store_contract_size)
     in
@@ -313,8 +341,9 @@ let test_size_adds_entries_sizes () =
          (Printf.sprintf
             "Invalid script cache size, expecting %d, got %d"
             expected_size
-            (Script_cache.size ctxt))) )
-  >>=? throw_block_away
+            (Script_cache.size ctxt)))
+  in
+  return_unit
 
 (*
 
@@ -326,16 +355,19 @@ let defined_size_limit =
     .cache_script_size
 
 let test_size_limit_is_in_constants_repr () =
-  init () >>=? fun (block, _baker, _src, _) ->
-  ( make_block block @! fun ctxt ->
+  let open Lwt_result_syntax in
+  let* block, _baker, _src, _ = init () in
+  let* (), _block =
+    make_block block @! fun ctxt ->
     fail_unless
       (Script_cache.size_limit ctxt = defined_size_limit)
       (err
          (Printf.sprintf
             "Invalid size limit, expecting %d, got %d"
             defined_size_limit
-            (Script_cache.size_limit ctxt))) )
-  >>=? throw_block_away
+            (Script_cache.size_limit ctxt)))
+  in
+  return_unit
 
 (*
 
@@ -344,27 +376,33 @@ let test_size_limit_is_in_constants_repr () =
 
 *)
 let test_entries_shows_lru () =
+  let open Lwt_result_wrap_syntax in
   let ncontracts = 10 in
-  init () >>=? fun (block, baker, src, _) ->
-  add_some_contracts ncontracts src block baker >>=? fun (contracts, block) ->
+  let* block, baker, src, _ = init () in
+  let* contracts, block = add_some_contracts ncontracts src block baker in
   (* We pretend that the contracts' sizes grow so much that they cannot all
      fit into the cache. *)
   let new_size = 2 * defined_size_limit / ncontracts in
-  ( make_block block @@ fun ctxt ->
-    List.fold_left_es
-      (fun ctxt (_, addr) ->
-        find ctxt addr >>=? fun (ctxt, id, script, cached_contract) ->
-        Lwt.return
-        @@ (Script_cache.update ctxt id (script, cached_contract) new_size
-           |> Environment.wrap_tzresult))
-      ctxt
-      contracts
-    >>=? fun ctxt -> return ((), ctxt) )
-  >>=? fun ((), block) ->
+  let* (), block =
+    make_block block @@ fun ctxt ->
+    let* ctxt =
+      List.fold_left_es
+        (fun ctxt (_, addr) ->
+          let* ctxt, id, script, cached_contract = find ctxt addr in
+          let*?@ result =
+            Script_cache.update ctxt id (script, cached_contract) new_size
+          in
+          return result)
+        ctxt
+        contracts
+    in
+    return ((), ctxt)
+  in
   (* At this point, the cache should only contain the most recently modified
      contracts. *)
-  ( make_block block @@ fun ctxt ->
-    Script_cache.entries ctxt |> Environment.wrap_tzresult >>?= fun entries ->
+  let* (), _block =
+    make_block block @@ fun ctxt ->
+    let*?@ entries = Script_cache.entries ctxt in
     let rev_entries = List.rev entries in
     let rev_contracts = List.rev contracts in
     let rec aux rev_entries rev_contracts =
@@ -385,27 +423,32 @@ let test_entries_shows_lru () =
                   removed_contracts
                   (ncontracts / 2)))
       | (contract, size) :: rev_entries, (_, contract') :: rev_contracts ->
-          fail_unless
-            (size = new_size || contract = liquidity_baking_contract)
-            (err
-               (Printf.sprintf
-                  "A contract in the cache has not the right size, expecting \
-                   %d, got %d"
-                  new_size
-                  size))
-          >>=? fun () ->
-          fail_unless
-            (contract = contract')
-            (err
-               (Printf.sprintf
-                  "entries do not return cached contracts in right order"))
-          >>=? fun () -> aux rev_entries rev_contracts
+          let* () =
+            fail_unless
+              (size = new_size || contract = liquidity_baking_contract)
+              (err
+                 (Printf.sprintf
+                    "A contract in the cache has not the right size, expecting \
+                     %d, got %d"
+                    new_size
+                    size))
+          in
+          let* () =
+            fail_unless
+              (contract = contract')
+              (err
+                 (Printf.sprintf
+                    "entries do not return cached contracts in right order"))
+          in
+          aux rev_entries rev_contracts
       | _, [] ->
           (* There cannot be more entries than contracts. *)
           assert false
     in
-    aux rev_entries rev_contracts >>=? fun () -> return ((), ctxt) )
-  >>=? throw_block_away
+    let* () = aux rev_entries rev_contracts in
+    return ((), ctxt)
+  in
+  return_unit
 
 let tests =
   let open Tztest in

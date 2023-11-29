@@ -331,6 +331,7 @@ let () =
 
 let check_signature (block : t) (chain_id : Chain_id.t)
     (key : Signature.Public_key.t) =
+  let open Result_syntax in
   let check_signature key ({shell; protocol_data = {contents; signature}} : t) =
     let unsigned_header =
       Data_encoding.Binary.to_bytes_exn unsigned_encoding (shell, contents)
@@ -341,9 +342,9 @@ let check_signature (block : t) (chain_id : Chain_id.t)
       signature
       unsigned_header
   in
-  if check_signature key block then ok ()
+  if check_signature key block then return_unit
   else
-    error (Invalid_block_signature (hash block, Signature.Public_key.hash key))
+    tzfail (Invalid_block_signature (hash block, Signature.Public_key.hash key))
 
 let check_payload_round ~round ~payload_round =
   error_when
@@ -352,14 +353,16 @@ let check_payload_round ~round ~payload_round =
 
 let check_timestamp round_durations ~timestamp ~round ~predecessor_timestamp
     ~predecessor_round =
-  Round_repr.timestamp_of_round
-    round_durations
-    ~predecessor_timestamp
-    ~predecessor_round
-    ~round
-  >>? fun expected_timestamp ->
-  if Time_repr.(expected_timestamp = timestamp) then Error_monad.ok ()
-  else error (Wrong_timestamp (timestamp, expected_timestamp))
+  let open Result_syntax in
+  let* expected_timestamp =
+    Round_repr.timestamp_of_round
+      round_durations
+      ~predecessor_timestamp
+      ~predecessor_round
+      ~round
+  in
+  if Time_repr.(expected_timestamp = timestamp) then return_unit
+  else tzfail (Wrong_timestamp (timestamp, expected_timestamp))
 
 module Proof_of_work = struct
   let check_hash hash stamp_threshold =
@@ -374,13 +377,14 @@ module Proof_of_work = struct
     check_hash hash stamp_threshold
 
   let check_proof_of_work_stamp ~proof_of_work_threshold block =
+    let open Result_syntax in
     if
       check_header_proof_of_work_stamp
         block.shell
         block.protocol_data.contents
         proof_of_work_threshold
-    then ok ()
-    else error Invalid_stamp
+    then return_unit
+    else tzfail Invalid_stamp
 end
 
 let begin_validate_block_header ~(block_header : t) ~(chain_id : Chain_id.t)
@@ -389,6 +393,7 @@ let begin_validate_block_header ~(block_header : t) ~(chain_id : Chain_id.t)
     ~(delegate_pk : Signature.Public_key.t)
     ~(round_durations : Round_repr.Durations.t)
     ~(proof_of_work_threshold : int64) ~(expected_commitment : bool) =
+  let open Result_syntax in
   (* Level relationship between current node and the predecessor is
      done by the shell. We know that level is predecessor level + 1.
      The predecessor block hash is guaranteed by the shell to be the
@@ -398,21 +403,26 @@ let begin_validate_block_header ~(block_header : t) ~(chain_id : Chain_id.t)
     block_header.protocol_data.contents
   in
   let raw_level = block_header.shell.level in
-  Proof_of_work.check_proof_of_work_stamp ~proof_of_work_threshold block_header
-  >>? fun () ->
-  Raw_level_repr.of_int32 raw_level >>? fun level ->
-  check_signature block_header chain_id delegate_pk >>? fun () ->
+  let* () =
+    Proof_of_work.check_proof_of_work_stamp
+      ~proof_of_work_threshold
+      block_header
+  in
+  let* level = Raw_level_repr.of_int32 raw_level in
+  let* () = check_signature block_header chain_id delegate_pk in
   let round = Fitness_repr.round fitness in
-  check_payload_round ~round ~payload_round >>? fun () ->
-  check_timestamp
-    round_durations
-    ~predecessor_timestamp
-    ~predecessor_round
-    ~timestamp
-    ~round
-  >>? fun () ->
-  Fitness_repr.check_except_locked_round fitness ~level ~predecessor_round
-  >>? fun () ->
+  let* () = check_payload_round ~round ~payload_round in
+  let* () =
+    check_timestamp
+      round_durations
+      ~predecessor_timestamp
+      ~predecessor_round
+      ~timestamp
+      ~round
+  in
+  let* () =
+    Fitness_repr.check_except_locked_round fitness ~level ~predecessor_round
+  in
   let has_commitment =
     match seed_nonce_hash with None -> false | Some _ -> true
   in

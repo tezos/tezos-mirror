@@ -1,0 +1,27 @@
+
+./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_list.tz on storage '""' and input '{}' --level 1 --trace-stack
+storage
+  ""
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 10.388)
+    [ (Pair {} "") ]
+  - location: 8 (just consumed gas: 0.010)
+    [ {} ]
+  - location: 9 (just consumed gas: 0.010)
+    [ ""
+      {} ]
+  - location: 12 (just consumed gas: 0.010)
+    [ {}
+      "" ]
+  - location: 13 (just consumed gas: 0.040)
+    [ "" ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {}
+      "" ]
+  - location: 26 (just consumed gas: 0.010)
+    [ (Pair {} "") ]
+

@@ -52,7 +52,9 @@ type transaction =
 
 type atomic_transaction_batch = {transactions : transaction list}
 
-type outbox_message = Atomic_transaction_batch of atomic_transaction_batch
+type outbox_message =
+  | Atomic_transaction_batch of atomic_transaction_batch
+  | Whitelist_update of Sc_rollup.Whitelist.t option
 
 let make_internal_transfer ctxt ty ~payload ~sender ~source ~destination =
   let open Lwt_result_syntax in
@@ -133,14 +135,19 @@ let internal_typed_transaction ctxt
 
 let outbox_message_of_outbox_message_repr ctxt transactions =
   let open Lwt_result_syntax in
-  let* ctxt, transactions =
-    match transactions with
-    | Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions} ->
+  match transactions with
+  | Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions} ->
+      let* ctxt, transactions =
         List.fold_left_map_es internal_untyped_transaction ctxt transactions
-    | Sc_rollup.Outbox.Message.Atomic_transaction_batch_typed {transactions} ->
+      in
+      return (Atomic_transaction_batch {transactions}, ctxt)
+  | Sc_rollup.Outbox.Message.Atomic_transaction_batch_typed {transactions} ->
+      let* ctxt, transactions =
         List.fold_left_map_es internal_typed_transaction ctxt transactions
-  in
-  return (Atomic_transaction_batch {transactions}, ctxt)
+      in
+      return (Atomic_transaction_batch {transactions}, ctxt)
+  | Sc_rollup.Outbox.Message.Whitelist_update whitelist_opt ->
+      return (Whitelist_update whitelist_opt, ctxt)
 
 module Internal_for_tests = struct
   let make_transaction ctxt parameters_ty ~parameters ~destination ~entrypoint =
@@ -161,8 +168,7 @@ module Internal_for_tests = struct
 
   let make_atomic_batch transactions = Atomic_transaction_batch {transactions}
 
-  let serialize_outbox_message_untyped (Atomic_transaction_batch {transactions})
-      =
+  let serialize_outbox_transactions_untyped transactions =
     let open Result_syntax in
     let of_internal_transaction
         (Transaction
@@ -182,7 +188,7 @@ module Internal_for_tests = struct
     in
     Sc_rollup.Outbox.Message.serialize output_message_internal
 
-  let serialize_outbox_message_typed (Atomic_transaction_batch {transactions}) =
+  let serialize_outbox_transactions_typed transactions =
     let open Result_syntax in
     let of_internal_transaction
         (Transaction

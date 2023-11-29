@@ -303,7 +303,7 @@ module Set_add : Benchmark.S = struct
     Benchmark.Other_purpose
       "Validate assumptions about functions using Set.add."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -352,7 +352,7 @@ module Set_elements : Benchmark.S = struct
     Benchmark.Other_purpose
       "Validate assumptions about functions using Set.elements."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -404,7 +404,7 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
       "Validate assumptions about functions using \
        Script_expr_hash.of_b58check_opt."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "script_expr_hash"
 
   let tags = ["global_constants"]
 
@@ -465,7 +465,7 @@ struct
 
   let purpose = Benchmark.Generate_code "global_constants"
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -541,7 +541,7 @@ module Global_constants_storage_expand_models = struct
 
     let purpose = Benchmark.Generate_code "global_constants"
 
-    let group = Benchmark.Standalone
+    let group = Benchmark.Group "global_constants"
 
     let tags = ["global_constants"]
 
@@ -569,6 +569,7 @@ module Global_constants_storage_expand_models = struct
        consisting of the same constant repeated n times. As n increases,
        the benchmark more closely approximates the true cost of Branch 2. *)
     let create_benchmark ~rng_state _config =
+      let open Lwt_syntax in
       let open Micheline in
       let node = Micheline_sampler.sample rng_state in
       let size = (Micheline_sampler.micheline_size node).nodes in
@@ -576,10 +577,13 @@ module Global_constants_storage_expand_models = struct
       let hash = registered_constant |> node_to_hash in
       let context, _ = Execution_context.make ~rng_state () |> assert_ok_lwt in
       let context, _, _ =
-        Alpha_context.Global_constants_storage.register
-          context
-          (strip_locations registered_constant)
-        >|= Environment.wrap_tzresult |> assert_ok_lwt
+        (let+ result =
+           Alpha_context.Global_constants_storage.register
+             context
+             (strip_locations registered_constant)
+         in
+         Environment.wrap_tzresult result)
+        |> assert_ok_lwt
       in
       let node = seq_of_n_constants size hash in
       let closure () =
@@ -608,7 +612,7 @@ module Global_constants_storage_expand_models = struct
 
     let purpose = Benchmark.Generate_code "global_constants"
 
-    let group = Benchmark.Standalone
+    let group = Benchmark.Group "global_constants"
 
     let tags = ["global_constants"]
 

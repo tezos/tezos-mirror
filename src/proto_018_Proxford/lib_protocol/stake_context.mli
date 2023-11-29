@@ -31,24 +31,15 @@
 val apply_limits :
   Raw_context.t ->
   Staking_parameters_repr.t ->
-  Stake_repr.Full.t ->
+  Full_staking_balance_repr.t ->
   Stake_repr.t tzresult
-
-(** The weight of a staker or a set of stakers. When adaptive
-    issuance is active, the delegated tez weight
-    edge_of_staking_over_delegation less than frozen ones. Since this
-    function is applied on a [Stake_repr.t], the limits should already
-    have been applied using [apply_limits] if necessary. *)
-val staking_weight : Raw_context.t -> Stake_repr.t -> int64
-
-(** The weight of a delegate used for voting rights. *)
-val voting_weight : Raw_context.t -> Stake_repr.Full.t -> int64 tzresult
 
 (** The weight of a baker used for baking and attesting rights. *)
 val baking_weight :
   Raw_context.t ->
   Staking_parameters_repr.t ->
-  Stake_repr.Full.t ->
+  Full_staking_balance_repr.t ->
   int64 tzresult
 
-val compare : Raw_context.t -> Stake_repr.t -> Stake_repr.t -> int
+val optimal_frozen_wrt_delegated_without_ai :
+  Raw_context.t -> Full_staking_balance_repr.t -> Tez_repr.t tzresult

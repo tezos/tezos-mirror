@@ -159,20 +159,23 @@ let add_input diff vk index position sum state =
   return (diff, {rcm; position; amount; address; nf}, new_idx)
 
 let generate_commitments ~vk ~nb_input ~nb_cm ~nb_nf ~diff ~index state =
+  let open Lwt_result_syntax in
   let inj = random_injection nb_input nb_cm state in
   let use_for_input i = Array.exists (fun k -> k = i) inj in
   let rec loop i cm_index nb_nf diff to_forge sum =
     if i = nb_cm then return (reverse diff, to_forge)
     else if use_for_input i then
       (* create commitment for input *)
-      add_input diff vk cm_index (Int64.of_int i) sum state
-      >>=? fun (diff, forge_info, next_index) ->
+      let* diff, forge_info, next_index =
+        add_input diff vk cm_index (Int64.of_int i) sum state
+      in
       let sum = Int64.add sum forge_info.amount in
       loop (i + 1) next_index nb_nf diff (forge_info :: to_forge) sum
     else
       (* create commitment (not for input) *)
-      add_input diff vk cm_index (Int64.of_int i) sum state
-      >>=? fun (diff, {nf; _}, next_index) ->
+      let* diff, {nf; _}, next_index =
+        add_input diff vk cm_index (Int64.of_int i) sum state
+      in
       (* can we use a nullifier? *)
       if nb_nf = 0 then (* No. *)
         loop (i + 1) next_index nb_nf diff to_forge sum
@@ -187,12 +190,15 @@ let generate_commitments ~vk ~nb_input ~nb_cm ~nb_nf ~diff ~index state =
 
 (* Add roots to the storage. One cm has to be added for every root. *)
 let rec add_root nb_root ctxt id vk index size diff state =
+  let open Lwt_result_syntax in
   if nb_root > 0 then
-    add_input Protocol.Sapling_storage.empty_diff vk index size 0L state
-    >>=? fun (diff_to_add, {position = size; _}, new_idx) ->
-    Protocol.Sapling_storage.apply_diff ctxt id diff_to_add
-    >|= Environment.wrap_tzresult
-    >>=? fun (ctxt, _) ->
+    let* diff_to_add, {position = size; _}, new_idx =
+      add_input Protocol.Sapling_storage.empty_diff vk index size 0L state
+    in
+    let* ctxt, _ =
+      let*! result = Protocol.Sapling_storage.apply_diff ctxt id diff_to_add in
+      Lwt.return (Environment.wrap_tzresult result)
+    in
     (* We call it nb_root -1 because one root is already present*)
     add_root
       (nb_root - 1)
@@ -298,15 +304,18 @@ let make_inputs to_forge local_state proving_ctx sk vk root anti_replay =
     to_forge
 
 let init_fresh_sapling_state ctxt =
-  let open Environment.Error_monad in
-  Protocol.Lazy_storage_diff.fresh
-    Protocol.Lazy_storage_kind.Sapling_state
-    ~temporary:false
-    ctxt
-  >>=? fun (ctxt, id) ->
-  Protocol.Sapling_storage.init ctxt id ~memo_size:0
-  (* TODO CHECK *)
-  >>=? fun ctxt -> return (ctxt, id)
+  let open Lwt_result_syntax in
+  let* ctxt, id =
+    Protocol.Lazy_storage_diff.fresh
+      Protocol.Lazy_storage_kind.Sapling_state
+      ~temporary:false
+      ctxt
+  in
+  let* ctxt =
+    Protocol.Sapling_storage.init ctxt id ~memo_size:0
+    (* TODO CHECK *)
+  in
+  return (ctxt, id)
 
 let generate_spending_and_viewing_keys state =
   let sk =
@@ -325,83 +334,95 @@ let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     * Protocol.Lazy_storage_kind.Sapling_state.Id.t)
     tzresult
     Lwt.t =
-  init_fresh_sapling_state ctxt >|= Environment.wrap_tzresult
-  >>=? fun (ctxt, id) ->
+  let open Lwt_result_syntax in
+  let* ctxt, id =
+    let*! result = init_fresh_sapling_state ctxt in
+    Lwt.return (Environment.wrap_tzresult result)
+  in
   let index_start = Tezos_sapling.Core.Client.Viewing_key.default_index in
   let sk, vk = generate_spending_and_viewing_keys state in
-  generate_commitments
-    ~vk
-    ~nb_input
-    ~nb_cm
-    ~nb_nf
-    ~diff:Protocol.Sapling_storage.empty_diff
-    ~index:index_start
-    state
-  >>=? fun (diff, to_forge) ->
-  Protocol.Sapling_storage.apply_diff ctxt id (reverse diff)
-  >|= Environment.wrap_tzresult
-  >>=? fun (ctxt, _size) -> return (diff, to_forge, sk, vk, ctxt, id)
+  let* diff, to_forge =
+    generate_commitments
+      ~vk
+      ~nb_input
+      ~nb_cm
+      ~nb_nf
+      ~diff:Protocol.Sapling_storage.empty_diff
+      ~index:index_start
+      state
+  in
+  let* ctxt, _size =
+    let*! result = Protocol.Sapling_storage.apply_diff ctxt id (reverse diff) in
+    Lwt.return (Environment.wrap_tzresult result)
+  in
+  return (diff, to_forge, sk, vk, ctxt, id)
 
 let prepare_seeded_state
     {state_seed; nullifier_count; commitment_count; sapling_tx} ctxt =
+  let open Lwt_result_syntax in
   let rng_state = Random.State.make [|Int64.to_int state_seed|] in
-  prepare_seeded_state_internal
-    ~nb_input:(List.length sapling_tx.inputs)
-    ~nb_nf:(Int64.to_int nullifier_count)
-    ~nb_cm:(Int64.to_int commitment_count)
-    (alpha_to_raw ctxt)
-    rng_state
-  >>=? fun (diff, forge_info, spending_key, viewing_key, raw_ctxt, raw_id) ->
+  let* diff, forge_info, spending_key, viewing_key, raw_ctxt, raw_id =
+    prepare_seeded_state_internal
+      ~nb_input:(List.length sapling_tx.inputs)
+      ~nb_nf:(Int64.to_int nullifier_count)
+      ~nb_cm:(Int64.to_int commitment_count)
+      (alpha_to_raw ctxt)
+      rng_state
+  in
   let id = Protocol.Lazy_storage_kind.Sapling_state.Id.unparse_to_z raw_id in
   return (diff, forge_info, spending_key, viewing_key, raw_to_alpha raw_ctxt, id)
 
 let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
     ~(anti_replay : string) ~ctxt state =
+  let open Lwt_result_syntax in
   assert (nb_input <= nb_cm) ;
   assert (nb_nf <= nb_cm - nb_input) ;
-  prepare_seeded_state_internal ~nb_input ~nb_nf ~nb_cm ctxt state
-  >>=? fun (diff, to_forge, sk, vk, ctxt, id) ->
+  let* diff, to_forge, sk, vk, ctxt, id =
+    prepare_seeded_state_internal ~nb_input ~nb_nf ~nb_cm ctxt state
+  in
   let local_state = state_from_rpc_diff diff in
   let root = Tezos_sapling.Storage.get_root local_state in
-  Tezos_sapling.Core.Client.Proving.with_proving_ctx (fun proving_ctx ->
-      make_inputs to_forge local_state proving_ctx sk vk root anti_replay
-      >>=? fun inputs ->
-      let output_amount, outputs = outputs nb_output proving_ctx vk state in
-      let input_amount =
-        List.fold_left
-          (fun sum {amount; _} ->
-            assert (
-              Int64.compare
-                sum
-                (Int64.sub
-                   Int64.max_int
-                   Tezos_sapling.Core.Validator.UTXO.max_amount)
-              < 0) ;
-            Int64.add sum amount)
-          0L
-          to_forge
-      in
-      let balance = Int64.sub input_amount output_amount in
-      let bound_data =
-        (* The bound data are benched separately so we add
-           empty bound data*)
-        ""
-      in
-      let binding_sig =
-        Tezos_sapling.Core.Client.Proving.make_binding_sig
-          proving_ctx
-          inputs
-          outputs
-          ~balance
-          ~bound_data
-          anti_replay
-      in
-      let transaction =
-        Tezos_sapling.Core.Validator.UTXO.
-          {inputs; outputs; binding_sig; balance; root; bound_data}
-      in
-      return transaction)
-  >>=? fun transaction ->
+  let* transaction =
+    Tezos_sapling.Core.Client.Proving.with_proving_ctx (fun proving_ctx ->
+        let* inputs =
+          make_inputs to_forge local_state proving_ctx sk vk root anti_replay
+        in
+        let output_amount, outputs = outputs nb_output proving_ctx vk state in
+        let input_amount =
+          List.fold_left
+            (fun sum {amount; _} ->
+              assert (
+                Int64.compare
+                  sum
+                  (Int64.sub
+                     Int64.max_int
+                     Tezos_sapling.Core.Validator.UTXO.max_amount)
+                < 0) ;
+              Int64.add sum amount)
+            0L
+            to_forge
+        in
+        let balance = Int64.sub input_amount output_amount in
+        let bound_data =
+          (* The bound data are benched separately so we add
+             empty bound data*)
+          ""
+        in
+        let binding_sig =
+          Tezos_sapling.Core.Client.Proving.make_binding_sig
+            proving_ctx
+            inputs
+            outputs
+            ~balance
+            ~bound_data
+            anti_replay
+        in
+        let transaction =
+          Tezos_sapling.Core.Validator.UTXO.
+            {inputs; outputs; binding_sig; balance; root; bound_data}
+        in
+        return transaction)
+  in
   assert (Compare.List_length_with.(transaction.inputs = nb_input)) ;
   assert (Compare.List_length_with.(transaction.outputs = nb_output)) ;
   return (transaction, (ctxt, id))
@@ -439,19 +460,20 @@ let save ~filename ~txs =
     (Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str)
 
 let load_file filename =
+  let open Lwt_syntax in
   Lwt_main.run
-  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
-       Format.eprintf "Sapling_generation.load: loaded %s@." filename ;
-       match Data_encoding.Binary.of_string sapling_dataset_encoding str with
-       | Ok result ->
-           let result = List.map (fun tx -> (filename, tx)) result in
-           Lwt.return result
-       | Error err ->
-           Format.eprintf
-             "Sapling_generation.load: can't load file (%a); exiting@."
-             Data_encoding.Binary.pp_read_error
-             err ;
-           exit 1 )
+  @@ let* str = Tezos_stdlib_unix.Lwt_utils_unix.read_file filename in
+     Format.eprintf "Sapling_generation.load: loaded %s@." filename ;
+     match Data_encoding.Binary.of_string sapling_dataset_encoding str with
+     | Ok result ->
+         let result = List.map (fun tx -> (filename, tx)) result in
+         return result
+     | Error err ->
+         Format.eprintf
+           "Sapling_generation.load: can't load file (%a); exiting@."
+           Data_encoding.Binary.pp_read_error
+           err ;
+         exit 1
 
 let get_all_sapling_data_files directory =
   let is_sapling_data file =
@@ -498,6 +520,7 @@ let shared_seed = [|9798798; 217861209; 876786|]
 
 let generate (save_to : string) (tx_count : int)
     (sapling_gen_options : sapling_gen_options) =
+  let open Lwt_result_syntax in
   let result =
     Lwt_main.run
       (let {
@@ -515,7 +538,7 @@ let generate (save_to : string) (tx_count : int)
          Random.State.make
          @@ Option.fold ~none:shared_seed ~some:(fun seed -> [|seed|]) seed
        in
-       Execution_context.make ~rng_state () >>=? fun (ctxt, step_constants) ->
+       let* ctxt, step_constants = Execution_context.make ~rng_state () in
        let address = Contract_hash.to_b58check step_constants.self in
        let chain_id =
          Environment.Chain_id.to_b58check step_constants.chain_id
@@ -553,15 +576,16 @@ let generate (save_to : string) (tx_count : int)
                Format.eprintf "anti_replay = %s@." anti_replay
              in
              let state = Random.State.make [|seed|] in
-             generate
-               ~nb_input
-               ~nb_output
-               ~nb_nf
-               ~nb_cm
-               ~anti_replay
-               ~ctxt
-               state
-             >>=? fun (tx, (_ctxt, _state_id)) ->
+             let* tx, (_ctxt, _state_id) =
+               generate
+                 ~nb_input
+                 ~nb_output
+                 ~nb_nf
+                 ~nb_cm
+                 ~anti_replay
+                 ~ctxt
+                 state
+             in
              let result =
                {
                  state_seed = Int64.of_int seed;
@@ -577,6 +601,6 @@ let generate (save_to : string) (tx_count : int)
   match result with Ok txs -> save ~filename:save_to ~txs | Error _ -> ()
 
 let apply_diff ctxt id diff =
-  let open Environment.Error_monad in
-  Sapling_storage.apply_diff (alpha_to_raw ctxt) id diff
-  >>=? fun (ctxt, size) -> return (raw_to_alpha ctxt, size)
+  let open Lwt_result_syntax in
+  let* ctxt, size = Sapling_storage.apply_diff (alpha_to_raw ctxt) id diff in
+  return (raw_to_alpha ctxt, size)

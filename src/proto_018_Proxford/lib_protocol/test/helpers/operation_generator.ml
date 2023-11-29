@@ -70,6 +70,7 @@ let manager_kinds =
     `KTransaction;
     `KOrigination;
     `KDelegation;
+    `KSet_deposits_limit;
     `KIncrease_paid_storage;
     `KRegister_global_constant;
     `KTransfer_ticket;
@@ -389,10 +390,10 @@ let generate_attestation =
 
 let generate_dal_attestation =
   let open QCheck2.Gen in
-  let+ attestor = random_pkh in
+  let* level = gen_level in
+  let+ slot = gen_slot in
   Dal_attestation
-    Dal.Attestation.
-      {attestor; attestation = Dal.Attestation.empty; level = Raw_level.root}
+    Dal.Attestation.{attestation = Dal.Attestation.empty; level; slot}
 
 let generate_vdf_revelation =
   let open QCheck2.Gen in
@@ -501,6 +502,11 @@ let generate_increase_paid_storage =
   let+ destination = random_contract_hash in
   Increase_paid_storage {amount_in_bytes; destination}
 
+let generate_set_deposits_limit =
+  let open QCheck2.Gen in
+  let+ amount_opt = option gen_amount in
+  Set_deposits_limit amount_opt
+
 let generate_register_global_constant =
   let value = Script_repr.lazy_expr (Expr.from_string "Pair 1 2") in
   QCheck2.Gen.pure (Register_global_constant {value})
@@ -529,7 +535,9 @@ let generate_sc_rollup_originate =
   let kind = Sc_rollup.Kind.Example_arith in
   let boot_sector = "" in
   let parameters_ty = Script.lazy_expr (Expr.from_string "1") in
-  QCheck2.Gen.pure (Sc_rollup_originate {kind; boot_sector; parameters_ty})
+  let whitelist = None in
+  QCheck2.Gen.pure
+    (Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist})
 
 let generate_sc_rollup_add_messages =
   let open QCheck2.Gen in
@@ -598,6 +606,8 @@ let generator_of ?source = function
   | `KReveal -> generate_manager_operation ?source generate_reveal
   | `KTransaction -> generate_manager_operation ?source generate_transaction
   | `KOrigination -> generate_manager_operation ?source generate_origination
+  | `KSet_deposits_limit ->
+      generate_manager_operation ?source generate_set_deposits_limit
   | `KIncrease_paid_storage ->
       generate_manager_operation ?source generate_increase_paid_storage
   | `KDelegation -> generate_manager_operation ?source generate_delegation

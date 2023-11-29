@@ -91,21 +91,17 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
     let dal_attestation_lag = constants.dal.attestation_lag in
-    let decode_reveal (Tezos_scoru_wasm.Wasm_pvm_state.Reveal_raw payload) =
-      match
-        Data_encoding.Binary.of_string_opt
-          Sc_rollup_PVM_sig.reveal_encoding
-          payload
-      with
-      | Some reveal -> reveal
-      | None ->
-          (* If the kernel has tried to submit an incorrect reveal request,
-             we don’t stuck the rollup. Instead, we fallback to the
-             requesting the [well_known_reveal_hash] preimage *)
-          Reveal_raw_data Sc_rollup.Wasm_2_0_0PVM.well_known_reveal_hash
+    let dal_parameters =
+      Sc_rollup.Dal_parameters.
+        {
+          number_of_slots = Int64.of_int constants.dal.number_of_slots;
+          attestation_lag = Int64.of_int dal_attestation_lag;
+          slot_size = Int64.of_int constants.dal.cryptobox_parameters.slot_size;
+          page_size = Int64.of_int constants.dal.cryptobox_parameters.page_size;
+        }
     in
     let reveal_builtins request =
-      match decode_reveal request with
+      match Sc_rollup.Wasm_2_0_0PVM.decode_reveal request with
       | Reveal_raw_data hash -> (
           let*! data =
             get_reveal
@@ -126,9 +122,32 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             (Data_encoding.Binary.to_string_exn
                Sc_rollup.Metadata.encoding
                metadata)
-      | Request_dal_page _ ->
-          (* DAL in the Fast Execution WASM PVM is not supported for Mumbai. *)
-          assert false
+      | Request_dal_page dal_page -> (
+          let*! content =
+            Dal_pages_request.page_content
+              ~inbox_level:(Int32.of_int level)
+              ~dal_attestation_lag
+              node_ctxt
+              dal_page
+          in
+          match content with
+          | Error error ->
+              (* The [Error_wrapper] must be caught upstream and converted into
+                 a tzresult. *)
+              (* This happens when, for example, the kernel requests a page from a future level. *)
+              Lwt.fail (Error_wrapper error)
+          | Ok None ->
+              (* The page was not confirmed by L1.
+                 We return empty string in this case, as done in the slow executon. *)
+              Lwt.return ""
+          | Ok (Some b) -> Lwt.return (Bytes.to_string b))
+      | Reveal_dal_parameters ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+             Consider supporting revealing of historical DAL parameters. *)
+          Lwt.return
+            (Data_encoding.Binary.to_string_exn
+               Sc_rollup.Dal_parameters.encoding
+               dal_parameters)
     in
     let eval_tick fuel failing_ticks state =
       let max_steps = F.max_ticks fuel in
@@ -227,12 +246,23 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Needs_reveal (Request_dal_page page_id) -> (
           let* content_opt =
             Dal_pages_request.page_content
+              ~inbox_level:(Int32.of_int level)
               ~dal_attestation_lag
               node_ctxt
               page_id
           in
           let*! next_state =
             PVM.set_input (Reveal (Dal_page content_opt)) state
+          in
+          match F.consume F.one_tick_consumption fuel with
+          | None -> abort state fuel current_tick
+          | Some fuel ->
+              go fuel (Int64.succ current_tick) failing_ticks next_state)
+      | Needs_reveal Reveal_dal_parameters -> (
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+             Consider supporting revealing of historical DAL parameters. *)
+          let*! next_state =
+            PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
           in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick

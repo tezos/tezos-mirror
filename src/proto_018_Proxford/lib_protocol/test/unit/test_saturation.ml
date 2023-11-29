@@ -54,21 +54,24 @@ let n = ok_int 123123
 let m = ok_int 377337
 
 let add () =
+  let open Lwt_result_syntax in
   Saturation_repr.(
-    fail_unless
-      (add saturated (ok_int 1) = saturated)
-      (err "saturated + 1 <> saturated")
-    >>=? fun () ->
-    fail_unless (add zero n = n) (err "zero + n <> n") >>=? fun () ->
-    fail_unless (add n zero = n) (err "n + zero <> n") >>=? fun () ->
+    let* () =
+      fail_unless
+        (add saturated (ok_int 1) = saturated)
+        (err "saturated + 1 <> saturated")
+    in
+    let* () = fail_unless (add zero n = n) (err "zero + n <> n") in
+    let* () = fail_unless (add n zero = n) (err "n + zero <> n") in
     let r = add n m in
     fail_unless
       (valid r && r = ok_int ((n |> to_int) + (m |> to_int)))
       (err "add does not behave like + on small numbers."))
 
 let sub () =
+  let open Lwt_result_syntax in
   Saturation_repr.(
-    fail_unless (sub zero n = zero) (err "zero - n <> zero") >>=? fun () ->
+    let* () = fail_unless (sub zero n = zero) (err "zero - n <> zero") in
     let n = max n m and m = min n m in
     let r = sub n m in
     fail_unless
@@ -84,57 +87,71 @@ let n' = mul_safe_of_int 1000
 let m' = mul_safe_of_int 10000
 
 let mul_fast () =
+  let open Lwt_result_syntax in
   Saturation_repr.(
-    fail_unless (mul_fast zero n' = zero) (err "mul_fast zero x <> zero")
-    >>=? fun () ->
-    fail_unless (mul_fast n' zero = zero) (err "mul_fast x zero <> zero")
-    >>=? fun () ->
+    let* () =
+      fail_unless (mul_fast zero n' = zero) (err "mul_fast zero x <> zero")
+    in
+    let* () =
+      fail_unless (mul_fast n' zero = zero) (err "mul_fast x zero <> zero")
+    in
     let r = mul_fast n' m' in
     fail_unless
       (valid r && r = ok_int ((n' |> to_int) * (m' |> to_int)))
       (err "mul_fast does not behave like * on small numbers."))
 
 let scale_fast () =
+  let open Lwt_result_syntax in
   Saturation_repr.(
-    fail_unless (scale_fast zero n = zero) (err "scale_fast zero x <> zero")
-    >>=? fun () ->
-    fail_unless (scale_fast n' zero = zero) (err "scale_fast x zero <> zero")
-    >>=? fun () ->
-    fail_unless
-      (scale_fast n' saturated = saturated)
-      (err "scale_fast x saturated <> saturated")
-    >>=? fun () ->
+    let* () =
+      fail_unless (scale_fast zero n = zero) (err "scale_fast zero x <> zero")
+    in
+    let* () =
+      fail_unless (scale_fast n' zero = zero) (err "scale_fast x zero <> zero")
+    in
+    let* () =
+      fail_unless
+        (scale_fast n' saturated = saturated)
+        (err "scale_fast x saturated <> saturated")
+    in
     let r = scale_fast n' m in
     fail_unless
       (valid r && r = ok_int ((n' |> to_int) * (m |> to_int)))
       (err "mul_fast does not behave like * on small numbers."))
 
 let mul () =
+  let open Lwt_result_syntax in
   Saturation_repr.(
-    fail_unless
-      (mul saturated saturated = saturated)
-      (err "saturated * saturated <> saturated")
-    >>=? fun () ->
-    fail_unless (mul zero saturated = zero) (err "zero * saturated <> zero")
-    >>=? fun () ->
-    fail_unless (mul saturated zero = zero) (err "saturated * zero <> zero")
-    >>=? fun () ->
+    let* () =
+      fail_unless
+        (mul saturated saturated = saturated)
+        (err "saturated * saturated <> saturated")
+    in
+    let* () =
+      fail_unless (mul zero saturated = zero) (err "zero * saturated <> zero")
+    in
+    let* () =
+      fail_unless (mul saturated zero = zero) (err "saturated * zero <> zero")
+    in
     let max_squared = ok_int (1 lsl 31) in
     let r = mul max_squared max_squared in
-    fail_unless (r = saturated) (err "2 ^ 31 * 2 ^ 31 should be saturated")
-    >>=? fun () ->
+    let* () =
+      fail_unless (r = saturated) (err "2 ^ 31 * 2 ^ 31 should be saturated")
+    in
     let safe_squared = ok_int ((1 lsl 31) - 1) in
     let r = mul safe_squared safe_squared in
-    fail_unless
-      (valid r && r <> saturated)
-      (err "(2 ^ 31 - 1) * (2 ^ 31 - 1) should not be saturated")
-    >>=? fun () ->
+    let* () =
+      fail_unless
+        (valid r && r <> saturated)
+        (err "(2 ^ 31 - 1) * (2 ^ 31 - 1) should not be saturated")
+    in
     let r = mul n m in
     fail_unless
       (valid r && r = ok_int ((n |> to_int) * (m |> to_int)))
       (err "mul does not behave like * on small numbers."))
 
 let shift_left () =
+  let open Lwt_result_syntax in
   Saturation_repr.(
     let must_saturate flag (k, v) =
       fail_unless
@@ -146,10 +163,11 @@ let shift_left () =
               v
               (if flag then "<>" else "=")))
     in
-    List.iter_es
-      (must_saturate true)
-      [(saturated, 1); (shift_right saturated 1, 2); (ok_int 1, 62)]
-    >>=? fun () ->
+    let* () =
+      List.iter_es
+        (must_saturate true)
+        [(saturated, 1); (shift_right saturated 1, 2); (ok_int 1, 62)]
+    in
     List.iter_es
       (must_saturate false)
       [
@@ -161,16 +179,21 @@ let shift_left () =
       ])
 
 let sqrt () =
+  let open Lwt_result_syntax in
   Saturation_repr.(
-    fail_unless (sqrt saturated = saturated) (err "sqrt saturated <> saturated")
-    >>=? fun () ->
-    fail_unless (sqrt zero = zero) (err "sqrt zero <> zero") >>=? fun () ->
-    fail_unless (sqrt one = one) (err "sqrt one <> one") >>=? fun () ->
-    fail_unless (sqrt (ok_int 4) = ok_int 2) (err "sqrt 4 <> 2") >>=? fun () ->
-    fail_unless
-      (sqrt (ok_int 5) = ok_int 2)
-      (err "sqrt 5 <> 2 (sqrt should round down)")
-    >>=? fun () ->
+    let* () =
+      fail_unless
+        (sqrt saturated = saturated)
+        (err "sqrt saturated <> saturated")
+    in
+    let* () = fail_unless (sqrt zero = zero) (err "sqrt zero <> zero") in
+    let* () = fail_unless (sqrt one = one) (err "sqrt one <> one") in
+    let* () = fail_unless (sqrt (ok_int 4) = ok_int 2) (err "sqrt 4 <> 2") in
+    let* () =
+      fail_unless
+        (sqrt (ok_int 5) = ok_int 2)
+        (err "sqrt 5 <> 2 (sqrt should round down)")
+    in
     let safe_squared = ok_int ((1 lsl 31) - 1) in
     let r = mul safe_squared safe_squared in
     fail_unless
@@ -178,29 +201,33 @@ let sqrt () =
       (err "sqrt (2 ^ 31 - 1) * (2 ^ 31 - 1) <> (2 ^ 31 - 1)"))
 
 let of_z_opt () =
-  fail_unless
-    (Saturation_repr.(of_z_opt (Z.succ (Z.of_int max_int))) = None)
-    (err
-       "of_z_opt should saturate when given a z integer greater than max_int.")
-  >>=? fun () ->
-  fail_unless
-    (Saturation_repr.(of_z_opt (Z.pred Z.zero)) = None)
-    (err "of_z_opt should fail on a z negative integer.")
-  >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () =
+    fail_unless
+      (Saturation_repr.(of_z_opt (Z.succ (Z.of_int max_int))) = None)
+      (err
+         "of_z_opt should saturate when given a z integer greater than max_int.")
+  in
+  let* () =
+    fail_unless
+      (Saturation_repr.(of_z_opt (Z.pred Z.zero)) = None)
+      (err "of_z_opt should fail on a z negative integer.")
+  in
   fail_unless
     (Saturation_repr.(of_z_opt (Z.of_int min_int)) = None)
     (err "of_z_opt should fail on a z negative integer.")
 
 let encoding encoder () =
+  let open Lwt_result_syntax in
   let check_encode_decode x =
     Data_encoding.Binary.(
       match to_bytes encoder (ok_int x) with
       | Error _ ->
-          fail (err (Printf.sprintf "Problem during binary encoding of %d" x))
+          tzfail (err (Printf.sprintf "Problem during binary encoding of %d" x))
       | Ok bytes -> (
           match of_bytes encoder bytes with
           | Error _ ->
-              fail
+              tzfail
                 (err (Printf.sprintf "Problem during binary decoding of %d" x))
           | Ok x' ->
               fail_unless

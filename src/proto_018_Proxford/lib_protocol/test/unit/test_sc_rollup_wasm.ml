@@ -72,8 +72,8 @@ module Wasm_context = struct
     match Context.Tree.kinded_key tree with
     | Some k ->
         let* p = Context.produce_tree_proof index k step in
-        return (Some p)
-    | None -> return None
+        return_some p
+    | None -> return_none
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
@@ -134,11 +134,11 @@ let test_metadata_size () =
   Lwt_result_syntax.return_unit
 
 let test_l1_input_kind () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_inbox_message_repr in
   let open Tezos_scoru_wasm in
   let check_msg msg expected =
-    let*? msg = Environment.wrap_tzresult @@ serialize msg in
+    let*?@ msg = serialize msg in
     let msg = unsafe_to_string msg |> Pvm_input_kind.from_raw_input in
     assert (msg = expected) ;
     return_unit
@@ -178,7 +178,7 @@ let make_transactions () =
    Info_per_level, input, EOL) it receives. It uses the [write_output] host
    function and so it is used to test this function. *)
 let test_output () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let level_offset = 20 in
   let dst = 60 in
   let max_bytes = 3600 in
@@ -308,9 +308,7 @@ let test_output () =
       bytes_output_message
   in
   assert (message = out) ;
-  let*? outbox_level =
-    Environment.wrap_tzresult @@ Raw_level_repr.of_int32 last_outbox_level
-  in
+  let*?@ outbox_level = Raw_level_repr.of_int32 last_outbox_level in
   let output = Sc_rollup_PVM_sig.{outbox_level; message_index; message} in
 
   let*! pf = Full_Wasm.produce_output_proof dummy_context final_tree output in
@@ -322,6 +320,28 @@ let test_output () =
         (Result.is_ok valid)
         (Exn (Failure "An output proof is not valid."))
   | Error _ -> failwith "Error during proof generation"
+
+let test_reveal_compat_metadata () =
+  let open Alpha_context.Sc_rollup in
+  let open Tezos_scoru_wasm.Wasm_pvm_state in
+  let (Reveal_raw metadata_scoru_wasm) = reveal_metadata in
+  let metadata_protocol =
+    Data_encoding.Binary.to_string_exn reveal_encoding Reveal_metadata
+  in
+  Assert.equal_string ~loc:__LOC__ metadata_scoru_wasm metadata_protocol
+
+let test_reveal_compat_raw_data () =
+  let open Alpha_context.Sc_rollup in
+  let open Tezos_scoru_wasm.Wasm_pvm_state in
+  let hash = Wasm_2_0_0PVM.well_known_reveal_hash in
+  let hash_string =
+    Data_encoding.Binary.to_string_exn Sc_rollup_reveal_hash.encoding hash
+  in
+  let (Reveal_raw raw_data_scoru_wasm) = reveal_raw_data hash_string in
+  let raw_data_protocol =
+    Data_encoding.Binary.to_string_exn reveal_encoding (Reveal_raw_data hash)
+  in
+  Assert.equal_string ~loc:__LOC__ raw_data_scoru_wasm raw_data_protocol
 
 (* When snapshoting a new protocol, to fix this test, the following
    action should be done.
@@ -355,6 +375,72 @@ let test_protocol_names () =
     = Protocol_migration Tezos_scoru_wasm.Constants.oxford_name) ;
   Lwt_result_syntax.return_unit
 
+let test_reveal_host_function_can_request_dal_pages () =
+  let open Alpha_context in
+  let wasm_hex str =
+    String.concat
+      ""
+      (String.fold_right
+         (fun c hex ->
+           let x, y = Hex.of_char c in
+           Format.sprintf "\\%c%c" x y :: hex)
+         str
+         [])
+  in
+  let request_dal_module level slot_index page_index payload_addr
+      destination_addr max_bytes =
+    let payload_value =
+      Sc_rollup.Request_dal_page
+        {
+          slot_id =
+            {published_level = Raw_level.of_int32_exn level; index = slot_index};
+          page_index;
+        }
+    in
+    let payload =
+      Data_encoding.Binary.to_string_exn Sc_rollup.reveal_encoding payload_value
+    in
+    let kernel =
+      Format.sprintf
+        {|
+      (module
+        (import "smart_rollup_core" "reveal"
+          (func $reveal (param i32 i32 i32 i32) (result i32)))
+        (memory 1)
+        (data (i32.const %ld) "%s")
+        (export "mem" (memory 0))
+        (func (export "kernel_run")
+          (call $reveal (i32.const %ld) (i32.const %ld) (i32.const %ld) (i32.const %ld))))
+    |}
+        payload_addr
+        (wasm_hex payload)
+        payload_addr
+        (String.length payload |> Int32.of_int)
+        destination_addr
+        max_bytes
+    in
+    (payload_value, kernel)
+  in
+  let payload_value, kernel =
+    request_dal_module 10l Dal.Slot_index.zero 4 100l 200l 4_096l
+  in
+  let* tree = Wasm_utils.initial_tree ~version:V3 kernel in
+  let* tree = Wasm_utils.set_empty_inbox_step 0l tree in
+  let* tree =
+    Wasm_utils.eval_until_input_requested ~reveal_builtins:None tree
+  in
+  let* info = Wasm_utils.Wasm.get_info tree in
+  match info.input_request with
+  | Reveal_required (Reveal_raw payload) -> (
+      match
+        Data_encoding.Binary.of_string Sc_rollup.reveal_encoding payload
+      with
+      | Ok payload ->
+          assert (payload_value = payload) ;
+          Lwt_result_syntax.return_unit
+      | Error _ -> assert false)
+  | _ -> assert false
+
 let tests =
   [
     Tztest.tztest
@@ -368,7 +454,19 @@ let tests =
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
     Tztest.tztest "output proofs" `Quick test_output;
+    Tztest.tztest
+      "lib_scoru_wasm reveal encoding compatibility: Reveal_metadata"
+      `Quick
+      test_reveal_compat_metadata;
+    Tztest.tztest
+      "lib_scoru_wasm reveal encoding compatibility: Reveal_raw_data"
+      `Quick
+      test_reveal_compat_raw_data;
     Tztest.tztest "protocol names consistency" `Quick test_protocol_names;
+    Tztest.tztest
+      "reveal host function can request DAL pages"
+      `Quick
+      test_reveal_host_function_can_request_dal_pages;
   ]
 
 let () =

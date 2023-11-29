@@ -93,6 +93,15 @@ module S = struct
       ~output:(option Tez.encoding)
       RPC_path.(custom_root /: Contract.rpc_arg / "staked_balance")
 
+  let staking_numerator =
+    RPC_service.get_service
+      ~description:
+        "Returns an abstract representation of the contract's \
+         total_delegated_stake."
+      ~query:RPC_query.empty
+      ~output:Staking_pseudotoken.For_RPC.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "staking_numerator")
+
   let unstaked_frozen_balance =
     RPC_service.get_service
       ~description:
@@ -234,11 +243,13 @@ module S = struct
   type big_map_get_all_query = {offset : int option; length : int option}
 
   let rpc_arg_uint : int RPC_arg.t =
+    let open Result_syntax in
     let int_of_string s =
-      int_of_string_opt s
-      |> Option.to_result
-           ~none:(Format.sprintf "Cannot parse integer value %s" s)
-      >>? fun i ->
+      let* i =
+        int_of_string_opt s
+        |> Option.to_result
+             ~none:(Format.sprintf "Cannot parse integer value %s" s)
+      in
       if Compare.Int.(i < 0) then
         Error (Format.sprintf "Negative integer: %d" i)
       else Ok i
@@ -300,25 +311,29 @@ module S = struct
     *)
 
     let single_sapling_get_id ctxt contract_id =
-      Contract.get_script ctxt contract_id >>=? fun (ctxt, script) ->
+      let open Lwt_result_syntax in
+      let* ctxt, script = Contract.get_script ctxt contract_id in
       match script with
       | None -> return (None, ctxt)
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
-          Script_ir_translator.parse_script
-            ctxt
-            ~elab_conf:legacy
-            ~allow_forged_in_storage:true
-            script
-          >|= fun tzresult ->
-          tzresult >>? fun (Ex_script (Script script), ctxt) ->
-          Script_ir_translator.get_single_sapling_state
-            ctxt
-            script.storage_type
-            script.storage
+          let*! tzresult =
+            Script_ir_translator.parse_script
+              ctxt
+              ~elab_conf:legacy
+              ~allow_forged_in_storage:true
+              script
+          in
+          let*? Ex_script (Script script), ctxt = tzresult in
+          Lwt.return
+          @@ Script_ir_translator.get_single_sapling_state
+               ctxt
+               script.storage_type
+               script.storage
 
     let make_service
         Sapling_services.S.Args.{name; description; query; output; f} =
+      let open Lwt_result_syntax in
       let name = "single_sapling_" ^ name in
       let path = RPC_path.(custom_root /: Contract.rpc_arg / name) in
       let service = RPC_service.get_service ~description ~query ~output path in
@@ -327,8 +342,7 @@ module S = struct
           match (contract_id : Contract.t) with
           | Implicit _ -> return_none
           | Originated contract_id ->
-              single_sapling_get_id ctxt contract_id
-              >>=? fun (sapling_id, ctxt) ->
+              let* sapling_id, ctxt = single_sapling_get_id ctxt contract_id in
               Option.map_es (fun sapling_id -> f ctxt sapling_id q) sapling_id
       )
 
@@ -346,32 +360,41 @@ module S = struct
 end
 
 let register () =
+  let open Lwt_result_syntax in
   let open Services_registration in
-  register0 ~chunked:true S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
+  register0 ~chunked:true S.list (fun ctxt () () ->
+      let*! result = Contract.list ctxt in
+      return result) ;
   let register_field_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract () () ->
         filter_contract contract @@ fun filtered_contract ->
-        Contract.exists ctxt contract >>= function
+        let*! exists = Contract.exists ctxt contract in
+        match exists with
         | true -> f ctxt filtered_contract |> wrap_result
         | false -> return_none)
   in
   let register_field_with_query_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract query () ->
         filter_contract contract @@ fun filtered_contract ->
-        Contract.exists ctxt contract >>= function
+        let*! exists = Contract.exists ctxt contract in
+        match exists with
         | true -> f ctxt filtered_contract query |> wrap_result
         | false -> return_none)
   in
   let register_field s =
     register_field_gen
       ~filter_contract:(fun c k -> k c)
-      ~wrap_result:(fun res -> res >|=? Option.some)
+      ~wrap_result:(fun res ->
+        let+ value = res in
+        Option.some value)
       s
   in
   let register_field_with_query s =
     register_field_with_query_gen
       ~filter_contract:(fun c k -> k c)
-      ~wrap_result:(fun res -> res >|=? Option.some)
+      ~wrap_result:(fun res ->
+        let+ value = res in
+        Option.some value)
       s
   in
   let register_opt_field s =
@@ -392,52 +415,59 @@ let register () =
   let do_big_map_get ctxt id key =
     let open Script_ir_translator in
     let ctxt = Gas.set_unlimited ctxt in
-    Big_map.exists ctxt id >>=? fun (ctxt, types) ->
+    let* ctxt, types = Big_map.exists ctxt id in
     match types with
     | None -> return_none
     | Some (_, value_type) -> (
-        parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
-        >>?= fun (Ex_ty value_type, ctxt) ->
-        Big_map.get_opt ctxt id key >>=? fun (_ctxt, value) ->
+        let*? Ex_ty value_type, ctxt =
+          parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
+        in
+        let* _ctxt, value = Big_map.get_opt ctxt id key in
         match value with
         | None -> return_none
         | Some value ->
-            parse_data
-              ctxt
-              ~elab_conf:legacy
-              ~allow_forged:true
-              value_type
-              (Micheline.root value)
-            >>=? fun (value, ctxt) ->
-            unparse_data ctxt Readable value_type value
-            >|=? fun (value, _ctxt) -> Some value)
+            let* value, ctxt =
+              parse_data
+                ctxt
+                ~elab_conf:legacy
+                ~allow_forged:true
+                value_type
+                (Micheline.root value)
+            in
+            let+ value, _ctxt = unparse_data ctxt Readable value_type value in
+            Some value)
   in
   let do_big_map_get_all ?offset ?length ctxt id =
     let open Script_ir_translator in
     let ctxt = Gas.set_unlimited ctxt in
-    Big_map.exists ctxt id >>=? fun (ctxt, types) ->
+    let* ctxt, types = Big_map.exists ctxt id in
     match types with
     | None -> raise Not_found
     | Some (_, value_type) ->
-        parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
-        >>?= fun (Ex_ty value_type, ctxt) ->
-        Big_map.list_key_values ?offset ?length ctxt id
-        >>=? fun (ctxt, key_values) ->
-        List.fold_left_s
-          (fun acc (_key_hash, value) ->
-            acc >>?= fun (ctxt, rev_values) ->
-            parse_data
-              ctxt
-              ~elab_conf:legacy
-              ~allow_forged:true
-              value_type
-              (Micheline.root value)
-            >>=? fun (value, ctxt) ->
-            unparse_data ctxt Readable value_type value
-            >|=? fun (value, ctxt) -> (ctxt, value :: rev_values))
-          (Ok (ctxt, []))
-          key_values
-        >|=? fun (_ctxt, rev_values) -> List.rev rev_values
+        let*? Ex_ty value_type, ctxt =
+          parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
+        in
+        let* ctxt, key_values =
+          Big_map.list_key_values ?offset ?length ctxt id
+        in
+        let+ _ctxt, rev_values =
+          List.fold_left_s
+            (fun acc (_key_hash, value) ->
+              let*? ctxt, rev_values = acc in
+              let* value, ctxt =
+                parse_data
+                  ctxt
+                  ~elab_conf:legacy
+                  ~allow_forged:true
+                  value_type
+                  (Micheline.root value)
+              in
+              let+ value, ctxt = unparse_data ctxt Readable value_type value in
+              (ctxt, value :: rev_values))
+            (Ok (ctxt, []))
+            key_values
+        in
+        List.rev rev_values
   in
   register_field ~chunked:false S.balance Contract.get_balance ;
   register_field ~chunked:false S.frozen_bonds Contract.get_frozen_bonds ;
@@ -449,6 +479,8 @@ let register () =
     ~chunked:false
     S.staked_balance
     Contract.For_RPC.get_staked_balance ;
+  register_field ~chunked:false S.staking_numerator (fun ctxt delegator ->
+      Staking_pseudotokens.For_RPC.staking_pseudotokens_balance ctxt ~delegator) ;
   register_field
     ~chunked:false
     S.unstaked_frozen_balance
@@ -459,46 +491,55 @@ let register () =
     Contract.For_RPC.get_unstaked_finalizable_balance ;
   register_field ~chunked:false S.full_balance Contract.For_RPC.get_full_balance ;
   register1 ~chunked:false S.unstake_requests (fun ctxt contract () () ->
-      Unstake_requests.prepare_finalize_unstake ctxt contract >>=? function
+      let* result = Unstake_requests.prepare_finalize_unstake ctxt contract in
+      match result with
       | None -> return_none
       | Some {finalizable; unfinalizable} ->
-          Unstake_requests.For_RPC
-          .apply_slash_to_unstaked_unfinalizable_stored_requests
-            ctxt
-            unfinalizable
-          >>=? fun unfinalizable ->
+          let* unfinalizable =
+            Unstake_requests.For_RPC
+            .apply_slash_to_unstaked_unfinalizable_stored_requests
+              ctxt
+              unfinalizable
+          in
           return_some Unstake_requests.{finalizable; unfinalizable}) ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match contract with
       | Originated _ -> return_none
       | Implicit mgr -> (
-          Contract.is_manager_key_revealed ctxt mgr >>=? function
+          let* is_revealed = Contract.is_manager_key_revealed ctxt mgr in
+          match is_revealed with
           | false -> return_some None
           | true ->
-              Contract.get_manager_key ctxt mgr >|=? fun key -> Some (Some key))) ;
+              let+ key = Contract.get_manager_key ctxt mgr in
+              Some (Some key))) ;
   register_opt_field ~chunked:false S.delegate Contract.Delegate.find ;
   opt_register1 ~chunked:false S.counter (fun ctxt contract () () ->
       match contract with
       | Originated _ -> return_none
       | Implicit mgr ->
-          Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
+          let+ counter = Contract.get_counter ctxt mgr in
+          Some counter) ;
   register_originated_opt_field ~chunked:true S.script (fun c v ->
-      Contract.get_script c v >|=? fun (_, v) -> v) ;
+      let+ _, v = Contract.get_script c v in
+      v) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
-      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+      let* ctxt, script = Contract.get_script ctxt contract in
       match script with
       | None -> return_none
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script
-            ctxt
-            ~elab_conf:legacy
-            ~allow_forged_in_storage:true
-            script
-          >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
-          unparse_data ctxt Readable storage_type storage
-          >|=? fun (storage, _ctxt) -> Some storage) ;
+          let* Ex_script (Script {storage; storage_type; _}), ctxt =
+            parse_script
+              ctxt
+              ~elab_conf:legacy
+              ~allow_forged_in_storage:true
+              script
+          in
+          let+ storage, _ctxt =
+            unparse_data ctxt Readable storage_type storage
+          in
+          Some storage) ;
   opt_register2
     ~chunked:true
     S.entrypoint_type
@@ -506,39 +547,41 @@ let register () =
       match (v : Contract.t) with
       | Implicit _ -> return_none
       | Originated v -> (
-          Contract.get_script_code ctxt v >>=? fun (_, expr) ->
+          let* _, expr = Contract.get_script_code ctxt v in
           match expr with
           | None -> return_none
-          | Some expr ->
+          | Some expr -> (
               let ctxt = Gas.set_unlimited ctxt in
               let legacy = true in
               let open Script_ir_translator in
-              Script.force_decode_in_context
-                ~consume_deserialization_gas:When_needed
-                ctxt
-                expr
-              >>?= fun (expr, _) ->
-              parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
-              Lwt.return
-                ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-                >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
-                          _ ) ->
-                  Gas_monad.run ctxt
-                  @@ Script_ir_translator.find_entrypoint
-                       ~error_details:(Informative ())
-                       arg_type
-                       entrypoints
-                       entrypoint
-                  >>? fun (r, ctxt) ->
-                  r |> function
-                  | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
-                      if normalize_types then
-                        Script_ir_unparser.unparse_ty ~loc:() ctxt ty
-                        >|? fun (ty_node, _ctxt) ->
-                        Some (Micheline.strip_locations ty_node)
-                      else
-                        ok (Some (Micheline.strip_locations original_type_expr))
-                  | Error _ -> Result.return_none ))) ;
+              let*? expr, _ =
+                Script.force_decode_in_context
+                  ~consume_deserialization_gas:When_needed
+                  ctxt
+                  expr
+              in
+              let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
+              let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+                parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+              in
+              let*? r, ctxt =
+                Gas_monad.run ctxt
+                @@ Script_ir_translator.find_entrypoint
+                     ~error_details:(Informative ())
+                     arg_type
+                     entrypoints
+                     entrypoint
+              in
+              r |> function
+              | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
+                  if normalize_types then
+                    let*? ty_node, _ctxt =
+                      Script_ir_unparser.unparse_ty ~loc:() ctxt ty
+                    in
+                    return_some (Micheline.strip_locations ty_node)
+                  else
+                    return_some (Micheline.strip_locations original_type_expr)
+              | Error _ -> return_none))) ;
   opt_register1
     ~chunked:true
     S.list_entrypoints
@@ -546,44 +589,51 @@ let register () =
       match (v : Contract.t) with
       | Implicit _ -> return_none
       | Originated v -> (
-          Contract.get_script_code ctxt v >>=? fun (_, expr) ->
+          let* _, expr = Contract.get_script_code ctxt v in
           match expr with
           | None -> return_none
           | Some expr ->
               let ctxt = Gas.set_unlimited ctxt in
               let legacy = true in
               let open Script_ir_translator in
-              Script.force_decode_in_context
-                ~consume_deserialization_gas:When_needed
-                ctxt
-                expr
-              >>?= fun (expr, _) ->
-              parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
+              let*? expr, _ =
+                Script.force_decode_in_context
+                  ~consume_deserialization_gas:When_needed
+                  ctxt
+                  expr
+              in
+              let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
               Lwt.return
-                ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-                >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
-                          _ ) ->
-                  let unreachable_entrypoint, map =
-                    Script_ir_translator.list_entrypoints_uncarbonated
-                      arg_type
-                      entrypoints
-                  in
+                (let open Result_syntax in
+                let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _
+                    =
+                  parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+                in
+                let unreachable_entrypoint, map =
+                  Script_ir_translator.list_entrypoints_uncarbonated
+                    arg_type
+                    entrypoints
+                in
+                let* entrypoint_types, _ctxt =
                   Entrypoint.Map.fold_e
                     (fun entry
                          (Script_typed_ir.Ex_ty ty, original_type_expr)
                          (acc, ctxt) ->
-                      (if normalize_types then
-                       Script_ir_unparser.unparse_ty ~loc:() ctxt ty
-                       >|? fun (ty_node, ctxt) ->
-                       (Micheline.strip_locations ty_node, ctxt)
-                      else
-                        ok (Micheline.strip_locations original_type_expr, ctxt))
-                      >|? fun (ty_expr, ctxt) ->
-                      ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+                      let* ty_expr, ctxt =
+                        if normalize_types then
+                          let* ty_node, ctxt =
+                            Script_ir_unparser.unparse_ty ~loc:() ctxt ty
+                          in
+                          return (Micheline.strip_locations ty_node, ctxt)
+                        else
+                          return
+                            (Micheline.strip_locations original_type_expr, ctxt)
+                      in
+                      return ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
                     map
                     ([], ctxt)
-                  >|? fun (entrypoint_types, _ctxt) ->
-                  Some (unreachable_entrypoint, entrypoint_types) ))) ;
+                in
+                return_some (unreachable_entrypoint, entrypoint_types)))) ;
   opt_register1
     ~chunked:true
     S.contract_big_map_get_opt
@@ -591,36 +641,43 @@ let register () =
       match (contract : Contract.t) with
       | Implicit _ -> return_none
       | Originated contract -> (
-          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+          let* ctxt, script = Contract.get_script ctxt contract in
           let key_type_node = Micheline.root key_type in
-          Script_ir_translator.parse_comparable_ty ctxt key_type_node
-          >>?= fun (Ex_comparable_ty key_type, ctxt) ->
-          Script_ir_translator.parse_comparable_data
-            ctxt
-            key_type
-            (Micheline.root key)
-          >>=? fun (key, ctxt) ->
-          Script_ir_translator.hash_comparable_data ctxt key_type key
-          >>=? fun (key, ctxt) ->
+          let*? Ex_comparable_ty key_type, ctxt =
+            Script_ir_translator.parse_comparable_ty ctxt key_type_node
+          in
+          let* key, ctxt =
+            Script_ir_translator.parse_comparable_data
+              ctxt
+              key_type
+              (Micheline.root key)
+          in
+          let* key, ctxt =
+            Script_ir_translator.hash_comparable_data ctxt key_type key
+          in
           match script with
           | None -> return_none
           | Some script -> (
               let ctxt = Gas.set_unlimited ctxt in
               let open Script_ir_translator in
-              parse_script
-                ctxt
-                ~elab_conf:legacy
-                ~allow_forged_in_storage:true
-                script
-              >>=? fun (Ex_script (Script script), ctxt) ->
-              Script_ir_translator.collect_lazy_storage
-                ctxt
-                script.storage_type
-                script.storage
-              >>?= fun (ids, _ctxt) ->
+              let* Ex_script (Script script), ctxt =
+                parse_script
+                  ctxt
+                  ~elab_conf:legacy
+                  ~allow_forged_in_storage:true
+                  script
+              in
+              let*? ids, _ctxt =
+                Script_ir_translator.collect_lazy_storage
+                  ctxt
+                  script.storage_type
+                  script.storage
+              in
               match Script_ir_translator.list_of_big_map_ids ids with
               | [] | _ :: _ :: _ -> return_some None
-              | [id] -> do_big_map_get ctxt id key >|=? Option.some))) ;
+              | [id] ->
+                  let+ result = do_big_map_get ctxt id key in
+                  Option.some result))) ;
   opt_register2 ~chunked:true S.big_map_get (fun ctxt id key () () ->
       do_big_map_get ctxt id key) ;
   register1 ~chunked:true S.big_map_get_all (fun ctxt id {offset; length} () ->
@@ -629,26 +686,27 @@ let register () =
     ~chunked:false
     S.info
     (fun ctxt contract {normalize_types} ->
-      Contract.get_balance ctxt contract >>=? fun balance ->
-      Contract.Delegate.find ctxt contract >>=? fun delegate ->
+      let* balance = Contract.get_balance ctxt contract in
+      let* delegate = Contract.Delegate.find ctxt contract in
       match contract with
       | Implicit manager ->
-          Contract.get_counter ctxt manager >|=? fun counter ->
+          let+ counter = Contract.get_counter ctxt manager in
           {balance; delegate; script = None; counter = Some counter}
       | Originated contract -> (
-          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+          let* ctxt, script = Contract.get_script ctxt contract in
           match script with
           | None -> return {balance; delegate; script = None; counter = None}
           | Some script ->
               let ctxt = Gas.set_unlimited ctxt in
-              Script_ir_translator.parse_and_unparse_script_unaccounted
-                ctxt
-                ~legacy:true
-                ~allow_forged_in_storage:true
-                Readable
-                ~normalize_types
-                script
-              >|=? fun (script, _ctxt) ->
+              let+ script, _ctxt =
+                Script_ir_translator.parse_and_unparse_script_unaccounted
+                  ctxt
+                  ~legacy:true
+                  ~allow_forged_in_storage:true
+                  Readable
+                  ~normalize_types
+                  script
+              in
               {balance; delegate; script = Some script; counter = None})) ;
   S.Sapling.register ()
 
@@ -668,6 +726,9 @@ let balance_and_frozen_bonds ctxt block contract =
 
 let staked_balance ctxt block contract =
   RPC_context.make_call1 S.staked_balance ctxt block contract () ()
+
+let staking_numerator ctxt block contract =
+  RPC_context.make_call1 S.staking_numerator ctxt block contract () ()
 
 let unstaked_frozen_balance ctxt block contract =
   RPC_context.make_call1 S.unstaked_frozen_balance ctxt block contract () ()

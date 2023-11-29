@@ -41,6 +41,7 @@ module Test_operation_repr = struct
   open Operation_repr
 
   let test_of_list_single_case () =
+    let open Lwt_result_wrap_syntax in
     let op =
       Manager_operation
         {
@@ -52,12 +53,13 @@ module Test_operation_repr = struct
           source = Obj.magic 0;
         }
     in
-    Environment.wrap_tzresult @@ of_list [Contents op] >>?= fun contents_list ->
+    let*?@ contents_list = of_list [Contents op] in
     match contents_list with
-    | Contents_list (Single op') when op == Obj.magic op' -> return_unit
+    | Contents_list (Single op') when Obj.repr op == Obj.repr op' -> return_unit
     | _ -> failwith "Unexpected value"
 
   let test_of_list_multiple_case () =
+    let open Lwt_result_wrap_syntax in
     let op1 =
       Manager_operation
         {
@@ -80,11 +82,10 @@ module Test_operation_repr = struct
           source = Obj.magic 0;
         }
     in
-    Environment.wrap_tzresult @@ of_list [Contents op1; Contents op2]
-    >>?= fun contents_list ->
+    let*?@ contents_list = of_list [Contents op1; Contents op2] in
     match contents_list with
     | Contents_list (Cons (op1', Single op2'))
-      when op1 == Obj.magic op1' && op2 == Obj.magic op2' ->
+      when Obj.repr op1 == Obj.repr op1' && Obj.repr op2 == Obj.repr op2' ->
         return_unit
     | _ -> failwith "Unexpected value"
 

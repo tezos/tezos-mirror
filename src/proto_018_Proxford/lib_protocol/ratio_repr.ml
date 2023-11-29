@@ -30,7 +30,7 @@ let encoding =
   conv_with_guard
     (fun r -> (r.numerator, r.denominator))
     (fun (numerator, denominator) ->
-      if Compare.Int.(denominator > 0) then ok {numerator; denominator}
+      if Compare.Int.(denominator > 0) then Ok {numerator; denominator}
       else Error "The denominator must be greater than 0.")
     (obj2 (req "numerator" uint16) (req "denominator" uint16))
 

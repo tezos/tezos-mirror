@@ -137,13 +137,15 @@ module Nonce = struct
   end
 
   let register () =
+    let open Lwt_result_syntax in
     let open Services_registration in
     register1 ~chunked:false S.get (fun ctxt raw_level () () ->
         let level = Level.from_raw ctxt raw_level in
-        Nonce.get ctxt level >|= function
-        | Ok (Revealed nonce) -> ok (Revealed nonce)
-        | Ok (Unrevealed {nonce_hash; _}) -> ok (Missing nonce_hash)
-        | Error _ -> ok Forgotten)
+        let*! status = Nonce.get ctxt level in
+        match status with
+        | Ok (Revealed nonce) -> return (Revealed nonce)
+        | Ok (Unrevealed {nonce_hash; _}) -> return (Missing nonce_hash)
+        | Error _ -> return Forgotten)
 
   let get ctxt block level = RPC_context.make_call1 S.get ctxt block level () ()
 end
@@ -300,6 +302,40 @@ module Cache = struct
     RPC_context.make_call0 S.contract_rank ctxt block () contract
 end
 
+module Denunciations = struct
+  type denunciations_with_key =
+    Signature.Public_key_hash.t * Denunciations_repr.item
+
+  let denunciations_with_key_encoding : denunciations_with_key Data_encoding.t =
+    let open Data_encoding in
+    merge_objs
+      (obj1 (req "slashed_delegate" Signature.Public_key_hash.encoding))
+      Denunciations_repr.item_encoding
+
+  module S = struct
+    let denunciations =
+      let open Data_encoding in
+      RPC_service.get_service
+        ~description:
+          "Returns the denunciations for misbehavior in the current cycle."
+        ~query:RPC_query.empty
+        ~output:(list denunciations_with_key_encoding)
+        RPC_path.(custom_root / "context" / "denunciations")
+  end
+
+  let register () =
+    let open Services_registration in
+    let open Lwt_result_syntax in
+    register0 ~chunked:false S.denunciations (fun ctxt () () ->
+        let*! r =
+          Alpha_context.Delegate.For_RPC.current_cycle_denunciations_list ctxt
+        in
+        return r)
+
+  let denunciations ctxt block =
+    RPC_context.make_call0 S.denunciations ctxt block () ()
+end
+
 let register () =
   Contract.register () ;
   Constants.register () ;
@@ -310,4 +346,5 @@ let register () =
   Sapling.register () ;
   Liquidity_baking.register () ;
   Cache.register () ;
-  Adaptive_issuance.register ()
+  Adaptive_issuance.register () ;
+  Denunciations.register ()

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [node_size_cost ~nodes] returns the cost of having called
-    a function in {!Script_typed_ir_size} that returned [nodes]. *)
+(** [nodes_cost ~nodes] returns the cost of having called
+    a function in {!Script_typed_ir_size} that returns [nodes], i.e.
+    [value_size], [lambda_size] and [node_size]
+*)
 val nodes_cost : nodes:Cache_memory_helpers.Nodes.t -> Gas_limit_repr.cost

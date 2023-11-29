@@ -108,6 +108,7 @@ module Micheline_common = struct
 
   let model_size name =
     Model.make
+      ~takes_saturation_reprs:true
       ~conv:(fun {size = {Size.traversal; int_bytes; string_bytes}; _} ->
         (traversal, (int_bytes, (string_bytes, ()))))
       (Model.trilinear
@@ -118,6 +119,7 @@ module Micheline_common = struct
 
   let model_bytes name =
     Model.make
+      ~takes_saturation_reprs:true
       ~conv:(fun {bytes; _} -> (bytes, ()))
       (Model.linear
          ~name:(ns (name ^ "_bytes"))
@@ -126,6 +128,8 @@ module Micheline_common = struct
   let models name =
     [("micheline", model_size name); ("micheline_bytes", model_bytes name)]
 end
+
+let group = Benchmark.Group "script_repr"
 
 module Encoding_micheline : Benchmark.S = struct
   include Translator_benchmarks.Config
@@ -195,7 +199,10 @@ module Encoding_micheline : Benchmark.S = struct
   let models = models (Namespace.basename name)
 end
 
-let () = Registration_helpers.register (module Encoding_micheline)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
+    (module Encoding_micheline)
 
 module Decoding_micheline : Benchmark.S = struct
   include Translator_benchmarks.Config
@@ -269,7 +276,10 @@ module Decoding_micheline : Benchmark.S = struct
   let models = models (Namespace.basename name)
 end
 
-let () = Registration_helpers.register (module Decoding_micheline)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
+    (module Decoding_micheline)
 
 module Timestamp = struct
   open Encodings

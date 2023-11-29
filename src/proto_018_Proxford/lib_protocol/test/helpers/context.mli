@@ -111,6 +111,8 @@ val get_constants : t -> Constants.t tzresult Lwt.t
     [init_with_constants]. *)
 val default_test_constants : Constants.Parametric.t
 
+val get_issuance_per_minute : t -> Tez.t tzresult Lwt.t
+
 val get_baking_reward_fixed_portion : t -> Tez.t tzresult Lwt.t
 
 val get_bonus_reward : t -> attesting_power:int -> Tez.t tzresult Lwt.t
@@ -131,6 +133,17 @@ val get_total_supply : t -> Tez.t tzresult Lwt.t
 val get_seed_nonce_revelation_tip : t -> Tez.t tzresult Lwt.t
 
 val get_vdf_revelation_tip : t -> Tez.t tzresult Lwt.t
+
+val get_ai_current_yearly_rate : t -> string tzresult Lwt.t
+
+val get_ai_current_yearly_rate_exact : t -> Q.t tzresult Lwt.t
+
+val get_ai_expected_issuance :
+  t -> Adaptive_issuance_services.expected_rewards list tzresult Lwt.t
+
+val get_denunciations :
+  t ->
+  (Signature.Public_key_hash.t * Denunciations_repr.item) list tzresult Lwt.t
 
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
@@ -194,6 +207,8 @@ module Contract : sig
 
   val full_balance : t -> Contract.t -> Tez.t tzresult Lwt.t
 
+  val staking_numerator : t -> Contract.t -> Z.t tzresult Lwt.t
+
   val counter : t -> Contract.t -> Manager_counter.t tzresult Lwt.t
 
   val manager : t -> Contract.t -> Account.t tzresult Lwt.t
@@ -217,14 +232,19 @@ module Delegate : sig
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
     staking_balance : Tez.t;
+    frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
+    total_delegated_stake : Tez.t;
+    staking_denominator : Staking_pseudotoken.t;
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Vote.delegate_info;
     active_consensus_key : Signature.Public_key_hash.t;
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
+
+  type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
 
@@ -238,6 +258,11 @@ module Delegate : sig
 
   val staking_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
 
+  val staking_denominator : t -> public_key_hash -> Z.t tzresult Lwt.t
+
+  val frozen_deposits_limit :
+    t -> public_key_hash -> Tez.t option tzresult Lwt.t
+
   val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
 
   val voting_info : t -> public_key_hash -> Vote.delegate_info tzresult Lwt.t
@@ -247,10 +272,25 @@ module Delegate : sig
 
   val participation :
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
+
+  (** This function might begin constructing a block. Use [policy] to
+      specify a valid baker for the new block (default [By_round 0]) *)
+  val is_forbidden :
+    ?policy:Block.baker_policy -> t -> public_key_hash -> bool tzresult Lwt.t
+
+  val stake_for_cycle :
+    ?policy:Block.baker_policy ->
+    t ->
+    Cycle.t ->
+    public_key_hash ->
+    stake tzresult Lwt.t
 end
 
 module Sc_rollup : sig
   val inbox : t -> Sc_rollup.Inbox.t tzresult Lwt.t
+
+  val whitelist :
+    t -> Sc_rollup.t -> Sc_rollup.Whitelist.t option tzresult Lwt.t
 
   val commitment :
     t ->
@@ -301,13 +341,15 @@ type 'accounts init :=
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
-  ?sc_rollup_enable:bool ->
   ?sc_rollup_arith_pvm_enable:bool ->
+  ?sc_rollup_private_enable:bool ->
+  ?sc_rollup_riscv_pvm_enable:bool ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
+  ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

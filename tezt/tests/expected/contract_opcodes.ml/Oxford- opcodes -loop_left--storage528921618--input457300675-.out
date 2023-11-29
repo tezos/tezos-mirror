@@ -1,0 +1,52 @@
+
+./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/loop_left.tz on storage '{""}' and input '{}' --level 1 --trace-stack
+storage
+  {}
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (just consumed gas: 16.607)
+    [ (Pair {} { "" }) ]
+  - location: 9 (just consumed gas: 0.010)
+    [ {} ]
+  - location: 10 (just consumed gas: 0.010)
+    [ {}
+      {} ]
+  - location: 12 (just consumed gas: 0.010)
+    [ {}
+      {} ]
+  - location: 13 (just consumed gas: 0.010)
+    [ (Pair {} {}) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ (Left (Pair {} {})) ]
+  - location: 41 (just consumed gas: 0.020)
+    [ (Pair {} {}) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ (Pair {} {})
+      (Pair {} {}) ]
+  - location: 20 (just consumed gas: 0.010)
+    [ {}
+      (Pair {} {}) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} {}) ]
+  - location: 23 (just consumed gas: 0.010)
+    [ {} ]
+  - location: 21 (just consumed gas: 0.035)
+    [ {}
+      {} ]
+  - location: 24 (just consumed gas: 0.010)
+    [ {} ]
+  - location: 35 (just consumed gas: 0.010)
+    [ (Right {}) ]
+  - location: 24 (just consumed gas: 0.025)
+    [ (Right {}) ]
+  - location: 41 (just consumed gas: 0.035)
+    [ {} ]
+  - location: 41 (just consumed gas: 0.010)
+    [ {}
+      {} ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Pair {} {}) ]
+

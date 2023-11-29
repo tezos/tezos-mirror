@@ -39,7 +39,7 @@ end
 
     {ul
       {li assuming the PVM and Inbox are in a state implied by [predecessor]}
-      {li the PVM consumes all the messages until [inbox_level] (not included)
+      {li the PVM consumes all the messages until (and including) [inbox_level]
           from the inbox ; }
       {li the PVM advances to the state [compressed_state] over
           [number_of_ticks] ticks. }

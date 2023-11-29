@@ -98,32 +98,6 @@
 ./octez-client rpc get /chains/main/blocks/head/context/denunciations
 []
 
-./octez-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
-[ { "level": 1,
-    "delegates":
-      [ { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 11, "endorsing_power": 50,
-          "consensus_key": "[PUBLIC_KEY_HASH]" },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 4, "endorsing_power": 47,
-          "consensus_key": "[PUBLIC_KEY_HASH]" },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 2, "endorsing_power": 46,
-          "consensus_key": "[PUBLIC_KEY_HASH]" },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 1, "endorsing_power": 55,
-          "consensus_key": "[PUBLIC_KEY_HASH]" },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 0, "endorsing_power": 58,
-          "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
-
-./octez-client rpc get '/chains/main/blocks/head/helpers/endorsing_rights?delegate=[PUBLIC_KEY_HASH]'
-[ { "level": 1,
-    "delegates":
-      [ { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 11, "endorsing_power": 50,
-          "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
-
 ./octez-client rpc get /chains/main/blocks/head/helpers/attestation_rights
 [ { "level": 1,
     "delegates":

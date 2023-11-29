@@ -110,6 +110,7 @@ in
         curl
         shellcheck
         poetry
+        kaitai-struct-compiler
         devPackageSet.ocaml-lsp-server
         devPackageSet.ocamlformat-rpc
         devPackageSet.ocp-indent

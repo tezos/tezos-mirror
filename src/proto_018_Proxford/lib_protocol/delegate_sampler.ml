@@ -43,22 +43,25 @@ module Delegate_sampler_state = struct
   let identifier_of_cycle cycle = Format.asprintf "%a" Cycle_repr.pp cycle
 
   let init ctxt cycle sampler_state =
+    let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
-    Storage.Delegate_sampler_state.init ctxt cycle sampler_state
-    >>=? fun ctxt ->
+    let* ctxt = Storage.Delegate_sampler_state.init ctxt cycle sampler_state in
     let size = 1 (* that's symbolic: 1 cycle = 1 entry *) in
-    Cache.update ctxt id (Some (sampler_state, size)) >>?= fun ctxt ->
+    let*? ctxt = Cache.update ctxt id (Some (sampler_state, size)) in
     return ctxt
 
   let get ctxt cycle =
+    let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
-    Cache.find ctxt id >>=? function
+    let* v_opt = Cache.find ctxt id in
+    match v_opt with
     | None -> Storage.Delegate_sampler_state.get ctxt cycle
     | Some v -> return v
 
   let remove_existing ctxt cycle =
+    let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
-    Cache.update ctxt id None >>?= fun ctxt ->
+    let*? ctxt = Cache.update ctxt id None in
     Storage.Delegate_sampler_state.remove_existing ctxt cycle
 end
 
@@ -116,16 +119,18 @@ module Random = struct
       the sampler and caches it in [ctxt] with
       [Raw_context.set_sampler_for_cycle]. *)
   let sampler_for_cycle ctxt cycle =
+    let open Lwt_result_syntax in
     let read ctxt =
-      Seed_storage.for_cycle ctxt cycle >>=? fun seed ->
-      Delegate_sampler_state.get ctxt cycle >>=? fun state ->
-      return (seed, state)
+      let* seed = Seed_storage.for_cycle ctxt cycle in
+      let+ state = Delegate_sampler_state.get ctxt cycle in
+      (seed, state)
     in
     Raw_context.sampler_for_cycle ~read ctxt cycle
 
   let owner c (level : Level_repr.t) offset =
+    let open Lwt_result_syntax in
     let cycle = level.Level_repr.cycle in
-    sampler_for_cycle c cycle >>=? fun (c, seed, state) ->
+    let* c, seed, state = sampler_for_cycle c cycle in
     let sample ~int_bound ~mass_bound =
       let state = init_random_state seed level offset in
       let i, state = take_int64 (Int64.of_int int_bound) state in
@@ -139,10 +144,12 @@ end
 let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
 
 let baking_rights_owner c (level : Level_repr.t) ~round =
-  Round_repr.to_int round >>?= fun round ->
+  let open Lwt_result_syntax in
+  let*? round = Round_repr.to_int round in
   let consensus_committee_size = Constants_storage.consensus_committee_size c in
-  Slot_repr.of_int (round mod consensus_committee_size) >>?= fun slot ->
-  slot_owner c level slot >>=? fun (ctxt, pk) -> return (ctxt, slot, pk)
+  let*? slot = Slot_repr.of_int (round mod consensus_committee_size) in
+  let+ ctxt, pk = slot_owner c level slot in
+  (ctxt, slot, pk)
 
 let load_sampler_for_cycle ctxt cycle =
   let open Lwt_result_syntax in
@@ -159,17 +166,26 @@ let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
   Lwt.return
     (Stake_context.apply_limits ctxt staking_parameters staking_balance)
 
-let get_stakes_for_selected_index ctxt index =
+let get_stakes_for_selected_index ctxt ~slashings index =
   let open Lwt_result_syntax in
   Stake_storage.fold_snapshot
     ctxt
     ~index
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
+      let staking_balance =
+        match Signature.Public_key_hash.Map.find delegate slashings with
+        | None -> staking_balance
+        | Some percentage ->
+            Full_staking_balance_repr.apply_slashing ~percentage staking_balance
+      in
       let* stake_for_cycle =
         get_delegate_stake_from_staking_balance ctxt delegate staking_balance
       in
-      let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
-      return ((delegate, stake_for_cycle) :: acc, total_stake))
+      if Stake_storage.has_minimal_stake_and_frozen_stake ctxt staking_balance
+      then
+        let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
+        return ((delegate, stake_for_cycle) :: acc, total_stake)
+      else return (acc, total_stake))
     ~init:([], Stake_repr.zero)
 
 let compute_snapshot_index_for_seed ~max_snapshot_index seed =
@@ -179,46 +195,54 @@ let compute_snapshot_index_for_seed ~max_snapshot_index seed =
   |> fst |> Int32.to_int |> return
 
 let compute_snapshot_index ctxt cycle ~max_snapshot_index =
-  Seed_storage.for_cycle ctxt cycle >>=? fun seed ->
+  let open Lwt_result_syntax in
+  let* seed = Seed_storage.for_cycle ctxt cycle in
   compute_snapshot_index_for_seed ~max_snapshot_index seed
 
-let select_distribution_for_cycle ctxt cycle =
-  Stake_storage.max_snapshot_index ctxt >>=? fun max_snapshot_index ->
-  Seed_storage.raw_for_cycle ctxt cycle >>=? fun seed ->
-  compute_snapshot_index_for_seed ~max_snapshot_index seed
-  >>=? fun selected_index ->
-  get_stakes_for_selected_index ctxt selected_index
-  >>=? fun (stakes, total_stake) ->
-  Stake_storage.set_selected_distribution_for_cycle
-    ctxt
-    cycle
-    stakes
-    total_stake
-  >>=? fun ctxt ->
-  List.fold_left_es
-    (fun acc (pkh, stake) ->
-      Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
-      >|=? fun pk -> (pk, Stake_context.staking_weight ctxt stake) :: acc)
-    []
-    stakes
-  >>=? fun stakes_pk ->
+let select_distribution_for_cycle ctxt ~slashings cycle =
+  let open Lwt_result_syntax in
+  let* max_snapshot_index = Stake_storage.max_snapshot_index ctxt in
+  let* seed = Seed_storage.raw_for_cycle ctxt cycle in
+  let* selected_index =
+    compute_snapshot_index_for_seed ~max_snapshot_index seed
+  in
+  let* stakes, total_stake =
+    get_stakes_for_selected_index ctxt ~slashings selected_index
+  in
+  let* ctxt =
+    Stake_storage.set_selected_distribution_for_cycle
+      ctxt
+      cycle
+      stakes
+      total_stake
+  in
+  let* stakes_pk =
+    List.fold_left_es
+      (fun acc (pkh, stake) ->
+        let+ pk =
+          Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
+        in
+        (pk, Stake_repr.staking_weight stake) :: acc)
+      []
+      stakes
+  in
   let state = Sampler.create stakes_pk in
-  Delegate_sampler_state.init ctxt cycle state >>=? fun ctxt ->
+  let* ctxt = Delegate_sampler_state.init ctxt cycle state in
   (* pre-allocate the sampler *)
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
-let select_new_distribution_at_cycle_end ctxt ~new_cycle =
+let select_new_distribution_at_cycle_end ctxt ~slashings ~new_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let for_cycle = Cycle_repr.add new_cycle preserved in
-  select_distribution_for_cycle ctxt for_cycle
+  select_distribution_for_cycle ctxt ~slashings for_cycle
 
 let clear_outdated_sampling_data ctxt ~new_cycle =
-  let max_slashing_period = Constants_storage.max_slashing_period ctxt in
-  match Cycle_repr.sub new_cycle max_slashing_period with
+  let open Lwt_result_syntax in
+  match Cycle_repr.sub new_cycle Constants_repr.max_slashing_period with
   | None -> return ctxt
   | Some outdated_cycle ->
-      Delegate_sampler_state.remove_existing ctxt outdated_cycle
-      >>=? fun ctxt -> Seed_storage.remove_for_cycle ctxt outdated_cycle
+      let* ctxt = Delegate_sampler_state.remove_existing ctxt outdated_cycle in
+      Seed_storage.remove_for_cycle ctxt outdated_cycle
 
 module For_RPC = struct
   let delegate_baking_power_for_cycle ctxt cycle delegate =

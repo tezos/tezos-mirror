@@ -38,7 +38,12 @@ type repr
     parameters of [Script_typed_ir.ty]. *)
 type t = Tez_tag of repr [@@ocaml.unboxed]
 
-type error += Subtraction_underflow of t * t (* `Temporary *)
+type error +=
+  | Addition_overflow of t * t (* `Temporary *)
+  | Subtraction_underflow of t * t (* `Temporary *)
+  | Multiplication_overflow of t * int64 (* `Temporary *)
+  | Negative_multiplicator of t * int64 (* `Temporary *)
+  | Invalid_divisor of t * int64 (* `Temporary *)
 
 type tez = t
 
@@ -70,9 +75,15 @@ val div2 : t -> t
 (** [div2_sub tez] returns [(⌊tez / 2⌋, tez - ⌊tez / 2⌋)]. *)
 val div2_sub : t -> t * t
 
-(** [mul_ratio tez ~num ~den] returns [tez * num / den] without failing
-    when [tez * num] overflows. *)
-val mul_ratio : t -> num:int64 -> den:int64 -> t tzresult
+(** [mul_ratio ~rounding tez ~num ~den] returns [tez * num / den] without failing
+    when [tez * num] overflows.
+    [rounding] controls the rounding of the division. *)
+val mul_ratio :
+  rounding:[`Down | `Up] -> t -> num:int64 -> den:int64 -> t tzresult
+
+(** [mul_percentage tez percentage] returns [tez * percentage / 100].
+    No errors can happen. *)
+val mul_percentage : rounding:[`Down | `Up] -> t -> Int_percentage.t -> t
 
 val to_mutez : t -> int64
 
@@ -90,6 +101,8 @@ val mul_exn : t -> int -> t
 val div_exn : t -> int -> t
 
 val encoding : t Data_encoding.t
+
+val balance_update_encoding : [`Credited of t | `Debited of t] Data_encoding.t
 
 include Compare.S with type t := t
 

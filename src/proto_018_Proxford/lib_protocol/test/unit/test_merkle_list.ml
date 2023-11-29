@@ -252,7 +252,7 @@ let valid_tests =
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      Lwt.return (f ()) >|= function Ok () -> () | Error _ -> assert false)
+      match f () with Ok () -> Lwt.return_unit | Error _ -> assert false)
 
 let tests = List.map wrap valid_tests
 

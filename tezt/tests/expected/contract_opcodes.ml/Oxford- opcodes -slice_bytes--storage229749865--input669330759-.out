@@ -1,0 +1,37 @@
+
+./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/slice_bytes.tz on storage 'Some 0xaabbcc' and input 'Pair 2 2' --level 1 --trace-stack
+storage
+  None
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (just consumed gas: 9.121)
+    [ (Pair (Pair 2 2) (Some 0xaabbcc)) ]
+  - location: 10 (just consumed gas: 0.010)
+    [ (Pair 2 2)
+      (Some 0xaabbcc) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ (Some 0xaabbcc)
+      (Pair 2 2) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ 0xaabbcc
+      (Pair 2 2) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ (Pair 2 2)
+      0xaabbcc ]
+  - location: 20 (just consumed gas: 0.010)
+    [ 2
+      2
+      0xaabbcc ]
+  - location: 21 (just consumed gas: 0.026)
+    [ None ]
+  - location: 13 (just consumed gas: 0.025)
+    [ None ]
+  - location: 22 (just consumed gas: 0.010)
+    [ {}
+      None ]
+  - location: 24 (just consumed gas: 0.010)
+    [ (Pair {} None) ]
+

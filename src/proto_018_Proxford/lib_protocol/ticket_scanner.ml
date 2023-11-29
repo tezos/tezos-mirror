@@ -210,7 +210,7 @@ module Ticket_inspection = struct
     | Operation_t ->
         (* Operations may contain tickets but they should never be passed
            why we fail in this case. *)
-        error Unsupported_type_operation
+        Result_syntax.tzfail Unsupported_type_operation
     | Chain_id_t -> (k [@ocaml.tailcall]) False_ht
     | Never_t -> (k [@ocaml.tailcall]) False_ht
     | Bls12_381_g1_t -> (k [@ocaml.tailcall]) False_ht
@@ -244,15 +244,13 @@ module Ticket_inspection = struct
             (k [@ocaml.tailcall]) (pair_has_tickets pair ht1 ht2)))
 
   let has_tickets_of_ty ctxt ty =
-    Gas.consume ctxt (Ticket_costs.has_tickets_of_ty_cost ty) >>? fun ctxt ->
-    has_tickets_of_ty ty ok >|? fun ht -> (ht, ctxt)
+    let open Result_syntax in
+    let* ctxt = Gas.consume ctxt (Ticket_costs.has_tickets_of_ty_cost ty) in
+    let+ ht = has_tickets_of_ty ty return in
+    (ht, ctxt)
 end
 
 module Ticket_collection = struct
-  let consume_gas_steps =
-    Ticket_costs.consume_gas_steps
-      ~step_cost:Ticket_costs.Constants.cost_collect_tickets_step
-
   type accumulator = ex_ticket list
 
   type 'a continuation = context -> accumulator -> 'a tzresult Lwt.t
@@ -299,11 +297,12 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ctxt key_ty _set acc k ->
-    consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
-    (* This is only invoked to support any future extensions making tickets
-       comparable. *)
-    (tickets_of_comparable [@ocaml.tailcall]) ctxt key_ty acc k
+    let open Lwt_result_syntax in
+    fun ctxt key_ty _set acc k ->
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
+      (* This is only invoked to support any future extensions making tickets
+         comparable. *)
+      (tickets_of_comparable [@ocaml.tailcall]) ctxt key_ty acc k
 
   let rec tickets_of_value :
       type a ac ret.
@@ -315,93 +314,94 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ~include_lazy ctxt hty ty x acc k ->
-    let open Script_typed_ir in
-    consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
-    match (hty, ty) with
-    | False_ht, _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _, _) ->
-        let l, r = x in
-        (tickets_of_value [@ocaml.tailcall])
-          ~include_lazy
-          ctxt
-          hty1
-          ty1
-          l
-          acc
-          (fun ctxt acc ->
-            (tickets_of_value [@ocaml.tailcall])
-              ~include_lazy
-              ctxt
-              hty2
-              ty2
-              r
-              acc
-              k)
-    | Or_ht (htyl, htyr), Or_t (tyl, tyr, _, _) -> (
-        match x with
-        | L v ->
-            (tickets_of_value [@ocaml.tailcall])
-              ~include_lazy
-              ctxt
-              htyl
-              tyl
-              v
-              acc
-              k
-        | R v ->
-            (tickets_of_value [@ocaml.tailcall])
-              ~include_lazy
-              ctxt
-              htyr
-              tyr
-              v
-              acc
-              k)
-    | Option_ht el_hty, Option_t (el_ty, _, _) -> (
-        match x with
-        | Some x ->
-            (tickets_of_value [@ocaml.tailcall])
-              ~include_lazy
-              ctxt
-              el_hty
-              el_ty
-              x
-              acc
-              k
-        | None -> (k [@ocaml.tailcall]) ctxt acc)
-    | List_ht el_hty, List_t (el_ty, _) ->
-        let elements = Script_list.to_list x in
-        (tickets_of_list [@ocaml.tailcall])
-          ctxt
-          ~include_lazy
-          el_hty
-          el_ty
-          elements
-          acc
-          k
-    | Set_ht _, Set_t (key_ty, _) ->
-        (tickets_of_set [@ocaml.tailcall]) ctxt key_ty x acc k
-    | Map_ht (_, val_hty), Map_t (key_ty, val_ty, _) ->
-        (tickets_of_comparable [@ocaml.tailcall])
-          ctxt
-          key_ty
-          acc
-          (fun ctxt acc ->
-            (tickets_of_map [@ocaml.tailcall])
-              ctxt
-              ~include_lazy
-              val_hty
-              val_ty
-              x
-              acc
-              k)
-    | Big_map_ht (_, val_hty), Big_map_t (key_ty, _, _) ->
-        if include_lazy then
-          (tickets_of_big_map [@ocaml.tailcall]) ctxt val_hty key_ty x acc k
-        else (k [@ocaml.tailcall]) ctxt acc
-    | True_ht, Ticket_t (comp_ty, _) ->
-        (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
+    let open Lwt_result_syntax in
+    fun ~include_lazy ctxt hty ty x acc k ->
+      let open Script_typed_ir in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
+      match (hty, ty) with
+      | False_ht, _ -> (k [@ocaml.tailcall]) ctxt acc
+      | Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _, _) ->
+          let l, r = x in
+          (tickets_of_value [@ocaml.tailcall])
+            ~include_lazy
+            ctxt
+            hty1
+            ty1
+            l
+            acc
+            (fun ctxt acc ->
+              (tickets_of_value [@ocaml.tailcall])
+                ~include_lazy
+                ctxt
+                hty2
+                ty2
+                r
+                acc
+                k)
+      | Or_ht (htyl, htyr), Or_t (tyl, tyr, _, _) -> (
+          match x with
+          | L v ->
+              (tickets_of_value [@ocaml.tailcall])
+                ~include_lazy
+                ctxt
+                htyl
+                tyl
+                v
+                acc
+                k
+          | R v ->
+              (tickets_of_value [@ocaml.tailcall])
+                ~include_lazy
+                ctxt
+                htyr
+                tyr
+                v
+                acc
+                k)
+      | Option_ht el_hty, Option_t (el_ty, _, _) -> (
+          match x with
+          | Some x ->
+              (tickets_of_value [@ocaml.tailcall])
+                ~include_lazy
+                ctxt
+                el_hty
+                el_ty
+                x
+                acc
+                k
+          | None -> (k [@ocaml.tailcall]) ctxt acc)
+      | List_ht el_hty, List_t (el_ty, _) ->
+          let elements = Script_list.to_list x in
+          (tickets_of_list [@ocaml.tailcall])
+            ctxt
+            ~include_lazy
+            el_hty
+            el_ty
+            elements
+            acc
+            k
+      | Set_ht _, Set_t (key_ty, _) ->
+          (tickets_of_set [@ocaml.tailcall]) ctxt key_ty x acc k
+      | Map_ht (_, val_hty), Map_t (key_ty, val_ty, _) ->
+          (tickets_of_comparable [@ocaml.tailcall])
+            ctxt
+            key_ty
+            acc
+            (fun ctxt acc ->
+              (tickets_of_map [@ocaml.tailcall])
+                ctxt
+                ~include_lazy
+                val_hty
+                val_ty
+                x
+                acc
+                k)
+      | Big_map_ht (_, val_hty), Big_map_t (key_ty, _, _) ->
+          if include_lazy then
+            (tickets_of_big_map [@ocaml.tailcall]) ctxt val_hty key_ty x acc k
+          else (k [@ocaml.tailcall]) ctxt acc
+      | True_ht, Ticket_t (comp_ty, _) ->
+          (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
 
   and tickets_of_list :
       type a ac ret.
@@ -413,27 +413,28 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ctxt ~include_lazy el_hty el_ty elements acc k ->
-    consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
-    match elements with
-    | elem :: elems ->
-        (tickets_of_value [@ocaml.tailcall])
-          ~include_lazy
-          ctxt
-          el_hty
-          el_ty
-          elem
-          acc
-          (fun ctxt acc ->
-            (tickets_of_list [@ocaml.tailcall])
-              ~include_lazy
-              ctxt
-              el_hty
-              el_ty
-              elems
-              acc
-              k)
-    | [] -> (k [@ocaml.tailcall]) ctxt acc
+    let open Lwt_result_syntax in
+    fun ctxt ~include_lazy el_hty el_ty elements acc k ->
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
+      match elements with
+      | elem :: elems ->
+          (tickets_of_value [@ocaml.tailcall])
+            ~include_lazy
+            ctxt
+            el_hty
+            el_ty
+            elem
+            acc
+            (fun ctxt acc ->
+              (tickets_of_list [@ocaml.tailcall])
+                ~include_lazy
+                ctxt
+                el_hty
+                el_ty
+                elems
+                acc
+                k)
+      | [] -> (k [@ocaml.tailcall]) ctxt acc
 
   and tickets_of_map :
       type k v vc ret.
@@ -445,20 +446,21 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ~include_lazy ctxt val_hty val_ty map acc k ->
-    let (module M) = Script_map.get_module map in
-    consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
-    (* Pay gas for folding over the values *)
-    consume_gas_steps ctxt ~num_steps:M.size >>?= fun ctxt ->
-    let values = M.OPS.fold (fun _ v vs -> v :: vs) M.boxed [] in
-    (tickets_of_list [@ocaml.tailcall])
-      ~include_lazy
-      ctxt
-      val_hty
-      val_ty
-      values
-      acc
-      k
+    let open Lwt_result_syntax in
+    fun ~include_lazy ctxt val_hty val_ty map acc k ->
+      let (module M) = Script_map.get_module map in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
+      (* Pay gas for folding over the values *)
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:M.size in
+      let values = M.OPS.fold (fun _ v vs -> v :: vs) M.boxed [] in
+      (tickets_of_list [@ocaml.tailcall])
+        ~include_lazy
+        ctxt
+        val_hty
+        val_ty
+        values
+        acc
+        k
 
   and tickets_of_big_map :
       type k v ret.
@@ -469,42 +471,50 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ctxt
-       val_hty
-       key_ty
-       (Big_map {id; diff = {map = _; size}; key_type = _; value_type})
-       acc
-       k ->
-    consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
-    (* Require empty overlay *)
-    if Compare.Int.(size > 0) then tzfail Unsupported_non_empty_overlay
-    else
-      (* Traverse the keys for tickets, although currently keys should never
-         contain any tickets. *)
-      (tickets_of_comparable [@ocaml.tailcall]) ctxt key_ty acc (fun ctxt acc ->
-          (* Accumulate tickets from values of the big-map stored in the context *)
-          match id with
-          | Some id ->
-              let accum (values, ctxt) (_key_hash, exp) =
-                Script_ir_translator.parse_data
-                  ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
+    let open Lwt_result_syntax in
+    fun ctxt
+        val_hty
+        key_ty
+        (Big_map {id; diff = {map = _; size}; key_type = _; value_type})
+        acc
+        k ->
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
+      (* Require empty overlay *)
+      if Compare.Int.(size > 0) then tzfail Unsupported_non_empty_overlay
+      else
+        (* Traverse the keys for tickets, although currently keys should never
+           contain any tickets. *)
+        (tickets_of_comparable [@ocaml.tailcall])
+          ctxt
+          key_ty
+          acc
+          (fun ctxt acc ->
+            (* Accumulate tickets from values of the big-map stored in the context *)
+            match id with
+            | Some id ->
+                let accum (values, ctxt) (_key_hash, exp) =
+                  let+ v, ctxt =
+                    Script_ir_translator.parse_data
+                      ~elab_conf:
+                        Script_ir_translator_config.(make ~legacy:true ())
+                      ctxt
+                      ~allow_forged:true
+                      value_type
+                      (Micheline.root exp)
+                  in
+                  (v :: values, ctxt)
+                in
+                let* ctxt, exps = Big_map.list_key_values ctxt id in
+                let* values, ctxt = List.fold_left_es accum ([], ctxt) exps in
+                (tickets_of_list [@ocaml.tailcall])
+                  ~include_lazy:true
                   ctxt
-                  ~allow_forged:true
+                  val_hty
                   value_type
-                  (Micheline.root exp)
-                >|=? fun (v, ctxt) -> (v :: values, ctxt)
-              in
-              Big_map.list_key_values ctxt id >>=? fun (ctxt, exps) ->
-              List.fold_left_es accum ([], ctxt) exps >>=? fun (values, ctxt) ->
-              (tickets_of_list [@ocaml.tailcall])
-                ~include_lazy:true
-                ctxt
-                val_hty
-                value_type
-                values
-                acc
-                k
-          | None -> (k [@ocaml.tailcall]) ctxt acc)
+                  values
+                  acc
+                  k
+            | None -> (k [@ocaml.tailcall]) ctxt acc)
 
   let tickets_of_value ctxt ~include_lazy ht ty x =
     tickets_of_value ctxt ~include_lazy ht ty x [] (fun ctxt ex_tickets ->
@@ -517,7 +527,8 @@ type 'a has_tickets =
       -> 'a has_tickets
 
 let type_has_tickets ctxt ty =
-  Ticket_inspection.has_tickets_of_ty ctxt ty >|? fun (has_tickets, ctxt) ->
+  let open Result_syntax in
+  let+ has_tickets, ctxt = Ticket_inspection.has_tickets_of_ty ctxt ty in
   (Has_tickets (has_tickets, ty), ctxt)
 
 let tickets_of_value ctxt ~include_lazy (Has_tickets (ht, ty)) =
@@ -528,29 +539,32 @@ let has_tickets (Has_tickets (ht, _)) =
 
 let tickets_of_node ctxt ~include_lazy has_tickets expr =
   let (Has_tickets (ht, ty)) = has_tickets in
+  let open Lwt_result_syntax in
   match ht with
   | Ticket_inspection.False_ht -> return ([], ctxt)
   | _ ->
-      Script_ir_translator.parse_data
-        ctxt
-        ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-        ~allow_forged:true
-        ty
-        expr
-      >>=? fun (value, ctxt) ->
+      let* value, ctxt =
+        Script_ir_translator.parse_data
+          ctxt
+          ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
+          ~allow_forged:true
+          ty
+          expr
+      in
       tickets_of_value ctxt ~include_lazy has_tickets value
 
 let ex_ticket_size ctxt (Ex_ticket (ty, ticket)) =
   (* type *)
-  Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
-  Script_ir_unparser.unparse_ty ~loc:() ctxt ty >>?= fun (ty', ctxt) ->
+  let open Lwt_result_syntax in
+  let*? ty = Script_typed_ir.ticket_t Micheline.dummy_location ty in
+  let*? ty', ctxt = Script_ir_unparser.unparse_ty ~loc:() ctxt ty in
   let ty_nodes, ty_size = Script_typed_ir_size.node_size ty' in
   let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
-  Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
+  let*? ctxt = Gas.consume ctxt ty_size_cost in
   (* contents *)
   let val_nodes, val_size = Script_typed_ir_size.value_size ty ticket in
   let val_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:val_nodes in
-  Gas.consume ctxt val_size_cost >>?= fun ctxt ->
+  let*? ctxt = Gas.consume ctxt val_size_cost in
   (* gas *)
   return (Saturation_repr.add ty_size val_size, ctxt)
 

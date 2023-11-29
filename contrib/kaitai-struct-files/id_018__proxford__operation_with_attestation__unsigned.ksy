@@ -129,13 +129,12 @@ types:
       type: bytes_dyn_uint30
   dal_attestation:
     seq:
-    - id: attestor
-      type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: attestation
       type: z
     - id: level
       type: s4
+    - id: slot
+      type: u2
   dal_page_id:
     seq:
     - id: published_level
@@ -387,6 +386,9 @@ types:
     - id: delegation
       type: delegation
       if: (id_018__proxford__operation__alpha__contents_tag == id_018__proxford__operation__alpha__contents_tag::delegation)
+    - id: set_deposits_limit
+      type: set_deposits_limit
+      if: (id_018__proxford__operation__alpha__contents_tag == id_018__proxford__operation__alpha__contents_tag::set_deposits_limit)
     - id: increase_paid_storage
       type: increase_paid_storage
       if: (id_018__proxford__operation__alpha__contents_tag == id_018__proxford__operation__alpha__contents_tag::increase_paid_storage)
@@ -1055,6 +1057,25 @@ types:
     seq:
     - id: sequence_elt
       type: micheline__018__proxford__michelson_v1__expression
+  set_deposits_limit:
+    seq:
+    - id: source
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    - id: fee
+      type: id_018__proxford__mutez
+    - id: counter
+      type: n
+    - id: gas_limit
+      type: n
+    - id: storage_limit
+      type: n
+    - id: limit_tag
+      type: u1
+      enum: bool
+    - id: limit
+      type: id_018__proxford__mutez
+      if: (limit_tag == bool::true)
   slot_header:
     seq:
     - id: slot_index
@@ -1132,6 +1153,12 @@ types:
       type: bytes_dyn_uint30
     - id: parameters_ty
       type: bytes_dyn_uint30
+    - id: whitelist_tag
+      type: u1
+      enum: bool
+    - id: whitelist
+      type: whitelist_0
+      if: (whitelist_tag == bool::true)
   smart_rollup_publish:
     seq:
     - id: source
@@ -1329,6 +1356,25 @@ types:
     - id: pk
       type: public_key
       doc: A Ed25519, Secp256k1, or P256 public key
+  whitelist:
+    seq:
+    - id: whitelist_entries
+      type: whitelist_entries
+      repeat: eos
+  whitelist_0:
+    seq:
+    - id: len_whitelist
+      type: u4
+      valid:
+        max: 1073741823
+    - id: whitelist
+      type: whitelist
+      size: len_whitelist
+  whitelist_entries:
+    seq:
+    - id: signature__public_key_hash
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   z:
     seq:
     - id: has_tail
@@ -1839,6 +1885,7 @@ enums:
     109: origination
     110: delegation
     111: register_global_constant
+    112: set_deposits_limit
     113: increase_paid_storage
     114: update_consensus_key
     158: transfer_ticket
@@ -1910,6 +1957,7 @@ enums:
   pvm_kind:
     0: arith
     1: wasm_2_0_0
+    2: riscv
   refutation_tag:
     0: start
     1: move
@@ -1917,6 +1965,7 @@ enums:
     0: raw__data__proof
     1: metadata__proof
     2: dal__page__proof
+    3: dal__parameters__proof
   step_tag:
     0: dissection
     1: proof

@@ -1,0 +1,156 @@
+
+
+{
+  "opponent": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+  "start_tick": "0",
+  "end_tick": "629",
+  "dissection": [
+    {
+      "state": "srs136U2KJweAXf7Excw61Zeu5R5L7mi2TCb1WKkowQJ6UdHJ2VZWS",
+      "tick": "0"
+    },
+    {
+      "state": "srs136djDFuVnqYeyDr9UbyHP2SCqQbq8dnXZY6ePsS2aThtWDr2Ai",
+      "tick": "19"
+    },
+    {
+      "state": "srs11sqLRJh2RwZdtg71dn5VddXExoYHQByQWYr7XsvnXojVXaLaRo",
+      "tick": "38"
+    },
+    {
+      "state": "srs12qSwJBtkq9B4VcpcSQAigEVBw5gsLTLgWoZ3h8WQm5FU5vSxpy",
+      "tick": "57"
+    },
+    {
+      "state": "srs12SbiEtcNeAPNX1YNC83Ysm2wUToTbP14m7nAR3NUcJKTprUGfV",
+      "tick": "76"
+    },
+    {
+      "state": "srs11TLxQ6xy4HxoT4tonedSZ4nR3wS6nPEt9k4kJgCTpCbfwATfZU",
+      "tick": "95"
+    },
+    {
+      "state": "srs13Cy8eZRTBm5QM6BXKRJ1NPQzNibT8UBUDLKedW5RG9ojyygEja",
+      "tick": "114"
+    },
+    {
+      "state": "srs12gYytLqonfQQp3Q1wW5kPywFxgBmR6168L6bW9TUCTdP7rimpQ",
+      "tick": "133"
+    },
+    {
+      "state": "srs129US7aZPgijAeWY81dXLGPrvfyY5PVbH5vMdG4dLmVcgNiTpSn",
+      "tick": "152"
+    },
+    {
+      "state": "srs13CHzURWpekmoxepmLWivVNZqUEeUrztuGuWeswokZYrRnWRR6S",
+      "tick": "171"
+    },
+    {
+      "state": "srs12BVfJAc9r5JRVSXcJFMGTBc6e7qGrdGUmrXfdN8QUiqkDQoSUC",
+      "tick": "190"
+    },
+    {
+      "state": "srs12k9nfFw67eGmyTtaHMBSLjRaPMkJMjvKtK2ubcdVy63wkCoBhY",
+      "tick": "209"
+    },
+    {
+      "state": "srs12DjAvkDmSo8FSMamgMHhWitZj4KVuNTCisiCYeJkycfn5pcjjE",
+      "tick": "228"
+    },
+    {
+      "state": "srs12MYeKGU7Z4FaTLv1zvVnM5LSyU4rxa8AYYcww2eFCZVKdMZuEb",
+      "tick": "247"
+    },
+    {
+      "state": "srs11vntikstjho8tvq7CSEGi8STaZ3EpuKQ6mtdnKX5ymMff9zdYE",
+      "tick": "266"
+    },
+    {
+      "state": "srs135KBowyeD3NQCtEh4ufvja4JUVStxSCNWZcTGZ7J5YRy9Ci3Sv",
+      "tick": "285"
+    },
+    {
+      "state": "srs12oGJ623voxVYotTwCVhs1X6PkNSie61VY41FtKcoUJ92Pzjkwc",
+      "tick": "304"
+    },
+    {
+      "state": "srs12LkRiYqgvJLTHtQ16WAKfESd1M7szoq85baWTs7q773JCPJm2o",
+      "tick": "323"
+    },
+    {
+      "state": "srs12BwLvVrWQv531zELu8TrCymUS1Gm9Naafz3PX6miVBYcZycJjr",
+      "tick": "342"
+    },
+    {
+      "state": "srs12oTSNspRC6jYQBC6SBbbjLGvZdwzHGB3MpH9YauX5WnG1nR3rk",
+      "tick": "361"
+    },
+    {
+      "state": "srs11yCYcjjygmBdQBHdVJiWTu4iPrK74PvXqqTPAuvDWnWRFdt8zR",
+      "tick": "380"
+    },
+    {
+      "state": "srs12euFuDjku1Aht4aSrt9vu92pWNWYCG2WCPfj9Unnx6Sp1gCu1H",
+      "tick": "399"
+    },
+    {
+      "state": "srs11YiQvUc9xWrqY75PHU134RYHVYqDvnPHWdCGkYEMyMMx7H6NiZ",
+      "tick": "418"
+    },
+    {
+      "state": "srs12AMmCyw3wsxK28Cdg8WPhzdRe4W2V1u6z6MukY52XzMoiASAv8",
+      "tick": "437"
+    },
+    {
+      "state": "srs11dsgEhcACoZfZFioGpSYX2mTZNdtmV2E6CZRM7Ctu3jPjvvVTR",
+      "tick": "456"
+    },
+    {
+      "state": "srs11orZFWdbyT5nb3UWV8Gp76ZUq57aUXaXhQiLYLVD9qW8VVgijJ",
+      "tick": "475"
+    },
+    {
+      "state": "srs12zM6jTWMXtgAyJgEt4uR7ZNv8b2zjNBBNy6t2k8EyEhJ31rhBV",
+      "tick": "494"
+    },
+    {
+      "state": "srs11nZY6GFt1bDrgANFKSb5EfzWQ1tx4ioyWY1ZkSRhKRujXG7PhM",
+      "tick": "513"
+    },
+    {
+      "state": "srs12yo5wkoFZjL6cHgPPMqzz2HZ5Y4ThYejfhB5QUqhAzrk7UJBGW",
+      "tick": "532"
+    },
+    {
+      "state": "srs13DpzUuwPEBhHBxr2CfRcyycJZYxRTjWJ4GBy4HfzNiNxkjW1mS",
+      "tick": "551"
+    },
+    {
+      "state": "srs11pWX2JdSoTB4vdvEBnZFhkKujFyYHFFtnbLUKhduJnriGYWbHM",
+      "tick": "570"
+    },
+    {
+      "tick": "589"
+    },
+    {
+      "tick": "629"
+    }
+  ]
+}
+
+
+{
+  "opponent": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+  "start_tick": "236",
+  "end_tick": "237",
+  "dissection": [
+    {
+      "state": "srs12hEz4xo8JgnSaaJQFGpa9JbASVeZUt5CTBtaRQZMwTawbn2H6X",
+      "tick": "236"
+    },
+    {
+      "state": "srs12bo57GfkUkpNopgptNPbtz68dZfojHbyC6ubeJVgptm6vBVSns",
+      "tick": "237"
+    }
+  ]
+}

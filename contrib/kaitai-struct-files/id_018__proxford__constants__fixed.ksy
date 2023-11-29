@@ -43,6 +43,8 @@ seq:
   type: u1
 - id: michelson_maximum_type_size
   type: u2
+- id: max_slashing_period
+  type: u1
 - id: smart_rollup_max_wrapped_proof_binary_size
   type: int31
 - id: smart_rollup_message_size_limit

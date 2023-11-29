@@ -27,6 +27,7 @@ Test that the chain reaches the 5th level.
 *)
 
 let test_level_5 () =
+  let open Lwt_result_syntax in
   let level_to_reach = 5l in
   let module Hooks : Hooks = struct
     include Default_hooks
@@ -42,8 +43,8 @@ let test_level_5 () =
       (* Make sure that all decided blocks have been decided at round 0. *)
       let round_is_zero block =
         let level = block.rpc_context.block_header.level in
-        get_block_round block >>=? fun round ->
-        if Int32.equal round 0l then return ()
+        let* round = get_block_round block in
+        if Int32.equal round 0l then return_unit
         else failwith "block at level %ld was selected at round %ld" level round
       in
       List.iter_es round_is_zero chain
@@ -127,6 +128,7 @@ let test_preattest_on_valid () =
   run ~config [(1, (module Hooks))]
 
 let test_reset_delayed_pqc () =
+  let open Lwt_syntax in
   let module Hooks : Hooks = struct
     include Default_hooks
 
@@ -135,8 +137,9 @@ let test_reset_delayed_pqc () =
     let trigger = ref false
 
     let on_new_operation x =
-      (if !should_wait then Lwt_unix.sleep 0.5 else Lwt_unix.sleep 0.2)
-      >>= fun () ->
+      let* () =
+        if !should_wait then Lwt_unix.sleep 0.5 else Lwt_unix.sleep 0.2
+      in
       if !trigger then (
         trigger := false ;
         Lwt.return_none)
@@ -155,7 +158,7 @@ let test_reset_delayed_pqc () =
         block_header.Block_header.shell.level = 1l
         && Protocol.Alpha_context.Round.(block_round = zero)
       then (
-        Lwt_unix.sleep 1. >>= fun () ->
+        let* () = Lwt_unix.sleep 1. in
         should_wait := false ;
         trigger := true ;
         Lwt.return_some (block_hash, block_header))
@@ -175,7 +178,7 @@ let test_reset_delayed_pqc () =
     let check_chain_on_success ~chain =
       let head = Stdlib.List.hd chain in
       if head.rpc_context.block_header.level = 1l then failwith "baker is stuck"
-      else return_unit
+      else return_ok_unit
   end in
   let config = {default_config with round0 = 2L; round1 = 3L; timeout = 50} in
   run ~config [(1, (module Hooks))]
@@ -194,6 +197,7 @@ Scenario T1
 *)
 
 let test_scenario_t1 () =
+  let open Lwt_result_syntax in
   let original_proposal = ref None in
   let a_preattested = ref false in
   let b_preattested = ref false in
@@ -220,40 +224,46 @@ let test_scenario_t1 () =
 
     let check_block_before_processing ~level ~round ~block_hash ~block_header
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
-      (match (!b_attested, level, round) with
-      | false, 1l, 0l ->
-          (* If any of the checks fails the whole scenario will fail. *)
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap1
-          >>=? fun () ->
-          save_proposal_payload ~protocol_data ~var:original_proposal
-      | true, 1l, 1l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap2
-          >>=? fun () ->
-          verify_payload_hash
-            ~protocol_data
-            ~original_proposal
-            ~message:"a new block proposed instead of reproposal"
-          >>=? fun () ->
-          b_reproposed := true ;
-          return_unit
-      | _ -> failwith "unexpected level = %ld / round = %ld" level round)
-      >>=? fun () -> return_unit
+      let* () =
+        match (!b_attested, level, round) with
+        | false, 1l, 0l ->
+            (* If any of the checks fails the whole scenario will fail. *)
+            let* () =
+              check_block_signature
+                ~block_hash
+                ~block_header
+                ~public_key:Mockup_simulator.bootstrap1
+            in
+            save_proposal_payload ~protocol_data ~var:original_proposal
+        | true, 1l, 1l ->
+            let* () =
+              check_block_signature
+                ~block_hash
+                ~block_header
+                ~public_key:Mockup_simulator.bootstrap2
+            in
+            let* () =
+              verify_payload_hash
+                ~protocol_data
+                ~original_proposal
+                ~message:"a new block proposed instead of reproposal"
+            in
+            b_reproposed := true ;
+            return_unit
+        | _ -> failwith "unexpected level = %ld / round = %ld" level round
+      in
+      return_unit
 
     let check_mempool_after_processing ~mempool =
-      mempool_has_op_ref
-        ~mempool
-        ~predicate:
-          (op_is_both
-             (op_is_signed_by ~public_key:Mockup_simulator.bootstrap2)
-             (op_is_preattestation ~level:1l ~round:0l))
-        ~var:b_preattested
-      >>=? fun () ->
+      let* () =
+        mempool_has_op_ref
+          ~mempool
+          ~predicate:
+            (op_is_both
+               (op_is_signed_by ~public_key:Mockup_simulator.bootstrap2)
+               (op_is_preattestation ~level:1l ~round:0l))
+          ~var:b_preattested
+      in
       mempool_has_op_ref
         ~mempool
         ~predicate:
@@ -283,6 +293,7 @@ Scenario T2
 *)
 
 let test_scenario_t2 () =
+  let open Lwt_result_syntax in
   let b_proposed = ref false in
   let module Node_a_hooks : Hooks = struct
     include Default_hooks
@@ -298,11 +309,12 @@ let test_scenario_t2 () =
          proposal for level 1 at round 1. *)
       match (level, round) with
       | 1l, 1l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap2
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap2
+          in
           b_proposed := true ;
           return_unit
       | _ -> failwith "unexpected level = %ld / round = %ld" level round
@@ -346,6 +358,7 @@ Scenario T3
 *)
 
 let test_scenario_t3 () =
+  let open Lwt_result_syntax in
   let b_observed_pqc = ref false in
   let original_proposal = ref None in
   let we_are_done = ref false in
@@ -356,8 +369,9 @@ let test_scenario_t3 () =
     let on_inject_operation ~op_hash ~op =
       if !b_observed_pqc then return (op_hash, op, [Pass; Pass; Pass; Pass])
       else
-        op_is_preattestation ~level:1l ~round:0l op_hash op
-        >>=? fun is_preattestation ->
+        let* is_preattestation =
+          op_is_preattestation ~level:1l ~round:0l op_hash op
+        in
         if is_preattestation then
           return (op_hash, op, [Pass; Pass; Block; Block])
         else failwith "unexpected operation from the node D"
@@ -371,17 +385,19 @@ let test_scenario_t3 () =
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
       match (level, round) with
       | 1l, 2l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap2
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap2
+          in
           we_are_done := true ;
-          verify_payload_hash
-            ~protocol_data
-            ~original_proposal
-            ~message:"a new block proposed instead of reproposal"
-          >>=? fun () ->
+          let* () =
+            verify_payload_hash
+              ~protocol_data
+              ~original_proposal
+              ~message:"a new block proposed instead of reproposal"
+          in
           return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
       | _ ->
           failwith
@@ -392,8 +408,9 @@ let test_scenario_t3 () =
     let on_inject_operation ~op_hash ~op =
       if !b_observed_pqc then return (op_hash, op, [Pass; Pass; Pass; Pass])
       else
-        op_is_preattestation ~level:1l ~round:0l op_hash op
-        >>=? fun is_preattestation ->
+        let* is_preattestation =
+          op_is_preattestation ~level:1l ~round:0l op_hash op
+        in
         if is_preattestation then
           return (op_hash, op, [Block; Pass; Block; Block])
         else failwith "unexpected operation from the node B"
@@ -402,7 +419,7 @@ let test_scenario_t3 () =
       let predicate op_hash op =
         op_is_preattestation ~level:1l ~round:0l op_hash op
       in
-      mempool_count_ops ~mempool ~predicate >>=? fun n ->
+      let* n = mempool_count_ops ~mempool ~predicate in
       if n > 3 then
         failwith "B received too many preattestations, expected to see only 3"
       else if n = 3 then (
@@ -419,13 +436,15 @@ let test_scenario_t3 () =
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
       match (level, round) with
       | 1l, 0l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap3
-          >>=? fun () ->
-          save_proposal_payload ~protocol_data ~var:original_proposal
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap3
+          in
+          let* () =
+            save_proposal_payload ~protocol_data ~var:original_proposal
+          in
           return
             (block_hash, block_header, operations, [Pass; Pass; Pass; Block])
       | _ ->
@@ -437,8 +456,9 @@ let test_scenario_t3 () =
     let on_inject_operation ~op_hash ~op =
       if !b_observed_pqc then return (op_hash, op, [Pass; Pass; Pass; Pass])
       else
-        op_is_preattestation ~level:1l ~round:0l op_hash op
-        >>=? fun is_preattestation ->
+        let* is_preattestation =
+          op_is_preattestation ~level:1l ~round:0l op_hash op
+        in
         if is_preattestation then
           return (op_hash, op, [Block; Pass; Pass; Block])
         else failwith "unexpected operation from the node C"
@@ -627,6 +647,7 @@ Scenario F1
 *)
 
 let test_scenario_f1 () =
+  let open Lwt_result_syntax in
   let c_proposed_l1_r0 = ref false in
   let d_proposed_l1_r1 = ref false in
   let a_proposed_l2_r0 = ref false in
@@ -646,14 +667,16 @@ let test_scenario_f1 () =
         ~protocol_data:_ =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1, level, round) with
       | true, true, 2l, 0l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap1
-          >>=? fun () ->
-          (a_proposed_l2_r0 := true ;
-           return_unit)
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap1
+          in
+          let* () =
+            a_proposed_l2_r0 := true ;
+            return_unit
+          in
           return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
@@ -685,14 +708,16 @@ let test_scenario_f1 () =
         ~protocol_data:_ =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1, level, round) with
       | false, false, 1l, 0l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap3
-          >>=? fun () ->
-          (c_proposed_l1_r0 := true ;
-           return_unit)
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap3
+          in
+          let* () =
+            c_proposed_l1_r0 := true ;
+            return_unit
+          in
           return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
@@ -714,14 +739,16 @@ let test_scenario_f1 () =
         ~protocol_data:_ =
       match (!d_proposed_l1_r1, level, round) with
       | false, 1l, 1l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap4
-          >>=? fun () ->
-          (d_proposed_l1_r1 := true ;
-           return_unit)
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap4
+          in
+          let* () =
+            d_proposed_l1_r1 := true ;
+            return_unit
+          in
           return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
@@ -1045,6 +1072,7 @@ Scenario M4
 *)
 
 let test_scenario_m4 () =
+  let open Lwt_result_syntax in
   let a_observed_qc = ref false in
   let stop_on_event0 _ = !a_observed_qc in
   let module Node_a_hooks : Hooks = struct
@@ -1054,11 +1082,12 @@ let test_scenario_m4 () =
         ~protocol_data:_ =
       match (level, round) with
       | 1l, 0l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap1
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap1
+          in
           return
             (block_hash, block_header, operations, [Pass; Pass; Pass; Delay 0.5])
       | _ ->
@@ -1071,7 +1100,7 @@ let test_scenario_m4 () =
       let predicate op_hash op =
         op_is_attestation ~level:1l ~round:0l op_hash op
       in
-      mempool_count_ops ~mempool ~predicate >>=? fun n ->
+      let* n = mempool_count_ops ~mempool ~predicate in
       if n > 3 then
         failwith "A received too many attestations, expected to see only 3"
       else if n = 3 then (
@@ -1090,8 +1119,7 @@ let test_scenario_m4 () =
     include Default_hooks
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_attestation ->
+      let* is_attestation = op_is_attestation ~level:1l ~round:0l op_hash op in
       return
         ( op_hash,
           op,
@@ -1147,6 +1175,7 @@ Scenario M5
 *)
 
 let test_scenario_m5 () =
+  let open Lwt_result_syntax in
   let stop_on_event0 = function
     | Baking_state.New_head_proposal {block; _} -> block.shell.level >= 2l
     | _ -> false
@@ -1158,11 +1187,12 @@ let test_scenario_m5 () =
         ~protocol_data:_ =
       match (level, round) with
       | 1l, 0l ->
-          check_block_signature
-            ~block_hash
-            ~block_header
-            ~public_key:Mockup_simulator.bootstrap1
-          >>=? fun () ->
+          let* () =
+            check_block_signature
+              ~block_hash
+              ~block_header
+              ~public_key:Mockup_simulator.bootstrap1
+          in
           return
             (block_hash, block_header, operations, [Pass; Pass; Pass; Delay 1.0])
       | _ ->
@@ -1233,6 +1263,7 @@ Scenario M6
 *)
 
 let test_scenario_m6 () =
+  let open Lwt_result_syntax in
   let b_proposal_2_1 = ref None in
   let stop_on_event0 = function
     | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
@@ -1251,8 +1282,9 @@ let test_scenario_m6 () =
       return (block_hash, block_header, operations, propagation_vector)
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_attestation ->
+      let* is_a10_attestation =
+        op_is_attestation ~level:1l ~round:0l op_hash op
+      in
       return
         ( op_hash,
           op,
@@ -1275,18 +1307,22 @@ let test_scenario_m6 () =
 
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data =
-      (match (level, round) with
-      | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
-      | 2l, 1l ->
-          save_proposal_payload ~protocol_data ~var:b_proposal_2_1
-          >>=? fun () -> return [Pass; Pass; Pass; Pass]
-      | _ -> return [Pass; Pass; Pass; Pass])
-      >>=? fun propagation_vector ->
+      let* propagation_vector =
+        match (level, round) with
+        | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
+        | 2l, 1l ->
+            let* () =
+              save_proposal_payload ~protocol_data ~var:b_proposal_2_1
+            in
+            return [Pass; Pass; Pass; Pass]
+        | _ -> return [Pass; Pass; Pass; Pass]
+      in
       return (block_hash, block_header, operations, propagation_vector)
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_attestation ->
+      let* is_a10_attestation =
+        op_is_attestation ~level:1l ~round:0l op_hash op
+      in
       return
         ( op_hash,
           op,
@@ -1303,8 +1339,9 @@ let test_scenario_m6 () =
       return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_attestation ->
+      let* is_a10_attestation =
+        op_is_attestation ~level:1l ~round:0l op_hash op
+      in
       return
         ( op_hash,
           op,
@@ -1361,6 +1398,7 @@ The same as M6, but:
 *)
 
 let test_scenario_m7 () =
+  let open Lwt_result_syntax in
   let a_proposal_2_1 = ref None in
   let c_received_2_1 = ref false in
   let d_received_2_1 = ref false in
@@ -1385,15 +1423,17 @@ let test_scenario_m7 () =
 
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data =
-      (match (level, round) with
-      | 2l, 1l -> save_proposal_payload ~protocol_data ~var:a_proposal_2_1
-      | _ -> return_unit)
-      >>=? fun () ->
+      let* () =
+        match (level, round) with
+        | 2l, 1l -> save_proposal_payload ~protocol_data ~var:a_proposal_2_1
+        | _ -> return_unit
+      in
       return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_attestation ->
+      let* is_a10_attestation =
+        op_is_attestation ~level:1l ~round:0l op_hash op
+      in
       return
         ( op_hash,
           op,
@@ -1409,19 +1449,20 @@ let test_scenario_m7 () =
 
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
-      (match (level, round) with
-      | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
-      | 2l, 0l -> return [Block; Pass; Pass; Pass]
-      | _ -> return [Pass; Pass; Pass; Pass])
-      >>=? fun propagation_vector ->
+      let* propagation_vector =
+        match (level, round) with
+        | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
+        | 2l, 0l -> return [Block; Pass; Pass; Pass]
+        | _ -> return [Pass; Pass; Pass; Pass]
+      in
       return (block_hash, block_header, operations, propagation_vector)
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_attestation ->
-      op_is_preattestation ~level:2l op_hash op
-      >>=? fun level2_preattestation ->
-      op_is_attestation ~level:2l op_hash op >>=? fun level2_attestation ->
+      let* is_a10_attestation =
+        op_is_attestation ~level:1l ~round:0l op_hash op
+      in
+      let* level2_preattestation = op_is_preattestation ~level:2l op_hash op in
+      let* level2_attestation = op_is_attestation ~level:2l op_hash op in
       let propagation_vector =
         match
           (is_a10_attestation, level2_preattestation, level2_attestation)
@@ -1455,11 +1496,11 @@ let test_scenario_m7 () =
       | _ -> return_unit
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_attestation ->
-      op_is_preattestation ~level:2l op_hash op
-      >>=? fun level2_preattestation ->
-      op_is_attestation ~level:2l op_hash op >>=? fun level2_attestation ->
+      let* is_a10_attestation =
+        op_is_attestation ~level:1l ~round:0l op_hash op
+      in
+      let* level2_preattestation = op_is_preattestation ~level:2l op_hash op in
+      let* level2_attestation = op_is_attestation ~level:2l op_hash op in
       let propagation_vector =
         match
           ( is_a10_attestation,
@@ -1496,11 +1537,11 @@ let test_scenario_m7 () =
       | _ -> return_unit
 
     let on_inject_operation ~op_hash ~op =
-      op_is_attestation ~level:1l ~round:0l op_hash op
-      >>=? fun is_a10_attestation ->
-      op_is_preattestation ~level:2l op_hash op
-      >>=? fun level2_preattestation ->
-      op_is_attestation ~level:2l op_hash op >>=? fun level2_attestation ->
+      let* is_a10_attestation =
+        op_is_attestation ~level:1l ~round:0l op_hash op
+      in
+      let* level2_preattestation = op_is_preattestation ~level:2l op_hash op in
+      let* level2_attestation = op_is_attestation ~level:2l op_hash op in
       let propagation_vector =
         match
           ( is_a10_attestation,
@@ -1567,18 +1608,22 @@ Scenario M8
 *)
 
 let test_scenario_m8 () =
+  let open Lwt_result_syntax in
   let b_proposal_2_0 = ref None in
   let stop_on_event0 = function
     | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
     | _ -> false
   in
   let on_inject_operation0 ~op_hash ~op =
-    op_is_attestation ~level:1l ~round:0l op_hash op
-    >>=? fun is_a10_attestation ->
-    op_is_attestation ~level:2l ~round:0l op_hash op
-    >>=? fun is_b20_attestation ->
-    op_is_attestation ~level:2l ~round:1l op_hash op
-    >>=? fun is_c21_attestation ->
+    let* is_a10_attestation =
+      op_is_attestation ~level:1l ~round:0l op_hash op
+    in
+    let* is_b20_attestation =
+      op_is_attestation ~level:2l ~round:0l op_hash op
+    in
+    let* is_c21_attestation =
+      op_is_attestation ~level:2l ~round:1l op_hash op
+    in
     let propagation_vector =
       if is_a10_attestation then [Pass; Block; Block; Block]
       else if is_b20_attestation || is_c21_attestation then
@@ -1617,13 +1662,16 @@ let test_scenario_m8 () =
 
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data =
-      (match (level, round) with
-      | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
-      | 2l, 0l ->
-          save_proposal_payload ~protocol_data ~var:b_proposal_2_0
-          >>=? fun () -> return [Block; Pass; Pass; Pass]
-      | _ -> return [Pass; Pass; Pass; Pass])
-      >>=? fun propagation_vector ->
+      let* propagation_vector =
+        match (level, round) with
+        | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
+        | 2l, 0l ->
+            let* () =
+              save_proposal_payload ~protocol_data ~var:b_proposal_2_0
+            in
+            return [Block; Pass; Pass; Pass]
+        | _ -> return [Pass; Pass; Pass; Pass]
+      in
       return (block_hash, block_header, operations, propagation_vector)
 
     let on_inject_operation = on_inject_operation0

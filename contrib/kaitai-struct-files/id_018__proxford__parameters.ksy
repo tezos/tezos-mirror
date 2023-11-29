@@ -12,7 +12,7 @@ types:
     - id: max_bonus
       type: s8
     - id: growth_rate
-      type: s8
+      type: growth_rate
     - id: center_dz
       type: center_dz
     - id: radius_dz
@@ -109,6 +109,12 @@ types:
       type: bytes_dyn_uint30
     - id: parameters_ty
       type: bytes_dyn_uint30
+    - id: whitelist_tag
+      type: u1
+      enum: bool
+    - id: whitelist
+      type: whitelist_0
+      if: (whitelist_tag == bool::true)
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
@@ -166,6 +172,12 @@ types:
       type: int31
     - id: number_of_shards
       type: u2
+  growth_rate:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   id_018__proxford__mutez:
     seq:
     - id: id_018__proxford__mutez
@@ -350,6 +362,27 @@ types:
       type: s4
     - id: dal_page
       type: s4
+    - id: dal_parameters
+      type: s4
+  whitelist:
+    seq:
+    - id: whitelist_entries
+      type: whitelist_entries
+      repeat: eos
+  whitelist_0:
+    seq:
+    - id: len_whitelist
+      type: u4
+      valid:
+        max: 1073741823
+    - id: whitelist
+      type: whitelist
+      size: len_whitelist
+  whitelist_entries:
+    seq:
+    - id: signature__public_key_hash
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   z:
     seq:
     - id: has_tail
@@ -386,6 +419,7 @@ enums:
   pvm_kind:
     0: arith
     1: wasm_2_0_0
+    2: riscv
 seq:
 - id: bootstrap_accounts
   type: bootstrap_accounts_0
@@ -459,8 +493,6 @@ seq:
   type: int31
 - id: minimal_participation_ratio
   type: minimal_participation_ratio
-- id: max_slashing_period
-  type: int31
 - id: limit_of_delegation_over_baking
   type: u1
 - id: percentage_of_frozen_deposits_slashed_per_double_baking
@@ -488,9 +520,6 @@ seq:
   type: s1
 - id: dal_parametric
   type: dal_parametric
-- id: smart_rollup_enable
-  type: u1
-  enum: bool
 - id: smart_rollup_arith_pvm_enable
   type: u1
   enum: bool
@@ -518,6 +547,12 @@ seq:
   type: int31
 - id: smart_rollup_reveal_activation_level
   type: smart_rollup_reveal_activation_level
+- id: smart_rollup_private_enable
+  type: u1
+  enum: bool
+- id: smart_rollup_riscv_pvm_enable
+  type: u1
+  enum: bool
 - id: zk_rollup_enable
   type: u1
   enum: bool
@@ -535,3 +570,9 @@ seq:
   type: s4
 - id: adaptive_rewards_params
   type: adaptive_rewards_params
+- id: adaptive_issuance_activation_vote_enable
+  type: u1
+  enum: bool
+- id: autostaking_enable
+  type: u1
+  enum: bool

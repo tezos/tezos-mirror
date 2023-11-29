@@ -64,7 +64,7 @@ let assert_fails ~loc ?error m =
         Stdlib.failwith msg
     | _, None ->
         (* Any error is ok. *)
-        return ()
+        return_unit
   in
   match res with
   | Ok _ -> Stdlib.failwith "Expected failure"
@@ -166,19 +166,23 @@ let assert_equal_ticket_token_diffs ctxt ~loc ticket_diffs
   (* Sort destinations by contract and the strings alphabetically so that order
      does not matter for comparison. *)
   let sorted_strings ticket_diffs =
-    List.map
-      (fun {ticket_token; total_amount; destinations} ->
-        {
-          ticket_token;
-          total_amount;
-          destinations =
-            List.sort
-              (fun (c1, _) (c2, _) -> Destination.compare c1 c2)
-              destinations;
-        })
-      ticket_diffs
-    |> List.map_es (string_of_ticket_operations_diff ctxt)
-    >|=? List.sort String.compare
+    let ticket_diffs =
+      List.map
+        (fun {ticket_token; total_amount; destinations} ->
+          {
+            ticket_token;
+            total_amount;
+            destinations =
+              List.sort
+                (fun (c1, _) (c2, _) -> Destination.compare c1 c2)
+                destinations;
+          })
+        ticket_diffs
+    in
+    let+ strings =
+      List.map_es (string_of_ticket_operations_diff ctxt) ticket_diffs
+    in
+    List.sort String.compare strings
   in
   let* exp_str_diffs = sorted_strings expected in
   let* str_diffs =
@@ -200,7 +204,8 @@ let string_token ~ticketer content =
 
 (** Initializes one address for operations and one baker. *)
 let init () =
-  Context.init2 ~consensus_threshold:0 () >|=? fun (block, (src0, src1)) ->
+  let open Lwt_result_wrap_syntax in
+  let+ block, (src0, src1) = Context.init2 ~consensus_threshold:0 () in
   let baker = Context.Contract.pkh src0 in
   (baker, src1, block)
 
@@ -224,22 +229,25 @@ let originate block ~script ~storage ~sender ~baker ~forges_tickets =
   let* incr =
     Incremental.add_operation
       ?expect_apply_failure:
-        (if forges_tickets then Some (fun _ -> return ()) else None)
+        (if forges_tickets then Some (fun _ -> return_unit) else None)
       incr
       operation
   in
   let script = (code, storage) in
-  Incremental.finalize_block incr >|=? fun block -> (destination, script, block)
+  let+ block = Incremental.finalize_block incr in
+  (destination, script, block)
 
 let two_ticketers block =
   let open Lwt_result_wrap_syntax in
-  let* ctxt =
-    Incremental.begin_construction block >|=? Incremental.alpha_ctxt
-  in
-  let* cs = Lwt.map Result.ok @@ Contract.list ctxt in
+  let* result = Incremental.begin_construction block in
+  let ctxt = Incremental.alpha_ctxt result in
+  let*! cs = Contract.list ctxt in
   match cs with c1 :: c2 :: _ -> return (c1, c2) | _ -> assert false
 
-let one_ticketer block = two_ticketers block >|=? fst
+let one_ticketer block =
+  let open Lwt_result_wrap_syntax in
+  let+ c1, _c2 = two_ticketers block in
+  c1
 
 let nat n = Script_int.(abs @@ of_int n)
 
@@ -367,18 +375,22 @@ let ticket_big_map_script =
   |}
 
 let list_ticket_string_ty =
-  ticket_t Micheline.dummy_location string_t >>? fun ticket_ty ->
+  let open Result_syntax in
+  let* ticket_ty = ticket_t Micheline.dummy_location string_t in
   list_t Micheline.dummy_location ticket_ty
 
 let make_ticket (ticketer, contents, amount) =
-  Script_string.of_string contents >>?= fun contents ->
+  let open Lwt_result_syntax in
+  let*? contents = Script_string.of_string contents in
   let amount = nat amount in
-  Option.value_e
-    ~error:
-      (Environment.Error_monad.trace_of_error
-         Script_tc_errors.Forbidden_zero_ticket_quantity)
-  @@ Ticket_amount.of_n amount
-  >>?= fun amount -> return {ticketer; contents; amount}
+  let*? amount =
+    Option.value_e
+      ~error:
+        (Environment.Error_monad.trace_of_error
+           Script_tc_errors.Forbidden_zero_ticket_quantity)
+    @@ Ticket_amount.of_n amount
+  in
+  return {ticketer; contents; amount}
 
 let make_tickets ts =
   let open Lwt_result_wrap_syntax in
@@ -387,7 +399,7 @@ let make_tickets ts =
 
 let transfer_tickets_operation ~incr ~sender ~destination tickets =
   let open Lwt_result_wrap_syntax in
-  let*? parameters_ty = Environment.wrap_tzresult list_ticket_string_ty in
+  let*?@ parameters_ty = list_ticket_string_ty in
   let*@ parameters = make_tickets tickets in
   transfer_operation ~incr ~sender ~destination ~parameters_ty ~parameters
 
@@ -1132,13 +1144,8 @@ let test_transfer_big_map_with_tickets () =
       ~forges_tickets:false
   in
   let open Lwt_result_syntax in
-  let*? value_type =
-    Environment.wrap_tzresult @@ ticket_t Micheline.dummy_location string_t
-  in
-  let*? parameters_ty =
-    Environment.wrap_tzresult
-    @@ big_map_t Micheline.dummy_location int_t value_type
-  in
+  let*?@ value_type = ticket_t Micheline.dummy_location string_t in
+  let*?@ parameters_ty = big_map_t Micheline.dummy_location int_t value_type in
   let parameters =
     Big_map
       {

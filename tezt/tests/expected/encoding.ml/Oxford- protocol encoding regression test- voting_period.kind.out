@@ -1,0 +1,24 @@
+
+./octez-codec encode 018-Proxford.voting_period.kind from '"promotion"'
+03
+
+./octez-codec decode 018-Proxford.voting_period.kind from 03
+"promotion"
+
+./octez-codec encode 018-Proxford.voting_period.kind from '"proposal"'
+00
+
+./octez-codec decode 018-Proxford.voting_period.kind from 00
+"proposal"
+
+./octez-codec encode 018-Proxford.voting_period.kind from '"exploration"'
+01
+
+./octez-codec decode 018-Proxford.voting_period.kind from 01
+"exploration"
+
+./octez-codec encode 018-Proxford.voting_period.kind from '"cooldown"'
+02
+
+./octez-codec decode 018-Proxford.voting_period.kind from 02
+"cooldown"

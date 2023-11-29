@@ -12,7 +12,7 @@ types:
     - id: max_bonus
       type: s8
     - id: growth_rate
-      type: s8
+      type: growth_rate
     - id: center_dz
       type: center_dz
     - id: radius_dz
@@ -44,6 +44,12 @@ types:
       type: int31
     - id: number_of_shards
       type: u2
+  growth_rate:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   id_018__proxford__mutez:
     seq:
     - id: id_018__proxford__mutez
@@ -132,6 +138,8 @@ types:
       type: s4
     - id: dal_page
       type: s4
+    - id: dal_parameters
+      type: s4
   z:
     seq:
     - id: has_tail
@@ -207,8 +215,6 @@ seq:
   type: int31
 - id: minimal_participation_ratio
   type: minimal_participation_ratio
-- id: max_slashing_period
-  type: int31
 - id: limit_of_delegation_over_baking
   type: u1
 - id: percentage_of_frozen_deposits_slashed_per_double_baking
@@ -236,9 +242,6 @@ seq:
   type: s1
 - id: dal_parametric
   type: dal_parametric
-- id: smart_rollup_enable
-  type: u1
-  enum: bool
 - id: smart_rollup_arith_pvm_enable
   type: u1
   enum: bool
@@ -266,6 +269,12 @@ seq:
   type: int31
 - id: smart_rollup_reveal_activation_level
   type: smart_rollup_reveal_activation_level
+- id: smart_rollup_private_enable
+  type: u1
+  enum: bool
+- id: smart_rollup_riscv_pvm_enable
+  type: u1
+  enum: bool
 - id: zk_rollup_enable
   type: u1
   enum: bool
@@ -283,3 +292,9 @@ seq:
   type: s4
 - id: adaptive_rewards_params
   type: adaptive_rewards_params
+- id: adaptive_issuance_activation_vote_enable
+  type: u1
+  enum: bool
+- id: autostaking_enable
+  type: u1
+  enum: bool

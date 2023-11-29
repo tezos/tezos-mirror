@@ -38,27 +38,25 @@ open Protocol
 open Alpha_context
 open Test_tez
 
-let wrap e = Lwt.return (Environment.wrap_tzresult e)
-
 (** Check that [Delegate.staking_balance] is the same as [Delegate.full_balance]
    (this is not true in general, but in these tests it is because they only deal
    with self-delegation. Also, check that [Delegate.staking_balance] coincides
    with [Stake_storage.Internal_for_tests.get] when the account is active and it
    has the minimal required stake. *)
 let check_stake ~loc (b : Block.t) (account : Account.t) =
-  Context.Delegate.staking_balance (B b) account.pkh >>=? fun staking_balance ->
-  Context.Delegate.full_balance (B b) account.pkh >>=? fun full_balance ->
-  Assert.equal_tez ~loc full_balance staking_balance >>=? fun () ->
-  Raw_context.prepare
-    b.context
-    ~level:b.header.shell.level
-    ~predecessor_timestamp:b.header.shell.timestamp
-    ~timestamp:b.header.shell.timestamp
-    ~adaptive_issuance_enable:false
-  >>= wrap
-  >>=? fun ctxt ->
-  Stake_storage.Internal_for_tests.get ctxt account.pkh >>= wrap
-  >>=? fun stake ->
+  let open Lwt_result_wrap_syntax in
+  let* staking_balance = Context.Delegate.staking_balance (B b) account.pkh in
+  let* full_balance = Context.Delegate.full_balance (B b) account.pkh in
+  let* () = Assert.equal_tez ~loc full_balance staking_balance in
+  let*@ ctxt =
+    Raw_context.prepare
+      b.context
+      ~level:b.header.shell.level
+      ~predecessor_timestamp:b.header.shell.timestamp
+      ~timestamp:b.header.shell.timestamp
+      ~adaptive_issuance_enable:false
+  in
+  let*@ stake = Stake_storage.Internal_for_tests.get ctxt account.pkh in
   Assert.equal_int64
     ~loc
     (Tez_repr.to_mutez stake)
@@ -72,87 +70,98 @@ let check_stake ~loc (b : Block.t) (account : Account.t) =
    is no longer in [Active_delegate_with_minimal_stake] because of deactivation,
    see [Stake_storage].) *)
 let check_no_stake ~loc (b : Block.t) (account : Account.t) =
-  Raw_context.prepare
-    b.context
-    ~level:b.header.shell.level
-    ~predecessor_timestamp:b.header.shell.timestamp
-    ~timestamp:b.header.shell.timestamp
-    ~adaptive_issuance_enable:false
-  >>= wrap
-  >>=? fun ctxt ->
-  Stake_storage.Internal_for_tests.get ctxt account.pkh >>= wrap
-  >>=? fun stake -> Assert.equal_int64 ~loc (Tez_repr.to_mutez stake) 0L
+  let open Lwt_result_wrap_syntax in
+  let*@ ctxt =
+    Raw_context.prepare
+      b.context
+      ~level:b.header.shell.level
+      ~predecessor_timestamp:b.header.shell.timestamp
+      ~timestamp:b.header.shell.timestamp
+      ~adaptive_issuance_enable:false
+  in
+  let*@ stake = Stake_storage.Internal_for_tests.get ctxt account.pkh in
+  Assert.equal_int64 ~loc (Tez_repr.to_mutez stake) 0L
 
 (** Create a block with two initialized contracts/accounts. Assert
     that the first account has a staking balance that is equal to its
     own balance, and that its staking rights are consistent
     (check_stake). *)
 let test_simple_staking_rights () =
-  Context.init2 () >>=? fun (b, (a1, _a2)) ->
-  Context.Contract.balance (B b) a1 >>=? fun balance ->
+  let open Lwt_result_syntax in
+  let* b, (a1, _a2) = Context.init2 () in
+  let* balance = Context.Contract.balance (B b) a1 in
   let delegate1 = Context.Contract.pkh a1 in
-  Context.Delegate.current_frozen_deposits (B b) delegate1
-  >>=? fun frozen_deposits ->
+  let* frozen_deposits =
+    Context.Delegate.current_frozen_deposits (B b) delegate1
+  in
   let expected_initial_balance =
     Account.default_initial_balance -! frozen_deposits
   in
-  Assert.equal_tez ~loc:__LOC__ balance expected_initial_balance >>=? fun () ->
-  Context.Contract.manager (B b) a1 >>=? fun m1 ->
-  Context.Delegate.info (B b) m1.pkh >>=? fun info ->
-  Assert.equal_tez
-    ~loc:__LOC__
-    Account.default_initial_balance
-    info.staking_balance
-  >>=? fun () -> check_stake ~loc:__LOC__ b m1
+  let* () = Assert.equal_tez ~loc:__LOC__ balance expected_initial_balance in
+  let* m1 = Context.Contract.manager (B b) a1 in
+  let* info = Context.Delegate.info (B b) m1.pkh in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      Account.default_initial_balance
+      info.staking_balance
+  in
+  check_stake ~loc:__LOC__ b m1
 
 (** Create a block with two initialized contracts/accounts. Bake
     five blocks. Assert that the staking balance of the first account
     equals to its balance. Then both accounts have consistent staking
     rights. *)
 let test_simple_staking_rights_after_baking () =
-  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (a1, a2)) ->
-  Context.Contract.manager (B b) a1 >>=? fun m1 ->
-  Context.Contract.manager (B b) a2 >>=? fun m2 ->
-  Block.bake_n ~policy:(By_account m2.pkh) 5 b >>=? fun b ->
-  Context.Contract.balance (B b) a1 >>=? fun balance ->
+  let open Lwt_result_syntax in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* m1 = Context.Contract.manager (B b) a1 in
+  let* m2 = Context.Contract.manager (B b) a2 in
+  let* b = Block.bake_n ~policy:(By_account m2.pkh) 5 b in
+  let* balance = Context.Contract.balance (B b) a1 in
   let delegate1 = Context.Contract.pkh a1 in
-  Context.Delegate.current_frozen_deposits (B b) delegate1
-  >>=? fun frozen_deposits ->
-  balance +? frozen_deposits >>?= fun full_balance ->
-  Context.Delegate.info (B b) m1.pkh >>=? fun info ->
-  Assert.equal_tez ~loc:__LOC__ full_balance info.staking_balance >>=? fun () ->
-  check_stake ~loc:__LOC__ b m1 >>=? fun () -> check_stake ~loc:__LOC__ b m2
+  let* frozen_deposits =
+    Context.Delegate.current_frozen_deposits (B b) delegate1
+  in
+  let*? full_balance = balance +? frozen_deposits in
+  let* info = Context.Delegate.info (B b) m1.pkh in
+  let* () = Assert.equal_tez ~loc:__LOC__ full_balance info.staking_balance in
+  let* () = check_stake ~loc:__LOC__ b m1 in
+  check_stake ~loc:__LOC__ b m2
 
 let check_active_staking_balance ~loc ~deactivated b (m : Account.t) =
-  Context.Delegate.info (B b) m.pkh >>=? fun info ->
-  Assert.equal_bool ~loc info.deactivated deactivated >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* info = Context.Delegate.info (B b) m.pkh in
+  let* () = Assert.equal_bool ~loc info.deactivated deactivated in
   if deactivated then check_no_stake ~loc b m else check_stake ~loc b m
 
 let run_until_deactivation () =
-  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (a1, a2)) ->
-  Context.Contract.balance (B b) a1 >>=? fun balance_start ->
-  Context.Contract.manager (B b) a1 >>=? fun m1 ->
-  Context.Contract.manager (B b) a2 >>=? fun m2 ->
-  check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m1
-  >>=? fun () ->
-  Context.Delegate.info (B b) m1.pkh >>=? fun info ->
-  Block.bake_until_cycle ~policy:(By_account m2.pkh) info.grace_period b
-  >>=? fun b ->
-  check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m1
-  >>=? fun () ->
-  Block.bake_until_cycle_end ~policy:(By_account m2.pkh) b >>=? fun b ->
-  check_active_staking_balance ~loc:__LOC__ ~deactivated:true b m1
-  >|=? fun () -> (b, ((a1, m1), balance_start), (a2, m2))
+  let open Lwt_result_syntax in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* balance_start = Context.Contract.balance (B b) a1 in
+  let* m1 = Context.Contract.manager (B b) a1 in
+  let* m2 = Context.Contract.manager (B b) a2 in
+  let* () = check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m1 in
+  let* info = Context.Delegate.info (B b) m1.pkh in
+  let* b =
+    Block.bake_until_cycle ~policy:(By_account m2.pkh) info.grace_period b
+  in
+  let* () = check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m1 in
+  let* b = Block.bake_until_cycle_end ~policy:(By_account m2.pkh) b in
+  let+ () = check_active_staking_balance ~loc:__LOC__ ~deactivated:true b m1 in
+  (b, ((a1, m1), balance_start), (a2, m2))
 
 (** From an initialized block with two contracts/accounts, the first
     one is active then deactivated. After baking, check that the
     account is active again. Baking rights are ensured. *)
 let test_deactivation_then_bake () =
-  run_until_deactivation ()
-  >>=? fun ( b,
-             ((_deactivated_contract, deactivated_account), _start_balance),
-             (_a2, _m2) ) ->
-  Block.bake ~policy:(By_account deactivated_account.pkh) b >>=? fun b ->
+  let open Lwt_result_syntax in
+  let* ( b,
+         ((_deactivated_contract, deactivated_account), _start_balance),
+         (_a2, _m2) ) =
+    run_until_deactivation ()
+  in
+  let* b = Block.bake ~policy:(By_account deactivated_account.pkh) b in
   check_active_staking_balance
     ~loc:__LOC__
     ~deactivated:false
@@ -162,139 +171,167 @@ let test_deactivation_then_bake () =
 (** check that an account which is deactivated for [preserved_cycles] cannot be
    part of a committee *)
 let test_a_really_deactivated_account_is_not_in_the_committee () =
-  run_until_deactivation ()
-  >>=? fun ( b,
-             ((_deactivated_contract, deactivated_account), _start_balance),
-             (_a2, m2) ) ->
+  let open Lwt_result_syntax in
+  let* ( b,
+         ((_deactivated_contract, deactivated_account), _start_balance),
+         (_a2, m2) ) =
+    run_until_deactivation ()
+  in
   (* at this point, the deactivated account can either bake (because it still
      has rights) and become active again, or, in case it is inactive for another
      [preserved_cycles], it has no more rights, thus cannot be part of the
      committee. *)
   let constants = Default_parameters.constants_test in
-  Block.bake_until_n_cycle_end
-    (constants.preserved_cycles + 1)
-    ~policy:(By_account m2.pkh)
-    b
-  >>=? fun b ->
-  Plugin.RPC.Baking_rights.get
-    Block.rpc_ctxt
-    ~delegates:[deactivated_account.pkh]
-    b
-  >>=? fun bakers ->
+  let* b =
+    Block.bake_until_n_cycle_end
+      (constants.preserved_cycles + 1)
+      ~policy:(By_account m2.pkh)
+      b
+  in
+  let* bakers =
+    Plugin.RPC.Baking_rights.get
+      Block.rpc_ctxt
+      ~delegates:[deactivated_account.pkh]
+      b
+  in
   match List.hd bakers with Some _ -> assert false | None -> return_unit
 
 (** A deactivated account, after baking with self-delegation, is
     active again. Preservation of its balance is tested. Baking rights
     are ensured. *)
 let test_deactivation_then_self_delegation () =
-  run_until_deactivation ()
-  >>=? fun ( b,
-             ((deactivated_contract, deactivated_account), _start_balance),
-             (_a2, m2) ) ->
-  Op.delegation (B b) deactivated_contract (Some deactivated_account.pkh)
-  >>=? fun self_delegation ->
-  Block.bake ~policy:(By_account m2.pkh) b ~operation:self_delegation
-  >>=? fun b ->
-  check_active_staking_balance
-    ~loc:__LOC__
-    ~deactivated:false
-    b
-    deactivated_account
-  >>=? fun () -> check_stake ~loc:__LOC__ b deactivated_account
+  let open Lwt_result_syntax in
+  let* ( b,
+         ((deactivated_contract, deactivated_account), _start_balance),
+         (_a2, m2) ) =
+    run_until_deactivation ()
+  in
+  let* self_delegation =
+    Op.delegation (B b) deactivated_contract (Some deactivated_account.pkh)
+  in
+  let* b =
+    Block.bake ~policy:(By_account m2.pkh) b ~operation:self_delegation
+  in
+  let* () =
+    check_active_staking_balance
+      ~loc:__LOC__
+      ~deactivated:false
+      b
+      deactivated_account
+  in
+  check_stake ~loc:__LOC__ b deactivated_account
 
 (** A deactivated account, which is emptied (into a newly created sink
     account), then self-delegated, becomes activated. Its balance is
     zero. Baking rights are ensured. *)
 let test_deactivation_then_empty_then_self_delegation () =
-  run_until_deactivation ()
-  >>=? fun ( b,
-             ((deactivated_contract, deactivated_account), _start_balance),
-             (_a2, m2) ) ->
+  let open Lwt_result_syntax in
+  let* ( b,
+         ((deactivated_contract, deactivated_account), _start_balance),
+         (_a2, m2) ) =
+    run_until_deactivation ()
+  in
   (* empty the contract *)
-  Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
+  let* balance = Context.Contract.balance (B b) deactivated_contract in
   let sink_account = Account.new_account () in
   let sink_contract = Contract.Implicit sink_account.pkh in
-  Context.get_constants (B b)
-  >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
+  let* {parametric = {origination_size; cost_per_byte; _}; _} =
+    Context.get_constants (B b)
+  in
+  let*? origination_burn = cost_per_byte *? Int64.of_int origination_size in
   let amount =
     match balance -? origination_burn with Ok r -> r | Error _ -> assert false
   in
-  Op.transaction (B b) deactivated_contract sink_contract amount
-  >>=? fun empty_contract ->
-  Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b
-  >>=? fun b1 ->
+  let* empty_contract =
+    Op.transaction (B b) deactivated_contract sink_contract amount
+  in
+  let* b1 =
+    Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b
+  in
   (* the account is deactivated, the stake is 0. *)
-  check_no_stake ~loc:__LOC__ b deactivated_account >>=? fun () ->
+  let* () = check_no_stake ~loc:__LOC__ b deactivated_account in
   (* self delegation *)
-  Op.delegation (B b1) deactivated_contract (Some deactivated_account.pkh)
-  >>=? fun self_delegation ->
-  Block.bake ~policy:(By_account m2.pkh) ~operation:self_delegation b1
-  >>=? fun b2 ->
-  check_active_staking_balance
-    ~loc:__LOC__
-    ~deactivated:false
-    b2
-    deactivated_account
-  >>=? fun () ->
+  let* self_delegation =
+    Op.delegation (B b1) deactivated_contract (Some deactivated_account.pkh)
+  in
+  let* b2 =
+    Block.bake ~policy:(By_account m2.pkh) ~operation:self_delegation b1
+  in
+  let* () =
+    check_active_staking_balance
+      ~loc:__LOC__
+      ~deactivated:false
+      b2
+      deactivated_account
+  in
   (* the account is activated, the stake is still 0. *)
-  Context.Contract.balance (B b2) deactivated_contract >>=? fun balance ->
+  let* balance = Context.Contract.balance (B b2) deactivated_contract in
   Assert.equal_tez ~loc:__LOC__ Tez.zero balance
 
 (** A deactivated account, which is emptied, then self-delegated, then
     re-credited of the sunk amount, becomes active again. Staking
     rights remain consistent. *)
 let test_deactivation_then_empty_then_self_delegation_then_recredit () =
-  run_until_deactivation ()
-  >>=? fun ( b,
-             ((deactivated_contract, deactivated_account), _start_balance),
-             (_a2, m2) ) ->
+  let open Lwt_result_syntax in
+  let* ( b,
+         ((deactivated_contract, deactivated_account), _start_balance),
+         (_a2, m2) ) =
+    run_until_deactivation ()
+  in
   (* empty the contract *)
-  Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
+  let* balance = Context.Contract.balance (B b) deactivated_contract in
   let sink_account = Account.new_account () in
   let sink_contract = Contract.Implicit sink_account.pkh in
-  Context.get_constants (B b)
-  >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
+  let* {parametric = {origination_size; cost_per_byte; _}; _} =
+    Context.get_constants (B b)
+  in
+  let*? origination_burn = cost_per_byte *? Int64.of_int origination_size in
   let amount =
     match balance -? origination_burn with Ok r -> r | Error _ -> assert false
   in
-  Op.transaction
-    ~force_reveal:true
-    (B b)
-    deactivated_contract
-    sink_contract
-    amount
-  >>=? fun empty_contract ->
-  Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b
-  >>=? fun b0 ->
+  let* empty_contract =
+    Op.transaction
+      ~force_reveal:true
+      (B b)
+      deactivated_contract
+      sink_contract
+      amount
+  in
+  let* b0 =
+    Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b
+  in
   (* the account is deactivated, the stake is 0. *)
-  check_no_stake ~loc:__LOC__ b deactivated_account >>=? fun () ->
+  let* () = check_no_stake ~loc:__LOC__ b deactivated_account in
   (**** self delegation *)
-  Op.delegation (B b0) deactivated_contract (Some deactivated_account.pkh)
-  >>=? fun self_delegation ->
-  Block.bake ~policy:(By_account m2.pkh) ~operation:self_delegation b0
-  >>=? fun b1 ->
+  let* self_delegation =
+    Op.delegation (B b0) deactivated_contract (Some deactivated_account.pkh)
+  in
+  let* b1 =
+    Block.bake ~policy:(By_account m2.pkh) ~operation:self_delegation b0
+  in
   (* the account is still deactivated *)
-  check_no_stake ~loc:__LOC__ b deactivated_account >>=? fun () ->
+  let* () = check_no_stake ~loc:__LOC__ b deactivated_account in
   (**** recredit *)
-  Op.transaction
-    ~force_reveal:true
-    (B b1)
-    sink_contract
-    deactivated_contract
-    amount
-  >>=? fun recredit_contract ->
-  Block.bake ~policy:(By_account m2.pkh) ~operation:recredit_contract b1
-  >>=? fun b2 ->
-  check_active_staking_balance
-    ~loc:__LOC__
-    ~deactivated:false
-    b2
-    deactivated_account
-  >>=? fun () ->
-  Context.Contract.balance (B b2) deactivated_contract >>=? fun balance2 ->
-  Assert.equal_tez ~loc:__LOC__ amount balance2 >>=? fun () ->
+  let* recredit_contract =
+    Op.transaction
+      ~force_reveal:true
+      (B b1)
+      sink_contract
+      deactivated_contract
+      amount
+  in
+  let* b2 =
+    Block.bake ~policy:(By_account m2.pkh) ~operation:recredit_contract b1
+  in
+  let* () =
+    check_active_staking_balance
+      ~loc:__LOC__
+      ~deactivated:false
+      b2
+      deactivated_account
+  in
+  let* balance2 = Context.Contract.balance (B b2) deactivated_contract in
+  let* () = Assert.equal_tez ~loc:__LOC__ amount balance2 in
   check_stake ~loc:__LOC__ b2 deactivated_account
 
 (** Initialize a block with two contracts/accounts. A third new account is also
@@ -305,35 +342,33 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
    be activated. Again, consistency for baking rights are preserved for the
    first and third accounts. *)
 let test_delegation () =
-  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (a1, a2)) ->
+  let open Lwt_result_syntax in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
   let m3 = Account.new_account () in
   Account.add_account m3 ;
-  Context.Contract.manager (B b) a1 >>=? fun m1 ->
-  Context.Contract.manager (B b) a2 >>=? fun m2 ->
+  let* m1 = Context.Contract.manager (B b) a1 in
+  let* m2 = Context.Contract.manager (B b) a2 in
   let a3 = Contract.Implicit m3.pkh in
-  Context.Contract.delegate_opt (B b) a1 >>=? fun delegate ->
+  let* delegate = Context.Contract.delegate_opt (B b) a1 in
   (match delegate with
   | None -> assert false
   | Some pkh -> assert (Signature.Public_key_hash.equal pkh m1.pkh)) ;
   let constants = Default_parameters.constants_test in
   let minimal_stake = constants.minimal_stake in
-  Op.transaction ~force_reveal:true (B b) a1 a3 minimal_stake
-  >>=? fun transact ->
-  Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->
-  Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
+  let* transact = Op.transaction ~force_reveal:true (B b) a1 a3 minimal_stake in
+  let* b = Block.bake ~policy:(By_account m2.pkh) b ~operation:transact in
+  let* delegate = Context.Contract.delegate_opt (B b) a3 in
   (match delegate with None -> () | Some _ -> assert false) ;
-  check_no_stake ~loc:__LOC__ b m3 >>=? fun () ->
-  Op.delegation ~force_reveal:true (B b) a3 (Some m3.pkh) >>=? fun delegation ->
-  Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation >>=? fun b ->
-  Adaptive_issuance_helpers.stake (B b) a3 minimal_stake >>=? fun stake ->
-  Block.bake ~policy:(By_account m2.pkh) b ~operation:stake >>=? fun b ->
-  Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
+  let* () = check_no_stake ~loc:__LOC__ b m3 in
+  let* delegation = Op.delegation ~force_reveal:true (B b) a3 (Some m3.pkh) in
+  let* b = Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation in
+  let* delegate = Context.Contract.delegate_opt (B b) a3 in
   (match delegate with
   | None -> assert false
   | Some pkh -> assert (Signature.Public_key_hash.equal pkh m3.pkh)) ;
-  check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m3
-  >>=? fun () ->
-  check_stake ~loc:__LOC__ b m3 >>=? fun () -> check_stake ~loc:__LOC__ b m1
+  let* () = check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m3 in
+  let* () = check_stake ~loc:__LOC__ b m3 in
+  check_stake ~loc:__LOC__ b m1
 
 let tests =
   [

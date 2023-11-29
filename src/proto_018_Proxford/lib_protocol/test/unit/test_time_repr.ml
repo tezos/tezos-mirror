@@ -9,9 +9,11 @@
 open Protocol
 
 let test_nominal_add () =
+  let open Result_syntax in
   let t = Time_repr.of_seconds (Int64.of_int 2) in
   let addition =
-    Period_repr.of_seconds Int64.one >>? fun p -> Time_repr.( +? ) t p
+    let* p = Period_repr.of_seconds Int64.one in
+    Time_repr.( +? ) t p
   in
   match addition with
   | Ok v ->

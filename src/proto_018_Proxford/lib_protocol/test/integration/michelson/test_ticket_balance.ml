@@ -157,7 +157,7 @@ let assert_token_balance ~loc block token owner expected =
   | Some b, None ->
       failwith "%s: Expected no balance but got some %d" loc (Z.to_int b)
   | None, Some b -> failwith "%s: Expected balance %d but got none" loc b
-  | None, None -> return ()
+  | None, None -> return_unit
 
 let string_token ~ticketer content =
   let contents =
@@ -173,10 +173,10 @@ let unit_ticket ~ticketer =
 let new_contracts ~before ~after =
   let open Lwt_result_wrap_syntax in
   let all_contracts current_block =
-    let* ctxt =
-      Incremental.begin_construction current_block >|=? Incremental.alpha_ctxt
-    in
-    Lwt.map Result.ok (Contract.list ctxt)
+    let* result = Incremental.begin_construction current_block in
+    let ctxt = Incremental.alpha_ctxt result in
+    let*! cs = Contract.list ctxt in
+    return cs
   in
   let* cs1 = all_contracts before in
   let* cs2 = all_contracts after in
@@ -1606,7 +1606,7 @@ let test_ticket_storage () =
   in
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 132 in
-  return ()
+  return_unit
 
 (* Test used ticket storage and paid storage. *)
 let test_storage_for_create_and_remove_tickets () =

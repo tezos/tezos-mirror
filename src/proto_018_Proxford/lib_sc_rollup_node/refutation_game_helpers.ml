@@ -67,7 +67,7 @@ let page_membership_proof params page_index slot_data =
       slot are not saved to the store, the function returns a failure
       in the error monad. *)
 let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
-    (dal_params : Dal.parameters) start_state =
+    ~inbox_level (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let dal_attestation_lag = constants.Rollup_constants.dal.attestation_lag in
@@ -87,7 +87,11 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
   | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
       let Dal.Page.{slot_id; page_index} = page_id in
       let* pages =
-        Dal_pages_request.slot_pages ~dal_attestation_lag node_ctxt slot_id
+        Dal_pages_request.slot_pages
+          ~dal_attestation_lag
+          ~inbox_level
+          node_ctxt
+          slot_id
       in
       match pages with
       | None -> return_none (* The slot is not confirmed. *)
@@ -159,9 +163,15 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let dal_l1_parameters = constants.dal in
   let dal_parameters = dal_l1_parameters.cryptobox_parameters in
   let dal_attestation_lag = dal_l1_parameters.attestation_lag in
+  let dal_number_of_slots = dal_l1_parameters.number_of_slots in
 
   let* page_info =
-    page_info_from_pvm_state constants node_ctxt dal_parameters start_state
+    page_info_from_pvm_state
+      constants
+      ~inbox_level:game.inbox_level
+      node_ctxt
+      dal_parameters
+      start_state
   in
   let module P = struct
     include PVM
@@ -179,7 +189,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           hash
       in
-      match res with Ok data -> return @@ Some data | Error _ -> return None
+      match res with Ok data -> return_some data | Error _ -> return_none
 
     module Inbox_with_history = struct
       let inbox = snapshot
@@ -225,6 +235,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
 
       let dal_parameters = dal_parameters
 
+      let dal_number_of_slots = dal_number_of_slots
+
       let page_info = page_info
     end
   end in
@@ -237,11 +249,13 @@ let generate_proof (node_ctxt : _ Node_context.t)
           (Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
              reveal_activation_level)
     | None ->
-        (* For older protocol, constants don't have the notion of reveal
-            activation level. *)
+        (* Constants for an older protocol, there is no notion of reveal
+           activation level for those. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6247
+           default value for is_reveal_enabled that returns true for all reveal
+           supported in protocols <= 18. *)
         fun ~current_block_level:_ _ -> true
   in
-
   let* proof =
     trace
       (Sc_rollup_node_errors.Cannot_produce_proof
@@ -249,19 +263,21 @@ let generate_proof (node_ctxt : _ Node_context.t)
            inbox_level = game.inbox_level;
            start_tick = Sc_rollup.Tick.to_z start_tick;
          })
-    @@ (Sc_rollup.Proof.produce
-          ~metadata
-          (module P)
-          (Raw_level.of_int32_exn game.inbox_level)
-          ~is_reveal_enabled
-       >|= Environment.wrap_tzresult)
+    @@ let*! result =
+         Sc_rollup.Proof.produce
+           ~metadata
+           (module P)
+           (Raw_level.of_int32_exn game.inbox_level)
+           ~is_reveal_enabled
+       in
+       Lwt.return @@ Environment.wrap_tzresult result
   in
   let*? pvm_step =
     Sc_rollup.Proof.unserialize_pvm_step ~pvm:(module PVM) proof.pvm_step
     |> Environment.wrap_tzresult
   in
   let unserialized_proof = {proof with pvm_step} in
-  let*! res =
+  let*! result =
     Sc_rollup.Proof.valid
       ~metadata
       snapshot
@@ -269,11 +285,12 @@ let generate_proof (node_ctxt : _ Node_context.t)
       dal_slots_history
       dal_parameters
       ~dal_attestation_lag
+      ~dal_number_of_slots
       ~pvm:(module PVM)
       unserialized_proof
       ~is_reveal_enabled
-    >|= Environment.wrap_tzresult
   in
+  let res = Environment.wrap_tzresult result in
   assert (Result.is_ok res) ;
   let proof =
     Data_encoding.Binary.to_string_exn Sc_rollup.Proof.encoding proof

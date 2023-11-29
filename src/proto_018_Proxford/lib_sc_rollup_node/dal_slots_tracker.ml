@@ -78,7 +78,7 @@ let slots_info constants node_ctxt (Layer1.{hash; _} as head) =
   | None ->
       (* Less then lag levels have passed from the rollup origination, and
          confirmed slots should not be applied *)
-      return None
+      return_none
   | Some published_block_hash ->
       let* {metadata; _} =
         Layer1_helpers.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash

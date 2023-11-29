@@ -112,7 +112,7 @@ let get_state (node_ctxt : _ Node_context.t) block_hash =
   match state with None -> failwith "No state" | Some state -> return state
 
 let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
-    ~insight_requests messages =
+    ~insight_requests ~log_kernel_debug_file messages =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
@@ -138,6 +138,7 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     Simulation.start_simulation
       node_ctxt
       ~reveal_map
+      ?log_kernel_debug_file
       Layer1.{hash = block; level}
   in
   let* sim, num_ticks_0 = Simulation.simulate_messages sim messages in
@@ -156,10 +157,11 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     List.filter (fun Sc_rollup.{outbox_level; _} -> outbox_level = level) outbox
   in
   let*! state_hash = PVM.state_hash state in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-     Use constants for correct protocol. *)
+  let* constants =
+    Protocol_plugins.get_constants_of_level node_ctxt inbox_level
+  in
   let is_reveal_enabled =
-    node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
+    constants.sc_rollup.reveal_activation_level
     |> WithExceptions.Option.get ~loc:__LOC__
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
@@ -216,10 +218,11 @@ let () =
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-     Use constants for correct protocol. *)
+  let* constants =
+    Protocol_plugins.get_constants_of_block_hash node_ctxt block
+  in
   let is_reveal_enabled =
-    node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
+    constants.sc_rollup.reveal_activation_level
     |> WithExceptions.Option.get ~loc:__LOC__
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
@@ -231,12 +234,15 @@ let () =
   Block_directory.register0 Sc_rollup_services.Block.dal_slots
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
+  let* constants =
+    Protocol_plugins.get_constants_of_block_hash node_ctxt block
+  in
   let+ slots =
     Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
   in
   List.rev_map
     (Sc_rollup_proto_types.Dal.Slot_header.of_octez
-       ~number_of_slots:node_ctxt.current_protocol.constants.dal.number_of_slots)
+       ~number_of_slots:constants.dal.number_of_slots)
     slots
   |> List.rev
 
@@ -271,9 +277,28 @@ let () =
   (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
 
 let () =
+  Block_helpers_directory.register1
+    Sc_rollup_services.Block.Helpers.outbox_proof_simple
+  @@ fun (node_ctxt, _block_hash) outbox_level message_index () ->
+  let open Lwt_result_syntax in
+  let+ commitment, proof =
+    Outbox.proof_of_output_simple node_ctxt ~outbox_level ~message_index
+  in
+  (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
+
+let () =
   Block_directory.register0 Sc_rollup_services.Block.simulate
-  @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
-  simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
+  @@ fun (node_ctxt, block)
+             ()
+             {messages; reveal_pages; insight_requests; log_kernel_debug_file}
+    ->
+  simulate_messages
+    node_ctxt
+    block
+    ~reveal_pages
+    ~insight_requests
+    ~log_kernel_debug_file
+    messages
 
 let block_directory (node_ctxt : _ Node_context.t) =
   let module PVM = (val Pvm_rpc.of_kind node_ctxt.kind) in

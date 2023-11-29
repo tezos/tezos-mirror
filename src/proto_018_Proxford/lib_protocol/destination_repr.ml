@@ -89,9 +89,10 @@ let of_b58data data =
 let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
 
 let of_b58check s =
+  let open Result_syntax in
   match of_b58check_opt s with
-  | None -> error (Invalid_destination_b58check s)
-  | Some dest -> Ok dest
+  | None -> tzfail (Invalid_destination_b58check s)
+  | Some dest -> return dest
 
 let encoding =
   let open Data_encoding in

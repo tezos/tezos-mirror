@@ -38,8 +38,10 @@ open Alpha_context
 (****************************************************************)
 
 let init_genesis ?policy () =
-  Context.init_n ~consensus_threshold:0 5 () >>=? fun (genesis, _contracts) ->
-  Block.bake ?policy genesis >>=? fun b -> return (genesis, b)
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* b = Block.bake ?policy genesis in
+  return (genesis, b)
 
 (****************************************************************)
 (*                      Tests                                   *)
@@ -48,15 +50,18 @@ let init_genesis ?policy () =
 (** Test that the preattestation's branch does not affect its
     validity. *)
 let test_preattestation_with_arbitrary_branch () =
-  Context.init1 () >>=? fun (genesis, _contract) ->
-  Block.bake genesis >>=? fun blk ->
-  Op.preattestation ~branch:Block_hash.zero blk >>=? fun operation ->
-  Incremental.begin_construction ~mempool_mode:true blk >>=? fun inc ->
-  Incremental.validate_operation inc operation >>=? fun _inc -> return_unit
+  let open Lwt_result_syntax in
+  let* genesis, _contract = Context.init1 () in
+  let* blk = Block.bake genesis in
+  let* operation = Op.preattestation ~branch:Block_hash.zero blk in
+  let* inc = Incremental.begin_construction ~mempool_mode:true blk in
+  let* _inc = Incremental.validate_operation inc operation in
+  return_unit
 
 (** Consensus operation for future level : apply a preattestation with a level in the future *)
 let test_consensus_operation_preattestation_for_future_level () =
-  init_genesis () >>=? fun (_genesis, pred) ->
+  let open Lwt_result_syntax in
+  let* _genesis, pred = init_genesis () in
   let raw_level = Raw_level.of_int32 (Int32.of_int 10) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -73,8 +78,9 @@ let test_consensus_operation_preattestation_for_future_level () =
 
 (** Consensus operation for old level : apply a preattestation with a level in the past *)
 let test_consensus_operation_preattestation_for_old_level () =
-  init_genesis () >>=? fun (_genesis, grandparent) ->
-  Block.bake grandparent >>=? fun pred ->
+  let open Lwt_result_syntax in
+  let* _genesis, grandparent = init_genesis () in
+  let* pred = Block.bake grandparent in
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -91,8 +97,9 @@ let test_consensus_operation_preattestation_for_old_level () =
 
 (** Consensus operation for future round : apply a preattestation with a round in the future *)
 let test_consensus_operation_preattestation_for_future_round () =
-  init_genesis () >>=? fun (_genesis, pred) ->
-  Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
+  let open Lwt_result_wrap_syntax in
+  let* _genesis, pred = init_genesis () in
+  let*?@ round = Round.of_int 21 in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
@@ -102,8 +109,9 @@ let test_consensus_operation_preattestation_for_future_round () =
 
 (** Consensus operation for old round : apply a preattestation with a round in the past *)
 let test_consensus_operation_preattestation_for_old_round () =
-  init_genesis ~policy:(By_round 10) () >>=? fun (_genesis, pred) ->
-  Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
+  let open Lwt_result_wrap_syntax in
+  let* _genesis, pred = init_genesis ~policy:(By_round 10) () in
+  let*?@ round = Round.of_int 0 in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
@@ -113,7 +121,8 @@ let test_consensus_operation_preattestation_for_old_round () =
 
 (** Consensus operation on competing proposal : apply a preattestation on a competing proposal *)
 let test_consensus_operation_preattestation_on_competing_proposal () =
-  init_genesis () >>=? fun (_genesis, pred) ->
+  let open Lwt_result_syntax in
+  let* _genesis, pred = init_genesis () in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
@@ -123,7 +132,8 @@ let test_consensus_operation_preattestation_on_competing_proposal () =
 
 (** Unexpected preattestations in block : apply a preattestation with an incorrect round *)
 let test_unexpected_preattestations_in_blocks () =
-  init_genesis () >>=? fun (_genesis, pred) ->
+  let open Lwt_result_syntax in
+  let* _genesis, pred = init_genesis () in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
@@ -135,10 +145,11 @@ let test_unexpected_preattestations_in_blocks () =
 
 (** Round too high : apply a preattestation with a too high round *)
 let test_too_high_round () =
-  init_genesis () >>=? fun (_genesis, pred) ->
+  let open Lwt_result_wrap_syntax in
+  let* _genesis, pred = init_genesis () in
   let raw_level = Raw_level.of_int32 (Int32.of_int 2) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
-  Environment.wrap_tzresult (Round.of_int 1) >>?= fun round ->
+  let*?@ round = Round.of_int 1 in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~attested_block:pred
@@ -152,13 +163,14 @@ let test_too_high_round () =
 
 (** Duplicate preattestation : apply a preattestation that has already been applied. *)
 let test_duplicate_preattestation () =
-  init_genesis () >>=? fun (genesis, _) ->
-  Block.bake genesis >>=? fun b ->
-  Incremental.begin_construction ~mempool_mode:true b >>=? fun inc ->
-  Op.preattestation b >>=? fun operation ->
-  Incremental.add_operation inc operation >>=? fun inc ->
-  Op.preattestation b >>=? fun operation ->
-  Incremental.add_operation inc operation >>= fun res ->
+  let open Lwt_result_syntax in
+  let* genesis, _ = init_genesis () in
+  let* b = Block.bake genesis in
+  let* inc = Incremental.begin_construction ~mempool_mode:true b in
+  let* operation = Op.preattestation b in
+  let* inc = Incremental.add_operation inc operation in
+  let* operation = Op.preattestation b in
+  let*! res = Incremental.add_operation inc operation in
   Assert.proto_error_with_info
     ~loc:__LOC__
     res
@@ -166,7 +178,8 @@ let test_duplicate_preattestation () =
 
 (** Preattestation for next level *)
 let test_preattestation_for_next_level () =
-  init_genesis () >>=? fun (genesis, _) ->
+  let open Lwt_result_syntax in
+  let* genesis, _ = init_genesis () in
   Consensus_helpers.test_consensus_op_for_next
     ~genesis
     ~kind:`Preattestation
@@ -174,7 +187,8 @@ let test_preattestation_for_next_level () =
 
 (** Preattestation for next round *)
 let test_preattestation_for_next_round () =
-  init_genesis () >>=? fun (genesis, _) ->
+  let open Lwt_result_syntax in
+  let* genesis, _ = init_genesis () in
   Consensus_helpers.test_consensus_op_for_next
     ~genesis
     ~kind:`Preattestation

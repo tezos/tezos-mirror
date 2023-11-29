@@ -127,8 +127,9 @@ let () =
     (fun () -> Invalid_cycle_eras)
 
 let create_cycle_eras cycle_eras =
+  let open Result_syntax in
   match cycle_eras with
-  | [] -> error Invalid_cycle_eras
+  | [] -> tzfail Invalid_cycle_eras
   | newest_era :: older_eras ->
       let rec aux {first_level; first_cycle; _} older_eras =
         match older_eras with
@@ -142,10 +143,11 @@ let create_cycle_eras cycle_eras =
               Raw_level_repr.(first_level > first_level_of_previous_era)
               && Cycle_repr.(first_cycle > first_cycle_of_previous_era)
             then aux previous_era even_older_eras
-            else error Invalid_cycle_eras
-        | [] -> ok ()
+            else tzfail Invalid_cycle_eras
+        | [] -> return_unit
       in
-      aux newest_era older_eras >>? fun () -> ok cycle_eras
+      let* () = aux newest_era older_eras in
+      return cycle_eras
 
 let add_cycle_era new_era cycle_eras = create_cycle_eras (new_era :: cycle_eras)
 
@@ -278,15 +280,17 @@ let () =
     (fun level -> Level_not_in_alpha level)
 
 let level_from_raw_aux ~cycle_eras level =
+  let open Result_syntax in
   let first_level_in_alpha_family =
     match List.rev cycle_eras with
     | [] -> assert false
     | {first_level; _} :: _ -> first_level
   in
-  error_when
-    Raw_level_repr.(level < first_level_in_alpha_family)
-    (Level_not_in_alpha level)
-  >|? fun () ->
+  let+ () =
+    error_when
+      Raw_level_repr.(level < first_level_in_alpha_family)
+      (Level_not_in_alpha level)
+  in
   let era = era_of_level ~cycle_eras level in
   level_from_raw_with_era era ~first_level_in_alpha_family level
 
@@ -315,7 +319,7 @@ let level_from_raw_with_offset ~cycle_eras ~offset raw_level =
   match res with
   | Ok level -> level_from_raw_aux ~cycle_eras level
   | Error _ ->
-      error
+      Result_syntax.tzfail
         (Negative_level_and_offset_sum
            (Raw_level_repr.to_int32 raw_level, offset))
 

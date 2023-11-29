@@ -337,26 +337,32 @@ let secrets () =
 (** Helper: Create a genesis block with predefined commitments,
     accounts and balances. *)
 let activation_init () =
-  Context.init1 ~consensus_threshold:0 ~commitments () >|=? fun (b, c) ->
-  secrets () |> fun ss -> (b, c, ss)
+  let open Lwt_result_syntax in
+  let+ b, c = Context.init1 ~consensus_threshold:0 ~commitments () in
+  let ss = secrets () in
+  (b, c, ss)
 
 (** Verify the genesis block created by [activation_init] can be
     baked. *)
 let test_simple_init_with_commitments () =
-  activation_init () >>=? fun (blk, _contract, _secrets) ->
-  Block.bake blk >>=? fun (_ : Block.t) -> return_unit
+  let open Lwt_result_syntax in
+  let* blk, _contract, _secrets = activation_init () in
+  let* (_ : Block.t) = Block.bake blk in
+  return_unit
 
 (** A single activation *)
 let test_single_activation () =
-  activation_init () >>=? fun (blk, _contract, secrets) ->
+  let open Lwt_result_syntax in
+  let* blk, _contract, secrets = activation_init () in
   let ({account; activation_code; amount = expected_amount; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   (* Contract does not exist *)
-  Assert.balance_is ~loc:__LOC__ (B blk) (Contract.Implicit account) Tez.zero
-  >>=? fun () ->
-  Op.activation (B blk) account activation_code >>=? fun operation ->
-  Block.bake ~operation blk >>=? fun blk ->
+  let* () =
+    Assert.balance_is ~loc:__LOC__ (B blk) (Contract.Implicit account) Tez.zero
+  in
+  let* operation = Op.activation (B blk) account activation_code in
+  let* blk = Block.bake ~operation blk in
   (* Contract does exist *)
   Assert.balance_is
     ~loc:__LOC__
@@ -366,31 +372,39 @@ let test_single_activation () =
 
 (** 10 activations, one per bake. *)
 let test_multi_activation_1 () =
-  activation_init () >>=? fun (blk, _contract, secrets) ->
-  List.fold_left_es
-    (fun blk {account; activation_code; amount = expected_amount; _} ->
-      Op.activation (B blk) account activation_code >>=? fun operation ->
-      Block.bake ~operation blk >>=? fun blk ->
-      Assert.balance_is
-        ~loc:__LOC__
-        (B blk)
-        (Contract.Implicit account)
-        expected_amount
-      >|=? fun () -> blk)
-    blk
-    secrets
-  >>=? fun (_ : Block.t) -> return_unit
+  let open Lwt_result_syntax in
+  let* blk, _contract, secrets = activation_init () in
+  let* (_ : Block.t) =
+    List.fold_left_es
+      (fun blk {account; activation_code; amount = expected_amount; _} ->
+        let* operation = Op.activation (B blk) account activation_code in
+        let* blk = Block.bake ~operation blk in
+        let+ () =
+          Assert.balance_is
+            ~loc:__LOC__
+            (B blk)
+            (Contract.Implicit account)
+            expected_amount
+        in
+        blk)
+      blk
+      secrets
+  in
+  return_unit
 
 (** All of the 10 activations occur in one bake. *)
 let test_multi_activation_2 () =
-  activation_init () >>=? fun (blk, _contract, secrets) ->
-  List.fold_left_es
-    (fun ops {account; activation_code; _} ->
-      Op.activation (B blk) account activation_code >|=? fun op -> op :: ops)
-    []
-    secrets
-  >>=? fun ops ->
-  Block.bake ~operations:ops blk >>=? fun blk ->
+  let open Lwt_result_syntax in
+  let* blk, _contract, secrets = activation_init () in
+  let* ops =
+    List.fold_left_es
+      (fun ops {account; activation_code; _} ->
+        let+ op = Op.activation (B blk) account activation_code in
+        op :: ops)
+      []
+      secrets
+  in
+  let* blk = Block.bake ~operations:ops blk in
   List.iter_es
     (fun {account; amount = expected_amount; _} ->
       (* Contract does exist *)
@@ -403,20 +417,23 @@ let test_multi_activation_2 () =
 
 (** Transfer with activated account. *)
 let test_activation_and_transfer () =
-  activation_init () >>=? fun (blk, bootstrap_contract, secrets) ->
+  let open Lwt_result_syntax in
+  let* blk, bootstrap_contract, secrets = activation_init () in
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   let first_contract = Contract.Implicit account in
-  Op.activation (B blk) account activation_code >>=? fun operation ->
-  Block.bake ~operation blk >>=? fun blk ->
-  Context.Contract.balance (B blk) bootstrap_contract >>=? fun amount ->
-  Test_tez.( /? ) amount 2L >>?= fun half_amount ->
-  Context.Contract.balance (B blk) first_contract
-  >>=? fun activated_amount_before ->
-  Op.transaction (B blk) bootstrap_contract first_contract half_amount
-  >>=? fun operation ->
-  Block.bake ~operation blk >>=? fun blk ->
+  let* operation = Op.activation (B blk) account activation_code in
+  let* blk = Block.bake ~operation blk in
+  let* amount = Context.Contract.balance (B blk) bootstrap_contract in
+  let*? half_amount = Test_tez.( /? ) amount 2L in
+  let* activated_amount_before =
+    Context.Contract.balance (B blk) first_contract
+  in
+  let* operation =
+    Op.transaction (B blk) bootstrap_contract first_contract half_amount
+  in
+  let* blk = Block.bake ~operation blk in
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
@@ -426,24 +443,26 @@ let test_activation_and_transfer () =
 
 (** Transfer to an unactivated account and then activating it. *)
 let test_transfer_to_unactivated_then_activate () =
-  activation_init () >>=? fun (blk, bootstrap_contract, secrets) ->
+  let open Lwt_result_syntax in
+  let* blk, bootstrap_contract, secrets = activation_init () in
   let ({account; activation_code; amount} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   let unactivated_commitment_contract = Contract.Implicit account in
-  Context.Contract.balance (B blk) bootstrap_contract >>=? fun b_amount ->
-  b_amount /? 2L >>?= fun b_half_amount ->
-  Incremental.begin_construction blk >>=? fun inc ->
-  Op.transaction
-    (I inc)
-    bootstrap_contract
-    unactivated_commitment_contract
-    b_half_amount
-  >>=? fun op ->
-  Incremental.add_operation inc op >>=? fun inc ->
-  Op.activation (I inc) account activation_code >>=? fun op' ->
-  Incremental.add_operation inc op' >>=? fun inc ->
-  Incremental.finalize_block inc >>=? fun blk2 ->
+  let* b_amount = Context.Contract.balance (B blk) bootstrap_contract in
+  let*? b_half_amount = b_amount /? 2L in
+  let* inc = Incremental.begin_construction blk in
+  let* op =
+    Op.transaction
+      (I inc)
+      bootstrap_contract
+      unactivated_commitment_contract
+      b_half_amount
+  in
+  let* inc = Incremental.add_operation inc op in
+  let* op' = Op.activation (I inc) account activation_code in
+  let* inc = Incremental.add_operation inc op' in
+  let* blk2 = Incremental.finalize_block inc in
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk2)
@@ -458,28 +477,30 @@ let test_transfer_to_unactivated_then_activate () =
 (** Invalid pkh activation: expected to fail as the context does not
     contain any commitment. *)
 let test_invalid_activation_with_no_commitments () =
-  Context.init1 () >>=? fun (blk, _contract) ->
+  let open Lwt_result_syntax in
+  let* blk, _contract = Context.init1 () in
   let secrets = secrets () in
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  Op.activation (B blk) account activation_code >>=? fun operation ->
-  Block.bake ~operation blk >>= fun res ->
+  let* operation = Op.activation (B blk) account activation_code in
+  let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Invalid_activation _ -> true
       | _ -> false)
 
 (** Wrong activation: wrong secret given in the operation. *)
 let test_invalid_activation_wrong_secret () =
-  activation_init () >>=? fun (blk, _contract, secrets) ->
+  let open Lwt_result_syntax in
+  let* blk, _contract, secrets = activation_init () in
   let ({account; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth secrets 0
   in
   let ({activation_code; _} as _second_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth secrets 1
   in
-  Op.activation (B blk) account activation_code >>=? fun operation ->
-  Block.bake ~operation blk >>= fun res ->
+  let* operation = Op.activation (B blk) account activation_code in
+  let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Invalid_activation _ -> true
       | _ -> false)
@@ -487,7 +508,8 @@ let test_invalid_activation_wrong_secret () =
 (** Invalid pkh activation : expected to fail as the context does not
     contain an associated commitment. *)
 let test_invalid_activation_inexistent_pkh () =
-  activation_init () >>=? fun (blk, _contract, secrets) ->
+  let open Lwt_result_syntax in
+  let* blk, _contract, secrets = activation_init () in
   let ({activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
@@ -495,8 +517,8 @@ let test_invalid_activation_inexistent_pkh () =
     Signature.Public_key_hash.of_b58check_exn
       "tz1PeQHGKPWSpNoozvxgqLN9TFsj6rDqNV3o"
   in
-  Op.activation (B blk) inexistent_pkh activation_code >>=? fun operation ->
-  Block.bake ~operation blk >>= fun res ->
+  let* operation = Op.activation (B blk) inexistent_pkh activation_code in
+  let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Invalid_activation _ -> true
       | _ -> false)
@@ -504,34 +526,37 @@ let test_invalid_activation_inexistent_pkh () =
 (** Invalid pkh activation : expected to fail as the commitment has
     already been claimed. *)
 let test_invalid_double_activation () =
-  activation_init () >>=? fun (blk, _contract, secrets) ->
+  let open Lwt_result_syntax in
+  let* blk, _contract, secrets = activation_init () in
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  Incremental.begin_construction blk >>=? fun inc ->
-  Op.activation (I inc) account activation_code >>=? fun op ->
-  Incremental.add_operation inc op >>=? fun inc ->
-  Op.activation (I inc) account activation_code >>=? fun op' ->
-  Incremental.add_operation inc op' >>= fun res ->
+  let* inc = Incremental.begin_construction blk in
+  let* op = Op.activation (I inc) account activation_code in
+  let* inc = Incremental.add_operation inc op in
+  let* op' = Op.activation (I inc) account activation_code in
+  let*! res = Incremental.add_operation inc op' in
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Anonymous.Conflicting_activation _ -> true
       | _ -> false)
 
 (** Transfer from an unactivated commitment account. *)
 let test_invalid_transfer_from_unactivated_account () =
-  activation_init () >>=? fun (blk, bootstrap_contract, secrets) ->
+  let open Lwt_result_syntax in
+  let* blk, bootstrap_contract, secrets = activation_init () in
   let ({account; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   let unactivated_commitment_contract = Contract.Implicit account in
   (* No activation *)
-  Op.transaction
-    (B blk)
-    unactivated_commitment_contract
-    bootstrap_contract
-    Tez.one
-  >>=? fun operation ->
-  Block.bake ~operation blk >>= fun res ->
+  let* operation =
+    Op.transaction
+      (B blk)
+      unactivated_commitment_contract
+      bootstrap_contract
+      Tez.one
+  in
+  let*! res = Block.bake ~operation blk in
   Assert.proto_error_with_info ~loc:__LOC__ res "Empty implicit contract"
 
 let tests =
