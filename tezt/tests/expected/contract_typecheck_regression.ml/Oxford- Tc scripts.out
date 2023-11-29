@@ -15,10 +15,11 @@ Well typed (Gas remaining: 1039933.430 units remaining)	michelson_test_scripts/a
            { DUP
              /* [ key_hash : key_hash
                 : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
-             DIIP { CDR %stored_balance
-                    /* [ map key_hash mutez ] */ ;
-                    DUP
-                    /* [ map key_hash mutez : map key_hash mutez ] */ }
+             DIP 2
+                 { CDR %stored_balance
+                   /* [ map key_hash mutez ] */ ;
+                   DUP
+                   /* [ map key_hash mutez : map key_hash mutez ] */ }
              /* [ key_hash : key_hash : map key_hash mutez : map key_hash mutez ] */ ;
              DIP { SWAP /* [ map key_hash mutez : key_hash : map key_hash mutez ] */ }
              /* [ key_hash : map key_hash mutez : key_hash : map key_hash mutez ] */ ;
@@ -72,13 +73,14 @@ Well typed (Gas remaining: 1039933.430 units remaining)	michelson_test_scripts/a
              /* [ key : pair key mutez signature : pair key mutez signature
                 : pair key mutez signature : pair key mutez signature
                 : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
-             DIIP { CDAR %withdraw_amount ;
-                    PACK
-                    /* [ bytes : pair key mutez signature : pair key mutez signature
-                       : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
-                    BLAKE2B @signed_amount
-                    /* [ bytes : pair key mutez signature : pair key mutez signature
-                       : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ }
+             DIP 2
+                 { CDAR %withdraw_amount ;
+                   PACK
+                   /* [ bytes : pair key mutez signature : pair key mutez signature
+                      : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
+                   BLAKE2B @signed_amount
+                   /* [ bytes : pair key mutez signature : pair key mutez signature
+                      : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ }
              /* [ key : pair key mutez signature : bytes : pair key mutez signature
                 : pair key mutez signature
                 : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
@@ -97,10 +99,11 @@ Well typed (Gas remaining: 1039933.430 units remaining)	michelson_test_scripts/a
                      : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
                   FAILWITH
                   /* [] */ } ;
-             DIIP { CDR %stored_balance
-                    /* [ map key_hash mutez ] */ ;
-                    DUP
-                    /* [ map key_hash mutez : map key_hash mutez ] */ }
+             DIP 2
+                 { CDR %stored_balance
+                   /* [ map key_hash mutez ] */ ;
+                   DUP
+                   /* [ map key_hash mutez : map key_hash mutez ] */ }
              /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez
                 : map key_hash mutez ] */ ;
              CAR %from
@@ -136,11 +139,12 @@ Well typed (Gas remaining: 1039933.430 units remaining)	michelson_test_scripts/a
                  /* [ mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  DUP
                  /* [ mutez : mutez : pair key mutez signature : map key_hash mutez ] */ ;
-                 DIIP { DUP
-                        /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
-                        CDAR %withdraw_amount ;
-                        DUP
-                        /* [ mutez : mutez : pair key mutez signature : map key_hash mutez ] */ }
+                 DIP 2
+                     { DUP
+                       /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
+                       CDAR %withdraw_amount ;
+                       DUP
+                       /* [ mutez : mutez : pair key mutez signature : map key_hash mutez ] */ }
                  /* [ mutez : mutez : mutez : mutez : pair key mutez signature
                     : map key_hash mutez ] */ ;
                  DIP { CMPLT @not_enough }
@@ -432,9 +436,9 @@ Well typed (Gas remaining: 1039987.872 units remaining)	michelson_test_scripts/a
   code { UNPAPAIR ;
          ITER { UNPAIR
                 /* [ string : int : big_map string int : unit ] */ ;
-                DUUUP
+                DUP 3
                 /* [ big_map string int : string : int : big_map string int : unit ] */ ;
-                DUUP
+                DUP 2
                 /* [ string : big_map string int : string : int : big_map string int : unit ] */ ;
                 GET
                 /* [ option int : string : int : big_map string int : unit ] */ ;
@@ -1762,49 +1766,50 @@ Well typed (Gas remaining: 1039676.449 units remaining)	michelson_test_scripts/a
                                               (pair mutez mutez)
                                               (pair address address)
                                               address ] */ ;
-                                      DIIP { DUP
-                                             /* [ pair (or string nat)
-                                                     (pair nat mutez mutez)
-                                                     (pair nat timestamp timestamp)
-                                                     (pair mutez mutez)
-                                                     (pair address address)
-                                                     address
-                                                : pair (or string nat)
-                                                     (pair nat mutez mutez)
-                                                     (pair nat timestamp timestamp)
-                                                     (pair mutez mutez)
-                                                     (pair address address)
-                                                     address ] */ ;
-                                             CDDAAR ;
-                                             DIP { DUP
-                                                   /* [ pair (or string nat)
-                                                           (pair nat mutez mutez)
-                                                           (pair nat timestamp timestamp)
-                                                           (pair mutez mutez)
-                                                           (pair address address)
-                                                           address
-                                                      : pair (or string nat)
-                                                           (pair nat mutez mutez)
-                                                           (pair nat timestamp timestamp)
-                                                           (pair mutez mutez)
-                                                           (pair address address)
-                                                           address ] */ ;
-                                                   CDDDAAR }
-                                             /* [ nat : mutez
-                                                : pair (or string nat)
-                                                     (pair nat mutez mutez)
-                                                     (pair nat timestamp timestamp)
-                                                     (pair mutez mutez)
-                                                     (pair address address)
-                                                     address ] */ ;
-                                             MUL
-                                             /* [ mutez
-                                                : pair (or string nat)
-                                                     (pair nat mutez mutez)
-                                                     (pair nat timestamp timestamp)
-                                                     (pair mutez mutez)
-                                                     (pair address address)
-                                                     address ] */ }
+                                      DIP 2
+                                          { DUP
+                                            /* [ pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address
+                                               : pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ ;
+                                            CDDAAR ;
+                                            DIP { DUP
+                                                  /* [ pair (or string nat)
+                                                          (pair nat mutez mutez)
+                                                          (pair nat timestamp timestamp)
+                                                          (pair mutez mutez)
+                                                          (pair address address)
+                                                          address
+                                                     : pair (or string nat)
+                                                          (pair nat mutez mutez)
+                                                          (pair nat timestamp timestamp)
+                                                          (pair mutez mutez)
+                                                          (pair address address)
+                                                          address ] */ ;
+                                                  CDDDAAR }
+                                            /* [ nat : mutez
+                                               : pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ ;
+                                            MUL
+                                            /* [ mutez
+                                               : pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ }
                                       /* [ mutez : mutez : mutez
                                          : pair (or string nat)
                                               (pair nat mutez mutez)
@@ -2022,12 +2027,13 @@ Well typed (Gas remaining: 1039676.449 units remaining)	michelson_test_scripts/a
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
-                                  DIIP { CDR
-                                         /* [ pair (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address ] */ }
+                                  DIP 2
+                                      { CDR
+                                        /* [ pair (pair nat mutez mutez)
+                                                (pair nat timestamp timestamp)
+                                                (pair mutez mutez)
+                                                (pair address address)
+                                                address ] */ }
                                   /* [ mutez : address
                                      : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
@@ -2405,12 +2411,13 @@ Well typed (Gas remaining: 1039676.449 units remaining)	michelson_test_scripts/a
                                                         (pair mutez mutez)
                                                         (pair address address)
                                                         address ] */ ;
-                                                DIIP { CDR
-                                                       /* [ pair (pair nat mutez mutez)
-                                                               (pair nat timestamp timestamp)
-                                                               (pair mutez mutez)
-                                                               (pair address address)
-                                                               address ] */ }
+                                                DIP 2
+                                                    { CDR
+                                                      /* [ pair (pair nat mutez mutez)
+                                                              (pair nat timestamp timestamp)
+                                                              (pair mutez mutez)
+                                                              (pair address address)
+                                                              address ] */ }
                                                 /* [ mutez : address
                                                    : pair (pair nat mutez mutez)
                                                         (pair nat timestamp timestamp)
@@ -2503,12 +2510,13 @@ Well typed (Gas remaining: 1039676.449 units remaining)	michelson_test_scripts/a
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
-                                       DIIP { CDR
-                                              /* [ pair (pair nat mutez mutez)
-                                                      (pair nat timestamp timestamp)
-                                                      (pair mutez mutez)
-                                                      (pair address address)
-                                                      address ] */ }
+                                       DIP 2
+                                           { CDR
+                                             /* [ pair (pair nat mutez mutez)
+                                                     (pair nat timestamp timestamp)
+                                                     (pair mutez mutez)
+                                                     (pair address address)
+                                                     address ] */ }
                                        /* [ mutez : address
                                           : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
@@ -2607,7 +2615,7 @@ Well typed (Gas remaining: 1039977.186 units remaining)	michelson_test_scripts/a
          /* [ list int : list int ] */ ;
          ITER { SWAP
                 /* [ list int : int ] */ ;
-                DIIP { NIL int /* [ list int ] */ }
+                DIP 2 { NIL int /* [ list int ] */ }
                 /* [ list int : int : list int ] */ ;
                 PUSH bool True
                 /* [ bool : list int : int : list int ] */ ;
@@ -2616,7 +2624,7 @@ Well typed (Gas remaining: 1039977.186 units remaining)	michelson_test_scripts/a
                            /* [ list int : int : int : list int ] */ ;
                            DIP { DUP
                                  /* [ int : int : int : list int ] */ ;
-                                 DIIP { DUP /* [ int : int : list int ] */ }
+                                 DIP 2 { DUP /* [ int : int : list int ] */ }
                                  /* [ int : int : int : int : list int ] */ ;
                                  DIP { CMPLT }
                                  /* [ int : bool : int : list int ] */ ;
@@ -3034,7 +3042,8 @@ Well typed (Gas remaining: 1039983.510 units remaining)	michelson_test_scripts/a
                TRANSFER_TOKENS
                /* [ operation : pair address address ] */ }
          /* [ operation : operation : pair address address ] */ ;
-         DIIP { NIL operation /* [ list operation : pair address address ] */ }
+         DIP 2
+             { NIL operation /* [ list operation : pair address address ] */ }
          /* [ operation : operation : list operation : pair address address ] */ ;
          DIP { CONS /* [ list operation : pair address address ] */ }
          /* [ operation : list operation : pair address address ] */ ;
@@ -3493,7 +3502,8 @@ Well typed (Gas remaining: 1039955.119 units remaining)	michelson_test_scripts/e
                    { IF_LEFT
                        { UNPAIR
                          /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
-                         DIIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
+                         DIP 2
+                             { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
                          /* [ string : nat : big_map string nat : big_map string nat ] */ ;
                          DIP { SOME /* [ option nat : big_map string nat : big_map string nat ] */ }
                          /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
@@ -3501,10 +3511,11 @@ Well typed (Gas remaining: 1039955.119 units remaining)	michelson_test_scripts/e
                          /* [ big_map string nat : big_map string nat ] */ }
                        { UNPAIR
                          /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
-                         DIIP { UNPAIR
-                                /* [ big_map string nat : big_map string nat ] */ ;
-                                SWAP
-                                /* [ big_map string nat : big_map string nat ] */ }
+                         DIP 2
+                             { UNPAIR
+                               /* [ big_map string nat : big_map string nat ] */ ;
+                               SWAP
+                               /* [ big_map string nat : big_map string nat ] */ }
                          /* [ string : nat : big_map string nat : big_map string nat ] */ ;
                          DIP { SOME /* [ option nat : big_map string nat : big_map string nat ] */ }
                          /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
@@ -3555,7 +3566,7 @@ Well typed (Gas remaining: 1039961.799 units remaining)	michelson_test_scripts/e
              /* [ mutez : mutez : or key_hash unit
                 : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
              ASSERT_CMPEQ ;
-             DUUP
+             DUP 2
              /* [ pair (or (or key_hash unit) (or string nat)) key_hash string nat
                 : or key_hash unit
                 : pair (or (or key_hash unit) (or string nat)) key_hash string nat ] */ ;
@@ -3663,7 +3674,7 @@ Well typed (Gas remaining: 1039984.594 units remaining)	michelson_test_scripts/e
              AMOUNT
              /* [ mutez : mutez : lambda unit (list operation) : key_hash ] */ ;
              ASSERT_CMPEQ ;
-             DUUP
+             DUP 2
              /* [ key_hash : lambda unit (list operation) : key_hash ] */ ;
              IMPLICIT_ACCOUNT
              /* [ contract unit : lambda unit (list operation) : key_hash ] */ ;
@@ -4191,51 +4202,52 @@ Well typed (Gas remaining: 1039971.433 units remaining)	michelson_test_scripts/m
          DUP
          /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : pair mutez mutez
             : pair mutez mutez ] */ ;
-         DIIIIIP
-           { NIL bool /* [ list bool ] */ }
+         DIP 5
+             { NIL bool /* [ list bool ] */ }
          /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : pair mutez mutez
             : pair mutez mutez : list bool ] */ ;
-         DIIIIP
-           { DUP
-             /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
-             CAR
-             /* [ mutez : pair mutez mutez : list bool ] */ ;
-             DIP { CDR /* [ mutez : list bool ] */ }
-             /* [ mutez : mutez : list bool ] */ ;
-             COMPARE
-             /* [ int : list bool ] */ ;
-             LE
-             /* [ bool : list bool ] */ ;
-             CONS
-             /* [ list bool ] */ }
+         DIP 4
+             { DUP
+               /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
+               CAR
+               /* [ mutez : pair mutez mutez : list bool ] */ ;
+               DIP { CDR /* [ mutez : list bool ] */ }
+               /* [ mutez : mutez : list bool ] */ ;
+               COMPARE
+               /* [ int : list bool ] */ ;
+               LE
+               /* [ bool : list bool ] */ ;
+               CONS
+               /* [ list bool ] */ }
          /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : pair mutez mutez
             : list bool ] */ ;
-         DIIIP
-           { DUP
-             /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
-             CAR
-             /* [ mutez : pair mutez mutez : list bool ] */ ;
-             DIP { CDR /* [ mutez : list bool ] */ }
-             /* [ mutez : mutez : list bool ] */ ;
-             COMPARE
-             /* [ int : list bool ] */ ;
-             GE
-             /* [ bool : list bool ] */ ;
-             CONS
-             /* [ list bool ] */ }
+         DIP 3
+             { DUP
+               /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
+               CAR
+               /* [ mutez : pair mutez mutez : list bool ] */ ;
+               DIP { CDR /* [ mutez : list bool ] */ }
+               /* [ mutez : mutez : list bool ] */ ;
+               COMPARE
+               /* [ int : list bool ] */ ;
+               GE
+               /* [ bool : list bool ] */ ;
+               CONS
+               /* [ list bool ] */ }
          /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : list bool ] */ ;
-         DIIP { DUP
-                /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
-                CAR
-                /* [ mutez : pair mutez mutez : list bool ] */ ;
-                DIP { CDR /* [ mutez : list bool ] */ }
-                /* [ mutez : mutez : list bool ] */ ;
-                COMPARE
-                /* [ int : list bool ] */ ;
-                LT
-                /* [ bool : list bool ] */ ;
-                CONS
-                /* [ list bool ] */ }
+         DIP 2
+             { DUP
+               /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
+               CAR
+               /* [ mutez : pair mutez mutez : list bool ] */ ;
+               DIP { CDR /* [ mutez : list bool ] */ }
+               /* [ mutez : mutez : list bool ] */ ;
+               COMPARE
+               /* [ int : list bool ] */ ;
+               LT
+               /* [ bool : list bool ] */ ;
+               CONS
+               /* [ list bool ] */ }
          /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
          DIP { DUP
                /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
@@ -4280,51 +4292,52 @@ Well typed (Gas remaining: 1039971.433 units remaining)	michelson_test_scripts/m
          DUP
          /* [ pair bytes bytes : pair bytes bytes : pair bytes bytes : pair bytes bytes
             : pair bytes bytes ] */ ;
-         DIIIIIP
-           { NIL bool /* [ list bool ] */ }
+         DIP 5
+             { NIL bool /* [ list bool ] */ }
          /* [ pair bytes bytes : pair bytes bytes : pair bytes bytes : pair bytes bytes
             : pair bytes bytes : list bool ] */ ;
-         DIIIIP
-           { DUP
-             /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
-             CAR
-             /* [ bytes : pair bytes bytes : list bool ] */ ;
-             DIP { CDR /* [ bytes : list bool ] */ }
-             /* [ bytes : bytes : list bool ] */ ;
-             COMPARE
-             /* [ int : list bool ] */ ;
-             LE
-             /* [ bool : list bool ] */ ;
-             CONS
-             /* [ list bool ] */ }
+         DIP 4
+             { DUP
+               /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
+               CAR
+               /* [ bytes : pair bytes bytes : list bool ] */ ;
+               DIP { CDR /* [ bytes : list bool ] */ }
+               /* [ bytes : bytes : list bool ] */ ;
+               COMPARE
+               /* [ int : list bool ] */ ;
+               LE
+               /* [ bool : list bool ] */ ;
+               CONS
+               /* [ list bool ] */ }
          /* [ pair bytes bytes : pair bytes bytes : pair bytes bytes : pair bytes bytes
             : list bool ] */ ;
-         DIIIP
-           { DUP
-             /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
-             CAR
-             /* [ bytes : pair bytes bytes : list bool ] */ ;
-             DIP { CDR /* [ bytes : list bool ] */ }
-             /* [ bytes : bytes : list bool ] */ ;
-             COMPARE
-             /* [ int : list bool ] */ ;
-             GE
-             /* [ bool : list bool ] */ ;
-             CONS
-             /* [ list bool ] */ }
+         DIP 3
+             { DUP
+               /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
+               CAR
+               /* [ bytes : pair bytes bytes : list bool ] */ ;
+               DIP { CDR /* [ bytes : list bool ] */ }
+               /* [ bytes : bytes : list bool ] */ ;
+               COMPARE
+               /* [ int : list bool ] */ ;
+               GE
+               /* [ bool : list bool ] */ ;
+               CONS
+               /* [ list bool ] */ }
          /* [ pair bytes bytes : pair bytes bytes : pair bytes bytes : list bool ] */ ;
-         DIIP { DUP
-                /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
-                CAR
-                /* [ bytes : pair bytes bytes : list bool ] */ ;
-                DIP { CDR /* [ bytes : list bool ] */ }
-                /* [ bytes : bytes : list bool ] */ ;
-                COMPARE
-                /* [ int : list bool ] */ ;
-                LT
-                /* [ bool : list bool ] */ ;
-                CONS
-                /* [ list bool ] */ }
+         DIP 2
+             { DUP
+               /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
+               CAR
+               /* [ bytes : pair bytes bytes : list bool ] */ ;
+               DIP { CDR /* [ bytes : list bool ] */ }
+               /* [ bytes : bytes : list bool ] */ ;
+               COMPARE
+               /* [ int : list bool ] */ ;
+               LT
+               /* [ bool : list bool ] */ ;
+               CONS
+               /* [ list bool ] */ }
          /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
          DIP { DUP
                /* [ pair bytes bytes : pair bytes bytes : list bool ] */ ;
@@ -4400,7 +4413,7 @@ Well typed (Gas remaining: 1039993.538 units remaining)	michelson_test_scripts/m
          /* [ pair unit unit ] */ ;
          UNIT
          /* [ unit : pair unit unit ] */ ;
-         DUUP @new_storage
+         DUP @new_storage 2
          /* [ pair unit unit : unit : pair unit unit ] */ ;
          DIP { DROP /* [ pair unit unit ] */ ; DROP /* [] */ }
          /* [ pair unit unit ] */ ;
@@ -4609,9 +4622,9 @@ Well typed (Gas remaining: 1039979.965 units remaining)	michelson_test_scripts/m
 { parameter (pair (lambda unit (list operation)) signature) ;
   storage (pair (nat %counter) key) ;
   code { UNPPAIPAIR ;
-         DUUUP
+         DUP 3
          /* [ nat : lambda unit (list operation) : signature : nat : key ] */ ;
-         DUUP
+         DUP 2
          /* [ lambda unit (list operation) : nat : lambda unit (list operation)
             : signature : nat : key ] */ ;
          SELF
@@ -4627,11 +4640,11 @@ Well typed (Gas remaining: 1039979.965 units remaining)	michelson_test_scripts/m
          /* [ bytes : lambda unit (list operation) : signature : nat : key ] */ ;
          DIP { SWAP /* [ signature : lambda unit (list operation) : nat : key ] */ }
          /* [ bytes : signature : lambda unit (list operation) : nat : key ] */ ;
-         DUUUUUP
+         DUP 5
          /* [ key : bytes : signature : lambda unit (list operation) : nat : key ] */ ;
          DIP { SWAP /* [ signature : bytes : lambda unit (list operation) : nat : key ] */ }
          /* [ key : signature : bytes : lambda unit (list operation) : nat : key ] */ ;
-         DUUUP
+         DUP 3
          /* [ bytes : key : signature : bytes : lambda unit (list operation) : nat
             : key ] */ ;
          DIP { CHECK_SIGNATURE /* [ bool : lambda unit (list operation) : nat : key ] */ }
@@ -4733,7 +4746,8 @@ Well typed (Gas remaining: 1039955.119 units remaining)	michelson_test_scripts/m
                    { IF_LEFT
                        { UNPAIR
                          /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
-                         DIIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
+                         DIP 2
+                             { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
                          /* [ string : nat : big_map string nat : big_map string nat ] */ ;
                          DIP { SOME /* [ option nat : big_map string nat : big_map string nat ] */ }
                          /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
@@ -4741,10 +4755,11 @@ Well typed (Gas remaining: 1039955.119 units remaining)	michelson_test_scripts/m
                          /* [ big_map string nat : big_map string nat ] */ }
                        { UNPAIR
                          /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
-                         DIIP { UNPAIR
-                                /* [ big_map string nat : big_map string nat ] */ ;
-                                SWAP
-                                /* [ big_map string nat : big_map string nat ] */ }
+                         DIP 2
+                             { UNPAIR
+                               /* [ big_map string nat : big_map string nat ] */ ;
+                               SWAP
+                               /* [ big_map string nat : big_map string nat ] */ }
                          /* [ string : nat : big_map string nat : big_map string nat ] */ ;
                          DIP { SOME /* [ option nat : big_map string nat : big_map string nat ] */ }
                          /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
@@ -8115,14 +8130,15 @@ Well typed (Gas remaining: 1039941.741 units remaining)	michelson_test_scripts/m
                                         /* [ key : signature : nat : bytes
                                            : or (lambda unit (list operation)) (pair nat (list key))
                                            : pair nat nat (list key) ] */ ;
-                                        DIIP { DUUP
-                                               /* [ bytes : nat : bytes
-                                                  : or (lambda unit (list operation)) (pair nat (list key))
-                                                  : pair nat nat (list key) ] */ }
+                                        DIP 2
+                                            { DUP 2
+                                              /* [ bytes : nat : bytes
+                                                 : or (lambda unit (list operation)) (pair nat (list key))
+                                                 : pair nat nat (list key) ] */ }
                                         /* [ key : signature : bytes : nat : bytes
                                            : or (lambda unit (list operation)) (pair nat (list key))
                                            : pair nat nat (list key) ] */ ;
-                                        { DUUUP
+                                        { DUP 3
                                           /* [ bytes : key : signature : bytes : nat : bytes
                                              : or (lambda unit (list operation)) (pair nat (list key))
                                              : pair nat nat (list key) ] */ ;
@@ -31824,14 +31840,15 @@ Well typed (Gas remaining: 1039945.396 units remaining)	michelson_test_scripts/m
                                     /* [ key : signature : nat : bytes
                                        : or (pair mutez (contract unit)) (or (option key_hash) (pair nat (list key)))
                                        : pair nat nat (list key) ] */ ;
-                                    DIIP { DUUP
-                                           /* [ bytes : nat : bytes
-                                              : or (pair mutez (contract unit)) (or (option key_hash) (pair nat (list key)))
-                                              : pair nat nat (list key) ] */ }
+                                    DIP 2
+                                        { DUP 2
+                                          /* [ bytes : nat : bytes
+                                             : or (pair mutez (contract unit)) (or (option key_hash) (pair nat (list key)))
+                                             : pair nat nat (list key) ] */ }
                                     /* [ key : signature : bytes : nat : bytes
                                        : or (pair mutez (contract unit)) (or (option key_hash) (pair nat (list key)))
                                        : pair nat nat (list key) ] */ ;
-                                    { DUUUP
+                                    { DUP 3
                                       /* [ bytes : key : signature : bytes : nat : bytes
                                          : or (pair mutez (contract unit)) (or (option key_hash) (pair nat (list key)))
                                          : pair nat nat (list key) ] */ ;
@@ -35666,13 +35683,14 @@ Well typed (Gas remaining: 1039964.178 units remaining)	michelson_test_scripts/m
             : pair (pair signature nat) (pair address address) nat key
             : pair (pair signature nat) (pair address address) nat key
             : pair (pair signature nat) (pair address address) nat key ] */ ;
-         DIIIP
-           { CDR %storage /* [ pair (pair address address) nat key ] */ }
+         DIP 3
+             { CDR %storage /* [ pair (pair address address) nat key ] */ }
          /* [ pair (pair signature nat) (pair address address) nat key
             : pair (pair signature nat) (pair address address) nat key
             : pair (pair signature nat) (pair address address) nat key
             : pair (pair address address) nat key ] */ ;
-         DIIP { CDAR }
+         DIP 2
+             { CDAR }
          /* [ pair (pair signature nat) (pair address address) nat key
             : pair (pair signature nat) (pair address address) nat key
             : pair address address : pair (pair address address) nat key ] */ ;
@@ -35970,35 +35988,36 @@ Well typed (Gas remaining: 1039924.536 units remaining)	michelson_test_scripts/m
                  /* [ bytes : big_map bytes (pair (pair address address) mutez timestamp) : bytes
                     : big_map bytes (pair (pair address address) mutez timestamp) : unit
                     : list operation ] */ ;
-                 DIIP { GET
-                        /* [ option (pair (pair address address) mutez timestamp) : unit
-                           : list operation ] */ ;
-                        ASSERT_SOME ;
-                        DUP
-                        /* [ pair (pair address address) mutez timestamp
-                           : pair (pair address address) mutez timestamp : unit : list operation ] */ ;
-                        CADR @% ;
-                        CONTRACT @dest
-                          unit
-                        /* [ option (contract unit) : pair (pair address address) mutez timestamp : unit
-                           : list operation ] */ ;
-                        ASSERT_SOME ;
-                        SWAP
-                        /* [ pair (pair address address) mutez timestamp : contract unit : unit
-                           : list operation ] */ ;
-                        CDR @%
-                        /* [ pair mutez timestamp : contract unit : unit : list operation ] */ ;
-                        UNPAIR @% @%
-                        /* [ mutez : timestamp : contract unit : unit : list operation ] */ ;
-                        SWAP
-                        /* [ timestamp : mutez : contract unit : unit : list operation ] */ ;
-                        NOW
-                        /* [ timestamp : timestamp : mutez : contract unit : unit : list operation ] */ ;
-                        ASSERT_CMPLT ;
-                        UNIT
-                        /* [ unit : mutez : contract unit : unit : list operation ] */ ;
-                        TRANSFER_TOKENS
-                        /* [ operation : unit : list operation ] */ }
+                 DIP 2
+                     { GET
+                       /* [ option (pair (pair address address) mutez timestamp) : unit
+                          : list operation ] */ ;
+                       ASSERT_SOME ;
+                       DUP
+                       /* [ pair (pair address address) mutez timestamp
+                          : pair (pair address address) mutez timestamp : unit : list operation ] */ ;
+                       CADR @% ;
+                       CONTRACT @dest
+                         unit
+                       /* [ option (contract unit) : pair (pair address address) mutez timestamp : unit
+                          : list operation ] */ ;
+                       ASSERT_SOME ;
+                       SWAP
+                       /* [ pair (pair address address) mutez timestamp : contract unit : unit
+                          : list operation ] */ ;
+                       CDR @%
+                       /* [ pair mutez timestamp : contract unit : unit : list operation ] */ ;
+                       UNPAIR @% @%
+                       /* [ mutez : timestamp : contract unit : unit : list operation ] */ ;
+                       SWAP
+                       /* [ timestamp : mutez : contract unit : unit : list operation ] */ ;
+                       NOW
+                       /* [ timestamp : timestamp : mutez : contract unit : unit : list operation ] */ ;
+                       ASSERT_CMPLT ;
+                       UNIT
+                       /* [ unit : mutez : contract unit : unit : list operation ] */ ;
+                       TRANSFER_TOKENS
+                       /* [ operation : unit : list operation ] */ }
                  /* [ bytes : big_map bytes (pair (pair address address) mutez timestamp)
                     : operation : unit : list operation ] */ }
                { DUP
@@ -49538,7 +49557,7 @@ Well typed (Gas remaining: 1039985.428 units remaining)	michelson_test_scripts/o
          /* [ address : pair nat nat ] */ ;
          DIP { UNPAIR /* [ nat : nat ] */ }
          /* [ address : nat : nat ] */ ;
-         DIIP { PUSH nat 1 /* [ nat : nat ] */ ; ASSERT_CMPEQ }
+         DIP 2 { PUSH nat 1 /* [ nat : nat ] */ ; ASSERT_CMPEQ }
          /* [ address : nat ] */ ;
          DIP { PUSH nat 42 /* [ nat : nat ] */ ; ASSERT_CMPEQ }
          /* [ address ] */ ;
@@ -50097,7 +50116,7 @@ Well typed (Gas remaining: 1039985.468 units remaining)	michelson_test_scripts/o
          /* [ address : pair nat nat : nat ] */ ;
          DIP { UNPAIR /* [ nat : nat : nat ] */ }
          /* [ address : nat : nat : nat ] */ ;
-         DIIP { ASSERT_CMPEQ }
+         DIP 2 { ASSERT_CMPEQ }
          /* [ address : nat ] */ ;
          DIP { PUSH nat 42 /* [ nat : nat ] */ ; ASSERT_CMPEQ }
          /* [ address ] */ ;
