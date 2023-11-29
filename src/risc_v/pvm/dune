@@ -49,4 +49,7 @@
    (progn
     (run cargo build --release)
     (copy target/release/liboctez_risc_v_pvm.a liboctez_risc_v_pvm.a)
-    (run sed -i s/___rdl_oom/tz_rdl_oo0/ liboctez_risc_v_pvm.a)))))
+    (setenv
+     LC_ALL
+     C
+     (run sed -i'' -e s/___rdl_oom/tz_rdl_oo0/ liboctez_risc_v_pvm.a))))))
