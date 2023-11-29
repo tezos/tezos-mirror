@@ -96,7 +96,7 @@ If you want to know more about the Tezos *technology*, there are several section
 
 Tezos is an open platform. As any programmable blockchain, its value lies in the increasing base of smart contracts and distributed applications covering various domains, but also in the tools that make the ecosystem easier to use and more efficient, such as wallets, indexers, and many others.
 
-If you are looking for an accessible and pedagogical exposition on how to write smart contracts or Dapps, there are many great resources out there for developing on Tezos, such as the `Tezos Developer Portal <https://tezos.com/developer-portal/>`__ and `Open Tezos <https://opentezos.com>`__.
+If you are looking for an accessible and pedagogical exposition on how to write smart contracts or Dapps, there are many great resources out there for developing on Tezos, such as the `Tezos Developer Portal <https://tezos.com/developers/>`__ and `Open Tezos <https://opentezos.com>`__.
 
 For Tezos developers, this website mostly provides reference and API documentation, but also some guidelines, including:
 
