@@ -279,19 +279,11 @@ pub fn run_test(
                     _ => {
                         writeln!(
                             host.buffer.borrow_mut(),
-                            "\nSomething unexpected happened for test {}.",
-                            name
-                        )
-                        .unwrap();
-                        writeln!(
-                            host.buffer.borrow_mut(),
-                            "Expected exception is the following: {:?}",
-                            test_execution.expect_exception
-                        )
-                        .unwrap();
-                        writeln!(
-                            host.buffer.borrow_mut(),
-                            "Furter details on the execution result: {:?}",
+                            "\nSomething unexpected happened for test {}.\n\
+                             Expected exception is the following: {:?}\n\
+                             Further details on the execution result: {:?}",
+                            name,
+                            test_execution.expect_exception,
                             exec_result
                         )
                         .unwrap();
