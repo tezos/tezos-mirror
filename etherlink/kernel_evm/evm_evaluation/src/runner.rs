@@ -22,7 +22,7 @@ use crate::evalhost::EvalHost;
 use crate::fillers::process;
 use crate::helpers::construct_folder_path;
 use crate::models::{Env, FillerSource, SpecName, TestSuite};
-use crate::{Opt, ReportValue};
+use crate::{write_host, Opt, ReportValue};
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
     (
@@ -95,12 +95,11 @@ pub fn run_test(
         writeln!(output_file, "Running unit test: {}", name).unwrap();
         let full_filler_path =
             construct_folder_path(&unit._info.source, &opt.eth_tests, &None);
-        writeln!(
-            host.buffer.borrow_mut(),
+        write_host!(
+            host,
             "Filler source: {}",
             &full_filler_path.to_str().unwrap()
-        )
-        .unwrap();
+        );
         let filler_path = Path::new(&full_filler_path);
         let reader = std::fs::read(filler_path).unwrap();
         let filler_source = if unit._info.source.contains(".json") {
@@ -115,45 +114,25 @@ pub fn run_test(
             None
         };
 
-        writeln!(
-            host.buffer.borrow_mut(),
-            "\n[START] Accounts initialisation"
-        )
-        .unwrap();
+        write_host!(host, "\n[START] Accounts initialisation");
         for (address, info) in unit.pre.into_iter() {
             let h160_address: H160 = address.as_fixed_bytes().into();
-            writeln!(host.buffer.borrow_mut(), "\nAccount is {}", h160_address).unwrap();
+            write_host!(host, "\nAccount is {}", h160_address);
             let mut account =
                 EthereumAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
             if info.nonce != 0 {
                 account.set_nonce(&mut host, info.nonce.into()).unwrap();
-                writeln!(
-                    host.buffer.borrow_mut(),
-                    "Nonce is set for {} : {}",
-                    address,
-                    info.nonce
-                )
-                .unwrap();
+                write_host!(host, "Nonce is set for {} : {}", address, info.nonce);
             }
             account.balance_add(&mut host, info.balance).unwrap();
-            writeln!(
-                host.buffer.borrow_mut(),
-                "Balance for {} was added : {}",
-                address,
-                info.balance
-            )
-            .unwrap();
+            write_host!(host, "Balance for {} was added : {}", address, info.balance);
             account.set_code(&mut host, &info.code).unwrap();
-            writeln!(host.buffer.borrow_mut(), "Code was set for {}", address).unwrap();
+            write_host!(host, "Code was set for {}", address);
             for (index, value) in info.storage.iter() {
                 account.set_storage(&mut host, index, value).unwrap();
             }
         }
-        writeln!(
-            host.buffer.borrow_mut(),
-            "\n[END] Accounts initialisation\n"
-        )
-        .unwrap();
+        write_host!(host, "\n[END] Accounts initialisation\n");
 
         let mut env = Env::default();
 
@@ -251,45 +230,32 @@ pub fn run_test(
                             }
                             None => "[INVALID]",
                         };
-                        writeln!(
-                            host.buffer.borrow_mut(),
-                            "\nOutcome status: {}",
-                            outcome_status
-                        )
-                        .unwrap();
+                        write_host!(host, "\nOutcome status: {}", outcome_status);
                     }
-                    Err(e) => writeln!(
-                        host.buffer.borrow_mut(),
-                        "\nA test failed due to {:?}",
-                        e
-                    )
-                    .unwrap(),
+                    Err(e) => write_host!(host, "\nA test failed due to {:?}", e),
                 }
 
                 write!(host.buffer.borrow_mut(), "\nFinal check: ").unwrap();
                 match (&test_execution.expect_exception, &exec_result) {
                     (None, Ok(_)) => {
-                        writeln!(host.buffer.borrow_mut(), "No unexpected exception.")
-                            .unwrap()
+                        write_host!(host, "No unexpected exception.")
                     }
                     (Some(_), Err(_)) => {
-                        writeln!(host.buffer.borrow_mut(), "Exception was expected.")
-                            .unwrap()
+                        write_host!(host, "Exception was expected.")
                     }
                     _ => {
-                        writeln!(
-                            host.buffer.borrow_mut(),
+                        write_host!(
+                            host,
                             "\nSomething unexpected happened for test {}.\n\
                              Expected exception is the following: {:?}\n\
                              Further details on the execution result: {:?}",
                             name,
                             test_execution.expect_exception,
                             exec_result
-                        )
-                        .unwrap();
+                        );
                     }
                 }
-                writeln!(host.buffer.borrow_mut(), "\n=======> OK! <=======\n").unwrap();
+                write_host!(host, "\n=======> OK! <=======\n");
             }
 
             // Check the state after the execution of the result.
@@ -302,11 +268,10 @@ pub fn run_test(
                     report_key.clone(),
                     output_file,
                 ),
-                None => writeln!(
-                    host.buffer.borrow_mut(),
+                None => write_host!(
+                    host,
                     "No filler file, the outcome of this test is uncertain."
-                )
-                .unwrap(),
+                ),
             };
         }
     }
