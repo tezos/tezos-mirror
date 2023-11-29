@@ -397,18 +397,6 @@ The idea is that a user should not use their own transparent tz{1,2,3}
 address to submit a shielded address but rather have a third party
 inject it.
 
-Message argument
-^^^^^^^^^^^^^^^^
-Sapling also allows to send an arbitrary encrypted message attached
-to an output.
-The message size has to be fixed for each shielded pool for privacy reasons.
-For now it is fixed overall at eight bytes. An incorrect message length
-will raise a failure in our client and the protocol will reject the
-transaction. Our client adds a default zero-filled message of the
-right length. If a message is provided with the ``--message`` option,
-the client will pad it or truncate it if necessary. A warning message
-is printed only if the user's message is truncated.
-
 
 Code base
 ~~~~~~~~~
@@ -478,6 +466,10 @@ For privacy reasons the size of the memo is fixed per contract
 and it is chosen at origination time.
 A transaction containing an output with a different memo-size
 will be rejected.
+Our client adds a default zero-filled message of the
+right length. If a message is provided with the ``--message`` option,
+the client will pad it or truncate it if necessary. A warning message
+is printed only if the user's message is truncated.
 
 Sandbox tutorial
 ~~~~~~~~~~~~~~~~
