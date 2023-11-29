@@ -436,8 +436,8 @@ let make_signers_for_injector operators =
          let strategy =
            match operation_kinds with
            | [Operation_kind.Add_messages] ->
-               (* For the batcher We delay of 0.5 sec to allow more
-                  operator to get in *)
+               (* For the batcher we delay of 0.5 sec to allow more
+                  operations to get in. *)
                `Delay_block 0.5
            | _ -> `Each_block
          in
