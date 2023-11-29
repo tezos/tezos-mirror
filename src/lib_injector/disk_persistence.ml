@@ -190,7 +190,12 @@ let delete_file file =
   @@ protect
   @@ fun () ->
   let open Lwt_result_syntax in
-  let*! () = Lwt_unix.unlink file in
+  let*! () =
+    Lwt.catch
+      (fun () -> Lwt_unix.unlink file)
+      (function
+        | Unix.(Unix_error (ENOENT, _, _)) -> Lwt.return_unit | e -> raise e)
+  in
   return_unit
 
 module Make_table (H : H) = struct
