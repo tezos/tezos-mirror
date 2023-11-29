@@ -387,8 +387,11 @@ let export_snapshot =
     (prefixes ["snapshot"; "export"] @@ stop)
     (fun (data_dir, dest, no_checks, compress_on_the_fly) cctxt ->
       let open Lwt_result_syntax in
+      let compression =
+        if compress_on_the_fly then Snapshots.OnTheFly else Snapshots.After
+      in
       let* snapshot_file =
-        Snapshots.export ~no_checks ~compress_on_the_fly ~data_dir ~dest
+        Snapshots.export ~no_checks ~compression ~data_dir ~dest
       in
       let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
       return_unit)
