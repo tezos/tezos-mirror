@@ -330,13 +330,14 @@ let may_insert_delegate =
       (Tezos_base.TzPervasives.Signature.Public_key_hash) in
   let delegate_cache = create 1_000 in
   fun (module Db : Caqti_lwt.CONNECTION) address ->
-    let already_treated = mem delegate_cache address in
-    if already_treated then
-      Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax.return_unit
-    else
-      Lwt_result.map
-        (fun () -> add delegate_cache address)
-        (Db.exec Sql_requests.maybe_insert_delegate address)
+    (* Note: even if data is already in cache,
+       we add it again in order to mark it as recent. *)
+    Lwt_result.map
+      (fun () -> add delegate_cache address)
+      (if mem delegate_cache address then
+         Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
+         .return_unit
+       else Db.exec Sql_requests.maybe_insert_delegate address)
 
 let endorsing_rights_callback db_pool g rights =
   let level = Int32.of_string (Re.Group.get g 1) in
@@ -374,13 +375,14 @@ let may_insert_operation =
       (Tezos_base.TzPervasives.Operation_hash) in
   let operation_cache = create 10_000 in
   fun (module Db : Caqti_lwt.CONNECTION) hash op ->
-    let already_treated = mem operation_cache hash in
-    if already_treated then
-      Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax.return_unit
-    else
-      Lwt_result.map
-        (fun () -> add operation_cache hash)
-        (Db.exec Sql_requests.maybe_insert_operation op)
+    (* Note: even if data is already in cache,
+       we add it again in order to mark it as recent. *)
+    Lwt_result.map
+      (fun () -> add operation_cache hash)
+      (if mem operation_cache hash then
+         Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
+         .return_unit
+       else Db.exec Sql_requests.maybe_insert_operation op)
 
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
     block_hash operations =
@@ -424,47 +426,56 @@ let block_callback =
       Caqti_lwt.Pool.use
         (fun (module Db : Caqti_lwt.CONNECTION) ->
           let* () =
-            if Block_lru_cache.mem block_cache hash then return_unit
-            else
-              let* () = may_insert_delegate (module Db) delegate in
-              let* () =
-                Db.exec
-                  Sql_requests.maybe_insert_block
-                  ((level, timestamp, hash, round), (predecessor, delegate))
-              in
-              let* () =
-                match cycle_info with
-                | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size} ->
-                    Db.exec
-                      Sql_requests.maybe_insert_cycle
-                      (cycle, Int32.sub level cycle_position, cycle_size)
-                | _ -> Lwt.return_ok ()
-              in
-              Block_lru_cache.add block_cache hash ;
-              return_unit
+            (* Note: even if data is already in cache,
+               we add it again in order to mark it as recent. *)
+            Lwt_result.map
+              (fun () -> Block_lru_cache.add block_cache hash)
+              (if Block_lru_cache.mem block_cache hash then return_unit
+               else
+                 let* () = may_insert_delegate (module Db) delegate in
+                 let* () =
+                   Db.exec
+                     Sql_requests.maybe_insert_block
+                     ((level, timestamp, hash, round), (predecessor, delegate))
+                 in
+                 let* () =
+                   match cycle_info with
+                   | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size}
+                     ->
+                       Db.exec
+                         Sql_requests.maybe_insert_cycle
+                         (cycle, Int32.sub level cycle_position, cycle_size)
+                   | _ -> Lwt.return_ok ()
+                 in
+                 return_unit)
           in
           let* () =
             (* Validated blocks do not provide operations only applied
                one does so we need a second cache *)
-            if Block_lru_cache.mem block_operations_cache hash then return_unit
-            else
-              let* () =
-                insert_operations_from_block
-                  (module Db)
-                  (Int32.pred level)
-                  hash
-                  endorsements
-              in
-              let* () =
-                insert_operations_from_block
-                  (module Db)
-                  level
-                  hash
-                  preendorsements
-              in
-              if endorsements <> [] then
-                Block_lru_cache.add block_operations_cache hash ;
-              return_unit
+            (* Note: even if data is already in cache,
+               we add it again in order to mark it as recent. *)
+            Lwt_result.map
+              (fun () ->
+                if endorsements <> [] then
+                  Block_lru_cache.add block_operations_cache hash)
+              (if Block_lru_cache.mem block_operations_cache hash then
+                 return_unit
+               else
+                 let* () =
+                   insert_operations_from_block
+                     (module Db)
+                     (Int32.pred level)
+                     hash
+                     endorsements
+                 in
+                 let* () =
+                   insert_operations_from_block
+                     (module Db)
+                     level
+                     hash
+                     preendorsements
+                 in
+                 return_unit)
           in
           (* This data is non-redondant: we always treat it. *)
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
