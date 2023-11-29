@@ -21,7 +21,7 @@ use thiserror::Error;
 use crate::evalhost::EvalHost;
 use crate::fillers::process;
 use crate::helpers::construct_folder_path;
-use crate::models::{Env, FillerSource, SpecName, TestSuite};
+use crate::models::{Env, FillerSource, SpecName, TestSuite, TestUnit};
 use crate::{write_host, Opt, ReportValue};
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
@@ -73,6 +73,33 @@ pub enum TestError {
     UnknownPrivateKey { private_key: H256 },
 }
 
+fn prepare_filler_source(
+    host: &EvalHost,
+    unit: &TestUnit,
+    opt: &Opt,
+) -> Result<Option<FillerSource>, TestError> {
+    let full_filler_path =
+        construct_folder_path(&unit._info.source, &opt.eth_tests, &None);
+    write_host!(
+        host,
+        "Filler source: {}",
+        &full_filler_path.to_str().unwrap()
+    );
+    let filler_path = Path::new(&full_filler_path);
+    let reader = std::fs::read(filler_path).unwrap();
+    if unit._info.source.contains(".json") {
+        let filler_source: FillerSource = serde_json::from_reader(&*reader)?;
+        Ok(Some(filler_source))
+    } else if unit._info.source.contains(".yml") {
+        let filler_source: FillerSource = serde_yaml::from_reader(&*reader)?;
+        Ok(Some(filler_source))
+    } else {
+        // Test will be ignored, interpretation of results will not
+        // be possible.
+        Ok(None)
+    }
+}
+
 pub fn run_test(
     path: &Path,
     report_map: &mut HashMap<String, ReportValue>,
@@ -93,26 +120,7 @@ pub fn run_test(
         let mut evm_account_storage = init_account_storage().unwrap();
 
         writeln!(output_file, "Running unit test: {}", name).unwrap();
-        let full_filler_path =
-            construct_folder_path(&unit._info.source, &opt.eth_tests, &None);
-        write_host!(
-            host,
-            "Filler source: {}",
-            &full_filler_path.to_str().unwrap()
-        );
-        let filler_path = Path::new(&full_filler_path);
-        let reader = std::fs::read(filler_path).unwrap();
-        let filler_source = if unit._info.source.contains(".json") {
-            let filler_source: FillerSource = serde_json::from_reader(&*reader)?;
-            Some(filler_source)
-        } else if unit._info.source.contains(".yml") {
-            let filler_source: FillerSource = serde_yaml::from_reader(&*reader)?;
-            Some(filler_source)
-        } else {
-            // Test will be ignored, interpretation of results will not
-            // be possible.
-            None
-        };
+        let filler_source = prepare_filler_source(&host, &unit, opt)?;
 
         write_host!(host, "\n[START] Accounts initialisation");
         for (address, info) in unit.pre.into_iter() {
