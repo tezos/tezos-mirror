@@ -82,6 +82,11 @@ val init :
 (** [spawn_run evm_node] same as {!run} but spawns a process. *)
 val spawn_run : t -> Process.t
 
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
 (** [endpoint evm_node] returns the endpoint to communicate with the
     [evm_node]. *)
 val endpoint : t -> string
