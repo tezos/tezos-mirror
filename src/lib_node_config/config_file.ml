@@ -165,11 +165,11 @@ let blockchain_network_ghostnet =
     ~default_bootstrap_peers:
       [
         "ghostnet.teztnets.xyz";
-        "ghostnet.smartpy.io";
+        "ghostnet.tzinit.org";
+        "ghostnet.tzboot.net";
         "ghostnet.boot.ecadinfra.com";
         "ghostnet.kaml.fr";
         "ghostnet.stakenow.de:9733";
-        "ghostnet.visualtez.com";
       ]
 
 let blockchain_network_sandbox =
