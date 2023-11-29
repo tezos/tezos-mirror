@@ -1,0 +1,3 @@
+code { SOME } ;
+input { } ;
+output (StaticError _)

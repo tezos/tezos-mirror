@@ -1,0 +1,4 @@
+code { MEM } ;
+input { Stack_elt nat 3 ; Stack_elt (big_map nat nat) 10 } ;
+output { Stack_elt bool False } ;
+big_maps { Big_map 10 nat nat { Elt 1 4 ; Elt 2 11 } }

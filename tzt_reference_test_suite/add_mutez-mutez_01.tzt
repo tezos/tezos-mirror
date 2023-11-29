@@ -1,0 +1,3 @@
+code { ADD } ;
+input { Stack_elt mutez 9223372036854775807 ; Stack_elt mutez 1 } ;
+output (MutezOverflow 9223372036854775807 1)

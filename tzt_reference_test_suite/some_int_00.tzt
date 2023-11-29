@@ -1,0 +1,3 @@
+code { SOME } ;
+input { Stack_elt int 5 } ;
+output { Stack_elt (option int) (Some 5) }

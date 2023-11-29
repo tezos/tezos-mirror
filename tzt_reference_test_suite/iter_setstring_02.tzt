@@ -1,0 +1,3 @@
+code { ITER { SWAP ; CONCAT } } ;
+input { Stack_elt (set string) { } ; Stack_elt string "" } ;
+output { Stack_elt string "" }

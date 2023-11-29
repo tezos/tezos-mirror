@@ -1,0 +1,3 @@
+code { IF { PUSH nat 1 } { PUSH int 1 } } ;
+input { Stack_elt bool True } ;
+output (StaticError _)

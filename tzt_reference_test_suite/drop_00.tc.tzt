@@ -1,0 +1,3 @@
+code { DROP } ;
+input { } ;
+output (StaticError _);

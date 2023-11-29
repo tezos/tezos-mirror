@@ -1,0 +1,3 @@
+code { COMPARE } ;
+input { Stack_elt nat 1 ; Stack_elt nat 1 } ;
+output { Stack_elt int 0 }

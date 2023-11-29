@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (contract unit) "tz1LQ5c9xSrgLnLkS95ydhCyZr4cuv5WfUi9" } ;
+output { Stack_elt bytes 0x050a0000001600000854bc32bfe1ce7a82d58e37ea42a4f9100e03b4 } ;

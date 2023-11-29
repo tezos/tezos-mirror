@@ -1,0 +1,3 @@
+code { ITER { ADD } } ;
+input { Stack_elt (set int) { -100 ; 1 ; 2 ; 3 } ; Stack_elt int 0 } ;
+output { Stack_elt int -94 }

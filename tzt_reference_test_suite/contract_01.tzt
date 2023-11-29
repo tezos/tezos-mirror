@@ -1,0 +1,4 @@
+code { CONTRACT unit } ;
+input { Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+output { Stack_elt (option (contract unit)) None } ;
+other_contracts { Contract "KT1QuofAgnsWffHzLA7D78rxytJruGHDe7XG" unit }

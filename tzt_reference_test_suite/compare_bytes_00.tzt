@@ -1,0 +1,3 @@
+code { COMPARE } ;
+input { Stack_elt bytes 0xaabbcc ; Stack_elt bytes 0xAABBCC } ;
+output { Stack_elt int 0 }

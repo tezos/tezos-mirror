@@ -1,0 +1,4 @@
+code { PACK } ;
+input { Stack_elt (lambda bool unit) { ASSERT; UNIT } } ;
+output { Stack_elt bytes 0x05020000001c0200000015072c020000000002000000090200000004034f0327034f } ;
+# How macro expanded before packing can be checked with `octez-client expand macros`

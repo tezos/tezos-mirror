@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (map bool unit) { Elt False Unit } } ;
+output { Stack_elt bytes 0x05020000000607040303030b } ;

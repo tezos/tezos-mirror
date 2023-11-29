@@ -1,0 +1,3 @@
+code { AND } ;
+input { Stack_elt nat 6 ; Stack_elt nat 5 } ;
+output { Stack_elt nat 4 }

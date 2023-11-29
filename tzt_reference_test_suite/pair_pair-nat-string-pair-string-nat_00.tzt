@@ -1,0 +1,3 @@
+code { PAIR } ;
+input { Stack_elt (pair nat string) (Pair 5 "Hello") ; Stack_elt (pair string nat) (Pair "World" 6) } ;
+output { Stack_elt (pair (pair nat string) (pair string nat)) (Pair (Pair 5 "Hello") (Pair "World" 6)) }

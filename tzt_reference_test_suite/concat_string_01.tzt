@@ -1,0 +1,3 @@
+code { ITER { SWAP ; DIP { NIL string ; SWAP ; CONS } ; CONS ; CONCAT } } ;
+input { Stack_elt (list string) { "a" ; "b" ; "c" } ; Stack_elt string "" } ;
+output { Stack_elt string "abc" }

@@ -1,0 +1,3 @@
+code { DIP { PUSH bool True } } ;
+input { Stack_elt nat 5 } ;
+output { Stack_elt nat 5 ; Stack_elt bool True }

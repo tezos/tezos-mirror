@@ -1,0 +1,3 @@
+code { NOT } ;
+input { Stack_elt bytes 0xC5CD } ;
+output { Stack_elt bytes 0x3a32}

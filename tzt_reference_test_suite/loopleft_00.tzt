@@ -1,0 +1,3 @@
+code { LOOP_LEFT { PUSH int 2 ; ADD ; DUP ; DIP { PUSH int 10 } ; COMPARE ; GE ; IF { DROP ; PUSH string "hello" ; RIGHT int } { LEFT string } } } ;
+input { Stack_elt (or int string) (Left 1) } ;
+output { Stack_elt string "hello" }

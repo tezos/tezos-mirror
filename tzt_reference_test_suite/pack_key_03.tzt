@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt key "BLpk1nKe7wQ28U8UWBCujAGVfrBXNTw2GyodckgGdxccayFyY3phv5i8ZPWXwT1HunAzPM6x674o" } ;
+output { Stack_elt bytes 0x050a000000310386fdbdf3fae0262882ff5d3e01884fed9e1f1248d7f24e9fcf12bbb06fedf0dc322bb915ba4bd4357f2136ce98aabda3 } ;

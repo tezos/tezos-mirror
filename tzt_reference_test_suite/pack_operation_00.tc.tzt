@@ -1,0 +1,3 @@
+code { SET_DELEGATE; PACK } ;
+input { Stack_elt (option key_hash) None } ;
+output (StaticError _) ;

@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt address "sr1QrKHrxcritCgwevZVtPNaDtDa1mu6WKcY" } ;
+output { Stack_elt bytes 0x050a0000001603ce54758ccfeb1a7b4dc7602b9267b1be1a08d4dd00 } ;

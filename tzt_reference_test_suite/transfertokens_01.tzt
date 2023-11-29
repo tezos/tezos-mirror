@@ -1,0 +1,4 @@
+code { TRANSFER_TOKENS } ;
+input { Stack_elt mutez 20 ; Stack_elt mutez 5 ; Stack_elt (contract mutez) "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+output { Stack_elt operation (Transfer_tokens 20 5 "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" _) } ;
+other_contracts { Contract "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" mutez }

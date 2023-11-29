@@ -1,0 +1,3 @@
+code { PACK ; UNPACK key_hash } ;
+input { Stack_elt key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" } ;
+output { Stack_elt (option key_hash) (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") }

@@ -1,0 +1,3 @@
+code { ADD } ;
+input { Stack_elt mutez 5 ; Stack_elt mutez 12 } ;
+output { Stack_elt mutez 17 }
