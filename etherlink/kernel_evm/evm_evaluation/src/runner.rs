@@ -100,6 +100,30 @@ fn prepare_filler_source(
     }
 }
 
+fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
+    write_host!(host, "\n[START] Accounts initialisation");
+
+    for (address, info) in unit.pre.to_owned().iter() {
+        let h160_address: H160 = address.as_fixed_bytes().into();
+        write_host!(host, "\nAccount is {}", h160_address);
+        let mut account =
+            EthereumAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
+        if info.nonce != 0 {
+            account.set_nonce(host, info.nonce.into()).unwrap();
+            write_host!(host, "Nonce is set for {} : {}", address, info.nonce);
+        }
+        account.balance_add(host, info.balance).unwrap();
+        write_host!(host, "Balance for {} was added : {}", address, info.balance);
+        account.set_code(host, &info.code).unwrap();
+        write_host!(host, "Code was set for {}", address);
+        for (index, value) in info.storage.iter() {
+            account.set_storage(host, index, value).unwrap();
+        }
+    }
+
+    write_host!(host, "\n[END] Accounts initialisation\n");
+}
+
 pub fn run_test(
     path: &Path,
     report_map: &mut HashMap<String, ReportValue>,
@@ -122,25 +146,7 @@ pub fn run_test(
         writeln!(output_file, "Running unit test: {}", name).unwrap();
         let filler_source = prepare_filler_source(&host, &unit, opt)?;
 
-        write_host!(host, "\n[START] Accounts initialisation");
-        for (address, info) in unit.pre.into_iter() {
-            let h160_address: H160 = address.as_fixed_bytes().into();
-            write_host!(host, "\nAccount is {}", h160_address);
-            let mut account =
-                EthereumAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
-            if info.nonce != 0 {
-                account.set_nonce(&mut host, info.nonce.into()).unwrap();
-                write_host!(host, "Nonce is set for {} : {}", address, info.nonce);
-            }
-            account.balance_add(&mut host, info.balance).unwrap();
-            write_host!(host, "Balance for {} was added : {}", address, info.balance);
-            account.set_code(&mut host, &info.code).unwrap();
-            write_host!(host, "Code was set for {}", address);
-            for (index, value) in info.storage.iter() {
-                account.set_storage(&mut host, index, value).unwrap();
-            }
-        }
-        write_host!(host, "\n[END] Accounts initialisation\n");
+        initialize_accounts(&mut host, &unit);
 
         let mut env = Env::default();
 
