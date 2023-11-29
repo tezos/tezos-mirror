@@ -389,16 +389,29 @@ let post_checks ~action ~message snapshot_metadata ~dest =
   let* () = Store.close store in
   return_unit
 
+(* Magic bytes for gzip files is 1f8b. *)
+let is_compressed_snapshot snapshot_file =
+  let ic = open_in snapshot_file in
+  try
+    let ok = input_byte ic = 0x1f && input_byte ic = 0x8b in
+    close_in ic ;
+    ok
+  with
+  | End_of_file ->
+      close_in ic ;
+      false
+  | e ->
+      close_in ic ;
+      raise e
+
 let post_export_checks ~snapshot_file =
   let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
+  let reader =
+    if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
+  in
   let* snapshot_metadata =
-    extract
-      gzip_reader
-      stdlib_writer
-      (fun _ -> return_unit)
-      ~snapshot_file
-      ~dest
+    extract reader stdlib_writer (fun _ -> return_unit) ~snapshot_file ~dest
   in
   post_checks
     ~action:`Export
@@ -539,9 +552,12 @@ let import ~no_checks cctxt ~data_dir ~snapshot_file =
     ~when_locked:`Fail
     (Node_context.global_lockfile_path ~data_dir)
   @@ fun () ->
+  let reader =
+    if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
+  in
   let* snapshot_metadata =
     extract
-      gzip_reader
+      reader
       stdlib_writer
       (pre_import_checks cctxt ~data_dir)
       ~snapshot_file
