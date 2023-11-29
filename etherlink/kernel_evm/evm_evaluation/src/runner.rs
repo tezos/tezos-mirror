@@ -219,6 +219,52 @@ fn execute_transaction(
     )
 }
 
+fn check_results(
+    host: &EvalHost,
+    name: &str,
+    test: &Test,
+    exec_result: &Result<Option<ExecutionOutcome>, EthereumError>,
+) {
+    match exec_result {
+        Ok(execution_outcome_opt) => {
+            let outcome_status = match execution_outcome_opt {
+                Some(execution_outcome) => {
+                    if execution_outcome.is_success {
+                        "[SUCCESS]"
+                    } else {
+                        "[FAILURE]"
+                    }
+                }
+                None => "[INVALID]",
+            };
+            write_host!(host, "\nOutcome status: {}", outcome_status);
+        }
+        Err(e) => write_host!(host, "\nA test failed due to {:?}", e),
+    }
+
+    write_host!(host, "\nFinal check: ");
+    match (test.expect_exception.clone(), exec_result) {
+        (None, Ok(_)) => {
+            write_host!(host, "No unexpected exception.")
+        }
+        (Some(_), Err(_)) => {
+            write_host!(host, "Exception was expected.")
+        }
+        _ => {
+            write_host!(
+                host,
+                "\nSomething unexpected happened for test {}.\n\
+                 Expected exception is the following: {:?}\n\
+                 Further details on the execution result: {:?}",
+                name,
+                &test.expect_exception,
+                exec_result
+            );
+        }
+    }
+    write_host!(host, "\n=======> OK! <=======\n");
+}
+
 pub fn run_test(
     path: &Path,
     report_map: &mut HashMap<String, ReportValue>,
@@ -261,44 +307,7 @@ pub fn run_test(
                     test_execution,
                 );
 
-                match &exec_result {
-                    Ok(execution_outcome_opt) => {
-                        let outcome_status = match execution_outcome_opt {
-                            Some(execution_outcome) => {
-                                if execution_outcome.is_success {
-                                    "[SUCCESS]"
-                                } else {
-                                    "[FAILURE]"
-                                }
-                            }
-                            None => "[INVALID]",
-                        };
-                        write_host!(host, "\nOutcome status: {}", outcome_status);
-                    }
-                    Err(e) => write_host!(host, "\nA test failed due to {:?}", e),
-                }
-
-                write!(host.buffer.borrow_mut(), "\nFinal check: ").unwrap();
-                match (&test_execution.expect_exception, &exec_result) {
-                    (None, Ok(_)) => {
-                        write_host!(host, "No unexpected exception.")
-                    }
-                    (Some(_), Err(_)) => {
-                        write_host!(host, "Exception was expected.")
-                    }
-                    _ => {
-                        write_host!(
-                            host,
-                            "\nSomething unexpected happened for test {}.\n\
-                             Expected exception is the following: {:?}\n\
-                             Further details on the execution result: {:?}",
-                            name,
-                            test_execution.expect_exception,
-                            exec_result
-                        );
-                    }
-                }
-                write_host!(host, "\n=======> OK! <=======\n");
+                check_results(&host, &name, test_execution, &exec_result);
             }
 
             // Check the state after the execution of the result.
