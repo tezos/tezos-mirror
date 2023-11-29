@@ -35,6 +35,7 @@ use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::{index_account, read_ticketer};
+use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{tick_model, CONFIG};
 
 // This implementation of `Transaction` is used to share the logic of
@@ -188,12 +189,34 @@ fn account<Host: Runtime>(
     Ok(evm_account_storage.get(host, &caller_account_path)?)
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Validity {
+    Valid(H160),
+    InvalidChainId,
+    InvalidGasLimit,
+    InvalidSignature,
+    InvalidNonce,
+    InvalidPrePay,
+    InvalidCode,
+    InvalidMaxBaseFee,
+}
+
 fn is_valid_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
-) -> Result<Option<H160>, Error> {
+) -> Result<Validity, Error> {
+    // Chain id is correct.
+    if block_constant.chain_id != transaction.chain_id {
+        log!(host, Debug, "Transaction status: ERROR_CHAINID");
+        return Ok(Validity::InvalidChainId);
+    }
+    // Gas limit is bounded.
+    if transaction.gas_limit > MAX_TRANSACTION_GAS_LIMIT {
+        log!(host, Debug, "Transaction status: ERROR_GASLIMIT");
+        return Ok(Validity::InvalidGasLimit);
+    }
     // The transaction signature is valid.
     let caller = match transaction.caller() {
         Ok(caller) => caller,
@@ -201,7 +224,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
             log!(host, Debug, "Transaction status: ERROR_SIGNATURE.");
             // Transaction with undefined caller are ignored, i.e. the caller
             // could not be derived from the signature.
-            return Ok(None);
+            return Ok(Validity::InvalidSignature);
         }
     };
 
@@ -219,7 +242,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     // The transaction nonce is valid.
     if nonce != transaction.nonce {
         log!(host, Debug, "Transaction status: ERROR_NONCE.");
-        return Ok(None);
+        return Ok(Validity::InvalidNonce);
     };
 
     // The sender account balance contains at least the cost.
@@ -229,13 +252,13 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         U256::from(transaction.gas_limit).saturating_mul(transaction.max_fee_per_gas);
     if balance < cost || balance < max_fee {
         log!(host, Debug, "Transaction status: ERROR_PRE_PAY.");
-        return Ok(None);
+        return Ok(Validity::InvalidPrePay);
     }
 
     // The sender does not have code, see EIP3607.
     if code_exists {
         log!(host, Debug, "Transaction status: ERROR_CODE.");
-        return Ok(None);
+        return Ok(Validity::InvalidCode);
     }
 
     // EIP 1559 checks
@@ -245,10 +268,10 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         || transaction.max_fee_per_gas < transaction.max_priority_fee_per_gas
     {
         log!(host, Debug, "Transaction status: ERROR_MAX_BASE_FEE");
-        return Ok(None);
+        return Ok(Validity::InvalidMaxBaseFee);
     }
 
-    Ok(Some(caller))
+    Ok(Validity::Valid(caller))
 }
 
 pub struct TransactionResult {
@@ -272,8 +295,8 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         transaction,
         block_constants,
     )? {
-        Some(caller) => caller,
-        None => return Ok(None),
+        Validity::Valid(caller) => caller,
+        _reason => return Ok(None),
     };
 
     let to = transaction.to;
@@ -515,6 +538,7 @@ pub fn apply_transaction<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use crate::{apply::Validity, tick_model::constants::MAX_TRANSACTION_GAS_LIMIT};
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use tezos_ethereum::{
@@ -529,10 +553,12 @@ mod tests {
 
     use super::{is_valid_ethereum_transaction_common, make_object_info};
 
+    const CHAIN_ID: u32 = 1337;
+
     fn mock_block_constants() -> BlockConstants {
         BlockConstants::first_block(
             U256::from(Timestamp::from(0).as_u64()),
-            U256::from(1337),
+            CHAIN_ID.into(),
             U256::from(21000),
         )
     }
@@ -575,7 +601,7 @@ mod tests {
     fn valid_tx() -> EthereumTransactionCommon {
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Eip1559,
-            chain_id: U256::from(1),
+            chain_id: CHAIN_ID.into(),
             nonce: U256::from(0),
             max_priority_fee_per_gas: U256::zero(),
             max_fee_per_gas: U256::from(21000),
@@ -612,7 +638,7 @@ mod tests {
             &block_constants,
         );
         assert_eq!(
-            Some(address),
+            Validity::Valid(address),
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
@@ -641,7 +667,7 @@ mod tests {
             &block_constants,
         );
         assert_eq!(
-            None,
+            Validity::InvalidPrePay,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
@@ -670,7 +696,7 @@ mod tests {
             &block_constants,
         );
         assert_eq!(
-            None,
+            Validity::InvalidSignature,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
@@ -688,6 +714,7 @@ mod tests {
         let balance = U256::from(21000 * 21000);
         let mut transaction = valid_tx();
         transaction.nonce = U256::from(42);
+        transaction = resign(transaction);
 
         // fund account
         set_balance(&mut host, &mut evm_account_storage, &address, balance);
@@ -700,7 +727,69 @@ mod tests {
             &block_constants,
         );
         assert_eq!(
-            None,
+            Validity::InvalidNonce,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_wrong_chain_id() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let mut transaction = valid_tx();
+        transaction.chain_id = U256::from(42);
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            Validity::InvalidChainId,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_wrong_gas_limit() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(21000 * 21000);
+        let mut transaction = valid_tx();
+        transaction.gas_limit = MAX_TRANSACTION_GAS_LIMIT + 1;
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+        );
+        assert_eq!(
+            Validity::InvalidGasLimit,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
@@ -732,7 +821,7 @@ mod tests {
             &block_constants,
         );
         assert_eq!(
-            None,
+            Validity::InvalidMaxBaseFee,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
@@ -764,7 +853,7 @@ mod tests {
             &block_constants,
         );
         assert_eq!(
-            None,
+            Validity::InvalidMaxBaseFee,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
