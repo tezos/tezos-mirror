@@ -337,7 +337,9 @@ let setup_evm_kernel ?config ?kernel_installee
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
-  let* evm_node = Evm_node.init ~devmode:true sc_rollup_node in
+  let* evm_node =
+    Evm_node.init ~devmode:true (Sc_rollup_node.endpoint sc_rollup_node)
+  in
   let endpoint = Evm_node.endpoint evm_node in
   return
     {
@@ -486,7 +488,7 @@ let test_evm_node_connection =
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:Constant.bootstrap1.alias
   in
-  let evm_node = Evm_node.create sc_rollup_node in
+  let evm_node = Evm_node.create (Sc_rollup_node.endpoint sc_rollup_node) in
   (* Tries to start the EVM node server without a listening rollup node. *)
   let process = Evm_node.spawn_run evm_node in
   let* () = Process.check ~expect_failure:true process in
@@ -2562,7 +2564,11 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
-  let* evm_node = Evm_node.init ~devmode:false evm_setup.sc_rollup_node in
+  let* evm_node =
+    Evm_node.init
+      ~devmode:false
+      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+  in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
     scenario_prior ~evm_setup:{evm_setup with evm_node; endpoint}
@@ -2713,7 +2719,7 @@ let test_deposit_dailynet =
       smart_rollup_node_extra_args
   in
 
-  let* evm_node = Evm_node.init sc_rollup_node in
+  let* evm_node = Evm_node.init (Sc_rollup_node.endpoint sc_rollup_node) in
   let endpoint = Evm_node.endpoint evm_node in
 
   (* Deposit tokens to the EVM rollup. *)

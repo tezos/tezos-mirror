@@ -38,7 +38,7 @@ type mode =
   | Proxy
 
 (** [create ?runner ?mode ?data_dir ?devmode ?rpc_addr ?rpc_port
-    rollup_node] creates an EVM node server.
+    rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to ["127.0.0.1"] and a fresh port is
@@ -48,7 +48,7 @@ type mode =
     set it to the one on production set [devmode] to [false] (or omit the parameter).
 
     The server communicates with a rollup-node and sets its endpoint via
-    [rollup_node].
+    [rollup_node_endpoint].
 
     [mode] defaults to [Proxy].
 *)
@@ -59,16 +59,16 @@ val create :
   ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
-  Sc_rollup_node.t ->
+  string ->
   t
 
 (** [run evm_node] launches the EVM node server with the arguments
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
-(** [init ?runner ?mode ?data_dir ?devmode ?rpc_addr ?rpc_port rollup_node]
-    creates an EVM node server with {!create} and runs it with
-    {!run}. *)
+(** [init ?runner ?mode ?data_dir ?devmode ?rpc_addr ?rpc_port
+    rollup_node_endpoint] creates an EVM node server with {!create}
+    and runs it with {!run}. *)
 val init :
   ?runner:Runner.t ->
   ?mode:mode ->
@@ -76,7 +76,7 @@ val init :
   ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
-  Sc_rollup_node.t ->
+  string ->
   t Lwt.t
 
 (** [spawn_run evm_node] same as {!run} but spawns a process. *)

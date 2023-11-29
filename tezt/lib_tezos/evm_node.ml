@@ -36,7 +36,7 @@ module Parameters = struct
     devmode : bool;
     rpc_addr : string;
     rpc_port : int;
-    rollup_node : Sc_rollup_node.t;
+    rollup_node_endpoint : string;
     runner : Runner.t option;
   }
 
@@ -96,7 +96,7 @@ let wait_for_ready evm_node =
       check_event evm_node event_ready_name promise
 
 let create ?runner ?(mode = Proxy) ?data_dir ~devmode ?rpc_addr ?rpc_port
-    rollup_node =
+    rollup_node_endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ~devmode ?rpc_addr ?rpc_port ()
   in
@@ -116,7 +116,7 @@ let create ?runner ?(mode = Proxy) ?data_dir ~devmode ?rpc_addr ?rpc_port
         devmode;
         rpc_addr;
         rpc_port;
-        rollup_node;
+        rollup_node_endpoint;
         runner;
       }
   in
@@ -127,9 +127,6 @@ let create ?runner ?mode ?data_dir ?(devmode = false) ?rpc_addr ?rpc_port
     rollup_node =
   create ?mode ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node
 
-let rollup_node_endpoint evm_node =
-  Sc_rollup_node.endpoint evm_node.persistent_state.rollup_node
-
 let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
 let run_args evm_node =
@@ -137,14 +134,20 @@ let run_args evm_node =
   let mode_args =
     match evm_node.persistent_state.mode with
     | Proxy ->
-        ["run"; "proxy"; "with"; "endpoint"; rollup_node_endpoint evm_node]
+        [
+          "run";
+          "proxy";
+          "with";
+          "endpoint";
+          evm_node.persistent_state.rollup_node_endpoint;
+        ]
     | Sequencer {kernel; preimage_dir} ->
         [
           "run";
           "sequencer";
           "with";
           "endpoint";
-          rollup_node_endpoint evm_node;
+          evm_node.persistent_state.rollup_node_endpoint;
           "--kernel";
           kernel;
           "--preimage-dir";
