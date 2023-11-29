@@ -144,7 +144,7 @@ let () =
     ~id:"michelson_v1.script_overflow"
     ~title:"Script failed (overflow error)"
     ~description:
-      "A FAIL instruction was reached due to the detection of an overflow"
+      "While interpreting a Michelson script, an overflow was detected"
     (obj2
        (req "location" Script.location_encoding)
        (opt "trace" trace_encoding))
