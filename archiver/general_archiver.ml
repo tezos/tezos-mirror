@@ -335,11 +335,16 @@ module Loops (Archiver : Archiver.S) = struct
         Lwt.return_unit
 
   let reception_blocks_loop cctx =
+    let logger = Teztale_lib.Log.logger () in
     let*! block_stream =
       Shell_services.Monitor.applied_blocks cctx ~chains:[cctx#chain] ()
     in
     match block_stream with
     | Error e ->
+        let () =
+          Teztale_lib.Log.error logger (fun () ->
+              Format.asprintf "%a" Error_monad.pp_print_trace e)
+        in
         let () = Error_monad.pp_print_trace Format.err_formatter e in
         Lwt.return_unit
     | Ok (block_stream, _stopper) ->
@@ -373,11 +378,13 @@ module Loops (Archiver : Archiver.S) = struct
                           in
                           match recorder with
                           | None ->
-                              let*! () =
-                                Lwt_fmt.eprintf
-                                  "no block recorder found for protocol %a@."
-                                  Protocol_hash.pp
-                                  current_protocol
+                              let () =
+                                Teztale_lib.Log.error logger (fun () ->
+                                    Format.asprintf
+                                      "no block recorder found for protocol \
+                                       %a@."
+                                      Protocol_hash.pp
+                                      current_protocol)
                               in
                               Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
                           | Some (rights_of, get_applied_block) ->
@@ -430,16 +437,17 @@ module Loops (Archiver : Archiver.S) = struct
                                       header.Block_header.shell
                                         .Block_header.proto_level ) )
                         else
-                          let*! () =
-                            Lwt_fmt.eprintf
-                              "skipping block %a, migrating from protocol %a \
-                               to %a@."
-                              Block_hash.pp
-                              hash
-                              Protocol_hash.pp
-                              current_protocol
-                              Protocol_hash.pp
-                              next_protocol
+                          let () =
+                            Teztale_lib.Log.error logger (fun () ->
+                                Format.asprintf
+                                  "skipping block %a, migrating from protocol \
+                                   %a to %a@."
+                                  Block_hash.pp
+                                  hash
+                                  Protocol_hash.pp
+                                  current_protocol
+                                  Protocol_hash.pp
+                                  next_protocol)
                           in
                           Lwt.return ((fun _ _ _ _ _ -> return_unit), None))
               in

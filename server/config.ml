@@ -35,6 +35,7 @@ type t = {
   users : (string * string) list;
   max_batch_size : int32;
   with_transaction : bool;
+  verbosity : Teztale_lib.Log.level;
 }
 
 let tls_conf_encoding =
@@ -75,6 +76,7 @@ let encoding =
            users;
            max_batch_size;
            with_transaction;
+           verbosity;
          } ->
       ( db_uri,
         network_interfaces,
@@ -82,14 +84,16 @@ let encoding =
         admins,
         users,
         max_batch_size,
-        with_transaction ))
+        with_transaction,
+        verbosity ))
     (fun ( db_uri,
            network_interfaces,
            public_directory,
            admins,
            users,
            max_batch_size,
-           with_transaction ) ->
+           with_transaction,
+           verbosity ) ->
       {
         db_uri;
         network_interfaces;
@@ -98,8 +102,9 @@ let encoding =
         users;
         max_batch_size;
         with_transaction;
+        verbosity;
       })
-    (obj7
+    (obj8
        (req
           ~description:
             "Uri to reach the database: sqlite3:path or postgresql://host:port"
@@ -116,4 +121,5 @@ let encoding =
        (req "admins" (list login_encoding))
        (req "users" (list login_encoding))
        (dft "max_batch_size" int32 0l)
-       (dft "with_transaction" bool false))
+       (dft "with_transaction" bool false)
+       (dft "verbosity" Teztale_lib.Log.level_encoding ERROR))

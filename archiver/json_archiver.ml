@@ -266,11 +266,17 @@ let add_inclusion_in_block block_hash validators delegate_operations =
         updated_known
         unknown
 
-let dump_included_in_block path block_level block_hash block_predecessor
+let dump_included_in_block logger path block_level block_hash block_predecessor
     block_round timestamp reception_times baker cycle_info consensus_ops =
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
+   Teztale_lib.Log.info logger (fun () ->
+       Format.asprintf
+         "Dumping delegate operations in block %a at level %li."
+         Block_hash.pp
+         block_hash
+         block_level) ;
    let mutex = get_file_mutex filename in
    Lwt_mutex.with_lock mutex (fun () ->
        let* infos = load filename Data.encoding Data.empty in
@@ -296,15 +302,16 @@ let dump_included_in_block path block_level block_hash block_predecessor
    match out with
    | Ok () -> Lwt.return_unit
    | Error err ->
-       Lwt_io.printl
-         (Format.asprintf
-            "@[Failed to dump delegate operations in block %a at level %li :@ \
-             @[%a@]@]"
-            Block_hash.pp
-            block_hash
-            block_level
-            Error_monad.pp_print_trace
-            err))
+       Teztale_lib.Log.error logger (fun () ->
+           Format.asprintf
+             "@[Failed to dump delegate operations in block %a at level %li :@ \
+              @[%a@]@]"
+             Block_hash.pp
+             block_hash
+             block_level
+             Error_monad.pp_print_trace
+             err) ;
+       Lwt.return_unit)
   <&>
   let filename = filename_of_level path block_level in
   let mutex = get_file_mutex filename in
@@ -339,14 +346,15 @@ let dump_included_in_block path block_level block_hash block_predecessor
   match out with
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Lwt_io.printl
-        (Format.asprintf
-           "@[Failed to dump block %a at level %li :@ @[%a@]@]"
-           Block_hash.pp
-           block_hash
-           block_level
-           Error_monad.pp_print_trace
-           err)
+      Teztale_lib.Log.error logger (fun () ->
+          Format.asprintf
+            "@[Failed to dump block %a at level %li :@ @[%a@]@]"
+            Block_hash.pp
+            block_hash
+            block_level
+            Error_monad.pp_print_trace
+            err) ;
+      Lwt.return_unit
 
 (* NB: the same operation may be received several times; we only record the
    first reception time. *)
@@ -383,7 +391,7 @@ let merge_operations =
           }
           :: acc)
 
-let dump_received path ?unaccurate level received_ops =
+let dump_received logger path ?unaccurate level received_ops =
   let filename = filename_of_level path level in
   let mutex = get_file_mutex filename in
   let*! out =
@@ -476,12 +484,13 @@ let dump_received path ?unaccurate level received_ops =
   match out with
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Lwt_io.printl
-        (Format.asprintf
-           "@[Failed to dump delegate operations at level %li :@ @[%a@]@]"
-           level
-           Error_monad.pp_print_trace
-           err)
+      Teztale_lib.Log.error logger (fun () ->
+          Format.asprintf
+            "@[Failed to dump delegate operations at level %li :@ @[%a@]@]"
+            level
+            Error_monad.pp_print_trace
+            err) ;
+      Lwt.return_unit
 
 type chunk =
   | Block of
@@ -498,7 +507,9 @@ type chunk =
 
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
-let dump prefix = function
+let dump prefix chunk =
+  let logger = Teztale_lib.Log.logger () in
+  match chunk with
   | Block
       ( level,
         block_hash,
@@ -510,6 +521,7 @@ let dump prefix = function
         cycle_info,
         block_info ) ->
       dump_included_in_block
+        logger
         prefix
         level
         block_hash
@@ -521,7 +533,7 @@ let dump prefix = function
         cycle_info
         block_info
   | Mempool (unaccurate, level, items) ->
-      dump_received prefix ?unaccurate level items
+      dump_received logger prefix ?unaccurate level items
 
 let launch _cctxt prefix = Lwt_stream.iter_p (dump prefix) chunk_stream
 

@@ -35,6 +35,7 @@ type t = {
   users : (string * string) list;
   max_batch_size : int32;
   with_transaction : bool;
+  verbosity : Teztale_lib.Log.level;
 }
 
 (** Encoding driver for a structure with two required fields: "login" and "password" *)

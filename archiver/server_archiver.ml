@@ -52,28 +52,36 @@ let extract_auth uri =
   let pass = Option.value (Uri.password uri) ~default:"secret" in
   {auth = (user, pass); endpoint = Uri.with_uri ~userinfo:None uri}
 
-let send_something ctx path body log_msg_prefix =
-  let headers =
-    Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
-  in
-  Lwt_list.iter_p
-    (fun {auth; endpoint} ->
-      let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
-      let uri = Uri.with_path endpoint (Uri.path endpoint ^ "/" ^ path) in
-      let*! resp, out =
-        Cohttp_lwt_unix.Client.post ~ctx:ctx.cohttp_ctx ~body ~headers uri
-      in
-      let*! out = Cohttp_lwt.Body.to_string out in
-      let msg =
-        Printf.sprintf
-          "%s%s: %s"
-          log_msg_prefix
-          (Cohttp.Code.string_of_status resp.status)
-          out
-      in
-      let*! () = Lwt_io.printlf "%s" msg in
-      if resp.status <> `OK then Lwt.fail_with msg else Lwt.return_unit)
-    ctx.endpoints
+let send_something =
+  let sent = ref 0 in
+  let received = ref 0 in
+  fun ctx path body ->
+    let headers =
+      Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
+    in
+    Lwt_list.iter_p
+      (fun {auth; endpoint} ->
+        let logger = Teztale_lib.Log.logger () in
+        let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
+        let uri = Uri.with_path endpoint (Uri.path endpoint ^ "/" ^ path) in
+        incr sent ;
+        let*! resp, out =
+          Teztale_lib.Log.debug logger (fun () -> "Sending " ^ path) ;
+          Cohttp_lwt_unix.Client.post ~ctx:ctx.cohttp_ctx ~body ~headers uri
+        in
+        incr received ;
+        let*! out = Cohttp_lwt.Body.to_string out in
+        let msg =
+          Printf.sprintf
+            "%s: %s (%d/%d requests treated)"
+            (Cohttp.Code.string_of_status resp.status)
+            out
+            !received
+            !sent
+        in
+        let () = Teztale_lib.Log.info logger (fun () -> msg) in
+        if resp.status <> `OK then Lwt.fail_with msg else Lwt.return_unit)
+      ctx.endpoints
 
 let send_rights ctx level rights =
   let body =
@@ -84,8 +92,7 @@ let send_rights ctx level rights =
             rights))
   in
   let path = Int32.to_string level ^ "/rights" in
-  let log_msg_prefix = Format.sprintf "level %li: " level in
-  send_something ctx path body log_msg_prefix
+  send_something ctx path body
 
 let send_block ctx level block_data =
   let body =
@@ -94,8 +101,7 @@ let send_block ctx level block_data =
          (Data_encoding.Json.construct Data.block_data_encoding block_data))
   in
   let path = Int32.to_string level ^ "/block" in
-  let log_msg_prefix = Format.sprintf "level %li: " level in
-  send_something ctx path body log_msg_prefix
+  send_something ctx path body
 
 let send_mempool ctx level ops =
   let body =
@@ -104,8 +110,7 @@ let send_mempool ctx level ops =
          (Data_encoding.Json.construct Consensus_ops.delegate_ops_encoding ops))
   in
   let path = Int32.to_string level ^ "/mempool" in
-  let log_msg_prefix = Format.sprintf "level %li: " level in
-  send_something ctx path body log_msg_prefix
+  send_something ctx path body
 
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
 

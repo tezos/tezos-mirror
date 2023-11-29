@@ -135,11 +135,12 @@ let with_data encoding body f =
           ~body:(Printexc.to_string e)
           ())
 
-let with_caqti_error x f =
+let with_caqti_error ~logger x f =
   Lwt.bind x (function
       | Ok x -> f x
       | Error e ->
           let body = Caqti_error.show e in
+          Teztale_lib.Log.error logger (fun () -> body) ;
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
 let reply_json0 ?(status = `OK) ?headers:(headers_arg = []) body =
@@ -194,7 +195,7 @@ let reply_public_compressed_json ?status ?(headers = []) encoding data =
     encoding
     data
 
-let get_stats db_pool =
+let get_stats ~logger db_pool =
   let query =
     Caqti_request.Infix.(
       Caqti_type.(unit ->? tup3 int32 int32 Sql_requests.Type.time_protocol))
@@ -202,6 +203,7 @@ let get_stats db_pool =
        DESC LIMIT 1"
   in
   with_caqti_error
+    ~logger
     (Caqti_lwt.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query ())
        db_pool)
@@ -218,12 +220,13 @@ let get_stats db_pool =
           let body = "No registered block yet." in
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
-let get_head db_pool =
+let get_head ~logger db_pool =
   let query =
     Caqti_request.Infix.(Caqti_type.(unit ->? int32))
       "SELECT MAX (level) FROM blocks"
   in
   with_caqti_error
+    ~logger
     (Caqti_lwt.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query ())
        db_pool)
@@ -231,12 +234,13 @@ let get_head db_pool =
       reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
 
 (** Fetch allowed users' logins from db. *)
-let get_users db_pool =
+let get_users ~logger db_pool =
   let query =
     Caqti_request.Infix.(Caqti_type.(unit ->* string))
       "SELECT name FROM nodes WHERE password IS NOT NULL"
   in
   with_caqti_error
+    ~logger
     (Caqti_lwt.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) -> Db.collect_list query ())
        db_pool)
@@ -348,7 +352,7 @@ let endorsing_rights_callback =
         let hash = Int32.to_int
       end) in
   let level_cache = create 100 in
-  fun db_pool g rights ->
+  fun ~logger db_pool g rights ->
     let level = Int32.of_string (Re.Group.get g 1) in
     let out =
       let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -356,32 +360,45 @@ let endorsing_rights_callback =
          we add it again in order to mark it as recent. *)
       Lwt_result.map
         (fun () -> add level_cache level)
-        (if mem level_cache level then return_unit
+        (if mem level_cache level then
+           let () =
+             Teztale_lib.Log.debug logger (fun () ->
+                 Format.asprintf "(%ld) CACHE.mem Level rights" level)
+           in
+           return_unit
          else
-           Caqti_lwt.Pool.use
-             (fun (module Db : Caqti_lwt.CONNECTION) ->
-               let* () =
+           let* () =
+             Caqti_lwt.Pool.use
+               (fun (module Db : Caqti_lwt.CONNECTION) ->
+                 let* () =
+                   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                     (fun right ->
+                       may_insert_delegate
+                         (module Db)
+                         right.Teztale_lib.Consensus_ops.address)
+                     rights
+                 in
                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                   (fun right ->
-                     may_insert_delegate
-                       (module Db)
-                       right.Teztale_lib.Consensus_ops.address)
-                   rights
-               in
-               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                 (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
-                   Db.exec
-                     Sql_requests.maybe_insert_endorsing_right
-                     (level, first_slot, power, address))
-                 rights)
-             db_pool)
+                   (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
+                     Db.exec
+                       Sql_requests.maybe_insert_endorsing_right
+                       (level, first_slot, power, address))
+                   rights)
+               db_pool
+           in
+           let () =
+             Teztale_lib.Log.debug logger (fun () ->
+                 Format.asprintf "(%ld) CACHE.add Level rights" level)
+           in
+           return_unit)
     in
-    with_caqti_error out (fun () ->
+
+    with_caqti_error ~logger out (fun () ->
         Cohttp_lwt_unix.Server.respond_string
           ~headers:
             (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
           ~status:`OK
-          ~body:"Endorsing_right noted"
+          ~body:"Endorsing rights"
           ())
 
 let may_insert_operation =
@@ -428,7 +445,8 @@ module Block_lru_cache =
 let block_callback =
   let block_cache = Block_lru_cache.create 100 in
   let block_operations_cache = Block_lru_cache.create 100 in
-  fun conf
+  fun ~logger
+      conf
       db_pool
       g
       source
@@ -446,7 +464,16 @@ let block_callback =
                we add it again in order to mark it as recent. *)
             Lwt_result.map
               (fun () -> Block_lru_cache.add block_cache hash)
-              (if Block_lru_cache.mem block_cache hash then return_unit
+              (if Block_lru_cache.mem block_cache hash then
+                 let () =
+                   Teztale_lib.Log.debug logger (fun () ->
+                       Format.asprintf
+                         "(%ld) CACHE.mem %a"
+                         level
+                         Tezos_base.TzPervasives.Block_hash.pp
+                         hash)
+                 in
+                 return_unit
                else
                  let* () = may_insert_delegate (module Db) delegate in
                  let* () =
@@ -463,6 +490,12 @@ let block_callback =
                          (cycle, Int32.sub level cycle_position, cycle_size)
                    | _ -> Lwt.return_ok ()
                  in
+                 Teztale_lib.Log.debug logger (fun () ->
+                     Format.asprintf
+                       "(%ld) CACHE.add (block) %a"
+                       level
+                       Tezos_base.TzPervasives.Block_hash.pp
+                       hash) ;
                  return_unit)
           in
           let* () =
@@ -491,28 +524,47 @@ let block_callback =
                      hash
                      preendorsements
                  in
+                 Teztale_lib.Log.debug logger (fun () ->
+                     Format.asprintf
+                       "(%ld) CACHE.add (block operations) %a"
+                       level
+                       Tezos_base.TzPervasives.Block_hash.pp
+                       hash) ;
                  return_unit)
           in
-          (* This data is non-redondant: we always treat it. *)
-          maybe_with_transaction conf (module Db) @@ fun () ->
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun r ->
-              let open Teztale_lib.Data.Block in
-              Db.exec
-                Sql_requests.insert_received_block
-                (r.application_time, r.validation_time, hash, source))
-            reception_times)
+          let* () =
+            (* This data is non-redondant: we always treat it. *)
+            maybe_with_transaction conf (module Db) @@ fun () ->
+            Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+              (fun r ->
+                let open Teztale_lib.Data.Block in
+                Db.exec
+                  Sql_requests.insert_received_block
+                  (r.application_time, r.validation_time, hash, source))
+              reception_times
+          in
+          Teztale_lib.Log.debug logger (fun () ->
+              Format.asprintf
+                "(%ld) OK Block reception times for %a"
+                level
+                Tezos_base.TzPervasives.Block_hash.pp
+                hash) ;
+          return_unit)
         db_pool
     in
-    with_caqti_error out (fun () ->
+    with_caqti_error ~logger out (fun () ->
         Cohttp_lwt_unix.Server.respond_string
           ~headers:
             (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
           ~status:`OK
-          ~body:"Block registered"
+          ~body:
+            (Format.asprintf
+               "Block %a"
+               Tezos_base.TzPervasives.Block_hash.pp
+               hash)
           ())
 
-let operations_callback conf db_pool g source operations =
+let operations_callback ~logger conf db_pool g source operations =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -526,6 +578,8 @@ let operations_callback conf db_pool g source operations =
                 right.Teztale_lib.Consensus_ops.address)
             operations
         in
+        Teztale_lib.Log.debug logger (fun () ->
+            Printf.sprintf "(%ld) OK Delegates" level) ;
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, ops) ->
@@ -539,32 +593,39 @@ let operations_callback conf db_pool g source operations =
                 ops)
             operations
         in
-        maybe_with_transaction conf (module Db) @@ fun () ->
-        Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-          (fun (right, ops) ->
-            Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-              (fun op ->
-                Db.exec
-                  Sql_requests.insert_received_operation
-                  Teztale_lib.Consensus_ops.
-                    ( ( op.reception_time,
-                        op.errors,
-                        right.Teztale_lib.Consensus_ops.address,
-                        op.op.kind = Endorsement ),
-                      (op.op.round, source, level) ))
-              ops)
-          operations)
+        Teztale_lib.Log.debug logger (fun () ->
+            Printf.sprintf "(%ld) OK Operations" level) ;
+        let* () =
+          maybe_with_transaction conf (module Db) @@ fun () ->
+          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+            (fun (right, ops) ->
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun op ->
+                  Db.exec
+                    Sql_requests.insert_received_operation
+                    Teztale_lib.Consensus_ops.
+                      ( ( op.reception_time,
+                          op.errors,
+                          right.Teztale_lib.Consensus_ops.address,
+                          op.op.kind = Endorsement ),
+                        (op.op.round, source, level) ))
+                ops)
+            operations
+        in
+        Teztale_lib.Log.debug logger (fun () ->
+            Printf.sprintf "(%ld) OK Operations reception times" level) ;
+        Lwt.return_ok ())
       db_pool
   in
-  with_caqti_error out (fun () ->
+  with_caqti_error ~logger out (fun () ->
       Cohttp_lwt_unix.Server.respond_string
         ~headers:
           (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
         ~status:`OK
-        ~body:"Received operations stored"
+        ~body:"Operations reception times"
         ())
 
-let import_callback db_pool g data =
+let import_callback ~logger db_pool g data =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -707,7 +768,7 @@ let import_callback db_pool g data =
         return_unit)
       db_pool
   in
-  with_caqti_error out (fun () ->
+  with_caqti_error ~logger out (fun () ->
       Cohttp_lwt_unix.Server.respond_string
         ~headers:
           (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
@@ -718,6 +779,7 @@ let import_callback db_pool g data =
 let routes :
     (Re.re
     * (Re.Group.t ->
+      logger:Teztale_lib.Log.t ->
       conf:Config.t ->
       admins:(string * Bcrypt.hash) list ->
       users:(string * Bcrypt.hash) list ref ->
@@ -729,36 +791,39 @@ let routes :
     list =
   [
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"],
-      fun g ~conf:_ ~admins:_ ~users db_pool header meth body ->
+      fun g ~logger ~conf:_ ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun _source ->
             with_data
               Teztale_lib.Consensus_ops.rights_encoding
               body
-              (endorsing_rights_callback db_pool g)) );
+              (endorsing_rights_callback ~logger db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
-      fun g ~conf ~admins:_ ~users db_pool header meth body ->
+      fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
               Teztale_lib.Data.block_data_encoding
               body
-              (block_callback conf db_pool g source)) );
+              (block_callback ~logger conf db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
-      fun g ~conf ~admins:_ ~users db_pool header meth body ->
+      fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
               Teztale_lib.Consensus_ops.delegate_ops_encoding
               body
-              (operations_callback conf db_pool g source)) );
+              (operations_callback ~logger conf db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/import"],
-      fun g ~conf:_ ~admins ~users:_ db_pool header meth body ->
+      fun g ~logger ~conf:_ ~admins ~users:_ db_pool header meth body ->
         post_only_endpoint admins header meth (fun _source ->
-            with_data Teztale_lib.Data.encoding body (import_callback db_pool g))
-    );
+            with_data
+              Teztale_lib.Data.encoding
+              body
+              (import_callback ~logger db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
-      fun g ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let level = Int32.of_string (Re.Group.get g 1) in
             with_caqti_error
+              ~logger
               (Exporter.data_at_level_range db_pool (level, level))
               (fun data ->
                 reply_public_json Teztale_lib.Data.encoding (List.hd data).data))
@@ -771,7 +836,7 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str ".json";
         ],
-      fun g ~conf ~admins:_ ~users:_ db_pool header meth _body ->
+      fun g ~logger ~conf ~admins:_ ~users:_ db_pool header meth _body ->
         get_only_endpoint meth (fun () ->
             let min = Re.Group.get g 1 in
             let max = Re.Group.get g 2 in
@@ -785,6 +850,7 @@ let routes :
               Cohttp_lwt_unix.Server.respond_error ~body ()
             else
               with_caqti_error
+                ~logger
                 (Exporter.data_at_level_range
                    db_pool
                    (Int32.of_string min, Int32.of_string max))
@@ -801,11 +867,12 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str "/anomalies.json";
         ],
-      fun g ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let first_level = int_of_string (Re.Group.get g 1) in
             let last_level = int_of_string (Re.Group.get g 2) in
             with_caqti_error
+              ~logger
               (let levels =
                  Stdlib.List.init
                    (last_level - first_level + 1)
@@ -830,7 +897,7 @@ let routes :
                   ~body
                   ())) );
     ( Re.str "/user",
-      fun _g ~conf:_ ~admins ~users db_pool header meth body ->
+      fun _g ~logger ~conf:_ ~admins ~users db_pool header meth body ->
         let reply_ok login () =
           reply_json
             Data_encoding.(obj2 (req "status" string) (req "login" string))
@@ -843,6 +910,7 @@ let routes :
                 with_data Config.login_encoding body (fun (login, password) ->
                     let password = Bcrypt.hash password in
                     with_caqti_error
+                      ~logger
                       (Lwt_result.bind
                          (upsert_user db_pool login password)
                          (fun () -> refresh_users db_pool users))
@@ -853,35 +921,39 @@ let routes :
                   body
                   (fun login ->
                     with_caqti_error
+                      ~logger
                       (Lwt_result.bind (delete_user db_pool login) (fun () ->
                            refresh_users db_pool users))
                       (reply_ok login))
             | `OPTIONS -> options_respond methods
             | _ -> method_not_allowed_respond methods) );
     ( Re.str "/users",
-      fun _g ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
-        get_only_endpoint meth (fun () -> get_users db_pool) );
+      fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
+        get_only_endpoint meth (fun () -> get_users ~logger db_pool) );
     ( Re.str "/stats.json",
-      fun _g ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
-        get_stats db_pool );
+      fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
+        get_stats ~logger db_pool );
     ( Re.str "/head.json",
-      fun _g ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
-        get_head db_pool );
+      fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
+        get_head ~logger db_pool );
   ]
   |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
 
 let callback ~conf ~admins ~users db_pool _connection request body =
+  let logger = Teztale_lib.Log.logger () in
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
   let uri = Cohttp.Request.uri request in
   let path = Uri.path uri in
+  Teztale_lib.Log.info logger (fun () ->
+      Printf.sprintf "%s %s" (Cohttp.Code.string_of_method meth) path) ;
   match
     List.find_map
       (fun (r, fn) ->
         match Re.exec_opt r path with Some g -> Some (fn g) | None -> None)
       routes
   with
-  | Some fn -> fn ~conf ~admins ~users db_pool header meth body
+  | Some fn -> fn ~logger ~conf ~admins ~users db_pool header meth body
   | None -> (
       match conf.Config.public_directory with
       | None -> Cohttp_lwt_unix.Server.respond_not_found ()
@@ -943,6 +1015,8 @@ let conf =
           exit 1)
 
 let () =
+  Teztale_lib.Log.verbosity := conf.Config.verbosity ;
+  let logger = Teztale_lib.Log.logger () in
   let uri = Uri.of_string conf.Config.db_uri in
   let users = ref [] in
   let admins = List.map (fun (u, p) -> (u, Bcrypt.hash p)) conf.Config.admins in
@@ -1007,16 +1081,15 @@ let () =
                                               | None ->
                                                   `TCP (`Port con.Config.port)
                                             in
-                                            Format.printf
-                                              "Server listening at %a:%d@."
-                                              (Format.pp_print_option
-                                                 ~none:(fun f () ->
-                                                   Format.pp_print_string
-                                                     f
-                                                     "<default>")
-                                                 Format.pp_print_string)
-                                              con.Config.source
-                                              con.port ;
+                                            Teztale_lib.Log.info
+                                              logger
+                                              (fun () ->
+                                                Printf.sprintf
+                                                  "Server listening at %s:%d."
+                                                  (match con.Config.source with
+                                                  | None -> "<default>"
+                                                  | Some s -> s)
+                                                  con.port) ;
                                             Cohttp_lwt_unix.Server.create
                                               ~stop
                                               ~ctx
