@@ -2203,6 +2203,22 @@ let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     client
   |> Process.check
 
+let spawn_run_tzt_unit_tests ?hooks ?protocol_hash ~tests ?no_base_dir_warnings
+    client =
+  spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
+  @@ ["run"; "unit"; "tests"; "from"]
+  @ tests
+
+let run_tzt_unit_tests ?hooks ?protocol_hash ~tests ?no_base_dir_warnings client
+    =
+  spawn_run_tzt_unit_tests
+    ?hooks
+    ?protocol_hash
+    ~tests
+    ?no_base_dir_warnings
+    client
+  |> Process.check
+
 let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode
     ?other_contracts ?extra_big_maps ~entrypoint ~contract ?input
     ?(unlimited_gas = false) client =
