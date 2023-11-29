@@ -250,6 +250,27 @@ let check_last_commitment head snapshot_metadata =
        Commitment.Hash.pp
        snapshot_metadata.last_commitment
 
+let check_last_commitment_published cctxt snapshot_metadata =
+  let open Lwt_result_syntax in
+  Error.trace_lwt_result_with
+    "Last commitment of snapshot is not published on L1."
+  @@ let* {current_protocol; _} =
+       Tezos_shell_services.Shell_services.Blocks.protocols
+         cctxt
+         ~block:(`Head 0)
+         ()
+     in
+     let*? (module Plugin) =
+       Protocol_plugins.proto_plugin_for_protocol current_protocol
+     in
+     let* (_commitment : Commitment.t) =
+       Plugin.Layer1_helpers.get_commitment
+         cctxt
+         snapshot_metadata.address
+         snapshot_metadata.last_commitment
+     in
+     return_unit
+
 let post_checks ~action ~message snapshot_metadata ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
@@ -302,7 +323,7 @@ let post_checks ~action ~message snapshot_metadata ~dest =
 let post_export_checks ~snapshot_file =
   let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
-  let* () =
+  let* snapshot_metadata =
     extract
       gzip_reader
       stdlib_writer
@@ -310,7 +331,11 @@ let post_export_checks ~snapshot_file =
       ~snapshot_file
       ~dest
   in
-  post_checks ~action:`Export ~message:"Checking snapshot   " ~dest
+  post_checks
+    ~action:`Export
+    ~message:"Checking snapshot   "
+    snapshot_metadata
+    ~dest
 
 let operator_local_file_regexp =
   Re.Str.regexp "^storage/\\(commitments_published_at_level.*\\|lpc$\\)"
@@ -364,7 +389,7 @@ let export ~data_dir ~dest =
   let* () = post_export_checks ~snapshot_file in
   return snapshot_file
 
-let pre_import_checks ~data_dir snapshot_metadata =
+let pre_import_checks cctxt ~data_dir snapshot_metadata =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   (* Load stores in read-only to make simple checks. *)
@@ -421,6 +446,7 @@ let pre_import_checks ~data_dir snapshot_metadata =
              head.header.level
              snapshot_metadata.head_level
   in
+  let* () = check_last_commitment_published cctxt snapshot_metadata in
   return_unit
 
 let import cctxt ~data_dir ~snapshot_file =
@@ -431,12 +457,16 @@ let import cctxt ~data_dir ~snapshot_file =
     ~when_locked:`Fail
     (Node_context.global_lockfile_path ~data_dir)
   @@ fun () ->
-  let* () =
+  let* snapshot_metadata =
     extract
       gzip_reader
       stdlib_writer
-      (pre_import_checks ~data_dir)
+      (pre_import_checks cctxt ~data_dir)
       ~snapshot_file
       ~dest:data_dir
   in
-  post_checks ~action:`Import ~message:"Checking imported data" ~dest:data_dir
+  post_checks
+    ~action:`Import
+    ~message:"Checking imported data"
+    snapshot_metadata
+    ~dest:data_dir

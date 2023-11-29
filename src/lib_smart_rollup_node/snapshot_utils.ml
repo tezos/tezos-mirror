@@ -274,7 +274,7 @@ let extract (module Reader : READER) (module Writer : WRITER) metadata_check
       Progress_bar.with_reporter spinner @@ fun count_progress ->
       Writer.count_progress := count_progress ;
       Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
-      return_unit)
+      return metadata)
     (fun () ->
       Reader.close_in in_chan ;
       Lwt.return_unit)
