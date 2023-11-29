@@ -379,16 +379,23 @@ let export_snapshot =
   command
     ~group
     ~desc:"Export a snapshot of the rollup node state."
-    (args4
+    (args5
        data_dir_arg
        Cli.snapshot_dir_arg
        Cli.no_checks_arg
-       Cli.compress_on_the_fly_arg)
+       Cli.compress_on_the_fly_arg
+       Cli.uncompressed)
     (prefixes ["snapshot"; "export"] @@ stop)
-    (fun (data_dir, dest, no_checks, compress_on_the_fly) cctxt ->
+    (fun (data_dir, dest, no_checks, compress_on_the_fly, uncompressed) cctxt ->
       let open Lwt_result_syntax in
-      let compression =
-        if compress_on_the_fly then Snapshots.OnTheFly else Snapshots.After
+      let*! compression =
+        match (compress_on_the_fly, uncompressed) with
+        | true, true ->
+            cctxt#error
+              "Cannot have both --uncompressed and --compress-on-the-fly"
+        | true, false -> Lwt.return Snapshots.On_the_fly
+        | false, false -> Lwt.return Snapshots.After
+        | false, true -> Lwt.return Snapshots.No
       in
       let* snapshot_file =
         Snapshots.export ~no_checks ~compression ~data_dir ~dest
