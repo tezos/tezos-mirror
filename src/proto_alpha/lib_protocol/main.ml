@@ -367,15 +367,17 @@ let init chain_id ctxt block_header =
   let predecessor = block_header.predecessor in
   let typecheck_smart_contract (ctxt : Alpha_context.context)
       (script : Alpha_context.Script.t) =
-    let allow_forged_in_storage =
-      false
+    let allow_forged_tickets_in_storage, allow_forged_lazy_storage_id_in_storage
+        =
+      (false, false)
       (* There should be no forged value in bootstrap contracts. *)
     in
     let* Ex_script (Script parsed_script), ctxt =
       Script_ir_translator.parse_script
         ctxt
         ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-        ~allow_forged_in_storage
+        ~allow_forged_tickets_in_storage
+        ~allow_forged_lazy_storage_id_in_storage
         script
     in
     let* storage, lazy_storage_diff, ctxt =

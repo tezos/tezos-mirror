@@ -118,7 +118,8 @@ let data_typechecker_workload ctxt t_kind micheline_node ex_ty =
            Script_ir_translator.parse_data
              ctxt
              ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-             ~allow_forged:false
+             ~allow_forged_tickets:false
+             ~allow_forged_lazy_storage_id:false
              ty
              micheline_node
            |> Lwt.map Environment.wrap_tzresult

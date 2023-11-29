@@ -87,7 +87,8 @@ let get_address_from_storage inc factory_addr =
     Script_ir_translator.parse_data
       ctxt
       ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-      ~allow_forged:false
+      ~allow_forged_tickets:false
+      ~allow_forged_lazy_storage_id:false
       option_address_t
       (Micheline.root factory_storage)
   in

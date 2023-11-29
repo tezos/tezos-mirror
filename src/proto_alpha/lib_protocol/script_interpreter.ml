@@ -574,7 +574,8 @@ module Raw = struct
               let* Ex_script (Script {storage; storage_type; views; _}), ctxt =
                 parse_script
                   ~elab_conf:legacy
-                  ~allow_forged_in_storage:true
+                  ~allow_forged_tickets_in_storage:true
+                  ~allow_forged_lazy_storage_id_in_storage:true
                   ctxt
                   script
               in
@@ -1770,7 +1771,8 @@ let lift_execution_arg (type a ac) ctxt ~internal (entrypoint_ty : (a, ac) ty)
         parse_data
           ctxt
           ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-          ~allow_forged:internal
+          ~allow_forged_tickets:internal
+          ~allow_forged_lazy_storage_id:internal
           entrypoint_ty
           arg
     | Typed_arg (loc, parsed_arg_ty, parsed_arg) ->
@@ -1825,7 +1827,8 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
           ctxt
           unparsed_script
           ~elab_conf
-          ~allow_forged_in_storage:true
+          ~allow_forged_tickets_in_storage:true
+          ~allow_forged_lazy_storage_id_in_storage:true
     | Some ex_script -> return (ex_script, ctxt)
   in
   let*? r, ctxt =

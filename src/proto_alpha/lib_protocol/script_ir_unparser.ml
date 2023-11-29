@@ -489,7 +489,8 @@ module type MICHELSON_PARSER = sig
     elab_conf:Script_ir_translator_config.elab_config ->
     stack_depth:int ->
     context ->
-    allow_forged:bool ->
+    allow_forged_tickets:bool ->
+    allow_forged_lazy_storage_id:bool ->
     ('a, 'ac) ty ->
     Script.node ->
     ('a * t) tzresult Lwt.t
@@ -767,8 +768,8 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
             ~legacy:elab_conf.legacy
             ty
         in
-        let allow_forged =
-          false
+        let allow_forged_tickets, allow_forged_lazy_storage_id =
+          (false, false)
           (* Forgeable in PUSH data are already forbidden at parsing,
              the only case for which this matters is storing a lambda resulting
              from APPLYing a non-forgeable but this cannot happen either as long
@@ -780,7 +781,8 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
             ~elab_conf
             ctxt
             ~stack_depth:(stack_depth + 1)
-            ~allow_forged
+            ~allow_forged_tickets
+            ~allow_forged_lazy_storage_id
             t
             data
         in

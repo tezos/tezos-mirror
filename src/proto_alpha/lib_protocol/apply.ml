@@ -1091,7 +1091,8 @@ let apply_manager_operation :
                 Script_ir_translator.parse_data
                   ~elab_conf
                   ctxt
-                  ~allow_forged:false
+                  ~allow_forged_tickets:false
+                  ~allow_forged_lazy_storage_id:false
                   Script_typed_ir.pair_int_int_unit_t
                   (Micheline.root parameters)
               in
@@ -1152,13 +1153,8 @@ let apply_manager_operation :
               Script_ir_translator.parse_data
                 ctxt
                 ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-                  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2964
-
-                     Setting [allow_forged] to [true] would also enable placing
-                     lazy storage ids in the parameter, which is something we should avoid.
-                     To prevent this, we should split [allow_forged] into something like
-                     [allow_tickets] and [allow_lazy_storage_id]. *)
-                ~allow_forged:true
+                ~allow_forged_tickets:true
+                ~allow_forged_lazy_storage_id:true
                 parameters_ty
                 (Micheline.root parameters)
             in
@@ -1321,7 +1317,8 @@ let apply_manager_operation :
           Script_ir_translator.parse_script
             ctxt
             ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-            ~allow_forged_in_storage:false
+            ~allow_forged_tickets_in_storage:false
+            ~allow_forged_lazy_storage_id_in_storage:false
             script
         in
         let (Script {storage_type; views; storage; _}) = parsed_script in

@@ -780,14 +780,16 @@ module Scripts = struct
           (fun () ->
             let exp_ty = Script_ir_unparser.serialize_ty_for_error exp_ty in
             Script_tc_errors.Ill_typed_data (None, data, exp_ty))
-          (let allow_forged =
+          (let allow_forged_tickets = true in
+           let allow_forged_lazy_storage_id =
              true
              (* Safe since we ignore the value afterwards. *)
            in
            Script_ir_translator.parse_data
              ctxt
              ~elab_conf:(elab_conf ~legacy ())
-             ~allow_forged
+             ~allow_forged_tickets
+             ~allow_forged_lazy_storage_id
              exp_ty
              (Micheline.root data))
       in
@@ -909,7 +911,8 @@ module Scripts = struct
               Script_ir_translator.parse_data
                 ctxt
                 ~elab_conf
-                ~allow_forged:true
+                ~allow_forged_tickets:true
+                ~allow_forged_lazy_storage_id:true
                 ty
                 data_node
             in
@@ -1289,7 +1292,8 @@ module Scripts = struct
               parse_data
                 ctxt
                 ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-                ~allow_forged:true
+                ~allow_forged_tickets:true
+                ~allow_forged_lazy_storage_id:true
                 map_ty
                 items
             in
@@ -1778,7 +1782,8 @@ module Scripts = struct
         let* storage, _ =
           Script_ir_translator.parse_data
             ~elab_conf
-            ~allow_forged:true
+            ~allow_forged_tickets:true
+            ~allow_forged_lazy_storage_id:true
             ctxt
             storage_type
             (Micheline.root storage)
@@ -1828,7 +1833,8 @@ module Scripts = struct
           parse_data
             ctxt
             ~elab_conf:(elab_conf ~legacy:true ())
-            ~allow_forged:true
+            ~allow_forged_tickets:true
+            ~allow_forged_lazy_storage_id:true
             typ
             (Micheline.root expr)
         in
@@ -1855,7 +1861,8 @@ module Scripts = struct
           parse_data
             ctxt
             ~elab_conf:(elab_conf ~legacy ())
-            ~allow_forged:true
+            ~allow_forged_tickets:true
+            ~allow_forged_lazy_storage_id:true
             typ
             (Micheline.root expr)
         in
@@ -2348,7 +2355,8 @@ module Contract = struct
               parse_script
                 ctxt
                 ~elab_conf:(elab_conf ~legacy:true ())
-                ~allow_forged_in_storage:true
+                ~allow_forged_tickets_in_storage:true
+                ~allow_forged_lazy_storage_id_in_storage:true
                 script
             in
             let+ storage, _ctxt =
@@ -2370,7 +2378,8 @@ module Contract = struct
               Script_ir_translator.parse_and_unparse_script_unaccounted
                 ctxt
                 ~legacy:true
-                ~allow_forged_in_storage:true
+                ~allow_forged_tickets_in_storage:true
+                ~allow_forged_lazy_storage_id_in_storage:true
                 unparsing_mode
                 ~normalize_types
                 script
@@ -2417,7 +2426,8 @@ module Contract = struct
               Script_ir_translator.parse_script
                 ctxt
                 ~elab_conf:(elab_conf ~legacy:true ())
-                ~allow_forged_in_storage:true
+                ~allow_forged_tickets_in_storage:true
+                ~allow_forged_lazy_storage_id_in_storage:true
                 script
             in
             let*? has_tickets, ctxt =
@@ -2538,7 +2548,8 @@ module Big_map = struct
                   parse_data
                     ctxt
                     ~elab_conf:(elab_conf ~legacy:true ())
-                    ~allow_forged:true
+                    ~allow_forged_tickets:true
+                    ~allow_forged_lazy_storage_id:true
                     value_type
                     (Micheline.root value)
                 in

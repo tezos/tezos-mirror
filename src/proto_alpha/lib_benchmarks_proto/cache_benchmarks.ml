@@ -69,7 +69,8 @@ let dummy_script : Cache.cached_contract =
     Script_ir_translator.parse_script
       throwaway_context
       ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-      ~allow_forged_in_storage:false
+      ~allow_forged_tickets_in_storage:false
+      ~allow_forged_lazy_storage_id_in_storage:false
       script
     |> assert_ok_lwt
   in

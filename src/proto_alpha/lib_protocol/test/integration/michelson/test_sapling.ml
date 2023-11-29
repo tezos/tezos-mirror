@@ -1053,7 +1053,8 @@ module Interpreter_tests = struct
         Script_ir_translator.parse_script
           ctx_without_gas_2
           ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-          ~allow_forged_in_storage:true
+          ~allow_forged_tickets_in_storage:true
+          ~allow_forged_lazy_storage_id_in_storage:true
           script
       in
       let*?@ id, _ctx_2 =
@@ -1197,7 +1198,8 @@ module Interpreter_tests = struct
       Script_ir_translator.parse_storage
         ctx_without_gas
         ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-        ~allow_forged:true
+        ~allow_forged_tickets:true
+        ~allow_forged_lazy_storage_id:true
         tytype
         ~storage:storage_lazy_expr
     in

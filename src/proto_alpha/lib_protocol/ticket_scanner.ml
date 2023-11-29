@@ -498,7 +498,8 @@ module Ticket_collection = struct
                       ~elab_conf:
                         Script_ir_translator_config.(make ~legacy:true ())
                       ctxt
-                      ~allow_forged:true
+                      ~allow_forged_tickets:true
+                      ~allow_forged_lazy_storage_id:true
                       value_type
                       (Micheline.root exp)
                   in
@@ -547,7 +548,8 @@ let tickets_of_node ctxt ~include_lazy has_tickets expr =
         Script_ir_translator.parse_data
           ctxt
           ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-          ~allow_forged:true
+          ~allow_forged_tickets:true
+          ~allow_forged_lazy_storage_id:true
           ty
           expr
       in
