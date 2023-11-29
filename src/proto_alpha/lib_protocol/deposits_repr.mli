@@ -32,8 +32,6 @@
 
     The [initial_amount] may be increased during the current cycle only, when
     an unstake is requested.
-
-    TODO #5788: possibly rename fields
 *)
 type t = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 
