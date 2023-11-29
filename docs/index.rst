@@ -239,3 +239,10 @@ Platform developers are also provided reference materials for internal APIs of O
    releases/releases
    releases/version-18
    releases/history
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Global doc
+   :hidden:
+
+   global/architecture
