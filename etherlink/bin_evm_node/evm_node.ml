@@ -244,15 +244,15 @@ let data_parameter =
 let kernel_arg =
   Tezos_clic.arg
     ~long:"kernel"
+    ~placeholder:"evm_installer.wasm"
     ~doc:"Path to the EVM kernel"
-    ~placeholder:"_evm_installer_preimages"
     Params.string
 
 let preimages_arg =
   Tezos_clic.arg
     ~long:"preimage-dir"
     ~doc:"Path to the preimages directory"
-    ~placeholder:"evm_installer.wasm"
+    ~placeholder:"_evm_installer_preimages"
     Params.string
 
 let proxy_command =
