@@ -6,7 +6,7 @@ use crate::evalhost::EvalHost;
 use crate::helpers::{parse_and_get_cmp, purify_network};
 use crate::models::spec::SpecId;
 use crate::models::{AccountInfoFiller, FillerSource, SpecName};
-use crate::ReportValue;
+use crate::{write_host, ReportValue};
 
 use evm_execution::account_storage::EthereumAccount;
 
@@ -26,20 +26,10 @@ fn check_should_not_exist(
 ) {
     if let Some(_shouldnotexist) = shouldnotexist {
         if account.balance(host).is_ok() {
-            writeln!(
-                host.buffer.borrow_mut(),
-                "Account {} should not exist.",
-                hex_address
-            )
-            .unwrap();
+            write_host!(host, "Account {} should not exist.", hex_address);
             *invalid_state = true;
         } else {
-            writeln!(
-                host.buffer.borrow_mut(),
-                "Account {} rightfully do not exist.",
-                hex_address
-            )
-            .unwrap();
+            write_host!(host, "Account {} rightfully do not exist.", hex_address);
         }
     }
 }
@@ -56,24 +46,14 @@ fn check_balance(
             Ok(current_balance) => {
                 if current_balance != *balance {
                     *invalid_state = true;
-                    writeln!( host.buffer.borrow_mut(), "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance).unwrap();
+                    write_host!( host, "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance);
                 } else {
-                    writeln!(
-                        host.buffer.borrow_mut(),
-                        "Account {}: balance matched.",
-                        hex_address
-                    )
-                    .unwrap();
+                    write_host!(host, "Account {}: balance matched.", hex_address);
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                writeln!(
-                    host.buffer.borrow_mut(),
-                    "Account {} should have a balance.",
-                    hex_address
-                )
-                .unwrap();
+                write_host!(host, "Account {} should have a balance.", hex_address);
             }
         }
     }
@@ -92,24 +72,14 @@ fn check_code(
                 let current_code: Bytes = current_code.into();
                 if current_code != code {
                     *invalid_state = true;
-                    writeln!( host.buffer.borrow_mut(), "Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code).unwrap();
+                    write_host!( host, "Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code);
                 } else {
-                    writeln!(
-                        host.buffer.borrow_mut(),
-                        "Account {}: code matched.",
-                        hex_address
-                    )
-                    .unwrap();
+                    write_host!(host, "Account {}: code matched.", hex_address);
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                writeln!(
-                    host.buffer.borrow_mut(),
-                    "Account {} should have a code.",
-                    hex_address
-                )
-                .unwrap();
+                write_host!(host, "Account {} should have a code.", hex_address);
             }
         }
     }
@@ -127,24 +97,14 @@ fn check_nonce(
             Ok(current_nonce) => {
                 if current_nonce != (*nonce).into() {
                     *invalid_state = true;
-                    writeln!( host.buffer.borrow_mut(), "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce).unwrap();
+                    write_host!( host, "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce);
                 } else {
-                    writeln!(
-                        host.buffer.borrow_mut(),
-                        "Account {}: nonce matched.",
-                        hex_address
-                    )
-                    .unwrap();
+                    write_host!(host, "Account {}: nonce matched.", hex_address);
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                writeln!(
-                    host.buffer.borrow_mut(),
-                    "Account {} should have a nonce.",
-                    hex_address
-                )
-                .unwrap();
+                write_host!(host, "Account {} should have a nonce.", hex_address);
             }
         }
     }
@@ -159,12 +119,11 @@ fn check_storage(
 ) {
     if let Some(storage) = &storage {
         if storage.is_empty() {
-            writeln!(
-                host.buffer.borrow_mut(),
+            write_host!(
+                host,
                 "Account {}: storage matched (both empty).",
                 hex_address
-            )
-            .unwrap();
+            );
         }
         for (index, value) in storage.iter() {
             match account.get_storage(host, index) {
@@ -172,25 +131,19 @@ fn check_storage(
                     let storage_value = value;
                     if current_storage_value != *storage_value {
                         *invalid_state = true;
-                        writeln!( host.buffer.borrow_mut(), "Account {}: storage don't match current one for index {}, {} was expected, but got {}.", hex_address, index, storage_value, current_storage_value).unwrap();
+                        write_host!( host, "Account {}: storage don't match current one for index {}, {} was expected, but got {}.", hex_address, index, storage_value, current_storage_value);
                     } else {
-                        writeln!(
-                            host.buffer.borrow_mut(),
+                        write_host!(
+                            host,
                             "Account {}: storage matched for index {}.",
                             hex_address,
                             index
-                        )
-                        .unwrap();
+                        );
                     }
                 }
                 Err(_) => {
                     *invalid_state = true;
-                    writeln!(
-                        host.buffer.borrow_mut(),
-                        "Account {} should have a storage.",
-                        hex_address
-                    )
-                    .unwrap();
+                    write_host!(host, "Account {} should have a storage.", hex_address);
                 }
             }
         }
@@ -251,9 +204,9 @@ fn check_durable_storage(
         if invalid_state {
             // One invalid state will cause the entire test to be a failure.
             *good_state = false;
-            writeln!(host.buffer.borrow_mut(), "==> [INVALID STATE]\n").unwrap();
+            write_host!(host, "==> [INVALID STATE]\n");
         } else {
-            writeln!(host.buffer.borrow_mut(), "==> [CORRECT STATE]\n").unwrap();
+            write_host!(host, "==> [CORRECT STATE]\n");
         }
     }
 }
@@ -269,12 +222,7 @@ pub fn process(
     let mut good_state = true;
 
     for (name, fillers) in filler_source.0.into_iter() {
-        writeln!(
-            host.buffer.borrow_mut(),
-            "Processing checks with filler: {}Filler\n",
-            name
-        )
-        .unwrap();
+        write_host!(host, "Processing checks with filler: {}Filler\n", name);
         for filler_expectation in fillers.expect {
             for filler_network in filler_expectation.network {
                 let cmp_spec_id = parse_and_get_cmp(&filler_network);
@@ -286,18 +234,8 @@ pub fn process(
                     continue;
                 }
 
-                writeln!(
-                    host.buffer.borrow_mut(),
-                    "CONFIG NETWORK ---- {}",
-                    spec_name.to_str()
-                )
-                .unwrap();
-                writeln!(
-                    host.buffer.borrow_mut(),
-                    "CHECK  NETWORK ---- {}\n",
-                    filler_network
-                )
-                .unwrap();
+                write_host!(host, "CONFIG NETWORK ---- {}", spec_name.to_str());
+                write_host!(host, "CHECK  NETWORK ---- {}\n", filler_network);
 
                 check_durable_storage(host, &filler_expectation.result, &mut good_state);
             }
