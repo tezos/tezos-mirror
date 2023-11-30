@@ -14,7 +14,7 @@
 #		     maintains a local copy of the Tezos blockchain.
 ### END INIT INFO
 
-set -eu
+#set -eu
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
 export DESC="octez node"
