@@ -45,9 +45,6 @@ val get_full_staking_balance :
   Signature.public_key_hash ->
   Full_staking_balance_repr.t tzresult Lwt.t
 
-val has_minimal_stake_and_frozen_stake :
-  Raw_context.t -> Full_staking_balance_repr.t -> bool
-
 val remove_delegated_stake :
   Raw_context.t ->
   Signature.Public_key_hash.t ->

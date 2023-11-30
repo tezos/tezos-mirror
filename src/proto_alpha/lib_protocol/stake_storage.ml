@@ -89,12 +89,6 @@ let has_minimal_stake ctxt
       true (* If the sum overflows, we are definitely over the minimal stake. *)
   | Ok staking_balance -> Tez_repr.(staking_balance >= minimal_stake)
 
-let has_minimal_stake_and_frozen_stake ctxt
-    ({own_frozen; _} as full_staking_balance : Full_staking_balance_repr.t) =
-  let minimal_frozen_stake = Constants_storage.minimal_frozen_stake ctxt in
-  Tez_repr.(own_frozen >= minimal_frozen_stake)
-  && has_minimal_stake ctxt full_staking_balance
-
 let initialize_delegate ctxt delegate ~delegated =
   let open Lwt_result_syntax in
   let balance =
