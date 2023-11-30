@@ -46,7 +46,8 @@ let octez_dac_node = Uses.make ~tag:"dac_node" ~path:"./octez-dac-node"
 
 let octez_dac_client = Uses.make ~tag:"dac_client" ~path:"./octez-dac-client"
 
-let octez_smart_rollup_node = "./octez-smart-rollup-node"
+let octez_smart_rollup_node =
+  Uses.make ~tag:"smart_rollup_node" ~path:"./octez-smart-rollup-node"
 
 let octez_evm_node = "./octez-evm-node"
 
