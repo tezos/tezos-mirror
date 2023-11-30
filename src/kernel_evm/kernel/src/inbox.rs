@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK};
+use crate::sequencer_blueprint::SequencerBlueprint;
 use crate::simulation;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
@@ -184,6 +185,7 @@ impl Encodable for KernelUpgrade {
 pub struct InboxContent {
     pub kernel_upgrade: Option<KernelUpgrade>,
     pub transactions: Vec<Transaction>,
+    pub sequencer_blueprints: Vec<SequencerBlueprint>,
 }
 
 pub fn read_input<Host: Runtime>(
@@ -297,6 +299,7 @@ pub fn read_inbox<Host: Runtime>(
     let mut res = InboxContent {
         kernel_upgrade: None,
         transactions: vec![],
+        sequencer_blueprints: vec![],
     };
     loop {
         match read_input(host, smart_rollup_address, &ticketer, &admin)? {
@@ -335,6 +338,7 @@ pub fn read_inbox<Host: Runtime>(
                 return Ok(InboxContent {
                     kernel_upgrade: None,
                     transactions: vec![],
+                    sequencer_blueprints: vec![],
                 });
             }
             InputResult::Input(Input::Info(info)) => {
@@ -342,6 +346,9 @@ pub fn read_inbox<Host: Runtime>(
             }
             InputResult::Input(Input::Deposit(deposit)) => {
                 res.transactions.push(handle_deposit(host, deposit)?)
+            }
+            InputResult::Input(Input::SequencerBlueprint(seq_blueprint)) => {
+                res.sequencer_blueprints.push(seq_blueprint)
             }
         }
     }
@@ -699,7 +706,8 @@ mod tests {
             inbox_content,
             InboxContent {
                 kernel_upgrade: None,
-                transactions: vec![]
+                transactions: vec![],
+                sequencer_blueprints: vec![]
             }
         );
 

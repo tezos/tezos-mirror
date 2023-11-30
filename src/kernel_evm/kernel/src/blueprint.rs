@@ -6,9 +6,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
+use crate::current_timestamp;
 use crate::inbox::{read_inbox, KernelUpgrade, Transaction};
-use crate::sequencer_blueprint::SequencerBlueprint;
-use crate::{current_timestamp, sequencer_blueprint};
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
@@ -21,15 +20,6 @@ use tezos_smart_rollup_host::runtime::Runtime;
 pub struct Blueprint {
     pub transactions: Vec<Transaction>,
     pub timestamp: Timestamp,
-}
-
-impl From<SequencerBlueprint> for Blueprint {
-    fn from(seq_blueprint: SequencerBlueprint) -> Self {
-        Self {
-            transactions: seq_blueprint.transactions,
-            timestamp: seq_blueprint.timestamp,
-        }
-    }
 }
 
 impl Encodable for Blueprint {
@@ -171,15 +161,27 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
 
 fn fetch_sequencer_blueprints<Host: Runtime>(
     host: &mut Host,
+    smart_rollup_address: [u8; 20],
+    ticketer: Option<ContractKt1Hash>,
+    admin: Option<ContractKt1Hash>,
 ) -> Result<Queue, anyhow::Error> {
-    let seq_blueprints = sequencer_blueprint::fetch(host)?;
+    let inbox_content = read_inbox(host, smart_rollup_address, ticketer, admin)?;
+    let seq_blueprints = inbox_content.sequencer_blueprints;
     let proposals = seq_blueprints
         .into_iter()
-        .map(|sb| QueueElement::Blueprint(From::from(sb)))
+        .map(|sb| {
+            // Note: this parsing will be done by the blueprint storage module
+            let transactions = rlp::decode_list(&sb.transactions);
+            let blueprint: Blueprint = Blueprint {
+                timestamp: sb.timestamp,
+                transactions,
+            };
+            QueueElement::Blueprint(blueprint)
+        })
         .collect();
     Ok(Queue {
         proposals,
-        kernel_upgrade: None,
+        kernel_upgrade: inbox_content.kernel_upgrade,
     })
 }
 
@@ -191,7 +193,7 @@ pub fn fetch<Host: Runtime>(
     is_sequencer: bool,
 ) -> Result<Queue, anyhow::Error> {
     if is_sequencer {
-        fetch_sequencer_blueprints(host)
+        fetch_sequencer_blueprints(host, smart_rollup_address, ticketer, admin)
     } else {
         fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)
     }
