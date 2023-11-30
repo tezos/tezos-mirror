@@ -28,13 +28,15 @@ open Tezos_micheline
 open Micheline_parser
 open Micheline
 
-type parsed = {
+type 'prim parser_result = {
   source : string;
   unexpanded : string canonical;
-  expanded : Michelson_v1_primitives.prim canonical;
+  expanded : 'prim canonical;
   expansion_table : (int * (Micheline_parser.location * int list)) list;
   unexpansion_table : (int * int) list;
 }
+
+type parsed = Michelson_v1_primitives.prim parser_result
 
 let compare_parsed = Stdlib.compare
 
@@ -71,33 +73,55 @@ let expand_all source ast errors =
     | Ok v -> v
     | Error () -> invalid_arg "Michelson_v1_parser.expand_all"
   in
-  match Michelson_v1_primitives.prims_of_strings expanded with
-  | Ok expanded ->
-      ( {source; unexpanded; expanded; expansion_table; unexpansion_table},
-        errors @ expansion_errors )
+  ( {source; unexpanded; expanded; expansion_table; unexpansion_table},
+    errors @ expansion_errors )
+
+let expand_all_and_recognize_prims source ast errors =
+  let parsed, errors = expand_all source ast errors in
+  match Michelson_v1_primitives.prims_of_strings parsed.expanded with
+  | Ok expanded -> ({parsed with expanded}, errors)
   | Error errs ->
       let errs = Environment.wrap_tztrace errs in
-      ( {
-          source;
-          unexpanded;
-          expanded = Micheline.strip_locations (Seq ((), []));
-          expansion_table;
-          unexpansion_table;
-        },
-        errors @ expansion_errors @ errs )
+      let expanded = Micheline.strip_locations (Seq ((), [])) in
+      ({parsed with expanded}, errors @ errs)
 
-let parse_toplevel ?check source =
+type micheline_parser = Toplevel | Expression
+
+type 'prim prim_type =
+  | Michelson_prim : Michelson_v1_primitives.prim prim_type
+  | String : string prim_type
+
+let parse (type prim) micheline_parser (prim_type : prim prim_type) ?check
+    source =
   let tokens, lexing_errors = Micheline_parser.tokenize source in
-  let asts, parsing_errors = Micheline_parser.parse_toplevel ?check tokens in
-  let ast =
-    let start = min_point asts and stop = max_point asts in
-    Seq ({start; stop}, asts)
+  let ast, parsing_errors =
+    match micheline_parser with
+    | Toplevel ->
+        let asts, parsing_errors =
+          Micheline_parser.parse_toplevel ?check tokens
+        in
+        let start = min_point asts and stop = max_point asts in
+        (Seq ({start; stop}, asts), parsing_errors)
+    | Expression -> Micheline_parser.parse_expression ?check tokens
   in
-  expand_all source ast (lexing_errors @ parsing_errors)
+  let expand :
+      string ->
+      (location, string) Micheline.node ->
+      error trace ->
+      prim parser_result Micheline_parser.parsing_result =
+    match prim_type with
+    | Michelson_prim -> expand_all_and_recognize_prims
+    | String -> expand_all
+  in
+  expand source ast (lexing_errors @ parsing_errors)
 
-let parse_expression ?check source =
-  let tokens, lexing_errors = Micheline_parser.tokenize source in
-  let ast, parsing_errors = Micheline_parser.parse_expression ?check tokens in
-  expand_all source ast (lexing_errors @ parsing_errors)
+let parse_toplevel = parse Toplevel Michelson_prim
 
-let expand_all ~source ~original = expand_all source original []
+let expand_toplevel = parse Toplevel String
+
+let parse_expression = parse Expression Michelson_prim
+
+let expand_expression = parse Expression String
+
+let expand_all_and_recognize_prims ~source ~original =
+  expand_all_and_recognize_prims source original []
