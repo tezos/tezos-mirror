@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/ediv.tz on storage '(Pair None None None None)' and input '(Pair 10 -3)' --level 1 --trace-stack
+./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/ediv.tz on storage '(Pair None None None None)' and input '(Pair 10 -3)' --level 1 --trace-stack
 storage
   (Pair (Some (Pair -3 1)) (Some (Pair 3 1)) (Some (Pair -3 1)) (Some (Pair 3 1)))
 emitted operations

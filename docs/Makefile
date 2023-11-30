@@ -21,7 +21,7 @@ PROTOCOLS     = $(NAMED_PROTOS) alpha
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 nairobi_long  = PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
-oxford_long   = ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw
+oxford_long   = ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 nairobi_short = PtNairob

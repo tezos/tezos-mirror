@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/comb-set.tz on storage '(Pair 1 4 2 Unit)' and input Unit --level 1 --trace-stack
+./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/comb-set.tz on storage '(Pair 1 4 2 Unit)' and input Unit --level 1 --trace-stack
 storage
   (Pair 2 12 8 Unit)
 emitted operations

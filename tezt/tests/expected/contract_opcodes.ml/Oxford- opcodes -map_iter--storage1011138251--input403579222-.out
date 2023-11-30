@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/map_iter.tz on storage '(Pair 0 0)' and input '{ Elt 1 1 ; Elt 2 100 }' --level 1 --trace-stack
+./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/map_iter.tz on storage '(Pair 0 0)' and input '{ Elt 1 1 ; Elt 2 100 }' --level 1 --trace-stack
 storage
   (Pair 3 101)
 emitted operations
