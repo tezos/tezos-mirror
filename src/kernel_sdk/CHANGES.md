@@ -3,6 +3,7 @@
 ## Version next
 
 ### SDK
+- Add experimental support for compiling kernels to a Hermit RISC-V image behind the `proto-alpha` flag.
 
 ### Installer client/kernel
 

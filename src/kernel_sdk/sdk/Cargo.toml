@@ -59,6 +59,10 @@ optional = true
 version = "=0.5.2"
 optional = true
 
+[target.'cfg(target_os = "hermit")'.dependencies.hermit]
+version = "0.7.2"
+default-features = false
+
 [features]
 default = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage", "bls"]
 crypto = ["tezos_crypto_rs"]

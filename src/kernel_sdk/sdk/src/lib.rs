@@ -10,6 +10,9 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
+extern crate hermit;
+
 pub use tezos_smart_rollup_entrypoint::kernel_entry;
 
 pub mod host {
