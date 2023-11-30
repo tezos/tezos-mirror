@@ -113,9 +113,13 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       ~l2_blocks_cache_size
       Configuration.(default_storage_dir data_dir)
   in
+  let*? (module Plugin : Protocol_plugin_sig.S) =
+    Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
+  in
+  let (module C) = Plugin.Pvm.context kind in
   let* context =
     Context.load
-      (module Irmin_context)
+      (module C)
       ~cache_size:irmin_cache_size
       mode
       (Configuration.default_context_dir data_dir)
@@ -253,9 +257,13 @@ module Internal_for_tests = struct
         ~l2_blocks_cache_size
         Configuration.(default_storage_dir data_dir)
     in
+    let*? (module Plugin : Protocol_plugin_sig.S) =
+      Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
+    in
+    let (module C) = Plugin.Pvm.context kind in
     let* context =
       Context.load
-        (module Irmin_context)
+        (module C)
         Read_write
         (Configuration.default_context_dir data_dir)
         ~cache_size:irmin_cache_size

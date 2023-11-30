@@ -25,7 +25,7 @@ let check_store_version store_dir =
   in
   return_unit
 
-let check_head (store : _ Store.t) context =
+let get_head (store : _ Store.t) =
   let open Lwt_result_syntax in
   let* head = Store.L2_head.read store.l2_head in
   let*? head =
@@ -35,6 +35,10 @@ let check_head (store : _ Store.t) context =
           "There is no head in the rollup node store, cannot produce snapshot."
     | Some head -> Ok head
   in
+  return head
+
+let check_head (head : Sc_rollup_block.t) context =
+  let open Lwt_result_syntax in
   (* Ensure head context is available. *)
   let*! head_ctxt = Context.checkout context head.header.context in
   let*? () =
@@ -56,29 +60,36 @@ let pre_export_checks_and_get_snapshot_metadata ~data_dir =
     | Some m -> Ok m
   in
   let*? () = Context.Version.check metadata.context_version in
-  let* context =
-    Context.load ~cache_size:1 (module Irmin_context) Read_only context_dir
-  in
   let* store =
     Store.load Read_only ~index_buffer_size:0 ~l2_blocks_cache_size:1 store_dir
   in
+
+  let* head = get_head store in
+  let level = head.Sc_rollup_block.header.level in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store level
+  in
+  let (module C) = Plugin.Pvm.context metadata.kind in
+  let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
   let* history_mode = Store.History_mode.read store.history_mode in
   let*? history_mode =
     match history_mode with
     | None -> error_with "No history mode information in %S." data_dir
     | Some h -> Ok h
   in
-  let* head = check_head store context in
+
+  let* head = check_head head context in
   (* Closing context and stores after checks *)
   let*! () = Context.close context in
   let* () = Store.close store in
   return
-    {
-      history_mode;
-      address = metadata.rollup_address;
-      head_level = head.header.level;
-      last_commitment = Sc_rollup_block.most_recent_commitment head.header;
-    }
+    ( {
+        history_mode;
+        address = metadata.rollup_address;
+        head_level = head.header.level;
+        last_commitment = Sc_rollup_block.most_recent_commitment head.header;
+      },
+      (module Plugin : Protocol_plugin_sig.S) )
 
 let first_available_level ~data_dir store =
   let open Lwt_result_syntax in
@@ -137,14 +148,22 @@ let check_l2_chain ~message ~data_dir (store : _ Store.t) context
   in
   check_block head.header.block_hash
 
-let post_import_checks ~message ~dest =
+let post_import_checks ~message ~dest protocol_plugin =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
   let context_dir = Configuration.default_context_dir dest in
   (* Load context and stores in read-only to run checks. *)
   let* () = check_store_version store_dir in
+  let (module Plugin : Protocol_plugin_sig.S) = protocol_plugin in
+  let* metadata = Metadata.read_metadata_file ~dir:dest in
+  let*? metadata =
+    match metadata with
+    | None -> error_with "No rollup node metadata in %S." dest
+    | Some m -> Ok m
+  in
+  let (module C) = Plugin.Pvm.context metadata.kind in
   let* context =
-    Context.load ~cache_size:100 (module Irmin_context) Read_only context_dir
+    Context.load (module C) ~cache_size:100 Read_only context_dir
   in
   let* store =
     Store.load
@@ -153,16 +172,17 @@ let post_import_checks ~message ~dest =
       ~l2_blocks_cache_size:100
       store_dir
   in
-  let* head = check_head store context in
+  let* head = get_head store in
+  let* head = check_head head context in
   let* () = check_l2_chain ~message ~data_dir:dest store context head in
   let*! () = Context.close context in
   let* () = Store.close store in
   return_unit
 
-let post_export_checks ~snapshot_file =
+let post_export_checks ~snapshot_file context_plugin =
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
   extract gzip_reader stdlib_writer (fun _ -> ()) ~snapshot_file ~dest ;
-  post_import_checks ~message:"Checking snapshot   " ~dest
+  post_import_checks ~message:"Checking snapshot   " ~dest context_plugin
 
 let operator_local_file_regexp =
   Re.Str.regexp "^storage/\\(commitments_published_at_level.*\\|lpc$\\)"
@@ -173,14 +193,16 @@ let snapshotable_files_regexp =
 
 let export ~data_dir ~dest =
   let open Lwt_result_syntax in
-  let* uncompressed_snapshot =
+  let* uncompressed_snapshot, protocol_plugin =
     Format.eprintf "Acquiring GC lock@." ;
     (* Take GC lock first in order to not prevent progression of rollup node. *)
     Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
     Format.eprintf "Acquiring process lock@." ;
     Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
     @@ fun () ->
-    let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
+    let* metadata, protocol_plugin =
+      pre_export_checks_and_get_snapshot_metadata ~data_dir
+    in
     let dest_file_name =
       Format.asprintf
         "snapshot-%a-%ld.%s.uncompressed"
@@ -210,8 +232,8 @@ let export ~data_dir ~dest =
         ~dest:dest_file ;
       return_unit
     in
-    return dest_file
+    return (dest_file, protocol_plugin)
   in
   let snapshot_file = compress ~snapshot_file:uncompressed_snapshot in
-  let* () = post_export_checks ~snapshot_file in
+  let* () = post_export_checks ~snapshot_file protocol_plugin in
   return snapshot_file
