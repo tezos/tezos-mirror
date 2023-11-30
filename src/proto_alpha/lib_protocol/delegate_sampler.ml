@@ -169,6 +169,7 @@ let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
 let get_stakes_for_selected_index ctxt ~slashings index =
   let open Lwt_result_syntax in
   let minimal_frozen_stake = Constants_storage.minimal_frozen_stake ctxt in
+  let minimal_stake = Constants_storage.minimal_stake ctxt in
   Stake_storage.fold_snapshot
     ctxt
     ~index
@@ -187,8 +188,7 @@ let get_stakes_for_selected_index ctxt ~slashings index =
         let* stake_for_cycle =
           get_delegate_stake_from_staking_balance ctxt delegate staking_balance
         in
-        if Stake_storage.has_minimal_stake_and_frozen_stake ctxt staking_balance
-        then
+        if Stake_repr.has_minimal_stake ~minimal_stake stake_for_cycle then
           let stakes, total_stake = acc in
           let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
           return ((delegate, stake_for_cycle) :: stakes, total_stake)
