@@ -557,7 +557,15 @@ module Make (Parameters : PARAMETERS) = struct
           op.errors.last_error
       in
       Op_queue.remove state.queue op.hash
-    else return_unit
+    else
+      let*! () =
+        Event.(emit3 ?signers error_simulation_operation)
+          state
+          op.operation
+          op.errors.count
+          error
+      in
+      return_unit
 
   let inject_on_node state ~nb signer (module Unsigned_op : Proto_unsigned_op) =
     let open Lwt_result_syntax in

@@ -208,6 +208,17 @@ module Make
           ("error", Data_encoding.option Error_monad.trace_encoding)
           ~pp3:(fun ppf -> Option.iter (Error_monad.pp_print_trace ppf))
 
+      let error_simulation_operation =
+        declare_3
+          ~name:"error_simulation_operation"
+          ~msg:"Simulation for {operation} failing {count} times with {error}"
+          ~level:Debug
+          ("operation", Operation.encoding)
+          ~pp1:Operation.pp
+          ("count", Data_encoding.int31)
+          ("error", Error_monad.trace_encoding)
+          ~pp3:Error_monad.pp_print_trace
+
       let injected =
         declare_2
           ~name:"injected"
