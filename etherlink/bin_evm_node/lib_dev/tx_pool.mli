@@ -5,9 +5,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start config] starts the tx-pool. The [config] represents the 
-    Rollup_node rpc module and the address of the smart rollup. *)
-val start : (module Services_backend_sig.S) * string -> unit tzresult Lwt.t
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6672
+   It should be created by the configuration, or at least using values of
+   the configuration. *)
+type mode = Proxy | Sequencer of {time_between_blocks : float}
+
+(** [start config] starts the tx-pool. The [config] represents:
+    - the backend rpc module,
+    - the address of the smart rollup,
+    - the mode of the node.
+*)
+val start :
+  (module Services_backend_sig.S) * string * mode -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the tx-pool, waiting for the ongoing request
     to be processed. *)

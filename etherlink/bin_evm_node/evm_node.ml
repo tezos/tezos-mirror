@@ -305,8 +305,13 @@ let proxy_command =
           in
           return_unit
         else
-          let* rollup_config = rollup_node_config_dev ~rollup_node_endpoint in
-          let* () = Evm_node_lib_dev.Tx_pool.start rollup_config in
+          let* ((backend_rpc, smart_rollup_address) as rollup_config) =
+            rollup_node_config_dev ~rollup_node_endpoint
+          in
+          let* () =
+            Evm_node_lib_dev.Tx_pool.start
+              (backend_rpc, smart_rollup_address, Proxy)
+          in
           let* directory = dev_directory config rollup_config in
           let* server = start config ~directory in
           let (_ : Lwt_exit.clean_up_callback_id) =
@@ -373,7 +378,10 @@ let sequencer_command =
         let ctxt = ctxt
       end) in
       (* Ignore the smart rollup address for now. *)
-      let* () = Tx_pool.start ((module Sequencer), "") in
+      let* () =
+        Tx_pool.start
+          ((module Sequencer), "", Sequencer {time_between_blocks = 5.})
+      in
       let* directory = dev_directory config ((module Sequencer), "") in
       let* server = start config ~directory in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_dev server in

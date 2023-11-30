@@ -104,15 +104,18 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
+type mode = Proxy | Sequencer of {time_between_blocks : float}
+
 module Types = struct
   type state = {
     rollup_node : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable level : Ethereum_types.block_height;
     mutable pool : Pool.t;
+    mode : mode;
   }
 
-  type parameters = (module Services_backend_sig.S) * string
+  type parameters = (module Services_backend_sig.S) * string * mode
 end
 
 module Name = struct
@@ -304,7 +307,7 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () (rollup_node, smart_rollup_address) =
+  let on_launch _w () (rollup_node, smart_rollup_address, mode) =
     let state =
       Types.
         {
@@ -312,6 +315,7 @@ module Handlers = struct
           smart_rollup_address;
           level = Block_height Z.zero;
           pool = Pool.empty;
+          mode;
         }
     in
     Lwt_result_syntax.return state
@@ -356,12 +360,12 @@ TODO: https://gitlab.com/tezos/tezos/-/issues/6079
 listen to the node instead of pulling the level each 5s
 *)
 let rec subscribe_l2_block worker =
-  let open Lwt_result_syntax in
-  let*! () = Lwt_unix.sleep 5.0 in
+  let open Lwt_syntax in
+  let* () = Lwt_unix.sleep 5.0 in
   let state = Worker.state worker in
   let Types.{rollup_node = (module Rollup_node_rpc); _} = state in
   (* Get the current eth level.*)
-  let*! res = Rollup_node_rpc.current_block_number () in
+  let* res = Rollup_node_rpc.current_block_number () in
   match res with
   | Error _ ->
       (* Kind of retry strategy *)
@@ -370,25 +374,37 @@ let rec subscribe_l2_block worker =
       subscribe_l2_block worker
   | Ok block_number ->
       if state.level != block_number then
-        let*! _pushed =
+        let* _pushed =
           Worker.Queue.push_request worker (Request.New_l2_head block_number)
         in
         subscribe_l2_block worker
       else subscribe_l2_block worker
 
-let start
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
-  let open Lwt_result_syntax in
-  let+ worker =
-    Worker.launch
-      table
-      ()
-      ((module Rollup_node_rpc), smart_rollup_address)
-      (module Handlers)
+let rec sequencer_produce_block ~time_between_blocks worker =
+  let open Lwt_syntax in
+  let* () = Lwt_unix.sleep time_between_blocks in
+  let state = Worker.state worker in
+  let Types.{rollup_node = (module Rollup_node_rpc); _} = state in
+  let* _pushed =
+    Worker.Queue.push_request
+      worker
+      (* The sequencer mode does not rely on the state.level, therefore we do not
+         care about the value we push. Also, note that this is state.level will
+         be completely removed when we stream L2 blocks. *)
+      (Request.New_l2_head (Ethereum_types.Block_height Z.zero))
   in
+  sequencer_produce_block ~time_between_blocks worker
+
+let start ((_, _, mode) as parameters) =
+  let open Lwt_result_syntax in
+  let+ worker = Worker.launch table () parameters (module Handlers) in
   let () =
     Lwt.dont_wait
-      (fun () -> subscribe_l2_block worker)
+      (fun () ->
+        match mode with
+        | Proxy -> subscribe_l2_block worker
+        | Sequencer {time_between_blocks} ->
+            sequencer_produce_block ~time_between_blocks worker)
       (fun _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
         Format.printf "[tx-pool] Pool has been stopped.\n%!")
