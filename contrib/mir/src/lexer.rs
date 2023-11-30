@@ -120,6 +120,7 @@ defprim! {
     output,
     Failed,
     amount,
+    balance,
     MutezOverflow,
     GeneralOverflow,
     StaticError,
