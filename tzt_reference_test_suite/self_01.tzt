@@ -1,13 +1,16 @@
 # SELF inside CREATE_CONTRACT is valid, even if they both are inside a LAMBDA.
 # SELF should produce a `contract` value with parameter matching the inner contract.
 code {
-       LAMBDA (pair (option key_hash) mutez unit) address
-       { UNPAIR 3; CREATE_CONTRACT
-          { code { SELF ; CAST (contract key); FAIL } ;
-            storage unit ;
-            parameter key } ;
-         DROP;
-       } ;
+       LAMBDA
+         (pair (option key_hash) mutez unit)
+         address
+         { UNPAIR 3;
+           CREATE_CONTRACT
+             { code { SELF ; CAST (contract key); FAIL } ;
+               storage unit ;
+               parameter key } ;
+           DROP;
+         } ;
        DROP;
      } ;
 input { } ;
