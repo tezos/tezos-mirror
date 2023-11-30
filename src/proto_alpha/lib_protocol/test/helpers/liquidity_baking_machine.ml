@@ -895,7 +895,8 @@ module ConcreteBaseMachine :
         ~issuance_weights:
           {
             base_total_issued_per_minute =
-              Tez.(div_exn (mul_exn liquidity_baking_subsidy 60) block_delay);
+              Test_tez.(
+                liquidity_baking_subsidy *! 60L /! Int64.of_int block_delay);
             attesting_reward_weight = 0;
             baking_reward_fixed_portion_weight = 0;
             baking_reward_bonus_weight = 0;

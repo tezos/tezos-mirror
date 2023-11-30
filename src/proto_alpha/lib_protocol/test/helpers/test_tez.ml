@@ -36,8 +36,6 @@ let ( -? ) t1 t2 = t1 -? t2 |> wrap_tzresult
 
 let ( *? ) t1 t2 = t1 *? t2 |> wrap_tzresult
 
-let ( /? ) t1 t2 = t1 /? t2 |> wrap_tzresult
-
 let ( +! ) t1 t2 =
   match t1 +? t2 with Ok r -> r | Error _ -> Pervasives.failwith "adding tez"
 

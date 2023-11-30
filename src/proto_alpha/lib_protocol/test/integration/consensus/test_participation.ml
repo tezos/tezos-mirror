@@ -175,7 +175,7 @@ let test_participation_rpc () =
       ~reward_kind:Attesting_reward_per_slot
   in
   let expected_attesting_rewards =
-    Tez.mul_exn attesting_reward_per_slot expected_cycle_activity
+    Test_tez.(attesting_reward_per_slot *! Int64.of_int expected_cycle_activity)
   in
   let* b1 = Block.bake ~policy:(By_account del1) b0 in
   let* _, _, _ =

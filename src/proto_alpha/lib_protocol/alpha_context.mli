@@ -114,37 +114,35 @@ module Tez : sig
 
   include BASIC_DATA with type t := t
 
-  type tez = t
+  val zero : t
 
-  val zero : tez
+  val one_mutez : t
 
-  val one_mutez : tez
+  val one_cent : t
 
-  val one_cent : tez
+  val fifty_cents : t
 
-  val fifty_cents : tez
+  val one : t
 
-  val one : tez
+  val max_mutez : t
 
-  val max_mutez : tez
+  val ( -? ) : t -> t -> t tzresult
 
-  val ( -? ) : tez -> tez -> tez tzresult
+  val sub_opt : t -> t -> t option
 
-  val sub_opt : tez -> tez -> tez option
+  val ( +? ) : t -> t -> t tzresult
 
-  val ( +? ) : tez -> tez -> tez tzresult
+  val ( *? ) : t -> int64 -> t tzresult
 
-  val ( *? ) : tez -> int64 -> tez tzresult
+  val ( /? ) : t -> int64 -> t tzresult
 
-  val ( /? ) : tez -> int64 -> tez tzresult
+  val of_string : string -> t option
 
-  val of_string : string -> tez option
+  val to_string : t -> string
 
-  val to_string : tez -> string
+  val of_mutez : int64 -> t option
 
-  val of_mutez : int64 -> tez option
-
-  val to_mutez : tez -> int64
+  val to_mutez : t -> int64
 
   val of_mutez_exn : int64 -> t
 
@@ -4460,7 +4458,7 @@ and _ contents =
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
       source : public_key_hash;
-      fee : Tez.tez;
+      fee : Tez.t;
       counter : Manager_counter.t;
       operation : 'kind manager_operation;
       gas_limit : Gas.Arith.integral;
@@ -4471,7 +4469,7 @@ and _ contents =
 and _ manager_operation =
   | Reveal : public_key -> Kind.reveal manager_operation
   | Transaction : {
-      amount : Tez.tez;
+      amount : Tez.t;
       parameters : Script.lazy_expr;
       entrypoint : Entrypoint.t;
       destination : Contract.t;
@@ -4480,7 +4478,7 @@ and _ manager_operation =
   | Origination : {
       delegate : public_key_hash option;
       script : Script.t;
-      credit : Tez.tez;
+      credit : Tez.t;
     }
       -> Kind.origination manager_operation
   | Delegation : public_key_hash option -> Kind.delegation manager_operation
@@ -4877,10 +4875,7 @@ end
 (** This module re-exports definitions from {!Commitment_repr} and,
     {!Commitment_storage}. *)
 module Commitment : sig
-  type t = {
-    blinded_public_key_hash : Blinded_public_key_hash.t;
-    amount : Tez.tez;
-  }
+  type t = {blinded_public_key_hash : Blinded_public_key_hash.t; amount : Tez.t}
 
   (** See {!Commitment_storage.exists}. *)
   val exists : context -> Blinded_public_key_hash.t -> bool Lwt.t

@@ -1435,7 +1435,7 @@ and ('input, 'output) view_signature =
 and 'kind internal_operation_contents =
   | Transaction_to_implicit : {
       destination : Signature.Public_key_hash.t;
-      amount : Tez.tez;
+      amount : Tez.t;
     }
       -> Kind.transaction internal_operation_contents
   | Transaction_to_implicit_with_ticket : {
@@ -1443,12 +1443,12 @@ and 'kind internal_operation_contents =
       ticket_ty : ('content ticket, _) ty;
       ticket : 'content ticket;
       unparsed_ticket : Script.lazy_expr;
-      amount : Tez.tez;
+      amount : Tez.t;
     }
       -> Kind.transaction internal_operation_contents
   | Transaction_to_smart_contract : {
       destination : Contract_hash.t;
-      amount : Tez.tez;
+      amount : Tez.t;
       entrypoint : Entrypoint.t;
       location : Script.location;
       parameters_ty : ('a, _) ty;
@@ -1481,7 +1481,7 @@ and 'kind internal_operation_contents =
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
       unparsed_storage : Script.expr;
-      credit : Tez.tez;
+      credit : Tez.t;
       preorigination : Contract_hash.t;
       storage_type : ('storage, _) ty;
       storage : 'storage;

@@ -113,16 +113,14 @@ let assert_balance_changed op ctxt ctxt' account amount =
   let open Lwt_result_wrap_syntax in
   let*@ _, balance = Token.Internal_for_tests.balance ctxt account in
   let*@ _, balance' = Token.Internal_for_tests.balance ctxt' account in
-  let*@ balance_op_amount = op balance amount in
+  let*?@ balance_op_amount = op balance amount in
   equal_tez balance' ~loc:__LOC__ balance_op_amount
 
 let assert_balance_increased ctxt ctxt' account amount =
-  let ( +? ) t1 t2 = Lwt.return Tez_repr.(t1 +? t2) in
-  assert_balance_changed ( +? ) ctxt ctxt' account amount
+  assert_balance_changed Tez_repr.( +? ) ctxt ctxt' account amount
 
 let assert_balance_decreased ctxt ctxt' account amount =
-  let ( -? ) t1 t2 = Lwt.return Tez_repr.(t1 -? t2) in
-  assert_balance_changed ( -? ) ctxt ctxt' account amount
+  assert_balance_changed Tez_repr.( -? ) ctxt ctxt' account amount
 
 let perform_staking_action_and_check ctxt rollup staker do_and_check =
   let staker_contract = Contract_repr.Implicit staker in
@@ -636,7 +634,7 @@ module Stake_storage_tests = struct
              min_expected_balance = stake;
            })
     in
-    let staker_balance = Tez_repr.div_exn stake 2 in
+    let*?@ staker_balance = Tez_repr.(stake /? 2L) in
     let staker_contract = Contract_repr.Implicit staker in
     let*@ ctxt, _ =
       Token.transfer ctxt `Minted (`Contract staker_contract) staker_balance
@@ -689,7 +687,8 @@ module Stake_storage_tests = struct
         rollup2
         staker
     in
-    assert_frozen_balance ctxt staker (Tez_repr.mul_exn stake 2)
+    let*?@ stake_times_2 = Tez_repr.(stake *? 2L) in
+    assert_frozen_balance ctxt staker stake_times_2
 
   (** Test that deposit twice on the same rollup fails. *)
   let test_deposit_twice_fails () =

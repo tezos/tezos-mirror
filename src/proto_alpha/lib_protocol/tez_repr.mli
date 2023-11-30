@@ -45,8 +45,6 @@ type error +=
   | Negative_multiplicator of t * int64 (* `Temporary *)
   | Invalid_divisor of t * int64 (* `Temporary *)
 
-type tez = t
-
 val zero : t
 
 val one_mutez : t
@@ -71,9 +69,6 @@ val ( *? ) : t -> int64 -> t tzresult
 val ( /? ) : t -> int64 -> t tzresult
 
 val div2 : t -> t
-
-(** [div2_sub tez] returns [(⌊tez / 2⌋, tez - ⌊tez / 2⌋)]. *)
-val div2_sub : t -> t * t
 
 (** [mul_ratio ~rounding tez ~num ~den] returns [tez * num / den] without failing
     when [tez * num] overflows.

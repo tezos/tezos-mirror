@@ -204,7 +204,7 @@ let liquidity_baking_subsidy_param () =
     attesting_reward_per_slot *? Int64.of_int constants.consensus_committee_size
   in
   let*? total_rewards = baking_rewards +? validators_rewards in
-  let*? expected_subsidy = total_rewards /? 16L in
+  let expected_subsidy = total_rewards /! 16L in
   let liquidity_baking_subsidy =
     get_reward ~reward_kind:Liquidity_baking_subsidy
   in

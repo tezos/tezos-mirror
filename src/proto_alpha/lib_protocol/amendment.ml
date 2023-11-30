@@ -67,7 +67,7 @@ let select_winning_proposal ctxt =
     participation EMA and the current participation./
     The expected quorum is calculated using the last participation EMA, capped
     by the min/max quorum protocol constants. *)
-let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
+let approval_and_participation_ema (ballots : Vote.ballots) ~total_voting_power
     ~participation_ema ~expected_quorum =
   (* Note overflows: considering a maximum of 1e9 tokens (around 2^30),
      hence 1e15 mutez (around 2^50)
@@ -83,7 +83,7 @@ let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
       to_int32
         (div
            (mul (Z.of_int64 all_votes) (Z.of_int 100_00))
-           (Z.of_int64 maximum_vote)))
+           (Z.of_int64 total_voting_power)))
   in
   let approval =
     Compare.Int32.(participation >= expected_quorum)
@@ -97,14 +97,14 @@ let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
 let get_approval_and_update_participation_ema ctxt =
   let open Lwt_result_syntax in
   let* ballots = Vote.get_ballots ctxt in
-  let* maximum_vote = Vote.get_total_voting_power_free ctxt in
+  let* total_voting_power = Vote.get_total_voting_power_free ctxt in
   let* participation_ema = Vote.get_participation_ema ctxt in
   let* expected_quorum = Vote.get_current_quorum ctxt in
   let*! ctxt = Vote.clear_ballots ctxt in
   let approval, new_participation_ema =
     approval_and_participation_ema
       ballots
-      ~maximum_vote
+      ~total_voting_power
       ~participation_ema
       ~expected_quorum
   in

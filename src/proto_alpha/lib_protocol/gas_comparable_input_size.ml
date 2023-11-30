@@ -76,7 +76,7 @@ let script_string = Script_string.length
 
 let bytes (b : Bytes.t) : t = Bytes.length b
 
-let mutez (_tez : Alpha_context.Tez.tez) : t =
+let mutez (_tez : Alpha_context.Tez.t) : t =
   (* Up to now, mutez are stored on 8 bytes (int64). *)
   8
 

@@ -34,6 +34,8 @@ type repr = t
 
 type t = Tez_tag of repr [@@ocaml.unboxed]
 
+let wrap t = Tez_tag t [@@ocaml.inline always]
+
 type error +=
   | Addition_overflow of t * t (* `Temporary *)
   | Subtraction_underflow of t * t (* `Temporary *)
@@ -79,7 +81,7 @@ let of_string s =
       String.init 6 (fun i -> if Compare.Int.(i < len) then s.[i] else '0')
     in
     let prepared = remove_commas left ^ pad_to_six (remove_commas right) in
-    Option.map (fun i -> Tez_tag i) (Int64.of_string_opt prepared)
+    Option.map wrap (Int64.of_string_opt prepared)
   in
   match String.split_on_char '.' s with
   | [left; right] ->
@@ -98,8 +100,8 @@ let of_string s =
 let pp ppf (Tez_tag amount) =
   let mult_int = 1_000_000L in
   let rec left ppf amount =
-    let d, r = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
-    if d > 0L then Format.fprintf ppf "%a%03Ld" left d r
+    let d, r = (Int64.div amount 1000L, Int64.rem amount 1000L) in
+    if Compare.Int64.(d > 0L) then Format.fprintf ppf "%a%03Ld" left d r
     else Format.fprintf ppf "%Ld" r
   in
   let right ppf amount =
@@ -113,7 +115,7 @@ let pp ppf (Tez_tag amount) =
     else Format.fprintf ppf "%03d%a" hi triplet lo
   in
   let ints, decs =
-    (Int64.(div amount mult_int), Int64.(to_int (rem amount mult_int)))
+    (Int64.div amount mult_int, Int64.(to_int (rem amount mult_int)))
   in
   left ppf ints ;
   if Compare.Int.(decs > 0) then Format.fprintf ppf ".%a" right decs
@@ -152,24 +154,13 @@ let ( /? ) tez d =
   if d <= 0L then tzfail (Invalid_divisor (tez, d))
   else return (Tez_tag (Int64.div t d))
 
-let div2_sub tez =
-  let (Tez_tag t) = tez in
-  let quo = Int64.div t 2L in
-  (* t ≥ 0 ⇒ t / 2 ≥ 0 ⇒ quo ≥ 0 *)
-  (* t ≥ 0 ⇒ t / 2 ≤ t ⇒ t - t / 2 ≥ 0 ⇒ t - quo ≥ 0 *)
-  (Tez_tag quo, Tez_tag (Int64.sub t quo))
-
-let div2 tez = fst (div2_sub tez)
+let div2 (Tez_tag t) = Tez_tag (Int64.div t 2L)
 
 let mul_exn t m =
-  match t *? Int64.(of_int m) with
-  | Ok v -> v
-  | Error _ -> invalid_arg "mul_exn"
+  match t *? Int64.of_int m with Ok v -> v | Error _ -> invalid_arg "mul_exn"
 
 let div_exn t d =
-  match t /? Int64.(of_int d) with
-  | Ok v -> v
-  | Error _ -> invalid_arg "div_exn"
+  match t /? Int64.of_int d with Ok v -> v | Error _ -> invalid_arg "div_exn"
 
 let mul_ratio ~rounding tez ~num ~den =
   let open Result_syntax in
@@ -309,8 +300,6 @@ let () =
     (obj2 (req "amount" encoding) (req "divisor" int64))
     (function Invalid_divisor (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Invalid_divisor (a, b))
-
-type tez = t
 
 let compare (Tez_tag x) (Tez_tag y) = compare x y
 

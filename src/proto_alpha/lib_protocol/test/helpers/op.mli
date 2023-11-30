@@ -125,7 +125,7 @@ val pp_gas_limit : Format.formatter -> gas_limit -> unit
 val transaction :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
@@ -165,7 +165,7 @@ val unsafe_transaction :
 
 val delegation :
   ?force_reveal:bool ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?counter:Manager_counter.t ->
   ?storage_limit:Z.t ->
@@ -176,19 +176,19 @@ val delegation :
 
 val set_deposits_limit :
   ?force_reveal:bool ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   Context.t ->
   Contract.t ->
-  Tez.tez option ->
+  Tez.t option ->
   Operation.packed tzresult Lwt.t
 
 val increase_paid_storage :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -203,7 +203,7 @@ val increase_paid_storage :
 
     Optional arguments allow to override defaults:
 
-    {ul {li [?fee:Tez.tez]: specify a fee, otherwise set to
+    {ul {li [?fee:Tez.t]: specify a fee, otherwise set to
     [Tez.zero].}
 
     {li [?gas_limit:Gas.Arith.integral]: force a gas limit, otherwise
@@ -246,8 +246,8 @@ val contract_origination :
   ?delegate:public_key_hash ->
   script:Script.t ->
   ?public_key:public_key ->
-  ?credit:Tez.tez ->
-  ?fee:Tez.tez ->
+  ?credit:Tez.t ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -260,8 +260,8 @@ val contract_origination_hash :
   ?delegate:public_key_hash ->
   script:Script.t ->
   ?public_key:public_key ->
-  ?credit:Tez.tez ->
-  ?fee:Tez.tez ->
+  ?credit:Tez.t ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -274,7 +274,7 @@ val register_global_constant :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?public_key:Signature.public_key ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -467,7 +467,7 @@ val sc_rollup_origination :
 val sc_rollup_publish :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -486,7 +486,7 @@ val sc_rollup_publish :
 val sc_rollup_cement :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -511,7 +511,7 @@ val sc_rollup_execute_outbox_message :
     commitment bond of [staker]. *)
 val sc_rollup_recover_bond :
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   ?force_reveal:bool ->
@@ -524,7 +524,7 @@ val sc_rollup_recover_bond :
 val sc_rollup_add_messages :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -535,7 +535,7 @@ val sc_rollup_add_messages :
 val sc_rollup_refute :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
@@ -548,7 +548,7 @@ val sc_rollup_refute :
 val sc_rollup_timeout :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
