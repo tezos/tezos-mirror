@@ -24,7 +24,12 @@
 (*****************************************************************************)
 
 let node_tls () =
-  Test.register ~title:"Test TLS" ~tags:["node"; "tls"] ~__FILE__ @@ fun () ->
+  Test.register
+    ~title:"Test TLS"
+    ~tags:["node"; "tls"]
+    ~uses_client:false
+    ~__FILE__
+  @@ fun () ->
   let certificate_path = "tezt/tests/tls/tezos.crt" in
   let key_path = "tezt/tests/tls/tezos.key" in
   let rpc_tls = Node.{certificate_path; key_path} in

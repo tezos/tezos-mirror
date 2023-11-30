@@ -52,6 +52,7 @@ let check_dump_encodings () =
     ~title:"octez-codec dump encodings"
     ~tags:["dump"]
     ~uses:[Constant.octez_codec]
+    ~uses_client:false
   @@ fun () ->
   let* (_ : JSON.t) = Codec.dump_encodings () in
   unit
@@ -85,6 +86,7 @@ let check_protocol_sample_encoding ?supports sample =
     ~title:(sf "protocol encoding regression test: %s" sample)
     ~tags:(["encoding"; "protocol"] @ sample_as_tags sample)
     ~uses:(fun _protocol -> [Constant.octez_codec])
+    ~uses_client:false
     ?supports
   @@ fun protocol ->
   let base_path =
@@ -101,6 +103,7 @@ let check_shell_sample_encoding sample =
     ~title:(sf "shell encoding regression test: %s" sample)
     ~tags:(["encoding"; "shell"] @ sample_as_tags sample)
     ~uses:[Constant.octez_codec]
+    ~uses_client:false
   @@ fun () ->
   let base_path =
     "tezt" // "tests" // "encoding_samples" // "shell" // sample
