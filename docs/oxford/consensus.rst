@@ -153,15 +153,15 @@ balance*. Let us first (re)define these and related concepts.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
   staking balance. We explain below how it is computed.
-- The *frozen deposit* represents a percentage ``FROZEN_DEPOSIT_PERCENTAGE``
-  of the maximum active stake during the last ``PRESERVED_CYCLES + MAX_SLASHING_PERIOD``. This amount
-  represents the delegate's skin in the game: in the case that the
+- The *frozen deposit* represents a percentage ``FROZEN_DEPOSIT_PERCENTAGE`` of
+  the active stake at the end of the cycle that precedes the consensus rights
+  snapshoting.
+  This amount represents the delegate's skin in the game: in the case that the
   delegate behaves badly, its frozen deposit is partly slashed (see
-  :ref:`slashing_oxford`).  Taking the maximum over an
-  interval of cycles (instead of just considering the active stake at
-  the cycle where the bad action can occur) allows to avoid situations
-  where a malicious delegate empties its accounts between the time when
-  rights are attributed and the time when the deposit is frozen. The frozen deposits are updated at the end of each cycle.
+  :ref:`slashing_oxford`).
+  The frozen deposits are updated at the end of each cycle.  It must be at least
+  ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot be selected as a
+  validator.
 - The *spendable balance* of a delegate is its full balance
   minus the frozen deposits.
 

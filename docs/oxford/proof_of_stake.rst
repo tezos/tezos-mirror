@@ -24,8 +24,8 @@ determined from the seed; and it is random, in that its seed (and hence its resu
 be predicted too much in advance.
 
 
-Delegation
-----------
+Delegation and Staking
+----------------------
 
 A *delegate* is any :ref:`implicit account <def_implicit_account_oxford>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
@@ -46,6 +46,8 @@ of all the accounts that delegate to it, including the balance of the delegate i
 participate in consensus or in governance, a
 delegate needs to have at least a minimal stake, which is given by the
 ``MINIMAL_STAKE`` :ref:`protocol constant
+<protocol_constants_oxford>` and a minimal frozen stake given by the
+``MINIMAL_FROZEN_STAKE`` :ref:`protocol constant
 <protocol_constants_oxford>`.
 
 Delegates place security deposits that may be forfeited in case they do not
@@ -62,6 +64,12 @@ transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant
 like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
 manager and consensus keys are listed.
 
+On test-network only, if the :ref:`adaptive issuance <adaptive_issuance_oxford>`
+feature is activated, it grants delegators the ability to become
+'stakers' by placing security deposits. These deposits would contribute to their
+delegate's stake and could be subject to slashing penalties if their delegate
+misbehaves.  The staking power of funds placed by stakers and delegates is twice
+that of delegated funds.
 
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -115,7 +123,8 @@ At the end of cycle ``n-1-PRESERVED_CYCLES``, the snapshot for cycle
 PRNG having as seed the :ref:`random seed<random_seed_oxford>` for
 cycle ``n``.
 
-Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE`` is snapshot.
+Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE``
+and frozen deposits greater than ``MINIMAL_FROZEN_STAKE`` is snapshotted.
 
 .. _rights_oxford:
 
@@ -166,6 +175,8 @@ Proof-of-stake parameters
      - 5 cycles
    * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
+   * - ``MINIMAL_FROZEN_STAKE``
+     - 600 ꜩ
    * - ``BLOCKS_PER_STAKE_SNAPSHOT``
      - 1024 blocks
 
@@ -176,6 +187,9 @@ Further External Resources
 The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
+
+
+The adaptive issuance experimental feature :ref:`documentation <adaptive_issuance_oxford>`.
 
 Other presentations of the Tezos' proof-of-stake mechanism can be
 found in the `Tezos Agora wiki entry
