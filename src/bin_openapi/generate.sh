@@ -14,6 +14,7 @@ cd "$(dirname "$0")"/../.. || exit
 # Tezos binaries.
 tezos_node=./octez-node
 tezos_client=./octez-client
+smart_rollup_node=./octez-smart-rollup-node
 
 # Protocol configuration.
 protocol_hash=ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
@@ -38,6 +39,7 @@ mempool_api_json=$tmp/mempool-api.json
 openapi_json=docs/api/rpc-openapi-rc.json
 proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
+smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
 
 # Get version number.
 version=$(dune exec octez-version)
@@ -46,7 +48,7 @@ version=$(dune exec octez-version)
 $tezos_node config init --data-dir $data_dir \
     --network sandbox \
     --expected-pow 0 \
-    --rpc-addr localhost:$rpc_port \
+    --local-rpc-addr localhost:$rpc_port \
     --no-bootstrap-peer \
     --synchronisation-threshold 0
 $tezos_node identity generate --data-dir $data_dir
@@ -102,4 +104,9 @@ dune exec src/bin_openapi/rpc_openapi.exe -- \
      $mempool_api_json \
     | clean_private_rpc "$@" > $mempool_openapi_json
 echo "Generated OpenAPI specification: $mempool_openapi_json"
+
+# Gernerate openapi file for rollup node
+$smart_rollup_node generate openapi -P $protocol_hash > $smart_rollup_node_openapi_json
+echo "Generated OpenAPI specification: $smart_rollup_node_openapi_json"
+
 echo "You can now clean up with: rm -rf $tmp"
