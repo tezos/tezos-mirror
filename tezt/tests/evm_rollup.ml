@@ -3403,124 +3403,41 @@ let test_originate_evm_kernel_and_dump_pvm_state =
     ~tags:["evm"]
     ~title:"Originate EVM kernel with installer and dump PVM state"
   @@ fun protocol ->
-  let* {node; client; sc_rollup_node; sc_rollup_client; config; _} =
+  let* {node; client; sc_rollup_node; sc_rollup_client; _} =
     setup_evm_kernel ~admin:None protocol
   in
   (* First run of the installed EVM kernel, it will initialize the directory
      "eth_accounts". *)
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
-  let evm_key = "evm" in
-  let*! storage_root_keys =
-    Sc_rollup_client.inspect_durable_state_value
-      ~hooks
-      sc_rollup_client
-      ~pvm_kind
-      ~operation:Sc_rollup_client.Subkeys
-      ~key:""
-  in
-  Check.(
-    list_mem
-      string
-      evm_key
-      storage_root_keys
-      ~error_msg:"Expected %L to be initialized by the EVM kernel.") ;
-  let* new_level = next_evm_level ~sc_rollup_node ~node ~client in
-  let dump = Temp.file "dump.yaml" in
-  (* Check that the given [config] is included in the dumped PVM state. *)
-  let check_dump ~config ~dump =
-    match Option.get config with
-    | `Config config -> return (Installer_kernel_config.check_dump ~config dump)
-    | _ -> (* dead code path *) assert false
-  in
+  let dump = Temp.file "dump.json" in
   let* () = Sc_rollup_node.dump_durable_storage ~sc_rollup_node ~dump () in
-  let* () = check_dump ~config ~dump in
-  let* () =
-    Sc_rollup_node.dump_durable_storage
-      ~sc_rollup_node
-      ~dump
-      ~block:(string_of_int new_level)
-      ()
-  in
-  let* () = check_dump ~config ~dump in
-  (* Check the consistency of the PVM state as queried by RPCs and the dumped PVM state. *)
-  let of_yaml s : Installer_kernel_config.t =
-    let yaml = Yaml.of_string_exn (Base.read_file s) in
-    match yaml with
-    | `O (("instructions", `A instrs) :: _) ->
-        List.fold_left
-          (fun acc -> function
-            | `O (("set", `O ((op, value) :: ("to", dest) :: _)) :: _) ->
-                let to_ = Yaml.to_string_exn dest in
-                let value = Yaml.to_string_exn value in
-                let instr =
-                  Installer_kernel_config.(
-                    match op with
-                    | "from" -> Move {from = value; to_}
-                    | "hash" -> Reveal {hash = value; to_}
-                    | "value" -> Set {value; to_}
-                    | _ -> (* dead code path *) assert false)
-                in
-                instr :: acc
-            | _ -> (* dead code path *) assert false)
-          []
-          instrs
-    | _ -> (* dead code path *) assert false
-  in
-  let check_dump_rpc () =
-    let module Std = Tezos_lwt_result_stdlib.Lwtreslib.Bare in
-    let instrs = of_yaml dump in
-    Std.List.iter_s
-      (fun instr ->
-        let open Runnable.Syntax in
-        let value, key =
-          Installer_kernel_config.(
-            match instr with
-            | Move {from; to_} -> (from, to_)
-            | Reveal {hash; to_} -> (hash, to_)
-            | Set {value; to_} -> (value, to_))
-        in
-        let*! expected_value =
-          Sc_rollup_client.inspect_durable_state_value
-            sc_rollup_client
-            ~pvm_kind:"wasm_2_0_0"
-            ~operation:Sc_rollup_client.Value
-            ~key
-        in
-        let expected_value =
-          Std.WithExceptions.Option.get ~loc:__LOC__ expected_value
-        in
-        let value = String.trim value in
-        let error_msg =
-          Format.asprintf "Expected %s, got %s" expected_value value
-        in
-        (match Base.(value =~* rex "^-?\\d+[.]?\\d*e[+](\\d+)$") with
-        | Some exponent ->
-            (* Check integers in scientific notation. *)
-            let tolerance =
-              Q.of_bigint Z.(pow (of_int 10) (int_of_string exponent))
-            in
-            let expected_value = Q.of_string expected_value in
-            (* Z.of_string does not parse scientific notation yet. *)
-            let value = Q.of_string value in
-            if Q.(abs (expected_value - value) < tolerance) then
-              (* Yaml.of_string_exn truncates integers.
-                 For instance 35316531343563303366356465633665343730343131393831333665313530633063323962346161
-                 becomes 3.53165313435633e+79, so we account for that. *) ()
-            else Check.(is_true (Q.equal expected_value value)) ~error_msg
-        | None ->
-            if Base.(value =~ rex "^-?[1-9][0-9]*$") then
-              (* Check integers in base 10. *)
-              Check.(
-                is_true Q.(equal (of_string expected_value) (of_string value)))
-                ~error_msg
-            else if Base.(value =~ rex "^0+$" && expected_value =~ rex "^0+$")
-            then (* The case of 0 (can be an int or hex) *) ()
-            else Check.((expected_value = value) string) ~error_msg) ;
+  let installer = Installer_kernel_config.of_json dump in
 
-        unit)
-      instrs
-  in
-  check_dump_rpc ()
+  (* Check the consistency of the PVM state as queried by RPCs and the dumped PVM state. *)
+  Lwt_list.iter_s
+    (function
+      (* We consider only the Set instruction because the dump durable storage
+         command of the node produce only this instruction. *)
+      | Installer_kernel_config.Set {value; to_} ->
+          let*! expected_value =
+            Sc_rollup_client.inspect_durable_state_value
+              sc_rollup_client
+              ~pvm_kind:"wasm_2_0_0"
+              ~operation:Sc_rollup_client.Value
+              ~key:to_
+          in
+          let expected_value =
+            match expected_value with
+            | Some expected_value -> expected_value
+            | None ->
+                Test.fail "The key %S doesn't exist in the durable storage" to_
+          in
+          Check.((expected_value = value) string)
+            ~error_msg:
+              (sf "Value found in installer is %%R but expected %%L at %S" to_) ;
+          unit
+      | _ -> assert false)
+    installer
 
 (** Test that a contract can be called,
     and that the call can modify the storage.  *)

@@ -89,29 +89,29 @@ module Installer_kernel_config = struct
   let to_yaml t =
     "instructions:\n" ^ String.concat "" (List.map instr_to_yaml t)
 
-  let check_dump ~config dump =
-    let dump = Base.read_file dump in
-    let check kind value destination =
-      let regexp =
-        Format.asprintf "- set:\n    %s: %s\n    to: %s" kind value destination
-      in
-      let error_msg =
-        Format.asprintf
-          "key-value pair not found in dump (%s: %s, to: %s)"
-          kind
-          value
-          destination
-      in
-      Check.is_true ~error_msg Base.(dump =~ rex regexp)
+  let of_json file =
+    let json = JSON.parse_file file in
+    let instrs =
+      JSON.(
+        json |-> "instructions" |> as_list |> List.map as_object |> List.flatten)
     in
-    (* Check that the config is included in the dump (the PVM did not alter
-       the key-value pairs defined in the config) *)
-    List.iter
-      (function
-        | Move {from; to_} -> check "from" from to_
-        | Reveal {hash; to_} -> check "hash" hash to_
-        | Set {value; to_} -> check "value" value to_)
-      config
+    List.map
+      (fun (instr, json) ->
+        match instr with
+        | "set" ->
+            let value = JSON.(json |-> "value" |> as_string) in
+            let to_ = JSON.(json |-> "to" |> as_string) in
+            Set {value; to_}
+        | "move" ->
+            let from = JSON.(json |-> "from" |> as_string) in
+            let to_ = JSON.(json |-> "to" |> as_string) in
+            Move {from; to_}
+        | "reveal" ->
+            Test.fail
+              "The JSON format of configuration installer is not valid for the \
+               moment."
+        | s -> Test.fail "Invalid instruction %S" s)
+      instrs
 end
 
 type installer_result = {
