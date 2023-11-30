@@ -70,6 +70,14 @@ Adaptive Issuance (experimental)
 ----------------------------------
 
 
+- This protocol expands the voting system for bakers to include
+  Adaptive Issuance alongside Liquidity Baking. This vote is ignored
+  on Mainnet (as explained below), but active on testnets for
+  testing purposes. Bakers may use the per-block votes
+  file, or CLI option ``--adaptive-issuance-vote``. If they do
+  not vote for the Adaptive Issuance feature, the vote defaults to
+  "pass" (unlike the case of Liquidity Baking, whose vote remains mandatory).
+
 - Adaptive Issuance is locked behind a feature flag and cannot be activated for
   this proposal. The voting mechanism for Adaptive Issuance remains accessible,
   but is ignored and can never activate the feature. Moreover, the vote EMA will
@@ -90,12 +98,6 @@ Adaptive Issuance (experimental)
 - Denunciation rewards computation updated to depend on ``limit_of_staking_over_baking``. (MR :gl:`!8939`)
 
 When the feature flag is enabled (testnets only), the following extra changes happen:
-
-- This protocol asks the bakers to set their votes for the adoption of
-  the adaptive issuance feature. They may use the per-block votes
-  file, or CLI option ``--adaptive-issuance-vote``. If they do
-  not vote for the adaptive issuance feature, the vote defaults to
-  "pass" (unlike for the liquidity baking vote, which is mandatory).
 
 - Add parameter ``limit_of_staking_over_baking`` as the limit of the ratio of tez staked by other delegators over the baker's own, for a given baker. (MR :gl:`!8744`)
 
