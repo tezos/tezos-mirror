@@ -205,12 +205,9 @@ let on_transaction state tx_raw =
       state.pool <- pool ;
       return (Ok hash)
 
-let on_head state block_height =
+let inject_transactions ~smart_rollup_address rollup_node pool =
   let open Lwt_result_syntax in
-  let open Types in
-  let {rollup_node = (module Rollup_node); smart_rollup_address; pool; _} =
-    state
-  in
+  let (module Rollup_node : Services_backend_sig.S) = rollup_node in
   (* Get all the addresses in the tx-pool. *)
   let addresses = Pool.addresses pool in
   (* Get the nonce related to each address. *)
@@ -278,6 +275,13 @@ let on_head state block_height =
             "[tx-pool] Transaction %s sent to the rollup.\n%!"
             (Ethereum_types.hash_to_string hash))
         hashes) ;
+  return pool
+
+let on_head state block_height =
+  let open Lwt_result_syntax in
+  let open Types in
+  let {rollup_node; smart_rollup_address; pool; _} = state in
+  let* pool = inject_transactions ~smart_rollup_address rollup_node pool in
   (* update the pool *)
   state.level <- block_height ;
   state.pool <- pool ;
