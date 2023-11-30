@@ -231,6 +231,21 @@ fn read_rlp<T: Decodable, Host: Runtime>(
     FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
 }
 
+/// Read data from the durable storage under the given path.
+///
+/// If there is no data, None is returned.
+pub fn read_optional_rlp<T: Decodable>(
+    host: &impl Runtime,
+    path: &impl Path,
+) -> Result<Option<T>, anyhow::Error> {
+    if let Some(ValueType::Value) = host.store_has(path)? {
+        let elt = read_rlp(host, path)?;
+        Ok(Some(elt))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
     let hash = read_current_block_hash(host)?;
     let block_path = block_path(hash)?;
