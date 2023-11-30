@@ -1,6 +1,6 @@
 # Proxy Mode
 
-The proxy mode is an alternative mode of `tezos-client` where some RPCs
+The proxy mode is an alternative mode of `octez-client` where some RPCs
 are done locally instead of being delegated to the node. The point
 is to discharge the node from potentially long computations, such as
 estimating baking rights.
@@ -22,7 +22,7 @@ At the high-level, the proxy mode consists of:
   execute RPCs locally: missing data is requested over the network
   under the hood.
 
-## `tezos-client` CLI
+## `octez-client` CLI
 
 The proxy mode is requested by passing `--mode proxy` to the client. For
 this, `src/lib_client/client_config.ml` contains a `Mode_proxy` value.

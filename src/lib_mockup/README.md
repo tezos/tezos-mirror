@@ -1,7 +1,7 @@
 # Mockup mode
 
 Libraries for mockup mode, i.e., the implementation of
-`tezos-client`'s `--mode mockup` flags.
+`octez-client`'s `--mode mockup` flags.
 
 ## Overview
 
@@ -12,7 +12,7 @@ There are 3 libraries in this directory (see `dune` file):
 * `tezos_mockup_commands`
 
 
-### Tezos mockup 
+### Tezos mockup
 
 This library defines a mockup implementation of RPCs that are handled locally
 in mockup mode while they are executed on a node by vanilla clients.
@@ -51,7 +51,7 @@ dedicated mockup context object in
 the local mockup implementation
 
 
-## Testing 
+## Testing
 
 Tests for mockup mode use the `tezt` testing framework.
 

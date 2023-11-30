@@ -28,7 +28,7 @@
 
     The [main] function is the entry point for the forked process.
     While [Updater.compile] is the 'forking' function to be called by
-    the [tezos-node] process.
+    the [octez-node] process.
 
 *)
 
