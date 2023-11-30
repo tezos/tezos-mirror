@@ -104,7 +104,9 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
-type mode = Proxy | Sequencer of {time_between_blocks : float}
+type mode =
+  | Proxy of {rollup_node_endpoint : Uri.t}
+  | Sequencer of {time_between_blocks : float}
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);
@@ -116,7 +118,6 @@ module Types = struct
   type state = {
     rollup_node : (module Services_backend_sig.S);
     smart_rollup_address : string;
-    mutable level : Ethereum_types.block_height;
     mutable pool : Pool.t;
     mode : mode;
   }
@@ -142,7 +143,7 @@ module Request = struct
     | Add_transaction :
         string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | Inject_transactions : Ethereum_types.block_height -> (unit, tztrace) t
+    | Inject_transactions : (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -164,11 +165,9 @@ module Request = struct
         case
           (Tag 1)
           ~title:"Inject_transactions"
-          (obj2
-             (req "request" (constant "new_l2_head"))
-             (req "block_height" Ethereum_types.block_height_encoding))
-          (function View (Inject_transactions b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (Inject_transactions b));
+          (obj1 (req "request" (constant "new_l2_head")))
+          (function View Inject_transactions -> Some () | _ -> None)
+          (fun () -> View Inject_transactions);
       ]
 
   let pp ppf (View r) =
@@ -178,9 +177,7 @@ module Request = struct
           ppf
           "Add [%s] tx to tx-pool"
           (Hex.of_string transaction |> Hex.show)
-    | Inject_transactions block_height ->
-        let (Ethereum_types.Block_height block_height) = block_height in
-        Format.fprintf ppf "New L2 head: %s" (Z.to_string block_height)
+    | Inject_transactions -> Format.fprintf ppf "Inject transactions"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -286,13 +283,12 @@ let inject_transactions ~smart_rollup_address rollup_node pool =
         hashes) ;
   return pool
 
-let on_head state block_height =
+let on_head state =
   let open Lwt_result_syntax in
   let open Types in
   let {rollup_node; smart_rollup_address; pool; _} = state in
   let* pool = inject_transactions ~smart_rollup_address rollup_node pool in
   (* update the pool *)
-  state.level <- block_height ;
   state.pool <- pool ;
   return_unit
 
@@ -308,22 +304,14 @@ module Handlers = struct
     match request with
     | Request.Add_transaction raw_tx ->
         protect @@ fun () -> on_transaction state raw_tx
-    | Request.Inject_transactions block_height ->
-        protect @@ fun () -> on_head state block_height
+    | Request.Inject_transactions -> protect @@ fun () -> on_head state
 
   type launch_error = error trace
 
   let on_launch _w ()
       ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
     let state =
-      Types.
-        {
-          rollup_node;
-          smart_rollup_address;
-          level = Block_height Z.zero;
-          pool = Pool.empty;
-          mode;
-        }
+      Types.{rollup_node; smart_rollup_address; pool = Pool.empty; mode}
     in
     Lwt_result_syntax.return state
 
@@ -362,34 +350,38 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-(** Sends New_l2_level each time there is a new l2 level 
-TODO: https://gitlab.com/tezos/tezos/-/issues/6079
-listen to the node instead of pulling the level each 5s
-*)
-let rec subscribe_l2_block worker =
+let make_streamed_call ~rollup_node_endpoint =
   let open Lwt_syntax in
-  let* () = Lwt_unix.sleep 5.0 in
-  let state = Worker.state worker in
-  let (Types.{rollup_node = (module Rollup_node_rpc); _} : Types.state) =
-    state
+  let stream, push = Lwt_stream.create () in
+  let on_chunk _v = push (Some ()) and on_close () = push None in
+  let* _spill_all =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
+      [Media_type.json]
+      ~base:rollup_node_endpoint
+      Rollup_node_services.global_block_watcher
+      ~on_chunk
+      ~on_close
+      ()
+      ()
+      ()
   in
-  (* Get the current eth level.*)
-  let* res = Rollup_node_rpc.current_block_number () in
-  match res with
-  | Error _ ->
+  return stream
+
+let rec subscribe_l2_block ~stream_l2 worker =
+  let open Lwt_syntax in
+  let* new_head = Lwt_stream.get stream_l2 in
+  match new_head with
+  | Some () ->
+      let* _pushed =
+        Worker.Queue.push_request worker Request.Inject_transactions
+      in
+      subscribe_l2_block ~stream_l2 worker
+  | None ->
       (* Kind of retry strategy *)
       Format.printf
         "Connection with the rollup node has been lost, retrying...\n" ;
-      subscribe_l2_block worker
-  | Ok block_number ->
-      if state.level != block_number then
-        let* _pushed =
-          Worker.Queue.push_request
-            worker
-            (Request.Inject_transactions block_number)
-        in
-        subscribe_l2_block worker
-      else subscribe_l2_block worker
+      let* () = Lwt_unix.sleep 1. in
+      subscribe_l2_block ~stream_l2 worker
 
 let rec sequencer_produce_block ~time_between_blocks worker =
   let open Lwt_syntax in
@@ -398,14 +390,7 @@ let rec sequencer_produce_block ~time_between_blocks worker =
   let (Types.{rollup_node = (module Rollup_node_rpc); _} : Types.state) =
     state
   in
-  let* _pushed =
-    Worker.Queue.push_request
-      worker
-      (* The sequencer mode does not rely on the state.level, therefore we do not
-         care about the value we push. Also, note that this is state.level will
-         be completely removed when we stream L2 blocks. *)
-      (Request.Inject_transactions (Ethereum_types.Block_height Z.zero))
-  in
+  let* _pushed = Worker.Queue.push_request worker Request.Inject_transactions in
   sequencer_produce_block ~time_between_blocks worker
 
 let start ({mode; _} as parameters) =
@@ -415,7 +400,9 @@ let start ({mode; _} as parameters) =
     Lwt.dont_wait
       (fun () ->
         match mode with
-        | Proxy -> subscribe_l2_block worker
+        | Proxy {rollup_node_endpoint} ->
+            let*! stream_l2 = make_streamed_call ~rollup_node_endpoint in
+            subscribe_l2_block ~stream_l2 worker
         | Sequencer {time_between_blocks} ->
             sequencer_produce_block ~time_between_blocks worker)
       (fun _ ->

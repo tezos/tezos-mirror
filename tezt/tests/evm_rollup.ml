@@ -3263,14 +3263,17 @@ let register_evm_migration ~protocols =
   test_block_storage_before_and_after_migration protocols ;
   test_transaction_storage_before_and_after_migration protocols
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6438
-   The rollup node batches the transactions before receiving all of them.
-   This test fails deterministically and so is disabled. *)
 let test_reboot =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "reboot"; "loop"; Tag.ci_disabled]
-    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
+    ~tags:["evm"; "reboot"; "loop"]
+    ~uses:(fun protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Check that the kernel can handle too many txs for a single run"
   @@ fun protocol ->
   let* {evm_node; sc_rollup_node; node; client; _} =
