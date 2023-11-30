@@ -580,7 +580,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
   let* ctxt, balance_updates =
     transfer_from_any_address ctxt sender contract amount
   in
-  (* Token.transfer which is being called before already loads this value into
+  (* [Token.transfer], which is being called before, already loads this value into
      the Irmin cache, so no need to burn gas for it. *)
   let* balance = Contract.get_balance ctxt contract in
   let now = Script_timestamp.now ctxt in
