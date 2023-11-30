@@ -107,7 +107,8 @@ let test_injector : Protocol.t list -> unit =
   Protocol.register_test
     ~__FILE__
     ~title:"Injector daemon"
-    ~tags:["bin_injector"]
+    ~tags:[]
+    ~uses:(fun _ -> [Constant.octez_injector_server])
   @@ fun protocol ->
   let nodes_args = Node.[Synchronisation_threshold 0; Private_mode] in
   let* node, client =
