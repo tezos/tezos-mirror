@@ -224,8 +224,8 @@ pub fn store_rlp<T: Encodable, Host: Runtime>(
 }
 
 fn read_rlp<T: Decodable, Host: Runtime>(
-    host: &mut Host,
-    path: &OwnedPath,
+    host: &Host,
+    path: &impl Path,
 ) -> Result<T, Error> {
     let bytes = host.store_read_all(path)?;
     FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
@@ -905,7 +905,7 @@ pub(crate) mod internal_for_tests {
     }
 }
 
-pub fn is_sequencer<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
+pub fn is_sequencer<Host: Runtime>(host: &Host) -> Result<bool, Error> {
     Ok(host.store_has(&SEQUENCER)?.is_some())
 }
 
