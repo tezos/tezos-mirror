@@ -196,21 +196,14 @@ module Context = struct
   end
 
   module Internal_for_tests = struct
-    let get_a_tree : type a. a t -> string -> pvmstate Lwt.t =
-     fun (Context
-           {
-             pvm_context_impl = (module Pvm_Context_Impl);
-             equality_witness;
-             impl_name;
-             _;
-           })
-         key ->
+    let get_a_tree : (module Context_sigs.S) -> string -> pvmstate Lwt.t =
+     fun (module Pvm_Context_Impl) key ->
       let open Lwt_syntax in
       let+ tree = Pvm_Context_Impl.Internal_for_tests.get_a_tree key in
       make_pvmstate
         ~pvm_context_impl:(module Pvm_Context_Impl)
-        ~equality_witness
-        ~impl_name
+        ~equality_witness:Pvm_Context_Impl.equality_witness
+        ~impl_name:Pvm_Context_Impl.impl_name
         ~pvmstate:tree
   end
 end

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -78,6 +79,8 @@ module type FUELED_PVM = sig
 end
 
 module type S = sig
+  val context : Kind.t -> (module Context_sigs.S)
+
   val get_tick : Kind.t -> Context.tree -> Z.t Lwt.t
 
   val state_hash : Kind.t -> Context.tree -> State_hash.t Lwt.t

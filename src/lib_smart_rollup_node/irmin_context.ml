@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 open Store_sigs
+open Context_sigs
 module Context_encoding = Tezos_context_encoding.Context_binary
 
 (* We shadow [Tezos_context_encoding] to prevent accidentally using
@@ -43,17 +44,19 @@ end
 module IStoreTree =
   Tezos_context_helpers.Context.Make_tree (Context_encoding.Conf) (IStore)
 
+type repo = IStore.Repo.t
+
 type tree = IStore.tree
 
-type 'a raw_index = {path : string; repo : IStore.Repo.t}
+type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
-type 'a index = 'a raw_index constraint 'a = [< `Read | `Write > `Read]
+type nonrec 'a index = ('a, repo) Context_sigs.index
 
 type rw_index = [`Read | `Write] index
 
 type ro_index = [`Read] index
 
-type 'a t = {index : 'a index; tree : tree}
+type 'a t = ('a, repo, tree) Context_sigs.t
 
 type rw = [`Read | `Write] t
 
@@ -66,6 +69,11 @@ type hash = Smart_rollup_context_hash.t
 type path = string list
 
 let () = assert (Smart_rollup_context_hash.size = IStore.Hash.hash_size)
+
+let impl_name = "Irmin"
+
+let equality_witness : (repo, tree) Context_sigs.equality_witness =
+  (Context_sigs.Equality_witness.make (), Context_sigs.Equality_witness.make ())
 
 let hash_to_istore_hash h =
   Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string

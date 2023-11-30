@@ -26,6 +26,10 @@
 open Protocol
 open Alpha_context
 
+let context = Pvm.context
+
+module Context = Irmin_context
+
 let get_tick kind state =
   let open Lwt_syntax in
   let module PVM = (val Pvm.of_kind kind) in

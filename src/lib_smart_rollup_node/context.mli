@@ -156,7 +156,7 @@ module Context : sig
   module Internal_for_tests : sig
     (** [get_a_tree key] provides a value of internal type [tree] which can be
       used as a state to be set in the context directly. *)
-    val get_a_tree : 'a t -> string -> pvmstate Lwt.t
+    val get_a_tree : (module Context_sigs.S) -> string -> pvmstate Lwt.t
   end
 end
 

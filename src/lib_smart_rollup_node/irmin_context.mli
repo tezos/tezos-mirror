@@ -26,9 +26,16 @@
 
 open Store_sigs
 
+type repo
+
+(** The type of trees stored in the context, i.e. the actual data. *)
+type tree
+
+type 'a raw_index = ('a, repo) Context_sigs.raw_index
+
 (** The type of indexed repository for contexts. The parameter indicates if the
     index can be written or only read. *)
-type 'a index constraint 'a = [< `Read | `Write > `Read]
+type 'a index = 'a raw_index constraint 'a = [< `Read | `Write > `Read]
 
 (** Read/write {!type:index}. *)
 type rw_index = [`Read | `Write] index
@@ -36,11 +43,8 @@ type rw_index = [`Read | `Write] index
 (** Read only {!type:index}. *)
 type ro_index = [`Read] index
 
-(** The type of trees stored in the context, i.e. the actual data. *)
-type tree
-
 (** The type of context with its content. *)
-type 'a t constraint 'a = [< `Read | `Write > `Read]
+type 'a t = ('a, repo, tree) Context_sigs.t
 
 (** Read/write context {!t}. *)
 type rw = [`Read | `Write] t
@@ -55,10 +59,14 @@ type hash = Smart_rollup_context_hash.t
 (** The type of commits for the context. *)
 type commit
 
+val impl_name : string
+
+val equality_witness : (repo, tree) Context_sigs.equality_witness
+
 (** [load cache_size path] initializes from disk a context from [path].
     [cache_size] allows to change the LRU cache size of Irmin
     (100_000 by default at irmin-pack/config.ml *)
-val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
+val load : cache_size:int -> 'a mode -> string -> 'a raw_index tzresult Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index
