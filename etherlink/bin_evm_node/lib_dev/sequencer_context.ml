@@ -21,6 +21,7 @@ type t = {
   kernel : string;
   preimages : string;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+  mutable next_blueprint_number : Ethereum_types.quantity;
 }
 
 (** The EVM/PVM local state used by the sequencer. *)
@@ -40,36 +41,53 @@ module EVMState = struct
     return {ctxt with store}
 end
 
+type metadata = {
+  checkpoint : Context_hash.t;
+  next_blueprint_number : Ethereum_types.quantity;
+}
+
 let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
-let checkpoint_path ~data_dir = Filename.Infix.(data_dir // "checkpoint")
+let metadata_path ~data_dir = Filename.Infix.(data_dir // "metadata")
 
-let checkpoint_encoding =
-  Data_encoding.(obj1 (req "checkpoint" Context_hash.encoding))
+let metadata_encoding =
+  let open Data_encoding in
+  conv
+    (fun {checkpoint; next_blueprint_number} ->
+      (checkpoint, next_blueprint_number))
+    (fun (checkpoint, next_blueprint_number) ->
+      {checkpoint; next_blueprint_number})
+    (obj2
+       (req "checkpoint" Context_hash.encoding)
+       (req "next_blueprint_number" Ethereum_types.quantity_encoding))
 
-let store_checkpoint ~data_dir commit =
-  let json = Data_encoding.Json.construct checkpoint_encoding commit in
-  Lwt_utils_unix.Json.write_file (checkpoint_path ~data_dir) json
+let store_metadata ~data_dir metadata =
+  let json = Data_encoding.Json.construct metadata_encoding metadata in
+  Lwt_utils_unix.Json.write_file (metadata_path ~data_dir) json
 
-let load_checkpoint ~data_dir index =
+let load_metadata ~data_dir index =
   let open Lwt_result_syntax in
-  let path = checkpoint_path ~data_dir in
+  let path = metadata_path ~data_dir in
   let*! exists = Lwt_unix.file_exists path in
   if exists then
     let* content = Lwt_utils_unix.Json.read_file path in
-    let checkpoint = Data_encoding.Json.destruct checkpoint_encoding content in
+    let {checkpoint; next_blueprint_number} =
+      Data_encoding.Json.destruct metadata_encoding content
+    in
     let*! store = Context.checkout_exn index checkpoint in
     let* evm_state = EVMState.get store in
-    return (store, evm_state, true)
+    return (store, evm_state, next_blueprint_number, true)
   else
     let store = Context.empty index in
     let evm_state = Context.Tree.empty store in
-    return (store, evm_state, false)
+    return (store, evm_state, Ethereum_types.Qty Z.zero, false)
 
 let init ~data_dir ~kernel ~preimages ~smart_rollup_address =
   let open Lwt_result_syntax in
   let*! index = Context.init (store_path ~data_dir) in
-  let* store, evm_state, loaded = load_checkpoint ~data_dir index in
+  let* store, evm_state, next_blueprint_number, loaded =
+    load_metadata ~data_dir index
+  in
   let smart_rollup_address =
     Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
   in
@@ -82,20 +100,25 @@ let init ~data_dir ~kernel ~preimages ~smart_rollup_address =
         kernel;
         preimages;
         smart_rollup_address;
+        next_blueprint_number;
       },
       loaded )
 
 let commit ctxt evm_state =
   let open Lwt_result_syntax in
   let*! ctxt = EVMState.set ctxt evm_state in
-  let*! commit = Context.commit ~time:Time.Protocol.epoch ctxt.store in
-  let* () = store_checkpoint ~data_dir:ctxt.data_dir commit in
+  let*! checkpoint = Context.commit ~time:Time.Protocol.epoch ctxt.store in
+  let* () =
+    store_metadata
+      ~data_dir:ctxt.data_dir
+      {checkpoint; next_blueprint_number = ctxt.next_blueprint_number}
+  in
   return {ctxt with evm_state}
 
 let sync ctxt =
   let open Lwt_result_syntax in
   let*! () = Context.sync ctxt.index in
-  let* store, evm_state, _loaded =
-    load_checkpoint ~data_dir:ctxt.data_dir ctxt.index
+  let* store, evm_state, next_blueprint_number, _loaded =
+    load_metadata ~data_dir:ctxt.data_dir ctxt.index
   in
-  return {ctxt with store; evm_state}
+  return {ctxt with store; evm_state; next_blueprint_number}
