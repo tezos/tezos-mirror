@@ -6,6 +6,9 @@
 #       This could be solved by --target-language and --target-script-path
 #       parameters.
 
+# TODO: https://gitlab.com/tezos/tezos/-/issues/6666
+#       The script is generally very verbose. We may want to add logging levels.
+
 set -u
 
 if [ -n "${TRACE:-}" ]; then set -x; fi
