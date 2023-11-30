@@ -7,7 +7,11 @@ const CREATE_STORAGE_CUTOFF = 600_000
 
 const MLR = require("ml-regression-multivariate-linear")
 
-module.exports = { is_transfer, is_create, is_transaction, BASE_GAS, make_lr, print_lr, print_summary_errors, print_model, predict_linear_model }
+const path = require('node:path')
+const fs = require('fs');
+const csv = require('csv-stringify/sync');
+
+module.exports = { is_transfer, is_create, is_transaction, BASE_GAS, make_lr, print_lr, print_summary_errors, print_model, predict_linear_model, print_csv }
 
 function is_transfer(record) {
     return record.gas_cost == BASE_GAS
@@ -62,4 +66,12 @@ function print_model(model, var_name) {
 function predict_linear_model(model, x) {
     if (isNaN(x)) return model.intercept
     return model.intercept + model.coef * x
+}
+
+function print_csv(dir, name, data_array, columns) {
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.format({ dir, name }), csv.stringify(data_array, {
+        header: true,
+        columns
+    }))
 }
