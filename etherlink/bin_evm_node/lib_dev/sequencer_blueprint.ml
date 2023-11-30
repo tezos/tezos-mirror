@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Ethereum_types
+
 let now_bytes () =
   let now = Ptime_clock.now () in
   let now = Ptime.to_rfc3339 now in
@@ -12,7 +14,7 @@ let now_bytes () =
   Time.Protocol.to_seconds timestamp
   |> Z.of_int64 |> Z.to_bits |> Bytes.of_string
 
-let create ~smart_rollup_address ~transactions =
+let create ~smart_rollup_address ~number ~transactions =
   let timestamp = Rlp.Value (now_bytes ()) in
   let messages =
     Rlp.List
@@ -20,8 +22,9 @@ let create ~smart_rollup_address ~transactions =
          (fun transaction -> Rlp.Value (Bytes.of_string transaction))
          transactions)
   in
+  let number = Rlp.Value (encode_u256_le number) in
   let rlp_blueprint =
-    Rlp.List [messages; timestamp] |> Rlp.encode |> Bytes.to_string
+    Rlp.List [messages; timestamp; number] |> Rlp.encode |> Bytes.to_string
   in
 
   [
