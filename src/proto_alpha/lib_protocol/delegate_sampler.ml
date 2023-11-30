@@ -171,7 +171,7 @@ let get_stakes_for_selected_index ctxt ~slashings index =
   Stake_storage.fold_snapshot
     ctxt
     ~index
-    ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
+    ~f:(fun (delegate, staking_balance) acc ->
       let staking_balance =
         match Signature.Public_key_hash.Map.find delegate slashings with
         | None -> staking_balance
@@ -183,9 +183,10 @@ let get_stakes_for_selected_index ctxt ~slashings index =
       in
       if Stake_storage.has_minimal_stake_and_frozen_stake ctxt staking_balance
       then
+        let stakes, total_stake = acc in
         let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
-        return ((delegate, stake_for_cycle) :: acc, total_stake)
-      else return (acc, total_stake))
+        return ((delegate, stake_for_cycle) :: stakes, total_stake)
+      else return acc)
     ~init:([], Stake_repr.zero)
 
 let compute_snapshot_index_for_seed ~max_snapshot_index seed =
