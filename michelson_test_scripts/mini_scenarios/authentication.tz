@@ -21,9 +21,9 @@ storage (pair (nat %counter) key);
 code
   {
     UNPPAIPAIR;
-    DUUUP; DUUP ; SELF; CHAIN_ID ; PPAIPAIR; PACK;
-    DIP { SWAP }; DUUUUUP ; DIP { SWAP };
-    DUUUP; DIP {CHECK_SIGNATURE}; SWAP; IF {DROP} {FAILWITH};
+    DUP 3; DUP 2 ; SELF; CHAIN_ID ; PPAIPAIR; PACK;
+    DIP { SWAP }; DUP 5 ; DIP { SWAP };
+    DUP 3; DIP {CHECK_SIGNATURE}; SWAP; IF {DROP} {FAILWITH};
     UNIT; EXEC;
     DIP { PUSH nat 1; ADD };
     PAPAIR

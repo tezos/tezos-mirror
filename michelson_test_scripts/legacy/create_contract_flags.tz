@@ -4,9 +4,7 @@ code { CAR;
 
        UNPAPAIR @mgr @spendable @deletagable;
        DIP { NONE  @delegate key_hash } ;
-       DIIIIP { UNIT @init;
-                PUSH  @credit mutez 100000000 ;
-              };
+       DIP 4 { UNIT @init; PUSH @credit mutez 100000000 };
        # type of legacy create_contract
        # :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
        #                -> operation : address : 'S

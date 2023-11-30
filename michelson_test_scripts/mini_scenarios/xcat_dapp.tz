@@ -47,17 +47,19 @@ code {
              { # It's a claim!
                DUP; SIZE; PUSH nat 32; ASSERT_CMPGE;
                SHA256 @hash; DUP; DIP {SWAP};
-               DIIP {
-                      GET; ASSERT_SOME;
-                      # Check deadline and prepare transaction.
-                      DUP; CADR @%; CONTRACT @dest unit; ASSERT_SOME;
-                      SWAP; CDR @%;
-                      UNPAIR @% @%; SWAP;
-                      # The deadline must not have passed
-                      NOW; ASSERT_CMPLT;
-                      # prepare transaction
-                      UNIT; TRANSFER_TOKENS;
-                    };
+               DIP
+                 2
+                 {
+                   GET; ASSERT_SOME;
+                   # Check deadline and prepare transaction.
+                   DUP; CADR @%; CONTRACT @dest unit; ASSERT_SOME;
+                   SWAP; CDR @%;
+                   UNPAIR @% @%; SWAP;
+                   # The deadline must not have passed
+                   NOW; ASSERT_CMPLT;
+                   # prepare transaction
+                   UNIT; TRANSFER_TOKENS;
+                 };
              }
              { # It's a refund!
                DUP;

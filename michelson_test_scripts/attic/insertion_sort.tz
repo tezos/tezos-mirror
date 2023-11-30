@@ -2,11 +2,11 @@ parameter (list int) ;
 storage (list int) ;
 code { CAR ;
        NIL int ; SWAP ;
-       ITER { SWAP; DIIP{NIL int} ; PUSH bool True ;
+       ITER { SWAP; DIP 2 {NIL int} ; PUSH bool True ;
               LOOP
                 { IF_CONS
                     { SWAP ;
-                      DIP{DUP ; DIIP{DUP} ; DIP{CMPLT} ; SWAP} ;
+                      DIP{DUP ; DIP 2 {DUP} ; DIP{CMPLT} ; SWAP} ;
                       SWAP ;
                       IF { DIP{SWAP ; DIP{CONS}} ; PUSH bool True}
                          { SWAP ; CONS ; PUSH bool False}}

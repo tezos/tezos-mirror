@@ -74,6 +74,10 @@ Client
   client command allowing to run a single Michelson instruction or a
   sequence of Michelson instructions on a given stack. (MR :gl:`!9935`)
 
+- The legacy unary macros for the ``DIP`` and ``DUP`` Michelson
+  instructions have been deprecated. Using them now displays a warning
+  message on stderr.
+
 Baker
 -----
 
