@@ -439,6 +439,7 @@ pub enum Instruction<'a> {
     Sha256,
     Sha3,
     Sha512,
+    Balance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

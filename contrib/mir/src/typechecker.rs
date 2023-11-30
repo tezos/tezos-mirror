@@ -1356,6 +1356,12 @@ pub(crate) fn typecheck_instruction<'a>(
             unexpected_micheline!()
         }
 
+        (App(BALANCE, [], _), ..) => {
+            stack.push(T::Mutez);
+            I::Balance
+        }
+        (App(BALANCE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5128,5 +5134,16 @@ mod typecheck_tests {
         test!(SHA256, Sha256);
         test!(SHA3, Sha3);
         test!(SHA512, Sha512);
+    }
+
+    #[test]
+    fn balance() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("BALANCE").unwrap(), &mut Ctx::default(), stk),
+            Ok(Balance)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Mutez]);
     }
 }

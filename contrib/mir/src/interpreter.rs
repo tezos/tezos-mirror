@@ -903,6 +903,10 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::sha512(msg)?)?;
             *msg = sha512(msg).to_vec();
         }
+        I::Balance => {
+            ctx.gas.consume(interpret_cost::BALANCE)?;
+            stack.push(V::Mutez(ctx.balance));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -3221,6 +3225,20 @@ mod interpreter_tests {
             Sha512;
             "00" => "b8244d028981d693af7b456af8efa4cad63d282e19ff14942c246e50d9351d22704a802a71c3580b6370de4ceb293c324a8423342557d4e5c38438f0e36910ee";
             "deadbeef" => "1284b2d521535196f22175d5f558104220a6ad7680e78b49fa6f20e57ea7b185d71ec1edb137e70eba528dedb141f5d2f8bb53149d262932b27cf41fed96aa7f";
+        );
+    }
+
+    #[test]
+    fn balance() {
+        let mut ctx = Ctx::default();
+        ctx.balance = 70;
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&vec![Balance], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Mutez(70),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::BALANCE + interpret_cost::INTERPRET_RET
         );
     }
 }
