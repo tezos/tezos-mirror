@@ -4,10 +4,11 @@
 #
 # SPDX-License-Identifier: MIT
 
-KERNELS=evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy.elf
+KERNELS=evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy risc-v-dummy.elf
 SDK_DIR=src/kernel_sdk
 RISC_V_SANDBOX_DIR=src/risc_v/sandbox
 RISC_V_INTERPRETER_DIR=src/risc_v/interpreter
+RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
 RISC_V_DUMMY_BM_DIR=src/risc_v/dummy_kernel_bm
 RISC_V_TESTS_DIR=src/risc_v/tests
 EVM_DIR=etherlink/kernel_evm
@@ -117,6 +118,10 @@ risc-v-dummy.elf:
 	@make -C ${RISC_V_DUMMY_BM_DIR} build
 	@ln -f ${RISC_V_DUMMY_BM_DIR}/target/riscv64gc-unknown-none-elf/release/risc-v-dummy-bm $@
 
+.PHONY: risc-v-dummy
+risc-v-dummy:
+	@make -C ${RISC_V_DUMMY_DIR} build
+
 .PHONY: risc-v-tests
 risc-v-tests:
 	@make -C ${RISC_V_TESTS_DIR} build
@@ -139,6 +144,7 @@ build-deps:
 	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
 	@make -C ${RISC_V_DUMMY_BM_DIR} build-deps
+	@make -C ${RISC_V_DUMMY_DIR} build-deps
 
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
@@ -150,6 +156,7 @@ test:
 	@make -C ${RISC_V_SANDBOX_DIR} test
 	@make -C ${RISC_V_INTERPRETER_DIR} test
 	@make -C ${RISC_V_DUMMY_BM_DIR} test
+	@make -C ${RISC_V_DUMMY_DIR} test
 	@make -C ${EVM_DIR} test
 	@make -C ${SEQUENCER_DIR} test
 	@make -C ${DEMO_DIR} test
@@ -160,6 +167,7 @@ check: build-dev-deps
 	@make -C ${RISC_V_SANDBOX_DIR} check
 	@make -C ${RISC_V_INTERPRETER_DIR} check
 	@make -C ${RISC_V_DUMMY_BM_DIR} check
+	@make -C ${RISC_V_DUMMY_DIR} check
 	@make -C ${EVM_DIR} check
 	@make -C ${SEQUENCER_DIR} check
 	@make -C ${DEMO_DIR} check
@@ -183,6 +191,7 @@ clean:
 	@make -C ${RISC_V_SANDBOX_DIR} clean
 	@make -C ${RISC_V_INTERPRETER_DIR} clean
 	@make -C ${RISC_V_DUMMY_BM_DIR} clean
+	@make -C ${RISC_V_DUMMY_DIR} clean
 	@make -C ${EVM_DIR} clean
 	@make -C ${SEQUENCER_DIR} clean
 	@make -C ${DEMO_DIR} clean

@@ -9,8 +9,8 @@ all: build test check
 build:
 	@cargo build --release --target=riscv64gc-unknown-hermit
 
-.PHONY: build-dev-deps
-build-dev-deps: build-deps
+.PHONY: build-deps
+build-deps:
 	@exec ./install-rust-std-hermit.sh
 	@rustup component add rustfmt clippy
 
