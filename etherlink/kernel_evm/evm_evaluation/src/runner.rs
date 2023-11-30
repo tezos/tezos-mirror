@@ -3,9 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use evm_execution::account_storage::{init_account_storage, EthereumAccount};
-use evm_execution::precompiles::precompile_set;
-use evm_execution::{run_transaction, Config};
+use evm_execution::account_storage::{
+    init_account_storage, EthereumAccount, EthereumAccountStorage,
+};
+use evm_execution::handler::ExecutionOutcome;
+use evm_execution::precompiles::{precompile_set, PrecompileBTreeMap};
+use evm_execution::{run_transaction, Config, EthereumError};
 
 use tezos_ethereum::block::BlockConstants;
 
@@ -21,7 +24,7 @@ use thiserror::Error;
 use crate::evalhost::EvalHost;
 use crate::fillers::process;
 use crate::helpers::construct_folder_path;
-use crate::models::{Env, FillerSource, SpecName, TestSuite, TestUnit};
+use crate::models::{Env, FillerSource, SpecName, Test, TestSuite, TestUnit};
 use crate::{write_host, Opt, ReportValue};
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
@@ -163,6 +166,59 @@ fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
     Ok(env)
 }
 
+fn execute_transaction(
+    host: &mut EvalHost,
+    evm_account_storage: &mut EthereumAccountStorage,
+    precompiles: &PrecompileBTreeMap<EvalHost>,
+    config: &Config,
+    unit: &TestUnit,
+    env: &mut Env,
+    test: &Test,
+) -> Result<Option<ExecutionOutcome>, EthereumError> {
+    let gas_limit = *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
+    let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
+    env.tx.gas_limit = gas_limit;
+    env.tx.data = unit
+        .transaction
+        .data
+        .get(test.indexes.data)
+        .unwrap()
+        .clone();
+    env.tx.value = *unit.transaction.value.get(test.indexes.value).unwrap();
+    env.tx.transact_to = unit.transaction.to;
+
+    let block_constants = BlockConstants {
+        gas_price: env.tx.gas_price,
+        number: env.block.number,
+        coinbase: env.block.coinbase.to_fixed_bytes().into(),
+        timestamp: env.block.timestamp,
+        gas_limit: env.block.gas_limit.as_u64(),
+        base_fee_per_gas: env.block.basefee,
+        chain_id: U256::from(1337),
+    };
+    let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
+    let caller = env.tx.caller.to_fixed_bytes().into();
+    let call_data = env.tx.data.to_vec();
+    let gas_limit = Some(env.tx.gas_limit);
+    let transaction_value = Some(env.tx.value);
+    let pay_for_gas = true; // always, for now
+
+    run_transaction(
+        host,
+        &block_constants,
+        evm_account_storage,
+        precompiles,
+        config.clone(),
+        address,
+        caller,
+        call_data,
+        gas_limit,
+        transaction_value,
+        pay_for_gas,
+        u64::MAX, // don't account for ticks during the test
+    )
+}
+
 pub fn run_test(
     path: &Path,
     report_map: &mut HashMap<String, ReportValue>,
@@ -186,7 +242,7 @@ pub fn run_test(
         let mut env = initialize_env(&unit)?;
 
         // post and execution
-        for (spec_name, tests) in unit.post {
+        for (spec_name, tests) in &unit.post {
             let config = match spec_name {
                 SpecName::Shanghai => Config::shanghai(),
                 // TODO: enable future configs when parallelization is enabled.
@@ -194,56 +250,15 @@ pub fn run_test(
                 _ => continue,
             };
 
-            for test_execution in tests.into_iter() {
-                let gas_limit = *unit
-                    .transaction
-                    .gas_limit
-                    .get(test_execution.indexes.gas)
-                    .unwrap();
-                let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
-                env.tx.gas_limit = gas_limit;
-                env.tx.data = unit
-                    .transaction
-                    .data
-                    .get(test_execution.indexes.data)
-                    .unwrap()
-                    .clone();
-                env.tx.value = *unit
-                    .transaction
-                    .value
-                    .get(test_execution.indexes.value)
-                    .unwrap();
-                env.tx.transact_to = unit.transaction.to;
-
-                let block_constants = BlockConstants {
-                    gas_price: env.tx.gas_price,
-                    number: env.block.number,
-                    coinbase: env.block.coinbase.to_fixed_bytes().into(),
-                    timestamp: env.block.timestamp,
-                    gas_limit: env.block.gas_limit.as_u64(),
-                    base_fee_per_gas: env.block.basefee,
-                    chain_id: U256::from(1337),
-                };
-                let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
-                let caller = env.tx.caller.to_fixed_bytes().into();
-                let call_data = env.tx.data.to_vec();
-                let gas_limit = Some(env.tx.gas_limit);
-                let transaction_value = Some(env.tx.value);
-                let pay_for_gas = true; // always, for now
-
-                let exec_result = run_transaction(
+            for test_execution in tests.iter() {
+                let exec_result = execute_transaction(
                     &mut host,
-                    &block_constants,
                     &mut evm_account_storage,
                     &precompiles,
-                    config.clone(),
-                    address,
-                    caller,
-                    call_data,
-                    gas_limit,
-                    transaction_value,
-                    pay_for_gas,
-                    u64::MAX, // don't account for ticks during the test
+                    &config,
+                    &unit,
+                    &mut env,
+                    test_execution,
                 );
 
                 match &exec_result {
@@ -291,7 +306,7 @@ pub fn run_test(
                 Some(filler_source) => process(
                     &mut host,
                     filler_source,
-                    &spec_name,
+                    spec_name,
                     report_map,
                     report_key.clone(),
                     output_file,
