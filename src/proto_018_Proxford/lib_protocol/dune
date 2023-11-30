@@ -314,7 +314,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw\"\nlet name = Tezos_protocol_environment_018_Proxford.Name.name\ninclude Tezos_raw_protocol_018_Proxford\ninclude Tezos_raw_protocol_018_Proxford.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4\"\nlet name = Tezos_protocol_environment_018_Proxford.Name.name\ninclude Tezos_raw_protocol_018_Proxford\ninclude Tezos_raw_protocol_018_Proxford.Main\n")))
 
 (rule
  (targets tezos_protocol_018_Proxford.ml)

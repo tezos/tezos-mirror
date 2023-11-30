@@ -28,6 +28,6 @@ let sub_bounded p1 p2 = Compare.Int.max 0 (p1 - p2)
 
 let p0 = 0
 
-let p7 = 7
+let p5 = 5
 
 let p50 = 50

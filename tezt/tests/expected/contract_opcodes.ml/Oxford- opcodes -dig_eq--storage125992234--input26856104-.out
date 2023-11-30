@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/dig_eq.tz on storage Unit and input '(Pair 2 (Pair 3 (Pair 12 (Pair 16 (Pair 10 (Pair 14 (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))' --level 1 --trace-stack
+./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/dig_eq.tz on storage Unit and input '(Pair 2 (Pair 3 (Pair 12 (Pair 16 (Pair 10 (Pair 14 (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))' --level 1 --trace-stack
 storage
   Unit
 emitted operations

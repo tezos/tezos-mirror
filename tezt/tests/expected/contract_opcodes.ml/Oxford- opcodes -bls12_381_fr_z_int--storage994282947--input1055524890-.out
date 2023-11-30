@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/bls12_381_fr_z_int.tz on storage 0x0100000000000000000000000000000000000000000000000000000000000000 and input 52435875175126190479447740508185965837690552500527637822603658699938581184514 --level 1 --trace-stack
+./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/bls12_381_fr_z_int.tz on storage 0x0100000000000000000000000000000000000000000000000000000000000000 and input 52435875175126190479447740508185965837690552500527637822603658699938581184514 --level 1 --trace-stack
 storage
   0x0100000000000000000000000000000000000000000000000000000000000000
 emitted operations

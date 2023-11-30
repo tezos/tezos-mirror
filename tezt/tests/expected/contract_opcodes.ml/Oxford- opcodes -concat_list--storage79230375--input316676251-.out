@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordZ2moBxbF2J2mfaLnN1NrdBfx1rrnaBbRzWdgs8Qcsyw --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_list.tz on storage '""' and input '{ "Hello" ; " " ; "World" ; "!" }' --level 1 --trace-stack
+./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_list.tz on storage '""' and input '{ "Hello" ; " " ; "World" ; "!" }' --level 1 --trace-stack
 storage
   "Hello World!"
 emitted operations

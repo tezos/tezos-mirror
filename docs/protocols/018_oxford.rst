@@ -266,7 +266,7 @@ Minor Changes
 
 - Slashing penalties for double-signing are now applied at the end of the cycle where denunciations were included, rather than immediately. The same applies for rewards allocated from denunciations. (MR :gl:`!10389`)
 
-- Double baking penalty is now 7% of the offending baker's stake -- instead of 10%. (MR :gl:`!10431`)
+- Double baking penalty is now 5% of the offending baker's stake -- instead of 10%. (MR :gl:`!10431`)
 
 Internal
 --------
