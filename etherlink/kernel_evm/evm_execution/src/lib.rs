@@ -729,15 +729,18 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(21000),
+            Some(22000),
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas = 21000 // base cost
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 21000,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
@@ -854,12 +857,12 @@ mod test {
         ];
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
-
+        let all_the_gas = 25_000;
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            21006.into(),
+            all_the_gas.into(),
         );
 
         // Act
@@ -872,15 +875,19 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(21006),
+            Some(all_the_gas),
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas = 21000 // base cost
+        + 6 // execution cost
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 21006,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
@@ -910,6 +917,7 @@ mod test {
             0u8,
             Opcode::REVERT.as_u8(),
         ];
+        let init_balance = 22_000;
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
 
@@ -917,7 +925,7 @@ mod test {
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            22000.into(),
+            init_balance.into(),
         );
 
         // Act
@@ -930,17 +938,19 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(22000),
+            Some(init_balance),
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
         );
 
-        let expected_gas_used = 21000 + 3 + 3; // Base Cost + PUHS1 + PUSH1, remaining gas is refunded
+        let expected_gas = 21000 // base cost
+        + 2 * 3 // execution cost (only push)
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
 
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: expected_gas_used,
+            gas_used: expected_gas,
             is_success: false,
             reason: ExitReason::Revert(ExitRevert::Reverted),
             new_address: None,
@@ -955,7 +965,9 @@ mod test {
         // Some gas is returned to the send after the transaction is reverted
         assert_eq!(
             get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
-            block.gas_price.saturating_mul(994.into())
+            block
+                .gas_price
+                .saturating_mul((init_balance - expected_gas).into())
         )
     }
 
@@ -1080,7 +1092,7 @@ mod test {
         let mut mock_runtime = MockHost::default();
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
-        let target = H160::from_low_u64_be(4u64);
+        let target = H160::from_low_u64_be(4u64); // identity contract
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118u64);
         let data = [1u8; 32]; // Need some data to make it a contract call
@@ -1108,9 +1120,13 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas = 21000 // base cost
+            + 18 // execution cost
+            + 32 * CONFIG.gas_transaction_non_zero_data; // transaction data cost
+
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 21018,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
@@ -1142,7 +1158,7 @@ mod test {
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            24001.into(),
+            35001.into(),
         );
 
         // Act
@@ -1155,7 +1171,7 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(24000),
+            Some(35000),
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1166,7 +1182,7 @@ mod test {
         let expected_address =
             "0000000000000000000000007156526fbd7a3c72969b54f64e42c10fbb768c8a";
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 24000,
+            gas_used: 25676,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
@@ -1349,10 +1365,16 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas = 21000 // base cost
+        + 65535 // staticcall allocated gas
+        + 6 * 3 // cost for push
+        + 100 // cost for staticcall
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         // Since we execute an invalid instruction (for a static call that is) we spend
-        // _all_ the gas.
+        // _all_ the gas allocated to the call (so 0xFFFF or 65535)
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 86653,
+            gas_used: expected_gas,
             is_success: false,
             reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
                 ExitError::InvalidCode(Opcode::SSTORE),
@@ -1438,10 +1460,16 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas = 21000 // base cost
+        + 65535 // staticcall allocated gas
+        + 6 * 3 // cost for push
+        + 100 // cost for staticcall
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         // Since we execute an invalid instruction (for a static call that is), we
         // expect to spend _all_ the gas.
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 86653,
+            gas_used: expected_gas,
             is_success: false,
             reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
                 ExitError::InvalidCode(Opcode::LOG0),
@@ -1560,8 +1588,12 @@ mod test {
             data: vec![1, 2, 3, 4, 5, 6, 7, 8],
         };
 
+        let expected_gas = 21000 // base cost
+        + 1348 // execution cost (taken at face value from tests)
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 22348,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
@@ -1662,8 +1694,12 @@ mod test {
             data: vec![0],
         };
 
+        let expected_gas = 21000 // base cost
+        + 911 // execution cost (taken at face value from tests)
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 21911,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
@@ -1752,9 +1788,11 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
         );
-
+        let expected_gas = 21000 // base cost
+        + 30124 // execution gas cost (taken at face value from tests)
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 51124,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
@@ -1877,7 +1915,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 9512509485,
+            estimated_ticks_used: 9511229485,
         }));
 
         assert_eq!(result, expected_result);
@@ -1917,17 +1955,19 @@ mod test {
         let caller = H160::from_low_u64_be(118u64);
         let data = [0u8; 32]; // Need some data to make it a call
         let code = vec![
-            Opcode::CHAINID.as_u8(),
-            Opcode::PUSH1.as_u8(), // push ost
+            Opcode::CHAINID.as_u8(), // cost 2
+            Opcode::PUSH1.as_u8(),   // push ost, cost 3
             0,
-            Opcode::MSTORE.as_u8(),
-            Opcode::PUSH1.as_u8(), // push len
+            Opcode::MSTORE.as_u8(), // cost 3, memory expansion cost 3
+            Opcode::PUSH1.as_u8(),  // push len, cost 3
             32,
-            Opcode::PUSH1.as_u8(), // push ost
+            Opcode::PUSH1.as_u8(), // push ost, cost 3
             0,
-            Opcode::RETURN.as_u8(),
+            Opcode::RETURN.as_u8(), // cost 0
         ];
-        let all_the_gas = 21_017_u64;
+
+        // value not relevant to test, must be big enough
+        let all_the_gas = 25_000_u64;
 
         set_balance(
             &mut mock_runtime,
@@ -1954,9 +1994,13 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas = 21000 // base cost
+        + 17 // execution cost
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 21017,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
@@ -1983,17 +2027,19 @@ mod test {
         let caller = H160::from_low_u64_be(118u64);
         let data = [0u8; 32]; // Need some data to make it a call
         let code = vec![
-            Opcode::BASEFEE.as_u8(),
-            Opcode::PUSH1.as_u8(), // push ost
+            Opcode::BASEFEE.as_u8(), // cost 2
+            Opcode::PUSH1.as_u8(),   // push ost, cost 3
             0,
-            Opcode::MSTORE.as_u8(),
-            Opcode::PUSH1.as_u8(), // push len
+            Opcode::MSTORE.as_u8(), // cost 3, memory expansion cost 3
+            Opcode::PUSH1.as_u8(),  // push len, cost 3
             32,
-            Opcode::PUSH1.as_u8(), // push ost
+            Opcode::PUSH1.as_u8(), // push ost, cost 3
             0,
             Opcode::RETURN.as_u8(),
         ];
-        let all_the_gas = 21_017_u64;
+
+        // value not relevant to test, just needs to be big enough
+        let all_the_gas = 25_000_u64;
 
         set_balance(
             &mut mock_runtime,
@@ -2020,9 +2066,13 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas = 21000 // base cost
+        + 17 // execution cost
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 21017,
+            gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             is_success: true,
             new_address: None,
@@ -2125,14 +2175,11 @@ mod test {
         assert!(result.is_success);
 
         // gas calculation
-        let base_cost = 21000;
-        // TODO: fix base cost and data cost, cf !10349
-        let base_create_cost = 0; // should be 32000
-        let tx_data_cost = 0; // should be 1220
-        let code_cost = 12600;
-        let init_cost = 42;
-        let expected_gas =
-            base_cost + base_create_cost + tx_data_cost + code_cost + init_cost;
+        let expected_gas = 21000 // base cost
+        + 32000 // create base cost
+        + 1220 // transaction data cost
+        + 12600 // code deposit cost
+        + 42; // init cost
 
         assert_eq!(expected_gas, result.gas_used);
     }
@@ -2148,8 +2195,7 @@ mod test {
         let caller = H160::from_low_u64_be(117);
         let transaction_value = U256::from(0);
         // data should result in failed contract creation
-        let data_str = "101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010";
-        let call_data: Vec<u8> = hex::decode(data_str).unwrap();
+        let create_data: Vec<u8> = vec![0x01; 32];
 
         // not testing gas_limit, should be big enough
         let gas_limit = 2_400_000;
@@ -2171,7 +2217,7 @@ mod test {
             CONFIG,
             callee,
             caller,
-            call_data,
+            create_data,
             Some(gas_limit),
             Some(transaction_value),
             true,
@@ -2185,14 +2231,10 @@ mod test {
         assert!(!result.is_success);
 
         // gas calculation
-        let base_cost = 21000;
-        // TODO: fix data cost, cf !10349
-        let base_create_cost = 0; // should be 32000
-        let tx_data_cost = 0; // should be 1280
-        let code_cost = 0; // no code is stored
-        let init_cost = 3; // creation should fail, so no code storing cost
-        let expected_gas =
-            base_cost + base_create_cost + tx_data_cost + code_cost + init_cost;
+        let expected_gas = 21000 // base cost
+        + 32000 // create cost
+        + 32 * CONFIG.gas_transaction_non_zero_data // transaction data cost
+        + 3; // init cost
 
         assert_eq!(expected_gas, result.gas_used);
     }
