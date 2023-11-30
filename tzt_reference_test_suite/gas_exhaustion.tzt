@@ -1,0 +1,5 @@
+# This is an infinite loop, whatever initial gas is given to the
+# interpreter to run this code, all gas will be consumed.
+input { Stack_elt bool True };
+code { LOOP { PUSH bool True }};
+output Gas_exhaustion
