@@ -7,9 +7,13 @@ Got output: { Stack_elt
 Expected: { Stack_elt operation (Transfer_tokens 20 5 "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" _) }
 
 tzt_reference_test_suite/transfertokens_00.tzt:
-At line 4 characters 16 to 72,
-Unexpected format for a description of other contracts. Expected a sequence of Contract <address> <ty>; got { Contract "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" unit }.
-Bad argument value for a smart contract address. Expected an address in base58 checked notation starting with 'KT1', but given 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx'
+Got output: { Stack_elt
+    operation
+    0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60000000105000002298c03ed7d454a101eb7022bc95f7e5f41ac7800 }
+Expected: { Stack_elt
+    operation
+    (Transfer_tokens Unit 5 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" _) }
+
 tzt_reference_test_suite/setdelegate_00.tzt:
 Got output: { Stack_elt
     operation
