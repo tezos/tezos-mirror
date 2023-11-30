@@ -29,7 +29,10 @@ module Uses : sig
       in its [~uses]. And when you declare a test with [~uses:[data]],
       the test checks, at the end, that [Uses.path data] was called.
       This helps to maintain the invariant that a test that uses a given file
-      has a given tag. *)
+      has a given tag.
+
+      Note that some uses are added by default to all tests.
+      See section {!section:default} below. *)
 
   (** Test dependencies. *)
   type t
@@ -45,6 +48,17 @@ module Uses : sig
 
   (** Get the tag of a test dependency. *)
   val tag : t -> string
+
+  (** {2:default Default Uses} *)
+
+  (** The following uses are added by default, but can be removed by specifying
+      [~uses_client:false] etc. *)
+
+  (** ["./octez-client"], with tag ["client"]. *)
+  val octez_client : t
+
+  (** ["./octez-admin-client"], with tag ["admin_client"]. *)
+  val octez_admin_client : t
 end
 
 module Test : sig
@@ -56,6 +70,8 @@ module Test : sig
     title:string ->
     tags:string list ->
     ?uses:Uses.t list ->
+    ?uses_client:bool ->
+    ?uses_admin_client:bool ->
     ?seed:seed ->
     (unit -> unit Lwt.t) ->
     unit
@@ -70,6 +86,8 @@ module Regression : sig
     title:string ->
     tags:string list ->
     ?uses:Uses.t list ->
+    ?uses_client:bool ->
+    ?uses_admin_client:bool ->
     ?file:string ->
     (unit -> unit Lwt.t) ->
     unit

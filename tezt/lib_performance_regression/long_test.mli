@@ -100,6 +100,8 @@ val register :
   title:string ->
   tags:string list ->
   ?uses:Uses.t list ->
+  ?uses_client:bool ->
+  ?uses_admin_client:bool ->
   ?team:string ->
   executors:executor list ->
   timeout:timeout ->

@@ -232,6 +232,8 @@ val register_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_client:bool ->
+  ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
   (t -> unit Lwt.t) ->
   t list ->
@@ -246,6 +248,8 @@ val register_long_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_client:bool ->
+  ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
   ?team:string ->
   executors:Long_test.executor list ->
@@ -264,6 +268,8 @@ val register_regression_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_client:bool ->
+  ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
   (t -> unit Lwt.t) ->
   t list ->
