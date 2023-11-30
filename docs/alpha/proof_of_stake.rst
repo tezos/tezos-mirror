@@ -192,6 +192,5 @@ found in the `whitepaper
 The adaptive issuance experimental feature :ref:`documentation <adaptive_issuance_oxford>`.
 
 Other presentations of the Tezos' proof-of-stake mechanism can be
-found in the `Tezos Agora wiki entry
-<https://wiki.tezosagora.org/learn/baking/proofofstake>`_ and
+found in the
 `Open Tezos entry <https://opentezos.com/tezos-basics/liquid-proof-of-stake/>`_.
