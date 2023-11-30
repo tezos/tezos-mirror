@@ -156,7 +156,7 @@ Here are a few tips and guidelines on using docstrings.
 
 - Docstrings in ``.mli`` and ``.ml`` files are handled the same, so do not omit documenting the interfaces in the latter files.
 
-For more information on using docstrings, see the ``odoc`` `documentation for library authors <https://ocaml.github.io/odoc/odoc/odoc_for_authors.html>`__.
+For more information on using docstrings, see the ``odoc`` `documentation for library authors <https://ocaml.github.io/odoc/odoc_for_authors.html>`__.
 
 Docstrings errors
 """""""""""""""""

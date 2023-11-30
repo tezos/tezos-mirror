@@ -76,8 +76,7 @@ voting operations:
   (``Pass``), when examining a protocol amendment proposal.
 
 Further details on each operation's implementation and semantics are
-provided in the dedicated entry for :ref:`on-chain
-governance<voting_operations_alpha>`.
+provided in the dedicated entry for :doc:`on-chain governance<voting>`.
 
 .. _anonymous_operations_alpha:
 
